@@ -1,3 +1,4 @@
+import type { SavedRun } from "./results";
 import { rateAt, validateProfile, type TrafficProfile } from "./workload";
 export type ComponentKind = "traffic" | "service" | "database" | "cache";
 export interface ModelNode {
@@ -41,6 +42,7 @@ export interface Project {
   updatedAt: number;
   /** Presentation only; never passed to the simulation engine. */
   expandedNodeIds?: string[];
+  savedRuns?: SavedRun[];
 }
 export const labels: Record<ComponentKind, string> = {
   traffic: "Traffic source",

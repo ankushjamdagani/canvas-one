@@ -1,3 +1,8 @@
+import {
+  MAX_SAVED_RUNS,
+  validateSavedRun,
+  type SavedRun,
+} from "../domain/results";
 import Dexie, { type EntityTable } from "dexie";
 import { clone, validateGraph, type Project } from "../domain/model";
 const db = new Dexie("system-studio");
@@ -10,7 +15,7 @@ export const repository = {
 };
 export function exportProject(project: Project) {
   return JSON.stringify(
-    { format: "system-studio", version: 2, project },
+    { format: "system-studio", version: 3, project },
     null,
     2,
   );
@@ -19,9 +24,9 @@ export function importProject(text: string): Project {
   if (text.length > 2_000_000)
     throw new Error("Project files must be smaller than 2 MB.");
   const data = JSON.parse(text);
-  if (data?.format !== "system-studio" || ![1, 2].includes(data.version))
+  if (data?.format !== "system-studio" || ![1, 2, 3].includes(data.version))
     throw new Error(
-      "Unsupported file. Choose a System studio version 1 or 2 JSON export.",
+      "Unsupported file. Choose a System studio version 1, 2 or 3 JSON export.",
     );
   const p = data.project;
   if (
@@ -52,6 +57,15 @@ export function importProject(text: string): Project {
     expanded.some((id: unknown) => typeof id !== "string")
   )
     throw new Error("Expanded component settings are invalid.");
+  const savedRuns = p.savedRuns ?? [];
+  if (!Array.isArray(savedRuns) || savedRuns.length > MAX_SAVED_RUNS)
+    throw new Error(
+      `A project can contain up to ${MAX_SAVED_RUNS} saved results.`,
+    );
+  for (const run of savedRuns) {
+    const problems = validateSavedRun(run);
+    if (problems.length) throw new Error(problems[0]);
+  }
   const v = p.viewport;
   if (
     !v ||
@@ -71,6 +85,11 @@ export function importProject(text: string): Project {
       id: crypto.randomUUID(),
     })),
     viewport: v,
+    savedRuns: savedRuns.map((run: SavedRun) => ({
+      ...clone(run),
+      id: crypto.randomUUID(),
+      origin: "imported" as const,
+    })),
     expandedNodeIds: [...new Set<string>(expanded)].filter((id) =>
       p.graph.nodes.some((n: { id: string }) => n.id === id),
     ),

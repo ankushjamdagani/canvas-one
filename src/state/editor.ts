@@ -1,3 +1,4 @@
+import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
 import { create } from "zustand";
 import {
   clone,
@@ -11,6 +12,10 @@ import {
 } from "../domain/model";
 interface Editor {
   project: Project;
+  saveRun: (run: SavedRun) => boolean;
+  renameRun: (id: string, name: string) => void;
+  deleteRun: (id: string) => void;
+  restoreRun: (id: string) => void;
   selected: string | null;
   past: Graph[];
   future: Graph[];
@@ -37,6 +42,41 @@ interface Editor {
 }
 export const useEditor = create<Editor>((set, get) => ({
   project: newProject(),
+  saveRun: (run) => {
+    const runs = get().project.savedRuns ?? [];
+    if (runs.some((r) => r.id === run.id)) return true;
+    if (runs.length >= MAX_SAVED_RUNS) return false;
+    set((s) => ({
+      project: {
+        ...s.project,
+        savedRuns: [...(s.project.savedRuns ?? []), clone(run)],
+        updatedAt: Date.now(),
+      },
+    }));
+    return true;
+  },
+  renameRun: (id, name) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        savedRuns: s.project.savedRuns?.map((r) =>
+          r.id === id ? { ...r, name: name.trim().slice(0, 80) || r.name } : r,
+        ),
+        updatedAt: Date.now(),
+      },
+    })),
+  deleteRun: (id) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        savedRuns: s.project.savedRuns?.filter((r) => r.id !== id),
+        updatedAt: Date.now(),
+      },
+    })),
+  restoreRun: (id) => {
+    const run = get().project.savedRuns?.find((r) => r.id === id);
+    if (run) get().change((g) => Object.assign(g, clone(run.graph)));
+  },
   selected: null,
   past: [],
   future: [],

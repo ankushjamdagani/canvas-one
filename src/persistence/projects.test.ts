@@ -51,6 +51,6 @@ it("preserves workload profiles and rejects malformed imported timing", () => {
   expect(() => importProject(exportProject(project))).toThrow("Burst");
 });
 
-it("marks exports with the workload-aware format version", () => {
-  expect(JSON.parse(exportProject(newProject())).version).toBe(2);
+it("marks exports with the result-aware format version", () => {
+  expect(JSON.parse(exportProject(newProject())).version).toBe(3);
 });
