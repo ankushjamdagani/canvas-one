@@ -83,3 +83,10 @@ To reproduce, copy `artifacts/performance-profile.test.ts.txt` to `src/simulatio
 ResultsPanel now loads on demand with an accessible loading state. Production entry JavaScript: 525.29 KB /166.92 KB gzip versus 530.38 KB /167.89 KB gzip before; deferred results chunk: 6.85 KB /2.48 KB gzip. Total JavaScript is not reduced and the 500 KB entry warning remains. No vendor splitting was used merely to hide that warning.
 
 Verification: 27 unit tests; 11 existing browser journeys; production results journeys plus a request-level check that ResultsPanel is fetched only after opening Saved runs. Production browser mode is available via `TEST_PRODUCTION=1 npm run test:e2e` after `npm run build`.
+
+
+## Milestone 8 — editable service parameters
+
+27 unit tests and 14 Chromium journeys pass; production build passes. The new service journeys verify drafts leave completed metrics intact, both settings apply/reset as one undo step, inspector changes synchronize, zero queue slots work, replay results retain their model through save/restore/reload, empty/fractional drafts are rejected, Escape/Cancel restore values, Backspace does not delete the node, and Enter applies. Mobile assertions verify the entire expanded service fits the canvas and the page does not overflow.
+
+Direct desktop/mobile screenshot inspection: `editable-service.png`, `editable-service-mobile.png`. Fields retain the existing docked design. Only service parameters are editable inside the canvas; concurrency and nested subsystems are not introduced. No independent visual review was performed for this scoped addition.

@@ -170,3 +170,10 @@ Live metrics place configured traffic above observed queue history. Both plots s
 Saved runs sit beside checkpoints in the library. A completed run offers an inline naming form. Selecting saved results opens a docked bottom panel, keeping the architecture visible above it. Native baseline/comparison selects lead into a measurement table and a shared-scale queue overlay: baseline amber, comparison teal. Workload matching and imported provenance appear beside the evidence; mismatched workloads suppress deltas.
 
 The desktop panel scrolls internally with a 460 px height cap. Canvas resizing reframes the graph with space reserved for its heading. Mobile keeps readable node scale and places the full results panel in document flow. Rename, restore and delete controls remain accessible below the measurements; deletion offers an inline undo action.
+
+
+## Editable service internals (milestone 8)
+
+The expanded service retains its queue, processor and observed counters. Two compact, labeled inputs below those measurements edit capacity and waiting slots. Apply changes commits both values in one action; Cancel/Escape discards the draft. A short note explains the run reset and Undo. Inputs inherit the workspace's fields, typography and focus treatment; canvas drag, pan and deletion keys do not intercept editing.
+
+Only service internals gain these controls. Database/cache views retain their view-only note. Mobile allocates 500 px to the canvas when service controls are present, preserving the readable 0.9 node scale and full access to inputs/actions. This is direct parameter editing, not nested graph editing.

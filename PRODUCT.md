@@ -20,7 +20,7 @@ An editable infinite canvas for frontend, backend and whole-system architecture.
 
 ## Capabilities and Constraints
 
-Seeded replay with steady, burst and linear-ramp workloads; bounded queues and request timeouts; explicit illustrative assumptions. Named local projects, autosave, checkpoints, versioned JSON import/export. No cloud sync. No need to restore an in-progress simulation. Expandable components reveal existing queues and processing on the same canvas. Named completed results persist locally, support matched-workload comparisons, and travel with version-3 JSON exports. Imported results retain an explicit provenance label. Editable nested subgraphs are future work; visual abstraction must never replace the simulation model silently.
+Seeded replay with steady, burst and linear-ramp workloads; bounded queues and request timeouts; explicit illustrative assumptions. Named local projects, autosave, checkpoints, versioned JSON import/export. No cloud sync. No need to restore an in-progress simulation. Expandable components reveal existing queues and processing on the same canvas. Expanded services support draft capacity/queue edits with atomic Apply, run reset and Undo; inspector and canvas settings stay synchronized. Named completed results persist locally, support matched-workload comparisons, and travel with version-3 JSON exports. Imported results retain an explicit provenance label. Editable nested subgraphs are future work; visual abstraction must never replace the simulation model silently.
 
 ## Brand Commitments
 

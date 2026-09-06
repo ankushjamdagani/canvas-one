@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUpRight, CornerDownRight } from "lucide-react";
+import { ServiceModelEditor } from "./ServiceModelEditor";
 import { profileLabel } from "../domain/workload";
 import type { ModelNode, Settings } from "../domain/model";
 import type { Metrics, NodeMetrics } from "../simulation/engine";
@@ -133,7 +134,11 @@ export function ComponentInternals({
         <span>Rejected here</span>
         <strong>{hasRun ? metrics?.rejected.toLocaleString() : "—"}</strong>
       </div>
-      <div className="internal-model-note">Same model · view only</div>
+      {node.kind === "service" ? (
+        <ServiceModelEditor node={node} />
+      ) : (
+        <div className="internal-model-note">Same model · view only</div>
+      )}
     </div>
   );
 }

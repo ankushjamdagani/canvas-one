@@ -1,6 +1,16 @@
 # Development handoff
 
-## Current milestone — measured simulation performance (7 September 2026)
+## Current milestone — editable service internals
+
+Expanded service nodes now edit processing capacity and queue slots directly on the canvas. Drafts leave the current run untouched. Apply changes/Enter validates and commits both values in one undo step, resetting the run through the existing model-change path. Cancel/Escape discards drafts. Inspector edits, Undo/Redo, project reload and saved-model restoration synchronize both fields. Saved runs remain immutable. Other component internals are unchanged.
+
+`src/components/ServiceModelEditor.tsx` owns local drafts and dispatches the existing `updateNode` action. No engine, domain or portable format changes. Mobile allocates 500 px to the canvas while service controls are expanded. This is parameter editing in the existing serial processor model; worker concurrency and nested graph editing remain future scope.
+
+Verification: 27 unit tests, 14 browser journeys and production build pass. New journeys cover draft isolation, atomic apply/reset/undo, inspector synchronization, saved result restoration/reload, native validation, keyboard editing and mobile bounds. Desktop/mobile screenshots inspected: `artifacts/editable-service.png`, `artifacts/editable-service-mobile.png`. Main entry approximately 527 KB /167 KB gzip; known size warning remains.
+
+Checkpoint: `git log -1`. Preview http://localhost:5173/. No push or deployment. Next suggested milestone: multiple processing workers with explicit concurrency semantics and deterministic tests.
+
+## Previous milestone — measured simulation performance (7 September 2026)
 
 Resumed from clean saved-results checkpoint `0d787bd`. Metrics snapshots merge newly sorted latencies into an existing index instead of sorting all responses repeatedly. Exact metrics and model version are preserved. A 120-second, 700 requests/s local paired profile reduced median computation from about 2612 ms to 387 ms; see artifacts/VERIFICATION.md for scope, measurements and reproduction. The index trades extra memory for CPU savings.
 

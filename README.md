@@ -52,6 +52,8 @@ Use a node's chevron, or **Show internals on canvas** in the inspector, to expan
 
 Expanding, collapsing and moving components do not restart or replace the simulation. Expanded views are saved with the project and included in JSON exports. Queue bars summarize occupancy; they are not individual queued requests. Busy/idle is a sampled state, while busy-time percentage is cumulative.
 
+Expanded **service** nodes also include capacity and queue-limit inputs. Type both values, then choose **Apply changes** (or press Enter). Applying makes one undoable model edit and resets the current run; drafting, canceling and expanding do not. Escape cancels a draft. Inspector edits, Undo/Redo and restored models synchronize the canvas fields. Capacity accepts 1–100,000 req/s; queue limits accept 0–10,000 whole waiting slots. Saved results keep their original models. Database and cache internals remain read-only on canvas and configurable in the inspector.
+
 Traffic dots run continuously on the browser's animation clock, pause/resume without losing their phase, and are disabled for reduced-motion preferences. Dots show direction, not request count or measured speed.
 
 ## Editing and persistence

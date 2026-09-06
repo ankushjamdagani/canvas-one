@@ -2158,3 +2158,45 @@ select:focus-visible {
     min-width: calc(50% - 5px);
   }
 }
+
+.service-model-editor {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.internal-edit-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.internal-edit-fields label {
+  min-width: 0;
+}
+.internal-edit-fields label > span {
+  display: block;
+  font-size: 9px;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+.internal-edit-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.internal-edit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.internal-edit-actions button {
+  padding: 7px 8px;
+  font-size: 10px;
+}
+@media (max-width: 560px) {
+  .canvas-area:has(.service-model-editor) {
+    height: 500px;
+    min-height: 500px;
+  }
+}
