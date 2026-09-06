@@ -1,3 +1,4 @@
+import { nextArrivalTime, rateAt } from "../domain/workload";
 import { validateGraph, type Graph, type ModelNode } from "../domain/model";
 export interface NodeMetrics {
   arrived: number;
@@ -11,11 +12,14 @@ export interface Sample {
   time: number;
   queue: number;
   completed: number;
+  generated: number;
+  arrivalRate: number;
   latency: number;
 }
 export interface Metrics {
   time: number;
   generated: number;
+  arrivalRate: number;
   succeeded: number;
   dropped: number;
   timedOut: number;
@@ -137,8 +141,11 @@ export class Simulation {
     this.heap.push({ ...event, seq: this.seq++ });
   }
   private scheduleArrival() {
-    const time =
-      this.time - Math.log(1 - this.rng()) / this.graph.settings.traffic;
+    const time = nextArrivalTime(
+      this.graph.settings,
+      this.time,
+      -Math.log(1 - this.rng()),
+    );
     if (time <= this.graph.settings.duration)
       this.schedule({ time, kind: "arrival" });
   }
@@ -236,6 +243,8 @@ export class Simulation {
         0,
       ),
       completed: this.succeeded,
+      generated: this.generated,
+      arrivalRate: rateAt(this.graph.settings, time),
       latency: this.latencies.length
         ? this.latencies.slice(-500).reduce((a, b) => a + b, 0) /
           Math.min(500, this.latencies.length)
@@ -266,6 +275,7 @@ export class Simulation {
     return {
       time: this.time,
       generated: this.generated,
+      arrivalRate: rateAt(this.graph.settings, this.time),
       succeeded: this.succeeded,
       dropped: this.dropped,
       timedOut: this.timedOut,

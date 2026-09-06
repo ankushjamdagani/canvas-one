@@ -1,3 +1,4 @@
+import { rateAt, validateProfile, type TrafficProfile } from "./workload";
 export type ComponentKind = "traffic" | "service" | "database" | "cache";
 export interface ModelNode {
   id: string;
@@ -18,6 +19,7 @@ export interface Settings {
   seed: number;
   duration: number;
   timeoutMs: number;
+  profile?: TrafficProfile;
 }
 export interface Graph {
   nodes: ModelNode[];
@@ -143,6 +145,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     errors.push("Experiment length must be between 1 and 120 seconds.");
   if (!Number.isFinite(s.timeoutMs) || s.timeoutMs < 10 || s.timeoutMs > 10000)
     errors.push("Timeout must be between 10 and 10,000 ms.");
+  errors.push(...validateProfile(s));
   if (edges.some((e) => !ids.has(e.source) || !ids.has(e.target)))
     errors.push("A connection references a missing component.");
   // Drafts are portable even before their topology can execute.
@@ -181,7 +184,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
   }
   return [...new Set(errors)];
 }
-export function expectedDatabaseRate(graph: Graph) {
+export function expectedDatabaseRate(graph: Graph, time = 0) {
   const cache = graph.nodes.find((n) => n.kind === "cache");
-  return graph.settings.traffic * (1 - (cache?.hitRate ?? 0) / 100);
+  return rateAt(graph.settings, time) * (1 - (cache?.hitRate ?? 0) / 100);
 }

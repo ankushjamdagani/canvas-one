@@ -103,6 +103,11 @@ export const useEditor = create<Editor>((set, get) => ({
   settings: (patch) =>
     get().change((g) => {
       Object.assign(g.settings, patch);
+      const profile = g.settings.profile;
+      if (patch.duration !== undefined && profile?.kind === "burst") {
+        profile.end = Math.min(profile.end, g.settings.duration);
+        profile.start = Math.min(profile.start, Math.max(0, profile.end - 0.1));
+      }
     }),
   add: (kind) => {
     const node = makeNode(
