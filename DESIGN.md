@@ -156,3 +156,10 @@ The compact 215 px node card retains its original footprint in the request path.
 Traffic connections use a persistent solid route plus small teal directional dots. A 1.2-second linear CSS loop travels one 24 px dash period and retains its phase through pause/resume. Renderer measurements are retained across worker updates so edges do not remount. The cue pauses on hidden pages and disappears under reduced-motion preferences or zero expected demand.
 
 On mobile, the introductory copy sits above a dedicated 380 px canvas area. Expanded cards are centered at readable scale, with no heading overlay on the revealed details. All expansion metadata belongs to project presentation, outside the simulation graph.
+
+
+## Workload controls (milestone 5)
+
+Traffic pattern is a three-button segmented choice in the existing inspector: Steady, Burst and Ramp. The selected control uses the existing soft-teal selection style. A compact configured-rate plot precedes the rate and timing inputs. Burst times share one row; mobile keeps rate fields full-width.
+
+Live metrics place configured traffic above observed queue history. Both plots stretch over the same time-axis width, with independent explicitly named vertical quantities. Configured rate is teal; queue length is amber. The comparison column explains burst recovery using observed counts, while cumulative latency remains clearly distinct from the final queue state. Edge labels and traffic cards show the instantaneous configured rate without altering animation phase.

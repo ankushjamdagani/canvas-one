@@ -53,3 +53,11 @@ The simulator supports a single linear URL lookup path; no nested submodels, bra
 - Root cause fixed: renderer measurements were missing from controlled-node updates, causing React Flow to clear handle bounds and remount connections. Measurements now remain in rendering state only.
 - Desktop and mobile expansion screenshots were inspected, including a regression assertion preventing heading overlap on narrow screens. See `expanded-database.png` and `expanded-mobile.png`.
 - Expansion reveals the existing model. Editable nested subgraphs remain future work.
+
+## Milestone 5 — changing workloads
+
+Twenty unit tests and nine Chromium journeys cover steady, burst and linear-ramp profiles, semantic workload comparison, local/checkpoint persistence, version-2 JSON exports and version-1 imports. The production build passes. Configured traffic and observed queue are plotted on aligned time axes.
+
+Default burst: seed 42, baseline 100/s, burst 700/s from 10–20 seconds, 30-second window. Observed 8,983 generated requests, 7,474 successes, 1,509 queue-full rejections, zero timed out and zero in flight at the end. Aggregate sampled queue peaked at 502 (across components) and drained to zero. Successful-response p95 was 1,010.4 ms. Cache replay generates the same arrivals and has no failures. These are illustrative simulation results, not hardware measurements.
+
+Screenshots: `burst-workload.png`, `ramp-mobile.png`.

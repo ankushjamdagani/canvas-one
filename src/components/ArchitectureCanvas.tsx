@@ -22,11 +22,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
-import {
-  expectedDatabaseRate,
-  type ModelNode,
-  type Settings,
-} from "../domain/model";
+import { type ModelNode, type Settings } from "../domain/model";
+import { rateAt } from "../domain/workload";
 import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
 import { TrafficEdge, type TrafficConnection } from "./TrafficEdge";
@@ -44,7 +41,7 @@ type ArchitectureNode = Node<
     hasRun: boolean;
     expanded: boolean;
     settings: Settings;
-    totals: Pick<Metrics, "generated" | "cacheHits"> | null;
+    totals: Pick<Metrics, "generated" | "cacheHits" | "arrivalRate"> | null;
   },
   "component"
 >;
@@ -190,18 +187,23 @@ export function ArchitectureCanvas({
         selected: editor.selected === n.id,
         data: {
           model: n,
-          rate: g.settings.traffic,
+          rate: rateAt(g.settings, metrics?.time ?? 0),
           metrics: metrics?.nodes[n.id],
           hasRun: !!metrics?.time,
           expanded: editor.project.expandedNodeIds?.includes(n.id) ?? false,
           settings: g.settings,
           totals: metrics
-            ? { generated: metrics.generated, cacheHits: metrics.cacheHits }
+            ? {
+                generated: metrics.generated,
+                cacheHits: metrics.cacheHits,
+                arrivalRate: metrics.arrivalRate,
+              }
             : null,
         },
       })),
     [g, editor.selected, editor.project.expandedNodeIds, metrics, dimensions],
   );
+  const expectedRate = rateAt(g.settings, metrics?.time ?? 0);
   const edges: TrafficConnection[] = useMemo(
     () =>
       g.edges.map((e) => {
@@ -214,8 +216,11 @@ export function ArchitectureCanvas({
             running: running && pageVisible,
             rate:
               target?.kind === "database"
-                ? expectedDatabaseRate(g)
-                : g.settings.traffic,
+                ? expectedRate *
+                  (1 -
+                    (g.nodes.find((n) => n.kind === "cache")?.hitRate ?? 0) /
+                      100)
+                : expectedRate,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -225,7 +230,7 @@ export function ArchitectureCanvas({
           },
         };
       }),
-    [g, selectedEdges, running, pageVisible],
+    [g, selectedEdges, running, pageVisible, expectedRate],
   );
   const onNodesChange: OnNodesChange<ArchitectureNode> = (changes) => {
     for (const change of changes) {

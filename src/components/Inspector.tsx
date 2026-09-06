@@ -10,45 +10,10 @@ import {
 import { useEditor } from "../state/editor";
 import { expectedDatabaseRate } from "../domain/model";
 import type { Metrics } from "../simulation/engine";
+import { NumberField } from "./NumberField";
+import { WorkloadControls } from "./WorkloadControls";
+import { rateAt, profileLabel } from "../domain/workload";
 import { icons } from "./ArchitectureCanvas";
-export function NumberField({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  unit,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  unit?: string;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <div className="input-unit">
-        <input
-          aria-label={label}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => {
-            if (e.target.value !== "")
-              onChange(Math.min(max, Math.max(min, Number(e.target.value))));
-          }}
-        />
-        {unit && <span>{unit}</span>}
-      </div>
-    </label>
-  );
-}
 export function Inspector({ metrics }: { metrics: Metrics | null }) {
   const editor = useEditor(),
     g = editor.project.graph,
@@ -68,14 +33,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
             spend their time.
           </p>
           <div className="section-rule" />
-          <NumberField
-            label="Incoming traffic"
-            value={g.settings.traffic}
-            min={1}
-            max={10000}
-            unit="req/s"
-            onChange={(v) => editor.settings({ traffic: v })}
-          />
+          <WorkloadControls />
           <NumberField
             label="Workload seed"
             value={g.settings.seed}
@@ -102,8 +60,8 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
           <div className="note">
             <Info size={16} />
             <p>
-              Same seed and traffic create the same arrivals. Model changes
-              reset the current run.
+              Same seed and workload profile create the same arrivals. Model
+              changes reset the current run.
             </p>
           </div>
           <h3>Inspect a component</h3>
@@ -116,7 +74,9 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
   const Icon = icons[n.kind],
     m = metrics?.nodes[n.id],
     demand =
-      n.kind === "database" ? expectedDatabaseRate(g) : g.settings.traffic,
+      n.kind === "database"
+        ? expectedDatabaseRate(g, metrics?.time ?? 0)
+        : rateAt(g.settings, metrics?.time ?? 0),
     overloaded = n.kind !== "traffic" && demand > n.capacity;
   return (
     <aside className="inspector">
@@ -162,14 +122,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
               />
             </label>
             {n.kind === "traffic" ? (
-              <NumberField
-                label="Incoming traffic"
-                min={1}
-                max={10000}
-                value={g.settings.traffic}
-                unit="req/s"
-                onChange={(v) => editor.settings({ traffic: v })}
-              />
+              <WorkloadControls />
             ) : (
               <>
                 <NumberField
@@ -235,7 +188,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                   {overloaded
                     ? `${Math.round(demand)} expected arrivals/s · ${n.capacity} capacity/s`
                     : n.kind === "traffic"
-                      ? `${g.settings.traffic} requests/s on average`
+                      ? profileLabel(g.settings)
                       : `${Math.round(demand)} expected arrivals/s`}
                 </p>
               </div>

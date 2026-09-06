@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUpRight, CornerDownRight } from "lucide-react";
+import { profileLabel } from "../domain/workload";
 import type { ModelNode, Settings } from "../domain/model";
 import type { Metrics, NodeMetrics } from "../simulation/engine";
 
@@ -12,7 +13,7 @@ export function ComponentInternals({
   node: ModelNode;
   settings: Settings;
   metrics?: NodeMetrics;
-  totals: Pick<Metrics, "generated" | "cacheHits"> | null;
+  totals: Pick<Metrics, "generated" | "cacheHits" | "arrivalRate"> | null;
   hasRun: boolean;
 }) {
   if (node.kind === "traffic")
@@ -25,14 +26,15 @@ export function ComponentInternals({
         <div className="internal-heading">Arrival generator</div>
         <div className="internal-generator">
           <strong>
-            {settings.traffic.toLocaleString()}
-            <small> req/s average</small>
+            {(totals?.arrivalRate ?? settings.traffic).toLocaleString(
+              undefined,
+              { maximumFractionDigits: 0 },
+            )}
+            <small> req/s expected now</small>
           </strong>
           <span>Poisson arrivals · seed {settings.seed}</span>
         </div>
-        <p className="internal-caption">
-          Irregular arrivals, repeatable workload.
-        </p>
+        <p className="internal-caption">{profileLabel(settings)}</p>
         <div className="internal-stat">
           <span>Generated so far</span>
           <strong>{hasRun ? totals?.generated.toLocaleString() : "—"}</strong>

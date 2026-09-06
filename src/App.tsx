@@ -31,6 +31,7 @@ import {
   exportProject,
   importProject,
 } from "./persistence/projects";
+import { profileLabel } from "./domain/workload";
 import { useSimulation } from "./simulation/useSimulation";
 import { ArchitectureCanvas, icons } from "./components/ArchitectureCanvas";
 import { Inspector } from "./components/Inspector";
@@ -337,25 +338,43 @@ export default function App() {
                 </strong>
                 <span>
                   {simulation.running
-                    ? "4× playback · all metrics use simulated time"
+                    ? `4× playback · ${profileLabel(graph.settings)}`
                     : "Run the baseline, raise the traffic, then give the database some help."}
                 </span>
               </div>
             </div>
             <div className="scenario-actions">
               <button
-                className={graph.settings.traffic === 100 ? "active" : ""}
+                className={
+                  graph.settings.traffic === 100 &&
+                  (!graph.settings.profile ||
+                    graph.settings.profile.kind === "steady")
+                    ? "active"
+                    : ""
+                }
                 onClick={() => {
-                  editor.settings({ traffic: 100 });
+                  editor.settings({
+                    traffic: 100,
+                    profile: { kind: "steady" },
+                  });
                   editor.select(null);
                 }}
               >
                 100 req/s
               </button>
               <button
-                className={graph.settings.traffic === 700 ? "active" : ""}
+                className={
+                  graph.settings.traffic === 700 &&
+                  (!graph.settings.profile ||
+                    graph.settings.profile.kind === "steady")
+                    ? "active"
+                    : ""
+                }
                 onClick={() => {
-                  editor.settings({ traffic: 700 });
+                  editor.settings({
+                    traffic: 700,
+                    profile: { kind: "steady" },
+                  });
                   editor.select(
                     graph.nodes.find((n) => n.kind === "database")?.id ?? null,
                   );
@@ -484,8 +503,9 @@ export default function App() {
           <dl>
             <dt>Arrival pattern</dt>
             <dd>
-              Seeded Poisson arrivals at your average request rate. Replay
-              preserves every arrival when seed and traffic stay the same.
+              Seeded Poisson arrivals follow the configured steady, burst or
+              linear-ramp rate. Replay preserves every arrival when seed and the
+              complete traffic profile stay the same.
             </dd>
             <dt>Processing & queues</dt>
             <dd>

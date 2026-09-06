@@ -28,9 +28,29 @@ it("preserves unfinished editable graph drafts in portable exports", () => {
 });
 it("roundtrips expanded views while preserving version 1 compatibility", () => {
   const project = newProject();
-  expect(importProject(exportProject(project)).expandedNodeIds).toEqual([]);
+  const legacy = JSON.parse(exportProject(project));
+  legacy.version = 1;
+  expect(importProject(JSON.stringify(legacy)).expandedNodeIds).toEqual([]);
   project.expandedNodeIds = [project.graph.nodes[2].id];
   expect(importProject(exportProject(project)).expandedNodeIds).toEqual(
     project.expandedNodeIds,
   );
+});
+it("preserves workload profiles and rejects malformed imported timing", () => {
+  const project = newProject();
+  project.graph.settings.profile = {
+    kind: "burst",
+    peakRate: 700,
+    start: 10,
+    end: 20,
+  };
+  expect(importProject(exportProject(project)).graph.settings).toEqual(
+    project.graph.settings,
+  );
+  project.graph.settings.profile.end = 100;
+  expect(() => importProject(exportProject(project))).toThrow("Burst");
+});
+
+it("marks exports with the workload-aware format version", () => {
+  expect(JSON.parse(exportProject(newProject())).version).toBe(2);
 });

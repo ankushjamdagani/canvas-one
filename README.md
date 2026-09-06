@@ -22,6 +22,18 @@ Open http://localhost:5173. Production build: `npm run build`.
 
 Pause/resume preserves simulation state; Reset starts from the seed. Changing model parameters starts a fresh run. Moving/renaming nodes does not change the simulation model.
 
+## Try changing traffic over time
+
+Select empty canvas space (or configure the traffic source), then choose **Steady**, **Burst**, or **Ramp** under Traffic pattern.
+
+- **Steady** keeps a fixed average request rate.
+- **Burst** uses the baseline rate, switches to a configured burst rate between its start/end times, then returns to baseline. Defaults: 100 → 700 → 100 requests/s, from 10–20 seconds in a 30-second run.
+- **Ramp** changes the arrival rate linearly from starting to ending traffic over the complete run. Increasing and decreasing ramps are supported.
+
+The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
+
+Profiles save with local projects and checkpoints. JSON exports now use **version 2** to mark the new workload semantics; version-1 imports still work. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+
 ## Reveal the model
 
 Use a node's chevron, or **Show internals on canvas** in the inspector, to expand it. The same canvas reveals:
@@ -49,7 +61,7 @@ No cloud synchronization or remote account is involved. Export JSON to preserve 
 This is a learning model, not a hardware benchmark or architecture sizing tool.
 
 - One supported request path: traffic → service → optional cache → database.
-- Poisson arrivals from a deterministic seed. Cache outcomes use a separate per-request deterministic draw, so adding the cache does not perturb arrivals.
+- Poisson arrivals from a deterministic seed, following the configured steady, burst or linear-ramp rate. Integrated arrival intensity is inverted analytically; unused exponential hazard is carried across burst boundaries, without fixed time-step approximations. Cache outcomes use a separate per-request deterministic draw, so adding the cache does not perturb arrivals.
 - One effective serial server per component; processing time is `1 / capacity`. Service defaults to 2,000 requests/s; database 500; cache 5,000.
 - FIFO waiting queues default to 500 slots. Queue limits exclude the actively processed request. Full queues reject new arrivals.
 - A global deadline defaults to 2,000 ms and includes a fixed 8 ms response overhead. An expired queued request is skipped. Already-processing expired work still consumes capacity until it completes, but never becomes a successful response.

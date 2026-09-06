@@ -10,7 +10,7 @@ export const repository = {
 };
 export function exportProject(project: Project) {
   return JSON.stringify(
-    { format: "system-studio", version: 1, project },
+    { format: "system-studio", version: 2, project },
     null,
     2,
   );
@@ -19,9 +19,9 @@ export function importProject(text: string): Project {
   if (text.length > 2_000_000)
     throw new Error("Project files must be smaller than 2 MB.");
   const data = JSON.parse(text);
-  if (data?.format !== "system-studio" || data.version !== 1)
+  if (data?.format !== "system-studio" || ![1, 2].includes(data.version))
     throw new Error(
-      "Unsupported file. Choose a System studio version 1 JSON export.",
+      "Unsupported file. Choose a System studio version 1 or 2 JSON export.",
     );
   const p = data.project;
   if (
