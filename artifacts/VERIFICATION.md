@@ -70,3 +70,16 @@ Screenshots: `burst-workload.png`, `ramp-mobile.png`.
 Direct screenshot inspection found graph clipping when the results dock reduced canvas height. Resize-aware framing resolves this; a browser assertion checks all nodes remain within the canvas. Desktop and mobile evidence: `saved-comparison.png`, `saved-results-mobile.png`. This milestone used direct visual QA, not an additional independent review.
 
 Saved results are manual, capped at 20 per project without eviction, and imported data is not rerun or authenticated. The main production chunk is approximately 530 KB minified /168 KB gzip.
+
+
+## Milestone 7 — simulation profiling and deferred results (7 September 2026)
+
+Incremental snapshots now sort only newly completed latencies and merge them with an existing sorted index. Percentile values and the order of floating-point summation remain exact; unchanged snapshots reuse their statistics. This adds one numeric index entry per successful response and a transient merge array, trading additional memory for less repeated sorting. The model version and exported metrics format do not change.
+
+Local CPU profile: 700 requests/s, seed 42, baseline no-cache graph, 120 simulated seconds, snapshots every 0.5 seconds. Four paired runs compared the prior engine at `0d787bd` with the new engine. Measured old times: 2681.85, 2592.23, 2631.65, 2591.28 ms; new: 389.38, 384.42, 389.25, 380.21 ms. Median improved from approximately 2612 ms to 387 ms (about 85%). These are local computation timings, excluding worker transport/rendering, not device or frame-rate guarantees. Exact final-metrics comparison passed on all four pairs. The profiling harness timeout was raised from 5 to 60 seconds to accommodate both engines; its completed verification then passed.
+
+To reproduce, copy `artifacts/performance-profile.test.ts.txt` to `src/simulation/performance.test.ts`, write `git show 0d787bd:src/simulation/engine.ts` to `src/simulation/engine.before.ts`, and run `npx vitest run src/simulation/performance.test.ts`. Remove those two temporary source files afterward. The retained regular regression compares irregular incremental snapshots and repeat reads against direct runs at low, baseline and overload traffic.
+
+ResultsPanel now loads on demand with an accessible loading state. Production entry JavaScript: 525.29 KB /166.92 KB gzip versus 530.38 KB /167.89 KB gzip before; deferred results chunk: 6.85 KB /2.48 KB gzip. Total JavaScript is not reduced and the 500 KB entry warning remains. No vendor splitting was used merely to hide that warning.
+
+Verification: 27 unit tests; 11 existing browser journeys; production results journeys plus a request-level check that ResultsPanel is fetched only after opening Saved runs. Production browser mode is available via `TEST_PRODUCTION=1 npm run test:e2e` after `npm run build`.

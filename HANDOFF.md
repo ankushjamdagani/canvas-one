@@ -1,6 +1,16 @@
 # Development handoff
 
-## Current milestone — saved experiment results (7 September 2026)
+## Current milestone — measured simulation performance (7 September 2026)
+
+Resumed from clean saved-results checkpoint `0d787bd`. Metrics snapshots merge newly sorted latencies into an existing index instead of sorting all responses repeatedly. Exact metrics and model version are preserved. A 120-second, 700 requests/s local paired profile reduced median computation from about 2612 ms to 387 ms; see artifacts/VERIFICATION.md for scope, measurements and reproduction. The index trades extra memory for CPU savings.
+
+Saved-results code loads when its panel opens, with an accessible loading state. Initial JS is 525.29 KB /166.92 KB gzip, plus 6.85 KB /2.48 KB gzip deferred results. The entry-size warning remains; no claim of measured frame-rate or real-device improvement.
+
+Verification: 27 unit tests, 11 existing browser journeys, and three production saved-results journeys including deferred-network-loading coverage. Build passes. `TEST_PRODUCTION=1 npm run test:e2e` uses a local production preview on port 5174 after building. Preview for normal development remains http://localhost:5173/.
+
+Final checkpoint: `git log -1`. No push or deployment. Next product scope is still editable nested subgraphs or additional supported request paths; these need explicit simulation semantics. Current expanded internals remain presentation-only.
+
+## Previous milestone — saved experiment results (7 September 2026)
 
 Resumed after the usage reset from clean completed workload checkpoint `3041861`. Named completed experiments now preserve their immutable starting graph, full workload, metrics/history, model version and provenance. A docked results panel compares saved runs, reports model changes and suppresses deltas for mismatched workloads. Local autosave and version-3 JSON exports include results; imports accept versions 1, 2 and 3. Imported results are explicitly labeled and have not been rerun. Validation checks structure/accounting, not authenticity.
 

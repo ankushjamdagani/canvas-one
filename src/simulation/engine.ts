@@ -85,6 +85,8 @@ export class Simulation {
   private timedOut = 0;
   private hits = 0;
   private latencies: number[] = [];
+  private sortedLatencies: number[] = [];
+  private meanLatency = 0;
   private history: Sample[] = [];
   private nextSample = 1;
   constructor(private graph: Graph) {
@@ -221,7 +223,29 @@ export class Simulation {
     });
   }
   snapshot(): Metrics {
-    const sorted = [...this.latencies].sort((a, b) => a - b);
+    // Preserve exact percentile and floating-point summation semantics while
+    // sorting only the responses completed since the previous snapshot.
+    if (this.sortedLatencies.length !== this.latencies.length) {
+      const added = this.latencies
+        .slice(this.sortedLatencies.length)
+        .sort((a, b) => a - b);
+      const prior = this.sortedLatencies;
+      const merged = new Array<number>(prior.length + added.length);
+      let i = 0,
+        j = 0,
+        total = 0;
+      for (let k = 0; k < merged.length; k++) {
+        const value =
+          j === added.length || (i < prior.length && prior[i] <= added[j])
+            ? prior[i++]
+            : added[j++];
+        merged[k] = value;
+        total += value;
+      }
+      this.sortedLatencies = merged;
+      this.meanLatency = total / merged.length;
+    }
+    const sorted = this.sortedLatencies;
     const nodes = Object.fromEntries(
       this.stages.map((s) => [
         s.node.id,
@@ -250,9 +274,7 @@ export class Simulation {
       timedOut: this.timedOut,
       inFlight: this.generated - this.succeeded - this.dropped - this.timedOut,
       throughput: this.time ? this.succeeded / this.time : 0,
-      meanLatency: sorted.length
-        ? sorted.reduce((a, b) => a + b, 0) / sorted.length
-        : 0,
+      meanLatency: this.meanLatency,
       p95Latency: sorted.length
         ? sorted[Math.ceil(sorted.length * 0.95) - 1]
         : 0,

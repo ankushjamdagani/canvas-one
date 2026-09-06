@@ -76,3 +76,16 @@ describe("discrete-event request model", () => {
     expect(validateGraph(g).join()).toContain("Traffic");
   });
 });
+
+it("retains exact latency statistics across irregular snapshots and repeat reads", () => {
+  for (const traffic of [1, 100, 700]) {
+    const g = graph(traffic, true);
+    const incremental = new Simulation(g);
+    for (const time of [0, 0.1, 0.7, 2, 6.3, 15, 30]) {
+      const observed = incremental.advance(time);
+      const direct = new Simulation(g).advance(time);
+      expect(observed).toEqual(direct);
+      expect(incremental.snapshot()).toEqual(observed);
+    }
+  }
+});

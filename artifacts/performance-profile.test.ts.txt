@@ -1,0 +1,19 @@
+import { it, expect } from 'vitest';
+import { baseline } from '../domain/model';
+import { Simulation } from './engine';
+import { Simulation as Before } from './engine.before';
+it('profiles complete incremental replay and checks exact metrics', () => {
+  const g = baseline(); g.settings.traffic = 700; g.settings.duration = 120;
+  const timings: Record<string, number[]> = {before: [], after: []};
+  for (let round = 0; round < 4; round++) {
+    const outputs = [];
+    for (const [name, Model] of [['before', Before], ['after', Simulation]] as const) {
+      const sim = new Model(g); const started = performance.now();
+      let result;
+      for (let t = .5; t <= 120; t += .5) result = sim.advance(t);
+      timings[name].push(performance.now() - started); outputs.push(result);
+    }
+    expect(outputs[1]).toEqual(outputs[0]);
+  }
+  console.log(JSON.stringify(timings));
+}, 60000);

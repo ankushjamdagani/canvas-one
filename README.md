@@ -94,8 +94,12 @@ npm test
 npm run build
 npx playwright install chromium
 npm run test:e2e
+# Verify built assets with a separate local preview:
+TEST_PRODUCTION=1 npm run test:e2e
 ```
 
 Simulation tests cover baseline, overload, exact accounting, timeout cancellation, deterministic replay, chunk equivalence, cache demand reduction, zero queue slots and unsupported graphs. Browser journeys cover full experiments, pause/reset, local reopen, checkpoint restoration, import/export, invalid-graph repair, viewport persistence, connections and narrow-screen access.
 
 Exact stable package versions are pinned in `package.json` and `package-lock.json`. `HANDOFF.md` records milestone commits, measured verification and concrete continuation steps. No remote push or deployment has been performed.
+
+Metrics updates retain exact latency statistics using incremental sorted merges. Saved-results UI code loads when opened. Measured performance and the memory tradeoff are documented in `artifacts/VERIFICATION.md`; no real-device frame-rate claim is made.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
   Play,
@@ -36,7 +36,11 @@ import { profileLabel } from "./domain/workload";
 import { useSimulation } from "./simulation/useSimulation";
 import { ArchitectureCanvas, icons } from "./components/ArchitectureCanvas";
 import { Inspector } from "./components/Inspector";
-import { ResultsPanel } from "./components/ResultsPanel";
+const ResultsPanel = lazy(() =>
+  import("./components/ResultsPanel").then((module) => ({
+    default: module.ResultsPanel,
+  })),
+);
 import { createSavedRun, defaultRunName } from "./domain/results";
 import { MetricsPanel } from "./components/MetricsPanel";
 export default function App() {
@@ -519,18 +523,30 @@ export default function App() {
           )}
         </div>
         {resultsOpen ? (
-          <ResultsPanel
-            key={project.id}
-            selectedId={selectedResult}
-            onClose={() => setResultsOpen(false)}
-            onRestore={(id) => {
-              editor.restoreRun(id);
-              setResultsOpen(false);
-              setNotice(
-                "Saved model and workload restored. Run to replay; Undo returns to your previous canvas.",
-              );
-            }}
-          />
+          <Suspense
+            fallback={
+              <section
+                className="results-panel"
+                role="status"
+                aria-label="Saved experiment results"
+              >
+                Loading saved results…
+              </section>
+            }
+          >
+            <ResultsPanel
+              key={project.id}
+              selectedId={selectedResult}
+              onClose={() => setResultsOpen(false)}
+              onRestore={(id) => {
+                editor.restoreRun(id);
+                setResultsOpen(false);
+                setNotice(
+                  "Saved model and workload restored. Run to replay; Undo returns to your previous canvas.",
+                );
+              }}
+            />
+          </Suspense>
         ) : (
           <MetricsPanel
             metrics={simulation.metrics}

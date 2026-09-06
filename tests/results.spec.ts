@@ -144,3 +144,18 @@ test("exports stored metrics with provenance and supports delete undo on mobile"
     fullPage: true,
   });
 });
+
+
+test("saved results code loads only when the panel is opened", async ({ page }) => {
+  const modules: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/ResultsPanel")) modules.push(request.url());
+  });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeEnabled();
+  expect(modules).toHaveLength(0);
+  await page.getByRole("button", { name: /Saved runs/ }).click();
+  await expect(page.getByRole("region", { name: "Saved experiment results" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Close saved results" })).toBeVisible();
+  expect(modules.length).toBeGreaterThan(0);
+});
