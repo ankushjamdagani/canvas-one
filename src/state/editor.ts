@@ -17,6 +17,7 @@ interface Editor {
   revision: number;
   load: (p: Project) => void;
   select: (id: string | null) => void;
+  toggleExpanded: (id: string) => void;
   change: (fn: (g: Graph) => void) => void;
   updateNode: (id: string, patch: Partial<ModelNode>) => void;
   settings: (patch: Partial<Settings>) => void;
@@ -49,6 +50,21 @@ export const useEditor = create<Editor>((set, get) => ({
       revision: s.revision + 1,
     })),
   select: (selected) => set({ selected }),
+  toggleExpanded: (id) =>
+    set((s) => {
+      if (!s.project.graph.nodes.some((n) => n.id === id)) return {};
+      const expanded = s.project.expandedNodeIds ?? [];
+      return {
+        selected: id,
+        project: {
+          ...s.project,
+          expandedNodeIds: expanded.includes(id)
+            ? expanded.filter((value) => value !== id)
+            : [...expanded, id],
+          updatedAt: Date.now(),
+        },
+      };
+    }),
   change: (fn) =>
     set((s) => {
       const graph = clone(s.project.graph);

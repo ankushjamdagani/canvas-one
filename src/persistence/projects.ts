@@ -45,6 +45,13 @@ export function importProject(text: string): Project {
     errors.push(...validateGraph(checkpoint.graph, false));
   }
   if (errors.length) throw new Error(errors[0]);
+  const expanded = p.expandedNodeIds ?? [];
+  if (
+    !Array.isArray(expanded) ||
+    expanded.length > 100 ||
+    expanded.some((id: unknown) => typeof id !== "string")
+  )
+    throw new Error("Expanded component settings are invalid.");
   const v = p.viewport;
   if (
     !v ||
@@ -64,6 +71,9 @@ export function importProject(text: string): Project {
       id: crypto.randomUUID(),
     })),
     viewport: v,
+    expandedNodeIds: [...new Set<string>(expanded)].filter((id) =>
+      p.graph.nodes.some((n: { id: string }) => n.id === id),
+    ),
     updatedAt: Date.now(),
   };
 }

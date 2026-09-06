@@ -5,6 +5,7 @@ import {
   Trash2,
   TriangleAlert,
   SlidersHorizontal,
+  ScanLine,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
 import { expectedDatabaseRate } from "../domain/model";
@@ -139,6 +140,15 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
         </button>
       </div>
       <div className="inspector-body">
+        <button
+          className="inspect-internals"
+          onClick={() => editor.toggleExpanded(n.id)}
+        >
+          <ScanLine size={16} />
+          {editor.project.expandedNodeIds?.includes(n.id)
+            ? "Hide internals on canvas"
+            : "Show internals on canvas"}
+        </button>
         {tab === "configuration" ? (
           <>
             <label className="field">
@@ -293,7 +303,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
       </div>
       <div className="inspector-bottom">
         <Info size={14} />
-        <span>Black box · one explicit processing model</span>
+        <span>One model · expand to inspect</span>
       </div>
     </aside>
   );

@@ -147,3 +147,12 @@ Controls and inputs use 6px corners, tags 4px, experiment guides 8px, nodes 9px 
 - Don't shrink the entire mobile graph to fit at the expense of readable labels.
 - Don't present predicted database arrivals or configured capacities as measured results.
 - Don't silently replace the explicit processing model with visual abstraction.
+
+
+## Expandable component detail (milestone 4)
+
+The compact 215 px node card retains its original footprint in the request path. A small right-hand chevron expands it downward, keeping connection handles at the header's 39 px center. The inspector offers the same action explicitly. Details reveal the existing model rather than introduce a new one: ten aggregate queue-occupancy segments, one processing slot, sampled state, fixed processing time and relevant counters. Cache branching labels describe configured hit/miss probabilities. A quiet “Same model · view only” footer preserves the distinction.
+
+Traffic connections use a persistent solid route plus small teal directional dots. A 1.2-second linear CSS loop travels one 24 px dash period and retains its phase through pause/resume. Renderer measurements are retained across worker updates so edges do not remount. The cue pauses on hidden pages and disappears under reduced-motion preferences or zero expected demand.
+
+On mobile, the introductory copy sits above a dedicated 380 px canvas area. Expanded cards are centered at readable scale, with no heading overlay on the revealed details. All expansion metadata belongs to project presentation, outside the simulation graph.

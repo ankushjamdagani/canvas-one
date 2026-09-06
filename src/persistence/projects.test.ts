@@ -26,3 +26,11 @@ it("preserves unfinished editable graph drafts in portable exports", () => {
   project.graph.edges = [];
   expect(importProject(exportProject(project)).graph).toEqual(project.graph);
 });
+it("roundtrips expanded views while preserving version 1 compatibility", () => {
+  const project = newProject();
+  expect(importProject(exportProject(project)).expandedNodeIds).toEqual([]);
+  project.expandedNodeIds = [project.graph.nodes[2].id];
+  expect(importProject(exportProject(project)).expandedNodeIds).toEqual(
+    project.expandedNodeIds,
+  );
+});

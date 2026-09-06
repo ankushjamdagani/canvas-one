@@ -43,3 +43,13 @@ The simulator supports a single linear URL lookup path; no nested submodels, bra
 | Mobile checkpoint access | Resolved |
 | Heading spacing | Resolved |
 | Faint secondary captions | Resolved |
+
+## Milestone 4 — expansion and continuous motion
+
+- Twelve unit tests and seven Chromium journeys pass; production build passes.
+- Expanding/collapsing the database during a paused run preserves the displayed metrics and resumes the same worker. Its final seeded overload totals remain 5,346 rejections and 499 queued requests.
+- Expanded views persist through browser reopen and JSON export/import, with old version-1 exports supported.
+- Browser animation-clock assertions verify continuous progress across worker samples, stable phase during pause, continued phase after resume and reduced-motion suppression. No measured frame-rate claim is made.
+- Root cause fixed: renderer measurements were missing from controlled-node updates, causing React Flow to clear handle bounds and remount connections. Measurements now remain in rendering state only.
+- Desktop and mobile expansion screenshots were inspected, including a regression assertion preventing heading overlap on narrow screens. See `expanded-database.png` and `expanded-mobile.png`.
+- Expansion reveals the existing model. Editable nested subgraphs remain future work.

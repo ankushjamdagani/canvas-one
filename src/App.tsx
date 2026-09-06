@@ -477,8 +477,9 @@ export default function App() {
             </button>
           </div>
           <p>
-            An educational model for understanding cause and effect. Capacities
-            are illustrative, not real hardware measurements.
+            An educational model for understanding cause and effect. Moving dots
+            show direction, not individual requests or measured speed.
+            Capacities are illustrative, not real hardware measurements.
           </p>
           <dl>
             <dt>Arrival pattern</dt>

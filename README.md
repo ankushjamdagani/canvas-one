@@ -22,6 +22,18 @@ Open http://localhost:5173. Production build: `npm run build`.
 
 Pause/resume preserves simulation state; Reset starts from the seed. Changing model parameters starts a fresh run. Moving/renaming nodes does not change the simulation model.
 
+## Reveal the model
+
+Use a node's chevron, or **Show internals on canvas** in the inspector, to expand it. The same canvas reveals:
+
+- Traffic: the seeded Poisson generator and observed arrival count.
+- Service/database: bounded FIFO queue occupancy, one processing slot, processing time, sampled busy/idle state and processed/rejected counts.
+- Cache: the same queue and processing details plus configured hit/miss routing and observed hits.
+
+Expanding, collapsing and moving components do not restart or replace the simulation. Expanded views are saved with the project and included in JSON exports. Queue bars summarize occupancy; they are not individual queued requests. Busy/idle is a sampled state, while busy-time percentage is cumulative.
+
+Traffic dots run continuously on the browser's animation clock, pause/resume without losing their phase, and are disabled for reduced-motion preferences. Dots show direction, not request count or measured speed.
+
 ## Editing and persistence
 
 - Add components from the library, drag nodes, connect source and target handles, select a connection and press Delete, or delete a component from its inspector. Undo/redo preserves recent edits. Unsupported graphs remain editable and explain why Run is disabled.

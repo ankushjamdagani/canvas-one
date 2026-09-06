@@ -37,6 +37,8 @@ export interface Project {
   checkpoints: Checkpoint[];
   viewport: { x: number; y: number; zoom: number };
   updatedAt: number;
+  /** Presentation only; never passed to the simulation engine. */
+  expandedNodeIds?: string[];
 }
 export const labels: Record<ComponentKind, string> = {
   traffic: "Traffic source",
