@@ -1,6 +1,21 @@
 # Development handoff
 
-## Current milestone — steady, burst and ramp workloads
+## Current milestone — saved experiment results (7 September 2026)
+
+Resumed after the usage reset from clean completed workload checkpoint `3041861`. Named completed experiments now preserve their immutable starting graph, full workload, metrics/history, model version and provenance. A docked results panel compares saved runs, reports model changes and suppresses deltas for mismatched workloads. Local autosave and version-3 JSON exports include results; imports accept versions 1, 2 and 3. Imported results are explicitly labeled and have not been rerun. Validation checks structure/accounting, not authenticity.
+
+Save result appears after completion. Up to 20 results may be saved per project, with no automatic eviction. Rename, delete/undo delete and undoable Restore model are available. Worker run IDs prevent late messages from attaching measurements to another model. Opening/resizing results reframes the desktop canvas; mobile retains readable nodes and full result controls.
+
+### Verification and checkpoints
+
+- `npm test`: 26 tests pass, including immutable results, import accounting/provenance, comparison eligibility and undoable model restoration.
+- `npm run test:e2e`: 11 Chromium journeys cover all previous milestones plus saved comparisons, reload/rename/restore/undo, portable results and mobile delete/undo.
+- `npm run build`: passes; main JS approximately 530 KB minified /168 KB gzip. Code splitting remains future work.
+- Screenshots inspected directly: `artifacts/saved-comparison.png`, `artifacts/saved-results-mobile.png`. Browser regression verifies nodes remain inside the resized canvas.
+- `8d5c9c0`: immutable completed experiment domain, worker identity and validated imports. Final UI/documentation checkpoint: see `git log -1`.
+- Preview: http://localhost:5173/. No remote push or deployment.
+
+## Previous milestone — steady, burst and ramp workloads
 
 Resumed with richer workloads after offering next-step options and proceeding with the stated default. The existing light workspace now supports configured steady traffic, a timed burst, or an increasing/decreasing linear ramp. Controls are in Experiment settings or the traffic source Configuration tab. Workload previews show configured rates; the metrics panel aligns configured traffic with observed queue history. Node/edge expected rates update at the current simulation time.
 
@@ -19,7 +34,7 @@ Resumed with richer workloads after offering next-step options and proceeding wi
 - `e73ad9f`: deterministic burst/ramp domain and engine milestone.
 - Latest commit completes workload controls, comparison, export format and verification (`git log -1`).
 - Preview: http://localhost:5173/. `npm run dev` if needed. See README.md for controls and semantics.
-- Future scope remains editable nested subgraphs, additional paths, saved measured results and performance profiling. No cloud sync or remote deployment.
+- Future scope remains editable nested subgraphs, additional paths and performance profiling. No cloud sync or remote deployment.
 
 ## Previous milestone — expandable components and continuous traffic motion
 
@@ -57,10 +72,4 @@ Traffic stutter root cause: rebuilding controlled nodes without their measured d
 
 One supported execution path: traffic → service → optional cache → database. Seeded Poisson arrivals; deterministic service time 1/capacity; FIFO queues default 500; global deadline default 2 seconds; fixed 8 ms response overhead; separate deterministic cache draws. Expired queued requests are skipped; expired active work still occupies capacity until completion. Observation windows end with outstanding work explicitly counted as in flight.
 
-These are illustrative learning assumptions, not real hardware benchmarks. Expanded internals currently inspect this existing model; they are not editable nested architecture graphs. Future milestones may add editable subsystems, richer workloads, other supported paths or saved measured comparisons. Add those deliberately with model validation and deterministic tests. No cloud sync; running simulation state/results are ephemeral. The main JS bundle is approximately 511 KB minified (~162 KB gzip), with code splitting a later performance opportunity.
-
-## Saved-results milestone in progress (7 September)
-
-Prior workload checkpoint `3041861` was complete and clean when resuming after the usage reset. Continuing with named saved experiments and comparisons. Domain metrics now live separately from the engine; completed snapshots store model/workload, metrics, model version and provenance. Worker responses carry run IDs and are matched to immutable start-of-run graphs, preventing late messages attaching to a newer experiment. Save/rename/delete/undoable model restore are implemented in editor state, with a 20-result limit and no automatic eviction.
-
-Version-3 JSON exports include saved results; version-1/2 imports remain accepted. Import validation checks request accounting and sample structure, and all imported results are labeled as imported rather than claimed verified. Twenty-six unit tests and eleven browser journeys passed. A post-test visual correction is being verified: the canvas now reframes when opening/resizing the docked results panel. Finish documentation, final checks and the UI commit remain.
+These are illustrative learning assumptions, not real hardware benchmarks. Expanded internals currently inspect this existing model; they are not editable nested architecture graphs. Future milestones may add editable subsystems, richer workloads, other supported paths. Add those deliberately with model validation and deterministic tests. No cloud sync; running simulation state is ephemeral, while explicitly saved completed results persist. The main JS bundle is approximately 511 KB minified (~162 KB gzip), with code splitting a later performance opportunity.

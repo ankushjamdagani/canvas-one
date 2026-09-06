@@ -30,7 +30,7 @@ These are simulator results, not measured real-system performance. The configure
 
 ## Known limits
 
-The simulator supports a single linear URL lookup path; no nested submodels, branching execution, retries, replication, eviction, writes or realistic hardware/network modeling. Black boxes have explicit models; no hidden model substitution. Projects are browser-local, with no cloud sync. In-progress runs and previous measured comparisons are ephemeral. Build currently emits a ~505 KB minified main chunk (~161 KB gzip); code splitting is a future performance improvement.
+The simulator supports a single linear URL lookup path; no nested submodels, branching execution, retries, replication, eviction, writes or realistic hardware/network modeling. Black boxes have explicit models; no hidden model substitution. Projects are browser-local, with no cloud sync. In-progress runs and unsaved previous comparisons are ephemeral; milestone 6 adds explicitly saved completed results. Build currently emits a ~505 KB minified main chunk (~161 KB gzip); code splitting is a future performance improvement.
 
 ## Final visual-review verdict
 
@@ -61,3 +61,12 @@ Twenty unit tests and nine Chromium journeys cover steady, burst and linear-ramp
 Default burst: seed 42, baseline 100/s, burst 700/s from 10–20 seconds, 30-second window. Observed 8,983 generated requests, 7,474 successes, 1,509 queue-full rejections, zero timed out and zero in flight at the end. Aggregate sampled queue peaked at 502 (across components) and drained to zero. Successful-response p95 was 1,010.4 ms. Cache replay generates the same arrivals and has no failures. These are illustrative simulation results, not hardware measurements.
 
 Screenshots: `burst-workload.png`, `ramp-mobile.png`.
+
+
+## Milestone 6 — saved results (7 September 2026)
+
+26 unit tests and 11 Chromium journeys pass, along with the TypeScript/Vite production build. Saved-result tests cover immutable model capture, completion checks, imported accounting/provenance, workload matching, model restoration and undo. Browser journeys save and compare no-cache/cache runs, reload and rename results, restore/undo the model, export/import measurements, and delete/undo on mobile. Existing workload, expansion, animation, editing and viewport journeys remain covered.
+
+Direct screenshot inspection found graph clipping when the results dock reduced canvas height. Resize-aware framing resolves this; a browser assertion checks all nodes remain within the canvas. Desktop and mobile evidence: `saved-comparison.png`, `saved-results-mobile.png`. This milestone used direct visual QA, not an additional independent review.
+
+Saved results are manual, capped at 20 per project without eviction, and imported data is not rerun or authenticated. The main production chunk is approximately 530 KB minified /168 KB gzip.

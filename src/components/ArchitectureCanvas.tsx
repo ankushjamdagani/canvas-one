@@ -11,6 +11,8 @@ import {
   type OnNodesChange,
   applyNodeChanges,
   useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
 } from "@xyflow/react";
 import {
   ArrowRight,
@@ -125,6 +127,54 @@ export function ArchitectureCanvas({
   const editor = useEditor(),
     g = editor.project.graph;
   const flow = useReactFlow();
+  const canvasRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = canvasRef.current;
+    if (!element) return;
+    let previous: { width: number; height: number } | undefined;
+    let frame = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      const size = entry.contentRect;
+      if (
+        previous &&
+        (Math.abs(size.width - previous.width) > 1 ||
+          Math.abs(size.height - previous.height) > 1)
+      ) {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          const nodes = flow.getNodes();
+          if (!nodes.length) return;
+          if (window.innerWidth <= 560) {
+            const selected =
+              nodes.find((n) => n.id === useEditor.getState().selected) ??
+              nodes[0];
+            flow.setCenter(
+              selected.position.x + 107,
+              selected.position.y + (selected.measured?.height ?? 78) / 2,
+              { zoom: 0.9 },
+            );
+          } else {
+            const reserved = 110;
+            const view = getViewportForBounds(
+              getNodesBounds(nodes),
+              size.width,
+              Math.max(120, size.height - reserved),
+              0.3,
+              1,
+              0.2,
+            );
+            flow.setViewport({ ...view, y: view.y + reserved });
+          }
+        });
+      }
+      previous = { width: size.width, height: size.height };
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [flow]);
   const initialFit = useRef(
     editor.project.viewport.x === 0 &&
       editor.project.viewport.y === 0 &&
@@ -256,6 +306,7 @@ export function ArchitectureCanvas({
   };
   return (
     <ReactFlow
+      ref={canvasRef}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}

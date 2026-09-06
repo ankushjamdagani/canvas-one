@@ -163,3 +163,10 @@ On mobile, the introductory copy sits above a dedicated 380 px canvas area. Expa
 Traffic pattern is a three-button segmented choice in the existing inspector: Steady, Burst and Ramp. The selected control uses the existing soft-teal selection style. A compact configured-rate plot precedes the rate and timing inputs. Burst times share one row; mobile keeps rate fields full-width.
 
 Live metrics place configured traffic above observed queue history. Both plots stretch over the same time-axis width, with independent explicitly named vertical quantities. Configured rate is teal; queue length is amber. The comparison column explains burst recovery using observed counts, while cumulative latency remains clearly distinct from the final queue state. Edge labels and traffic cards show the instantaneous configured rate without altering animation phase.
+
+
+## Saved experiment results (milestone 6)
+
+Saved runs sit beside checkpoints in the library. A completed run offers an inline naming form. Selecting saved results opens a docked bottom panel, keeping the architecture visible above it. Native baseline/comparison selects lead into a measurement table and a shared-scale queue overlay: baseline amber, comparison teal. Workload matching and imported provenance appear beside the evidence; mismatched workloads suppress deltas.
+
+The desktop panel scrolls internally with a 460 px height cap. Canvas resizing reframes the graph with space reserved for its heading. Mobile keeps readable node scale and places the full results panel in document flow. Rename, restore and delete controls remain accessible below the measurements; deletion offers an inline undo action.

@@ -32,7 +32,15 @@ Select empty canvas space (or configure the traffic source), then choose **Stead
 
 The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
 
-Profiles save with local projects and checkpoints. JSON exports now use **version 2** to mark the new workload semantics; version-1 imports still work. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+Profiles save with local projects and checkpoints. JSON exports use **version 3** and include saved results; version-1 and version-2 imports still work. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+
+## Save and compare experiments
+
+After a run finishes, choose **Save result**, name it, and save. Open **Saved runs** in the library to revisit up to 20 completed experiments per project. Results retain the exact starting model, workload and measured history, even as you continue editing. Saving is explicit; reaching the limit never removes older results automatically.
+
+Choose a baseline and comparison in the bottom results panel. The table and shared-scale queue chart compare the saved measurements. Deltas appear only when model version, complete workload and generated arrival counts match; differences are explained otherwise. Model changes are listed alongside the measurements.
+
+Rename a result in the panel, **Restore model** to edit or replay its setup, or delete it. Model restoration supports regular Undo; deletion offers **Undo delete** while the panel remains open. Local autosave and JSON exports retain saved results. Imported results are labeled as imported and have not been rerun: validation checks structure and accounting, not authenticity.
 
 ## Reveal the model
 
@@ -51,7 +59,7 @@ Traffic dots run continuously on the browser's animation clock, pause/resume wit
 - Add components from the library, drag nodes, connect source and target handles, select a connection and press Delete, or delete a component from its inspector. Undo/redo preserves recent edits. Unsupported graphs remain editable and explain why Run is disabled.
 - Select a component → Configuration for capacity, queue size, and cache hit rate. Select empty canvas for traffic, seed, duration and timeout.
 - Projects autosave to IndexedDB in this browser. The project menu renames, reopens, creates, imports and exports projects. JSON exports are versioned; import creates a new copy.
-- Checkpoints store the graph and workload settings. Project storage also includes canvas viewport. Running simulation state is intentionally not saved.
+- Checkpoints store the graph and workload settings. Project storage also includes canvas viewport. Running simulation state is intentionally not saved; completed measurements persist only after Save result.
 - On narrow screens, the readable canvas can be panned, the inspector follows below it, and Checkpoints is a disclosure above the workspace.
 
 No cloud synchronization or remote account is involved. Export JSON to preserve a portable backup; browser site-data deletion removes local projects.
@@ -72,8 +80,8 @@ This is a learning model, not a hardware benchmark or architecture sizing tool.
 
 ## Structure
 
-- `src/domain`: framework-independent project/graph types and validation.
-- `src/simulation`: deterministic event heap, request lifecycle, worker and React adapter.
+- `src/domain`: framework-independent project/graph types, metrics, immutable saved results and validation.
+- `src/simulation`: deterministic event heap, request lifecycle, worker and React adapter; run IDs associate worker output with its starting model.
 - `src/persistence`: Dexie project repository and versioned import/export.
 - `src/state`: Zustand graph editing, history and checkpoints.
 - `src/components`: React Flow canvas, inspector and observed metrics.

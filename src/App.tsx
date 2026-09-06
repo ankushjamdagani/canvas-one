@@ -14,6 +14,7 @@ import {
   FolderOpen,
   Check,
   BookmarkPlus,
+  BarChart3,
   X,
   Info,
   ChevronRight,
@@ -35,12 +36,14 @@ import { profileLabel } from "./domain/workload";
 import { useSimulation } from "./simulation/useSimulation";
 import { ArchitectureCanvas, icons } from "./components/ArchitectureCanvas";
 import { Inspector } from "./components/Inspector";
+import { ResultsPanel } from "./components/ResultsPanel";
+import { createSavedRun, defaultRunName } from "./domain/results";
 import { MetricsPanel } from "./components/MetricsPanel";
 export default function App() {
   const editor = useEditor(),
     { project } = editor,
     graph = project.graph,
-    simulation = useSimulation(graph);
+    simulation = useSimulation(graph, project.id);
   const [ready, setReady] = useState(false),
     [saved, setSaved] = useState("Loading…"),
     [error, setError] = useState(""),
@@ -49,6 +52,42 @@ export default function App() {
     [assumptions, setAssumptions] = useState(false),
     [checkpointName, setCheckpointName] = useState(""),
     [notice, setNotice] = useState("");
+  const [resultsOpen, setResultsOpen] = useState(false),
+    [selectedResult, setSelectedResult] = useState<string | null>(null),
+    [savingResult, setSavingResult] = useState(false),
+    [resultName, setResultName] = useState("");
+  const savedRuns = project.savedRuns ?? [];
+  const resultSaved =
+    !!simulation.result &&
+    savedRuns.some((run) => run.id === simulation.result!.id);
+  useEffect(() => {
+    setResultsOpen(false);
+    setSelectedResult(null);
+    setSavingResult(false);
+  }, [project.id]);
+  useEffect(() => {
+    setSavingResult(false);
+  }, [simulation.result?.id]);
+  const saveResult = () => {
+    if (!simulation.result) return;
+    try {
+      const result = createSavedRun(simulation.result, resultName);
+      if (!editor.saveRun(result)) {
+        setError(
+          "This project already has 20 saved results. Delete one before saving another.",
+        );
+        return;
+      }
+      setSavingResult(false);
+      setSelectedResult(result.id);
+      setResultsOpen(true);
+      setNotice("Result saved with its model, workload and observed metrics.");
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Could not save this result.",
+      );
+    }
+  };
   const fileInput = useRef<HTMLInputElement>(null),
     saveQueue = useRef(Promise.resolve()),
     boot = useRef(false);
@@ -234,6 +273,39 @@ export default function App() {
             </button>
           </form>
         </details>
+        <div className="saved-runs-library">
+          <button
+            className="saved-runs-heading"
+            onClick={() => setResultsOpen(!resultsOpen)}
+            aria-expanded={resultsOpen}
+          >
+            <BarChart3 size={16} />
+            <span>Saved runs</span>
+            <small>{savedRuns.length}</small>
+          </button>
+          {savedRuns.length ? (
+            <div className="saved-runs-list">
+              {savedRuns
+                .slice()
+                .reverse()
+                .map((run) => (
+                  <button
+                    key={run.id}
+                    onClick={() => {
+                      setSelectedResult(run.id);
+                      setResultsOpen(true);
+                    }}
+                    title={run.name}
+                  >
+                    <span>{run.name}</span>
+                    <ChevronRight size={13} />
+                  </button>
+                ))}
+            </div>
+          ) : (
+            <p>Finish a run, then save its result to compare later.</p>
+          )}
+        </div>
         <button
           className="assumptions-link"
           onClick={() => setAssumptions(!assumptions)}
@@ -382,6 +454,18 @@ export default function App() {
               >
                 700 req/s
               </button>
+              {simulation.result && (
+                <button
+                  disabled={resultSaved}
+                  onClick={() => {
+                    setResultName(defaultRunName(simulation.result!.graph));
+                    setSavingResult(true);
+                  }}
+                >
+                  <BookmarkPlus size={14} />
+                  {resultSaved ? "Result saved" : "Save result"}
+                </button>
+              )}
               <button
                 disabled={hasCache || !!errors.length}
                 onClick={() => {
@@ -395,6 +479,32 @@ export default function App() {
                 {hasCache ? "Cache added" : "Add cache"}
               </button>
             </div>
+            {savingResult && simulation.result && (
+              <form
+                className="save-result-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveResult();
+                }}
+              >
+                <label>
+                  <span>Result name</span>
+                  <input
+                    aria-label="Result name"
+                    maxLength={80}
+                    value={resultName}
+                    onChange={(event) => setResultName(event.target.value)}
+                    autoFocus
+                  />
+                </label>
+                <button type="submit" className="primary">
+                  Save
+                </button>
+                <button type="button" onClick={() => setSavingResult(false)}>
+                  Cancel
+                </button>
+              </form>
+            )}
           </div>
           {errors.length > 0 && (
             <div className="validation" role="alert">
@@ -408,11 +518,26 @@ export default function App() {
             </div>
           )}
         </div>
-        <MetricsPanel
-          metrics={simulation.metrics}
-          previous={simulation.previous}
-          graph={graph}
-        />
+        {resultsOpen ? (
+          <ResultsPanel
+            key={project.id}
+            selectedId={selectedResult}
+            onClose={() => setResultsOpen(false)}
+            onRestore={(id) => {
+              editor.restoreRun(id);
+              setResultsOpen(false);
+              setNotice(
+                "Saved model and workload restored. Run to replay; Undo returns to your previous canvas.",
+              );
+            }}
+          />
+        ) : (
+          <MetricsPanel
+            metrics={simulation.metrics}
+            previous={simulation.previous}
+            graph={graph}
+          />
+        )}
       </main>
       <Inspector metrics={simulation.metrics} />
       {projectPanel && (
