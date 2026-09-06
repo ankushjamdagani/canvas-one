@@ -15,7 +15,7 @@ export const repository = {
 };
 export function exportProject(project: Project) {
   return JSON.stringify(
-    { format: "system-studio", version: 3, project },
+    { format: "system-studio", version: 4, project },
     null,
     2,
   );
@@ -24,9 +24,9 @@ export function importProject(text: string): Project {
   if (text.length > 2_000_000)
     throw new Error("Project files must be smaller than 2 MB.");
   const data = JSON.parse(text);
-  if (data?.format !== "system-studio" || ![1, 2, 3].includes(data.version))
+  if (data?.format !== "system-studio" || ![1, 2, 3, 4].includes(data.version))
     throw new Error(
-      "Unsupported file. Choose a System studio version 1, 2 or 3 JSON export.",
+      "Unsupported file. Choose a System studio version 1, 2, 3 or 4 JSON export.",
     );
   const p = data.project;
   if (
@@ -49,6 +49,19 @@ export function importProject(text: string): Project {
       throw new Error("A checkpoint is invalid.");
     errors.push(...validateGraph(checkpoint.graph, false));
   }
+  if (
+    data.version < 4 &&
+    [
+      p.graph,
+      ...p.checkpoints.map((c: Project["checkpoints"][number]) => c.graph),
+    ].some((g) =>
+      g.nodes?.some(
+        (n: { workers?: number }) =>
+          n?.workers !== undefined && n.workers !== 1,
+      ),
+    )
+  )
+    errors.push("Concurrent service workers require a version-4 project file.");
   if (errors.length) throw new Error(errors[0]);
   const expanded = p.expandedNodeIds ?? [];
   if (
@@ -63,6 +76,10 @@ export function importProject(text: string): Project {
       `A project can contain up to ${MAX_SAVED_RUNS} saved results.`,
     );
   for (const run of savedRuns) {
+    if (data.version < 4 && run?.modelVersion !== "url-lookup/2")
+      throw new Error(
+        "New simulation results require a version-4 project file.",
+      );
     const problems = validateSavedRun(run);
     if (problems.length) throw new Error(problems[0]);
   }

@@ -6,7 +6,10 @@ export interface ModelNode {
   kind: ComponentKind;
   name: string;
   position: { x: number; y: number };
+  /** Service rate per worker; database/cache each have one processor. */
   capacity: number;
+  /** Absent in legacy graphs means one worker. Only services support concurrency. */
+  workers?: number;
   queueLimit: number;
   hitRate: number;
 }
@@ -50,6 +53,13 @@ export const labels: Record<ComponentKind, string> = {
   database: "Database",
   cache: "Cache",
 };
+export const MAX_SERVICE_WORKERS = 16;
+export function workerCount(node: ModelNode): number {
+  return node.kind === "service" ? (node.workers ?? 1) : 1;
+}
+export function totalCapacity(node: ModelNode): number {
+  return node.capacity * workerCount(node);
+}
 export function makeNode(kind: ComponentKind, x: number, y: number): ModelNode {
   return {
     id: crypto.randomUUID(),
@@ -128,6 +138,16 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       !Number.isFinite(n.position?.y)
     )
       errors.push("Components need a name and valid canvas position.");
+    if (
+      n.workers !== undefined &&
+      (!Number.isInteger(n.workers) ||
+        n.workers < 1 ||
+        n.workers > MAX_SERVICE_WORKERS ||
+        (n.kind !== "service" && n.workers !== 1))
+    )
+      errors.push(
+        "Service workers must be whole numbers from 1 to 16; other components have one processor.",
+      );
     if (!Number.isFinite(n.capacity) || n.capacity < 1 || n.capacity > 100000)
       errors.push("Capacity must be between 1 and 100,000 requests/s.");
     if (

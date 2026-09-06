@@ -1,8 +1,8 @@
-import { clone, validateGraph, type Graph } from "./model";
+import { clone, validateGraph, workerCount, type Graph } from "./model";
 import type { Metrics } from "./metrics";
 import { sameWorkload, profileLabel } from "./workload";
 
-export const MODEL_VERSION = "url-lookup/2";
+export const MODEL_VERSION = "url-lookup/3";
 export const MAX_SAVED_RUNS = 20;
 export interface RunResult {
   id: string;
@@ -47,10 +47,15 @@ export function validateSavedRun(run: SavedRun): string[] {
     !Number.isFinite(run.completedAt)
   )
     return ["Saved results need a valid name and completion time."];
-  if (run.modelVersion !== MODEL_VERSION)
+  if (!["url-lookup/2", MODEL_VERSION].includes(run.modelVersion))
     return ["This saved result uses an unsupported simulation model version."];
   const graphErrors = validateGraph(run.graph);
   if (graphErrors.length) return graphErrors;
+  if (
+    run.modelVersion === "url-lookup/2" &&
+    run.graph.nodes.some((node) => workerCount(node) !== 1)
+  )
+    return ["Historical model results must use one worker per component."];
   const m = run.metrics;
   const values = [
     "time",
@@ -106,6 +111,11 @@ export function validateSavedRun(run: SavedRun): string[] {
           Number(n[k as keyof typeof n]) < 0,
       ) ||
       typeof n.busy !== "boolean" ||
+      ((run.modelVersion === MODEL_VERSION || n.activeWorkers !== undefined) &&
+        (!Number.isInteger(n.activeWorkers) ||
+          n.activeWorkers! < 0 ||
+          n.activeWorkers! > workerCount(node) ||
+          n.busy !== n.activeWorkers! > 0)) ||
       !Number.isFinite(n.utilization) ||
       n.utilization < 0 ||
       n.utilization > 1 ||
@@ -173,9 +183,13 @@ export function modelChanges(a: Graph, b: Graph): string[] {
       continue;
     }
     if (!before || !after) continue;
+    if (workerCount(before) !== workerCount(after))
+      changes.push(
+        `${after.name} workers: ${workerCount(before)} → ${workerCount(after)}.`,
+      );
     if (before.capacity !== after.capacity)
       changes.push(
-        `${after.name} capacity: ${before.capacity} → ${after.capacity} req/s.`,
+        `${after.name} ${kind === "service" ? "capacity per worker" : "capacity"}: ${before.capacity} → ${after.capacity} req/s.`,
       );
     if (before.queueLimit !== after.queueLimit)
       changes.push(

@@ -1,5 +1,10 @@
 import { nextArrivalTime, rateAt } from "../domain/workload";
-import { validateGraph, type Graph, type ModelNode } from "../domain/model";
+import {
+  validateGraph,
+  workerCount,
+  type Graph,
+  type ModelNode,
+} from "../domain/model";
 import type { Metrics, Sample } from "../domain/metrics";
 export type { Metrics, NodeMetrics, Sample } from "../domain/metrics";
 interface Request {
@@ -13,16 +18,16 @@ interface Event {
   kind: "arrival" | "complete" | "timeout" | "response";
   request?: Request;
   stage?: number;
+  worker?: number;
 }
 interface Stage {
   node: ModelNode;
   queue: Request[];
-  active?: Request;
+  workers: { active?: Request; started: number }[];
   arrived: number;
   completed: number;
   rejected: number;
   busyTime: number;
-  started: number;
 }
 class Heap {
   values: Event[] = [];
@@ -103,7 +108,9 @@ export class Simulation {
           completed: 0,
           rejected: 0,
           busyTime: 0,
-          started: 0,
+          workers: Array.from({ length: workerCount(node) }, () => ({
+            started: 0,
+          })),
         })),
     );
     this.scheduleArrival();
@@ -120,15 +127,17 @@ export class Simulation {
     if (time <= this.graph.settings.duration)
       this.schedule({ time, kind: "arrival" });
   }
-  private start(request: Request, stageIndex: number) {
+  private start(request: Request, stageIndex: number, workerIndex: number) {
     const stage = this.stages[stageIndex];
-    stage.active = request;
-    stage.started = this.time;
+    const worker = stage.workers[workerIndex];
+    worker.active = request;
+    worker.started = this.time;
     this.schedule({
       time: this.time + 1 / stage.node.capacity,
       kind: "complete",
       request,
       stage: stageIndex,
+      worker: workerIndex,
     });
   }
   private enter(request: Request, stageIndex: number) {
@@ -140,7 +149,8 @@ export class Simulation {
     const stage = this.stages[stageIndex];
     stage.arrived++;
     stage.queue = stage.queue.filter((r) => !r.done);
-    if (!stage.active) this.start(request, stageIndex);
+    const free = stage.workers.findIndex((worker) => !worker.active);
+    if (free !== -1) this.start(request, stageIndex, free);
     else if (stage.queue.length < stage.node.queueLimit)
       stage.queue.push(request);
     else {
@@ -170,8 +180,9 @@ export class Simulation {
     } else if (event.kind === "complete" && request) {
       const i = event.stage!,
         stage = this.stages[i];
-      stage.busyTime += this.time - stage.started;
-      stage.active = undefined;
+      const worker = stage.workers[event.worker!];
+      stage.busyTime += this.time - worker.started;
+      worker.active = undefined;
       stage.completed++;
       if (!request.done) {
         if (
@@ -185,7 +196,7 @@ export class Simulation {
       }
       let next = stage.queue.shift();
       while (next?.done) next = stage.queue.shift();
-      if (next) this.start(next, i);
+      if (next) this.start(next, i, event.worker!);
     }
   }
   advance(target: number): Metrics {
@@ -254,12 +265,18 @@ export class Simulation {
           completed: s.completed,
           rejected: s.rejected,
           queued: s.queue.filter((r) => !r.done).length,
-          busy: !!s.active,
+          busy: s.workers.some((worker) => !!worker.active),
+          activeWorkers: s.workers.filter((worker) => !!worker.active).length,
           utilization: this.time
             ? Math.min(
                 1,
-                (s.busyTime + (s.active ? this.time - s.started : 0)) /
-                  this.time,
+                (s.busyTime +
+                  s.workers.reduce(
+                    (total, worker) =>
+                      total + (worker.active ? this.time - worker.started : 0),
+                    0,
+                  )) /
+                  (this.time * s.workers.length),
               )
             : 0,
         },

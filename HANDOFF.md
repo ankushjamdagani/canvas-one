@@ -93,3 +93,10 @@ Traffic stutter root cause: rebuilding controlled nodes without their measured d
 One supported execution path: traffic → service → optional cache → database. Seeded Poisson arrivals; deterministic service time 1/capacity; FIFO queues default 500; global deadline default 2 seconds; fixed 8 ms response overhead; separate deterministic cache draws. Expired queued requests are skipped; expired active work still occupies capacity until completion. Observation windows end with outstanding work explicitly counted as in flight.
 
 These are illustrative learning assumptions, not real hardware benchmarks. Expanded internals currently inspect this existing model; they are not editable nested architecture graphs. Future milestones may add editable subsystems, richer workloads, other supported paths. Add those deliberately with model validation and deterministic tests. No cloud sync; running simulation state is ephemeral, while explicitly saved completed results persist. The main JS bundle is approximately 511 KB minified (~162 KB gzip), with code splitting a later performance opportunity.
+
+
+## Concurrent service workers — implementation checkpoint
+
+Domain/engine milestone implements 1–16 service workers, per-worker rate and one bounded shared FIFO queue. Defaults/absent worker counts preserve one worker. Active deadlines never release a worker early; completed work dispatches the next nonexpired waiting request. Utilization divides total occupied time by workers × elapsed time. Thirty-six unit tests pass, covering concurrency, timeouts, accounting, profile replay and portable compatibility.
+
+Version-4 exports carry the worker configuration. Historical model `url-lookup/2` results remain unchanged/readable; new results use `url-lookup/3` and cross-version deltas are suppressed. Targeted canvas, saved-results and new concurrency browser journeys pass. UI screenshots fit desktop/mobile. Final production regression, documentation and UI checkpoint remain in progress.

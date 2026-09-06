@@ -4,6 +4,8 @@ export interface NodeMetrics {
   rejected: number;
   queued: number;
   busy: boolean;
+  /** Omitted by historical model v2; sampled number of occupied processors. */
+  activeWorkers?: number;
   utilization: number;
 }
 export interface Sample {
