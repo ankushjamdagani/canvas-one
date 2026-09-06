@@ -1,32 +1,539 @@
-import { useEffect, useRef, useState } from 'react';
-import { ReactFlowProvider } from '@xyflow/react';
-import { Play, Pause, RotateCcw, Undo2, Redo2, Workflow, ArrowUpRight, Plus, Download, Upload, FolderOpen, Check, BookmarkPlus, X, Info, ChevronRight, TriangleAlert } from 'lucide-react';
-import { useEditor } from './state/editor';
-import { newProject, validateGraph, type ComponentKind, type Project } from './domain/model';
-import { repository, exportProject, importProject } from './persistence/projects';
-import { useSimulation } from './simulation/useSimulation';
-import { ArchitectureCanvas, icons } from './components/ArchitectureCanvas';
-import { Inspector } from './components/Inspector';
-import { MetricsPanel } from './components/MetricsPanel';
+import { useEffect, useRef, useState } from "react";
+import { ReactFlowProvider } from "@xyflow/react";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Undo2,
+  Redo2,
+  Workflow,
+  ArrowUpRight,
+  Plus,
+  Download,
+  Upload,
+  FolderOpen,
+  Check,
+  BookmarkPlus,
+  X,
+  Info,
+  ChevronRight,
+  TriangleAlert,
+} from "lucide-react";
+import { useEditor } from "./state/editor";
+import {
+  newProject,
+  validateGraph,
+  type ComponentKind,
+  type Project,
+} from "./domain/model";
+import {
+  repository,
+  exportProject,
+  importProject,
+} from "./persistence/projects";
+import { useSimulation } from "./simulation/useSimulation";
+import { ArchitectureCanvas, icons } from "./components/ArchitectureCanvas";
+import { Inspector } from "./components/Inspector";
+import { MetricsPanel } from "./components/MetricsPanel";
 export default function App() {
- const editor = useEditor(), { project } = editor, graph = project.graph, simulation = useSimulation(graph);
- const [ready, setReady] = useState(false), [saved, setSaved] = useState('Loading…'), [error, setError] = useState(''), [projects, setProjects] = useState<Project[]>([]), [projectPanel, setProjectPanel] = useState(false), [assumptions, setAssumptions] = useState(false), [checkpointName, setCheckpointName] = useState(''), [notice, setNotice] = useState('');
- const fileInput = useRef<HTMLInputElement>(null), saveQueue = useRef(Promise.resolve()), boot = useRef(false);
- const errors = validateGraph(graph), hasCache = graph.nodes.some(n => n.kind === 'cache');
- useEffect(() => { if (boot.current) return; boot.current = true; repository.list().then(list => { setProjects(list); if (list.length) editor.load(list[0]); setReady(true); }).catch(() => { setError('Local storage is unavailable. You can still build and export your project.'); setReady(true); }); }, []);
- useEffect(() => { if (!ready) return; setSaved('Saving…'); const copy = structuredClone(project); const timer = setTimeout(() => { saveQueue.current = saveQueue.current.catch(() => {}).then(async () => { await repository.save(copy); if (useEditor.getState().project.updatedAt === copy.updatedAt) setSaved('Saved locally'); setProjects(await repository.list()); }).catch(() => { setSaved('Save failed'); setError('Could not save to this browser. Export your project to keep a copy.'); }); }, 250); return () => clearTimeout(timer); }, [project, ready]);
- useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(timer); }, [notice]);
- const switchProject = async (p: Project) => { try { await saveQueue.current; await repository.save(project); editor.load(p); setProjectPanel(false); } catch { setError('Could not save the current project. Export it before switching.'); } };
- const download = () => { const a = document.createElement('a'), url = URL.createObjectURL(new Blob([exportProject(project)], { type: 'application/json' })); a.href = url; a.download = `${project.name.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}.system-studio.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
- const importFile = async (file?: File) => { if (!file) return; try { const p = importProject(await file.text()); await repository.save(project); await repository.save(p); editor.load(p); setProjectPanel(false); setNotice('Project imported as a new local copy.'); } catch (e) { setError(e instanceof Error ? e.message : 'Could not import this file.'); } if (fileInput.current) fileInput.current.value = ''; };
- return <div className="studio"><aside className="library"><div className="brand"><Workflow size={25}/><span>System studio<span className="brand-dot">.</span></span></div><button className={`project-switch ${projectPanel ? 'active' : ''}`} onClick={() => setProjectPanel(!projectPanel)} aria-expanded={projectPanel}><span>{project.name}</span><FolderOpen size={15}/></button><div className="library-section"><h2>Components</h2><p>Click to add to your canvas</p>{(['traffic', 'service', 'database', 'cache'] as ComponentKind[]).map(kind => { const Icon = icons[kind]; return <button className="library-item" key={kind} onClick={() => editor.add(kind)}><Icon size={20}/><span>{kind === 'traffic' ? 'Traffic source' : kind === 'service' ? 'Service' : kind === 'database' ? 'Database' : 'Cache'}</span><Plus size={14}/></button>; })}<div className="library-caption">More components will follow.<br/>Start with one request path.</div></div><div className="checkpoints"><div className="section-heading"><h2>Checkpoints</h2><BookmarkPlus size={16}/></div>{project.checkpoints.length ? <div className="checkpoint-list">{project.checkpoints.map(c => <button key={c.id} onClick={() => { editor.restore(c.id); setNotice(`Restored “${c.name}”.`); }}><span className="checkpoint-dot"/><span>{c.name}</span><ChevronRight size={13}/></button>)}</div> : <p>Keep a version before trying something new.</p>}<form onSubmit={e => { e.preventDefault(); editor.checkpoint(checkpointName.trim() || `Checkpoint ${project.checkpoints.length + 1}`); setCheckpointName(''); setNotice('Checkpoint saved with the current model and settings.'); }}><input aria-label="Checkpoint name" placeholder="Name this checkpoint" value={checkpointName} maxLength={80} onChange={e => setCheckpointName(e.target.value)}/><button className="subtle" type="submit"><Plus size={14}/>Save checkpoint</button></form></div><button className="assumptions-link" onClick={() => setAssumptions(!assumptions)}><Info size={16}/><span>How the model works</span><ArrowUpRight size={14}/></button><div className="local-footnote"><span className="save-dot"/>Local workspace · v0.1</div></aside>
- <main className="workspace"><header className="toolbar"><div className="history-actions"><button aria-label="Undo" title="Undo model edit" disabled={!editor.past.length} onClick={editor.undo}><Undo2 size={17}/></button><button aria-label="Redo" title="Redo model edit" disabled={!editor.future.length} onClick={editor.redo}><Redo2 size={17}/></button><span className="toolbar-divider"/><span className="workspace-label">Architecture playground</span></div><div className="run-actions"><span className="save-status" role="status"><span className={`save-dot ${saved === 'Save failed' ? 'failed' : ''}`}/>{saved}</span><button className="primary" disabled={!!errors.length || !ready} onClick={simulation.toggle}>{simulation.running ? <Pause size={15}/> : <Play size={15} fill="currentColor"/>}{simulation.running ? 'Pause' : simulation.metrics?.finished ? 'Replay' : simulation.metrics?.time ? 'Resume' : 'Run'}</button><button onClick={simulation.reset} disabled={!!errors.length} className="reset-button"><RotateCcw size={15}/>Reset</button></div></header>
- <div className="canvas-shell"><div className="experiment-heading"><div><h1>Follow a request.</h1><p>Find the bottleneck. Change one thing. Replay.</p></div><span className="tag">URL shortener experiment</span></div><div className="canvas-area"><ReactFlowProvider key={project.id}><ArchitectureCanvas metrics={simulation.metrics} running={simulation.running}/></ReactFlowProvider></div><div className="experiment-guide"><div className="guide-copy"><span className={`guide-status ${simulation.running ? 'running' : ''}`}/><div><strong>{simulation.running ? 'Watching requests move through your system' : simulation.metrics?.finished ? 'Run complete. What changed?' : 'One experiment, three moments'}</strong><span>{simulation.running ? '4× playback · all metrics use simulated time' : 'Run the baseline, raise the traffic, then give the database some help.'}</span></div></div><div className="scenario-actions"><button className={graph.settings.traffic === 100 ? 'active' : ''} onClick={() => { editor.settings({ traffic: 100 }); editor.select(null); }}>100 req/s</button><button className={graph.settings.traffic === 700 ? 'active' : ''} onClick={() => { editor.settings({ traffic: 700 }); editor.select(graph.nodes.find(n => n.kind === 'database')?.id ?? null); }}>700 req/s</button><button disabled={hasCache || !!errors.length} onClick={() => { editor.insertCache(); setNotice('Cache connected. Before and after checkpoints saved. Replay the same workload.'); }}><Plus size={14}/>{hasCache ? 'Cache added' : 'Add cache'}</button></div></div>
- {errors.length > 0 && <div className="validation" role="alert"><TriangleAlert size={18}/><div><strong>Connect a supported request path to run</strong>{errors.map(e => <p key={e}>{e}</p>)}</div></div>}
- </div><MetricsPanel metrics={simulation.metrics} previous={simulation.previous} graph={graph}/></main><Inspector metrics={simulation.metrics}/>
- {projectPanel && <section className="project-panel" aria-label="Local projects"><div className="panel-title"><h2>Your local projects</h2><button aria-label="Close projects" onClick={() => setProjectPanel(false)}><X size={17}/></button></div><label className="field"><span>Current project name</span><input aria-label="Project name" maxLength={80} value={project.name} onChange={e => editor.rename(e.target.value)}/></label><div className="project-list">{projects.map(p => <button key={p.id} onClick={() => switchProject(p)}><FolderOpen size={17}/><span><strong>{p.name}</strong><small>{new Date(p.updatedAt).toLocaleDateString()} · {p.graph.nodes.length} components</small></span>{p.id === project.id && <Check size={16}/>}</button>)}</div><button className="subtle" onClick={() => switchProject(newProject(`Untitled project ${projects.length + 1}`))}><Plus size={15}/>New project</button><div className="panel-actions"><button onClick={download}><Download size={15}/>Export JSON</button><button onClick={() => fileInput.current?.click()}><Upload size={15}/>Import JSON</button></div><p className="small muted">Saved in this browser. Export a copy to move devices or keep a backup.</p></section>}
- <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={e => importFile(e.target.files?.[0])}/>
- {assumptions && <section className="assumptions-panel" aria-label="Model assumptions"><div className="panel-title"><h2>What this simulation assumes</h2><button aria-label="Close assumptions" onClick={() => setAssumptions(false)}><X size={18}/></button></div><p>An educational model for understanding cause and effect. Capacities are illustrative, not real hardware measurements.</p><dl><dt>Arrival pattern</dt><dd>Seeded Poisson arrivals at your average request rate. Replay preserves every arrival when seed and traffic stay the same.</dd><dt>Processing & queues</dt><dd>One effective server per component. Each request takes 1 ÷ capacity seconds. FIFO queues have fixed limits; a full queue rejects the incoming request.</dd><dt>Cache</dt><dd>Fixed per-request hit probability with its own capacity and queue. Hits return immediately after cache processing; misses reach the database. No cache warm-up, eviction, or writes.</dd><dt>Timeouts & responses</dt><dd>One deadline from arrival, including a fixed 8 ms response overhead. Timed-out work already processing finishes but cannot succeed. Expired waiting requests are removed.</dd><dt>End of an experiment</dt><dd>The run stops at its configured duration. Outstanding requests remain counted as in flight. Successful-request latency excludes failures. Utilization and throughput are averages since the start.</dd><dt>Scope</dt><dd>One linear URL lookup path. No replication, retries, network contention, frontend rendering, or nested subsystems yet. Moving a node changes only the view.</dd></dl></section>}
- {(error || simulation.error) && <div className="error-banner" role="alert"><TriangleAlert size={18}/><span>{error || simulation.error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X size={16}/></button></div>}{notice && <div className="toast" role="status"><Check size={17}/>{notice}</div>}
- </div>;
+  const editor = useEditor(),
+    { project } = editor,
+    graph = project.graph,
+    simulation = useSimulation(graph);
+  const [ready, setReady] = useState(false),
+    [saved, setSaved] = useState("Loading…"),
+    [error, setError] = useState(""),
+    [projects, setProjects] = useState<Project[]>([]),
+    [projectPanel, setProjectPanel] = useState(false),
+    [assumptions, setAssumptions] = useState(false),
+    [checkpointName, setCheckpointName] = useState(""),
+    [notice, setNotice] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null),
+    saveQueue = useRef(Promise.resolve()),
+    boot = useRef(false);
+  const errors = validateGraph(graph),
+    hasCache = graph.nodes.some((n) => n.kind === "cache");
+  useEffect(() => {
+    if (boot.current) return;
+    boot.current = true;
+    repository
+      .list()
+      .then((list) => {
+        setProjects(list);
+        if (list.length) editor.load(list[0]);
+        setReady(true);
+      })
+      .catch(() => {
+        setError(
+          "Local storage is unavailable. You can still build and export your project.",
+        );
+        setReady(true);
+      });
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    setSaved("Saving…");
+    const copy = structuredClone(project);
+    const timer = setTimeout(() => {
+      saveQueue.current = saveQueue.current
+        .catch(() => {})
+        .then(async () => {
+          await repository.save(copy);
+          if (useEditor.getState().project.updatedAt === copy.updatedAt)
+            setSaved("Saved locally");
+          setProjects(await repository.list());
+        })
+        .catch(() => {
+          setSaved("Save failed");
+          setError(
+            "Could not save to this browser. Export your project to keep a copy.",
+          );
+        });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [project, ready]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  const switchProject = async (p: Project) => {
+    try {
+      await saveQueue.current;
+      await repository.save(project);
+      editor.load(p);
+      setProjectPanel(false);
+    } catch {
+      setError(
+        "Could not save the current project. Export it before switching.",
+      );
+    }
+  };
+  const download = () => {
+    const a = document.createElement("a"),
+      url = URL.createObjectURL(
+        new Blob([exportProject(project)], { type: "application/json" }),
+      );
+    a.href = url;
+    a.download = `${project.name.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}.system-studio.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const importFile = async (file?: File) => {
+    if (!file) return;
+    try {
+      const p = importProject(await file.text());
+      await repository.save(project);
+      await repository.save(p);
+      editor.load(p);
+      setProjectPanel(false);
+      setNotice("Project imported as a new local copy.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not import this file.");
+    }
+    if (fileInput.current) fileInput.current.value = "";
+  };
+  return (
+    <div className="studio">
+      <aside className="library">
+        <div className="brand">
+          <Workflow size={25} />
+          <span>
+            System studio<span className="brand-dot">.</span>
+          </span>
+        </div>
+        <button
+          className={`project-switch ${projectPanel ? "active" : ""}`}
+          onClick={() => setProjectPanel(!projectPanel)}
+          aria-expanded={projectPanel}
+        >
+          <span>{project.name}</span>
+          <FolderOpen size={15} />
+        </button>
+        <div className="library-section">
+          <h2>Components</h2>
+          <p>Click to add to your canvas</p>
+          {(["traffic", "service", "database", "cache"] as ComponentKind[]).map(
+            (kind) => {
+              const Icon = icons[kind];
+              return (
+                <button
+                  className="library-item"
+                  key={kind}
+                  onClick={() => editor.add(kind)}
+                >
+                  <Icon size={20} />
+                  <span>
+                    {kind === "traffic"
+                      ? "Traffic source"
+                      : kind === "service"
+                        ? "Service"
+                        : kind === "database"
+                          ? "Database"
+                          : "Cache"}
+                  </span>
+                  <Plus size={14} />
+                </button>
+              );
+            },
+          )}
+          <div className="library-caption">
+            More components will follow.
+            <br />
+            Start with one request path.
+          </div>
+        </div>
+        <details className="checkpoints" open={window.innerWidth > 560}>
+          <summary className="section-heading">
+            <h2>Checkpoints</h2>
+            <BookmarkPlus size={16} />
+          </summary>
+          {project.checkpoints.length ? (
+            <div className="checkpoint-list">
+              {project.checkpoints.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    editor.restore(c.id);
+                    setNotice(`Restored “${c.name}”.`);
+                  }}
+                >
+                  <span className="checkpoint-dot" />
+                  <span>{c.name}</span>
+                  <ChevronRight size={13} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p>Keep a version before trying something new.</p>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              editor.checkpoint(
+                checkpointName.trim() ||
+                  `Checkpoint ${project.checkpoints.length + 1}`,
+              );
+              setCheckpointName("");
+              setNotice(
+                "Checkpoint saved with the current model and settings.",
+              );
+            }}
+          >
+            <input
+              aria-label="Checkpoint name"
+              placeholder="Name this checkpoint"
+              value={checkpointName}
+              maxLength={80}
+              onChange={(e) => setCheckpointName(e.target.value)}
+            />
+            <button className="subtle" type="submit">
+              <Plus size={14} />
+              Save checkpoint
+            </button>
+          </form>
+        </details>
+        <button
+          className="assumptions-link"
+          onClick={() => setAssumptions(!assumptions)}
+        >
+          <Info size={16} />
+          <span>How the model works</span>
+          <ArrowUpRight size={14} />
+        </button>
+        <div className="local-footnote">
+          <span className="save-dot" />
+          Local workspace · v0.1
+        </div>
+      </aside>
+      <main className="workspace">
+        <header className="toolbar">
+          <div className="history-actions">
+            <button
+              aria-label="Undo"
+              title="Undo model edit"
+              disabled={!editor.past.length}
+              onClick={editor.undo}
+            >
+              <Undo2 size={17} />
+            </button>
+            <button
+              aria-label="Redo"
+              title="Redo model edit"
+              disabled={!editor.future.length}
+              onClick={editor.redo}
+            >
+              <Redo2 size={17} />
+            </button>
+            <span className="toolbar-divider" />
+            <span className="workspace-label">Architecture playground</span>
+          </div>
+          <div className="run-actions">
+            <span className="save-status" role="status">
+              <span
+                className={`save-dot ${saved === "Save failed" ? "failed" : ""}`}
+              />
+              {saved}
+            </span>
+            <button
+              className="primary"
+              disabled={!!errors.length || !ready}
+              onClick={simulation.toggle}
+            >
+              {simulation.running ? (
+                <Pause size={15} />
+              ) : (
+                <Play size={15} fill="currentColor" />
+              )}
+              {simulation.running
+                ? "Pause"
+                : simulation.metrics?.finished
+                  ? "Replay"
+                  : simulation.metrics?.time
+                    ? "Resume"
+                    : "Run"}
+            </button>
+            <button
+              onClick={simulation.reset}
+              disabled={!!errors.length}
+              className="reset-button"
+            >
+              <RotateCcw size={15} />
+              Reset
+            </button>
+          </div>
+        </header>
+        <div className="canvas-shell">
+          <div className="experiment-heading">
+            <div>
+              <h1>Follow a request.</h1>
+              <p>Find the bottleneck. Change one thing. Replay.</p>
+              <p className="mobile-pan-hint">
+                Drag the canvas to follow the request →
+              </p>
+            </div>
+            <span className="tag">URL shortener experiment</span>
+          </div>
+          <div className="canvas-area">
+            <ReactFlowProvider key={project.id}>
+              <ArchitectureCanvas
+                metrics={simulation.metrics}
+                running={simulation.running}
+              />
+            </ReactFlowProvider>
+          </div>
+          <div className="experiment-guide">
+            <div className="guide-copy">
+              <span
+                className={`guide-status ${simulation.running ? "running" : ""}`}
+              />
+              <div>
+                <strong>
+                  {simulation.running
+                    ? "Watching requests move through your system"
+                    : simulation.metrics?.finished
+                      ? "Run complete. What changed?"
+                      : "One experiment, three moments"}
+                </strong>
+                <span>
+                  {simulation.running
+                    ? "4× playback · all metrics use simulated time"
+                    : "Run the baseline, raise the traffic, then give the database some help."}
+                </span>
+              </div>
+            </div>
+            <div className="scenario-actions">
+              <button
+                className={graph.settings.traffic === 100 ? "active" : ""}
+                onClick={() => {
+                  editor.settings({ traffic: 100 });
+                  editor.select(null);
+                }}
+              >
+                100 req/s
+              </button>
+              <button
+                className={graph.settings.traffic === 700 ? "active" : ""}
+                onClick={() => {
+                  editor.settings({ traffic: 700 });
+                  editor.select(
+                    graph.nodes.find((n) => n.kind === "database")?.id ?? null,
+                  );
+                }}
+              >
+                700 req/s
+              </button>
+              <button
+                disabled={hasCache || !!errors.length}
+                onClick={() => {
+                  editor.insertCache();
+                  setNotice(
+                    "Cache connected. Before and after checkpoints saved. Replay the same workload.",
+                  );
+                }}
+              >
+                <Plus size={14} />
+                {hasCache ? "Cache added" : "Add cache"}
+              </button>
+            </div>
+          </div>
+          {errors.length > 0 && (
+            <div className="validation" role="alert">
+              <TriangleAlert size={18} />
+              <div>
+                <strong>Connect a supported request path to run</strong>
+                {errors.map((e) => (
+                  <p key={e}>{e}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <MetricsPanel
+          metrics={simulation.metrics}
+          previous={simulation.previous}
+          graph={graph}
+        />
+      </main>
+      <Inspector metrics={simulation.metrics} />
+      {projectPanel && (
+        <section className="project-panel" aria-label="Local projects">
+          <div className="panel-title">
+            <h2>Your local projects</h2>
+            <button
+              aria-label="Close projects"
+              onClick={() => setProjectPanel(false)}
+            >
+              <X size={17} />
+            </button>
+          </div>
+          <label className="field">
+            <span>Current project name</span>
+            <input
+              aria-label="Project name"
+              maxLength={80}
+              value={project.name}
+              onChange={(e) => editor.rename(e.target.value)}
+            />
+          </label>
+          <div className="project-list">
+            {projects.map((p) => (
+              <button key={p.id} onClick={() => switchProject(p)}>
+                <FolderOpen size={17} />
+                <span>
+                  <strong>{p.name}</strong>
+                  <small>
+                    {new Date(p.updatedAt).toLocaleDateString()} ·{" "}
+                    {p.graph.nodes.length} components
+                  </small>
+                </span>
+                {p.id === project.id && <Check size={16} />}
+              </button>
+            ))}
+          </div>
+          <button
+            className="subtle"
+            onClick={() =>
+              switchProject(
+                newProject(`Untitled project ${projects.length + 1}`),
+              )
+            }
+          >
+            <Plus size={15} />
+            New project
+          </button>
+          <div className="panel-actions">
+            <button onClick={download}>
+              <Download size={15} />
+              Export JSON
+            </button>
+            <button onClick={() => fileInput.current?.click()}>
+              <Upload size={15} />
+              Import JSON
+            </button>
+          </div>
+          <p className="small muted">
+            Saved in this browser. Export a copy to move devices or keep a
+            backup.
+          </p>
+        </section>
+      )}
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={(e) => importFile(e.target.files?.[0])}
+      />
+      {assumptions && (
+        <section className="assumptions-panel" aria-label="Model assumptions">
+          <div className="panel-title">
+            <h2>What this simulation assumes</h2>
+            <button
+              aria-label="Close assumptions"
+              onClick={() => setAssumptions(false)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <p>
+            An educational model for understanding cause and effect. Capacities
+            are illustrative, not real hardware measurements.
+          </p>
+          <dl>
+            <dt>Arrival pattern</dt>
+            <dd>
+              Seeded Poisson arrivals at your average request rate. Replay
+              preserves every arrival when seed and traffic stay the same.
+            </dd>
+            <dt>Processing & queues</dt>
+            <dd>
+              One effective server per component. Each request takes 1 ÷
+              capacity seconds. FIFO queues have fixed limits; a full queue
+              rejects the incoming request.
+            </dd>
+            <dt>Cache</dt>
+            <dd>
+              Fixed per-request hit probability with its own capacity and queue.
+              Hits return immediately after cache processing; misses reach the
+              database. No cache warm-up, eviction, or writes.
+            </dd>
+            <dt>Timeouts & responses</dt>
+            <dd>
+              One deadline from arrival, including a fixed 8 ms response
+              overhead. Timed-out work already processing finishes but cannot
+              succeed. Expired waiting requests are removed.
+            </dd>
+            <dt>End of an experiment</dt>
+            <dd>
+              The run stops at its configured duration. Outstanding requests
+              remain counted as in flight. Successful-request latency excludes
+              failures. Utilization and throughput are averages since the start.
+            </dd>
+            <dt>Scope</dt>
+            <dd>
+              One linear URL lookup path. No replication, retries, network
+              contention, frontend rendering, or nested subsystems yet. Moving a
+              node changes only the view.
+            </dd>
+          </dl>
+        </section>
+      )}
+      {(error || simulation.error) && (
+        <div className="error-banner" role="alert">
+          <TriangleAlert size={18} />
+          <span>{error || simulation.error}</span>
+          <button aria-label="Dismiss error" onClick={() => setError("")}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {notice && (
+        <div className="toast" role="status">
+          <Check size={17} />
+          {notice}
+        </div>
+      )}
+    </div>
+  );
 }

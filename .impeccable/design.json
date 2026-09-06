@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-06T08:34:59.150895+00:00",
+  "title": "Design System: System studio",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "teal": {
+        "role": "primary",
+        "displayName": "Teal",
+        "tonalRamp": [
+          "oklch(15% 0.08 190)",
+          "oklch(25% 0.08 190)",
+          "oklch(35% 0.08 190)",
+          "oklch(45% 0.08 190)",
+          "oklch(60% 0.08 190)",
+          "oklch(75% 0.08 190)",
+          "oklch(85% 0.08 190)",
+          "oklch(95% 0.08 190)"
+        ]
+      },
+      "teal-soft": {
+        "role": "primary",
+        "displayName": "Teal Soft",
+        "tonalRamp": [
+          "oklch(15% 0.08 190)",
+          "oklch(25% 0.08 190)",
+          "oklch(35% 0.08 190)",
+          "oklch(45% 0.08 190)",
+          "oklch(60% 0.08 190)",
+          "oklch(75% 0.08 190)",
+          "oklch(85% 0.08 190)",
+          "oklch(95% 0.08 190)"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Amber",
+        "tonalRamp": [
+          "oklch(15% 0.1 70)",
+          "oklch(25% 0.1 70)",
+          "oklch(35% 0.1 70)",
+          "oklch(45% 0.1 70)",
+          "oklch(60% 0.1 70)",
+          "oklch(75% 0.1 70)",
+          "oklch(85% 0.1 70)",
+          "oklch(95% 0.1 70)"
+        ]
+      },
+      "amber-soft": {
+        "role": "secondary",
+        "displayName": "Amber Soft",
+        "tonalRamp": [
+          "oklch(15% 0.1 70)",
+          "oklch(25% 0.1 70)",
+          "oklch(35% 0.1 70)",
+          "oklch(45% 0.1 70)",
+          "oklch(60% 0.1 70)",
+          "oklch(75% 0.1 70)",
+          "oklch(85% 0.1 70)",
+          "oklch(95% 0.1 70)"
+        ]
+      },
+      "teal-hover": {
+        "role": "primary",
+        "displayName": "Teal Hover",
+        "tonalRamp": [
+          "oklch(15% 0.08 190)",
+          "oklch(25% 0.08 190)",
+          "oklch(35% 0.08 190)",
+          "oklch(45% 0.08 190)",
+          "oklch(60% 0.08 190)",
+          "oklch(75% 0.08 190)",
+          "oklch(85% 0.08 190)",
+          "oklch(95% 0.08 190)"
+        ]
+      },
+      "small-text": {
+        "role": "neutral",
+        "displayName": "Small Text",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      },
+      "canvas-dots": {
+        "role": "neutral",
+        "displayName": "Canvas Dots",
+        "tonalRamp": [
+          "oklch(15% 0.015 160)",
+          "oklch(25% 0.015 160)",
+          "oklch(35% 0.015 160)",
+          "oklch(45% 0.015 160)",
+          "oklch(60% 0.015 160)",
+          "oklch(75% 0.015 160)",
+          "oklch(85% 0.015 160)",
+          "oklch(95% 0.015 160)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Experiment heading",
+        "purpose": "Names the current experiment."
+      },
+      "metric": {
+        "displayName": "Metric value",
+        "purpose": "Observed simulation output with tabular numerals."
+      }
+    },
+    "shadows": [
+      {
+        "name": "floating-panel",
+        "value": "0 12px 35px #203d3521",
+        "purpose": "Project and assumptions panels, toasts and errors."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-transition",
+        "value": "background 0.15s, border-color 0.15s",
+        "purpose": "Button feedback; disabled under reduced motion."
+      },
+      {
+        "name": "running-status",
+        "value": "pulse 1s ease-in-out infinite",
+        "purpose": "Running guide dot; disabled under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1600px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1200px"
+      },
+      {
+        "name": "tablet",
+        "value": "900px"
+      },
+      {
+        "name": "mobile",
+        "value": "560px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Run button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Run button as implemented in the docked workspace.",
+      "html": "<button class=\"ds-button-primary\">Run experiment</button>",
+      "css": ".ds-button-primary{font-family:\"Inter Variable\",sans-serif;font-size:13px;font-weight:500;border:1px solid var(--line,#e1e7e3);border-radius:6px;padding:9px 11px;cursor:pointer;transition:background .15s,border-color .15s;background:var(--teal,#087f84);color:#fff;padding:10px 19px}.ds-button-primary:hover{background:#086b70;border-color:#086b70}.ds-button-primary:focus-visible{outline:2px solid var(--teal,#087f84);outline-offset:3px}.ds-button-primary:disabled{opacity:.4;cursor:not-allowed}"
+    },
+    {
+      "name": "Neutral button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Neutral button as implemented in the docked workspace.",
+      "html": "<button class=\"ds-button-default\">Reset</button>",
+      "css": ".ds-button-default{font-family:\"Inter Variable\",sans-serif;font-size:13px;font-weight:500;border:1px solid var(--line,#e1e7e3);border-radius:6px;padding:9px 11px;cursor:pointer;transition:background .15s,border-color .15s;background:#fff;color:var(--ink,#243b41);padding:9px 11px}.ds-button-default:hover{background:#f0f5f2;border-color:#bdceca}.ds-button-default:focus-visible{outline:2px solid var(--teal,#087f84);outline-offset:3px}.ds-button-default:disabled{opacity:.4;cursor:not-allowed}"
+    },
+    {
+      "name": "Configuration input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Configuration input as implemented in the docked workspace.",
+      "html": "<label class=\"ds-field\">Capacity<input type=\"number\" value=\"500\" aria-label=\"Capacity in requests per second\"></label>",
+      "css": ".ds-field{display:block;font:11px \"Inter Variable\",sans-serif;color:var(--ink,#243b41)}.ds-field input{display:block;margin-top:9px;font:12px \"Inter Variable\",sans-serif;border:1px solid #dbe3df;border-radius:6px;padding:10px 11px;background:#fff;color:var(--ink,#243b41);font-variant-numeric:tabular-nums}.ds-field input:focus-visible{outline:2px solid var(--teal,#087f84);outline-offset:3px}"
+    },
+    {
+      "name": "Inspector tabs",
+      "kind": "nav",
+      "refersTo": "button-default",
+      "description": "Inspector tabs as implemented in the docked workspace.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Inspector\"><button class=\"ds-active\">Configuration</button><button>Explanation</button></nav>",
+      "css": ".ds-tabs{display:flex;gap:9px;padding:0 18px;border-bottom:1px solid var(--line,#e1e7e3)}.ds-tabs button{font:500 10px \"Inter Variable\",sans-serif;flex:1;border:0;border-bottom:2px solid transparent;background:transparent;padding:16px 5px 13px;color:var(--ink,#243b41);cursor:pointer}.ds-tabs button.ds-active{border-color:var(--teal,#087f84);color:var(--teal,#087f84)}.ds-tabs button:hover{background:#f0f5f2}.ds-tabs button:focus-visible{outline:2px solid var(--teal,#087f84);outline-offset:3px}"
+    },
+    {
+      "name": "Amber status tag",
+      "kind": "chip",
+      "refersTo": "warning-tag",
+      "description": "Amber status tag as implemented in the docked workspace.",
+      "html": "<span class=\"ds-tag\">Illustrative model</span>",
+      "css": ".ds-tag{display:inline-block;font:9px/1.4 \"Inter Variable\",sans-serif;padding:5px 7px;border-radius:4px;color:var(--amber,#a76108);background:var(--amber-soft,#fff3df)}"
+    },
+    {
+      "name": "Architecture card",
+      "kind": "card",
+      "refersTo": "component-node",
+      "description": "Architecture card as implemented in the docked workspace.",
+      "html": "<div class=\"ds-node\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><ellipse cx=\"12\" cy=\"5\" rx=\"9\" ry=\"3\"/><path d=\"M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0\"/></svg><div><strong>Database</strong><span>500 req/s capacity</span></div></div>",
+      "css": ".ds-node{display:flex;align-items:center;gap:12px;width:215px;padding:22px 15px;background:#fff;border:1px solid #d4deda;border-radius:9px;color:var(--ink,#243b41);font-family:\"Inter Variable\",sans-serif}.ds-node svg{color:#355c5d;flex-shrink:0}.ds-node strong{display:block;font-size:11px;font-weight:650}.ds-node span{display:block;font-size:10px;color:#5e726d;margin-top:6px;font-variant-numeric:tabular-nums}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Light docked workspace A",
+    "overview": "The selected light docked workspace keeps architecture, configuration and observed results in one working surface. Warm white material, a quiet dotted canvas, compact cards and restrained teal and amber support learning through changes and replay.\n\nOperate mode is the dominant interaction posture: edit the graph, inspect a component, run a seeded workload and compare the result. Density belongs in useful controls and measurements, while the central graph retains room to pan.",
+    "keyCharacteristics": [
+      "Left library, central graph, right inspector and slim bottom metrics.",
+      "Warm white surfaces with fine borders and limited elevation.",
+      "Compact Inter typography and tabular numerical measurements.",
+      "Teal for action and selection; amber for pressure and warnings."
+    ],
+    "rules": [],
+    "dos": [
+      "Do preserve the docked workspace hierarchy and readable graph cards.",
+      "Do label configured-rate predictions as expected and measured values as simulation output.",
+      "Do show units, empty measurement states and explicit illustrative assumptions.",
+      "Do keep mobile cards readable through pan and zoom and retain checkpoint disclosure."
+    ],
+    "donts": [
+      "Don't introduce a marketing hero, decorative imagery or a new visual identity into the workspace.",
+      "Don't shrink the entire mobile graph to fit at the expense of readable labels.",
+      "Don't present predicted database arrivals or configured capacities as measured results.",
+      "Don't silently replace the explicit processing model with visual abstraction."
+    ]
+  }
+}
