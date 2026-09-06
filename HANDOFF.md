@@ -15,3 +15,12 @@
 
 ## Decisions
 Only linear traffic → service → optional cache → database graphs execute in this milestone. Unsupported editor graphs remain editable with explicit validation. Expansion of internals is future work and must preserve simulation semantics.
+
+## Milestone 2 — working docked workspace
+- Canvas nodes/connections editable with keyboard deletion; unsupported paths disable Run and explain repair. Undo/redo, configurable component properties and workload settings.
+- Worker run/pause/reset/replay, observed metrics, queue chart, request accounting and previous-run comparison.
+- Dexie autosave, named local project switcher, JSON import/export, manual checkpoints plus automatic before/after-cache snapshots.
+- Self-hosted Inter, Lucide line icons, light docked design matching selected reference; responsive small-screen stacking.
+- Verification: `npm test` passed 9 tests; `npm run build` passed. Initial bundle is ~503 KB minified (160 KB gzip); optional chunk splitting remains a performance improvement.
+- Preview running at http://localhost:5173/.
+- Next: browser journey tests and screenshot review, fix functional/visual findings, commit verified milestone.
