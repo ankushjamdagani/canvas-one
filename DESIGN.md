@@ -177,3 +177,12 @@ The desktop panel scrolls internally with a 460 px height cap. Canvas resizing r
 The expanded service retains its queue, processor and observed counters. Two compact, labeled inputs below those measurements edit capacity and waiting slots. Apply changes commits both values in one action; Cancel/Escape discards the draft. A short note explains the run reset and Undo. Inputs inherit the workspace's fields, typography and focus treatment; canvas drag, pan and deletion keys do not intercept editing.
 
 Only service internals gain these controls. Database/cache views retain their view-only note. Mobile allocates 500 px to the canvas when service controls are present, preserving the readable 0.9 node scale and full access to inputs/actions. This is direct parameter editing, not nested graph editing.
+
+
+## Concurrent service workers (milestone 9)
+
+Expanded services add a Workers field to the existing atomic edit form. The capacity label explicitly says Per worker; a compact equation shows the applied worker count × rate = total req/s. The node header shows total capacity. The inspector uses the same worker-count and total-capacity domain helpers, labels capacity units req/s/worker and explains the shared queue.
+
+The processor block labels the configured slot count and sampled occupied count. Up to sixteen aggregate occupancy segments use teal for occupied slots, with an accessible meter and sampled-state wording; these segments do not identify individual worker histories. The queue remains one shared bounded FIFO. Service utilization is labeled worker utilization. Mobile provides a 580 px canvas when the service editor is expanded, keeping all sixteen slots and editing actions visible at readable scale.
+
+Saved-result contexts identify historical single-worker models. Comparisons explain model-version mismatches and suppress deltas while leaving original measurements intact. Other docks, components, traffic motion and the selected light design remain consistent.

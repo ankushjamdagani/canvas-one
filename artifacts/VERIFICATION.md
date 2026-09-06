@@ -90,3 +90,14 @@ Verification: 27 unit tests; 11 existing browser journeys; production results jo
 27 unit tests and 14 Chromium journeys pass; production build passes. The new service journeys verify drafts leave completed metrics intact, both settings apply/reset as one undo step, inspector changes synchronize, zero queue slots work, replay results retain their model through save/restore/reload, empty/fractional drafts are rejected, Escape/Cancel restore values, Backspace does not delete the node, and Enter applies. Mobile assertions verify the entire expanded service fits the canvas and the page does not overflow.
 
 Direct desktop/mobile screenshot inspection: `editable-service.png`, `editable-service-mobile.png`. Fields retain the existing docked design. Only service parameters are editable inside the canvas; concurrency and nested subsystems are not introduced. No independent visual review was performed for this scoped addition.
+
+
+## Milestone 9 — concurrent service workers
+
+36 unit tests and 16 production Chromium journeys pass; TypeScript/Vite build passes. Defaults preserve the historical 700 req/s, seed-42, 30-second counts: 20,845 generated, 14,995 succeeded, 5,346 rejected, zero timed out and 504 in flight. Absent and explicit one-worker configurations produce identical current snapshots.
+
+Concurrency tests check shared queue/worker bounds, request conservation, throughput scaling, normalized utilization, zero waiting slots, retained occupancy after active timeouts, skipping expired queued work, per-worker latency semantics, and burst/ramp replay independently of snapshot cadence. Compatibility tests round-trip current worker graphs/checkpoints/results and v1–v3 historical projects/results, reject concurrency hidden in old format versions, retain historical metrics unchanged, and suppress cross-model deltas.
+
+Browser checks exercise one-to-four worker replay with matching generated arrivals, worker-count change descriptions, atomic apply/Undo/Redo, immutable saved model restoration/reload, inspector synchronization, invalid-count drafts, Escape and a sixteen-slot mobile view. Desktop/mobile evidence: `concurrent-service.png`, `concurrent-service-mobile.png`. Direct visual inspection confirms controls fit the approved light workspace; no additional independent visual review is claimed.
+
+Workers are ideal independent processors, not machine replicas. No scheduler contention, pool overhead or database/cache parallelism is added. Capacity is per-worker, total rate is workers × capacity, the queue is shared, and utilization averages across workers. New result model is `url-lookup/3`; historical `url-lookup/2` results remain readable. Version-4 export prevents older readers silently ignoring worker counts. Entry JS remains about 530.23 KB /168.33 KB gzip; existing chunk warning is retained.

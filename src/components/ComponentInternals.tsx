@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUpRight, CornerDownRight } from "lucide-react";
 import { ServiceModelEditor } from "./ServiceModelEditor";
 import { profileLabel } from "../domain/workload";
-import type { ModelNode, Settings } from "../domain/model";
+import { workerCount, type ModelNode, type Settings } from "../domain/model";
 import type { Metrics, NodeMetrics } from "../simulation/engine";
 
 export function ComponentInternals({
@@ -43,6 +43,8 @@ export function ComponentInternals({
         <div className="internal-model-note">Same model · view only</div>
       </div>
     );
+  const workers = workerCount(node);
+  const activeWorkers = metrics?.activeWorkers ?? (metrics?.busy ? 1 : 0);
   const queue = metrics?.queued ?? 0,
     occupancy = node.queueLimit ? queue / node.queueLimit : 0;
   return (
@@ -52,7 +54,9 @@ export function ComponentInternals({
       aria-label={`${node.name} internals`}
     >
       <div className="internal-heading">
-        <span>FIFO waiting queue</span>
+        <span>
+          {node.kind === "service" ? "Shared FIFO queue" : "FIFO waiting queue"}
+        </span>
         <strong>
           {hasRun ? queue : "—"}
           <small> / {node.queueLimit}</small>
@@ -77,31 +81,67 @@ export function ComponentInternals({
       </div>
       <p className="internal-caption">
         {node.queueLimit
-          ? "Queue full → reject new arrivals"
-          : "No waiting slots → reject when busy"}
+          ? node.kind === "service"
+            ? "All workers busy + full queue → reject"
+            : "Queue full → reject new arrivals"
+          : node.kind === "service"
+            ? "No waiting → reject when all workers busy"
+            : "No waiting slots → reject when busy"}
       </p>
       <div className="internal-flow-arrow">
         <ArrowDown size={13} />
       </div>
       <div className="internal-processor">
         <div>
-          <strong>One processing slot</strong>
+          <strong>
+            {workers === 1
+              ? "One processing slot"
+              : `${workers} processing slots`}
+          </strong>
           <span>
             {(1000 / node.capacity).toLocaleString(undefined, {
               maximumFractionDigits: 3,
             })}{" "}
-            ms / request
+            ms / request{node.kind === "service" ? " per worker" : ""}
           </span>
         </div>
         <span
           className={`processor-state ${hasRun && metrics?.busy ? "busy" : ""}`}
         >
-          {hasRun ? (metrics?.busy ? "Busy" : "Idle") : "Ready"}
+          {hasRun
+            ? workers > 1
+              ? `${activeWorkers}/${workers} busy`
+              : metrics?.busy
+                ? "Busy"
+                : "Idle"
+            : "Ready"}
         </span>
       </div>
+      {node.kind === "service" && workers > 1 && (
+        <div
+          className="worker-occupancy"
+          role="meter"
+          aria-label={`${node.name} worker occupancy`}
+          aria-valuemin={0}
+          aria-valuemax={workers}
+          aria-valuenow={activeWorkers}
+          aria-valuetext={
+            hasRun
+              ? `${activeWorkers} of ${workers} workers occupied (sampled)`
+              : "Run to observe worker occupancy"
+          }
+        >
+          {Array.from({ length: workers }, (_, i) => (
+            <span
+              key={i}
+              className={hasRun && i < activeWorkers ? "occupied" : ""}
+            />
+          ))}
+        </div>
+      )}
       <p className="internal-caption">
         {hasRun
-          ? `${((metrics?.utilization ?? 0) * 100).toFixed(1)}% busy time · state sampled`
+          ? `${((metrics?.utilization ?? 0) * 100).toFixed(1)}% worker utilization · state sampled`
           : "Run to observe processing"}
       </p>
       {node.kind === "cache" && (

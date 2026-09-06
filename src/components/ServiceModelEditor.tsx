@@ -1,19 +1,32 @@
 import { useEffect, useState } from "react";
-import type { ModelNode } from "../domain/model";
+import {
+  MAX_SERVICE_WORKERS,
+  workerCount,
+  type ModelNode,
+} from "../domain/model";
 import { useEditor } from "../state/editor";
 
 export function ServiceModelEditor({ node }: { node: ModelNode }) {
   const updateNode = useEditor((state) => state.updateNode);
   const select = useEditor((state) => state.select);
   const [capacity, setCapacity] = useState(String(node.capacity));
+  const [workers, setWorkers] = useState(String(workerCount(node)));
   const [queue, setQueue] = useState(String(node.queueLimit));
   const resetDraft = () => {
     setCapacity(String(node.capacity));
+    setWorkers(String(workerCount(node)));
     setQueue(String(node.queueLimit));
   };
-  useEffect(resetDraft, [node.id, node.capacity, node.queueLimit]);
+  useEffect(resetDraft, [
+    node.id,
+    node.capacity,
+    node.queueLimit,
+    node.workers,
+  ]);
   const dirty =
-    capacity !== String(node.capacity) || queue !== String(node.queueLimit);
+    capacity !== String(node.capacity) ||
+    queue !== String(node.queueLimit) ||
+    workers !== String(workerCount(node));
   return (
     <form
       className="service-model-editor nodrag nopan nowheel"
@@ -30,8 +43,13 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
       onSubmit={(event) => {
         event.preventDefault();
         const nextCapacity = Number(capacity),
-          nextQueue = Number(queue);
+          nextQueue = Number(queue),
+          nextWorkers = Number(workers);
         if (
+          !workers ||
+          !Number.isInteger(nextWorkers) ||
+          nextWorkers < 1 ||
+          nextWorkers > MAX_SERVICE_WORKERS ||
           !capacity ||
           !queue ||
           !Number.isFinite(nextCapacity) ||
@@ -42,18 +60,24 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
           nextQueue > 10000
         )
           return;
-        if (nextCapacity !== node.capacity || nextQueue !== node.queueLimit)
+        if (
+          nextCapacity !== node.capacity ||
+          nextQueue !== node.queueLimit ||
+          nextWorkers !== workerCount(node)
+        )
           updateNode(node.id, {
             capacity: nextCapacity,
+            workers: nextWorkers,
             queueLimit: nextQueue,
           });
         setCapacity(String(nextCapacity));
+        setWorkers(String(nextWorkers));
         setQueue(String(nextQueue));
       }}
     >
       <div className="internal-edit-fields">
         <label>
-          <span>Capacity · req/s</span>
+          <span>Per worker · req/s</span>
           <input
             aria-label="Service processing capacity"
             type="number"
@@ -79,6 +103,24 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
           />
         </label>
       </div>
+      <label className="worker-count-field">
+        <span>Workers</span>
+        <input
+          aria-label="Service worker count"
+          type="number"
+          min={1}
+          max={MAX_SERVICE_WORKERS}
+          step={1}
+          required
+          value={workers}
+          onChange={(event) => setWorkers(event.target.value)}
+        />
+      </label>
+      <p className="internal-caption">
+        {workerCount(node)} × {node.capacity.toLocaleString()} ={" "}
+        {(workerCount(node) * node.capacity).toLocaleString()} req/s total ·
+        applied model
+      </p>
       <div className="internal-edit-actions">
         <button type="submit" disabled={!dirty}>
           Apply changes

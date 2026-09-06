@@ -2200,3 +2200,38 @@ select:focus-visible {
     min-height: 500px;
   }
 }
+
+.worker-count-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 10px;
+}
+.worker-count-field input {
+  width: 65px;
+  padding: 6px;
+  font-size: 12px;
+}
+.worker-occupancy {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  margin-top: 8px;
+}
+.worker-occupancy span {
+  height: 10px;
+  background: #eef2eb;
+  border: 1px solid #d7e1d9;
+  border-radius: 2px;
+}
+.worker-occupancy .occupied {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+@media (max-width: 560px) {
+  .canvas-area:has(.service-model-editor) {
+    height: 580px;
+    min-height: 580px;
+  }
+}

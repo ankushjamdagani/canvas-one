@@ -32,7 +32,7 @@ Select empty canvas space (or configure the traffic source), then choose **Stead
 
 The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
 
-Profiles save with local projects and checkpoints. JSON exports use **version 3** and include saved results; version-1 and version-2 imports still work. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+Profiles save with local projects and checkpoints. JSON exports use **version 4** and include worker counts and saved results; version-1, version-2 and version-3 imports still work. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
 
 ## Save and compare experiments
 
@@ -47,14 +47,23 @@ Rename a result in the panel, **Restore model** to edit or replay its setup, or 
 Use a node's chevron, or **Show internals on canvas** in the inspector, to expand it. The same canvas reveals:
 
 - Traffic: the seeded Poisson generator and observed arrival count.
-- Service/database: bounded FIFO queue occupancy, one processing slot, processing time, sampled busy/idle state and processed/rejected counts.
+- Service: one bounded shared FIFO queue, 1–16 processing workers, per-worker processing time, sampled worker occupancy and processed/rejected counts.
+- Database: bounded FIFO queue, one processing slot and observed counters.
 - Cache: the same queue and processing details plus configured hit/miss routing and observed hits.
 
-Expanding, collapsing and moving components do not restart or replace the simulation. Expanded views are saved with the project and included in JSON exports. Queue bars summarize occupancy; they are not individual queued requests. Busy/idle is a sampled state, while busy-time percentage is cumulative.
+Expanding, collapsing and moving components do not restart or replace the simulation. Expanded views are saved with the project and included in JSON exports. Queue bars summarize occupancy; they are not individual queued requests. Worker occupancy is a sampled aggregate count, not a trace of individual worker identities. Utilization is cumulative occupied processor time divided by worker count × elapsed time.
 
-Expanded **service** nodes also include capacity and queue-limit inputs. Type both values, then choose **Apply changes** (or press Enter). Applying makes one undoable model edit and resets the current run; drafting, canceling and expanding do not. Escape cancels a draft. Inspector edits, Undo/Redo and restored models synchronize the canvas fields. Capacity accepts 1–100,000 req/s; queue limits accept 0–10,000 whole waiting slots. Saved results keep their original models. Database and cache internals remain read-only on canvas and configurable in the inspector.
+Expanded **service** nodes also include per-worker capacity, worker-count and queue-limit inputs. Type the values, then choose **Apply changes** (or press Enter). Applying makes one undoable model edit and resets the current run; drafting, canceling and expanding do not. Escape cancels a draft. Inspector edits, Undo/Redo and restored models synchronize the canvas fields. Capacity accepts 1–100,000 req/s per worker; worker count accepts whole numbers from 1–16; queue limits accept 0–10,000 whole waiting slots. Saved results keep their original models. Database and cache internals remain read-only on canvas and configurable in the inspector.
 
 Traffic dots run continuously on the browser's animation clock, pause/resume without losing their phase, and are disabled for reduced-motion preferences. Dots show direction, not request count or measured speed.
+
+## Scale service workers
+
+Try a service at 200 req/s per worker with 700 req/s incoming traffic. Run with one worker, save the result, then change Workers to four, Apply and replay. The service now has 800 req/s total capacity, while each request still needs 5 ms of service processing. The database can become the next bottleneck.
+
+Workers take requests from one shared FIFO queue. New arrivals use the first free worker; otherwise they wait or are rejected if the queue is full. Completing workers take the oldest nonexpired waiting request. Equal-time events use stable insertion order. Expired active work occupies its worker until processing completes. Workers are ideal independent processing slots: no contention, scheduling overhead, connection pools or machine-level scaling are modeled.
+
+Older projects omit worker count and retain one worker. Historical saved results remain labeled with the single-worker model (`url-lookup/2`); new results use `url-lookup/3`. Both remain readable, but cross-version comparisons suppress deltas. Restoring a historical model preserves its single-worker settings; replay creates a new result under the current model version. Portable exports use version 4 so old readers cannot silently ignore concurrency.
 
 ## Editing and persistence
 
@@ -72,8 +81,8 @@ This is a learning model, not a hardware benchmark or architecture sizing tool.
 
 - One supported request path: traffic → service → optional cache → database.
 - Poisson arrivals from a deterministic seed, following the configured steady, burst or linear-ramp rate. Integrated arrival intensity is inverted analytically; unused exponential hazard is carried across burst boundaries, without fixed time-step approximations. Cache outcomes use a separate per-request deterministic draw, so adding the cache does not perturb arrivals.
-- One effective serial server per component; processing time is `1 / capacity`. Service defaults to 2,000 requests/s; database 500; cache 5,000.
-- FIFO waiting queues default to 500 slots. Queue limits exclude the actively processed request. Full queues reject new arrivals.
+- Service defaults to one worker at 2,000 requests/s per worker. Total service capacity is `workers × capacity`; processing time for each request is `1 / capacity`. Database and cache each retain one serial processor at 500 and 5,000 requests/s respectively.
+- FIFO waiting queues default to 500 slots. Queue limits exclude all active workers. New arrivals are rejected when every worker is busy and the waiting queue is full.
 - A global deadline defaults to 2,000 ms and includes a fixed 8 ms response overhead. An expired queued request is skipped. Already-processing expired work still consumes capacity until it completes, but never becomes a successful response.
 - Cache hit probability is fixed (no warm-up, eviction, writes, consistency or key popularity).
 - Runs stop at the selected observation window. Outstanding requests are counted as in flight rather than silently marked successful. Generated = succeeded + rejected + timed out + in flight.

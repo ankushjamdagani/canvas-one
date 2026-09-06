@@ -24,7 +24,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
-import { type ModelNode, type Settings } from "../domain/model";
+import { totalCapacity, type ModelNode, type Settings } from "../domain/model";
 import { rateAt } from "../domain/workload";
 import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
@@ -70,7 +70,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
               ? `${rate.toLocaleString()} req/s`
               : n.kind === "cache"
                 ? `${n.hitRate}% hit rate`
-                : `${n.capacity.toLocaleString()} req/s capacity`}
+                : `${totalCapacity(n).toLocaleString()} req/s ${n.kind === "service" ? "total" : "capacity"}`}
           </span>
         </div>
         <button

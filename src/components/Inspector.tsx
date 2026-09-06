@@ -1,3 +1,8 @@
+import {
+  MAX_SERVICE_WORKERS,
+  workerCount,
+  totalCapacity,
+} from "../domain/model";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -77,7 +82,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
       n.kind === "database"
         ? expectedDatabaseRate(g, metrics?.time ?? 0)
         : rateAt(g.settings, metrics?.time ?? 0),
-    overloaded = n.kind !== "traffic" && demand > n.capacity;
+    overloaded = n.kind !== "traffic" && demand > totalCapacity(n);
   return (
     <aside className="inspector">
       <div className="inspector-heading">
@@ -130,9 +135,28 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                   min={1}
                   max={100000}
                   value={n.capacity}
-                  unit="req/s"
+                  unit={n.kind === "service" ? "req/s/worker" : "req/s"}
                   onChange={(v) => editor.updateNode(n.id, { capacity: v })}
                 />
+                {n.kind === "service" && (
+                  <>
+                    <NumberField
+                      label="Service workers"
+                      min={1}
+                      max={MAX_SERVICE_WORKERS}
+                      value={workerCount(n)}
+                      onChange={(v) =>
+                        editor.updateNode(n.id, { workers: Math.round(v) })
+                      }
+                    />
+                    <p className="small muted">
+                      {workerCount(n)} workers × {n.capacity.toLocaleString()}{" "}
+                      req/s each = {totalCapacity(n).toLocaleString()} req/s
+                      total. One shared FIFO queue; waiting slots exclude active
+                      workers.
+                    </p>
+                  </>
+                )}
                 <NumberField
                   label="Queue limit"
                   min={0}
@@ -186,7 +210,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                 </strong>
                 <p>
                   {overloaded
-                    ? `${Math.round(demand)} expected arrivals/s · ${n.capacity} capacity/s`
+                    ? `${Math.round(demand)} expected arrivals/s · ${totalCapacity(n)} total capacity/s`
                     : n.kind === "traffic"
                       ? profileLabel(g.settings)
                       : `${Math.round(demand)} expected arrivals/s`}
@@ -198,7 +222,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
               {n.kind === "traffic"
                 ? "Generates requests with seeded, irregular arrival times. The configured rate is an average; short bursts happen naturally."
                 : n.kind === "service"
-                  ? "Looks up a short URL and returns its destination. Each request passes through this service before checking the cache or database."
+                  ? "Looks up a short URL and returns its destination. Workers process requests concurrently from one shared FIFO queue. Each worker takes 1 ÷ per-worker capacity seconds per request; increasing workers increases total capacity, not individual request speed."
                   : n.kind === "database"
                     ? "Looks up the original URL. Requests wait in a FIFO queue when the database is busy; a full queue rejects new arrivals."
                     : "Returns a cached destination on a hit. A miss continues to the database. The hit rate is a fixed probability, with no warm-up or eviction model."}
@@ -220,7 +244,9 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                   <dd>{m.queued}</dd>
                 </div>
                 <div>
-                  <dt>Busy time</dt>
+                  <dt>
+                    {n.kind === "service" ? "Worker utilization" : "Busy time"}
+                  </dt>
                   <dd>{(m.utilization * 100).toFixed(1)}%</dd>
                 </div>
                 <div>

@@ -1,6 +1,18 @@
 # Development handoff
 
-## Current milestone — editable service internals
+## Current milestone — concurrent service workers (7 September 2026)
+
+Services support 1–16 independent workers. `capacity` is explicitly per-worker req/s; total capacity is `workers × capacity`, while each request still takes `1 / capacity` seconds. Workers share one bounded FIFO queue excluding active requests. Arrivals use the first free worker; completions take the oldest nonexpired waiting request. Equal-time events retain insertion-order ties. Timed-out active work does not release its worker until completion. Utilization is summed occupied time divided by workers × elapsed time. Database/cache stay single-processor.
+
+`ModelNode.workers` is optional: absent means one, preserving old projects. Shared `workerCount`, `totalCapacity` and worker-limit helpers serve UI/domain/engine. New snapshots include sampled activeWorkers. Version-4 portable exports include concurrency; v1–v3 imports remain supported, with no hidden concurrent settings accepted in old formats. New results use `url-lookup/3`; historical `url-lookup/2` results remain unchanged and labeled, and cross-version deltas are suppressed. No IndexedDB schema migration is required.
+
+Expanded service controls apply worker count, per-worker rate and queue limit atomically with Cancel/Escape and Undo. Inspector fields synchronize; total capacity and an aggregate occupied-slot meter are explicit. Saved models/checkpoints retain worker counts. Mobile fits up to sixteen slots and all editing controls in a 580 px canvas. Workers model ideal concurrency, not hardware replicas or contention.
+
+Verification: 36 unit tests cover default seeded counts, concurrent bounds/accounting/utilization, expired active/queued work, zero slots, latency semantics, burst/ramp chunk invariance and historical compatibility. Sixteen production Chromium journeys cover the existing features and worker apply/undo, matched arrivals, saved restoration/reload, inspector synchronization, validation and mobile fit. Production build passes (entry about 530 KB /168 KB gzip; size warning remains). Screenshots inspected: `artifacts/concurrent-service.png`, `artifacts/concurrent-service-mobile.png`.
+
+Checkpoints: `f67704a` engine/domain/compatibility; final UI/documentation commit is `git log -1`. Preview http://localhost:5173/. No push/deployment. Next scope could add a second supported path such as queued background jobs; specify routing, acknowledgment and failure semantics before implementing. Nested editable subgraphs and realistic contention remain future work.
+
+## Previous milestone — editable service internals
 
 Expanded service nodes now edit processing capacity and queue slots directly on the canvas. Drafts leave the current run untouched. Apply changes/Enter validates and commits both values in one undo step, resetting the run through the existing model-change path. Cancel/Escape discards drafts. Inspector edits, Undo/Redo, project reload and saved-model restoration synchronize both fields. Saved runs remain immutable. Other component internals are unchanged.
 
@@ -93,10 +105,3 @@ Traffic stutter root cause: rebuilding controlled nodes without their measured d
 One supported execution path: traffic → service → optional cache → database. Seeded Poisson arrivals; deterministic service time 1/capacity; FIFO queues default 500; global deadline default 2 seconds; fixed 8 ms response overhead; separate deterministic cache draws. Expired queued requests are skipped; expired active work still occupies capacity until completion. Observation windows end with outstanding work explicitly counted as in flight.
 
 These are illustrative learning assumptions, not real hardware benchmarks. Expanded internals currently inspect this existing model; they are not editable nested architecture graphs. Future milestones may add editable subsystems, richer workloads, other supported paths. Add those deliberately with model validation and deterministic tests. No cloud sync; running simulation state is ephemeral, while explicitly saved completed results persist. The main JS bundle is approximately 511 KB minified (~162 KB gzip), with code splitting a later performance opportunity.
-
-
-## Concurrent service workers — implementation checkpoint
-
-Domain/engine milestone implements 1–16 service workers, per-worker rate and one bounded shared FIFO queue. Defaults/absent worker counts preserve one worker. Active deadlines never release a worker early; completed work dispatches the next nonexpired waiting request. Utilization divides total occupied time by workers × elapsed time. Thirty-six unit tests pass, covering concurrency, timeouts, accounting, profile replay and portable compatibility.
-
-Version-4 exports carry the worker configuration. Historical model `url-lookup/2` results remain unchanged/readable; new results use `url-lookup/3` and cross-version deltas are suppressed. Targeted canvas, saved-results and new concurrency browser journeys pass. UI screenshots fit desktop/mobile. Final production regression, documentation and UI checkpoint remain in progress.

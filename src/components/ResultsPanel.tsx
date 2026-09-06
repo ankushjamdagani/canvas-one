@@ -265,6 +265,12 @@ export function ResultsPanel({
 function RunContext({ run }: { run: SavedRun }) {
   return (
     <small className="run-context">
+      {run.modelVersion === "url-lookup/2" && (
+        <>
+          Historical single-worker model
+          <br />
+        </>
+      )}
       {profileLabel(run.graph.settings)}
       <br />
       Seed {run.graph.settings.seed} · {run.graph.settings.duration}s · timeout{" "}

@@ -650,9 +650,14 @@ export default function App() {
             </dd>
             <dt>Processing & queues</dt>
             <dd>
-              One effective server per component. Each request takes 1 ÷
-              capacity seconds. FIFO queues have fixed limits; a full queue
-              rejects the incoming request.
+              Services have 1–16 parallel workers, each processing at the
+              configured per-worker capacity. Total capacity is workers ×
+              per-worker capacity; processing time per request remains 1 ÷
+              per-worker capacity. Database and cache each have one processor.
+              One bounded FIFO queue per component excludes active work.
+              Arrivals are rejected only when all workers are busy and the queue
+              is full. Worker utilization is occupied processor time divided by
+              workers × elapsed time.
             </dd>
             <dt>Cache</dt>
             <dd>
