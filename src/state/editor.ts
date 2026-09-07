@@ -1,3 +1,4 @@
+import { experiments } from "../domain/experiments";
 import { visibleSubsystems } from "../domain/subsystems";
 import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
 import { create } from "zustand";
@@ -33,6 +34,7 @@ interface Editor {
   settings: (patch: Partial<Settings>) => void;
   add: (kind: ComponentKind) => void;
   insertCache: () => void;
+  loadExperiment: (id: string) => void;
   useScenario: (scenario: "lookup" | "jobs") => void;
   beginMove: () => void;
   move: (
@@ -50,14 +52,52 @@ export const useEditor = create<Editor>((set, get) => ({
   project: newProject(),
   createSubsystem: (name, nodeIds) => {
     const active = visibleSubsystems(get().project);
-    const used = new Set(active.flatMap(group => group.nodeIds));
-    const members = [...new Set(nodeIds)].filter(id => !used.has(id) && get().project.graph.nodes.some(node => node.id === id));
+    const used = new Set(active.flatMap((group) => group.nodeIds));
+    const members = [...new Set(nodeIds)].filter(
+      (id) =>
+        !used.has(id) &&
+        get().project.graph.nodes.some((node) => node.id === id),
+    );
     if (members.length < 2 || active.length >= 10) return;
-    const group = { id: crypto.randomUUID(), name: name.trim().slice(0, 80) || "Subsystem", nodeIds: members, collapsed: false };
-    set(s => ({ project: { ...s.project, subsystems: [...active, group], updatedAt: Date.now() } }));
+    const group = {
+      id: crypto.randomUUID(),
+      name: name.trim().slice(0, 80) || "Subsystem",
+      nodeIds: members,
+      collapsed: false,
+    };
+    set((s) => ({
+      project: {
+        ...s.project,
+        subsystems: [...active, group],
+        updatedAt: Date.now(),
+      },
+    }));
   },
-  toggleSubsystem: (id) => set(s => ({ project: { ...s.project, subsystems: (s.project.subsystems ?? []).map(group => group.id === id ? { ...group, collapsed: !group.collapsed } : group), updatedAt: Date.now() }, selected: s.project.subsystems?.find(group => group.id === id)?.collapsed ? s.project.subsystems.find(group => group.id === id)!.nodeIds[0] : id })),
-  dissolveSubsystem: (id) => set(s => ({ project: { ...s.project, subsystems: (s.project.subsystems ?? []).filter(group => group.id !== id), updatedAt: Date.now() }, selected: null })),
+  toggleSubsystem: (id) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        subsystems: (s.project.subsystems ?? []).map((group) =>
+          group.id === id ? { ...group, collapsed: !group.collapsed } : group,
+        ),
+        updatedAt: Date.now(),
+      },
+      selected: s.project.subsystems?.find((group) => group.id === id)
+        ?.collapsed
+        ? s.project.subsystems.find((group) => group.id === id)!.nodeIds[0]
+        : id,
+    })),
+  dissolveSubsystem: (id) =>
+    set((s) => ({
+      project: {
+        ...s.project,
+        subsystems: (s.project.subsystems ?? []).filter(
+          (group) => group.id !== id,
+        ),
+        updatedAt: Date.now(),
+      },
+      selected: null,
+    })),
   saveRun: (run) => {
     const runs = get().project.savedRuns ?? [];
     if (runs.some((r) => r.id === run.id)) return true;
@@ -175,6 +215,29 @@ export const useEditor = create<Editor>((set, get) => ({
       g.nodes.push(node);
     });
     set({ selected: node.id });
+  },
+  loadExperiment: (id) => {
+    const experiment = experiments.find((item) => item.id === id);
+    if (!experiment) {
+      set((s) => ({
+        project: {
+          ...s.project,
+          activeExperiment: undefined,
+          updatedAt: Date.now(),
+        },
+      }));
+      return;
+    }
+    const graph = experiment.build();
+    get().change((g) => {
+      for (const key of Object.keys(g))
+        delete (g as unknown as Record<string, unknown>)[key];
+      Object.assign(g, graph);
+    });
+    set((s) => ({
+      project: { ...s.project, activeExperiment: id },
+      selected: null,
+    }));
   },
   useScenario: (scenario) => {
     const fresh = scenario === "jobs" ? backgroundJobs() : newProject().graph;

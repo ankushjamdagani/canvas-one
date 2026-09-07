@@ -1,3 +1,5 @@
+import { experiments } from "./domain/experiments";
+import { SubsystemsPanel } from "./components/SubsystemsPanel";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
@@ -213,6 +215,23 @@ export default function App() {
           </label>
           <p>Loads a starter model. Undo restores your canvas.</p>
         </div>
+        <div className="guided-picker">
+          <label>
+            <span>Guided experiment</span>
+            <select
+              aria-label="Guided experiment"
+              value={project.activeExperiment ?? ""}
+              onChange={(e) => editor.loadExperiment(e.target.value)}
+            >
+              <option value="">Explore freely</option>
+              {experiments.map((experiment) => (
+                <option key={experiment.id} value={experiment.id}>
+                  {experiment.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="library-section">
           <h2>Components</h2>
           <p>Click to add to your canvas</p>
@@ -289,6 +308,7 @@ export default function App() {
             </button>
           </form>
         </details>
+        <SubsystemsPanel key={project.id} />
         <div className="saved-runs-library">
           <button
             className="saved-runs-heading"

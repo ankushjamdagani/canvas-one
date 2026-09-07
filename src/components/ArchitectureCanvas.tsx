@@ -1,3 +1,6 @@
+import { visibleSubsystems } from "../domain/subsystems";
+import { SubsystemNode } from "./SubsystemNode";
+import { projectSubsystems } from "./subsystemProjection";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
@@ -124,7 +127,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
     </div>
   );
 }
-const nodeTypes = { component: ComponentNode };
+const nodeTypes = { component: ComponentNode, subsystem: SubsystemNode };
 const edgeTypes = { traffic: TrafficEdge };
 export function ArchitectureCanvas({
   metrics,
@@ -135,6 +138,7 @@ export function ArchitectureCanvas({
 }) {
   const editor = useEditor(),
     g = editor.project.graph;
+  const groups = visibleSubsystems(editor.project);
   const flow = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -155,7 +159,7 @@ export function ArchitectureCanvas({
       ) {
         cancelAnimationFrame(frame);
         const fit = () => {
-          const nodes = flow.getNodes();
+          const nodes = flow.getNodes().filter((node) => !node.hidden);
           if (!nodes.length) return;
           if (window.innerWidth <= 560) {
             const selected =
@@ -203,7 +207,9 @@ export function ArchitectureCanvas({
     document.addEventListener("visibilitychange", update);
     return () => document.removeEventListener("visibilitychange", update);
   }, []);
-  const expandedKey = (editor.project.expandedNodeIds ?? []).join(",");
+  const expandedKey =
+    (editor.project.expandedNodeIds ?? []).join(",") +
+    groups.map((group) => `${group.id}:${group.collapsed}`).join(",");
   const lastExpanded = useRef(expandedKey);
   useEffect(() => {
     if (lastExpanded.current === expandedKey) return;
@@ -243,7 +249,7 @@ export function ArchitectureCanvas({
     }, 80);
     return () => clearTimeout(timer);
   }, [g.nodes.length, flow]);
-  const nodes: ArchitectureNode[] = useMemo(
+  const baseNodes: ArchitectureNode[] = useMemo(
     () =>
       g.nodes.map((n) => ({
         id: n.id,
@@ -270,48 +276,66 @@ export function ArchitectureCanvas({
       })),
     [g, editor.selected, editor.project.expandedNodeIds, metrics, dimensions],
   );
+  const { nodes, endpoints } = projectSubsystems(baseNodes, groups, metrics);
   const expectedRate = rateAt(g.settings, metrics?.time ?? 0);
   const edges: TrafficConnection[] = useMemo(
     () =>
-      g.edges.map((e) => {
-        const target = g.nodes.find((n) => n.id === e.target);
-        return {
-          ...e,
-          selected: selectedEdges.includes(e.id),
-          type: "traffic",
-          data: {
-            running: running && pageVisible,
-            rateLabel:
-              target?.kind === "worker"
-                ? metrics?.time
-                  ? "attempts observed"
-                  : "capacity"
-                : target?.kind === "queue"
-                  ? "offered"
-                  : "expected",
-            rate:
-              target?.kind === "worker"
-                ? metrics?.time
-                  ? (metrics.nodes[target.id]?.arrived ?? 0) / metrics.time
-                  : totalCapacity(target)
-                : target?.kind === "database"
-                  ? expectedRate *
-                    (1 -
-                      (g.nodes.find((n) => n.kind === "cache")?.hitRate ?? 0) /
-                        100)
-                  : expectedRate,
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "#07858b",
-            width: 15,
-            height: 15,
-          },
-        };
-      }),
-    [g, selectedEdges, running, pageVisible, expectedRate, metrics],
+      g.edges
+        .filter(
+          (e) =>
+            (endpoints.get(e.source) ?? e.source) !==
+            (endpoints.get(e.target) ?? e.target),
+        )
+        .map((e) => {
+          const target = g.nodes.find((n) => n.id === e.target);
+          return {
+            ...e,
+            source: endpoints.get(e.source) ?? e.source,
+            target: endpoints.get(e.target) ?? e.target,
+            selected: selectedEdges.includes(e.id),
+            type: "traffic",
+            data: {
+              running: running && pageVisible,
+              rateLabel:
+                target?.kind === "worker"
+                  ? metrics?.time
+                    ? "attempts observed"
+                    : "capacity"
+                  : target?.kind === "queue"
+                    ? "offered"
+                    : "expected",
+              rate:
+                target?.kind === "worker"
+                  ? metrics?.time
+                    ? (metrics.nodes[target.id]?.arrived ?? 0) / metrics.time
+                    : totalCapacity(target)
+                  : target?.kind === "database"
+                    ? expectedRate *
+                      (1 -
+                        (g.nodes.find((n) => n.kind === "cache")?.hitRate ??
+                          0) /
+                          100)
+                    : expectedRate,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: "#07858b",
+              width: 15,
+              height: 15,
+            },
+          };
+        }),
+    [
+      g,
+      selectedEdges,
+      running,
+      pageVisible,
+      expectedRate,
+      metrics,
+      editor.project.subsystems,
+    ],
   );
-  const onNodesChange: OnNodesChange<ArchitectureNode> = (changes) => {
+  const onNodesChange: OnNodesChange = (changes) => {
     for (const change of changes) {
       if (change.type === "dimensions" && change.dimensions) {
         const size = change.dimensions;
@@ -330,7 +354,26 @@ export function ArchitectureCanvas({
     );
     if (positions.length) {
       const next = applyNodeChanges(positions, nodes);
-      editor.move(next.map((n) => ({ id: n.id, position: n.position })));
+      const moved = new Map(
+        g.nodes.map((node) => [
+          node.id,
+          next.find((n) => n.id === node.id)?.position ?? node.position,
+        ]),
+      );
+      for (const change of positions) {
+        if (change.type !== "position") continue;
+        const group = groups.find((group) => group.id === change.id);
+        const before = nodes.find((node) => node.id === change.id);
+        if (group && before && change.type === "position" && change.position) {
+          const dx = change.position.x - before.position.x,
+            dy = change.position.y - before.position.y;
+          for (const id of group.nodeIds) {
+            const position = moved.get(id)!;
+            moved.set(id, { x: position.x + dx, y: position.y + dy });
+          }
+        }
+      }
+      editor.move([...moved].map(([id, position]) => ({ id, position })));
     }
   };
   return (
@@ -354,6 +397,9 @@ export function ArchitectureCanvas({
       onNodeClick={(_, n) => editor.select(n.id)}
       onPaneClick={() => editor.select(null)}
       onConnect={(c) =>
+        !groups.some(
+          (group) => group.id === c.source || group.id === c.target,
+        ) &&
         editor.change((g) => {
           if (
             !g.edges.some((e) => e.source === c.source && e.target === c.target)

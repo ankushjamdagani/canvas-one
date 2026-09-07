@@ -1,3 +1,4 @@
+import { ExperimentCoach } from "./ExperimentCoach";
 import { JobControls } from "./JobControls";
 import { isJobGraph } from "../domain/model";
 import {
@@ -39,6 +40,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
             Change the incoming traffic, run the model, then see where requests
             spend their time.
           </p>
+          <ExperimentCoach project={editor.project} metrics={metrics} />
           <div className="section-rule" />
           <WorkloadControls />
           <NumberField

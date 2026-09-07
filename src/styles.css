@@ -2275,3 +2275,177 @@ select:focus-visible {
     min-height: 580px;
   }
 }
+
+.subsystems-panel {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.subsystems-panel summary {
+  cursor: pointer;
+  list-style: none;
+}
+.subsystems-panel p {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.subsystems-panel form > input {
+  width: 100%;
+  padding: 8px;
+}
+.subsystems-panel fieldset {
+  border: 0;
+  margin: 10px 0;
+  padding: 0;
+}
+.subsystems-panel legend {
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.subsystems-panel fieldset label {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  align-items: center;
+  margin: 5px 0;
+}
+.subsystems-panel input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--teal);
+}
+.subsystem-library-row {
+  display: flex;
+  align-items: center;
+  margin: 7px 0;
+}
+.subsystem-library-row button {
+  padding: 6px 4px;
+  border: 0;
+}
+.subsystem-library-row button:first-child {
+  flex: 1;
+  min-width: 0;
+  justify-content: start;
+}
+.subsystem-library-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.subsystem-shell {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed #88aba2;
+  background: #f0f6f180;
+  border-radius: 10px;
+  position: relative;
+}
+.subsystem-shell.collapsed {
+  background: #f3f8f5;
+  border-style: solid;
+}
+.subsystem-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--teal);
+  padding: 13px 14px;
+  height: 48px;
+}
+.subsystem-header strong {
+  font-size: 12px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subsystem-header button {
+  margin-left: auto;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+}
+.subsystem-shell p {
+  padding: 0 14px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.subsystem-summary {
+  display: flex;
+  gap: 15px;
+  padding: 12px 14px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.subsystem-shell small {
+  display: block;
+  padding: 0 14px;
+  font-size: 9px;
+  color: var(--muted);
+}
+.subsystem-model-note {
+  position: absolute;
+  bottom: 12px;
+}
+.subsystem-shell .react-flow__handle {
+  top: 24px;
+}
+@media (max-width: 560px) {
+  .subsystems-panel {
+    width: 100%;
+    margin: 8px 0;
+    padding-top: 8px;
+  }
+}
+
+.guided-picker {
+  margin-top: 14px;
+}
+.guided-picker label > span {
+  display: block;
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.guided-picker select {
+  width: 100%;
+  padding: 8px;
+  background: white;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.experiment-coach {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.experiment-coach h3 {
+  margin-top: 0;
+}
+.experiment-coach ol,
+.experiment-coach ul {
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.experiment-coach li {
+  margin: 8px 0;
+}
+.experiment-coach details {
+  margin: 14px 0;
+  background: var(--teal-soft);
+  border-radius: 6px;
+  padding: 10px;
+}
+.experiment-coach summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .guided-picker {
+    width: 100%;
+    margin: 0 0 14px;
+  }
+}

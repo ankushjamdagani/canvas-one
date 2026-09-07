@@ -186,3 +186,8 @@ Expanded services add a Workers field to the existing atomic edit form. The capa
 The processor block labels the configured slot count and sampled occupied count. Up to sixteen aggregate occupancy segments use teal for occupied slots, with an accessible meter and sampled-state wording; these segments do not identify individual worker histories. The queue remains one shared bounded FIFO. Service utilization is labeled worker utilization. Mobile provides a 580 px canvas when the service editor is expanded, keeping all sixteen slots and editing actions visible at readable scale.
 
 Saved-result contexts identify historical single-worker models. Comparisons explain model-version mismatches and suppress deltas while leaving original measurements intact. Other docks, components, traffic motion and the selected light design remain consistent.
+
+
+## Background jobs and subsystem composition
+
+The light docked workspace now offers an Experiment path selector. Job queue and worker cards reveal admission, attempt processing and retry settings; producer acknowledgement is explicitly distinct from completion. Job edges distinguish offered traffic from observed attempts. Subsystems use a lightly tinted dashed enclosure when expanded and a compact solid summary when collapsed. Header dragging moves members together. Names and controls remain in the left dock; mobile uses disclosures and a readable focused node rather than squeezing the whole subsystem into view. Renderer-only group dimensions are retained across samples to keep collapsed cards and boundary edges stable.

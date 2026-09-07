@@ -5,10 +5,10 @@
 User removed backward-compatibility requirements. Preserve local projects; portable imports now accept current format only.
 
 1. **Background jobs — complete.** Separate job engine, shared heap/RNG/latency helpers, queue/worker components, inline controls, path selector and job-specific metrics verified. 40 unit tests, 18 production browser journeys and build pass. Current checkpoint includes initial subsystem metadata/state scaffolding; subsystem rendering follows next.
-2. **Canvas subsystems — implementing.** Group real components, collapse/expand a summary on the same canvas, preserve simulation semantics, and edit real child components when expanded.
-3. **Guided experiments — next.** Finite starter scenarios and explanations connecting both paths, subsystem views and saved comparisons. Finish this roadmap without inventing additional milestones.
+2. **Canvas subsystems — complete.** Named non-overlapping groups wrap real components, collapse to waiting/active summaries and expose editable children on expansion. Projection only remaps rendered boundary endpoints; original graph identity/metrics remain unchanged. 43 unit tests, targeted desktop/mobile journeys and build pass. Group renderer measurements are retained across worker samples.
+3. **Guided experiments — implementing.** Finite starter scenarios and explanations connecting both paths, subsystem views and saved comparisons. Finish this roadmap without inventing additional milestones.
 
-Resume from current Git diff; do not recreate job implementation. Prior completed checkpoint is `398de12`. Job path is producer → queue → worker. Producer ack follows admission by 8 ms independently of job completion. Retries use fixed backoff and rejoin FIFO; full retry admission fails permanently. Absolute TTL covers all attempts; expired active jobs keep slots until processing ends. Queue/worker state and producer/job outcomes remain distinct. Version-5 exports/imports are current-only; no browser-local records are deleted.
+Resume from current Git diff; do not recreate job implementation. Background jobs checkpoint is `d690abb`. Subsystem checkpoint follows in Git. Guided experiment factories and coach scaffold are present, with dedicated verification next. Job path is producer → queue → worker. Producer ack follows admission by 8 ms independently of job completion. Retries use fixed backoff and rejoin FIFO; full retry admission fails permanently. Absolute TTL covers all attempts; expired active jobs keep slots until processing ends. Queue/worker state and producer/job outcomes remain distinct. Version-5 exports/imports are current-only; no browser-local records are deleted.
 
 ## Current milestone — concurrent service workers (7 September 2026)
 

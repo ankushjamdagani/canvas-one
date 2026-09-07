@@ -73,6 +73,12 @@ Producer acknowledgment follows successful queue admission after 8 ms. It is sep
 
 Job accounting satisfies **generated = completed + admission rejected + expired + permanently failed + in flight**. Accepted = generated − admission rejected. Producer acknowledgements are a separate counter; the observation window may end before an acknowledgement arrives. Successful-job latency includes waiting and retries. Queue-to-worker edges show observed attempt rate after starting, and configured capacity before starting.
 
+## Subsystems on the same canvas
+
+Open **Subsystems → Create subsystem**, name the group and choose at least two components. Groups are non-overlapping and one level deep. Collapse the group to see combined waiting/active counts and boundary connections; expand to edit the actual components and connections. Drag its header to move members together. Ungroup keeps every component.
+
+Grouping and collapse are view changes, so a running experiment continues with the same graph and exact results. Groups persist with local projects and portable exports. A group whose components are absent after loading another scenario stays dormant and can reappear when that model edit is undone. This is visual composition around executable nodes, not a replacement simulation model.
+
 ## Editing and persistence
 
 - Add components from the library, drag nodes, connect source and target handles, select a connection and press Delete, or delete a component from its inspector. Undo/redo preserves recent edits. Unsupported graphs remain editable and explain why Run is disabled.

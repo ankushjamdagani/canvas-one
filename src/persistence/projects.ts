@@ -39,7 +39,16 @@ export function importProject(text: string): Project {
     p.checkpoints.length > 50
   )
     throw new Error("Project name or checkpoints are invalid.");
-  const errors = [...validateGraph(p.graph, false), ...validateSubsystems(p.subsystems)];
+  const errors = [
+    ...validateGraph(p.graph, false),
+    ...validateSubsystems(p.subsystems),
+  ];
+  if (
+    (p.subsystems ?? []).some((group: { id: string }) =>
+      p.graph?.nodes?.some((node: { id: string }) => node.id === group.id),
+    )
+  )
+    errors.push("Subsystem IDs must differ from component IDs.");
   for (const checkpoint of p.checkpoints) {
     if (
       !checkpoint ||
@@ -78,6 +87,10 @@ export function importProject(text: string): Project {
   )
     throw new Error("Canvas viewport is invalid.");
   return {
+    activeExperiment:
+      typeof p.activeExperiment === "string" && p.activeExperiment.length < 80
+        ? p.activeExperiment
+        : undefined,
     subsystems: clone(p.subsystems ?? []),
     id: crypto.randomUUID(),
     name: p.name.slice(0, 69) + " (imported)",

@@ -43,6 +43,7 @@ export interface Checkpoint {
   createdAt: number;
 }
 export interface Project {
+  activeExperiment?: string;
   subsystems?: Subsystem[];
   id: string;
   name: string;
