@@ -273,7 +273,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       ? "Supported path: producer → queue → worker. Reconnect the handles to match."
       : balanced
         ? "Connect traffic → load balancer → every service instance → shared optional cache → database. No bypasses or duplicate connections."
-        : "Supported path: traffic → service → optional cache → database. Reconnect the handles to match.");
+        : "Connect every component into a supported request path: traffic → service → optional cache → database. Reconnect the handles to match.");
   return [...new Set(errors)];
 }
 export function expectedDatabaseRate(graph: Graph, time = 0) {

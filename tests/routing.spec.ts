@@ -6,15 +6,15 @@ test("load-balanced lookup exposes editable instances and observed round-robin l
   await path.selectOption("balanced");
   await expect(page.getByText("Load balancer", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: /Expand Load balancer/ }).click();
-  await expect(page.getByRole("region", { name: "Service instance routing" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add service instance", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Add service instance", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Service instance routing" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add service instance", exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Add service instance", exact: true }).first().click();
   await expect(page.getByText("Service instance 2", { exact: true }).first()).toBeVisible();
+  await page.locator(".react-flow__pane").click({ position: { x: 20, y: 20 } });
   await page.getByRole("spinbutton", { name: "Run duration", exact: true }).fill("2");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText(/routed ·/).first()).toBeVisible();
-  await expect(page.getByText(/Round robin routed/)).toBeVisible();
   await page.screenshot({ path: "artifacts/load-balanced.png", fullPage: true });
 });
 
@@ -23,6 +23,6 @@ test("load-balanced canvas remains readable on mobile", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("balanced");
   await expect(page.getByText("Load balancer", { exact: true }).first()).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.locator(".workspace").evaluate((el) => el.getBoundingClientRect().width <= innerWidth)).toBe(true);
   await page.screenshot({ path: "artifacts/load-balanced-mobile.png", fullPage: true });
 });

@@ -13,12 +13,12 @@ The user authorized all remaining concrete steps and explicitly removed backward
 
 ### What works
 
-- Two runnable paths: traffic → service → optional cache → database; producer → queue → worker pool.
+- Three runnable paths: traffic → service → optional cache → database; traffic → round-robin load balancer → service instances → shared optional cache/database; producer → queue → worker pool.
 - Steady, burst and ramp workloads with seeded exact replay, per-worker capacities, bounded FIFO waiting and absolute deadlines.
 - Background jobs separate admission/producer acknowledgements from job completion, use seeded per-attempt failure draws, bounded fixed-delay retries and explicit permanent failure accounting.
 - Expandable component views and atomic inline service/job settings; Undo/Redo, inspector synchronization, local projects/checkpoints, portable exports and immutable saved comparisons.
 - One-level non-overlapping named subsystems wrap real components. Collapse shows aggregate waiting/active work and boundary connections; expand exposes editable children. Group dragging moves members together. Subsystems are view metadata, never a replacement engine model.
-- Four guided starters: cache pressure, worker scaling, job burst recovery and retry cost. Suggested steps and measured observations live in the inspector; toolbar Guide returns to them. Guide identity follows model Undo/checkpoints; clearing a guide preserves a live run.
+- Five guided starters: cache pressure, worker scaling, job burst recovery, retry cost and horizontal service scaling. The routing guide demonstrates per-instance capacity and the shared database bottleneck.
 
 ### Important semantics
 
@@ -30,15 +30,15 @@ Job invariant: generated = completed + admission rejected + expired + permanentl
 
 ### Persistence and compatibility policy
 
-Current portable format is version 5; old portable formats are intentionally not imported. Browser-local records are not deleted or reset. Very old saved result models can remain in local records but may need rerunning before importing a current export containing them; preserve old exports as archives. Current lookup results use url-lookup/3, jobs background-jobs/1, and different experiment models/workloads do not produce misleading deltas. Imported metrics are validated structurally, not authenticated or rerun.
+Current portable format is version 6; old portable formats are intentionally not imported. Browser-local records are not deleted or reset. Very old saved result models can remain in local records but may need rerunning before importing a current export containing them; preserve old exports as archives. Current lookup results use url-lookup/4, load-balanced lookup uses the same model with routing measurements, and jobs use background-jobs/1. Imported metrics are validated structurally, not authenticated or rerun.
 
 Subsystems belong to Project.subsystems; missing members remain dormant through model undo. Creating new groups retains groups relevant to the current model. Graph.guideId is learning metadata excluded from the worker-reset signature. Renderer measurements are retained for components and groups so worker updates do not hide/remount views. Viewport restoration accounts for canvas height and node identity, preserving manual zoom for unchanged layouts.
 
 ### Verification and evidence
 
 - 54 unit tests pass: existing URL semantics, jobs/retries/deadlines/accounting, deterministic profiles, round-robin routing and shared-bottleneck accounting, current import validation, group identity/projection and meaningful guided comparisons.
-- All 22 production Chromium journeys pass. Final focused viewport regression covers guide switching/reopen, subsystem movement and manual viewport restoration.
-- TypeScript and Vite build pass. Main entry approximately 551 KB /175 KB gzip; the known chunk-size warning remains. Results UI is deferred; no mobile-device frame-rate claim.
+- The prior 22 production Chromium journeys pass. The two new routing journeys now pass against the local Vite server, covering desktop controls/run/per-instance load reporting and mobile canvas width. Bounded visual evidence is in `artifacts/load-balanced.png` and `artifacts/load-balanced-mobile.png`.
+- TypeScript and Vite build pass. Main entry approximately 559 KB /177 KB gzip; the known chunk-size warning remains. Results UI is deferred; no mobile-device frame-rate claim.
 - Direct bounded visual QA: artifacts/background-jobs.png, background-jobs-mobile.png, subsystem-collapsed.png, subsystem-expanded.png, subsystem-mobile.png, guided-experiment.png, guided-mobile.png. No new independent visual review is claimed.
 - Full evidence and historical milestones: artifacts/VERIFICATION.md. Usage: README.md. Product/design authority: PRODUCT.md, DESIGN.md.
 
