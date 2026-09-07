@@ -1,3 +1,8 @@
+import { LatencyStats } from "./latency";
+import { Heap, randomGenerator } from "./primitives";
+import { JobSimulation } from "./jobs";
+import { isJobGraph } from "../domain/model";
+export { randomGenerator } from "./primitives";
 import { nextArrivalTime, rateAt } from "../domain/workload";
 import {
   validateGraph,
@@ -29,57 +34,12 @@ interface Stage {
   rejected: number;
   busyTime: number;
 }
-class Heap {
-  values: Event[] = [];
-  before(a: Event, b: Event) {
-    return a.time < b.time || (a.time === b.time && a.seq < b.seq);
-  }
-  push(e: Event) {
-    const a = this.values;
-    a.push(e);
-    let i = a.length - 1;
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (!this.before(a[i], a[p])) break;
-      [a[i], a[p]] = [a[p], a[i]];
-      i = p;
-    }
-  }
-  pop() {
-    const a = this.values,
-      first = a[0],
-      last = a.pop()!;
-    if (a.length) {
-      a[0] = last;
-      let i = 0;
-      for (;;) {
-        let c = 2 * i + 1;
-        if (c >= a.length) break;
-        if (c + 1 < a.length && this.before(a[c + 1], a[c])) c++;
-        if (!this.before(a[c], a[i])) break;
-        [a[c], a[i]] = [a[i], a[c]];
-        i = c;
-      }
-    }
-    return first;
-  }
-}
-export function randomGenerator(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a += 0x6d2b79f5;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 // A separate per-request draw keeps arrivals identical when the topology changes.
 function cacheDraw(seed: number, id: number) {
   return randomGenerator((seed ^ Math.imul(id, 2654435761)) >>> 0)();
 }
-export class Simulation {
-  private heap = new Heap();
+class LookupSimulation {
+  private heap = new Heap<Event>();
   private seq = 0;
   private rng: () => number;
   private stages: Stage[];
@@ -89,9 +49,7 @@ export class Simulation {
   private dropped = 0;
   private timedOut = 0;
   private hits = 0;
-  private latencies: number[] = [];
-  private sortedLatencies: number[] = [];
-  private meanLatency = 0;
+  private latencies = new LatencyStats();
   private history: Sample[] = [];
   private nextSample = 1;
   constructor(private graph: Graph) {
@@ -227,36 +185,10 @@ export class Simulation {
       completed: this.succeeded,
       generated: this.generated,
       arrivalRate: rateAt(this.graph.settings, time),
-      latency: this.latencies.length
-        ? this.latencies.slice(-500).reduce((a, b) => a + b, 0) /
-          Math.min(500, this.latencies.length)
-        : 0,
+      latency: this.latencies.recentMean(),
     });
   }
   snapshot(): Metrics {
-    // Preserve exact percentile and floating-point summation semantics while
-    // sorting only the responses completed since the previous snapshot.
-    if (this.sortedLatencies.length !== this.latencies.length) {
-      const added = this.latencies
-        .slice(this.sortedLatencies.length)
-        .sort((a, b) => a - b);
-      const prior = this.sortedLatencies;
-      const merged = new Array<number>(prior.length + added.length);
-      let i = 0,
-        j = 0,
-        total = 0;
-      for (let k = 0; k < merged.length; k++) {
-        const value =
-          j === added.length || (i < prior.length && prior[i] <= added[j])
-            ? prior[i++]
-            : added[j++];
-        merged[k] = value;
-        total += value;
-      }
-      this.sortedLatencies = merged;
-      this.meanLatency = total / merged.length;
-    }
-    const sorted = this.sortedLatencies;
     const nodes = Object.fromEntries(
       this.stages.map((s) => [
         s.node.id,
@@ -291,10 +223,7 @@ export class Simulation {
       timedOut: this.timedOut,
       inFlight: this.generated - this.succeeded - this.dropped - this.timedOut,
       throughput: this.time ? this.succeeded / this.time : 0,
-      meanLatency: this.meanLatency,
-      p95Latency: sorted.length
-        ? sorted[Math.ceil(sorted.length * 0.95) - 1]
-        : 0,
+      ...this.latencies.snapshot(),
       cacheHits: this.hits,
       databaseLookups: this.stages.find((s) => s.node.kind === "database")!
         .arrived,
@@ -302,5 +231,20 @@ export class Simulation {
       history: [...this.history],
       finished: this.time >= this.graph.settings.duration,
     };
+  }
+}
+
+export class Simulation {
+  private model: LookupSimulation | JobSimulation;
+  constructor(graph: Graph) {
+    this.model = isJobGraph(graph)
+      ? new JobSimulation(graph)
+      : new LookupSimulation(graph);
+  }
+  advance(target: number): Metrics {
+    return this.model.advance(target);
+  }
+  snapshot(): Metrics {
+    return this.model.snapshot();
   }
 }

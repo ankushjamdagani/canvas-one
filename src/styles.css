@@ -2235,3 +2235,43 @@ select:focus-visible {
     min-height: 580px;
   }
 }
+
+.scenario-picker {
+  margin: 14px 0 0;
+}
+.scenario-picker label > span {
+  display: block;
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.scenario-picker select {
+  width: 100%;
+  padding: 8px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+}
+.scenario-picker p {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.job-controls {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin-top: 12px;
+}
+.inspector .job-controls {
+  margin: 18px 0;
+}
+@media (max-width: 560px) {
+  .scenario-picker {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .canvas-area:has(.job-controls) {
+    height: 580px;
+    min-height: 580px;
+  }
+}

@@ -1,3 +1,4 @@
+import { validateSubsystems } from "../domain/subsystems";
 import {
   MAX_SAVED_RUNS,
   validateSavedRun,
@@ -15,7 +16,7 @@ export const repository = {
 };
 export function exportProject(project: Project) {
   return JSON.stringify(
-    { format: "system-studio", version: 4, project },
+    { format: "system-studio", version: 5, project },
     null,
     2,
   );
@@ -24,9 +25,9 @@ export function importProject(text: string): Project {
   if (text.length > 2_000_000)
     throw new Error("Project files must be smaller than 2 MB.");
   const data = JSON.parse(text);
-  if (data?.format !== "system-studio" || ![1, 2, 3, 4].includes(data.version))
+  if (data?.format !== "system-studio" || data.version !== 5)
     throw new Error(
-      "Unsupported file. Choose a System studio version 1, 2, 3 or 4 JSON export.",
+      "Unsupported file. Import a current System studio version-5 export. Older portable formats are no longer imported; existing local projects are not deleted.",
     );
   const p = data.project;
   if (
@@ -38,7 +39,7 @@ export function importProject(text: string): Project {
     p.checkpoints.length > 50
   )
     throw new Error("Project name or checkpoints are invalid.");
-  const errors = validateGraph(p.graph, false);
+  const errors = [...validateGraph(p.graph, false), ...validateSubsystems(p.subsystems)];
   for (const checkpoint of p.checkpoints) {
     if (
       !checkpoint ||
@@ -49,19 +50,6 @@ export function importProject(text: string): Project {
       throw new Error("A checkpoint is invalid.");
     errors.push(...validateGraph(checkpoint.graph, false));
   }
-  if (
-    data.version < 4 &&
-    [
-      p.graph,
-      ...p.checkpoints.map((c: Project["checkpoints"][number]) => c.graph),
-    ].some((g) =>
-      g.nodes?.some(
-        (n: { workers?: number }) =>
-          n?.workers !== undefined && n.workers !== 1,
-      ),
-    )
-  )
-    errors.push("Concurrent service workers require a version-4 project file.");
   if (errors.length) throw new Error(errors[0]);
   const expanded = p.expandedNodeIds ?? [];
   if (
@@ -76,10 +64,6 @@ export function importProject(text: string): Project {
       `A project can contain up to ${MAX_SAVED_RUNS} saved results.`,
     );
   for (const run of savedRuns) {
-    if (data.version < 4 && run?.modelVersion !== "url-lookup/2")
-      throw new Error(
-        "New simulation results require a version-4 project file.",
-      );
     const problems = validateSavedRun(run);
     if (problems.length) throw new Error(problems[0]);
   }
@@ -94,6 +78,7 @@ export function importProject(text: string): Project {
   )
     throw new Error("Canvas viewport is invalid.");
   return {
+    subsystems: clone(p.subsystems ?? []),
     id: crypto.randomUUID(),
     name: p.name.slice(0, 69) + " (imported)",
     graph: clone(p.graph),

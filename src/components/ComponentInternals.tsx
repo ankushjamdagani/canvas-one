@@ -1,3 +1,4 @@
+import { JobInternals } from "./JobInternals";
 import { ArrowDown, ArrowUpRight, CornerDownRight } from "lucide-react";
 import { ServiceModelEditor } from "./ServiceModelEditor";
 import { profileLabel } from "../domain/workload";
@@ -14,9 +15,21 @@ export function ComponentInternals({
   node: ModelNode;
   settings: Settings;
   metrics?: NodeMetrics;
-  totals: Pick<Metrics, "generated" | "cacheHits" | "arrivalRate"> | null;
+  totals: Pick<
+    Metrics,
+    "generated" | "cacheHits" | "arrivalRate" | "jobs"
+  > | null;
   hasRun: boolean;
 }) {
+  if (["queue", "worker"].includes(node.kind))
+    return (
+      <JobInternals
+        node={node}
+        metrics={metrics}
+        jobs={totals?.jobs}
+        hasRun={hasRun}
+      />
+    );
   if (node.kind === "traffic")
     return (
       <div

@@ -1,8 +1,16 @@
-import { clone, validateGraph, workerCount, type Graph } from "./model";
-import type { Metrics } from "./metrics";
+import {
+  clone,
+  validateGraph,
+  workerCount,
+  isJobGraph,
+  type Graph,
+} from "./model";
+import { failureCount, type Metrics } from "./metrics";
 import { sameWorkload, profileLabel } from "./workload";
 
 export const MODEL_VERSION = "url-lookup/3";
+export const modelVersion = (graph: Graph) =>
+  isJobGraph(graph) ? "background-jobs/1" : MODEL_VERSION;
 export const MAX_SAVED_RUNS = 20;
 export interface RunResult {
   id: string;
@@ -16,6 +24,8 @@ export interface SavedRun extends RunResult {
   origin: "simulation" | "imported";
 }
 export function defaultRunName(graph: Graph) {
+  if (isJobGraph(graph))
+    return `${profileLabel(graph.settings)} · background jobs`.slice(0, 80);
   const cache = graph.nodes.find((n) => n.kind === "cache");
   return `${profileLabel(graph.settings)} · ${cache ? `${cache.hitRate}% cache` : "no cache"}`.slice(
     0,
@@ -27,7 +37,7 @@ export function createSavedRun(result: RunResult, name: string): SavedRun {
     ...clone(result),
     name: name.trim().slice(0, 80) || defaultRunName(result.graph),
     completedAt: Date.now(),
-    modelVersion: MODEL_VERSION,
+    modelVersion: modelVersion(result.graph),
     origin: "simulation",
   };
   const errors = validateSavedRun(run);
@@ -47,15 +57,12 @@ export function validateSavedRun(run: SavedRun): string[] {
     !Number.isFinite(run.completedAt)
   )
     return ["Saved results need a valid name and completion time."];
-  if (!["url-lookup/2", MODEL_VERSION].includes(run.modelVersion))
+  if (![MODEL_VERSION, "background-jobs/1"].includes(run.modelVersion))
     return ["This saved result uses an unsupported simulation model version."];
   const graphErrors = validateGraph(run.graph);
   if (graphErrors.length) return graphErrors;
-  if (
-    run.modelVersion === "url-lookup/2" &&
-    run.graph.nodes.some((node) => workerCount(node) !== 1)
-  )
-    return ["Historical model results must use one worker per component."];
+  if (run.modelVersion !== modelVersion(run.graph))
+    return ["Saved result model does not match its experiment path."];
   const m = run.metrics;
   const values = [
     "time",
@@ -89,12 +96,33 @@ export function validateSavedRun(run: SavedRun): string[] {
   ] as const;
   if (
     counts.some((k) => !Number.isSafeInteger(m[k])) ||
-    m.generated !== m.succeeded + m.dropped + m.timedOut + m.inFlight ||
+    m.generated !== m.succeeded + failureCount(m) + m.inFlight ||
     Math.abs(m.throughput - m.succeeded / m.time) > 1e-6 ||
     m.cacheHits > m.generated ||
     m.databaseLookups > m.generated
   )
     return ["Saved result request counts do not reconcile."];
+  if (isJobGraph(run.graph)) {
+    const j = m.jobs;
+    if (
+      !j ||
+      Object.values(j).some((v) => !Number.isSafeInteger(v) || v < 0) ||
+      [
+        "accepted",
+        "acknowledged",
+        "failed",
+        "attempts",
+        "retries",
+        "retrying",
+        "retryRejected",
+      ].some((k) => !Number.isSafeInteger(j[k as keyof typeof j])) ||
+      j.accepted !== m.generated - m.dropped ||
+      j.acknowledged > j.accepted ||
+      j.retrying > m.inFlight ||
+      j.retryRejected > j.failed
+    )
+      return ["Saved job accounting is invalid."];
+  } else if (m.jobs) return ["Job metrics require the background-job path."];
   if (
     !m.nodes ||
     typeof m.nodes !== "object" ||
@@ -111,11 +139,10 @@ export function validateSavedRun(run: SavedRun): string[] {
           Number(n[k as keyof typeof n]) < 0,
       ) ||
       typeof n.busy !== "boolean" ||
-      ((run.modelVersion === MODEL_VERSION || n.activeWorkers !== undefined) &&
-        (!Number.isInteger(n.activeWorkers) ||
-          n.activeWorkers! < 0 ||
-          n.activeWorkers! > workerCount(node) ||
-          n.busy !== n.activeWorkers! > 0)) ||
+      !Number.isInteger(n.activeWorkers) ||
+      n.activeWorkers! < 0 ||
+      n.activeWorkers! > workerCount(node) ||
+      n.busy !== n.activeWorkers! > 0 ||
       !Number.isFinite(n.utilization) ||
       n.utilization < 0 ||
       n.utilization > 1 ||
@@ -169,7 +196,13 @@ export function comparisonStatus(a: SavedRun, b: SavedRun) {
 }
 export function modelChanges(a: Graph, b: Graph): string[] {
   const changes: string[] = [];
-  for (const kind of ["service", "cache", "database"] as const) {
+  for (const kind of [
+    "service",
+    "cache",
+    "database",
+    "queue",
+    "worker",
+  ] as const) {
     const before = a.nodes.find((n) => n.kind === kind),
       after = b.nodes.find((n) => n.kind === kind);
     if (!before && after) {
@@ -189,12 +222,23 @@ export function modelChanges(a: Graph, b: Graph): string[] {
       );
     if (before.capacity !== after.capacity)
       changes.push(
-        `${after.name} ${kind === "service" ? "capacity per worker" : "capacity"}: ${before.capacity} → ${after.capacity} req/s.`,
+        `${after.name} ${["service", "worker"].includes(kind) ? "capacity per worker" : "capacity"}: ${before.capacity} → ${after.capacity} req/s.`,
       );
     if (before.queueLimit !== after.queueLimit)
       changes.push(
         `${after.name} queue: ${before.queueLimit} → ${after.queueLimit} slots.`,
       );
+    if (kind === "worker") {
+      for (const [key, label, fallback] of [
+        ["failureRate", "failure rate (%)", 0],
+        ["maxRetries", "max retries", 2],
+        ["retryDelayMs", "retry delay (ms)", 100],
+      ] as const)
+        if ((before[key] ?? fallback) !== (after[key] ?? fallback))
+          changes.push(
+            `${after.name} ${label}: ${before[key] ?? fallback} → ${after[key] ?? fallback}.`,
+          );
+    }
     if (kind === "cache" && before.hitRate !== after.hitRate)
       changes.push(`Cache hit rate: ${before.hitRate}% → ${after.hitRate}%.`);
   }

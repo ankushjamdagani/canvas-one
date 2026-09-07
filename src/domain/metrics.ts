@@ -16,7 +16,17 @@ export interface Sample {
   arrivalRate: number;
   latency: number;
 }
+export interface JobMetrics {
+  accepted: number;
+  acknowledged: number;
+  failed: number;
+  attempts: number;
+  retries: number;
+  retrying: number;
+  retryRejected: number;
+}
 export interface Metrics {
+  jobs?: JobMetrics;
   time: number;
   generated: number;
   arrivalRate: number;
@@ -33,3 +43,6 @@ export interface Metrics {
   history: Sample[];
   finished: boolean;
 }
+
+export const failureCount = (m: Metrics) =>
+  m.dropped + m.timedOut + (m.jobs?.failed ?? 0);

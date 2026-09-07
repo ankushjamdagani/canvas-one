@@ -1,6 +1,8 @@
+import type { Subsystem } from "./subsystems";
 import type { SavedRun } from "./results";
 import { rateAt, validateProfile, type TrafficProfile } from "./workload";
-export type ComponentKind = "traffic" | "service" | "database" | "cache";
+export type ComponentKind =
+  "traffic" | "service" | "database" | "cache" | "queue" | "worker";
 export interface ModelNode {
   id: string;
   kind: ComponentKind;
@@ -10,6 +12,9 @@ export interface ModelNode {
   capacity: number;
   /** Absent in legacy graphs means one worker. Only services support concurrency. */
   workers?: number;
+  failureRate?: number;
+  maxRetries?: number;
+  retryDelayMs?: number;
   queueLimit: number;
   hitRate: number;
 }
@@ -26,6 +31,7 @@ export interface Settings {
   profile?: TrafficProfile;
 }
 export interface Graph {
+  scenario?: "lookup" | "jobs";
   nodes: ModelNode[];
   edges: ModelEdge[];
   settings: Settings;
@@ -37,11 +43,12 @@ export interface Checkpoint {
   createdAt: number;
 }
 export interface Project {
+  subsystems?: Subsystem[];
   id: string;
   name: string;
   graph: Graph;
   checkpoints: Checkpoint[];
-  viewport: { x: number; y: number; zoom: number };
+  viewport: { x: number; y: number; zoom: number; canvasHeight?: number };
   updatedAt: number;
   /** Presentation only; never passed to the simulation engine. */
   expandedNodeIds?: string[];
@@ -52,10 +59,14 @@ export const labels: Record<ComponentKind, string> = {
   service: "Redirect service",
   database: "Database",
   cache: "Cache",
+  queue: "Job queue",
+  worker: "Job worker",
 };
 export const MAX_SERVICE_WORKERS = 16;
 export function workerCount(node: ModelNode): number {
-  return node.kind === "service" ? (node.workers ?? 1) : 1;
+  return node.kind === "service" || node.kind === "worker"
+    ? (node.workers ?? 1)
+    : 1;
 }
 export function totalCapacity(node: ModelNode): number {
   return node.capacity * workerCount(node);
@@ -67,7 +78,16 @@ export function makeNode(kind: ComponentKind, x: number, y: number): ModelNode {
     name: labels[kind],
     position: { x, y },
     capacity: kind === "database" ? 500 : kind === "cache" ? 5000 : 2000,
-    queueLimit: 500,
+    queueLimit: kind === "worker" ? 0 : 500,
+    ...(kind === "worker"
+      ? {
+          capacity: 100,
+          workers: 2,
+          failureRate: 0,
+          maxRetries: 2,
+          retryDelayMs: 100,
+        }
+      : {}),
     hitRate: 80,
   };
 }
@@ -83,6 +103,25 @@ export function baseline(): Graph {
       id: crypto.randomUUID(),
       source: nodes[i].id,
       target: n.id,
+    })),
+    settings: { traffic: 100, seed: 42, duration: 30, timeoutMs: 2000 },
+  };
+}
+export const isJobGraph = (graph: Graph) => graph.scenario === "jobs";
+export function backgroundJobs(): Graph {
+  const nodes = [
+    makeNode("traffic", 70, 170),
+    makeNode("queue", 375, 170),
+    makeNode("worker", 680, 170),
+  ];
+  nodes[0].name = "Job producer";
+  return {
+    scenario: "jobs",
+    nodes,
+    edges: nodes.slice(1).map((node, i) => ({
+      id: crypto.randomUUID(),
+      source: nodes[i].id,
+      target: node.id,
     })),
     settings: { traffic: 100, seed: 42, duration: 30, timeoutMs: 2000 },
   };
@@ -110,6 +149,11 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       "This file is missing a graph, connections, or experiment settings.",
     ];
   const { nodes, edges, settings: s } = graph;
+  if (
+    graph.scenario !== undefined &&
+    !["lookup", "jobs"].includes(graph.scenario)
+  )
+    errors.push("Choose a supported experiment path.");
   if (nodes.length > 20 || edges.length > 30)
     return ["This prototype supports up to 20 components and 30 connections."];
   if (
@@ -126,10 +170,12 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
   const ids = new Set(nodes.map((n) => n.id));
   if (ids.size !== nodes.length) errors.push("Component IDs must be unique.");
   for (const n of nodes) {
-    if (!["traffic", "service", "database", "cache"].includes(n.kind))
-      errors.push(
-        "Only traffic, service, cache and database components are supported.",
-      );
+    if (
+      !["traffic", "service", "database", "cache", "queue", "worker"].includes(
+        n.kind,
+      )
+    )
+      errors.push("Choose a supported component type.");
     if (
       typeof n.name !== "string" ||
       !n.name.trim() ||
@@ -143,7 +189,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       (!Number.isInteger(n.workers) ||
         n.workers < 1 ||
         n.workers > MAX_SERVICE_WORKERS ||
-        (n.kind !== "service" && n.workers !== 1))
+        (!["service", "worker"].includes(n.kind) && n.workers !== 1))
     )
       errors.push(
         "Service workers must be whole numbers from 1 to 16; other components have one processor.",
@@ -156,6 +202,21 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       n.queueLimit > 10000
     )
       errors.push("Queue limits must be whole numbers from 0 to 10,000.");
+    if (
+      n.kind === "worker" &&
+      (!Number.isFinite(n.failureRate ?? 0) ||
+        (n.failureRate ?? 0) < 0 ||
+        (n.failureRate ?? 0) > 100 ||
+        !Number.isInteger(n.maxRetries ?? 2) ||
+        (n.maxRetries ?? 2) < 0 ||
+        (n.maxRetries ?? 2) > 5 ||
+        !Number.isFinite(n.retryDelayMs ?? 100) ||
+        (n.retryDelayMs ?? 100) < 0 ||
+        (n.retryDelayMs ?? 100) > 10000)
+    )
+      errors.push(
+        "Job failure rate must be 0–100%, retries 0–5, and retry delay 0–10,000 ms.",
+      );
     if (!Number.isFinite(n.hitRate) || n.hitRate < 0 || n.hitRate > 100)
       errors.push("Cache hit rate must be between 0 and 100%.");
   }
@@ -172,21 +233,23 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     errors.push("A connection references a missing component.");
   // Drafts are portable even before their topology can execute.
   if (!requireRunnable) return [...new Set(errors)];
+  const order = isJobGraph(graph)
+    ? ["traffic", "queue", "worker"]
+    : [
+        "traffic",
+        "service",
+        ...(nodes.some((n) => n.kind === "cache") ? ["cache"] : []),
+        "database",
+      ];
   if (
-    nodes.filter((n) => n.kind === "traffic").length !== 1 ||
-    nodes.filter((n) => n.kind === "service").length !== 1 ||
-    nodes.filter((n) => n.kind === "database").length !== 1 ||
-    nodes.filter((n) => n.kind === "cache").length > 1
+    nodes.length !== order.length ||
+    order.some((kind) => nodes.filter((n) => n.kind === kind).length !== 1)
   )
     errors.push(
-      "Use one traffic source, one service, one database, and optionally one cache.",
+      isJobGraph(graph)
+        ? "Use one producer, one queue and one job worker."
+        : "Use one traffic source, one service, one database, and optionally one cache.",
     );
-  const order = [
-    "traffic",
-    "service",
-    ...(nodes.some((n) => n.kind === "cache") ? ["cache"] : []),
-    "database",
-  ];
   if (
     edges.length !== nodes.length - 1 ||
     edges.some((e) => !ids.has(e.source) || !ids.has(e.target))
@@ -201,7 +264,9 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       !edges.some((e) => e.source === from.id && e.target === to.id)
     )
       errors.push(
-        "Supported path: traffic → service → optional cache → database. Reconnect the handles to match.",
+        isJobGraph(graph)
+          ? "Supported path: producer → queue → worker. Reconnect the handles to match."
+          : "Supported path: traffic → service → optional cache → database. Reconnect the handles to match.",
       );
   }
   return [...new Set(errors)];

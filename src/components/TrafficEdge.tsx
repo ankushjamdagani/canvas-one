@@ -8,7 +8,7 @@ import {
 } from "@xyflow/react";
 
 export type TrafficConnection = Edge<
-  { running: boolean; rate: number },
+  { running: boolean; rate: number; rateLabel?: string },
   "traffic"
 >;
 
@@ -61,7 +61,8 @@ export const TrafficEdge = memo(function TrafficEdge({
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
           }}
         >
-          {Math.round(data?.rate ?? 0).toLocaleString()} /s expected
+          {Math.round(data?.rate ?? 0).toLocaleString()} /s{" "}
+          {data?.rateLabel ?? "expected"}
         </span>
       </EdgeLabelRenderer>
     </>

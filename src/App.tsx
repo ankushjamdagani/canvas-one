@@ -23,6 +23,8 @@ import {
 import { useEditor } from "./state/editor";
 import {
   newProject,
+  isJobGraph,
+  labels,
   validateGraph,
   type ComponentKind,
   type Project,
@@ -60,6 +62,7 @@ export default function App() {
     [selectedResult, setSelectedResult] = useState<string | null>(null),
     [savingResult, setSavingResult] = useState(false),
     [resultName, setResultName] = useState("");
+  const jobsMode = isJobGraph(graph);
   const savedRuns = project.savedRuns ?? [];
   const resultSaved =
     !!simulation.result &&
@@ -194,33 +197,42 @@ export default function App() {
           <span>{project.name}</span>
           <FolderOpen size={15} />
         </button>
+        <div className="scenario-picker">
+          <label>
+            <span>Experiment path</span>
+            <select
+              aria-label="Experiment path"
+              value={jobsMode ? "jobs" : "lookup"}
+              onChange={(e) =>
+                editor.useScenario(e.target.value as "jobs" | "lookup")
+              }
+            >
+              <option value="lookup">URL lookup</option>
+              <option value="jobs">Background jobs</option>
+            </select>
+          </label>
+          <p>Loads a starter model. Undo restores your canvas.</p>
+        </div>
         <div className="library-section">
           <h2>Components</h2>
           <p>Click to add to your canvas</p>
-          {(["traffic", "service", "database", "cache"] as ComponentKind[]).map(
-            (kind) => {
-              const Icon = icons[kind];
-              return (
-                <button
-                  className="library-item"
-                  key={kind}
-                  onClick={() => editor.add(kind)}
-                >
-                  <Icon size={20} />
-                  <span>
-                    {kind === "traffic"
-                      ? "Traffic source"
-                      : kind === "service"
-                        ? "Service"
-                        : kind === "database"
-                          ? "Database"
-                          : "Cache"}
-                  </span>
-                  <Plus size={14} />
-                </button>
-              );
-            },
-          )}
+          {(jobsMode
+            ? (["traffic", "queue", "worker"] as ComponentKind[])
+            : (["traffic", "service", "database", "cache"] as ComponentKind[])
+          ).map((kind) => {
+            const Icon = icons[kind];
+            return (
+              <button
+                className="library-item"
+                key={kind}
+                onClick={() => editor.add(kind)}
+              >
+                <Icon size={20} />
+                <span>{labels[kind]}</span>
+                <Plus size={14} />
+              </button>
+            );
+          })}
           <div className="library-caption">
             More components will follow.
             <br />
@@ -383,13 +395,17 @@ export default function App() {
         <div className="canvas-shell">
           <div className="experiment-heading">
             <div>
-              <h1>Follow a request.</h1>
+              <h1>{jobsMode ? "Follow a job." : "Follow a request."}</h1>
               <p>Find the bottleneck. Change one thing. Replay.</p>
               <p className="mobile-pan-hint">
                 Drag the canvas to follow the request →
               </p>
             </div>
-            <span className="tag">URL shortener experiment</span>
+            <span className="tag">
+              {jobsMode
+                ? "Background jobs experiment"
+                : "URL shortener experiment"}
+            </span>
           </div>
           <div className="canvas-area">
             <ReactFlowProvider key={project.id}>
@@ -415,7 +431,9 @@ export default function App() {
                 <span>
                   {simulation.running
                     ? `4× playback · ${profileLabel(graph.settings)}`
-                    : "Run the baseline, raise the traffic, then give the database some help."}
+                    : jobsMode
+                      ? "Compare admission, completion and retries. Scale workers to drain the queue."
+                      : "Run the baseline, raise the traffic, then give the database some help."}
                 </span>
               </div>
             </div>
@@ -471,7 +489,7 @@ export default function App() {
                 </button>
               )}
               <button
-                disabled={hasCache || !!errors.length}
+                disabled={hasCache || !!errors.length || jobsMode}
                 onClick={() => {
                   editor.insertCache();
                   setNotice(
@@ -480,7 +498,11 @@ export default function App() {
                 }}
               >
                 <Plus size={14} />
-                {hasCache ? "Cache added" : "Add cache"}
+                {jobsMode
+                  ? "Queue → workers"
+                  : hasCache
+                    ? "Cache added"
+                    : "Add cache"}
               </button>
             </div>
             {savingResult && simulation.result && (
@@ -679,9 +701,12 @@ export default function App() {
             </dd>
             <dt>Scope</dt>
             <dd>
-              One linear URL lookup path. No replication, retries, network
-              contention, frontend rendering, or nested subsystems yet. Moving a
-              node changes only the view.
+              Two paths: URL lookup and queued background jobs. Job retries use
+              a fixed backoff and an original-submission deadline. Producer
+              acknowledgements confirm queue admission after 8 ms, not
+              completion. Retrying jobs can fail permanently if the queue is
+              full. No replication, network contention or worker crashes. Moving
+              a node changes only the view.
             </dd>
           </dl>
         </section>

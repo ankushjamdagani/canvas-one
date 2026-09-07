@@ -1,5 +1,15 @@
 # Development handoff
 
+## Active finite roadmap — user authorized all remaining steps
+
+User removed backward-compatibility requirements. Preserve local projects; portable imports now accept current format only.
+
+1. **Background jobs — complete.** Separate job engine, shared heap/RNG/latency helpers, queue/worker components, inline controls, path selector and job-specific metrics verified. 40 unit tests, 18 production browser journeys and build pass. Current checkpoint includes initial subsystem metadata/state scaffolding; subsystem rendering follows next.
+2. **Canvas subsystems — implementing.** Group real components, collapse/expand a summary on the same canvas, preserve simulation semantics, and edit real child components when expanded.
+3. **Guided experiments — next.** Finite starter scenarios and explanations connecting both paths, subsystem views and saved comparisons. Finish this roadmap without inventing additional milestones.
+
+Resume from current Git diff; do not recreate job implementation. Prior completed checkpoint is `398de12`. Job path is producer → queue → worker. Producer ack follows admission by 8 ms independently of job completion. Retries use fixed backoff and rejoin FIFO; full retry admission fails permanently. Absolute TTL covers all attempts; expired active jobs keep slots until processing ends. Queue/worker state and producer/job outcomes remain distinct. Version-5 exports/imports are current-only; no browser-local records are deleted.
+
 ## Current milestone — concurrent service workers (7 September 2026)
 
 Services support 1–16 independent workers. `capacity` is explicitly per-worker req/s; total capacity is `workers × capacity`, while each request still takes `1 / capacity` seconds. Workers share one bounded FIFO queue excluding active requests. Arrivals use the first free worker; completions take the oldest nonexpired waiting request. Equal-time events retain insertion-order ties. Timed-out active work does not release its worker until completion. Utilization is summed occupied time divided by workers × elapsed time. Database/cache stay single-processor.

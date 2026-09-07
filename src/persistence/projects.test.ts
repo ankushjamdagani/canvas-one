@@ -26,11 +26,11 @@ it("preserves unfinished editable graph drafts in portable exports", () => {
   project.graph.edges = [];
   expect(importProject(exportProject(project)).graph).toEqual(project.graph);
 });
-it("roundtrips expanded views while preserving version 1 compatibility", () => {
+it("roundtrips expanded views and rejects retired portable formats", () => {
   const project = newProject();
   const legacy = JSON.parse(exportProject(project));
   legacy.version = 1;
-  expect(importProject(JSON.stringify(legacy)).expandedNodeIds).toEqual([]);
+  expect(() => importProject(JSON.stringify(legacy))).toThrow("version-5");
   project.expandedNodeIds = [project.graph.nodes[2].id];
   expect(importProject(exportProject(project)).expandedNodeIds).toEqual(
     project.expandedNodeIds,
@@ -52,5 +52,5 @@ it("preserves workload profiles and rejects malformed imported timing", () => {
 });
 
 it("marks exports with the result-aware format version", () => {
-  expect(JSON.parse(exportProject(newProject())).version).toBe(4);
+  expect(JSON.parse(exportProject(newProject())).version).toBe(5);
 });

@@ -101,3 +101,10 @@ Concurrency tests check shared queue/worker bounds, request conservation, throug
 Browser checks exercise one-to-four worker replay with matching generated arrivals, worker-count change descriptions, atomic apply/Undo/Redo, immutable saved model restoration/reload, inspector synchronization, invalid-count drafts, Escape and a sixteen-slot mobile view. Desktop/mobile evidence: `concurrent-service.png`, `concurrent-service-mobile.png`. Direct visual inspection confirms controls fit the approved light workspace; no additional independent visual review is claimed.
 
 Workers are ideal independent processors, not machine replicas. No scheduler contention, pool overhead or database/cache parallelism is added. Capacity is per-worker, total rate is workers × capacity, the queue is shared, and utilization averages across workers. New result model is `url-lookup/3`; historical `url-lookup/2` results remain readable. Version-4 export prevents older readers silently ignoring worker counts. Entry JS remains about 530.23 KB /168.33 KB gzip; existing chunk warning is retained.
+
+
+## Background-job path checkpoint
+
+40 unit tests, 18 production Chromium journeys and production build pass. Job tests cover separate admission acknowledgements, shared queue bounds, attempt limits/backoff, retained active slots after expiry, rejected retry re-entry, request conservation, profile replay and portable result accounting. The URL engine retains its seeded results after extracting shared heap/RNG/exact-latency primitives. Current-format-only import tests replace retired compatibility promises.
+
+Desktop/mobile screenshots: `background-jobs.png`, `background-jobs-mobile.png`. A small persisted viewport after closing a results pane was corrected by recording canvas height and reframing when reopening at a materially different height; manual viewport restoration remains covered. No browser-local data is deleted.

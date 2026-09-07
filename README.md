@@ -32,7 +32,7 @@ Select empty canvas space (or configure the traffic source), then choose **Stead
 
 The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
 
-Profiles save with local projects and checkpoints. JSON exports use **version 4** and include worker counts and saved results; version-1, version-2 and version-3 imports still work. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+Profiles save with local projects and checkpoints. JSON exports use **version 5** and include both experiment paths, worker counts and saved results. Imports accept the current format only; existing browser-local projects are not deleted. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
 
 ## Save and compare experiments
 
@@ -63,7 +63,15 @@ Try a service at 200 req/s per worker with 700 req/s incoming traffic. Run with 
 
 Workers take requests from one shared FIFO queue. New arrivals use the first free worker; otherwise they wait or are rejected if the queue is full. Completing workers take the oldest nonexpired waiting request. Equal-time events use stable insertion order. Expired active work occupies its worker until processing completes. Workers are ideal independent processing slots: no contention, scheduling overhead, connection pools or machine-level scaling are modeled.
 
-Older projects omit worker count and retain one worker. Historical saved results remain labeled with the single-worker model (`url-lookup/2`); new results use `url-lookup/3`. Both remain readable, but cross-version comparisons suppress deltas. Restoring a historical model preserves its single-worker settings; replay creates a new result under the current model version. Portable exports use version 4 so old readers cannot silently ignore concurrency.
+Older projects omit worker count and retain one worker. Historical saved results remain labeled with the single-worker model (`url-lookup/2`); new results use `url-lookup/3`. Both remain readable, but cross-version comparisons suppress deltas. Restoring a historical model preserves its single-worker settings; replay creates a new result under the current model version. Portable exports use version 5. Older portable formats are no longer imported; re-export an existing local project using the current app. Very old saved result models may need a fresh run before a portable import; local records are not erased.
+
+## Background jobs
+
+Choose **Background jobs** in Experiment path. Switching loads a starter graph and supports Undo. The path is producer → bounded job queue → worker pool. Expand the queue or worker to edit settings atomically. Failure probability is sampled independently for each seeded job attempt; retries use a fixed delay and join the FIFO tail, up to the configured limit.
+
+Producer acknowledgment follows successful queue admission after 8 ms. It is separate from job completion and may occur even if the job subsequently fails or expires. The deadline starts at original submission and includes waiting, attempts and retry backoff. Backoff does not occupy a worker; already-processing expired work does. A full queue rejects initial admission; full retry re-entry or exhausted retries permanently fail the job. No crash recovery, duplicate delivery or real durable broker is modeled.
+
+Job accounting satisfies **generated = completed + admission rejected + expired + permanently failed + in flight**. Accepted = generated − admission rejected. Producer acknowledgements are a separate counter; the observation window may end before an acknowledgement arrives. Successful-job latency includes waiting and retries. Queue-to-worker edges show observed attempt rate after starting, and configured capacity before starting.
 
 ## Editing and persistence
 

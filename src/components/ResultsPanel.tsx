@@ -1,3 +1,5 @@
+import { failureCount } from "../domain/metrics";
+import { isJobGraph } from "../domain/model";
 import { useEffect, useState } from "react";
 import {
   X,
@@ -154,9 +156,10 @@ export function ResultsPanel({
                       digits: 1,
                     },
                     {
-                      label: "Failed requests",
-                      get: (r: SavedRun) =>
-                        r.metrics.dropped + r.metrics.timedOut,
+                      label: isJobGraph(current.graph)
+                        ? "Failed jobs"
+                        : "Failed requests",
+                      get: (r: SavedRun) => failureCount(r.metrics),
                       digits: 0,
                     },
                     {
@@ -169,12 +172,33 @@ export function ResultsPanel({
                       get: (r: SavedRun) => r.metrics.inFlight,
                       digits: 0,
                     },
-                    {
-                      label: "Database arrivals /s",
-                      get: (r: SavedRun) =>
-                        r.metrics.databaseLookups / r.metrics.time,
-                      digits: 1,
-                    },
+                    ...(isJobGraph(current.graph)
+                      ? [
+                          {
+                            label: "Producer acknowledged",
+                            get: (r: SavedRun) =>
+                              r.metrics.jobs?.acknowledged ?? 0,
+                            digits: 0,
+                          },
+                          {
+                            label: "Retries scheduled",
+                            get: (r: SavedRun) => r.metrics.jobs?.retries ?? 0,
+                            digits: 0,
+                          },
+                          {
+                            label: "Permanent failures",
+                            get: (r: SavedRun) => r.metrics.jobs?.failed ?? 0,
+                            digits: 0,
+                          },
+                        ]
+                      : [
+                          {
+                            label: "Database arrivals /s",
+                            get: (r: SavedRun) =>
+                              r.metrics.databaseLookups / r.metrics.time,
+                            digits: 1,
+                          },
+                        ]),
                   ].map((row) => {
                     const b = baseline ? row.get(baseline) : null,
                       c = row.get(current),
@@ -265,12 +289,8 @@ export function ResultsPanel({
 function RunContext({ run }: { run: SavedRun }) {
   return (
     <small className="run-context">
-      {run.modelVersion === "url-lookup/2" && (
-        <>
-          Historical single-worker model
-          <br />
-        </>
-      )}
+      {isJobGraph(run.graph) ? "Background jobs" : "URL lookup"}
+      <br />
       {profileLabel(run.graph.settings)}
       <br />
       Seed {run.graph.settings.seed} · {run.graph.settings.duration}s · timeout{" "}

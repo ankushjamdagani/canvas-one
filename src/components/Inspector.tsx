@@ -1,3 +1,5 @@
+import { JobControls } from "./JobControls";
+import { isJobGraph } from "../domain/model";
 import {
   MAX_SERVICE_WORKERS,
   workerCount,
@@ -55,7 +57,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
             onChange={(v) => editor.settings({ duration: v })}
           />
           <NumberField
-            label="Request timeout"
+            label={isJobGraph(g) ? "Job deadline" : "Request timeout"}
             value={g.settings.timeoutMs}
             min={10}
             max={10000}
@@ -82,7 +84,11 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
       n.kind === "database"
         ? expectedDatabaseRate(g, metrics?.time ?? 0)
         : rateAt(g.settings, metrics?.time ?? 0),
-    overloaded = n.kind !== "traffic" && demand > totalCapacity(n);
+    capacity =
+      n.kind === "queue"
+        ? totalCapacity(g.nodes.find((n) => n.kind === "worker") ?? n)
+        : totalCapacity(n),
+    overloaded = n.kind !== "traffic" && demand > capacity;
   return (
     <aside className="inspector">
       <div className="inspector-heading">
@@ -126,7 +132,9 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                 }
               />
             </label>
-            {n.kind === "traffic" ? (
+            {["queue", "worker"].includes(n.kind) ? (
+              <JobControls node={n} />
+            ) : n.kind === "traffic" ? (
               <WorkloadControls />
             ) : (
               <>
@@ -210,7 +218,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                 </strong>
                 <p>
                   {overloaded
-                    ? `${Math.round(demand)} expected arrivals/s · ${totalCapacity(n)} total capacity/s`
+                    ? `${Math.round(demand)} expected arrivals/s · ${capacity} total capacity/s`
                     : n.kind === "traffic"
                       ? profileLabel(g.settings)
                       : `${Math.round(demand)} expected arrivals/s`}
@@ -219,13 +227,17 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
             </div>
             <h3>What this component does</h3>
             <p>
-              {n.kind === "traffic"
-                ? "Generates requests with seeded, irregular arrival times. The configured rate is an average; short bursts happen naturally."
-                : n.kind === "service"
-                  ? "Looks up a short URL and returns its destination. Workers process requests concurrently from one shared FIFO queue. Each worker takes 1 ÷ per-worker capacity seconds per request; increasing workers increases total capacity, not individual request speed."
-                  : n.kind === "database"
-                    ? "Looks up the original URL. Requests wait in a FIFO queue when the database is busy; a full queue rejects new arrivals."
-                    : "Returns a cached destination on a hit. A miss continues to the database. The hit rate is a fixed probability, with no warm-up or eviction model."}
+              {n.kind === "queue"
+                ? "Admits jobs to a bounded shared FIFO queue. Producer acknowledgment follows admission after 8 ms; it does not mean processing succeeded. Retries rejoin the tail and can fail permanently if waiting space is full."
+                : n.kind === "worker"
+                  ? "Runs independent job attempts. A successful attempt completes the job; failed attempts retry up to the configured limit after a fixed backoff. The deadline starts at original submission and includes all waiting and retries. Expired active work still consumes its slot. Failure draws are seeded per job and attempt."
+                  : n.kind === "traffic"
+                    ? "Generates requests with seeded, irregular arrival times. The configured rate is an average; short bursts happen naturally."
+                    : n.kind === "service"
+                      ? "Looks up a short URL and returns its destination. Workers process requests concurrently from one shared FIFO queue. Each worker takes 1 ÷ per-worker capacity seconds per request; increasing workers increases total capacity, not individual request speed."
+                      : n.kind === "database"
+                        ? "Looks up the original URL. Requests wait in a FIFO queue when the database is busy; a full queue rejects new arrivals."
+                        : "Returns a cached destination on a hit. A miss continues to the database. The hit rate is a fixed probability, with no warm-up or eviction model."}
             </p>
             <h3>{overloaded ? "Why a queue builds" : "What to watch"}</h3>
             <p>

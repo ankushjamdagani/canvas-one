@@ -1,9 +1,11 @@
+import { visibleSubsystems } from "../domain/subsystems";
 import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
 import { create } from "zustand";
 import {
   clone,
   makeNode,
   newProject,
+  backgroundJobs,
   type Project,
   type Graph,
   type ComponentKind,
@@ -12,6 +14,9 @@ import {
 } from "../domain/model";
 interface Editor {
   project: Project;
+  createSubsystem: (name: string, ids: string[]) => void;
+  toggleSubsystem: (id: string) => void;
+  dissolveSubsystem: (id: string) => void;
   saveRun: (run: SavedRun) => boolean;
   renameRun: (id: string, name: string) => void;
   deleteRun: (id: string) => void;
@@ -28,6 +33,7 @@ interface Editor {
   settings: (patch: Partial<Settings>) => void;
   add: (kind: ComponentKind) => void;
   insertCache: () => void;
+  useScenario: (scenario: "lookup" | "jobs") => void;
   beginMove: () => void;
   move: (
     positions: { id: string; position: { x: number; y: number } }[],
@@ -42,6 +48,16 @@ interface Editor {
 }
 export const useEditor = create<Editor>((set, get) => ({
   project: newProject(),
+  createSubsystem: (name, nodeIds) => {
+    const active = visibleSubsystems(get().project);
+    const used = new Set(active.flatMap(group => group.nodeIds));
+    const members = [...new Set(nodeIds)].filter(id => !used.has(id) && get().project.graph.nodes.some(node => node.id === id));
+    if (members.length < 2 || active.length >= 10) return;
+    const group = { id: crypto.randomUUID(), name: name.trim().slice(0, 80) || "Subsystem", nodeIds: members, collapsed: false };
+    set(s => ({ project: { ...s.project, subsystems: [...active, group], updatedAt: Date.now() } }));
+  },
+  toggleSubsystem: (id) => set(s => ({ project: { ...s.project, subsystems: (s.project.subsystems ?? []).map(group => group.id === id ? { ...group, collapsed: !group.collapsed } : group), updatedAt: Date.now() }, selected: s.project.subsystems?.find(group => group.id === id)?.collapsed ? s.project.subsystems.find(group => group.id === id)!.nodeIds[0] : id })),
+  dissolveSubsystem: (id) => set(s => ({ project: { ...s.project, subsystems: (s.project.subsystems ?? []).filter(group => group.id !== id), updatedAt: Date.now() }, selected: null })),
   saveRun: (run) => {
     const runs = get().project.savedRuns ?? [];
     if (runs.some((r) => r.id === run.id)) return true;
@@ -159,6 +175,15 @@ export const useEditor = create<Editor>((set, get) => ({
       g.nodes.push(node);
     });
     set({ selected: node.id });
+  },
+  useScenario: (scenario) => {
+    const fresh = scenario === "jobs" ? backgroundJobs() : newProject().graph;
+    get().change((g) => {
+      for (const key of Object.keys(g))
+        delete (g as unknown as Record<string, unknown>)[key];
+      Object.assign(g, fresh);
+    });
+    get().select(null);
   },
   insertCache: () => {
     if (get().project.graph.nodes.some((n) => n.kind === "cache")) return;

@@ -1,3 +1,5 @@
+import { failureCount } from "../domain/metrics";
+import { isJobGraph } from "../domain/model";
 import { ArrowDownRight, ArrowUpRight, Activity, Info } from "lucide-react";
 import { useState } from "react";
 import { sameWorkload } from "../domain/workload";
@@ -18,7 +20,9 @@ export function MetricsPanel({
     started = !!m?.time,
     queue = Object.values(m?.nodes ?? {}).reduce((a, n) => a + n.queued, 0);
   const comparable =
-    previous && sameWorkload(previous.graph.settings, graph.settings);
+    previous &&
+    isJobGraph(previous.graph) === isJobGraph(graph) &&
+    sameWorkload(previous.graph.settings, graph.settings);
   return (
     <section
       className={`metrics-panel ${expanded ? "expanded" : ""}`}
@@ -35,14 +39,14 @@ export function MetricsPanel({
           <span>{expanded ? "−" : "+"}</span>
         </button>
         <div className="metric">
-          <span>Completed</span>
+          <span>{isJobGraph(graph) ? "Jobs done" : "Completed"}</span>
           <strong data-testid="throughput">
             {started ? m!.throughput.toFixed(0) : "—"}
             <small>/s</small>
           </strong>
         </div>
         <div className="metric">
-          <span>p95 latency</span>
+          <span>{isJobGraph(graph) ? "p95 job latency" : "p95 latency"}</span>
           <strong data-testid="latency">
             {started ? m!.p95Latency.toFixed(1) : "—"}
             <small>ms</small>
@@ -55,7 +59,7 @@ export function MetricsPanel({
         <div className="metric">
           <span>Failed</span>
           <strong data-testid="failures">
-            {started ? (m!.dropped + m!.timedOut).toLocaleString() : "—"}
+            {started ? failureCount(m!).toLocaleString() : "—"}
           </strong>
         </div>
         <div className="metric elapsed">
@@ -106,12 +110,15 @@ export function MetricsPanel({
               <p>Run the experiment to observe queue length.</p>
             )}
             <p className="small muted">
-              Throughput is completed requests ÷ elapsed time. Latency includes
-              successful requests only.
+              {isJobGraph(graph)
+                ? "Throughput counts completed jobs. Successful-job latency includes waiting and retries. Producer acknowledgements only confirm admission, not completion."
+                : "Throughput is completed requests ÷ elapsed time. Latency includes successful requests only."}
             </p>
           </div>
           <div>
-            <h3>Request accounting</h3>
+            <h3>
+              {isJobGraph(graph) ? "Job accounting" : "Request accounting"}
+            </h3>
             <dl className="accounting">
               <div>
                 <dt>Generated</dt>
@@ -133,16 +140,52 @@ export function MetricsPanel({
                     : "—"}
                 </dd>
               </div>
-              <div>
-                <dt>Database arrivals /s</dt>
-                <dd>
-                  {started ? (m!.databaseLookups / m!.time).toFixed(1) : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt>Cache hits</dt>
-                <dd>{m?.cacheHits.toLocaleString() ?? "—"}</dd>
-              </div>
+              {isJobGraph(graph) ? (
+                <>
+                  <div>
+                    <dt>Accepted / producer acknowledged</dt>
+                    <dd>
+                      {m?.jobs
+                        ? `${m.jobs.accepted} / ${m.jobs.acknowledged}`
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Permanent failures</dt>
+                    <dd>{m?.jobs?.failed ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Attempts / retries scheduled</dt>
+                    <dd>
+                      {m?.jobs ? `${m.jobs.attempts} / ${m.jobs.retries}` : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Retry backoff / re-entry rejected</dt>
+                    <dd>
+                      {m?.jobs
+                        ? `${m.jobs.retrying} / ${m.jobs.retryRejected}`
+                        : "—"}
+                    </dd>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {" "}
+                  <div>
+                    <dt>Database arrivals /s</dt>
+                    <dd>
+                      {started
+                        ? (m!.databaseLookups / m!.time).toFixed(1)
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Cache hits</dt>
+                    <dd>{m?.cacheHits.toLocaleString() ?? "—"}</dd>
+                  </div>
+                </>
+              )}
             </dl>
           </div>
           <div>
@@ -161,7 +204,9 @@ export function MetricsPanel({
               <>
                 <div className="comparison">
                   <ArrowDownRight size={19} />
-                  <span>p95 latency</span>
+                  <span>
+                    {isJobGraph(graph) ? "p95 job latency" : "p95 latency"}
+                  </span>
                   <strong>
                     {previous.metrics.p95Latency.toFixed(1)} →{" "}
                     {m.p95Latency.toFixed(1)} ms

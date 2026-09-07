@@ -21,6 +21,8 @@ import {
   Layers,
   AlertTriangle,
   ChevronDown,
+  ListOrdered,
+  Cpu,
   ChevronRight,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
@@ -34,6 +36,8 @@ export const icons = {
   service: Hexagon,
   database: Database,
   cache: Layers,
+  queue: ListOrdered,
+  worker: Cpu,
 };
 type ArchitectureNode = Node<
   {
@@ -43,7 +47,10 @@ type ArchitectureNode = Node<
     hasRun: boolean;
     expanded: boolean;
     settings: Settings;
-    totals: Pick<Metrics, "generated" | "cacheHits" | "arrivalRate"> | null;
+    totals: Pick<
+      Metrics,
+      "generated" | "cacheHits" | "arrivalRate" | "jobs"
+    > | null;
   },
   "component"
 >;
@@ -70,7 +77,9 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
               ? `${rate.toLocaleString()} req/s`
               : n.kind === "cache"
                 ? `${n.hitRate}% hit rate`
-                : `${totalCapacity(n).toLocaleString()} req/s ${n.kind === "service" ? "total" : "capacity"}`}
+                : n.kind === "queue"
+                  ? `${n.queueLimit.toLocaleString()} waiting slots`
+                  : `${totalCapacity(n).toLocaleString()} req/s ${["service", "worker"].includes(n.kind) ? "total" : "capacity"}`}
           </span>
         </div>
         <button
@@ -100,7 +109,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           <AlertTriangle size={13} />
         </span>
       )}
-      {n.kind !== "database" && (
+      {!["database", "worker"].includes(n.kind) && (
         <Handle type="source" position={Position.Right} />
       )}
       <div className={`node-footnote ${overloaded ? "warning-text" : ""}`}>
@@ -133,15 +142,19 @@ export function ArchitectureCanvas({
     if (!element) return;
     let previous: { width: number; height: number } | undefined;
     let frame = 0;
+    let initialTimer: ReturnType<typeof setTimeout> | undefined;
     const observer = new ResizeObserver(([entry]) => {
       const size = entry.contentRect;
       if (
-        previous &&
-        (Math.abs(size.width - previous.width) > 1 ||
-          Math.abs(size.height - previous.height) > 1)
+        (previous &&
+          (Math.abs(size.width - previous.width) > 1 ||
+            Math.abs(size.height - previous.height) > 1)) ||
+        (!previous &&
+          editor.project.viewport.canvasHeight !== undefined &&
+          Math.abs(editor.project.viewport.canvasHeight - size.height) > 1)
       ) {
         cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(() => {
+        const fit = () => {
           const nodes = flow.getNodes();
           if (!nodes.length) return;
           if (window.innerWidth <= 560) {
@@ -165,7 +178,9 @@ export function ArchitectureCanvas({
             );
             flow.setViewport({ ...view, y: view.y + reserved });
           }
-        });
+        };
+        if (!previous) initialTimer = setTimeout(fit, 80);
+        else frame = requestAnimationFrame(fit);
       }
       previous = { width: size.width, height: size.height };
     });
@@ -173,6 +188,7 @@ export function ArchitectureCanvas({
     return () => {
       observer.disconnect();
       cancelAnimationFrame(frame);
+      clearTimeout(initialTimer);
     };
   }, [flow]);
   const initialFit = useRef(
@@ -245,6 +261,7 @@ export function ArchitectureCanvas({
           totals: metrics
             ? {
                 generated: metrics.generated,
+                jobs: metrics.jobs,
                 cacheHits: metrics.cacheHits,
                 arrivalRate: metrics.arrivalRate,
               }
@@ -264,13 +281,25 @@ export function ArchitectureCanvas({
           type: "traffic",
           data: {
             running: running && pageVisible,
+            rateLabel:
+              target?.kind === "worker"
+                ? metrics?.time
+                  ? "attempts observed"
+                  : "capacity"
+                : target?.kind === "queue"
+                  ? "offered"
+                  : "expected",
             rate:
-              target?.kind === "database"
-                ? expectedRate *
-                  (1 -
-                    (g.nodes.find((n) => n.kind === "cache")?.hitRate ?? 0) /
-                      100)
-                : expectedRate,
+              target?.kind === "worker"
+                ? metrics?.time
+                  ? (metrics.nodes[target.id]?.arrived ?? 0) / metrics.time
+                  : totalCapacity(target)
+                : target?.kind === "database"
+                  ? expectedRate *
+                    (1 -
+                      (g.nodes.find((n) => n.kind === "cache")?.hitRate ?? 0) /
+                        100)
+                  : expectedRate,
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -280,7 +309,7 @@ export function ArchitectureCanvas({
           },
         };
       }),
-    [g, selectedEdges, running, pageVisible, expectedRate],
+    [g, selectedEdges, running, pageVisible, expectedRate, metrics],
   );
   const onNodesChange: OnNodesChange<ArchitectureNode> = (changes) => {
     for (const change of changes) {
@@ -338,7 +367,12 @@ export function ArchitectureCanvas({
         })
       }
       onNodesDelete={(deleted) => deleted.forEach((n) => editor.remove(n.id))}
-      onMoveEnd={(_, viewport) => editor.viewport(viewport)}
+      onMoveEnd={(_, viewport) =>
+        editor.viewport({
+          ...viewport,
+          canvasHeight: canvasRef.current?.clientHeight,
+        })
+      }
       defaultViewport={editor.project.viewport}
       onInit={(instance) => {
         if (initialFit.current && mobile && g.nodes[0])
