@@ -24,6 +24,32 @@ test("collapsed subsystems preserve live runs, reopen and expose editable childr
       exact: true,
     }),
   ).toBeVisible();
+  await page.waitForTimeout(150);
+  const service = page
+    .locator(".react-flow__node-component")
+    .filter({ hasText: "Redirect service" });
+  const beforeMove = await service.boundingBox();
+  const database = page
+    .locator(".react-flow__node-component")
+    .filter({ hasText: "Database" });
+  const beforeDatabase = await database.boundingBox();
+  const header = await page.locator(".subsystem-header strong").boundingBox();
+  await page.mouse.move(header!.x + 10, header!.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(header!.x + 50, header!.y + 35, { steps: 5 });
+  await page.mouse.up();
+  const afterMove = await service.boundingBox();
+  const afterDatabase = await database.boundingBox();
+  expect(afterMove!.x - beforeMove!.x).toBeGreaterThan(20);
+  expect(afterMove!.y - beforeMove!.y).toBeGreaterThan(15);
+  expect(afterDatabase!.x - beforeDatabase!.x).toBeCloseTo(
+    afterMove!.x - beforeMove!.x,
+    0,
+  );
+  expect(afterDatabase!.y - beforeDatabase!.y).toBeCloseTo(
+    afterMove!.y - beforeMove!.y,
+    0,
+  );
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.waitForTimeout(200);
   await page.getByRole("button", { name: "Pause", exact: true }).click();

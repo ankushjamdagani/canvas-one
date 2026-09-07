@@ -227,7 +227,8 @@ export function ArchitectureCanvas({
     }, 80);
     return () => clearTimeout(timer);
   }, [expandedKey, flow]);
-  const nodeCount = useRef(g.nodes.length);
+  const nodeIdentity = g.nodes.map((node) => node.id).join(",");
+  const nodeSet = useRef(nodeIdentity);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
   // Keep renderer measurements between metric updates. Dropping them makes
   // React Flow discard handle bounds and remount every edge on each sample.
@@ -235,8 +236,8 @@ export function ArchitectureCanvas({
     Record<string, { width: number; height: number }>
   >({});
   useEffect(() => {
-    if (nodeCount.current === g.nodes.length) return;
-    nodeCount.current = g.nodes.length;
+    if (nodeSet.current === nodeIdentity) return;
+    nodeSet.current = nodeIdentity;
     const timer = setTimeout(() => {
       if (mobile) {
         const node =
@@ -248,7 +249,7 @@ export function ArchitectureCanvas({
       } else flow.fitView({ padding: 0.23, maxZoom: 1, duration: 0 });
     }, 80);
     return () => clearTimeout(timer);
-  }, [g.nodes.length, flow]);
+  }, [nodeIdentity, flow]);
   const baseNodes: ArchitectureNode[] = useMemo(
     () =>
       g.nodes.map((n) => ({

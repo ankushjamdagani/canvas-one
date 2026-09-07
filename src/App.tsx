@@ -220,7 +220,7 @@ export default function App() {
             <span>Guided experiment</span>
             <select
               aria-label="Guided experiment"
-              value={project.activeExperiment ?? ""}
+              value={project.graph.guideId ?? ""}
               onChange={(e) => editor.loadExperiment(e.target.value)}
             >
               <option value="">Explore freely</option>
@@ -376,6 +376,14 @@ export default function App() {
             </button>
             <span className="toolbar-divider" />
             <span className="workspace-label">Architecture playground</span>
+            {graph.guideId && (
+              <button
+                aria-label="Show experiment guide"
+                onClick={() => editor.select(null)}
+              >
+                Guide
+              </button>
+            )}
           </div>
           <div className="run-actions">
             <span className="save-status" role="status">

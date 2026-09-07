@@ -191,3 +191,10 @@ Saved-result contexts identify historical single-worker models. Comparisons expl
 ## Background jobs and subsystem composition
 
 The light docked workspace now offers an Experiment path selector. Job queue and worker cards reveal admission, attempt processing and retry settings; producer acknowledgement is explicitly distinct from completion. Job edges distinguish offered traffic from observed attempts. Subsystems use a lightly tinted dashed enclosure when expanded and a compact solid summary when collapsed. Header dragging moves members together. Names and controls remain in the left dock; mobile uses disclosures and a readable focused node rather than squeezing the whole subsystem into view. Renderer-only group dimensions are retained across samples to keep collapsed cards and boundary edges stable.
+
+
+## Guided experiments
+
+A compact library selector loads four concrete starters. The inspector's guide contains one learning question, three practical steps and an observed-results disclosure. Guide in the toolbar returns to it after component inspection. Findings use current measured queue, completion, attempt and failure counters; they do not claim real-system sizing. The guide is model metadata excluded from the simulation signature, preserving live runs when returning to free exploration and restoring the selected lesson with Undo/checkpoints. Mobile keeps native selectors and the coach in document flow.
+
+Viewport restoration considers canvas height and node identity changes. This preserves manual zoom for an unchanged workspace while reframing when switching starter graphs or returning from a differently sized results pane. Expanded controls remain inside the canvas.

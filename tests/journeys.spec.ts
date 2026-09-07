@@ -121,7 +121,7 @@ test("small screen stays usable without page overflow", async ({ page }) => {
   });
   const node = await page.locator(".react-flow__node").first().boundingBox();
   expect(node!.width).toBeGreaterThan(150);
-  await page.locator("summary").click();
+  await page.locator(".checkpoints > summary").click();
   await page
     .getByRole("textbox", { name: "Checkpoint name" })
     .fill("Mobile baseline");

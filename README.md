@@ -1,6 +1,6 @@
 # System studio
 
-An interactive architecture-learning prototype. Build a URL-shortener request path, run a seeded workload, find the bottleneck, add a cache, and replay the same arrivals.
+An interactive architecture-learning workspace. Explore URL lookups and queued background jobs, inspect component internals, group subsystems, run seeded workloads, and compare saved results.
 
 ## Run locally
 
@@ -12,6 +12,17 @@ npm run dev
 ```
 
 Open http://localhost:5173. Production build: `npm run build`.
+
+## Guided experiments
+
+Choose a **Guided experiment** in the library:
+
+- **Relieve database pressure:** compare overloaded URL lookups before and after adding cache.
+- **Scale a worker pool:** compare one worker with four at unchanged per-worker speed.
+- **Absorb a job burst:** inspect waiting and expiry, then scale consumers.
+- **Understand retry cost:** compare zero retries with two, measuring extra attempts and permanent failures.
+
+Each loads a real editable starter model. The inspector provides a question, suggested steps and observations calculated from the current run. Use **Guide** in the toolbar to return after selecting a component. The selected guide follows the model through Undo, checkpoints and export. **Explore freely** hides the guide without resetting a running experiment. Loading a different guide or path replaces the model with an undoable edit; saved results remain intact.
 
 ## First experiment
 
@@ -63,7 +74,7 @@ Try a service at 200 req/s per worker with 700 req/s incoming traffic. Run with 
 
 Workers take requests from one shared FIFO queue. New arrivals use the first free worker; otherwise they wait or are rejected if the queue is full. Completing workers take the oldest nonexpired waiting request. Equal-time events use stable insertion order. Expired active work occupies its worker until processing completes. Workers are ideal independent processing slots: no contention, scheduling overhead, connection pools or machine-level scaling are modeled.
 
-Older projects omit worker count and retain one worker. Historical saved results remain labeled with the single-worker model (`url-lookup/2`); new results use `url-lookup/3`. Both remain readable, but cross-version comparisons suppress deltas. Restoring a historical model preserves its single-worker settings; replay creates a new result under the current model version. Portable exports use version 5. Older portable formats are no longer imported; re-export an existing local project using the current app. Very old saved result models may need a fresh run before a portable import; local records are not erased.
+Missing worker count defaults to one. Portable exports/imports use the current version-5 format; old-format import shims are not maintained. Existing browser-local records are not deleted. Re-export a local project with the current app; very old saved result models may need a fresh run before portable import. Keep the original export as an archive if it contains unsupported historical results.
 
 ## Background jobs
 
@@ -93,7 +104,7 @@ No cloud synchronization or remote account is involved. Export JSON to preserve 
 
 This is a learning model, not a hardware benchmark or architecture sizing tool.
 
-- One supported request path: traffic → service → optional cache → database.
+- Supported paths: traffic → service → optional cache → database, and producer → job queue → worker pool.
 - Poisson arrivals from a deterministic seed, following the configured steady, burst or linear-ramp rate. Integrated arrival intensity is inverted analytically; unused exponential hazard is carried across burst boundaries, without fixed time-step approximations. Cache outcomes use a separate per-request deterministic draw, so adding the cache does not perturb arrivals.
 - Service defaults to one worker at 2,000 requests/s per worker. Total service capacity is `workers × capacity`; processing time for each request is `1 / capacity`. Database and cache each retain one serial processor at 500 and 5,000 requests/s respectively.
 - FIFO waiting queues default to 500 slots. Queue limits exclude all active workers. New arrivals are rejected when every worker is busy and the waiting queue is full.
@@ -101,7 +112,7 @@ This is a learning model, not a hardware benchmark or architecture sizing tool.
 - Cache hit probability is fixed (no warm-up, eviction, writes, consistency or key popularity).
 - Runs stop at the selected observation window. Outstanding requests are counted as in flight rather than silently marked successful. Generated = succeeded + rejected + timed out + in flight.
 - Throughput and utilization are cumulative averages. p95 and mean latency include successful requests only. The chart samples queue length each simulated second.
-- Replication, retries, frontend processing, network contention, branches and nested subsystems are not implemented. Future visual expansion must preserve the underlying simulation semantics.
+- URL lookups do not retry. Job retries follow the explicit policy above. Replication, worker crashes, duplicate delivery, frontend execution, network contention and branched execution are not modeled. Subsystems are one level of visual grouping around the same executable components.
 
 ## Structure
 

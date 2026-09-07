@@ -222,20 +222,21 @@ export const useEditor = create<Editor>((set, get) => ({
       set((s) => ({
         project: {
           ...s.project,
-          activeExperiment: undefined,
+          graph: { ...s.project.graph, guideId: undefined },
           updatedAt: Date.now(),
         },
       }));
       return;
     }
     const graph = experiment.build();
+    graph.guideId = id;
     get().change((g) => {
       for (const key of Object.keys(g))
         delete (g as unknown as Record<string, unknown>)[key];
       Object.assign(g, graph);
     });
     set((s) => ({
-      project: { ...s.project, activeExperiment: id },
+      project: s.project,
       selected: null,
     }));
   },

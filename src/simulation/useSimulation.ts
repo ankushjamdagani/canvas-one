@@ -14,8 +14,9 @@ export function useSimulation(graph: Graph, projectId = "") {
     [result, setResult] = useState<RunResult | null>(null),
     [error, setError] = useState("");
   const lastProject = useRef(projectId);
+  const { guideId: _guideId, ...simulationGraph } = graph;
   const signature = JSON.stringify({
-    ...graph,
+    ...simulationGraph,
     nodes: graph.nodes.map(
       ({ position: _position, name: _name, ...node }) => node,
     ),

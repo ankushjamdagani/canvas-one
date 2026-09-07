@@ -9,7 +9,7 @@ export function ExperimentCoach({
   metrics: Metrics | null;
 }) {
   const experiment = experiments.find(
-    (item) => item.id === project.activeExperiment,
+    (item) => item.id === project.graph.guideId,
   );
   if (!experiment) return null;
   const jobGuide =

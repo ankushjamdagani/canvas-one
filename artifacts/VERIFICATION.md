@@ -108,3 +108,14 @@ Workers are ideal independent processors, not machine replicas. No scheduler con
 40 unit tests, 18 production Chromium journeys and production build pass. Job tests cover separate admission acknowledgements, shared queue bounds, attempt limits/backoff, retained active slots after expiry, rejected retry re-entry, request conservation, profile replay and portable result accounting. The URL engine retains its seeded results after extracting shared heap/RNG/exact-latency primitives. Current-format-only import tests replace retired compatibility promises.
 
 Desktop/mobile screenshots: `background-jobs.png`, `background-jobs-mobile.png`. A small persisted viewport after closing a results pane was corrected by recording canvas height and reframing when reopening at a materially different height; manual viewport restoration remains covered. No browser-local data is deleted.
+
+
+## Completed finite roadmap — subsystems and guided experiments
+
+45 unit tests pass, including view-only graph identity, subgroup endpoint projection, current portable metadata, executable guided starters and measured effects of concurrency/retry changes. All 22 production browser journeys pass; final focused viewport checks cover changing guides with equal node counts, reopening expanded controls, group dragging and existing manual zoom persistence. Build passes; main entry is approximately 551 KB /175 KB gzip.
+
+Subsystems collapse real nodes into an aggregate summary without changing engine input, replay or live metrics. Browser tests verify collapse during a paused run, resume, stable boundary edges across samples, reopen, editing children, ungrouping and mobile access. Group dragging is checked by equal displacement of both members, accounting for React Flow's drag-start threshold.
+
+Guided starters cover cache pressure, worker scaling, job bursts and retry cost. Coach observations use actual measurements. Tests verify guide/model Undo, portable checkpoints, returning from node inspection, local reopen and switching to free exploration without resetting a run. Mobile/desktop layouts were inspected directly. Screenshots: subsystem-collapsed.png, subsystem-expanded.png, subsystem-mobile.png, guided-experiment.png, guided-mobile.png.
+
+Visual corrections: retain measured group dimensions to prevent collapsed cards/edges disappearing across worker samples; reframe on node identity changes, not merely node count, to avoid clipping expanded controls when switching guides. No new independent visual review or real-device performance claim is made. The user-authorized finite roadmap is complete; current-format-only imports are intentional and browser-local records were not deleted.

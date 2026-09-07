@@ -87,10 +87,6 @@ export function importProject(text: string): Project {
   )
     throw new Error("Canvas viewport is invalid.");
   return {
-    activeExperiment:
-      typeof p.activeExperiment === "string" && p.activeExperiment.length < 80
-        ? p.activeExperiment
-        : undefined,
     subsystems: clone(p.subsystems ?? []),
     id: crypto.randomUUID(),
     name: p.name.slice(0, 69) + " (imported)",

@@ -31,6 +31,8 @@ export interface Settings {
   profile?: TrafficProfile;
 }
 export interface Graph {
+  /** Learning-guide metadata, excluded from the simulation signature. */
+  guideId?: string;
   scenario?: "lookup" | "jobs";
   nodes: ModelNode[];
   edges: ModelEdge[];
@@ -43,7 +45,6 @@ export interface Checkpoint {
   createdAt: number;
 }
 export interface Project {
-  activeExperiment?: string;
   subsystems?: Subsystem[];
   id: string;
   name: string;
@@ -150,6 +151,11 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       "This file is missing a graph, connections, or experiment settings.",
     ];
   const { nodes, edges, settings: s } = graph;
+  if (
+    graph.guideId !== undefined &&
+    (typeof graph.guideId !== "string" || graph.guideId.length > 80)
+  )
+    errors.push("Experiment guide metadata is invalid.");
   if (
     graph.scenario !== undefined &&
     !["lookup", "jobs"].includes(graph.scenario)
