@@ -1,3 +1,4 @@
+import { balancedLookup, hasBalancer, serviceInstances } from "./routing";
 import { baseline, backgroundJobs, isJobGraph, type Graph } from "./model";
 import type { Metrics } from "./metrics";
 export interface Experiment {
@@ -8,6 +9,17 @@ export interface Experiment {
   build: () => Graph;
 }
 export const experiments: Experiment[] = [
+  {
+    id: "horizontal-scaling",
+    title: "Scale service instances",
+    question: "When does adding instances move the bottleneck to the shared database?",
+    steps: [
+      "Run and save one instance at 200 req/s with 700 req/s incoming traffic.",
+      "Select Load balancer and add two service instances. Each copies the first instance’s worker and queue settings; replay and save.",
+      "Compare throughput and per-instance routing. Three instances offer 600 req/s, but the shared database serves only 500. Raise its capacity to 1,000 and replay; add a fourth instance to handle more incoming traffic.",
+    ],
+    build: () => balancedLookup(1),
+  },
   {
     id: "cache-pressure",
     title: "Relieve database pressure",
@@ -113,6 +125,10 @@ export function observations(graph: Graph, metrics: Metrics | null): string[] {
         ? `${pressured.map((node) => node.name).join(", ")} averaged over 95% utilization. Inspect waiting and rejection there.`
         : "No component averaged over 95% utilization in this observation window.",
     );
+  }
+  if (hasBalancer(graph)) {
+    const instances = serviceInstances(graph);
+    findings.push(`Round robin routed ${instances.map((n) => `${metrics.nodes[n.id]?.arrived.toLocaleString() ?? "0"} to ${n.name}`).join("; ")}. Rejected arrivals are included; requests are not rerouted.`);
   }
   return findings;
 }

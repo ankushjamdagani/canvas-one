@@ -26,6 +26,8 @@ export interface JobMetrics {
   retryRejected: number;
 }
 export interface Metrics {
+  /** Actual edge traversals; routing includes rejected destination arrivals. */
+  edges?: Record<string, number>;
   jobs?: JobMetrics;
   time: number;
   generated: number;

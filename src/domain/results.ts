@@ -4,11 +4,12 @@ import {
   workerCount,
   isJobGraph,
   type Graph,
+  type ModelNode,
 } from "./model";
 import { failureCount, type Metrics } from "./metrics";
 import { sameWorkload, profileLabel } from "./workload";
 
-export const MODEL_VERSION = "url-lookup/3";
+export const MODEL_VERSION = "url-lookup/4";
 export const modelVersion = (graph: Graph) =>
   isJobGraph(graph) ? "background-jobs/1" : MODEL_VERSION;
 export const MAX_SAVED_RUNS = 20;
@@ -26,6 +27,8 @@ export interface SavedRun extends RunResult {
 export function defaultRunName(graph: Graph) {
   if (isJobGraph(graph))
     return `${profileLabel(graph.settings)} · background jobs`.slice(0, 80);
+  const instances = graph.nodes.filter((n) => n.kind === "service");
+  if (graph.nodes.some((n) => n.kind === "balancer")) return `${profileLabel(graph.settings)} · ${instances.length} service instances`.slice(0, 80);
   const cache = graph.nodes.find((n) => n.kind === "cache");
   return `${profileLabel(graph.settings)} · ${cache ? `${cache.hitRate}% cache` : "no cache"}`.slice(
     0,
@@ -150,6 +153,17 @@ export function validateSavedRun(run: SavedRun): string[] {
     )
       return ["Saved component measurements are invalid."];
   }
+  if (!isJobGraph(run.graph)) {
+    if (!m.edges || Object.keys(m.edges).length !== run.graph.edges.length || run.graph.edges.some((e) => !Number.isSafeInteger(m.edges?.[e.id]) || m.edges![e.id] < 0 || m.edges![e.id] > m.generated))
+      return ["Saved connection measurements are invalid."];
+    const balancer = run.graph.nodes.find((n) => n.kind === "balancer");
+    if (balancer) {
+      const services = run.graph.nodes.filter((n) => n.kind === "service");
+      if (services.some((n, i) => m.nodes[n.id].arrived !== Math.floor(m.generated / services.length) + (i < m.generated % services.length ? 1 : 0)) ||
+        run.graph.edges.filter((e) => e.source === balancer.id).some((e) => m.edges![e.id] !== m.nodes[e.target].arrived))
+        return ["Saved routing counts do not reconcile with round robin."];
+    }
+  }
   if (!Array.isArray(m.history) || m.history.length !== Math.floor(m.time))
     return ["Saved time-series samples are invalid."];
   for (let i = 0; i < m.history.length; i++) {
@@ -196,15 +210,18 @@ export function comparisonStatus(a: SavedRun, b: SavedRun) {
 }
 export function modelChanges(a: Graph, b: Graph): string[] {
   const changes: string[] = [];
-  for (const kind of [
-    "service",
-    "cache",
-    "database",
-    "queue",
-    "worker",
-  ] as const) {
-    const before = a.nodes.find((n) => n.kind === kind),
-      after = b.nodes.find((n) => n.kind === kind);
+  const beforeNodes = a.nodes.filter((n) => n.kind !== "traffic"), afterNodes = b.nodes.filter((n) => n.kind !== "traffic");
+  const matched = new Set<string>();
+  const pairs: { before?: ModelNode; after?: ModelNode }[] = beforeNodes.map((before) => {
+    const after = afterNodes.find((n) => n.id === before.id) ??
+      (beforeNodes.filter((n) => n.kind === before.kind).length === 1 && afterNodes.filter((n) => n.kind === before.kind).length === 1
+        ? afterNodes.find((n) => n.kind === before.kind) : undefined);
+    if (after) matched.add(after.id);
+    return { before, after };
+  });
+  for (const after of afterNodes.filter((n) => !matched.has(n.id))) pairs.push({ before: undefined, after });
+  for (const {before, after} of pairs) {
+    const kind = (after ?? before)!.kind;
     if (!before && after) {
       changes.push(
         `${after.name} added${kind === "cache" ? ` (${after.hitRate}% hit rate)` : ""}.`,
@@ -242,5 +259,7 @@ export function modelChanges(a: Graph, b: Graph): string[] {
     if (kind === "cache" && before.hitRate !== after.hitRate)
       changes.push(`Cache hit rate: ${before.hitRate}% → ${after.hitRate}%.`);
   }
+  const routes = (g: Graph) => g.edges.map((e) => `${e.source}>${e.target}`).sort().join(",");
+  if (a.nodes.length === b.nodes.length && a.nodes.every((n) => b.nodes.some((other) => other.id === n.id)) && routes(a) !== routes(b)) changes.push("Connections changed; inspect each saved model for its routing path.");
   return changes;
 }

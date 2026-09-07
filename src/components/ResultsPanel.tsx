@@ -1,3 +1,4 @@
+import { hasBalancer, serviceInstances } from "../domain/routing";
 import { failureCount } from "../domain/metrics";
 import { isJobGraph } from "../domain/model";
 import { useEffect, useState } from "react";
@@ -249,6 +250,14 @@ export function ResultsPanel({
               </p>
             </div>
           </div>
+          {hasBalancer(current.graph) && <details className="saved-routing">
+            <summary>Saved per-instance load · {current.name}</summary>
+            <div className="result-table-wrap"><table className="result-table">
+              <caption>Observed routing and processing in this saved result</caption>
+              <thead><tr><th scope="col">Instance</th><th scope="col">Routed</th><th scope="col">Waiting</th><th scope="col">Rejected here</th><th scope="col">Busy</th></tr></thead>
+              <tbody>{serviceInstances(current.graph).map((n) => { const m = current.metrics.nodes[n.id]; return <tr key={n.id}><th scope="row">{n.name}</th><td>{m.arrived.toLocaleString()}</td><td>{m.queued}</td><td>{m.rejected.toLocaleString()}</td><td>{(m.utilization * 100).toFixed(1)}%</td></tr>; })}</tbody>
+            </table></div>
+          </details>}
           <div className="result-actions">
             <label>
               <span>Result name</span>
@@ -289,7 +298,7 @@ export function ResultsPanel({
 function RunContext({ run }: { run: SavedRun }) {
   return (
     <small className="run-context">
-      {isJobGraph(run.graph) ? "Background jobs" : "URL lookup"}
+      {isJobGraph(run.graph) ? "Background jobs" : hasBalancer(run.graph) ? `Round robin · ${serviceInstances(run.graph).length} instances` : "URL lookup"}
       <br />
       {profileLabel(run.graph.settings)}
       <br />

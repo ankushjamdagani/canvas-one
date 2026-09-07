@@ -39,4 +39,4 @@ Tentative name System studio. User selected light layout A, docked workspace. Re
 
 ## Open Decisions
 
-The authorized finite roadmap is complete: background jobs, visual subsystem composition and guided experiments. Further execution paths, nested hierarchies and hardware realism require a separately scoped request.
+The scoped roadmap now includes load-balanced URL lookup: an optional instantaneous round-robin balancer fans traffic across 1–8 independently editable service instances, each with its own worker pool and FIFO queue, into a shared cache/database path. Full queues reject without rerouting; the shared downstream bottleneck remains visible. Nested hierarchies, alternate routing policies, health checks and hardware realism remain separately scoped.

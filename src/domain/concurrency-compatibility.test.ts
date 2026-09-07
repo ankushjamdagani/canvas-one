@@ -27,11 +27,11 @@ it("round-trips concurrent graphs, checkpoints and new results in the current fo
   ];
   const text = exportProject(p),
     data = JSON.parse(text);
-  expect(data.version).toBe(5);
+  expect(data.version).toBe(6);
   expect(importProject(text).savedRuns![0].graph.nodes[1].workers).toBe(4);
   expect(importProject(text).checkpoints[0].graph.nodes[1].workers).toBe(4);
   data.version = 3;
-  expect(() => importProject(JSON.stringify(data))).toThrow(/version-5/);
+  expect(() => importProject(JSON.stringify(data))).toThrow(/version-6/);
   const old = clone(p.savedRuns[0]);
   old.modelVersion = "url-lookup/2";
   expect(validateSavedRun(old).join()).toContain("unsupported");

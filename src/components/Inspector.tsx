@@ -1,3 +1,5 @@
+import { RoutingPanel } from "./RoutingPanel";
+import { hasBalancer, serviceInstances } from "../domain/routing";
 import { ExperimentCoach } from "./ExperimentCoach";
 import { JobControls } from "./JobControls";
 import { isJobGraph } from "../domain/model";
@@ -85,12 +87,12 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
     demand =
       n.kind === "database"
         ? expectedDatabaseRate(g, metrics?.time ?? 0)
-        : rateAt(g.settings, metrics?.time ?? 0),
+        : rateAt(g.settings, metrics?.time ?? 0) / (n.kind === "service" && hasBalancer(g) ? serviceInstances(g).length : 1),
     capacity =
       n.kind === "queue"
         ? totalCapacity(g.nodes.find((n) => n.kind === "worker") ?? n)
         : totalCapacity(n),
-    overloaded = n.kind !== "traffic" && demand > capacity;
+    overloaded = !["traffic", "balancer"].includes(n.kind) && demand > capacity;
   return (
     <aside className="inspector">
       <div className="inspector-heading">
@@ -134,7 +136,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                 }
               />
             </label>
-            {["queue", "worker"].includes(n.kind) ? (
+            {n.kind === "balancer" ? <RoutingPanel metrics={metrics} /> : ["queue", "worker"].includes(n.kind) ? (
               <JobControls node={n} />
             ) : n.kind === "traffic" ? (
               <WorkloadControls />
@@ -204,7 +206,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
               Delete component
             </button>
           </>
-        ) : (
+        ) : n.kind === "balancer" ? <RoutingPanel metrics={metrics} /> : (
           <>
             <div className={`status-callout ${overloaded ? "warning" : ""}`}>
               {overloaded ? <TriangleAlert size={22} /> : <Icon size={22} />}
@@ -227,6 +229,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                 </p>
               </div>
             </div>
+            {n.kind === "service" && hasBalancer(g) && <p className="note">Service instance {serviceInstances(g).findIndex((instance) => instance.id === n.id) + 1} of {serviceInstances(g).length}. This instance owns its workers and queue. Round robin gives equal turns, regardless of capacity; the downstream database is shared.</p>}
             <h3>What this component does</h3>
             <p>
               {n.kind === "queue"

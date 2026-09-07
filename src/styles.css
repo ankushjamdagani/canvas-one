@@ -2449,3 +2449,10 @@ select:focus-visible {
     margin: 0 0 14px;
   }
 }
+
+.routing-panel h3 { margin: 0 0 10px; }
+.routing-panel p { font-size: 11px; line-height: 1.65; color: var(--muted); }
+.routing-list { padding-left: 20px; margin: 16px 0; }
+.routing-list li { padding: 10px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.routing-list button { border: 0; padding: 3px 0; background: transparent; color: var(--teal); text-align: left; }
+.routing-list span { display: block; font-size: 10px; line-height: 1.7; }

@@ -43,6 +43,7 @@ class LookupSimulation {
   private seq = 0;
   private rng: () => number;
   private stages: Stage[];
+  private edgeCounts: Record<string, number> = {};
   private time = 0;
   private generated = 0;
   private succeeded = 0;
@@ -71,6 +72,7 @@ class LookupSimulation {
           })),
         })),
     );
+    this.edgeCounts = Object.fromEntries(graph.edges.map((e) => [e.id, 0]));
     this.scheduleArrival();
   }
   private schedule(event: Omit<Event, "seq">) {
@@ -117,6 +119,12 @@ class LookupSimulation {
       request.done = true;
     }
   }
+  private forward(request: Request, source: string) {
+    const connection = this.graph.edges.find((e) => e.source === source);
+    if (!connection) { this.enter(request, this.stages.length); return; }
+    this.edgeCounts[connection.id]++;
+    this.enter(request, this.stages.findIndex((s) => s.node.id === connection.target));
+  }
   private event(event: Event) {
     const request = event.request;
     if (event.kind === "arrival") {
@@ -126,7 +134,16 @@ class LookupSimulation {
         kind: "timeout",
         request: req,
       });
-      this.enter(req, 0);
+      const services = this.stages.filter((s) => s.node.kind === "service");
+      const balancer = this.graph.nodes.find((n) => n.kind === "balancer");
+      if (balancer) {
+        const destination = services[(req.id - 1) % services.length];
+        const incoming = this.graph.edges.find((e) => e.target === balancer.id)!;
+        const outgoing = this.graph.edges.find((e) => e.source === balancer.id && e.target === destination.node.id)!;
+        this.edgeCounts[incoming.id]++;
+        this.edgeCounts[outgoing.id]++;
+        this.enter(req, this.stages.indexOf(destination));
+      } else this.forward(req, this.graph.nodes.find((n) => n.kind === "traffic")!.id);
       this.scheduleArrival();
     } else if (event.kind === "timeout" && request && !request.done) {
       request.done = true;
@@ -150,7 +167,7 @@ class LookupSimulation {
         ) {
           this.hits++;
           this.enter(request, this.stages.length);
-        } else this.enter(request, i + 1);
+        } else this.forward(request, stage.node.id);
       }
       let next = stage.queue.shift();
       while (next?.done) next = stage.queue.shift();
@@ -214,7 +231,13 @@ class LookupSimulation {
         },
       ]),
     );
+    const balancer = this.graph.nodes.find((n) => n.kind === "balancer");
+    if (balancer) nodes[balancer.id] = {
+      arrived: this.generated, completed: this.generated, rejected: 0,
+      queued: 0, busy: false, activeWorkers: 0, utilization: 0,
+    };
     return {
+      edges: { ...this.edgeCounts },
       time: this.time,
       generated: this.generated,
       arrivalRate: rateAt(this.graph.settings, this.time),

@@ -1,3 +1,5 @@
+import { RoutingPanel } from "./RoutingPanel";
+import { hasBalancer, serviceInstances } from "../domain/routing";
 import { visibleSubsystems } from "../domain/subsystems";
 import { SubsystemNode } from "./SubsystemNode";
 import { projectSubsystems } from "./subsystemProjection";
@@ -18,6 +20,7 @@ import {
   getViewportForBounds,
 } from "@xyflow/react";
 import {
+  Network,
   ArrowRight,
   Database,
   Hexagon,
@@ -35,6 +38,7 @@ import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
 import { TrafficEdge, type TrafficConnection } from "./TrafficEdge";
 export const icons = {
+  balancer: Network,
   traffic: ArrowRight,
   service: Hexagon,
   database: Database,
@@ -44,6 +48,7 @@ export const icons = {
 };
 type ArchitectureNode = Node<
   {
+    fullMetrics: Metrics | null;
     model: ModelNode;
     rate: number;
     metrics?: Metrics["nodes"][string];
@@ -78,6 +83,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           <span>
             {n.kind === "traffic"
               ? `${rate.toLocaleString()} req/s`
+              : n.kind === "balancer" ? "Round-robin routing"
               : n.kind === "cache"
                 ? `${n.hitRate}% hit rate`
                 : n.kind === "queue"
@@ -98,7 +104,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </button>
       </div>
-      {expanded && (
+      {expanded && (n.kind === "balancer" ? <div className="component-internals"><RoutingPanel metrics={data.fullMetrics} /></div> :
         <ComponentInternals
           node={n}
           settings={data.settings}
@@ -118,6 +124,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
       <div className={`node-footnote ${overloaded ? "warning-text" : ""}`}>
         {n.kind === "traffic"
           ? "Seeded arrival stream"
+          : n.kind === "balancer" ? (hasRun ? `${m?.arrived.toLocaleString() ?? 0} routed · no rerouting` : "Equal turns · independent queues")
           : hasRun
             ? `${m?.queued ?? 0} queued · ${((m?.utilization ?? 0) * 100).toFixed(0)}% busy`
             : n.kind === "cache"
@@ -259,6 +266,7 @@ export function ArchitectureCanvas({
         measured: dimensions[n.id],
         selected: editor.selected === n.id,
         data: {
+          fullMetrics: metrics,
           model: n,
           rate: rateAt(g.settings, metrics?.time ?? 0),
           metrics: metrics?.nodes[n.id],
@@ -289,6 +297,9 @@ export function ArchitectureCanvas({
         )
         .map((e) => {
           const target = g.nodes.find((n) => n.id === e.target);
+          const source = g.nodes.find((n) => n.id === e.source);
+          const balanced = hasBalancer(g), count = serviceInstances(g).length;
+          const observed = !!metrics?.time && metrics.edges?.[e.id] !== undefined;
           return {
             ...e,
             source: endpoints.get(e.source) ?? e.source,
@@ -297,7 +308,7 @@ export function ArchitectureCanvas({
             type: "traffic",
             data: {
               running: running && pageVisible,
-              rateLabel:
+              rateLabel: observed ? "observed" :
                 target?.kind === "worker"
                   ? metrics?.time
                     ? "attempts observed"
@@ -305,7 +316,7 @@ export function ArchitectureCanvas({
                   : target?.kind === "queue"
                     ? "offered"
                     : "expected",
-              rate:
+              rate: observed ? metrics!.edges![e.id] / metrics!.time : balanced && (target?.kind === "service" || source?.kind === "service") ? expectedRate / count :
                 target?.kind === "worker"
                   ? metrics?.time
                     ? (metrics.nodes[target.id]?.arrived ?? 0) / metrics.time

@@ -1,3 +1,4 @@
+import { hasBalancer } from "./domain/routing";
 import { experiments } from "./domain/experiments";
 import { SubsystemsPanel } from "./components/SubsystemsPanel";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -204,13 +205,14 @@ export default function App() {
             <span>Experiment path</span>
             <select
               aria-label="Experiment path"
-              value={jobsMode ? "jobs" : "lookup"}
+              value={jobsMode ? "jobs" : hasBalancer(graph) ? "balanced" : "lookup"}
               onChange={(e) =>
-                editor.useScenario(e.target.value as "jobs" | "lookup")
+                editor.useScenario(e.target.value as "jobs" | "lookup" | "balanced")
               }
             >
               <option value="lookup">URL lookup</option>
               <option value="jobs">Background jobs</option>
+              <option value="balanced">Load-balanced lookup</option>
             </select>
           </label>
           <p>Loads a starter model. Undo restores your canvas.</p>
@@ -237,13 +239,14 @@ export default function App() {
           <p>Click to add to your canvas</p>
           {(jobsMode
             ? (["traffic", "queue", "worker"] as ComponentKind[])
-            : (["traffic", "service", "database", "cache"] as ComponentKind[])
+            : (["traffic", "balancer", "service", "database", "cache"] as ComponentKind[])
           ).map((kind) => {
             const Icon = icons[kind];
             return (
               <button
                 className="library-item"
                 key={kind}
+                disabled={kind === "balancer" && hasBalancer(graph)}
                 onClick={() => editor.add(kind)}
               >
                 <Icon size={20} />
@@ -253,9 +256,7 @@ export default function App() {
             );
           })}
           <div className="library-caption">
-            More components will follow.
-            <br />
-            Start with one request path.
+            {jobsMode ? "Queue admission and worker processing." : "Add a load balancer, then service instances to share traffic."}
           </div>
         </div>
         <details className="checkpoints" open={window.innerWidth > 560}>
@@ -461,7 +462,7 @@ export default function App() {
                     ? `4× playback · ${profileLabel(graph.settings)}`
                     : jobsMode
                       ? "Compare admission, completion and retries. Scale workers to drain the queue."
-                      : "Run the baseline, raise the traffic, then give the database some help."}
+                      : hasBalancer(graph) ? "Compare instance queues, then inspect the shared database bottleneck." : "Run the baseline, raise the traffic, then give the database some help."}
                 </span>
               </div>
             </div>
@@ -709,6 +710,8 @@ export default function App() {
               is full. Worker utilization is occupied processor time divided by
               workers × elapsed time.
             </dd>
+            <dt>Load balancing & instances</dt>
+            <dd>Optional round-robin routing sends arrivals to 1–8 service instances in their listed order. Each instance owns 1–16 workers and one queue. The balancer is instantaneous with no capacity limit or queue. Equal turns are independent of instance capacity; full queues reject without rerouting. All instances share the optional cache and database. Moving nodes does not change routing order.</dd>
             <dt>Cache</dt>
             <dd>
               Fixed per-request hit probability with its own capacity and queue.
@@ -733,7 +736,7 @@ export default function App() {
               a fixed backoff and an original-submission deadline. Producer
               acknowledgements confirm queue admission after 8 ms, not
               completion. Retrying jobs can fail permanently if the queue is
-              full. No replication, network contention or worker crashes. Moving
+              full. No state replication, network contention, health checks or worker crashes. Moving
               a node changes only the view.
             </dd>
           </dl>

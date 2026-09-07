@@ -1,3 +1,4 @@
+import { insertBalancer, addServiceInstance, balancedLookup, hasBalancer } from "../domain/routing";
 import { experiments } from "../domain/experiments";
 import { visibleSubsystems } from "../domain/subsystems";
 import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
@@ -34,8 +35,10 @@ interface Editor {
   settings: (patch: Partial<Settings>) => void;
   add: (kind: ComponentKind) => void;
   insertCache: () => void;
+  insertBalancer: () => void;
+  addServiceInstance: () => void;
   loadExperiment: (id: string) => void;
-  useScenario: (scenario: "lookup" | "jobs") => void;
+  useScenario: (scenario: "lookup" | "jobs" | "balanced") => void;
   beginMove: () => void;
   move: (
     positions: { id: string; position: { x: number; y: number } }[],
@@ -47,6 +50,10 @@ interface Editor {
   checkpoint: (name: string) => void;
   restore: (id: string) => void;
   viewport: (v: Project["viewport"]) => void;
+}
+function replaceGraph(target: Graph, source: Graph) {
+  for (const key of Object.keys(target)) delete (target as unknown as Record<string, unknown>)[key];
+  Object.assign(target, clone(source));
 }
 export const useEditor = create<Editor>((set, get) => ({
   project: newProject(),
@@ -131,7 +138,7 @@ export const useEditor = create<Editor>((set, get) => ({
     })),
   restoreRun: (id) => {
     const run = get().project.savedRuns?.find((r) => r.id === id);
-    if (run) get().change((g) => Object.assign(g, clone(run.graph)));
+    if (run) get().change((g) => replaceGraph(g, run.graph));
   },
   selected: null,
   past: [],
@@ -205,7 +212,15 @@ export const useEditor = create<Editor>((set, get) => ({
         profile.start = Math.min(profile.start, Math.max(0, profile.end - 0.1));
       }
     }),
+  insertBalancer: () => get().change(insertBalancer),
+  addServiceInstance: () => {
+    let id: string | undefined;
+    get().change((g) => { id = addServiceInstance(g)?.id; });
+    if (id) get().select(id);
+  },
   add: (kind) => {
+    if (kind === "balancer") { get().insertBalancer(); return; }
+    if (kind === "service" && hasBalancer(get().project.graph)) { get().addServiceInstance(); return; }
     const node = makeNode(
       kind,
       220 + get().project.graph.nodes.length * 35,
@@ -231,9 +246,7 @@ export const useEditor = create<Editor>((set, get) => ({
     const graph = experiment.build();
     graph.guideId = id;
     get().change((g) => {
-      for (const key of Object.keys(g))
-        delete (g as unknown as Record<string, unknown>)[key];
-      Object.assign(g, graph);
+      replaceGraph(g, graph);
     });
     set((s) => ({
       project: s.project,
@@ -241,11 +254,9 @@ export const useEditor = create<Editor>((set, get) => ({
     }));
   },
   useScenario: (scenario) => {
-    const fresh = scenario === "jobs" ? backgroundJobs() : newProject().graph;
+    const fresh = scenario === "jobs" ? backgroundJobs() : scenario === "balanced" ? balancedLookup() : newProject().graph;
     get().change((g) => {
-      for (const key of Object.keys(g))
-        delete (g as unknown as Record<string, unknown>)[key];
-      Object.assign(g, fresh);
+      replaceGraph(g, fresh);
     });
     get().select(null);
   },
@@ -267,11 +278,10 @@ export const useEditor = create<Editor>((set, get) => ({
       if (!service || !db) return;
       db.position = { x: node.position.x + 305, y: node.position.y };
       g.nodes.push(node);
-      g.edges = g.edges.filter(
-        (e) => !(e.source === service.id && e.target === db.id),
-      );
+      const services = g.nodes.filter((n) => n.kind === "service");
+      g.edges = g.edges.filter((e) => !services.some((n) => e.source === n.id && e.target === db.id));
       g.edges.push(
-        { id: crypto.randomUUID(), source: service.id, target: node.id },
+        ...services.map((n) => ({ id: crypto.randomUUID(), source: n.id, target: node.id })),
         { id: crypto.randomUUID(), source: node.id, target: db.id },
       );
     });
@@ -336,7 +346,7 @@ export const useEditor = create<Editor>((set, get) => ({
   restore: (id) => {
     const checkpoint = get().project.checkpoints.find((c) => c.id === id);
     if (checkpoint)
-      get().change((g) => Object.assign(g, clone(checkpoint.graph)));
+      get().change((g) => replaceGraph(g, checkpoint.graph));
   },
   viewport: (viewport) =>
     set((s) => ({

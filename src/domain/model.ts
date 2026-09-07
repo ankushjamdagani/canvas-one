@@ -2,7 +2,7 @@ import type { Subsystem } from "./subsystems";
 import type { SavedRun } from "./results";
 import { rateAt, validateProfile, type TrafficProfile } from "./workload";
 export type ComponentKind =
-  "traffic" | "service" | "database" | "cache" | "queue" | "worker";
+  "traffic" | "service" | "database" | "cache" | "queue" | "worker" | "balancer";
 export interface ModelNode {
   id: string;
   kind: ComponentKind;
@@ -57,6 +57,7 @@ export interface Project {
   savedRuns?: SavedRun[];
 }
 export const labels: Record<ComponentKind, string> = {
+  balancer: "Load balancer",
   traffic: "Traffic source",
   service: "Redirect service",
   database: "Database",
@@ -174,11 +175,12 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     )
   )
     return ["Components and connections need valid IDs."];
+  if (new Set(edges.map((e) => e.id)).size !== edges.length) errors.push("Connection IDs must be unique.");
   const ids = new Set(nodes.map((n) => n.id));
   if (ids.size !== nodes.length) errors.push("Component IDs must be unique.");
   for (const n of nodes) {
     if (
-      !["traffic", "service", "database", "cache", "queue", "worker"].includes(
+      !["traffic", "service", "database", "cache", "queue", "worker", "balancer"].includes(
         n.kind,
       )
     )
@@ -240,42 +242,38 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     errors.push("A connection references a missing component.");
   // Drafts are portable even before their topology can execute.
   if (!requireRunnable) return [...new Set(errors)];
-  const order = isJobGraph(graph)
+  const count = (kind: ComponentKind) => nodes.filter((n) => n.kind === kind).length;
+  const balanced = count("balancer") > 0;
+  const services = nodes.filter((n) => n.kind === "service");
+  const kinds: ComponentKind[] = isJobGraph(graph)
     ? ["traffic", "queue", "worker"]
-    : [
-        "traffic",
-        "service",
-        ...(nodes.some((n) => n.kind === "cache") ? ["cache"] : []),
-        "database",
-      ];
-  if (
-    nodes.length !== order.length ||
-    order.some((kind) => nodes.filter((n) => n.kind === kind).length !== 1)
-  )
-    errors.push(
-      isJobGraph(graph)
-        ? "Use one producer, one queue and one job worker."
-        : "Use one traffic source, one service, one database, and optionally one cache.",
-    );
-  if (
-    edges.length !== nodes.length - 1 ||
-    edges.some((e) => !ids.has(e.source) || !ids.has(e.target))
-  )
-    errors.push("Connect every component into a single request path.");
-  for (let i = 0; i < order.length - 1; i++) {
-    const from = nodes.find((n) => n.kind === order[i]),
-      to = nodes.find((n) => n.kind === order[i + 1]);
-    if (
-      from &&
-      to &&
-      !edges.some((e) => e.source === from.id && e.target === to.id)
-    )
-      errors.push(
-        isJobGraph(graph)
-          ? "Supported path: producer → queue → worker. Reconnect the handles to match."
-          : "Supported path: traffic → service → optional cache → database. Reconnect the handles to match.",
-      );
-  }
+    : ["traffic", ...(balanced ? ["balancer" as const] : []), "service", ...(count("cache") ? ["cache" as const] : []), "database"];
+  if (nodes.some((n) => !kinds.includes(n.kind)) || kinds.some((kind) =>
+    kind === "service" && balanced ? count(kind) < 1 || count(kind) > 8 : count(kind) !== 1))
+    errors.push(isJobGraph(graph)
+      ? "Use one producer, one queue and one job worker."
+      : balanced
+        ? "Use one traffic source, one load balancer, 1–8 service instances, one shared database and optionally one shared cache."
+        : "Use one traffic source, one service, one database, and optionally one cache.");
+  const required: { source: string; target: string }[] = [];
+  const link = (from: ModelNode | undefined, to: ModelNode | undefined) => {
+    if (from && to) required.push({ source: from.id, target: to.id });
+  };
+  const find = (kind: ComponentKind) => nodes.find((n) => n.kind === kind);
+  if (balanced && !isJobGraph(graph)) {
+    link(find("traffic"), find("balancer"));
+    for (const service of services) {
+      link(find("balancer"), service);
+      link(service, find("cache") ?? find("database"));
+    }
+    if (find("cache")) link(find("cache"), find("database"));
+  } else for (let i = 0; i < kinds.length - 1; i++) link(find(kinds[i]), find(kinds[i + 1]));
+  if (edges.length !== required.length || required.some((r) => edges.filter((e) => e.source === r.source && e.target === r.target).length !== 1))
+    errors.push(isJobGraph(graph)
+      ? "Supported path: producer → queue → worker. Reconnect the handles to match."
+      : balanced
+        ? "Connect traffic → load balancer → every service instance → shared optional cache → database. No bypasses or duplicate connections."
+        : "Supported path: traffic → service → optional cache → database. Reconnect the handles to match.");
   return [...new Set(errors)];
 }
 export function expectedDatabaseRate(graph: Graph, time = 0) {

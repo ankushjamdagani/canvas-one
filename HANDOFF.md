@@ -1,6 +1,6 @@
 # Development handoff
 
-## Current status — finite roadmap complete
+## Current status — load-balanced instances milestone complete
 
 The user authorized all remaining concrete steps and explicitly removed backward-compatibility requirements. Completed the agreed three milestones: background jobs, canvas subsystem composition, and guided experiments. No additional milestones are being pursued automatically. No push or deployment.
 
@@ -36,7 +36,7 @@ Subsystems belong to Project.subsystems; missing members remain dormant through 
 
 ### Verification and evidence
 
-- 45 unit tests pass: existing URL semantics, jobs/retries/deadlines/accounting, deterministic profiles, current import validation, group identity/projection and meaningful guided comparisons.
+- 54 unit tests pass: existing URL semantics, jobs/retries/deadlines/accounting, deterministic profiles, round-robin routing and shared-bottleneck accounting, current import validation, group identity/projection and meaningful guided comparisons.
 - All 22 production Chromium journeys pass. Final focused viewport regression covers guide switching/reopen, subsystem movement and manual viewport restoration.
 - TypeScript and Vite build pass. Main entry approximately 551 KB /175 KB gzip; the known chunk-size warning remains. Results UI is deferred; no mobile-device frame-rate claim.
 - Direct bounded visual QA: artifacts/background-jobs.png, background-jobs-mobile.png, subsystem-collapsed.png, subsystem-expanded.png, subsystem-mobile.png, guided-experiment.png, guided-mobile.png. No new independent visual review is claimed.
