@@ -26,13 +26,17 @@ import {
   Hexagon,
   Layers,
   AlertTriangle,
+  Trash2,
   ChevronDown,
   ListOrdered,
   Cpu,
   ChevronRight,
+  MonitorSmartphone, Smartphone, RadioTower, Globe2, ShieldCheck, Waypoints, Braces,
+  Boxes, CalendarClock, FileStack, Search, Warehouse, Radio, BellRing, Activity,
+  ChartNoAxesCombined, KeyRound, PlugZap,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
-import { totalCapacity, type ModelNode, type Settings } from "../domain/model";
+import { isDiagramGraph, totalCapacity, type ModelNode, type Settings } from "../domain/model";
 import { rateAt } from "../domain/workload";
 import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
@@ -45,6 +49,12 @@ export const icons = {
   cache: Layers,
   queue: ListOrdered,
   worker: Cpu,
+  client: MonitorSmartphone, mobile: Smartphone, device: RadioTower, dns: Globe2,
+  cdn: Globe2, firewall: ShieldCheck, gateway: Waypoints, function: Braces,
+  container: Boxes, scheduler: CalendarClock, nosql: FileStack, objectstore: FileStack,
+  search: Search, warehouse: Warehouse, stream: Radio, pubsub: Radio,
+  email: BellRing, monitoring: Activity, analytics: ChartNoAxesCombined,
+  secrets: KeyRound, thirdparty: PlugZap,
 };
 type ArchitectureNode = Node<
   {
@@ -55,23 +65,24 @@ type ArchitectureNode = Node<
     hasRun: boolean;
     expanded: boolean;
     settings: Settings;
-    totals: Pick<
+      totals: Pick<
       Metrics,
       "generated" | "cacheHits" | "cacheMisses" | "arrivalRate" | "jobs"
-    > | null;
+      > | null;
+      diagram: boolean;
   },
   "component"
 >;
 function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
-  const { model: n, rate, metrics: m, hasRun, expanded } = data,
+  const { model: n, rate, metrics: m, hasRun, expanded, diagram } = data,
     Icon = icons[n.kind];
   const toggleExpanded = useEditor((s) => s.toggleExpanded);
   const overloaded = hasRun && (m?.utilization ?? 0) > 0.95;
   return (
     <div
-      className={`component-node ${expanded ? "expanded-node" : ""} ${selected ? "selected" : ""} ${overloaded ? "overloaded" : ""}`}
+      className={`component-node ${diagram ? "diagram-node" : ""} ${expanded ? "expanded-node" : ""} ${selected ? "selected" : ""} ${overloaded ? "overloaded" : ""}`}
     >
-      {n.kind !== "traffic" && (
+      {(diagram || n.kind !== "traffic") && (
         <Handle type="target" position={Position.Left} />
       )}
       <div className="node-header">
@@ -81,7 +92,9 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
         <div className="node-copy">
           <strong>{n.name}</strong>
           <span>
-            {n.kind === "traffic"
+            {diagram
+              ? (n.description || "Architecture component")
+              : n.kind === "traffic"
               ? `${rate.toLocaleString()} req/s`
               : n.kind === "balancer" ? "Round-robin routing"
               : n.kind === "cache"
@@ -91,7 +104,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
                   : `${totalCapacity(n).toLocaleString()} req/s ${["service", "worker"].includes(n.kind) ? "total" : "capacity"}`}
           </span>
         </div>
-        <button
+        {!diagram && <button
           className="node-expand nodrag nopan"
           aria-label={`${expanded ? "Collapse" : "Expand"} ${n.name}`}
           aria-expanded={expanded}
@@ -102,9 +115,9 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           title={expanded ? "Hide internals" : "Reveal queue and processing"}
         >
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-        </button>
+        </button>}
       </div>
-      {expanded && (n.kind === "balancer" ? <div className="component-internals"><RoutingPanel metrics={data.fullMetrics} /></div> :
+      {expanded && !diagram && (n.kind === "balancer" ? <div className="component-internals"><RoutingPanel metrics={data.fullMetrics} /></div> :
         <ComponentInternals
           node={n}
           settings={data.settings}
@@ -118,11 +131,13 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           <AlertTriangle size={13} />
         </span>
       )}
-      {!["database", "worker"].includes(n.kind) && (
+      {(diagram || !["database", "worker"].includes(n.kind)) && (
         <Handle type="source" position={Position.Right} />
       )}
       <div className={`node-footnote ${overloaded ? "warning-text" : ""}`}>
-        {n.kind === "traffic"
+        {diagram
+          ? "Connect freely · diagram only"
+          : n.kind === "traffic"
           ? "Seeded arrival stream"
           : n.kind === "balancer" ? (hasRun ? `${m?.arrived.toLocaleString() ?? 0} routed · no rerouting` : "Equal turns · independent queues")
           : hasRun
@@ -282,6 +297,7 @@ export function ArchitectureCanvas({
                 arrivalRate: metrics.arrivalRate,
               }
             : null,
+          diagram: isDiagramGraph(g),
         },
       })),
     [g, editor.selected, editor.project.expandedNodeIds, metrics, dimensions],
@@ -309,6 +325,7 @@ export function ArchitectureCanvas({
             type: "traffic",
             data: {
               running: running && pageVisible,
+              showLabel: !isDiagramGraph(g),
               rateLabel: observed ? "observed" : g.nodes.find((n) => n.kind === "cache")?.cacheMode === "lru" && target?.kind === "database" ? "capacity" :
                 target?.kind === "worker"
                   ? metrics?.time
@@ -388,6 +405,7 @@ export function ArchitectureCanvas({
     }
   };
   return (
+    <>
     <ReactFlow
       ref={canvasRef}
       nodes={nodes}
@@ -412,6 +430,7 @@ export function ArchitectureCanvas({
           (group) => group.id === c.source || group.id === c.target,
         ) &&
         editor.change((g) => {
+          if (isDiagramGraph(g) && g.edges.length >= 200) return;
           if (
             !g.edges.some((e) => e.source === c.source && e.target === c.target)
           )
@@ -449,5 +468,10 @@ export function ArchitectureCanvas({
       <Background color="#d6e0dc" gap={20} size={1} />
       <Controls showInteractive={false} position="bottom-left" />
     </ReactFlow>
+    {!!selectedEdges.length && <button className="canvas-edge-delete" onClick={() => {
+      editor.change((graph) => { graph.edges = graph.edges.filter((edge) => !selectedEdges.includes(edge.id)); });
+      setSelectedEdges([]);
+    }}><Trash2 size={14} />Delete connection</button>}
+    </>
   );
 }

@@ -23,7 +23,8 @@ body {
   overflow-x: hidden;
 }
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 button {
@@ -66,6 +67,18 @@ input {
   color: var(--ink);
   caret-color: var(--teal);
 }
+textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #dbe3df;
+  border-radius: 6px;
+  background: white;
+  padding: 10px 11px;
+  color: var(--ink);
+  line-height: 1.55;
+  caret-color: var(--teal);
+}
+textarea:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
@@ -192,6 +205,30 @@ p {
   color: #74837e;
   margin: 14px 2px 0;
 }
+.component-search {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 9px;
+  margin-bottom: 14px;
+  color: var(--muted);
+  background: #f9fbf9;
+}
+.component-search input { border: 0; padding: 0; background: transparent; outline: 0; font-size: 11px; }
+.component-catalog { display: flex; flex-direction: column; gap: 18px; }
+.component-category h3 { margin: 0 2px 8px; color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+.component-category .library-item { height: 38px; margin-bottom: 5px; }
+.component-empty { font-size: 11px; line-height: 1.6; color: var(--muted); padding: 8px 2px; }
+.diagram-status { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--paper); }
+.diagram-status strong { font-size: 12px; }
+.diagram-status span { color: var(--muted); font-size: 10px; text-align: right; }
+.diagram-inspector textarea { min-height: 112px; }
+.diagram-node .react-flow__handle { width: 14px; height: 14px; }
+.diagram-node .node-copy span { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
+.canvas-edge-delete { position: absolute; z-index: 8; right: 18px; bottom: 18px; color: #a13e21; background: #fff; box-shadow: 0 8px 24px #203d3517; }
 .checkpoints {
   margin-top: 34px;
   border-top: 1px solid var(--line);
@@ -387,6 +424,7 @@ p {
 .canvas-area {
   flex: 1;
   min-height: 300px;
+  position: relative;
 }
 .react-flow__controls {
   box-shadow: none;
@@ -1221,6 +1259,11 @@ p {
     gap: 6px;
     margin: 0;
   }
+  .component-search { flex: 1 0 100%; margin: 0; }
+  .component-catalog { flex: 1 0 100%; max-height: 156px; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-right: 4px; }
+  .component-category .library-item { width: 100%; }
+  .diagram-status { min-height: 74px; padding: 12px 15px; align-items: flex-start; flex-direction: column; gap: 4px; }
+  .diagram-status span { text-align: left; }
   .library-section h2,
   .library-section > p,
   .library-caption,

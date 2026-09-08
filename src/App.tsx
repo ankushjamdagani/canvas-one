@@ -22,16 +22,19 @@ import {
   Info,
   ChevronRight,
   TriangleAlert,
+  Search,
 } from "lucide-react";
 import { useEditor } from "./state/editor";
 import {
   newProject,
   isJobGraph,
+  isDiagramGraph,
   labels,
   validateGraph,
   type ComponentKind,
   type Project,
 } from "./domain/model";
+import { componentCatalog, componentCategories } from "./domain/componentCatalog";
 import {
   repository,
   exportProject,
@@ -61,11 +64,13 @@ export default function App() {
     [assumptions, setAssumptions] = useState(false),
     [checkpointName, setCheckpointName] = useState(""),
     [notice, setNotice] = useState("");
+  const [componentSearch, setComponentSearch] = useState("");
   const [resultsOpen, setResultsOpen] = useState(false),
     [selectedResult, setSelectedResult] = useState<string | null>(null),
     [savingResult, setSavingResult] = useState(false),
     [resultName, setResultName] = useState("");
   const jobsMode = isJobGraph(graph);
+  const diagramMode = isDiagramGraph(graph);
   const savedRuns = project.savedRuns ?? [];
   const resultSaved =
     !!simulation.result &&
@@ -205,19 +210,20 @@ export default function App() {
             <span>Experiment path</span>
             <select
               aria-label="Experiment path"
-              value={jobsMode ? "jobs" : hasBalancer(graph) ? "balanced" : "lookup"}
+              value={diagramMode ? "diagram" : jobsMode ? "jobs" : hasBalancer(graph) ? "balanced" : "lookup"}
               onChange={(e) =>
-                editor.useScenario(e.target.value as "jobs" | "lookup" | "balanced")
+                editor.useScenario(e.target.value as "jobs" | "lookup" | "balanced" | "diagram")
               }
             >
               <option value="lookup">URL lookup</option>
               <option value="jobs">Background jobs</option>
               <option value="balanced">Load-balanced lookup</option>
+              <option value="diagram">Architecture diagram</option>
             </select>
           </label>
           <p>Loads a starter model. Undo restores your canvas.</p>
         </div>
-        <div className="guided-picker">
+        {!diagramMode && <div className="guided-picker">
           <label>
             <span>Guided experiment</span>
             <select
@@ -233,11 +239,26 @@ export default function App() {
               ))}
             </select>
           </label>
-        </div>
+        </div>}
         <div className="library-section">
           <h2>Components</h2>
-          <p>Click to add to your canvas</p>
-          {(jobsMode
+          <p>{diagramMode ? "Search and add building blocks" : "Click to add to your canvas"}</p>
+          {diagramMode ? (
+            <>
+              <label className="component-search">
+                <Search size={14} />
+                <input aria-label="Search components" placeholder="Search components" value={componentSearch} onChange={(event) => setComponentSearch(event.target.value)} />
+              </label>
+              <div className="component-catalog">
+                {componentCategories.map((category) => {
+                  const matches = componentCatalog.filter((item) => item.category === category && `${item.label} ${item.description}`.toLowerCase().includes(componentSearch.trim().toLowerCase()));
+                  if (!matches.length) return null;
+                  return <section key={category} className="component-category"><h3>{category}</h3>{matches.map((item) => { const Icon = icons[item.kind]; return <button className="library-item" key={item.kind} disabled={graph.nodes.length >= 100} onClick={() => editor.add(item.kind)} title={graph.nodes.length >= 100 ? "This diagram has reached 100 components." : item.description}><Icon size={20} /><span>{item.label}</span><Plus size={14} /></button>; })}</section>;
+                })}
+                {!componentCatalog.some((item) => `${item.label} ${item.description}`.toLowerCase().includes(componentSearch.trim().toLowerCase())) && <p className="component-empty">No components match. Try “storage”, “edge”, or “queue”.</p>}
+              </div>
+            </>
+          ) : (jobsMode
             ? (["traffic", "queue", "worker"] as ComponentKind[])
             : (["traffic", "balancer", "service", "database", "cache"] as ComponentKind[])
           ).map((kind) => {
@@ -256,7 +277,7 @@ export default function App() {
             );
           })}
           <div className="library-caption">
-            {jobsMode ? "Queue admission and worker processing." : "Add a load balancer, then service instances to share traffic."}
+            {diagramMode ? "Diagram components are visual. Simulation remains available in the executable experiment paths." : jobsMode ? "Queue admission and worker processing." : "Add a load balancer, then service instances to share traffic."}
           </div>
         </div>
         <details className="checkpoints" open={window.innerWidth > 560}>
@@ -395,7 +416,7 @@ export default function App() {
             </span>
             <button
               className="primary"
-              disabled={!!errors.length || !ready}
+              disabled={diagramMode || !!errors.length || !ready}
               onClick={simulation.toggle}
             >
               {simulation.running ? (
@@ -403,7 +424,7 @@ export default function App() {
               ) : (
                 <Play size={15} fill="currentColor" />
               )}
-              {simulation.running
+              {diagramMode ? "Diagram only" : simulation.running
                 ? "Pause"
                 : simulation.metrics?.finished
                   ? "Replay"
@@ -413,7 +434,7 @@ export default function App() {
             </button>
             <button
               onClick={simulation.reset}
-              disabled={!!errors.length}
+              disabled={diagramMode || !!errors.length}
               className="reset-button"
             >
               <RotateCcw size={15} />
@@ -424,14 +445,14 @@ export default function App() {
         <div className="canvas-shell">
           <div className="experiment-heading">
             <div>
-              <h1>{jobsMode ? "Follow a job." : "Follow a request."}</h1>
-              <p>Find the bottleneck. Change one thing. Replay.</p>
+              <h1>{diagramMode ? "Map the whole system." : jobsMode ? "Follow a job." : "Follow a request."}</h1>
+              <p>{diagramMode ? "Choose components. Connect responsibilities. Name the boundaries." : "Find the bottleneck. Change one thing. Replay."}</p>
               <p className="mobile-pan-hint">
-                Drag the canvas to follow the request →
+                {diagramMode ? "Drag to explore the architecture →" : "Drag the canvas to follow the request →"}
               </p>
             </div>
             <span className="tag">
-              {jobsMode
+              {diagramMode ? "Architecture diagram" : jobsMode
                 ? "Background jobs experiment"
                 : "URL shortener experiment"}
             </span>
@@ -444,7 +465,7 @@ export default function App() {
               />
             </ReactFlowProvider>
           </div>
-          <div className="experiment-guide">
+          {!diagramMode && <div className="experiment-guide">
             <div className="guide-copy">
               <span
                 className={`guide-status ${simulation.running ? "running" : ""}`}
@@ -560,7 +581,7 @@ export default function App() {
                 </button>
               </form>
             )}
-          </div>
+          </div>}
           {errors.length > 0 && (
             <div className="validation" role="alert">
               <TriangleAlert size={18} />
@@ -598,6 +619,11 @@ export default function App() {
               }}
             />
           </Suspense>
+        ) : diagramMode ? (
+          <section className="diagram-status" aria-label="Diagram guidance">
+            <strong>{graph.nodes.length} components · {graph.edges.length} connections</strong>
+            <span>{graph.nodes.length >= 100 ? "Component limit reached. " : ""}{graph.edges.length >= 200 ? "Connection limit reached." : "Drag from a handle to connect. Select a connection to remove it."}</span>
+          </section>
         ) : (
           <MetricsPanel
             metrics={simulation.metrics}

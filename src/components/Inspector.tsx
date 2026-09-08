@@ -7,7 +7,9 @@ import {
   MAX_SERVICE_WORKERS,
   workerCount,
   totalCapacity,
+  isDiagramGraph,
 } from "../domain/model";
+import { componentDefinition } from "../domain/componentCatalog";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -29,6 +31,19 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
     g = editor.project.graph,
     n = g.nodes.find((n) => n.id === editor.selected),
     [tab, setTab] = useState("explanation");
+  if (!n && isDiagramGraph(g))
+    return <aside className="inspector">
+      <div className="inspector-heading"><SlidersHorizontal size={20} /><strong>Architecture diagram</strong></div>
+      <div className="inspector-body">
+        <h2>Compose before you calculate.</h2>
+        <p>Use the component library to map responsibilities, data stores, asynchronous paths, edge services, and operational dependencies.</p>
+        <div className="section-rule" />
+        <h3>Build the path</h3>
+        <p>Search the library, add a component, and drag between handles to connect it. Select any component to name its responsibility or record a technology choice.</p>
+        <div className="note"><Info size={16} /><p>This is a visual architecture layer. Switch to an experiment path when you want exact queueing and capacity simulation.</p></div>
+      </div>
+      <div className="inspector-bottom"><Info size={14} /><span>Diagram layer · freely connected</span></div>
+    </aside>;
   if (!n)
     return (
       <aside className="inspector">
@@ -93,6 +108,20 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
         ? totalCapacity(g.nodes.find((n) => n.kind === "worker") ?? n)
         : totalCapacity(n),
     overloaded = !["traffic", "balancer"].includes(n.kind) && demand !== null && demand > capacity;
+  if (isDiagramGraph(g)) {
+    const definition = componentDefinition(n.kind);
+    return <aside className="inspector">
+      <div className="inspector-heading"><Icon size={22} /><strong>{n.name}</strong><span className="tag">{definition.category}</span></div>
+      <div className="inspector-body diagram-inspector">
+        <div className="status-callout"><Icon size={22} /><div><strong>{definition.label}</strong><p>{definition.description}</p></div></div>
+        <label className="field"><span>Component name</span><input value={n.name} maxLength={80} onChange={(event) => editor.updateNode(n.id, { name: event.target.value })} /></label>
+        <label className="field"><span>Responsibility or technology</span><textarea value={n.description ?? ""} maxLength={240} rows={5} placeholder="What does this component own? Add a technology, protocol, or design decision." onChange={(event) => editor.updateNode(n.id, { description: event.target.value })} /></label>
+        <div className="note"><Info size={16} /><p>Connect either side of the component. Diagram components document architecture; they do not invent simulation behavior.</p></div>
+        <button className="danger subtle" onClick={() => editor.remove(n.id)}><Trash2 size={15} />Delete component</button>
+      </div>
+      <div className="inspector-bottom"><Info size={14} /><span>Diagram layer · freely connected</span></div>
+    </aside>;
+  }
   return (
     <aside className="inspector">
       <div className="inspector-heading">

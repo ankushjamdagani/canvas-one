@@ -8,6 +8,7 @@ import {
   makeNode,
   newProject,
   backgroundJobs,
+  architectureDiagram,
   type Project,
   type Graph,
   type ComponentKind,
@@ -38,7 +39,7 @@ interface Editor {
   insertBalancer: () => void;
   addServiceInstance: () => void;
   loadExperiment: (id: string) => void;
-  useScenario: (scenario: "lookup" | "jobs" | "balanced") => void;
+  useScenario: (scenario: "lookup" | "jobs" | "balanced" | "diagram") => void;
   beginMove: () => void;
   move: (
     positions: { id: string; position: { x: number; y: number } }[],
@@ -219,6 +220,7 @@ export const useEditor = create<Editor>((set, get) => ({
     if (id) get().select(id);
   },
   add: (kind) => {
+    if (get().project.graph.scenario === "diagram" && get().project.graph.nodes.length >= 100) return;
     if (kind === "balancer") { get().insertBalancer(); return; }
     if (kind === "service" && hasBalancer(get().project.graph)) { get().addServiceInstance(); return; }
     const node = makeNode(
@@ -254,7 +256,7 @@ export const useEditor = create<Editor>((set, get) => ({
     }));
   },
   useScenario: (scenario) => {
-    const fresh = scenario === "jobs" ? backgroundJobs() : scenario === "balanced" ? balancedLookup() : newProject().graph;
+    const fresh = scenario === "jobs" ? backgroundJobs() : scenario === "balanced" ? balancedLookup() : scenario === "diagram" ? architectureDiagram() : newProject().graph;
     get().change((g) => {
       replaceGraph(g, fresh);
     });

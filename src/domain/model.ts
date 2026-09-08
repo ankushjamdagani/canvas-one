@@ -2,7 +2,10 @@ import type { Subsystem } from "./subsystems";
 import type { SavedRun } from "./results";
 import { rateAt, validateProfile, type TrafficProfile } from "./workload";
 export type ComponentKind =
-  "traffic" | "service" | "database" | "cache" | "queue" | "worker" | "balancer";
+  "traffic" | "client" | "mobile" | "device" | "dns" | "cdn" | "firewall" | "gateway" |
+  "balancer" | "service" | "function" | "container" | "worker" | "scheduler" | "database" |
+  "nosql" | "cache" | "objectstore" | "search" | "warehouse" | "queue" | "stream" |
+  "pubsub" | "email" | "monitoring" | "analytics" | "secrets" | "thirdparty";
 export interface ModelNode {
   id: string;
   kind: ComponentKind;
@@ -24,6 +27,7 @@ export interface ModelNode {
   cacheMode?: "fixed" | "lru";
   cacheEntries?: number;
   cacheTtlMs?: number;
+  description?: string;
 }
 export interface ModelEdge {
   id: string;
@@ -40,7 +44,7 @@ export interface Settings {
 export interface Graph {
   /** Learning-guide metadata, excluded from the simulation signature. */
   guideId?: string;
-  scenario?: "lookup" | "jobs";
+  scenario?: "lookup" | "jobs" | "diagram";
   nodes: ModelNode[];
   edges: ModelEdge[];
   settings: Settings;
@@ -71,6 +75,12 @@ export const labels: Record<ComponentKind, string> = {
   cache: "Cache",
   queue: "Job queue",
   worker: "Job worker",
+  client: "Web client", mobile: "Mobile app", device: "IoT device", dns: "DNS", cdn: "CDN",
+  firewall: "Firewall / WAF", gateway: "API gateway", function: "Serverless function",
+  container: "Container cluster", scheduler: "Scheduler", nosql: "NoSQL database",
+  objectstore: "Object storage", search: "Search index", warehouse: "Data warehouse",
+  stream: "Event stream", pubsub: "Pub/sub topic", email: "Notification service",
+  monitoring: "Monitoring", analytics: "Analytics", secrets: "Secrets manager", thirdparty: "External system",
 };
 export const MAX_SERVICE_WORKERS = 16;
 export function workerCount(node: ModelNode): number {
@@ -99,6 +109,7 @@ export function makeNode(kind: ComponentKind, x: number, y: number): ModelNode {
         }
       : {}),
     hitRate: 80,
+    description: "",
     ...(kind === "traffic"
       ? { popularity: "uniform" as const, catalogSize: 1000, hotSubset: 10, hotShare: 80 }
       : {}),
@@ -124,6 +135,19 @@ export function baseline(): Graph {
   };
 }
 export const isJobGraph = (graph: Graph) => graph.scenario === "jobs";
+export const isDiagramGraph = (graph: Graph) => graph.scenario === "diagram";
+export function architectureDiagram(): Graph {
+  const nodes = [makeNode("client", 70, 170), makeNode("gateway", 375, 170), makeNode("service", 680, 170)];
+  nodes[0].name = "Client";
+  nodes[1].name = "API gateway";
+  nodes[2].name = "Application service";
+  return {
+    scenario: "diagram",
+    nodes,
+    edges: nodes.slice(1).map((node, index) => ({ id: crypto.randomUUID(), source: nodes[index].id, target: node.id })),
+    settings: { traffic: 100, seed: 42, duration: 30, timeoutMs: 2000 },
+  };
+}
 export function backgroundJobs(): Graph {
   const nodes = [
     makeNode("traffic", 70, 170),
@@ -172,11 +196,12 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     errors.push("Experiment guide metadata is invalid.");
   if (
     graph.scenario !== undefined &&
-    !["lookup", "jobs"].includes(graph.scenario)
+    !["lookup", "jobs", "diagram"].includes(graph.scenario)
   )
     errors.push("Choose a supported experiment path.");
-  if (nodes.length > 20 || edges.length > 30)
-    return ["This prototype supports up to 20 components and 30 connections."];
+  const diagram = graph.scenario === "diagram";
+  if (nodes.length > (diagram ? 100 : 20) || edges.length > (diagram ? 200 : 30))
+    return [diagram ? "Architecture diagrams support up to 100 components and 200 connections." : "This experiment supports up to 20 components and 30 connections."];
   if (
     nodes.some((n) => !n || typeof n.id !== "string") ||
     edges.some(
@@ -193,9 +218,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
   if (ids.size !== nodes.length) errors.push("Component IDs must be unique.");
   for (const n of nodes) {
     if (
-      !["traffic", "service", "database", "cache", "queue", "worker", "balancer"].includes(
-        n.kind,
-      )
+      !Object.keys(labels).includes(n.kind)
     )
       errors.push("Choose a supported component type.");
     if (
@@ -206,6 +229,8 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       !Number.isFinite(n.position?.y)
     )
       errors.push("Components need a name and valid canvas position.");
+    if (n.description !== undefined && (typeof n.description !== "string" || n.description.length > 240))
+      errors.push("Component notes must be 240 characters or fewer.");
     if (
       n.workers !== undefined &&
       (!Number.isInteger(n.workers) ||
@@ -266,6 +291,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     errors.push("A connection references a missing component.");
   // Drafts are portable even before their topology can execute.
   if (!requireRunnable) return [...new Set(errors)];
+  if (graph.scenario === "diagram") return [...new Set(errors)];
   const count = (kind: ComponentKind) => nodes.filter((n) => n.kind === kind).length;
   const balanced = count("balancer") > 0;
   const services = nodes.filter((n) => n.kind === "service");

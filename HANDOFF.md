@@ -1,5 +1,7 @@
 # Development handoff
 
+Current architecture-component milestone: a separate diagram scenario offers 28 searchable components across six system layers, up to 100 nodes/200 connections, free directed wiring, editable names and responsibility/technology notes. Diagram mode is explicitly non-executable: it hides traffic-rate edge labels, disables Run/Reset, and keeps the existing exact simulations unchanged.
+
 Current finite-cache semantics: keys depend on seed, request ordinal and normalized URL popularity independently of arrivals. Finite LRU begins empty, decides at cache completion and fills only on live database completion. TTL starts at fill; hits refresh recency only. Expired active work holds its slot; timeout-before-database-completion cannot fill. There is no miss coalescing, write or invalidation model. All service instances share the cache. Observed hit rate uses completed hits plus misses, excluding pre-decision rejection/expiry.
 
 User workflow preference: use Gemini through `agy` for code exploration and minor implementations (`agy models` discovers models), not direct Gemini CLI. Gemini3.8Flash through agy generated observedCacheHitRate and tests; origin corrected the named type import and reviewed the output. Optional further source review is pending explicit source-sharing approval and does not block this milestone.

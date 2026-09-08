@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { validateGraph, clone, type Graph } from "../domain/model";
+import { validateGraph, clone, isDiagramGraph, type Graph } from "../domain/model";
 import type { Metrics } from "../domain/metrics";
 import type { RunResult } from "../domain/results";
 export type { RunResult } from "../domain/results";
@@ -31,7 +31,7 @@ export function useSimulation(graph: Graph, projectId = "") {
     if (active.current)
       worker.current?.postMessage({ type: "pause", runId: active.current.id });
     active.current = null;
-    if (validateGraph(graph).length) return;
+    if (isDiagramGraph(graph) || validateGraph(graph).length) return;
     const run = { id: crypto.randomUUID(), graph: clone(graph) };
     active.current = run;
     worker.current?.postMessage({
