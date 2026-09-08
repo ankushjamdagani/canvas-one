@@ -3,7 +3,7 @@ import { Boxes, ChevronDown, ChevronRight } from "lucide-react";
 import { useEditor } from "../state/editor";
 import type { Subsystem } from "../domain/subsystems";
 export type SubsystemCanvasNode = Node<
-  { group: Subsystem; queued: number; active: number; hasRun: boolean },
+  { group: Subsystem; queued: number; active: number; hasRun: boolean; diagram: boolean },
   "subsystem"
 >;
 export function SubsystemNode({ data }: NodeProps<SubsystemCanvasNode>) {
@@ -19,6 +19,7 @@ export function SubsystemNode({ data }: NodeProps<SubsystemCanvasNode>) {
       <div className="subsystem-header">
         <Boxes size={18} />
         <strong>{group.name}</strong>
+        <span className="subsystem-count">{group.nodeIds.length} components</span>
         <button
           className="nodrag nopan"
           aria-label={`${group.collapsed ? "Expand" : "Collapse"} ${group.name} on canvas`}
@@ -38,10 +39,10 @@ export function SubsystemNode({ data }: NodeProps<SubsystemCanvasNode>) {
       {group.collapsed ? (
         <>
           <p>{group.nodeIds.length} components · same model</p>
-          <div className="subsystem-summary">
+          {data.diagram ? <div className="subsystem-diagram-summary">Architecture boundary</div> : <div className="subsystem-summary">
             <span>{data.hasRun ? data.queued : "—"} waiting</span>
             <span>{data.hasRun ? data.active : "—"} active</span>
-          </div>
+          </div>}
           <small>Expand to edit components and connections.</small>
         </>
       ) : (

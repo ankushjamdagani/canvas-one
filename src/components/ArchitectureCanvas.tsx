@@ -41,6 +41,7 @@ import { rateAt } from "../domain/workload";
 import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
 import { TrafficEdge, type TrafficConnection } from "./TrafficEdge";
+import { DiagramOrganization } from "./DiagramOrganization";
 export const icons = {
   balancer: Network,
   traffic: ArrowRight,
@@ -280,7 +281,8 @@ export function ArchitectureCanvas({
         type: "component",
         position: n.position,
         measured: dimensions[n.id],
-        selected: editor.selected === n.id,
+        selected: isDiagramGraph(g) ? editor.selectedNodeIds.includes(n.id) : editor.selected === n.id,
+        deletable: !isDiagramGraph(g),
         data: {
           fullMetrics: metrics,
           model: n,
@@ -301,7 +303,7 @@ export function ArchitectureCanvas({
           diagram: isDiagramGraph(g),
         },
       })),
-    [g, editor.selected, editor.project.expandedNodeIds, metrics, dimensions],
+    [g, editor.selected, editor.selectedNodeIds, editor.project.expandedNodeIds, metrics, dimensions],
   );
   const { nodes, endpoints } = projectSubsystems(baseNodes, groups, metrics);
   const expectedRate = rateAt(g.settings, metrics?.time ?? 0);
@@ -379,12 +381,11 @@ export function ArchitectureCanvas({
         );
       }
     }
-    for (const c of changes)
-      if (c.type === "select" && c.selected) editor.select(c.id);
     const positions = changes.filter(
       (c) => c.type === "position" && c.position,
     );
     if (positions.length) {
+      const directlyMoved = new Set(positions.flatMap((change) => change.type === "position" ? [change.id] : []));
       const next = applyNodeChanges(positions, nodes);
       const moved = new Map(
         g.nodes.map((node) => [
@@ -400,6 +401,7 @@ export function ArchitectureCanvas({
           const dx = change.position.x - before.position.x,
             dy = change.position.y - before.position.y;
           for (const id of group.nodeIds) {
+            if (directlyMoved.has(id)) continue;
             const position = moved.get(id)!;
             moved.set(id, { x: position.x + dx, y: position.y + dy });
           }
@@ -417,18 +419,23 @@ export function ArchitectureCanvas({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
-      onNodeDragStart={editor.beginMove}
-      onEdgesChange={(changes) => {
-        for (const c of changes)
-          if (c.type === "select")
-            setSelectedEdges((ids) =>
-              c.selected
-                ? [...new Set([...ids, c.id])]
-                : ids.filter((id) => id !== c.id),
-            );
+      onNodeDragStart={(_, node) => {
+        if (isDiagramGraph(g) && !editor.selectedNodeIds.includes(node.id)) editor.select(node.id);
+        editor.beginMove();
       }}
-      onNodeClick={(_, n) => editor.select(n.id)}
-      onPaneClick={() => editor.select(null)}
+      onEdgesChange={(changes) => {
+        for (const c of changes) if (c.type === "select") {
+          if (c.selected) editor.select(null);
+          setSelectedEdges((ids) => c.selected
+            ? [...new Set([...ids, c.id])]
+            : ids.filter((id) => id !== c.id));
+        }
+      }}
+      onNodeClick={(event, n) => {
+        setSelectedEdges([]);
+        editor.select(n.id, isDiagramGraph(g) && (event.shiftKey || editor.selectionMode));
+      }}
+      onPaneClick={() => { editor.select(null); setSelectedEdges([]); }}
       onConnect={(c) =>
         !groups.some(
           (group) => group.id === c.source || group.id === c.target,
@@ -446,7 +453,7 @@ export function ArchitectureCanvas({
           g.edges = g.edges.filter((e) => !deleted.some((d) => d.id === e.id));
         })
       }
-      onNodesDelete={(deleted) => deleted.forEach((n) => editor.remove(n.id))}
+      onNodesDelete={(deleted) => !isDiagramGraph(g) && deleted.forEach((n) => editor.remove(n.id))}
       onMoveEnd={(_, viewport) =>
         editor.viewport({
           ...viewport,
@@ -466,12 +473,17 @@ export function ArchitectureCanvas({
       maxZoom={1.8}
       fitView={initialFit.current && !mobile}
       fitViewOptions={{ padding: 0.23, maxZoom: 1 }}
-      deleteKeyCode={["Backspace", "Delete"]}
+      deleteKeyCode={isDiagramGraph(g) ? null : ["Backspace", "Delete"]}
       proOptions={{ hideAttribution: true }}
     >
       <Background color="#d6e0dc" gap={20} size={1} />
       <Controls showInteractive={false} position="bottom-left" />
     </ReactFlow>
+    <DiagramOrganization
+      dimensions={dimensions}
+      onSelectComponent={(id) => { setSelectedEdges([]); editor.select(id, true); }}
+      onSelectionModeChange={(active) => { if (active) setSelectedEdges([]); editor.setSelectionMode(active); }}
+    />
     {!!selectedEdges.length && isDiagramGraph(g) && (() => { const edge = g.edges.find((item) => item.id === selectedEdges[0]); if (!edge) return null; return <section className="connection-editor" aria-label="Selected connection">
       <div className="connection-editor-heading"><strong>Connection</strong><button aria-label="Delete connection" onClick={() => { editor.change((graph) => { graph.edges = graph.edges.filter((item) => !selectedEdges.includes(item.id)); }); setSelectedEdges([]); }}><Trash2 size={14} /></button></div>
       <label><span>Label</span><input aria-label="Connection label" maxLength={60} placeholder="Reads, publishes, uploads…" value={edge.label ?? ""} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.label = event.target.value; })} /></label>

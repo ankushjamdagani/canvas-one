@@ -45,6 +45,7 @@ export function projectSubsystems(
       deletable: false,
       data: {
         group,
+        diagram: base.some((node) => (node.data as { diagram?: boolean }).diagram === true),
         queued: children.reduce(
           (sum, node) => sum + (metrics?.nodes[node.id]?.queued ?? 0),
           0,

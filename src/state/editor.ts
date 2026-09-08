@@ -26,11 +26,15 @@ interface Editor {
   deleteRun: (id: string) => void;
   restoreRun: (id: string) => void;
   selected: string | null;
+  selectedNodeIds: string[];
+  selectionMode: boolean;
   past: Graph[];
   future: Graph[];
   revision: number;
   load: (p: Project) => void;
-  select: (id: string | null) => void;
+  select: (id: string | null, additive?: boolean) => void;
+  setSelectionMode: (active: boolean) => void;
+  applyNodePositions: (positions: { id: string; position: { x: number; y: number } }[]) => boolean;
   toggleExpanded: (id: string) => void;
   change: (fn: (g: Graph) => void) => void;
   updateNode: (id: string, patch: Partial<ModelNode>) => void;
@@ -97,6 +101,7 @@ export const useEditor = create<Editor>((set, get) => ({
         ?.collapsed
         ? s.project.subsystems.find((group) => group.id === id)!.nodeIds[0]
         : id,
+      selectedNodeIds: [],
     })),
   dissolveSubsystem: (id) =>
     set((s) => ({
@@ -108,6 +113,7 @@ export const useEditor = create<Editor>((set, get) => ({
         updatedAt: Date.now(),
       },
       selected: null,
+      selectedNodeIds: [],
     })),
   saveRun: (run) => {
     const runs = get().project.savedRuns ?? [];
@@ -142,9 +148,14 @@ export const useEditor = create<Editor>((set, get) => ({
     })),
   restoreRun: (id) => {
     const run = get().project.savedRuns?.find((r) => r.id === id);
-    if (run) get().change((g) => replaceGraph(g, run.graph));
+    if (run) {
+      get().change((g) => replaceGraph(g, run.graph));
+      set({ selected: null, selectedNodeIds: [], selectionMode: false });
+    }
   },
   selected: null,
+  selectedNodeIds: [],
+  selectionMode: false,
   past: [],
   future: [],
   revision: 0,
@@ -152,11 +163,64 @@ export const useEditor = create<Editor>((set, get) => ({
     set((s) => ({
       project: clone(p),
       selected: null,
+      selectedNodeIds: [],
+      selectionMode: false,
       past: [],
       future: [],
       revision: s.revision + 1,
     })),
-  select: (selected) => set({ selected }),
+  select: (selected, additive = false) =>
+    set((state) => {
+      const hidden = new Set(visibleSubsystems(state.project).filter((group) => group.collapsed).flatMap((group) => group.nodeIds));
+      const isNode = !!selected && !hidden.has(selected) && state.project.graph.nodes.some((node) => node.id === selected);
+      if (state.project.graph.scenario === "diagram" && !isNode)
+        return { selected: null, selectedNodeIds: [] };
+      if (!isNode || state.project.graph.scenario !== "diagram")
+        return { selected, selectedNodeIds: [] };
+      if (!additive) return { selected, selectedNodeIds: [selected] };
+      const selectedNodeIds = state.selectedNodeIds.includes(selected)
+        ? state.selectedNodeIds.filter((id) => id !== selected)
+        : [...state.selectedNodeIds, selected];
+      return {
+        selectedNodeIds,
+        selected: selectedNodeIds.length === 1 ? selectedNodeIds[0] : null,
+      };
+    }),
+  setSelectionMode: (selectionMode) => set({ selectionMode }),
+  applyNodePositions: (positions) => {
+    const state = get();
+    if (state.project.graph.scenario !== "diagram" || positions.length === 0 || state.selectedNodeIds.length < 2) return false;
+    const ids = positions.map((item) => item.id);
+    const hidden = new Set(visibleSubsystems(state.project).filter((group) => group.collapsed).flatMap((group) => group.nodeIds));
+    if (new Set(ids).size !== ids.length || positions.some((item) =>
+      !Number.isFinite(item.position.x) ||
+      !Number.isFinite(item.position.y) ||
+      hidden.has(item.id) ||
+      !state.selectedNodeIds.includes(item.id) ||
+      !state.project.graph.nodes.some((node) => node.id === item.id))) return false;
+    const changed = positions.some((item) => {
+      const node = state.project.graph.nodes.find((candidate) => candidate.id === item.id)!;
+      return node.position.x !== item.position.x || node.position.y !== item.position.y;
+    });
+    if (!changed) return false;
+    set((current) => ({
+      project: {
+        ...current.project,
+        graph: {
+          ...current.project.graph,
+          nodes: current.project.graph.nodes.map((node) => {
+            const update = positions.find((item) => item.id === node.id);
+            return update ? { ...node, position: update.position } : node;
+          }),
+        },
+        updatedAt: Date.now(),
+      },
+      past: [...current.past.slice(-49), clone(current.project.graph)],
+      future: [],
+      revision: current.revision + 1,
+    }));
+    return true;
+  },
   toggleExpanded: (id) =>
     set((s) => {
       if (!s.project.graph.nodes.some((n) => n.id === id)) return {};
@@ -234,7 +298,7 @@ export const useEditor = create<Editor>((set, get) => ({
     get().change((g) => {
       g.nodes.push(node);
     });
-    set({ selected: node.id });
+    set({ selected: node.id, selectedNodeIds: get().project.graph.scenario === "diagram" ? [node.id] : [] });
   },
   duplicateNode: (id) => {
     const state = get();
@@ -267,7 +331,7 @@ export const useEditor = create<Editor>((set, get) => ({
     get().change((draft) => {
       draft.nodes.push(copy);
     });
-    set({ selected: copy.id });
+    set({ selected: copy.id, selectedNodeIds: [copy.id] });
     return true;
   },
   loadExperiment: (id) => {
@@ -290,6 +354,8 @@ export const useEditor = create<Editor>((set, get) => ({
     set((s) => ({
       project: s.project,
       selected: null,
+      selectedNodeIds: [],
+      selectionMode: false,
     }));
   },
   loadArchitectureTemplate: (id) => {
@@ -297,7 +363,7 @@ export const useEditor = create<Editor>((set, get) => ({
     if (!template) return false;
     const graph = template.create();
     get().change((draft) => replaceGraph(draft, graph));
-    set({ selected: null });
+    set({ selected: null, selectedNodeIds: [], selectionMode: false });
     return true;
   },
   useScenario: (scenario) => {
@@ -306,6 +372,7 @@ export const useEditor = create<Editor>((set, get) => ({
       replaceGraph(g, fresh);
     });
     get().select(null);
+    set({ selectionMode: false });
   },
   insertCache: () => {
     if (get().project.graph.nodes.some((n) => n.kind === "cache")) return;
@@ -340,7 +407,7 @@ export const useEditor = create<Editor>((set, get) => ({
       g.nodes = g.nodes.filter((n) => n.id !== id);
       g.edges = g.edges.filter((e) => e.source !== id && e.target !== id);
     });
-    set({ selected: null });
+    set({ selected: null, selectedNodeIds: [] });
   },
   undo: () =>
     set((s) =>
@@ -357,6 +424,7 @@ export const useEditor = create<Editor>((set, get) => ({
             future: [s.project.graph, ...s.future],
             revision: s.revision + 1,
             selected: graph.nodes.some((node) => node.id === s.selected) ? s.selected : null,
+            selectedNodeIds: s.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)),
           }; })()
         : {},
     ),
@@ -375,6 +443,7 @@ export const useEditor = create<Editor>((set, get) => ({
             future: s.future.slice(1),
             revision: s.revision + 1,
             selected: graph.nodes.some((node) => node.id === s.selected) ? s.selected : null,
+            selectedNodeIds: s.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)),
           }; })()
         : {},
     ),
@@ -398,8 +467,10 @@ export const useEditor = create<Editor>((set, get) => ({
     })),
   restore: (id) => {
     const checkpoint = get().project.checkpoints.find((c) => c.id === id);
-    if (checkpoint)
+    if (checkpoint) {
       get().change((g) => replaceGraph(g, checkpoint.graph));
+      set({ selected: null, selectedNodeIds: [], selectionMode: false });
+    }
   },
   viewport: (viewport) =>
     set((s) => ({

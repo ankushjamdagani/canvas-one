@@ -125,6 +125,83 @@ it("loads an architecture template as one reversible edit and preserves project 
   expect(useEditor.getState().project.graph.nodes.map((node) => node.id)).not.toEqual(generatedIds);
 });
 
+it("keeps diagram multi-selection transient and applies positions atomically", () => {
+  const project = newProject();
+  project.graph = architectureDiagram();
+  useEditor.getState().load(project);
+  const [first, second] = project.graph.nodes;
+  const before = structuredClone(project.graph);
+  const revision = useEditor.getState().revision;
+
+  useEditor.getState().select(first.id);
+  useEditor.getState().select(second.id, true);
+  expect(useEditor.getState().selectedNodeIds).toEqual([first.id, second.id]);
+  expect(useEditor.getState().selected).toBeNull();
+  expect(useEditor.getState().revision).toBe(revision);
+  expect(useEditor.getState().past).toHaveLength(0);
+
+  expect(useEditor.getState().applyNodePositions([
+    { id: first.id, position: { x: -20, y: 45 } },
+    { id: second.id, position: { x: 260, y: 45 } },
+  ])).toBe(true);
+  const changed = useEditor.getState();
+  expect(changed.past).toHaveLength(1);
+  expect(changed.project.graph.edges).toEqual(before.edges);
+  expect(changed.project.graph.nodes.map(({ position: _position, ...node }) => node)).toEqual(before.nodes.map(({ position: _position, ...node }) => node));
+  expect(changed.project.graph.nodes.slice(0, 2).map((node) => node.position)).toEqual([{ x: -20, y: 45 }, { x: 260, y: 45 }]);
+  useEditor.getState().undo();
+  expect(useEditor.getState().project.graph).toEqual(before);
+  useEditor.getState().redo();
+  expect(useEditor.getState().project.graph.nodes[0].position).toEqual({ x: -20, y: 45 });
+});
+
+it("guards position actions and clears stale selections across boundaries", () => {
+  const project = newProject();
+  useEditor.getState().load(project);
+  expect(useEditor.getState().applyNodePositions([{ id: project.graph.nodes[0].id, position: { x: 1, y: 1 } }])).toBe(false);
+  expect(useEditor.getState().past).toHaveLength(0);
+
+  project.graph = architectureDiagram();
+  useEditor.getState().load(project);
+  const id = project.graph.nodes[0].id;
+  expect(useEditor.getState().applyNodePositions([{ id: "missing", position: { x: 1, y: 1 } }])).toBe(false);
+  expect(useEditor.getState().applyNodePositions([{ id, position: { x: 2, y: 2 } }, { id, position: { x: 3, y: 3 } }])).toBe(false);
+  expect(useEditor.getState().applyNodePositions([{ id, position: project.graph.nodes[0].position }])).toBe(false);
+  expect(useEditor.getState().applyNodePositions([{ id, position: { x: Number.NaN, y: 1 } }])).toBe(false);
+  expect(useEditor.getState().past).toHaveLength(0);
+  useEditor.getState().setSelectionMode(true);
+  useEditor.getState().select(id);
+  useEditor.getState().loadArchitectureTemplate("event-processing");
+  expect(useEditor.getState().selectedNodeIds).toEqual([]);
+  expect(useEditor.getState().selectionMode).toBe(false);
+});
+
+it("excludes collapsed subsystem members from diagram selection and position actions", () => {
+  const project = newProject();
+  project.graph = architectureDiagram();
+  const [first, second, third] = project.graph.nodes;
+  project.subsystems = [{ id: "group", name: "Hidden pair", nodeIds: [first.id, second.id], collapsed: true }];
+  useEditor.getState().load(project);
+
+  useEditor.getState().select(first.id);
+  expect(useEditor.getState().selectedNodeIds).toEqual([]);
+  expect(useEditor.getState().selected).toBeNull();
+  useEditor.getState().select(third.id);
+  useEditor.getState().select(second.id, true);
+  expect(useEditor.getState().selectedNodeIds).toEqual([]);
+
+  project.subsystems![0].collapsed = false;
+  useEditor.getState().load(project);
+  useEditor.getState().select(first.id);
+  useEditor.getState().select(second.id, true);
+  useEditor.getState().toggleSubsystem("group");
+  expect(useEditor.getState().selectedNodeIds).toEqual([]);
+  expect(useEditor.getState().applyNodePositions([
+    { id: first.id, position: { x: 20, y: 20 } },
+    { id: second.id, position: { x: 40, y: 40 } },
+  ])).toBe(false);
+});
+
 it("restores a saved model through undoable history without mutating its result", async () => {
   const { createSavedRun } = await import("../domain/results");
   const project = newProject();

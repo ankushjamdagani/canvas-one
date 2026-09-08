@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Boxes, ChevronDown, ChevronRight, Ungroup } from "lucide-react";
 import { useEditor } from "../state/editor";
 import { visibleSubsystems } from "../domain/subsystems";
+import { isDiagramGraph } from "../domain/model";
 export function SubsystemsPanel() {
   const editor = useEditor(),
     groups = visibleSubsystems(editor.project);
@@ -99,7 +100,7 @@ export function SubsystemsPanel() {
           </div>
         </form>
       )}
-      <p>Group the view. The model stays the same.</p>
+      <p>{isDiagramGraph(editor.project.graph) ? "Draw a named boundary around related components." : "Group the view. The model stays the same."}</p>
     </details>
   );
 }

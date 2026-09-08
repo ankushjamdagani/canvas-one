@@ -10,6 +10,8 @@ Select a connection to name the relationship, record its protocol, and classify 
 
 Open **Architecture templates** for three editable starters: **Real-time chat**, **Ecommerce checkout**, and **Event processing**. Choose a template to read its purpose, then use **Load template**. Loading replaces the current diagram as one edit, so Undo restores the exact prior graph. Template nodes, notes, and labeled connections behave like anything drawn manually and persist through checkpoints and JSON export/import. These starters illustrate flows; they are not executable simulations or production recommendations.
 
+Organize a diagram by Shift-clicking cards, or choose **Select components** to use the keyboard- and touch-accessible checklist. Two or more selected components can align by any edge; three or more can distribute with equal horizontal or vertical gaps when the available span is large enough. Dragging one selected card moves the whole selection. Each alignment, distribution, or group drag is one Undo/Redo step and changes positions only. Collapsed subsystem members stay out of the selection list.
+
 ## Run locally
 
 Requires Node.js 22.12+ (verified with Node 24.5).
@@ -106,7 +108,7 @@ Job accounting satisfies **generated = completed + admission rejected + expired 
 
 ## Subsystems on the same canvas
 
-Open **Subsystems → Create subsystem**, name the group and choose at least two components. Groups are non-overlapping and one level deep. Collapse the group to see combined waiting/active counts and boundary connections; expand to edit the actual components and connections. Drag its header to move members together. Ungroup keeps every component.
+Open **Subsystems → Create subsystem**, name the group and choose at least two components. Groups are non-overlapping and one level deep. Collapse an executable subsystem to see combined waiting/active counts and boundary connections; collapsed diagram subsystems instead identify an architecture boundary without implying simulated work. Expand to edit the actual components and connections. Drag its header to move members together. Ungroup keeps every component.
 
 Grouping and collapse are view changes, so a running experiment continues with the same graph and exact results. Groups persist with local projects and portable exports. A group whose components are absent after loading another scenario stays dormant and can reappear when that model edit is undone. This is visual composition around executable nodes, not a replacement simulation model.
 

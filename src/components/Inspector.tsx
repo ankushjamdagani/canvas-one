@@ -32,6 +32,16 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
     g = editor.project.graph,
     n = g.nodes.find((n) => n.id === editor.selected),
     [tab, setTab] = useState("explanation");
+  if (isDiagramGraph(g) && editor.selectedNodeIds.length > 1)
+    return <aside className="inspector">
+      <div className="inspector-heading"><ScanLine size={20} /><strong>{editor.selectedNodeIds.length} components selected</strong></div>
+      <div className="inspector-body">
+        <h2>Organize the selection.</h2>
+        <p>Drag any selected card to move the set together, or use the canvas controls to align and distribute cards.</p>
+        <div className="note"><Info size={16} /><p>Organization changes positions only. Connections, notes and component settings stay unchanged.</p></div>
+      </div>
+      <div className="inspector-bottom"><Info size={14} /><span>Diagram selection · positions only</span></div>
+    </aside>;
   if (!n && isDiagramGraph(g))
     return <aside className="inspector">
       <div className="inspector-heading"><SlidersHorizontal size={20} /><strong>Architecture diagram</strong></div>

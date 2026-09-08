@@ -241,6 +241,23 @@ p {
 .diagram-node .node-copy { min-width: 0; }
 .diagram-node .node-copy strong, .diagram-node .node-copy span { overflow-wrap: anywhere; word-break: break-word; }
 .diagram-node .node-copy span { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
+.diagram-organizer { position: absolute; z-index: 7; top: 72px; right: 18px; width: 248px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: #fffffff2; box-shadow: 0 8px 24px #203d3517; backdrop-filter: blur(6px); }
+.diagram-organizer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.diagram-organizer-heading > div { display: grid; gap: 2px; }
+.diagram-organizer-heading strong { font-size: 11px; }
+.diagram-organizer-heading span { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.diagram-organizer-heading button { width: 44px; height: 44px; margin: -8px -7px -8px 0; padding: 0; border: 0; background: transparent; }
+.selection-mode-toggle { width: 100%; min-height: 44px; justify-content: center; margin-top: 8px; }
+.selection-mode-toggle.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+.diagram-selection-list { max-height: 164px; overflow: auto; margin: 9px 0 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.diagram-selection-list legend { padding: 0 4px; color: var(--muted); font-size: 9px; }
+.diagram-selection-list label { display: flex; align-items: center; gap: 7px; min-height: 44px; font-size: 10px; }
+.diagram-selection-list input { width: auto; accent-color: var(--teal); }
+.diagram-selection-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.organize-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 8px; }
+.organize-actions + .organize-actions { grid-template-columns: 1fr 1fr; }
+.organize-actions button { min-height: 44px; padding: 7px; justify-content: center; font-size: 9px; }
+.organize-reason { margin: 7px 0 0; color: var(--amber); font-size: 9px; line-height: 1.4; }
 .connection-editor { position: absolute; z-index: 8; right: 18px; bottom: 18px; width: 260px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: var(--shadow); }
 .connection-editor-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
 .connection-editor-heading button { width: 44px; height: 44px; padding: 0; color: #a13e21; }
@@ -2402,8 +2419,8 @@ select:focus-visible {
 .subsystem-shell {
   width: 100%;
   height: 100%;
-  border: 1px dashed #88aba2;
-  background: #f0f6f180;
+  border: 1.5px dashed #6f9f96;
+  background: #edf6f080;
   border-radius: 10px;
   position: relative;
 }
@@ -2416,8 +2433,9 @@ select:focus-visible {
   align-items: center;
   gap: 8px;
   color: var(--teal);
-  padding: 13px 14px;
-  height: 48px;
+  padding: 11px 14px;
+  height: 50px;
+  border-bottom: 1px solid #b9d1ca;
 }
 .subsystem-header strong {
   font-size: 12px;
@@ -2432,6 +2450,8 @@ select:focus-visible {
   border: 0;
   background: transparent;
 }
+.subsystem-count { color: var(--muted); font-size: 9px; white-space: nowrap; }
+.subsystem-diagram-summary { padding: 12px 14px; color: var(--teal); font-size: 11px; font-weight: 600; }
 .subsystem-shell p {
   padding: 0 14px;
   margin: 0;
@@ -2459,6 +2479,7 @@ select:focus-visible {
   top: 24px;
 }
 @media (max-width: 560px) {
+  .diagram-organizer { position: absolute; top: 70px; left: 14px; right: 14px; width: auto; }
   .subsystems-panel {
     width: 100%;
     margin: 8px 0;
