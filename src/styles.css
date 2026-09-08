@@ -226,7 +226,13 @@ p {
 .diagram-status strong { font-size: 12px; }
 .diagram-status span { color: var(--muted); font-size: 10px; text-align: right; }
 .diagram-inspector textarea { min-height: 112px; }
+.diagram-inspector .status-callout > div { min-width: 0; }
+.diagram-inspector .status-callout strong, .diagram-inspector .status-callout p { overflow-wrap: anywhere; word-break: break-word; }
+.duplicate-component { min-height: 44px; width: 100%; justify-content: center; margin-top: 4px; }
+.field-help { margin: -4px 0 4px; color: var(--amber); font-size: 10px; line-height: 1.5; }
 .diagram-node .react-flow__handle { width: 14px; height: 14px; }
+.diagram-node .node-copy { min-width: 0; }
+.diagram-node .node-copy strong, .diagram-node .node-copy span { overflow-wrap: anywhere; word-break: break-word; }
 .diagram-node .node-copy span { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
 .connection-editor { position: absolute; z-index: 8; right: 18px; bottom: 18px; width: 260px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: var(--shadow); }
 .connection-editor-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }

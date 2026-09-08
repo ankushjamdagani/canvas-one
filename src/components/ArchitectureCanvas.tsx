@@ -55,6 +55,7 @@ export const icons = {
   search: Search, warehouse: Warehouse, stream: Radio, pubsub: Radio,
   email: BellRing, monitoring: Activity, analytics: ChartNoAxesCombined,
   secrets: KeyRound, thirdparty: PlugZap,
+  custom: Boxes,
 };
 type ArchitectureNode = Node<
   {
@@ -93,7 +94,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           <strong>{n.name}</strong>
           <span>
             {diagram
-              ? (n.description || "Architecture component")
+              ? (n.kind === "custom" ? n.customType : n.description) || "Architecture component"
               : n.kind === "traffic"
               ? `${rate.toLocaleString()} req/s`
               : n.kind === "balancer" ? "Round-robin routing"

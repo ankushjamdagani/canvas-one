@@ -35,6 +35,7 @@ interface Editor {
   updateNode: (id: string, patch: Partial<ModelNode>) => void;
   settings: (patch: Partial<Settings>) => void;
   add: (kind: ComponentKind) => void;
+  duplicateNode: (id: string) => boolean;
   insertCache: () => void;
   insertBalancer: () => void;
   addServiceInstance: () => void;
@@ -233,6 +234,40 @@ export const useEditor = create<Editor>((set, get) => ({
     });
     set({ selected: node.id });
   },
+  duplicateNode: (id) => {
+    const state = get();
+    const graph = state.project.graph;
+    if (graph.scenario !== "diagram" || graph.nodes.length >= 100) return false;
+    const source = graph.nodes.find((node) => node.id === id);
+    if (!source) return false;
+    let step = 1;
+    let position = {
+      x: source.position.x + 40,
+      y: source.position.y + 40,
+    };
+    while (
+      graph.nodes.some(
+        (node) => node.position.x === position.x && node.position.y === position.y,
+      )
+    ) {
+      step += 1;
+      position = {
+        x: source.position.x + 40 * step,
+        y: source.position.y + 40 * step,
+      };
+    }
+    const copy: ModelNode = {
+      ...clone(source),
+      id: crypto.randomUUID(),
+      name: `${source.name.slice(0, 75)} copy`,
+      position,
+    };
+    get().change((draft) => {
+      draft.nodes.push(copy);
+    });
+    set({ selected: copy.id });
+    return true;
+  },
   loadExperiment: (id) => {
     const experiment = experiments.find((item) => item.id === id);
     if (!experiment) {
@@ -300,31 +335,37 @@ export const useEditor = create<Editor>((set, get) => ({
   undo: () =>
     set((s) =>
       s.past.length
-        ? {
+        ? (() => {
+            const graph = s.past.at(-1)!;
+            return {
             project: {
               ...s.project,
-              graph: s.past.at(-1)!,
+              graph,
               updatedAt: Date.now(),
             },
             past: s.past.slice(0, -1),
             future: [s.project.graph, ...s.future],
             revision: s.revision + 1,
-          }
+            selected: graph.nodes.some((node) => node.id === s.selected) ? s.selected : null,
+          }; })()
         : {},
     ),
   redo: () =>
     set((s) =>
       s.future.length
-        ? {
+        ? (() => {
+            const graph = s.future[0];
+            return {
             project: {
               ...s.project,
-              graph: s.future[0],
+              graph,
               updatedAt: Date.now(),
             },
             past: [...s.past, s.project.graph],
             future: s.future.slice(1),
             revision: s.revision + 1,
-          }
+            selected: graph.nodes.some((node) => node.id === s.selected) ? s.selected : null,
+          }; })()
         : {},
     ),
   rename: (name) =>

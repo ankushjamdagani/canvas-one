@@ -5,7 +5,7 @@ export type ComponentKind =
   "traffic" | "client" | "mobile" | "device" | "dns" | "cdn" | "firewall" | "gateway" |
   "balancer" | "service" | "function" | "container" | "worker" | "scheduler" | "database" |
   "nosql" | "cache" | "objectstore" | "search" | "warehouse" | "queue" | "stream" |
-  "pubsub" | "email" | "monitoring" | "analytics" | "secrets" | "thirdparty";
+  "pubsub" | "email" | "monitoring" | "analytics" | "secrets" | "thirdparty" | "custom";
 export interface ModelNode {
   id: string;
   kind: ComponentKind;
@@ -28,6 +28,8 @@ export interface ModelNode {
   cacheEntries?: number;
   cacheTtlMs?: number;
   description?: string;
+  /** Diagram-only type caption for generic architecture components. */
+  customType?: string;
 }
 export interface ModelEdge {
   id: string;
@@ -84,6 +86,7 @@ export const labels: Record<ComponentKind, string> = {
   objectstore: "Object storage", search: "Search index", warehouse: "Data warehouse",
   stream: "Event stream", pubsub: "Pub/sub topic", email: "Notification service",
   monitoring: "Monitoring", analytics: "Analytics", secrets: "Secrets manager", thirdparty: "External system",
+  custom: "Custom component",
 };
 export const MAX_SERVICE_WORKERS = 16;
 export function workerCount(node: ModelNode): number {
@@ -113,6 +116,7 @@ export function makeNode(kind: ComponentKind, x: number, y: number): ModelNode {
       : {}),
     hitRate: 80,
     description: "",
+    ...(kind === "custom" ? { customType: "Custom component" } : {}),
     ...(kind === "traffic"
       ? { popularity: "uniform" as const, catalogSize: 1000, hotSubset: 10, hotShare: 80 }
       : {}),
@@ -234,6 +238,13 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       errors.push("Components need a name and valid canvas position.");
     if (n.description !== undefined && (typeof n.description !== "string" || n.description.length > 240))
       errors.push("Component notes must be 240 characters or fewer.");
+    if (
+      n.customType !== undefined &&
+      (typeof n.customType !== "string" || !n.customType.trim() || n.customType.length > 60)
+    )
+      errors.push("Custom component type labels must be 1–60 characters.");
+    if (n.kind === "custom" && n.customType === undefined)
+      errors.push("Custom components need a type label.");
     if (
       n.workers !== undefined &&
       (!Number.isInteger(n.workers) ||

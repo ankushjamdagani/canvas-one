@@ -18,6 +18,7 @@ import {
   TriangleAlert,
   SlidersHorizontal,
   ScanLine,
+  Copy,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
 import { expectedDatabaseRate } from "../domain/model";
@@ -113,10 +114,13 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
     return <aside className="inspector">
       <div className="inspector-heading"><Icon size={22} /><strong>{n.name}</strong><span className="tag">{definition.category}</span></div>
       <div className="inspector-body diagram-inspector">
-        <div className="status-callout"><Icon size={22} /><div><strong>{definition.label}</strong><p>{definition.description}</p></div></div>
+        <div className="status-callout"><Icon size={22} /><div><strong>{n.kind === "custom" ? n.customType : definition.label}</strong><p>{definition.description}</p></div></div>
+        {n.kind === "custom" && <label className="field"><span>Type label</span><input value={n.customType ?? ""} maxLength={60} onChange={(event) => editor.updateNode(n.id, { customType: event.target.value })} /></label>}
         <label className="field"><span>Component name</span><input value={n.name} maxLength={80} onChange={(event) => editor.updateNode(n.id, { name: event.target.value })} /></label>
         <label className="field"><span>Responsibility or technology</span><textarea value={n.description ?? ""} maxLength={240} rows={5} placeholder="What does this component own? Add a technology, protocol, or design decision." onChange={(event) => editor.updateNode(n.id, { description: event.target.value })} /></label>
         <div className="note"><Info size={16} /><p>Connect either side of the component. Diagram components document architecture; they do not invent simulation behavior.</p></div>
+        <button className="duplicate-component" disabled={g.nodes.length >= 100} onClick={() => editor.duplicateNode(n.id)}><Copy size={15} />Duplicate component</button>
+        {g.nodes.length >= 100 && <p className="field-help" role="status">Duplication is unavailable at 100 components. Delete one to make room.</p>}
         <button className="danger subtle" onClick={() => editor.remove(n.id)}><Trash2 size={15} />Delete component</button>
       </div>
       <div className="inspector-bottom"><Info size={14} /><span>Diagram layer · freely connected</span></div>

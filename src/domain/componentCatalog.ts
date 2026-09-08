@@ -38,6 +38,7 @@ export const componentCatalog: ComponentDefinition[] = [
   { kind: "analytics", label: "Analytics", category: "Operations", description: "Processes product or business events for insight." },
   { kind: "secrets", label: "Secrets manager", category: "Operations", description: "Protects credentials and encryption material." },
   { kind: "thirdparty", label: "External system", category: "Operations", description: "Represents a dependency outside your boundary." },
+  { kind: "custom", label: "Custom component", category: "Operations", description: "Represents a component outside the built-in catalog." },
 ];
 
 export const componentDefinition = (kind: ComponentKind) =>

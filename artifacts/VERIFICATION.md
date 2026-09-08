@@ -119,3 +119,20 @@ Subsystems collapse real nodes into an aggregate summary without changing engine
 Guided starters cover cache pressure, worker scaling, job bursts and retry cost. Coach observations use actual measurements. Tests verify guide/model Undo, portable checkpoints, returning from node inspection, local reopen and switching to free exploration without resetting a run. Mobile/desktop layouts were inspected directly. Screenshots: subsystem-collapsed.png, subsystem-expanded.png, subsystem-mobile.png, guided-experiment.png, guided-mobile.png.
 
 Visual corrections: retain measured group dimensions to prevent collapsed cards/edges disappearing across worker samples; reframe on node identity changes, not merely node count, to avoid clipping expanded controls when switching guides. No new independent visual review or real-device performance claim is made. The user-authorized finite roadmap is complete; current-format-only imports are intentional and browser-local records were not deleted.
+
+
+## Architecture components and connection semantics — 8 September 2026
+
+Fresh full-suite verification of `a942f8c`: 88 unit tests across 18 files, TypeScript/Vite production build, and all 29 production Chromium journeys pass. Browser suite completed in 35.6 seconds using `TEST_PRODUCTION=1 npm run test:e2e`. The initial sandbox attempt could not bind the preview port; the authorized rerun started the local server and completed successfully.
+
+Coverage includes searchable diagram components, editable responsibilities and connection metadata, mobile access, component limits, existing simulation paths, caches, routing, persistence, saved comparisons and subsystems. This continuation changes documentation only; no additional visual review is claimed. Main entry is 583.57 KB /184.15 KB gzip; the existing chunk-size warning remains.
+
+README now lists all six guided experiments and distinguishes fixed-probability caches from finite LRU + TTL behavior. The handoff records current feature checkpoints and fresh verification counts. The agreed feature work is complete; no new milestone, push or deployment was performed.
+
+## Custom components and duplication — 8 September 2026
+
+Custom diagram components carry a separately validated 60-character type label, instance name and 240-character responsibility or technology notes. Any built-in or custom diagram node can be duplicated as one undoable history edit. Copies receive a fresh ID and deterministic offset while keeping node configuration; connections, subsystem membership and expanded state remain with the source.
+
+Fresh unit verification passes 93 tests across 18 files. TypeScript and Vite production build pass; the main entry is 585.47 KB /184.62 KB gzip and retains the known chunk-size warning. The first full production browser run completed with 29 passing and two failing assertions in the newly expanded diagram suite; both failures were corrected before the final rerun recorded in the completion report.
+
+The final production Chromium suite passes all 31 journeys in 35.5 seconds. Direct inspection of `custom-component.png` and `custom-component-mobile.png` confirmed the selected copy, separate custom type caption, touch-sized duplication control and contained mobile labels; one long inspector caption found during that bounded pass was wrapped before final verification.

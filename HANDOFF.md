@@ -1,6 +1,6 @@
 # Development handoff
 
-Current architecture-component milestone: a separate diagram scenario offers 28 searchable components across six system layers, up to 100 nodes/200 connections, free directed wiring, editable names and responsibility/technology notes. Diagram mode is explicitly non-executable: it hides traffic-rate edge labels, disables Run/Reset, and keeps the existing exact simulations unchanged.
+Current architecture-component milestone: a separate diagram scenario offers 29 searchable components across six system layers, including a generic custom type, up to 100 nodes/200 connections, free directed wiring, editable names and responsibility/technology notes. Every diagram node can be duplicated as a configured, independent unconnected copy. Diagram mode is explicitly non-executable: it hides traffic-rate edge labels, disables Run/Reset, and keeps the existing exact simulations unchanged.
 
 Connection semantics now persist on diagram edges: optional 60-character relationship label, 30-character protocol, and sync/async/data classification. Selected edges open a touch-safe canvas editor and render solid/dashed/dotted paths respectively.
 
@@ -8,7 +8,7 @@ Current finite-cache semantics: keys depend on seed, request ordinal and normali
 
 User workflow preference: use Gemini through `agy` for code exploration and minor implementations (`agy models` discovers models), not direct Gemini CLI. Gemini3.8Flash through agy generated observedCacheHitRate and tests; origin corrected the named type import and reviewed the output. Optional further source review is pending explicit source-sharing approval and does not block this milestone.
 
-## Current status — finite cache and URL popularity verification
+## Current status — architecture components and connection semantics verified
 
 The user authorized all remaining concrete steps and explicitly removed backward-compatibility requirements. Completed the agreed three milestones: background jobs, canvas subsystem composition, and guided experiments. No additional milestones are being pursued automatically. No push or deployment.
 
@@ -20,6 +20,9 @@ The user authorized all remaining concrete steps and explicitly removed backward
 - Final guide/verification/documentation checkpoint: `git log -1`.
 - `130b3b6`: load-balanced service instances and browser verification.
 - `e2360df`: bounded finite-cache helper with expiry and LRU boundary tests.
+- `b84834e`: completed finite-cache and URL-popularity milestone.
+- `e65cfe7`: searchable architecture component library and diagram mode.
+- `a942f8c`: editable diagram relationship labels, protocols and flow types.
 
 ### What works
 
@@ -49,9 +52,9 @@ Subsystems belong to Project.subsystems; missing members remain dormant through 
 
 ### Verification and evidence
 
-- 86 unit tests pass: existing URL semantics, deterministic popularity and finite-cache deadlines/evictions, jobs/retries/accounting, round-robin routing and shared-bottleneck accounting, cache hit-rate helper behavior, current import validation, group identity/projection and meaningful guided comparisons.
-- The prior 22 production Chromium journeys pass. The two new routing journeys now pass against the local Vite server, covering desktop controls/run/per-instance load reporting and mobile canvas width. Bounded visual evidence is in `artifacts/load-balanced.png` and `artifacts/load-balanced-mobile.png`.
-- TypeScript and Vite build pass. Main entry approximately 567 KB /179 KB gzip; the known chunk-size warning remains. Results UI is deferred; no mobile-device frame-rate claim.
+- Fresh verification on 8 September 2026: all 93 unit tests pass across 18 files, including custom metadata validation, duplication history and portable checkpoints.
+- All 31 production Chromium journeys pass, including custom-component desktop/mobile flows, diagram editing, finite caches, routing, jobs, saved results, subsystems and legacy lookup workflows. Command: `TEST_PRODUCTION=1 npm run test:e2e`.
+- TypeScript and Vite build pass. Main entry 585.47 KB /184.62 KB gzip; the known chunk-size warning remains. Results UI is deferred; no mobile-device frame-rate claim.
 - Direct bounded visual QA: artifacts/background-jobs.png, background-jobs-mobile.png, subsystem-collapsed.png, subsystem-expanded.png, subsystem-mobile.png, guided-experiment.png, guided-mobile.png. No new independent visual review is claimed.
 - Full evidence and historical milestones: artifacts/VERIFICATION.md. Usage: README.md. Product/design authority: PRODUCT.md, DESIGN.md.
 

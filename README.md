@@ -4,7 +4,7 @@ An interactive architecture-learning workspace. Explore URL lookups and queued b
 
 ## Architecture diagrams
 
-Choose **Architecture diagram** to compose a system from 28 searchable building blocks across clients, edge, compute, data, messaging and operations. Connect up to 100 components freely and annotate each responsibility or technology choice. Diagram components are visual by design; exact executable experiments remain separate, so a component never implies simulation behavior it does not implement.
+Choose **Architecture diagram** to compose a system from 29 searchable building blocks across clients, edge, compute, data, messaging and operations. Use **Custom component** when the built-in catalog does not describe a dependency, then edit its type label, instance name and responsibility or technology notes. Connect up to 100 components freely. Select any component and choose **Duplicate component** to copy its configuration into a new, unconnected node; Undo and Redo treat that copy as one edit. Diagram components are visual by design; exact executable experiments remain separate, so a component never implies simulation behavior it does not implement.
 
 Select a connection to name the relationship, record its protocol, and classify it as synchronous, asynchronous, or data flow. Those choices appear as solid, dashed, or dotted paths and persist with checkpoints and exports.
 
@@ -27,6 +27,8 @@ Choose a **Guided experiment** in the library:
 - **Scale a worker pool:** compare one worker with four at unchanged per-worker speed.
 - **Absorb a job burst:** inspect waiting and expiry, then scale consumers.
 - **Understand retry cost:** compare zero retries with two, measuring extra attempts and permanent failures.
+- **Scale service instances:** compare round-robin service instances while observing the shared downstream bottleneck.
+- **Warm a finite cache:** compare cache sizes under the same seeded hot-link workload.
 
 Each loads a real editable starter model. The inspector provides a question, suggested steps and observations calculated from the current run. Use **Guide** in the toolbar to return after selecting a component. The selected guide follows the model through Undo, checkpoints and export. **Explore freely** hides the guide without resetting a running experiment. Loading a different guide or path replaces the model with an undoable edit; saved results remain intact.
 
@@ -120,12 +122,12 @@ No cloud synchronization or remote account is involved. Export JSON to preserve 
 
 This is a learning model, not a hardware benchmark or architecture sizing tool.
 
-- Supported paths: traffic → service → optional cache → database, and producer → job queue → worker pool.
+- Supported paths: traffic → service → optional cache → database; traffic → round-robin load balancer → service instances → shared optional cache/database; and producer → job queue → worker pool.
 - Poisson arrivals from a deterministic seed, following the configured steady, burst or linear-ramp rate. Integrated arrival intensity is inverted analytically; unused exponential hazard is carried across burst boundaries, without fixed time-step approximations. Cache outcomes use a separate per-request deterministic draw, so adding the cache does not perturb arrivals.
 - Service defaults to one worker at 2,000 requests/s per worker. Total service capacity is `workers × capacity`; processing time for each request is `1 / capacity`. Database and cache each retain one serial processor at 500 and 5,000 requests/s respectively.
 - FIFO waiting queues default to 500 slots. Queue limits exclude all active workers. New arrivals are rejected when every worker is busy and the waiting queue is full.
 - A global deadline defaults to 2,000 ms and includes a fixed 8 ms response overhead. An expired queued request is skipped. Already-processing expired work still consumes capacity until it completes, but never becomes a successful response.
-- Cache hit probability is fixed (no warm-up, eviction, writes, consistency or key popularity).
+- Fixed-probability caches sample the configured hit rate independently. Optional finite LRU + TTL caches model cold starts, capacity, eviction and expiration against seeded URL popularity. Neither mode models writes or consistency.
 - Runs stop at the selected observation window. Outstanding requests are counted as in flight rather than silently marked successful. Generated = succeeded + rejected + timed out + in flight.
 - Throughput and utilization are cumulative averages. p95 and mean latency include successful requests only. The chart samples queue length each simulated second.
 - URL lookups do not retry. Job retries follow the explicit policy above. Replication, worker crashes, duplicate delivery, frontend execution, network contention and branched execution are not modeled. Subsystems are one level of visual grouping around the same executable components.

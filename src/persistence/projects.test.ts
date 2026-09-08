@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { newProject } from "../domain/model";
+import { architectureDiagram, makeNode, newProject } from "../domain/model";
 import { exportProject, importProject } from "./projects";
 it("roundtrips model, settings, checkpoints and viewport without overwriting original", () => {
   const p = newProject();
@@ -53,4 +53,21 @@ it("preserves workload profiles and rejects malformed imported timing", () => {
 
 it("marks exports with the result-aware format version", () => {
   expect(JSON.parse(exportProject(newProject())).version).toBe(7);
+});
+
+it("roundtrips custom component metadata in graphs and checkpoints", () => {
+  const project = newProject();
+  project.graph = architectureDiagram();
+  const custom = makeNode("custom", 400, 220);
+  custom.customType = "Feature flag service";
+  custom.name = "Flags";
+  custom.description = "Controls staged releases";
+  project.graph.nodes.push(custom);
+  project.checkpoints.push({ id: "custom-checkpoint", name: "Custom", graph: structuredClone(project.graph), createdAt: 2 });
+  const restored = importProject(exportProject(project));
+  expect(restored.graph.nodes.at(-1)).toEqual(custom);
+  expect(restored.checkpoints[0].graph.nodes.at(-1)).toEqual(custom);
+
+  project.checkpoints[0].graph.nodes.at(-1)!.customType = " ";
+  expect(() => importProject(exportProject(project))).toThrow("Custom component type labels");
 });

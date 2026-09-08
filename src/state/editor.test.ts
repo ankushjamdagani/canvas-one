@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { newProject } from "../domain/model";
+import { architectureDiagram, makeNode, newProject } from "../domain/model";
 import { Simulation } from "../simulation/engine";
 import { useEditor } from "./editor";
 
@@ -20,6 +20,66 @@ it("expansion preserves the exact model, graph history and in-progress results",
   expect(engine.advance(30)).toEqual(
     new Simulation(useEditor.getState().project.graph).advance(30),
   );
+});
+
+it("duplicates one diagram component as an independent undoable node", () => {
+  const project = newProject();
+  project.graph = architectureDiagram();
+  const custom = makeNode("custom", 100, 100);
+  custom.name = "A".repeat(80);
+  custom.customType = "Vector database";
+  custom.description = "Embeddings and semantic retrieval";
+  custom.capacity = 321;
+  project.graph.nodes.push(custom);
+  project.graph.edges.push({ id: "incident", source: project.graph.nodes[0].id, target: custom.id });
+  project.subsystems = [{ id: "group", name: "Search", nodeIds: [project.graph.nodes[0].id, custom.id], collapsed: false }];
+  project.expandedNodeIds = [custom.id];
+  useEditor.getState().load(project);
+
+  expect(useEditor.getState().duplicateNode(custom.id)).toBe(true);
+  const state = useEditor.getState();
+  const copy = state.project.graph.nodes.at(-1)!;
+  expect(copy).toMatchObject({
+    kind: "custom",
+    name: `${"A".repeat(75)} copy`,
+    customType: custom.customType,
+    description: custom.description,
+    capacity: 321,
+    position: { x: 140, y: 140 },
+  });
+  expect(copy.id).not.toBe(custom.id);
+  expect(state.selected).toBe(copy.id);
+  expect(state.project.graph.edges).toEqual(project.graph.edges);
+  expect(state.project.subsystems![0].nodeIds).not.toContain(copy.id);
+  expect(state.project.expandedNodeIds).not.toContain(copy.id);
+  expect(state.past).toHaveLength(1);
+
+  useEditor.getState().undo();
+  expect(useEditor.getState().project.graph.nodes.some((node) => node.id === copy.id)).toBe(false);
+  expect(useEditor.getState().selected).toBeNull();
+  useEditor.getState().redo();
+  expect(useEditor.getState().project.graph.nodes.at(-1)?.id).toBe(copy.id);
+});
+
+it("guards duplication and deterministically avoids occupied positions", () => {
+  const project = newProject();
+  expect(useEditor.getState().load(project)).toBeUndefined();
+  expect(useEditor.getState().duplicateNode("missing")).toBe(false);
+  expect(useEditor.getState().past).toHaveLength(0);
+
+  project.graph = architectureDiagram();
+  const source = project.graph.nodes[0];
+  project.graph.nodes.push(makeNode("custom", source.position.x + 40, source.position.y + 40));
+  useEditor.getState().load(project);
+  expect(useEditor.getState().duplicateNode(source.id)).toBe(true);
+  expect(useEditor.getState().project.graph.nodes.at(-1)?.position).toEqual({ x: source.position.x + 80, y: source.position.y + 80 });
+
+  const full = newProject();
+  full.graph = architectureDiagram();
+  while (full.graph.nodes.length < 100) full.graph.nodes.push(makeNode("custom", full.graph.nodes.length, 0));
+  useEditor.getState().load(full);
+  expect(useEditor.getState().duplicateNode(full.graph.nodes[0].id)).toBe(false);
+  expect(useEditor.getState().past).toHaveLength(0);
 });
 
 it("restores a saved model through undoable history without mutating its result", async () => {
