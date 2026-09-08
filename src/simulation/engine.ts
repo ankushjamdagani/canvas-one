@@ -2,6 +2,8 @@ import { LatencyStats } from "./latency";
 import { Heap, randomGenerator } from "./primitives";
 import { JobSimulation } from "./jobs";
 import { isJobGraph } from "../domain/model";
+import { KeyedCache } from "./keyed-cache";
+import { urlKey } from "./url-popularity";
 export { randomGenerator } from "./primitives";
 import { nextArrivalTime, rateAt } from "../domain/workload";
 import {
@@ -16,6 +18,7 @@ interface Request {
   id: number;
   born: number;
   done: boolean;
+  urlKey?: number;
 }
 interface Event {
   time: number;
@@ -51,12 +54,16 @@ class LookupSimulation {
   private timedOut = 0;
   private hits = 0;
   private latencies = new LatencyStats();
+  private cache?: KeyedCache;
+  private cacheMisses = 0;
   private history: Sample[] = [];
   private nextSample = 1;
   constructor(private graph: Graph) {
     const errors = validateGraph(graph);
     if (errors.length) throw new Error(errors.join(" "));
     this.rng = randomGenerator(graph.settings.seed);
+    const cacheNode = graph.nodes.find((n) => n.kind === "cache");
+    if (cacheNode?.cacheMode === "lru") this.cache = new KeyedCache(cacheNode.cacheEntries ?? 100, (cacheNode.cacheTtlMs ?? 10000) / 1000);
     this.stages = ["service", "cache", "database"].flatMap((kind) =>
       graph.nodes
         .filter((n) => n.kind === kind)
@@ -128,7 +135,7 @@ class LookupSimulation {
   private event(event: Event) {
     const request = event.request;
     if (event.kind === "arrival") {
-      const req = { id: ++this.generated, born: this.time, done: false };
+      const req = { id: ++this.generated, born: this.time, done: false, urlKey: urlKey(this.graph.settings.seed, this.generated, this.graph.nodes.find((n) => n.kind === "traffic")!) };
       this.schedule({
         time: this.time + this.graph.settings.timeoutMs / 1000,
         kind: "timeout",
@@ -160,14 +167,18 @@ class LookupSimulation {
       worker.active = undefined;
       stage.completed++;
       if (!request.done) {
+        if (stage.node.kind === "database" && this.cache && request.urlKey !== undefined)
+          this.cache.put(request.urlKey, this.time);
         if (
           stage.node.kind === "cache" &&
-          cacheDraw(this.graph.settings.seed, request.id) <
-            stage.node.hitRate / 100
+          (this.cache ? this.cache.get(request.urlKey!, this.time) : cacheDraw(this.graph.settings.seed, request.id) < stage.node.hitRate / 100)
         ) {
           this.hits++;
           this.enter(request, this.stages.length);
-        } else this.forward(request, stage.node.id);
+        } else {
+          if (stage.node.kind === "cache") this.cacheMisses++;
+          this.forward(request, stage.node.id);
+        }
       }
       let next = stage.queue.shift();
       while (next?.done) next = stage.queue.shift();
@@ -236,6 +247,7 @@ class LookupSimulation {
       arrived: this.generated, completed: this.generated, rejected: 0,
       queued: 0, busy: false, activeWorkers: 0, utilization: 0,
     };
+    const cacheSnapshot = this.cache?.snapshot(this.time);
     return {
       edges: { ...this.edgeCounts },
       time: this.time,
@@ -248,6 +260,10 @@ class LookupSimulation {
       throughput: this.time ? this.succeeded / this.time : 0,
       ...this.latencies.snapshot(),
       cacheHits: this.hits,
+      cacheMisses: this.cacheMisses,
+      cacheEvictions: cacheSnapshot?.evictions ?? 0,
+      cacheExpirations: cacheSnapshot?.expirations ?? 0,
+      cacheEntries: cacheSnapshot?.entries ?? 0,
       databaseLookups: this.stages.find((s) => s.node.kind === "database")!
         .arrived,
       nodes,

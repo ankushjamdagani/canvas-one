@@ -231,6 +231,10 @@ export class JobSimulation {
       ...this.latencies.snapshot(),
       jobs: { ...this.jobs },
       cacheHits: 0,
+      cacheMisses: 0,
+      cacheEvictions: 0,
+      cacheExpirations: 0,
+      cacheEntries: 0,
       databaseLookups: 0,
       nodes: {
         [this.queueNode.id]: {

@@ -1,4 +1,4 @@
-import type { Settings } from "./model";
+import type { Graph, Settings } from "./model";
 
 export type TrafficProfile =
   | { kind: "steady" }
@@ -81,6 +81,25 @@ export function sameWorkload(a: Settings, b: Settings) {
     return p.start === q.start && p.end === q.end && p.peakRate === q.peakRate;
   if (p.kind === "ramp" && q.kind === "ramp") return p.endRate === q.endRate;
   return true;
+}
+
+/** Effective request inputs only. Cache settings are architecture decisions. */
+export function sameGraphWorkload(a: Graph, b: Graph): boolean {
+  const jobs = a.scenario === "jobs";
+  if (jobs !== (b.scenario === "jobs") || !sameWorkload(a.settings, b.settings))
+    return false;
+  if (jobs) return true;
+  const distribution = (graph: Graph) => {
+    const source = graph.nodes.find((node) => node.kind === "traffic");
+    const hot = source?.popularity === "hot";
+    return [
+      hot ? "hot" : "uniform",
+      source?.catalogSize ?? 1000,
+      hot ? (source?.hotSubset ?? 10) : 0,
+      hot ? (source?.hotShare ?? 80) : 0,
+    ].join(":");
+  };
+  return distribution(a) === distribution(b);
 }
 
 export function validateProfile(settings: Settings): string[] {

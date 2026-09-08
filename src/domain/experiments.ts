@@ -1,5 +1,5 @@
 import { balancedLookup, hasBalancer, serviceInstances } from "./routing";
-import { baseline, backgroundJobs, isJobGraph, type Graph } from "./model";
+import { baseline, backgroundJobs, isJobGraph, makeNode, type Graph } from "./model";
 import type { Metrics } from "./metrics";
 export interface Experiment {
   id: string;
@@ -9,6 +9,32 @@ export interface Experiment {
   build: () => Graph;
 }
 export const experiments: Experiment[] = [
+  {
+    id: "cold-cache-popularity",
+    title: "Warm a finite cache",
+    question: "How do hot links and a cold finite cache change database pressure?",
+    steps: [
+      "Run the hot-link workload with a cold 20-entry LRU cache.",
+      "Inspect misses, evictions, expirations and current occupancy after the run.",
+      "Increase the cache limit or TTL and replay; compare the same URL distribution.",
+    ],
+    build: () => {
+      const g = baseline();
+      g.settings.traffic = 700;
+      const traffic = g.nodes.find((n) => n.kind === "traffic")!;
+      Object.assign(traffic, { popularity: "hot", catalogSize: 1000, hotSubset: 10, hotShare: 80 });
+      const database = g.nodes.find((n) => n.kind === "database")!;
+      const cache = makeNode("cache", 680, 170);
+      cache.name = "Finite LRU cache";
+      cache.cacheMode = "lru";
+      cache.cacheEntries = 20;
+      cache.cacheTtlMs = 10000;
+      database.position = { x: 990, y: 170 };
+      g.nodes.push(cache);
+      g.edges = [{ id: crypto.randomUUID(), source: g.nodes[0].id, target: g.nodes[1].id }, { id: crypto.randomUUID(), source: g.nodes[1].id, target: cache.id }, { id: crypto.randomUUID(), source: cache.id, target: database.id }];
+      return g;
+    },
+  },
   {
     id: "horizontal-scaling",
     title: "Scale service instances",
@@ -125,6 +151,8 @@ export function observations(graph: Graph, metrics: Metrics | null): string[] {
         ? `${pressured.map((node) => node.name).join(", ")} averaged over 95% utilization. Inspect waiting and rejection there.`
         : "No component averaged over 95% utilization in this observation window.",
     );
+    const cache = graph.nodes.find((node) => node.kind === "cache");
+    if (cache?.cacheMode === "lru") findings.push(`Finite cache: ${metrics.cacheHits.toLocaleString()} hits, ${metrics.cacheMisses.toLocaleString()} misses, ${metrics.cacheEvictions.toLocaleString()} evictions, ${metrics.cacheExpirations.toLocaleString()} expirations, ${metrics.cacheEntries} entries at the observation boundary.`);
   }
   if (hasBalancer(graph)) {
     const instances = serviceInstances(graph);

@@ -30,7 +30,7 @@ it("roundtrips expanded views and rejects retired portable formats", () => {
   const project = newProject();
   const legacy = JSON.parse(exportProject(project));
   legacy.version = 1;
-  expect(() => importProject(JSON.stringify(legacy))).toThrow("version-6");
+  expect(() => importProject(JSON.stringify(legacy))).toThrow("version-7");
   project.expandedNodeIds = [project.graph.nodes[2].id];
   expect(importProject(exportProject(project)).expandedNodeIds).toEqual(
     project.expandedNodeIds,
@@ -52,5 +52,5 @@ it("preserves workload profiles and rejects malformed imported timing", () => {
 });
 
 it("marks exports with the result-aware format version", () => {
-  expect(JSON.parse(exportProject(newProject())).version).toBe(6);
+  expect(JSON.parse(exportProject(newProject())).version).toBe(7);
 });

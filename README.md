@@ -43,7 +43,7 @@ Select empty canvas space (or configure the traffic source), then choose **Stead
 
 The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
 
-Profiles save with local projects and checkpoints. JSON exports use **version 6** and include lookup, load-balanced lookup, background jobs, worker counts, service instances and saved results. Imports accept the current format only; existing browser-local projects are not deleted. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+Profiles save with local projects and checkpoints. JSON exports use **version 7** and include lookup, load-balanced lookup, background jobs, worker counts, service instances and saved results. Imports accept the current format only; existing browser-local projects are not deleted. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
 
 ## Save and compare experiments
 
@@ -74,11 +74,17 @@ Try a service at 200 req/s per worker with 700 req/s incoming traffic. Run with 
 
 Workers take requests from one shared FIFO queue. New arrivals use the first free worker; otherwise they wait or are rejected if the queue is full. Completing workers take the oldest nonexpired waiting request. Equal-time events use stable insertion order. Expired active work occupies its worker until processing completes. Workers are ideal independent processing slots: no contention, scheduling overhead, connection pools or machine-level scaling are modeled.
 
-Missing worker count defaults to one. Portable exports/imports use the current version-6 format; old-format import shims are not maintained. Existing browser-local records are not deleted. Re-export a local project with the current app; very old saved result models may need a fresh run before portable import. Keep the original export as an archive if it contains unsupported historical results.
+Missing worker count defaults to one. Portable exports/imports use the current version-7 format; old-format import shims are not maintained. Existing browser-local records are not deleted. Re-export a local project with the current app; very old saved result models may need a fresh run before portable import. Keep the original export as an archive if it contains unsupported historical results.
 
 ## Load-balanced service instances
 
 Choose **Load-balanced lookup** in Experiment path. The instantaneous round-robin balancer sends each arrival to the next service instance in listed order. Each instance has its own worker pool and bounded FIFO queue; a full queue rejects that arrival and never reroutes it. Add up to eight instances from the expanded Load balancer panel; a new instance copies the first instance’s capacity, worker count and queue limit. Instances share the optional cache and database, so horizontal scaling can move the bottleneck downstream. The routing panel reports expected equal share before a run and routed, waiting, rejected and busy values after it. Moving or renaming nodes does not change routing order.
+
+## URL popularity and finite caches
+
+Traffic can use a uniform catalog or a hot-link distribution. Both use the same bounded catalog size; hot mode sends a configured share to a smaller hot subset and the rest to cold keys. URL keys are seeded by request ordinal, so changing cache or topology preserves the arrival stream. Background jobs do not use URL popularity settings.
+
+The default **Fixed probability** cache is a deliberately simple configured assumption: it starts with no state and applies its hit probability independently, with no eviction or warm-up. **Finite LRU + TTL** starts empty, admits entries only after successful live database completion, refreshes recency on hits without refreshing TTL, expires keys at their deadline, and evicts the oldest live key at capacity. Misses are not coalesced; there are no writes or invalidations. Live metrics separate observed hits, misses, hit rate, current entries, evictions and expirations from configured settings.
 
 ## Background jobs
 

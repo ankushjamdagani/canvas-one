@@ -57,7 +57,7 @@ type ArchitectureNode = Node<
     settings: Settings;
     totals: Pick<
       Metrics,
-      "generated" | "cacheHits" | "arrivalRate" | "jobs"
+      "generated" | "cacheHits" | "cacheMisses" | "arrivalRate" | "jobs"
     > | null;
   },
   "component"
@@ -85,7 +85,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
               ? `${rate.toLocaleString()} req/s`
               : n.kind === "balancer" ? "Round-robin routing"
               : n.kind === "cache"
-                ? `${n.hitRate}% hit rate`
+                ? n.cacheMode === "lru" ? `LRU · ${n.cacheEntries ?? 100} entries` : `${n.hitRate}% hit rate`
                 : n.kind === "queue"
                   ? `${n.queueLimit.toLocaleString()} waiting slots`
                   : `${totalCapacity(n).toLocaleString()} req/s ${["service", "worker"].includes(n.kind) ? "total" : "capacity"}`}
@@ -278,6 +278,7 @@ export function ArchitectureCanvas({
                 generated: metrics.generated,
                 jobs: metrics.jobs,
                 cacheHits: metrics.cacheHits,
+                cacheMisses: metrics.cacheMisses,
                 arrivalRate: metrics.arrivalRate,
               }
             : null,
@@ -308,7 +309,7 @@ export function ArchitectureCanvas({
             type: "traffic",
             data: {
               running: running && pageVisible,
-              rateLabel: observed ? "observed" :
+              rateLabel: observed ? "observed" : g.nodes.find((n) => n.kind === "cache")?.cacheMode === "lru" && target?.kind === "database" ? "capacity" :
                 target?.kind === "worker"
                   ? metrics?.time
                     ? "attempts observed"
@@ -322,11 +323,9 @@ export function ArchitectureCanvas({
                     ? (metrics.nodes[target.id]?.arrived ?? 0) / metrics.time
                     : totalCapacity(target)
                   : target?.kind === "database"
-                    ? expectedRate *
-                      (1 -
-                        (g.nodes.find((n) => n.kind === "cache")?.hitRate ??
-                          0) /
-                          100)
+                    ? g.nodes.find((n) => n.kind === "cache")?.cacheMode === "lru"
+                      ? (metrics?.time ? metrics.databaseLookups / metrics.time : totalCapacity(target))
+                      : expectedRate * (1 - (g.nodes.find((n) => n.kind === "cache")?.hitRate ?? 0) / 100)
                     : expectedRate,
             },
             markerEnd: {

@@ -40,6 +40,10 @@ export interface Metrics {
   meanLatency: number;
   p95Latency: number;
   cacheHits: number;
+  cacheMisses: number;
+  cacheEvictions: number;
+  cacheExpirations: number;
+  cacheEntries: number;
   databaseLookups: number;
   nodes: Record<string, NodeMetrics>;
   history: Sample[];

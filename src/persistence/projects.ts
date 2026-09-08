@@ -16,7 +16,7 @@ export const repository = {
 };
 export function exportProject(project: Project) {
   return JSON.stringify(
-    { format: "system-studio", version: 6, project },
+    { format: "system-studio", version: 7, project },
     null,
     2,
   );
@@ -25,9 +25,9 @@ export function importProject(text: string): Project {
   if (text.length > 2_000_000)
     throw new Error("Project files must be smaller than 2 MB.");
   const data = JSON.parse(text);
-  if (data?.format !== "system-studio" || data.version !== 6)
+  if (data?.format !== "system-studio" || data.version !== 7)
     throw new Error(
-      "Unsupported file. Import a current System studio version-6 export. Older portable formats are no longer imported; existing local projects are not deleted.",
+      "Unsupported file. Import a current System studio version-7 export. Older portable formats are no longer imported; existing local projects are not deleted.",
     );
   const p = data.project;
   if (

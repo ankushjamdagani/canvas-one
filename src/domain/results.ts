@@ -7,9 +7,9 @@ import {
   type ModelNode,
 } from "./model";
 import { failureCount, type Metrics } from "./metrics";
-import { sameWorkload, profileLabel } from "./workload";
+import { sameGraphWorkload, profileLabel } from "./workload";
 
-export const MODEL_VERSION = "url-lookup/4";
+export const MODEL_VERSION = "url-lookup/5";
 export const modelVersion = (graph: Graph) =>
   isJobGraph(graph) ? "background-jobs/1" : MODEL_VERSION;
 export const MAX_SAVED_RUNS = 20;
@@ -30,10 +30,15 @@ export function defaultRunName(graph: Graph) {
   const instances = graph.nodes.filter((n) => n.kind === "service");
   if (graph.nodes.some((n) => n.kind === "balancer")) return `${profileLabel(graph.settings)} · ${instances.length} service instances`.slice(0, 80);
   const cache = graph.nodes.find((n) => n.kind === "cache");
-  return `${profileLabel(graph.settings)} · ${cache ? `${cache.hitRate}% cache` : "no cache"}`.slice(
+  return `${profileLabel(graph.settings)} · ${cache ? cacheDescription(cache) : "no cache"}`.slice(
     0,
     80,
   );
+}
+function cacheDescription(cache: ModelNode) {
+  return cache.cacheMode === "lru"
+    ? `LRU ${cache.cacheEntries ?? 100} entries · ${cache.cacheTtlMs ?? 10000} ms TTL`
+    : `${cache.hitRate}% fixed probability`;
 }
 export function createSavedRun(result: RunResult, name: string): SavedRun {
   const run: SavedRun = {
@@ -79,6 +84,10 @@ export function validateSavedRun(run: SavedRun): string[] {
     "meanLatency",
     "p95Latency",
     "cacheHits",
+    "cacheMisses",
+    "cacheEntries",
+    "cacheEvictions",
+    "cacheExpirations",
     "databaseLookups",
   ] as const;
   if (
@@ -95,6 +104,10 @@ export function validateSavedRun(run: SavedRun): string[] {
     "timedOut",
     "inFlight",
     "cacheHits",
+    "cacheMisses",
+    "cacheEntries",
+    "cacheEvictions",
+    "cacheExpirations",
     "databaseLookups",
   ] as const;
   if (
@@ -153,6 +166,25 @@ export function validateSavedRun(run: SavedRun): string[] {
     )
       return ["Saved component measurements are invalid."];
   }
+  const cache = run.graph.nodes.find((node) => node.kind === "cache");
+  if (cache) {
+    if (
+      m.cacheHits + m.cacheMisses > m.generated ||
+      m.cacheHits + m.cacheMisses > m.nodes[cache.id].completed ||
+      m.cacheMisses !== m.databaseLookups
+    )
+      return ["Saved cache decisions do not reconcile with database arrivals."];
+    if (cache.cacheMode === "lru") {
+      const database = run.graph.nodes.find((node) => node.kind === "database")!;
+      if (
+        m.cacheEntries > (cache.cacheEntries ?? 100) ||
+        m.cacheEntries + m.cacheEvictions + m.cacheExpirations > m.nodes[database.id].completed
+      )
+        return ["Saved finite-cache occupancy and removals do not reconcile with fills."];
+    } else if (m.cacheEntries || m.cacheEvictions || m.cacheExpirations)
+      return ["Finite-cache measurements require the finite LRU model."];
+  } else if (m.cacheHits || m.cacheMisses || m.cacheEntries || m.cacheEvictions || m.cacheExpirations)
+    return ["Cache measurements require a cache component."];
   if (!isJobGraph(run.graph)) {
     if (!m.edges || Object.keys(m.edges).length !== run.graph.edges.length || run.graph.edges.some((e) => !Number.isSafeInteger(m.edges?.[e.id]) || m.edges![e.id] < 0 || m.edges![e.id] > m.generated))
       return ["Saved connection measurements are invalid."];
@@ -190,11 +222,11 @@ export function comparisonStatus(a: SavedRun, b: SavedRun) {
       message:
         "Different simulation model versions. Results are not directly comparable.",
     };
-  if (!sameWorkload(a.graph.settings, b.graph.settings))
+  if (!sameGraphWorkload(a.graph, b.graph))
     return {
       matched: false,
       message:
-        "Different workloads. Traffic profile, seed, duration or timeout changed; this is not a controlled architecture comparison.",
+        "Different workloads. Traffic profile, URL popularity or catalog, seed, duration or timeout changed; this is not a controlled architecture comparison.",
     };
   if (a.metrics.generated !== b.metrics.generated)
     return {
@@ -205,7 +237,7 @@ export function comparisonStatus(a: SavedRun, b: SavedRun) {
   return {
     matched: true,
     message:
-      "Same traffic profile, seed, duration and timeout. Generated arrival counts match.",
+      "Same traffic profile, URL distribution, seed, duration and timeout. Generated arrival counts match; cache settings are architecture assumptions.",
   };
 }
 export function modelChanges(a: Graph, b: Graph): string[] {
@@ -224,7 +256,7 @@ export function modelChanges(a: Graph, b: Graph): string[] {
     const kind = (after ?? before)!.kind;
     if (!before && after) {
       changes.push(
-        `${after.name} added${kind === "cache" ? ` (${after.hitRate}% hit rate)` : ""}.`,
+        `${after.name} added${kind === "cache" ? ` (${cacheDescription(after)})` : ""}.`,
       );
       continue;
     }
@@ -258,6 +290,12 @@ export function modelChanges(a: Graph, b: Graph): string[] {
     }
     if (kind === "cache" && before.hitRate !== after.hitRate)
       changes.push(`Cache hit rate: ${before.hitRate}% → ${after.hitRate}%.`);
+    if (kind === "cache" && (before.cacheMode ?? "fixed") !== (after.cacheMode ?? "fixed"))
+      changes.push(`Cache model: ${before.cacheMode ?? "fixed"} → ${after.cacheMode ?? "fixed"}.`);
+    if (kind === "cache" && (before.cacheEntries ?? 100) !== (after.cacheEntries ?? 100))
+      changes.push(`Cache entries: ${before.cacheEntries ?? 100} → ${after.cacheEntries ?? 100}.`);
+    if (kind === "cache" && (before.cacheTtlMs ?? 10000) !== (after.cacheTtlMs ?? 10000))
+      changes.push(`Cache TTL: ${before.cacheTtlMs ?? 10000} → ${after.cacheTtlMs ?? 10000} ms.`);
   }
   const routes = (g: Graph) => g.edges.map((e) => `${e.source}>${e.target}`).sort().join(",");
   if (a.nodes.length === b.nodes.length && a.nodes.every((n) => b.nodes.some((other) => other.id === n.id)) && routes(a) !== routes(b)) changes.push("Connections changed; inspect each saved model for its routing path.");

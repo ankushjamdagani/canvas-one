@@ -17,6 +17,13 @@ export interface ModelNode {
   retryDelayMs?: number;
   queueLimit: number;
   hitRate: number;
+  popularity?: "uniform" | "hot";
+  catalogSize?: number;
+  hotSubset?: number;
+  hotShare?: number;
+  cacheMode?: "fixed" | "lru";
+  cacheEntries?: number;
+  cacheTtlMs?: number;
 }
 export interface ModelEdge {
   id: string;
@@ -92,6 +99,12 @@ export function makeNode(kind: ComponentKind, x: number, y: number): ModelNode {
         }
       : {}),
     hitRate: 80,
+    ...(kind === "traffic"
+      ? { popularity: "uniform" as const, catalogSize: 1000, hotSubset: 10, hotShare: 80 }
+      : {}),
+    ...(kind === "cache"
+      ? { cacheMode: "fixed" as const, cacheEntries: 100, cacheTtlMs: 10000 }
+      : {}),
   };
 }
 export function baseline(): Graph {
@@ -228,6 +241,17 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       );
     if (!Number.isFinite(n.hitRate) || n.hitRate < 0 || n.hitRate > 100)
       errors.push("Cache hit rate must be between 0 and 100%.");
+    if (n.kind === "traffic") {
+      if (n.popularity !== undefined && !["uniform", "hot"].includes(n.popularity)) errors.push("Choose uniform or hot-link URL popularity.");
+      if (!Number.isInteger(n.catalogSize ?? 1000) || (n.catalogSize ?? 1000) < 2 || (n.catalogSize ?? 1000) > 100000) errors.push("URL catalog size must be a whole number from 2 to 100,000.");
+      if (!Number.isInteger(n.hotSubset ?? 10) || (n.hotSubset ?? 10) < 1 || (n.popularity === "hot" && (n.hotSubset ?? 10) >= (n.catalogSize ?? 1000))) errors.push("Hot-link URL count must be a positive whole number smaller than the catalog size when using hot links.");
+      if (!Number.isFinite(n.hotShare ?? 80) || (n.hotShare ?? 80) < 0 || (n.hotShare ?? 80) > 100) errors.push("Hot-link traffic share must be between 0 and 100%.");
+    }
+    if (n.kind === "cache") {
+      if (n.cacheMode !== undefined && !["fixed", "lru"].includes(n.cacheMode)) errors.push("Choose a fixed-probability or finite LRU cache.");
+      if (!Number.isInteger(n.cacheEntries ?? 100) || (n.cacheEntries ?? 100) < 1 || (n.cacheEntries ?? 100) > 100000) errors.push("Cache entries must be a whole number from 1 to 100,000.");
+      if (!Number.isFinite(n.cacheTtlMs ?? 10000) || (n.cacheTtlMs ?? 10000) < 1 || (n.cacheTtlMs ?? 10000) > 3600000) errors.push("Cache TTL must be between 1 ms and 3,600,000 ms.");
+    }
   }
   if (!Number.isFinite(s.traffic) || s.traffic < 1 || s.traffic > 10000)
     errors.push("Traffic must be between 1 and 10,000 requests/s.");
@@ -276,7 +300,8 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
         : "Connect every component into a supported request path: traffic → service → optional cache → database. Reconnect the handles to match.");
   return [...new Set(errors)];
 }
-export function expectedDatabaseRate(graph: Graph, time = 0) {
+export function expectedDatabaseRate(graph: Graph, time = 0): number | null {
   const cache = graph.nodes.find((n) => n.kind === "cache");
+  if (cache?.cacheMode === "lru") return null;
   return rateAt(graph.settings, time) * (1 - (cache?.hitRate ?? 0) / 100);
 }

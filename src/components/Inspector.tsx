@@ -92,7 +92,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
       n.kind === "queue"
         ? totalCapacity(g.nodes.find((n) => n.kind === "worker") ?? n)
         : totalCapacity(n),
-    overloaded = !["traffic", "balancer"].includes(n.kind) && demand > capacity;
+    overloaded = !["traffic", "balancer"].includes(n.kind) && demand !== null && demand > capacity;
   return (
     <aside className="inspector">
       <div className="inspector-heading">
@@ -182,15 +182,12 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
               </>
             )}
             {n.kind === "cache" && (
-              <NumberField
-                label="Cache hit rate"
-                min={0}
-                max={100}
-                value={n.hitRate}
-                unit="%"
-                onChange={(v) => editor.updateNode(n.id, { hitRate: v })}
-              />
+              <>
+                <label className="field"><span>Cache model</span><select aria-label="Cache model" value={n.cacheMode ?? "fixed"} onChange={(e) => editor.updateNode(n.id, { cacheMode: e.target.value as "fixed" | "lru" })}><option value="fixed">Fixed probability</option><option value="lru">Finite LRU + TTL</option></select></label>
+                {(n.cacheMode ?? "fixed") === "fixed" ? <NumberField label="Cache hit rate" min={0} max={100} value={n.hitRate} unit="%" onChange={(v) => editor.updateNode(n.id, { hitRate: v })} /> : <><NumberField label="Cache entries" min={1} max={100000} value={n.cacheEntries ?? 100} onChange={(v) => editor.updateNode(n.id, { cacheEntries: Math.round(v) })} /><NumberField label="Entry TTL" min={1} max={3600000} value={n.cacheTtlMs ?? 10000} unit="ms" onChange={(v) => editor.updateNode(n.id, { cacheTtlMs: v })} /></>}
+              </>
             )}
+            {n.kind === "traffic" && !isJobGraph(g) && <><label className="field"><span>URL popularity</span><select aria-label="URL popularity" value={n.popularity ?? "uniform"} onChange={(e) => editor.updateNode(n.id, { popularity: e.target.value as "uniform" | "hot", hotSubset: Math.min(n.hotSubset ?? 10, (n.catalogSize ?? 1000) - 1) })}><option value="uniform">Uniform catalog</option><option value="hot">Hot links</option></select></label><NumberField label="URL catalog size" min={2} max={100000} value={n.catalogSize ?? 1000} onChange={(v) => editor.updateNode(n.id, { catalogSize: Math.round(v), hotSubset: Math.min(n.hotSubset ?? 10, Math.round(v) - 1) })} />{(n.popularity ?? "uniform") === "hot" && <><NumberField label="Hot-link URLs" min={1} max={(n.catalogSize ?? 1000) - 1} value={n.hotSubset ?? 10} onChange={(v) => editor.updateNode(n.id, { hotSubset: Math.round(v) })} /><NumberField label="Hot-link traffic share" min={0} max={100} value={n.hotShare ?? 80} unit="%" onChange={(v) => editor.updateNode(n.id, { hotShare: v })} /></>}</>}
             <div className="note">
               <Info size={16} />
               <p>
@@ -218,14 +215,14 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                       ? "Start the request journey"
                       : n.kind === "cache"
                         ? "Serve hits closer to the user"
-                        : "Room to handle this workload"}
+                        : demand === null ? "Run to measure database demand" : "Room to handle this workload"}
                 </strong>
                 <p>
                   {overloaded
-                    ? `${Math.round(demand)} expected arrivals/s · ${capacity} total capacity/s`
+                    ? `${Math.round(demand!)} expected arrivals/s · ${capacity} total capacity/s`
                     : n.kind === "traffic"
                       ? profileLabel(g.settings)
-                      : `${Math.round(demand)} expected arrivals/s`}
+                      : demand === null ? "Observed after the run" : `${Math.round(demand)} expected arrivals/s`}
                 </p>
               </div>
             </div>
@@ -242,13 +239,13 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                       ? "Looks up a short URL and returns its destination. Workers process requests concurrently from one shared FIFO queue. Each worker takes 1 ÷ per-worker capacity seconds per request; increasing workers increases total capacity, not individual request speed."
                       : n.kind === "database"
                         ? "Looks up the original URL. Requests wait in a FIFO queue when the database is busy; a full queue rejects new arrivals."
-                        : "Returns a cached destination on a hit. A miss continues to the database. The hit rate is a fixed probability, with no warm-up or eviction model."}
+                        : `Returns a cached destination on a hit. A miss continues to the database. ${(n.cacheMode ?? "fixed") === "lru" ? "The finite cache starts empty; successful database completions populate it, hits refresh recency, and TTL expiration creates misses." : "The fixed probability is a simple configured assumption with no warm-up or eviction model."}`}
             </p>
             <h3>{overloaded ? "Why a queue builds" : "What to watch"}</h3>
             <p>
               {overloaded
                 ? "Requests arrive faster than this component can process them. Waiting time rises until the queue fills or requests time out."
-                : "Even below average capacity, bursts can briefly create a queue. Watch utilization and latency together."}
+                : demand === null ? "Finite-cache demand depends on URL reuse, fills and expiry. Watch observed database arrivals, utilization and waiting after a run." : "Even below average capacity, bursts can briefly create a queue. Watch utilization and latency together."}
             </p>
             {m && !!metrics?.time && (
               <dl className="node-measurements">

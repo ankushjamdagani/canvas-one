@@ -35,12 +35,12 @@ test("saved cache comparison survives reopen and restores the exact model", asyn
   await saveResult(page, "With cache");
   await expect(
     page.getByText(
-      "Same traffic profile, seed, duration and timeout. Generated arrival counts match.",
+      "Same traffic profile, URL distribution, seed, duration and timeout. Generated arrival counts match; cache settings are architecture assumptions.",
       { exact: true },
     ),
   ).toBeVisible();
   await expect(
-    page.getByText("Cache added (80% hit rate).", { exact: true }),
+    page.getByText("Cache added (80% fixed probability).", { exact: true }),
   ).toBeVisible();
   const failures = page.getByRole("row", { name: /Failed requests/ });
   await expect(failures).toContainText("5,346");

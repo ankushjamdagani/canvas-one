@@ -714,9 +714,12 @@ export default function App() {
             <dd>Optional round-robin routing sends arrivals to 1–8 service instances in their listed order. Each instance owns 1–16 workers and one queue. The balancer is instantaneous with no capacity limit or queue. Equal turns are independent of instance capacity; full queues reject without rerouting. All instances share the optional cache and database. Moving nodes does not change routing order.</dd>
             <dt>Cache</dt>
             <dd>
-              Fixed per-request hit probability with its own capacity and queue.
-              Hits return immediately after cache processing; misses reach the
-              database. No cache warm-up, eviction, or writes.
+              Fixed probability is a simple independent hit assumption. Finite LRU
+              starts empty and fills on live database completion; hits refresh
+              recency, while TTL starts at fill and does not refresh on hits.
+              Expired keys miss; capacity evicts the least recently used live key.
+              Hits return after cache processing; misses reach the database.
+              No miss coalescing, writes or invalidations are simulated.
             </dd>
             <dt>Timeouts & responses</dt>
             <dd>

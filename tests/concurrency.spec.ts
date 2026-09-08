@@ -72,7 +72,7 @@ test("worker scaling applies atomically and compares identical arrivals with sav
   ).toBeVisible();
   await expect(
     page.getByText(
-      "Same traffic profile, seed, duration and timeout. Generated arrival counts match.",
+      "Same traffic profile, URL distribution, seed, duration and timeout. Generated arrival counts match; cache settings are architecture assumptions.",
       { exact: true },
     ),
   ).toBeVisible();

@@ -4,6 +4,7 @@ import { ServiceModelEditor } from "./ServiceModelEditor";
 import { profileLabel } from "../domain/workload";
 import { workerCount, type ModelNode, type Settings } from "../domain/model";
 import type { Metrics, NodeMetrics } from "../simulation/engine";
+import { observedCacheHitRate } from "../domain/cache-metrics";
 
 export function ComponentInternals({
   node,
@@ -17,7 +18,7 @@ export function ComponentInternals({
   metrics?: NodeMetrics;
   totals: Pick<
     Metrics,
-    "generated" | "cacheHits" | "arrivalRate" | "jobs"
+    "generated" | "cacheHits" | "cacheMisses" | "arrivalRate" | "jobs"
   > | null;
   hasRun: boolean;
 }) {
@@ -159,17 +160,10 @@ export function ComponentInternals({
       </p>
       {node.kind === "cache" && (
         <div className="internal-routes">
-          <div>
-            <ArrowUpRight size={12} />
-            <span>{node.hitRate}% hit → response</span>
-          </div>
-          <div>
-            <CornerDownRight size={12} />
-            <span>{100 - node.hitRate}% miss → database</span>
-          </div>
-          <p>Configured probabilities</p>
+          {node.cacheMode === "lru" ? <><div><ArrowUpRight size={12} /><span>Observed hits → response</span></div><div><CornerDownRight size={12} /><span>Observed misses → database</span></div><p>Finite cache decisions from this run</p></> : <><div><ArrowUpRight size={12} /><span>{node.hitRate}% hit → response</span></div><div><CornerDownRight size={12} /><span>{100 - node.hitRate}% miss → database</span></div><p>Configured probabilities</p></>}
         </div>
       )}
+      {node.kind === "cache" && hasRun && <div className="internal-stat"><span>Observed hit rate</span><strong>{observedCacheHitRate({ cacheHits: totals?.cacheHits ?? 0, cacheMisses: totals?.cacheMisses ?? 0 }) === null ? "—" : `${observedCacheHitRate({ cacheHits: totals?.cacheHits ?? 0, cacheMisses: totals?.cacheMisses ?? 0 })!.toFixed(1)}%`}</strong></div>}
       <div className="internal-stat">
         <span>
           {node.kind === "cache" ? "Observed hits" : "Processed here"}

@@ -2,11 +2,12 @@ import { failureCount } from "../domain/metrics";
 import { isJobGraph } from "../domain/model";
 import { ArrowDownRight, ArrowUpRight, Activity, Info } from "lucide-react";
 import { useState } from "react";
-import { sameWorkload } from "../domain/workload";
+import { sameGraphWorkload } from "../domain/workload";
 import { WorkloadChart } from "./WorkloadChart";
 import type { Graph } from "../domain/model";
 import type { Metrics } from "../simulation/engine";
 import type { RunResult } from "../simulation/useSimulation";
+import { observedCacheHitRate } from "../domain/cache-metrics";
 export function MetricsPanel({
   metrics: m,
   previous,
@@ -22,7 +23,7 @@ export function MetricsPanel({
   const comparable =
     previous &&
     isJobGraph(previous.graph) === isJobGraph(graph) &&
-    sameWorkload(previous.graph.settings, graph.settings);
+    sameGraphWorkload(previous.graph, graph);
   return (
     <section
       className={`metrics-panel ${expanded ? "expanded" : ""}`}
@@ -184,6 +185,12 @@ export function MetricsPanel({
                     <dt>Cache hits</dt>
                     <dd>{m?.cacheHits.toLocaleString() ?? "—"}</dd>
                   </div>
+                  <div><dt>Observed hit rate</dt><dd>{observedCacheHitRate(m) === null ? "—" : `${observedCacheHitRate(m)!.toFixed(1)}%`}</dd></div>
+                  {graph.nodes.some((node) => node.kind === "cache" && node.cacheMode === "lru") && <>
+                    <div><dt>Cache misses</dt><dd>{m?.cacheMisses.toLocaleString() ?? "—"}</dd></div>
+                    <div><dt>Finite cache</dt><dd>{m?.cacheEntries ?? "—"} entries</dd></div>
+                    <div><dt>Evictions / expirations</dt><dd>{m?.cacheEvictions ?? 0} / {m?.cacheExpirations ?? 0}</dd></div>
+                  </>}
                 </>
               )}
             </dl>

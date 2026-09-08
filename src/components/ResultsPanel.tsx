@@ -1,5 +1,6 @@
 import { hasBalancer, serviceInstances } from "../domain/routing";
 import { failureCount } from "../domain/metrics";
+import { observedCacheHitRate } from "../domain/cache-metrics";
 import { isJobGraph } from "../domain/model";
 import { useEffect, useState } from "react";
 import {
@@ -200,10 +201,17 @@ export function ResultsPanel({
                             digits: 1,
                           },
                         ]),
+                    ...(!isJobGraph(current.graph) ? [
+                      { label: "Observed cache hit rate · %", get: (r: SavedRun) => observedCacheHitRate(r.metrics), digits: 1 },
+                      { label: "Cache misses", get: (r: SavedRun) => r.metrics.cacheMisses, digits: 0 },
+                      { label: "Cache entries at end", get: (r: SavedRun) => r.metrics.cacheEntries, digits: 0 },
+                      { label: "Cache evictions", get: (r: SavedRun) => r.metrics.cacheEvictions, digits: 0 },
+                      { label: "Cache expirations", get: (r: SavedRun) => r.metrics.cacheExpirations, digits: 0 },
+                    ] : []),
                   ].map((row) => {
                     const b = baseline ? row.get(baseline) : null,
                       c = row.get(current),
-                      difference = b === null ? null : c - b;
+                      difference = b === null || c === null ? null : c - b;
                     const format = (v: number) =>
                       v.toLocaleString(undefined, {
                         minimumFractionDigits: row.digits,
@@ -213,7 +221,7 @@ export function ResultsPanel({
                       <tr key={row.label}>
                         <th scope="row">{row.label}</th>
                         <td>{b === null ? "—" : format(b)}</td>
-                        <td>{format(c)}</td>
+                        <td>{c === null ? "—" : format(c)}</td>
                         <td>
                           {difference === null || !status?.matched
                             ? "—"
