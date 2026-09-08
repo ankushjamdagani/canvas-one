@@ -6,6 +6,8 @@ An interactive architecture-learning workspace. Explore URL lookups and queued b
 
 Choose **Architecture diagram** to compose a system from 28 searchable building blocks across clients, edge, compute, data, messaging and operations. Connect up to 100 components freely and annotate each responsibility or technology choice. Diagram components are visual by design; exact executable experiments remain separate, so a component never implies simulation behavior it does not implement.
 
+Select a connection to name the relationship, record its protocol, and classify it as synchronous, asynchronous, or data flow. Those choices appear as solid, dashed, or dotted paths and persist with checkpoints and exports.
+
 ## Run locally
 
 Requires Node.js 22.12+ (verified with Node 24.5).

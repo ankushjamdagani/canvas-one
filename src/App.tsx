@@ -622,7 +622,7 @@ export default function App() {
         ) : diagramMode ? (
           <section className="diagram-status" aria-label="Diagram guidance">
             <strong>{graph.nodes.length} components · {graph.edges.length} connections</strong>
-            <span>{graph.nodes.length >= 100 ? "Component limit reached. " : ""}{graph.edges.length >= 200 ? "Connection limit reached." : "Drag from a handle to connect. Select a connection to remove it."}</span>
+            <span>{graph.nodes.length >= 100 ? "Component limit reached. " : ""}{graph.edges.length >= 200 ? "Connection limit reached." : "Drag from a handle to connect. Select a connection to describe its flow or delete it."}</span>
           </section>
         ) : (
           <MetricsPanel

@@ -13,6 +13,10 @@ test("architecture diagram offers searchable components and editable responsibil
   await expect(page.locator(".node-copy").filter({ hasText: "Media bucket" })).toBeVisible();
   await expect(page.locator(".node-copy").getByText("Stores uploaded media and generated thumbnails.", { exact: true })).toBeVisible();
   await expect(page.getByText(/4 components · 2 connections/)).toBeVisible();
+  await page.locator(".react-flow__edge").first().click({ force: true });
+  await page.getByRole("textbox", { name: "Connection label" }).fill("Calls API");
+  await page.getByRole("textbox", { name: "Connection protocol" }).fill("HTTPS");
+  await expect(page.getByRole("region", { name: "Selected connection" })).toBeVisible();
   await page.screenshot({ path: "artifacts/architecture-components.png", fullPage: true });
 });
 
@@ -24,6 +28,10 @@ test("architecture component palette remains usable on mobile", async ({ page })
   await expect(page.getByRole("button", { name: /Message queue/ })).toBeVisible();
   await page.locator(".react-flow__edge").first().click({ force: true });
   await expect(page.getByRole("button", { name: "Delete connection" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Connection label" }).fill("Calls API");
+  await page.getByRole("textbox", { name: "Connection protocol" }).fill("HTTPS");
+  await page.getByRole("combobox", { name: "Connection flow" }).selectOption("async");
+  await expect(page.getByText("Calls API · HTTPS", { exact: true })).toBeVisible();
   expect(await page.locator(".workspace").evaluate((element) => element.getBoundingClientRect().width <= innerWidth)).toBe(true);
   await page.screenshot({ path: "artifacts/architecture-components-mobile.png", fullPage: true });
 });

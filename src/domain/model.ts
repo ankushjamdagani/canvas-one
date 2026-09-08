@@ -33,6 +33,9 @@ export interface ModelEdge {
   id: string;
   source: string;
   target: string;
+  label?: string;
+  protocol?: string;
+  communication?: "sync" | "async" | "data";
 }
 export interface Settings {
   traffic: number;
@@ -289,6 +292,11 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
   errors.push(...validateProfile(s));
   if (edges.some((e) => !ids.has(e.source) || !ids.has(e.target)))
     errors.push("A connection references a missing component.");
+  for (const edge of edges) {
+    if (edge.label !== undefined && (typeof edge.label !== "string" || edge.label.length > 60)) errors.push("Connection labels must be 60 characters or fewer.");
+    if (edge.protocol !== undefined && (typeof edge.protocol !== "string" || edge.protocol.length > 30)) errors.push("Connection protocols must be 30 characters or fewer.");
+    if (edge.communication !== undefined && !["sync", "async", "data"].includes(edge.communication)) errors.push("Choose synchronous, asynchronous, or data flow.");
+  }
   // Drafts are portable even before their topology can execute.
   if (!requireRunnable) return [...new Set(errors)];
   if (graph.scenario === "diagram") return [...new Set(errors)];

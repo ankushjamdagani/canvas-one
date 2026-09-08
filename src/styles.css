@@ -228,7 +228,13 @@ p {
 .diagram-inspector textarea { min-height: 112px; }
 .diagram-node .react-flow__handle { width: 14px; height: 14px; }
 .diagram-node .node-copy span { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.35; }
-.canvas-edge-delete { position: absolute; z-index: 8; right: 18px; bottom: 18px; color: #a13e21; background: #fff; box-shadow: 0 8px 24px #203d3517; }
+.connection-editor { position: absolute; z-index: 8; right: 18px; bottom: 18px; width: 260px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: var(--shadow); }
+.connection-editor-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.connection-editor-heading button { width: 44px; height: 44px; padding: 0; color: #a13e21; }
+.connection-editor label { display: grid; gap: 5px; font-size: 9px; color: var(--muted); }
+.connection-editor input, .connection-editor select { min-width: 0; padding: 7px 8px; font-size: 11px; }
+.connection-editor-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+@media (max-width: 560px) { .connection-editor { position: absolute; left: 14px; right: 14px; bottom: 14px; width: auto; } }
 .checkpoints {
   margin-top: 34px;
   border-top: 1px solid var(--line);

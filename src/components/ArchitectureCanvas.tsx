@@ -326,6 +326,9 @@ export function ArchitectureCanvas({
             data: {
               running: running && pageVisible,
               showLabel: !isDiagramGraph(g),
+              label: e.label,
+              protocol: e.protocol,
+              communication: e.communication ?? "sync",
               rateLabel: observed ? "observed" : g.nodes.find((n) => n.kind === "cache")?.cacheMode === "lru" && target?.kind === "database" ? "capacity" :
                 target?.kind === "worker"
                   ? metrics?.time
@@ -468,10 +471,11 @@ export function ArchitectureCanvas({
       <Background color="#d6e0dc" gap={20} size={1} />
       <Controls showInteractive={false} position="bottom-left" />
     </ReactFlow>
-    {!!selectedEdges.length && <button className="canvas-edge-delete" onClick={() => {
-      editor.change((graph) => { graph.edges = graph.edges.filter((edge) => !selectedEdges.includes(edge.id)); });
-      setSelectedEdges([]);
-    }}><Trash2 size={14} />Delete connection</button>}
+    {!!selectedEdges.length && isDiagramGraph(g) && (() => { const edge = g.edges.find((item) => item.id === selectedEdges[0]); if (!edge) return null; return <section className="connection-editor" aria-label="Selected connection">
+      <div className="connection-editor-heading"><strong>Connection</strong><button aria-label="Delete connection" onClick={() => { editor.change((graph) => { graph.edges = graph.edges.filter((item) => !selectedEdges.includes(item.id)); }); setSelectedEdges([]); }}><Trash2 size={14} /></button></div>
+      <label><span>Label</span><input aria-label="Connection label" maxLength={60} placeholder="Reads, publishes, uploads…" value={edge.label ?? ""} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.label = event.target.value; })} /></label>
+      <div className="connection-editor-row"><label><span>Protocol</span><input aria-label="Connection protocol" maxLength={30} placeholder="HTTPS, gRPC…" value={edge.protocol ?? ""} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.protocol = event.target.value; })} /></label><label><span>Flow</span><select aria-label="Connection flow" value={edge.communication ?? "sync"} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.communication = event.target.value as "sync" | "async" | "data"; })}><option value="sync">Synchronous</option><option value="async">Asynchronous</option><option value="data">Data flow</option></select></label></div>
+    </section>; })()}
     </>
   );
 }

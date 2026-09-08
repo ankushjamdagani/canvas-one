@@ -8,7 +8,7 @@ import {
 } from "@xyflow/react";
 
 export type TrafficConnection = Edge<
-  { running: boolean; rate: number; rateLabel?: string; showLabel?: boolean },
+  { running: boolean; rate: number; rateLabel?: string; showLabel?: boolean; label?: string; protocol?: string; communication?: "sync" | "async" | "data" },
   "traffic"
 >;
 
@@ -43,6 +43,7 @@ export const TrafficEdge = memo(function TrafficEdge({
         style={{
           stroke: selected ? "#c48212" : "#72b4b2",
           strokeWidth: selected ? 2 : 1.4,
+          strokeDasharray: data?.communication === "async" ? "7 5" : data?.communication === "data" ? "2 4" : undefined,
         }}
       />
       <path
@@ -54,15 +55,14 @@ export const TrafficEdge = memo(function TrafficEdge({
           opacity: moving ? 1 : 0,
         }}
       />
-      {data?.showLabel !== false && <EdgeLabelRenderer>
+      {(data?.showLabel !== false || data?.label || data?.protocol) && <EdgeLabelRenderer>
         <span
           className="traffic-edge-label"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
           }}
         >
-          {Math.round(data?.rate ?? 0).toLocaleString()} /s{" "}
-          {data?.rateLabel ?? "expected"}
+          {data?.showLabel === false ? [data?.label, data?.protocol].filter(Boolean).join(" · ") : <>{Math.round(data?.rate ?? 0).toLocaleString()} /s {data?.rateLabel ?? "expected"}</>}
         </span>
       </EdgeLabelRenderer>}
     </>
