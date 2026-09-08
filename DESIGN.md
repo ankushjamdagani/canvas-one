@@ -210,3 +210,9 @@ Diagram edges intentionally omit request-rate labels and animation. The toolbar 
 Selected diagram connections open a compact canvas editor for a concise relationship label, protocol, and flow type. Synchronous paths are solid, asynchronous paths dashed, and data movement dotted; labels combine the relationship and protocol without introducing throughput claims. The same editor carries the touch-safe delete action.
 
 The selected-node inspector includes a 44px Duplicate component action. Duplication copies node-local configuration and metadata, offsets the copy deterministically, selects it and records one history entry. Connections, subsystem membership and expanded presentation state remain attached only to the original. At 100 components the action is disabled with an inline explanation.
+
+## Architecture templates
+
+A compact native disclosure above component search introduces three diagram starters without competing with the catalog. The empty initial selector prevents accidental replacement. Selecting an option reveals one sentence describing its learning purpose; the separate 44px Load template action performs the replacement. Helper text states that Undo restores the current diagram.
+
+Real-time chat uses a message-write spine with persistence and asynchronous notification branches. Ecommerce checkout separates catalog reads, external payment authorization and queued fulfillment. Event processing branches transformed events into archive and warehouse/analytics paths. All use the existing compact cards, labeled solid/dashed/dotted connections and left-to-right spacing. Desktop frames the complete graph; mobile keeps a readable first node and panning behavior. The templates are editable educational diagrams and never imply execution or production completeness.

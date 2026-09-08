@@ -8,6 +8,8 @@ Choose **Architecture diagram** to compose a system from 29 searchable building 
 
 Select a connection to name the relationship, record its protocol, and classify it as synchronous, asynchronous, or data flow. Those choices appear as solid, dashed, or dotted paths and persist with checkpoints and exports.
 
+Open **Architecture templates** for three editable starters: **Real-time chat**, **Ecommerce checkout**, and **Event processing**. Choose a template to read its purpose, then use **Load template**. Loading replaces the current diagram as one edit, so Undo restores the exact prior graph. Template nodes, notes, and labeled connections behave like anything drawn manually and persist through checkpoints and JSON export/import. These starters illustrate flows; they are not executable simulations or production recommendations.
+
 ## Run locally
 
 Requires Node.js 22.12+ (verified with Node 24.5).

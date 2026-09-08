@@ -35,6 +35,7 @@ import {
   type Project,
 } from "./domain/model";
 import { componentCatalog, componentCategories } from "./domain/componentCatalog";
+import { architectureTemplates, type ArchitectureTemplateId } from "./domain/architectureTemplates";
 import {
   repository,
   exportProject,
@@ -65,6 +66,7 @@ export default function App() {
     [checkpointName, setCheckpointName] = useState(""),
     [notice, setNotice] = useState("");
   const [componentSearch, setComponentSearch] = useState("");
+  const [architectureTemplateId, setArchitectureTemplateId] = useState<ArchitectureTemplateId | "">("");
   const [resultsOpen, setResultsOpen] = useState(false),
     [selectedResult, setSelectedResult] = useState<string | null>(null),
     [savingResult, setSavingResult] = useState(false),
@@ -245,6 +247,19 @@ export default function App() {
           <p>{diagramMode ? "Search and add building blocks" : "Click to add to your canvas"}</p>
           {diagramMode ? (
             <>
+              <details className="architecture-templates">
+                <summary>Architecture templates</summary>
+                <p>Loading replaces the current diagram. You can Undo to restore it.</p>
+                <label>
+                  <span>Template</span>
+                  <select aria-label="Architecture template" value={architectureTemplateId} onChange={(event) => setArchitectureTemplateId(event.target.value as ArchitectureTemplateId | "")}>
+                    <option value="">Choose a template</option>
+                    {architectureTemplates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}
+                  </select>
+                </label>
+                {architectureTemplateId && <p className="template-purpose">{architectureTemplates.find((template) => template.id === architectureTemplateId)?.purpose}</p>}
+                <button className="load-template" disabled={!architectureTemplateId} onClick={() => architectureTemplateId && editor.loadArchitectureTemplate(architectureTemplateId)}>Load template</button>
+              </details>
               <label className="component-search">
                 <Search size={14} />
                 <input aria-label="Search components" placeholder="Search components" value={componentSearch} onChange={(event) => setComponentSearch(event.target.value)} />

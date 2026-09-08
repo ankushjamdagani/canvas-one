@@ -1,5 +1,6 @@
 import { insertBalancer, addServiceInstance, balancedLookup, hasBalancer } from "../domain/routing";
 import { experiments } from "../domain/experiments";
+import { architectureTemplate } from "../domain/architectureTemplates";
 import { visibleSubsystems } from "../domain/subsystems";
 import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
 import { create } from "zustand";
@@ -40,6 +41,7 @@ interface Editor {
   insertBalancer: () => void;
   addServiceInstance: () => void;
   loadExperiment: (id: string) => void;
+  loadArchitectureTemplate: (id: string) => boolean;
   useScenario: (scenario: "lookup" | "jobs" | "balanced" | "diagram") => void;
   beginMove: () => void;
   move: (
@@ -289,6 +291,14 @@ export const useEditor = create<Editor>((set, get) => ({
       project: s.project,
       selected: null,
     }));
+  },
+  loadArchitectureTemplate: (id) => {
+    const template = architectureTemplate(id);
+    if (!template) return false;
+    const graph = template.create();
+    get().change((draft) => replaceGraph(draft, graph));
+    set({ selected: null });
+    return true;
   },
   useScenario: (scenario) => {
     const fresh = scenario === "jobs" ? backgroundJobs() : scenario === "balanced" ? balancedLookup() : scenario === "diagram" ? architectureDiagram() : newProject().graph;

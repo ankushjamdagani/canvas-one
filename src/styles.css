@@ -218,6 +218,13 @@ p {
   background: #f9fbf9;
 }
 .component-search input { border: 0; padding: 0; background: transparent; outline: 0; font-size: 11px; }
+.architecture-templates { margin-bottom: 14px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #f9fbf9; }
+.architecture-templates summary { cursor: pointer; color: var(--ink); font-size: 11px; font-weight: 650; }
+.architecture-templates > p { margin: 9px 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.architecture-templates label { display: grid; gap: 5px; color: var(--muted); font-size: 9px; }
+.architecture-templates select { min-width: 0; width: 100%; padding: 8px; font-size: 11px; }
+.architecture-templates .template-purpose { color: var(--ink); }
+.load-template { min-height: 44px; width: 100%; justify-content: center; margin-top: 9px; }
 .component-catalog { display: flex; flex-direction: column; gap: 18px; }
 .component-category h3 { margin: 0 2px 8px; color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
 .component-category .library-item { height: 38px; margin-bottom: 5px; }
@@ -1272,6 +1279,7 @@ p {
     margin: 0;
   }
   .component-search { flex: 1 0 100%; margin: 0; }
+  .architecture-templates { flex: 1 0 100%; margin: 0; }
   .component-catalog { flex: 1 0 100%; max-height: 156px; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-right: 4px; }
   .component-category .library-item { width: 100%; }
   .diagram-status { min-height: 74px; padding: 12px 15px; align-items: flex-start; flex-direction: column; gap: 4px; }

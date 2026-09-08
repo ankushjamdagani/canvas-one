@@ -82,6 +82,49 @@ it("guards duplication and deterministically avoids occupied positions", () => {
   expect(useEditor.getState().past).toHaveLength(0);
 });
 
+it("loads an architecture template as one reversible edit and preserves project data", async () => {
+  const { createSavedRun } = await import("../domain/results");
+  const project = newProject("Keep this project");
+  project.graph = architectureDiagram();
+  project.graph.guideId = "stale-guide";
+  project.checkpoints = [{ id: "checkpoint", name: "Before", graph: structuredClone(project.graph), createdAt: 1 }];
+  project.subsystems = [{ id: "subsystem", name: "Dormant", nodeIds: project.graph.nodes.slice(0, 2).map((node) => node.id), collapsed: false }];
+  project.expandedNodeIds = [project.graph.nodes[0].id];
+  const executable = newProject().graph;
+  project.savedRuns = [createSavedRun({ id: "run", graph: executable, metrics: new Simulation(executable).advance(executable.settings.duration) }, "Saved")];
+  const before = structuredClone(project.graph);
+  useEditor.getState().load(project);
+  useEditor.getState().select(project.graph.nodes[0].id);
+
+  expect(useEditor.getState().loadArchitectureTemplate("realtime-chat")).toBe(true);
+  const loaded = useEditor.getState();
+  expect(loaded.project.graph.scenario).toBe("diagram");
+  expect(loaded.project.graph.guideId).toBeUndefined();
+  expect(loaded.selected).toBeNull();
+  expect(loaded.past).toHaveLength(1);
+  expect(loaded.project.id).toBe(project.id);
+  expect(loaded.project.name).toBe("Keep this project");
+  expect(loaded.project.checkpoints).toEqual(project.checkpoints);
+  expect(loaded.project.savedRuns).toEqual(project.savedRuns);
+  expect(loaded.project.subsystems).toEqual(project.subsystems);
+  expect(loaded.project.expandedNodeIds).toEqual(project.expandedNodeIds);
+  const generatedIds = loaded.project.graph.nodes.map((node) => node.id);
+
+  useEditor.getState().undo();
+  expect(useEditor.getState().project.graph).toEqual(before);
+  useEditor.getState().redo();
+  expect(useEditor.getState().project.graph.nodes.map((node) => node.id)).toEqual(generatedIds);
+
+  const revision = useEditor.getState().revision;
+  const history = useEditor.getState().past;
+  expect(useEditor.getState().loadArchitectureTemplate("unknown")).toBe(false);
+  expect(useEditor.getState().revision).toBe(revision);
+  expect(useEditor.getState().past).toBe(history);
+
+  expect(useEditor.getState().loadArchitectureTemplate("realtime-chat")).toBe(true);
+  expect(useEditor.getState().project.graph.nodes.map((node) => node.id)).not.toEqual(generatedIds);
+});
+
 it("restores a saved model through undoable history without mutating its result", async () => {
   const { createSavedRun } = await import("../domain/results");
   const project = newProject();

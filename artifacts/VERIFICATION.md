@@ -136,3 +136,11 @@ Custom diagram components carry a separately validated 60-character type label, 
 Fresh unit verification passes 93 tests across 18 files. TypeScript and Vite production build pass; the main entry is 585.47 KB /184.62 KB gzip and retains the known chunk-size warning. The first full production browser run completed with 29 passing and two failing assertions in the newly expanded diagram suite; both failures were corrected before the final rerun recorded in the completion report.
 
 The final production Chromium suite passes all 31 journeys in 35.5 seconds. Direct inspection of `custom-component.png` and `custom-component-mobile.png` confirmed the selected copy, separate custom type caption, touch-sized duplication control and contained mobile labels; one long inspector caption found during that bounded pass was wrapped before final verification.
+
+## Architecture templates — 8 September 2026
+
+Three typed factories create fresh valid diagram graphs for real-time chat, ecommerce checkout and event processing. Every node participates in a labeled relationship and carries editable notes; connection protocol and sync/async/data classifications use existing semantics. Loading replaces the graph in one history entry while preserving project-level checkpoints, saved results, subsystem metadata and local identity.
+
+All 96 unit tests pass across 19 files. TypeScript/Vite production build passes with a 590.22 KB /186.17 KB gzip main entry and the existing chunk-size warning. All 33 production Chromium journeys pass in 37.1 seconds. Two preceding parallel full-suite runs each exposed a different existing diagram edge-selection timeout; both passed alone. Final reviewed diagram coverage passes 7 journeys in 8.8 seconds using real pointer interaction at verified SVG edge points and explicit mobile canvas visibility.
+
+Browser coverage loads all three templates, verifies Undo/Redo, edits nodes and connections, duplicates a template node, saves, reloads and restores a checkpoint, and round-trips the graph through JSON import/export with imported project identity asserted. A mobile journey verifies the explicit 44px load action and page containment. Desktop framing is asserted before capture. Desktop and mobile evidence: `architecture-template.png`, `architecture-template-mobile.png`.
