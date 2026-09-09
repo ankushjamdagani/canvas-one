@@ -70,3 +70,9 @@ Subsystems belong to Project.subsystems; missing members remain dormant through 
 Workspace: /Users/ankushjamdagani/personal/system-design-planner. Preview: http://localhost:5173/ (npm run dev if not running). Run npm test, npm run build and TEST_PRODUCTION=1 npm run test:e2e for production verification. Preserve the light docked design, exact accounting, separation of configured/observed values, and view/model boundaries. Current finite roadmap is complete; do not invent endless extras.
 
 Latest image-export verification: 115 unit tests, production build (608.58 KB /192.18 KB gzip main entry), and all 37 production Chromium journeys pass. SVG metadata is escaped; PNG source sizing occurs before decoding. Full notes are in SVG titles, and visible text is bounded. No additional milestone is started automatically.
+
+## Product goals recorded for future work
+
+The next explanatory milestone is typed sticky notes on the diagram canvas: decisions, assumptions, future scope, questions and general notes, optionally attached to nodes, connections or subsystems. They must persist through checkpoints and image/JSON exports while remaining outside executable simulation semantics.
+
+The longer-term collaboration goal is shared team architecture workspaces. Teams should save named architectures, collaborate on proposed changes, review and finalize a selected design, and retain durable authored revisions. Each revision should record author, timestamp, reason for change, linked ticket or issue, and a commit-style explanation, with draft/final state, comparison and restore support. This remains future scope; current projects are browser-local and there is no cloud synchronization, identity, access control or multi-user conflict model yet.
