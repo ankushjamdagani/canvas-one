@@ -12,6 +12,8 @@ Open **Architecture templates** for three editable starters: **Real-time chat**,
 
 Organize a diagram by Shift-clicking cards, or choose **Select components** to use the keyboard- and touch-accessible checklist. Two or more selected components can align by any edge; three or more can distribute with equal horizontal or vertical gaps when the available span is large enough. Dragging one selected card moves the whole selection. Each alignment, distribution, or group drag is one Undo/Redo step and changes positions only. Collapsed subsystem members stay out of the selection list.
 
+Use **Download SVG** or **Download PNG** below the diagram to export the entire architecture independently of the current pan, zoom, or selection. Exports preserve the current subsystem collapse state and connection flow styles. SVG stays editable and searchable; PNG renders on white at up to 2× scale within safe browser image limits. Exports use compact standard cards and system fonts; long visible text is shortened, with full metadata retained in SVG titles. PNG is capped at 8192 pixels per side and 16 million pixels total. These image downloads complement the existing JSON project backup.
+
 ## Run locally
 
 Requires Node.js 22.12+ (verified with Node 24.5).

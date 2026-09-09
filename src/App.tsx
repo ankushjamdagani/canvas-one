@@ -52,6 +52,7 @@ const ResultsPanel = lazy(() =>
 );
 import { createSavedRun, defaultRunName } from "./domain/results";
 import { MetricsPanel } from "./components/MetricsPanel";
+import { DiagramExport } from "./components/DiagramExport";
 export default function App() {
   const editor = useEditor(),
     { project } = editor,
@@ -636,8 +637,9 @@ export default function App() {
           </Suspense>
         ) : diagramMode ? (
           <section className="diagram-status" aria-label="Diagram guidance">
-            <strong>{graph.nodes.length} components · {graph.edges.length} connections</strong>
-            <span>{graph.nodes.length >= 100 ? "Component limit reached. " : ""}{graph.edges.length >= 200 ? "Connection limit reached." : "Drag from a handle to connect. Select a connection to describe its flow or delete it."}</span>
+            <div className="diagram-status-copy"><strong>{graph.nodes.length} components · {graph.edges.length} connections</strong>
+            <span>{graph.nodes.length >= 100 ? "Component limit reached. " : ""}{graph.edges.length >= 200 ? "Connection limit reached." : "Drag from a handle to connect. Select a connection to describe its flow or delete it."}</span></div>
+            <DiagramExport project={project} />
           </section>
         ) : (
           <MetricsPanel

@@ -222,3 +222,9 @@ Real-time chat uses a message-write spine with persistence and asynchronous noti
 A compact floating organizer keeps position tools inside the diagram canvas. Its selected count and Shift-click hint stay visible; a 44px **Select components** action opens named checkbox rows for touch and keyboard use. Two-card selections expose edge alignment, while three-card selections add equal-gap distribution. Disabled distribution explains insufficient space instead of overlapping cards. Multi-selection replaces the single-component inspector with a positions-only summary.
 
 Selected component cards retain the teal outline. Alignment does not reframe the viewport, and dragging any selected card translates the set as one history edit. Expanded diagram subsystem members remain selectable and their dashed boundary recomputes around new positions. Collapsed members and subsystem shells remain outside organization actions. Diagram subsystem headers name the boundary and component count; collapsed copy says **Architecture boundary**, reserving waiting/active counters for executable experiments.
+
+## Diagram image export
+
+Diagram image actions sit in the existing bottom guidance strip, keeping the canvas unobstructed. The copy states **Entire diagram · current subsystem view** and pairs two 44px actions for SVG and PNG. At narrower desktop widths the strip wraps; on mobile the actions share the available row. Pending, success, and retryable error feedback occupy a stable status line.
+
+Exports are clean white-background renditions of the full graph using its model positions, compact cards, typed connection paths, labels, and current subsystem collapse state. They omit editor selection, controls, footnotes, pan, and zoom. SVG keeps full vector dimensions and metadata titles. PNG rasterizes the same SVG at up to 2× scale after capping both sides to 8192 pixels and total area to 16 million pixels.

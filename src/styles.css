@@ -229,9 +229,19 @@ p {
 .component-category h3 { margin: 0 2px 8px; color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
 .component-category .library-item { height: 38px; margin-bottom: 5px; }
 .component-empty { font-size: 11px; line-height: 1.6; color: var(--muted); padding: 8px 2px; }
-.diagram-status { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--paper); }
+.diagram-status { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 24px; border-top: 1px solid var(--line); background: var(--paper); }
 .diagram-status strong { font-size: 12px; }
 .diagram-status span { color: var(--muted); font-size: 10px; text-align: right; }
+.diagram-status-copy { display: grid; gap: 4px; min-width: 0; }
+.diagram-export { display: grid; grid-template-columns: minmax(150px, 1fr) auto; align-items: center; gap: 4px 12px; min-width: min(100%, 440px); }
+.diagram-export-copy { display: grid; gap: 3px; }
+.diagram-export-copy span { text-align: left; font-size: 9px; }
+.diagram-export-actions { display: flex; gap: 6px; }
+.diagram-export-actions button { min-height: 44px; padding: 8px 10px; font-size: 9px; white-space: nowrap; }
+.diagram-export-message { grid-column: 1 / -1; min-height: 12px; text-align: left !important; }
+.diagram-export-message.failed { color: #a13e21; }
+.export-spinner { animation: export-spin .8s linear infinite; }
+@keyframes export-spin { to { transform: rotate(360deg); } }
 .diagram-inspector textarea { min-height: 112px; }
 .diagram-inspector .status-callout > div { min-width: 0; }
 .diagram-inspector .status-callout strong, .diagram-inspector .status-callout p { overflow-wrap: anywhere; word-break: break-word; }
@@ -1120,6 +1130,8 @@ p {
   .toolbar {
     padding-inline: 15px;
   }
+  .diagram-status { align-items: flex-start; flex-wrap: wrap; }
+  .diagram-export { width: 100%; }
   .workspace-label {
     display: none;
   }
@@ -1299,8 +1311,11 @@ p {
   .architecture-templates { flex: 1 0 100%; margin: 0; }
   .component-catalog { flex: 1 0 100%; max-height: 156px; overflow: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-right: 4px; }
   .component-category .library-item { width: 100%; }
-  .diagram-status { min-height: 74px; padding: 12px 15px; align-items: flex-start; flex-direction: column; gap: 4px; }
+  .diagram-status { min-height: 74px; padding: 12px 15px; align-items: flex-start; flex-direction: column; gap: 8px; }
   .diagram-status span { text-align: left; }
+  .diagram-export { width: 100%; grid-template-columns: 1fr; }
+  .diagram-export-actions { width: 100%; }
+  .diagram-export-actions button { flex: 1; }
   .library-section h2,
   .library-section > p,
   .library-caption,
