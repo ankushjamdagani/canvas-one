@@ -64,6 +64,7 @@ export interface Checkpoint {
   createdAt: number;
 }
 export interface Project {
+  revisions?: import("./revisions").ArchitectureRevision[];
   subsystems?: Subsystem[];
   id: string;
   name: string;

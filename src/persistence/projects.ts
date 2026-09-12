@@ -1,4 +1,5 @@
 import { validateSubsystems } from "../domain/subsystems";
+import { validateRevisions } from "../domain/revisions";
 import {
   MAX_SAVED_RUNS,
   validateSavedRun,
@@ -42,6 +43,7 @@ export function importProject(text: string): Project {
   const errors = [
     ...validateGraph(p.graph, false),
     ...validateSubsystems(p.subsystems),
+    ...validateRevisions(p.revisions),
   ];
   const noteGroupCollision = (graph: Project["graph"]) => Array.isArray(graph?.notes) &&
     graph.notes.some(note => note && (p.subsystems ?? []).some((group: { id: string }) => group?.id === note.id));
@@ -93,6 +95,7 @@ export function importProject(text: string): Project {
   )
     throw new Error("Canvas viewport is invalid.");
   return {
+    revisions: clone(p.revisions ?? []),
     subsystems: clone(p.subsystems ?? []),
     id: crypto.randomUUID(),
     name: p.name.slice(0, 69) + " (imported)",

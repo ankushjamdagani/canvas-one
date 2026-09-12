@@ -1,4 +1,5 @@
 import { hasBalancer } from "./domain/routing";
+import { RevisionsPanel } from "./components/RevisionsPanel";
 import { experiments } from "./domain/experiments";
 import { SubsystemsPanel } from "./components/SubsystemsPanel";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -685,6 +686,7 @@ export default function App() {
               </button>
             ))}
           </div>
+          <RevisionsPanel key={project.id} />
           <button
             className="subtle"
             onClick={() =>

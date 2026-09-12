@@ -4,6 +4,7 @@ import { architectureTemplate } from "../domain/architectureTemplates";
 import { visibleSubsystems } from "../domain/subsystems";
 import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
 import { create } from "zustand";
+import { architectureSnapshot, MAX_REVISIONS, validateRevisionDetails, type ArchitectureSnapshot, type RevisionDetails } from "../domain/revisions";
 import { MAX_NOTES, validateNotes, type CanvasNote, type NoteKind } from "../domain/notes";
 import {
   clone,
@@ -18,6 +19,9 @@ import {
   type Settings,
 } from "../domain/model";
 interface Editor {
+  saveRevision: (details: RevisionDetails) => boolean;
+  finalizeRevision: (id: string) => boolean;
+  restoreRevision: (id: string) => void;
   addNote: (position: { x: number; y: number }, kind?: NoteKind) => void;
   updateNote: (id: string, patch: Partial<Pick<CanvasNote, "title" | "body" | "kind" | "collapsed" | "attachment" | "position">>) => boolean;
   removeNote: (id: string) => void;
@@ -32,8 +36,8 @@ interface Editor {
   selected: string | null;
   selectedNodeIds: string[];
   selectionMode: boolean;
-  past: Graph[];
-  future: Graph[];
+  past: { graph: Graph; view?: Omit<ArchitectureSnapshot, "graph"> }[];
+  future: { graph: Graph; view?: Omit<ArchitectureSnapshot, "graph"> }[];
   revision: number;
   load: (p: Project) => void;
   select: (id: string | null, additive?: boolean) => void;
@@ -69,6 +73,29 @@ function replaceGraph(target: Graph, source: Graph) {
 }
 export const useEditor = create<Editor>((set, get) => ({
   project: newProject(),
+  saveRevision: (details) => {
+    const clean = Object.fromEntries(Object.entries(details).map(([key, value]) => [key, value.trim()])) as unknown as RevisionDetails;
+    const project = get().project;
+    if (validateRevisionDetails(clean).length || (project.revisions?.length ?? 0) >= MAX_REVISIONS) return false;
+    const revision = { ...architectureSnapshot(project), ...clean, id: crypto.randomUUID(), createdAt: Date.now(), status: "draft" as const };
+    set({ project: { ...project, revisions: [...(project.revisions ?? []), revision], updatedAt: Date.now() } });
+    return true;
+  },
+  finalizeRevision: (id) => {
+    const project = get().project;
+    const source = project.revisions?.find(r => r.id === id);
+    if (!source || source.status !== "draft" || project.revisions!.some(r => r.status === "final" && r.sourceId === id) || project.revisions!.length >= MAX_REVISIONS) return false;
+    const revision = { ...clone(source), id: crypto.randomUUID(), sourceId: id, createdAt: Date.now(), status: "final" as const };
+    set({ project: { ...project, revisions: [...project.revisions!, revision], updatedAt: Date.now() } });
+    return true;
+  },
+  restoreRevision: (id) => {
+    const state = get();
+    const source = state.project.revisions?.find(r => r.id === id);
+    if (!source) return;
+    const { graph, ...view } = architectureSnapshot(state.project);
+    set({ project: { ...state.project, graph: clone(source.graph), subsystems: clone(source.subsystems), expandedNodeIds: [...source.expandedNodeIds], updatedAt: Date.now() }, past: [...state.past.slice(-49), { graph, view }], future: [], revision: state.revision + 1, selected: null, selectedNodeIds: [], selectionMode: false });
+  },
   addNote: (position, kind = "general") => {
     const graph = get().project.graph;
     if (graph.scenario !== "diagram" || (graph.notes?.length ?? 0) >= MAX_NOTES) return;
@@ -243,7 +270,7 @@ export const useEditor = create<Editor>((set, get) => ({
         },
         updatedAt: Date.now(),
       },
-      past: [...current.past.slice(-49), clone(current.project.graph)],
+      past: [...current.past.slice(-49), { graph: clone(current.project.graph) }],
       future: [],
       revision: current.revision + 1,
     }));
@@ -270,14 +297,14 @@ export const useEditor = create<Editor>((set, get) => ({
       fn(graph);
       return {
         project: { ...s.project, graph, updatedAt: Date.now() },
-        past: [...s.past.slice(-49), clone(s.project.graph)],
+        past: [...s.past.slice(-49), { graph: clone(s.project.graph) }],
         future: [],
         revision: s.revision + 1,
       };
     }),
   beginMove: () =>
     set((s) => ({
-      past: [...s.past.slice(-49), clone(s.project.graph)],
+      past: [...s.past.slice(-49), { graph: clone(s.project.graph) }],
       future: [],
     })),
   move: (positions) =>
@@ -445,15 +472,16 @@ export const useEditor = create<Editor>((set, get) => ({
     set((s) =>
       s.past.length
         ? (() => {
-            const graph = s.past.at(-1)!;
+            const { graph, view } = s.past.at(-1)!;
             return {
             project: {
               ...s.project,
+              ...view,
               graph,
               updatedAt: Date.now(),
             },
             past: s.past.slice(0, -1),
-            future: [s.project.graph, ...s.future],
+            future: [{ graph: s.project.graph, ...(view ? { view: { subsystems: clone(s.project.subsystems ?? []), expandedNodeIds: [...(s.project.expandedNodeIds ?? [])] } } : {}) }, ...s.future],
             revision: s.revision + 1,
             selected: graph.nodes.some((node) => node.id === s.selected) || graph.notes?.some(note => note.id === s.selected) ? s.selected : null,
             selectedNodeIds: s.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)),
@@ -464,14 +492,15 @@ export const useEditor = create<Editor>((set, get) => ({
     set((s) =>
       s.future.length
         ? (() => {
-            const graph = s.future[0];
+            const { graph, view } = s.future[0];
             return {
             project: {
               ...s.project,
+              ...view,
               graph,
               updatedAt: Date.now(),
             },
-            past: [...s.past, s.project.graph],
+            past: [...s.past, { graph: s.project.graph, ...(view ? { view: { subsystems: clone(s.project.subsystems ?? []), expandedNodeIds: [...(s.project.expandedNodeIds ?? [])] } } : {}) }],
             future: s.future.slice(1),
             revision: s.revision + 1,
             selected: graph.nodes.some((node) => node.id === s.selected) || graph.notes?.some(note => note.id === s.selected) ? s.selected : null,

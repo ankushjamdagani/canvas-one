@@ -1,5 +1,13 @@
 # System studio
 
+### Authored architecture revisions
+
+Open the project selector, then **Architecture revisions**. Save a draft with a name, author, reason for change, explanation and optional http/https issue URL. Each immutable snapshot includes the configured graph, canvas notes, subsystems and expanded component views. Compare any saved revision with the current canvas or another revision; changes include field values, connections, notes, subsystem layout and workload settings.
+
+**Finalize this draft** creates a final copy of the saved draft, retaining its author and linking back to its source. It does not capture subsequent canvas edits. **Restore to canvas** restores the snapshot in one Undo/Redo step, retaining project identity, checkpoints and saved results. The camera stays where it is. Current version-7 JSON backups preserve revisions and source links.
+
+There are up to 20 snapshots per project, including final copies. Names are self-reported and final status records a local decision; this is browser-local history, with no authenticated authors, team approval or cloud sync.
+
 An interactive architecture-learning workspace. Explore URL lookups and queued background jobs, inspect component internals, group subsystems, run seeded workloads, and compare saved results.
 
 ## Architecture diagrams

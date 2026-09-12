@@ -977,6 +977,18 @@ p {
 .metrics-details .muted svg {
   vertical-align: middle;
 }
+.revisions-panel { margin: 20px 0; border-top: 1px solid var(--line); padding-top: 16px; }
+.revisions-panel summary { cursor: pointer; font-weight: 600; }
+.revisions-panel form { display: grid; gap: 12px; margin-top: 18px; }
+.revisions-panel h3 { font-size: 14px; margin: 0 0 12px; }
+.revisions-panel .field { display: grid; gap: 6px; }
+.revisions-panel textarea { width: 100%; min-height: 72px; resize: vertical; }
+.revisions-panel select { width: 100%; min-width: 0; }
+.revision-review { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; overflow-wrap: anywhere; }
+.revision-review p { white-space: pre-wrap; }
+.revision-review .field { margin-top: 16px; }
+.revision-changes { padding-left: 20px; max-height: 200px; overflow-y: auto; }
+.revisions-panel .panel-actions { flex-wrap: wrap; }
 .project-panel,
 .assumptions-panel {
   position: absolute;
