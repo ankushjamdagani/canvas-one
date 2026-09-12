@@ -1,4 +1,5 @@
 import { RoutingPanel } from "./RoutingPanel";
+import { NoteInspector } from "./CanvasNotes";
 import { hasBalancer, serviceInstances } from "../domain/routing";
 import { ExperimentCoach } from "./ExperimentCoach";
 import { JobControls } from "./JobControls";
@@ -32,6 +33,8 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
     g = editor.project.graph,
     n = g.nodes.find((n) => n.id === editor.selected),
     [tab, setTab] = useState("explanation");
+  const note = g.scenario === "diagram" ? g.notes?.find(note => note.id === editor.selected) : undefined;
+  if (note) return <NoteInspector key={`${note.id}:${note.title}:${note.body}:${note.kind}:${JSON.stringify(note.attachment)}`} note={note} />;
   if (isDiagramGraph(g) && editor.selectedNodeIds.length > 1)
     return <aside className="inspector">
       <div className="inspector-heading"><ScanLine size={20} /><strong>{editor.selectedNodeIds.length} components selected</strong></div>

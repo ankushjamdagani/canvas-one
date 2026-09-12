@@ -98,6 +98,40 @@ describe("standalone diagram rendering", () => {
     p.graph.nodes[0].position.x = 1e10;
     expect(() => renderDiagramSvg(p)).toThrow("canvas origin");
   });
+
+  it("renders escaped notes, attachment labels, collapsed notes and note-only diagrams", () => {
+    const p = project();
+    const node = p.graph.nodes[0];
+    p.graph.notes = [{
+      id: "note-1",
+      kind: "decision",
+      title: 'Use <cache> & edge',
+      body: "Body <details> & " + "bounded ".repeat(40),
+      position: { x: -420, y: -260 },
+      collapsed: false,
+      attachment: { kind: "node", id: node.id },
+    }];
+    const expanded = renderDiagramSvg(p);
+    expect(expanded.svg).toContain('fill="#fff3df"');
+    expect(expanded.svg).toContain('width="240" height="200"');
+    expect(expanded.svg).toContain("Decision");
+    expect(expanded.svg).toContain("&lt;cache&gt; &amp; edge");
+    expect(expanded.svg).toContain("Body &lt;details&gt; &amp;");
+    expect(expanded.svg).toContain(node.name);
+    expect(expanded.svg).toContain("Decision — Use &lt;cache&gt; &amp; edge");
+    p.graph.notes[0].collapsed = true;
+    const collapsed = renderDiagramSvg(p);
+    expect(collapsed.svg).toContain('width="240" height="80"');
+    expect(collapsed.svg).not.toMatch(/<text[^>]*>Body &lt;details&gt;/);
+
+    p.graph.nodes = [];
+    p.graph.edges = [];
+    p.graph.notes[0].attachment = { kind: "edge", id: "missing-edge" };
+    const noteOnly = renderDiagramSvg(p);
+    expect(noteOnly.width).toBeGreaterThan(240);
+    expect(noteOnly.height).toBeGreaterThan(80);
+    expect(noteOnly.svg).toContain("Linked item unavailable");
+  });
 });
 
 it("caps raster memory and each side while preferring two-times size", () => {

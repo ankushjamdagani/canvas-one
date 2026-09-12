@@ -119,6 +119,7 @@ test("touch selection and diagram subsystem boundaries remain clear", async ({ p
   await page.locator(".subsystems-panel > summary").click();
   await page.getByRole("button", { name: "Create subsystem" }).click();
   await page.getByRole("button", { name: "Group components" }).click();
+  await page.locator(".react-flow").scrollIntoViewIfNeeded();
   await page.waitForTimeout(150);
   const boundaryBefore = await page.locator(".react-flow__node-subsystem").boundingBox();
   const client = await node(page, "Client").boundingBox();

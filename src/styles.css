@@ -15,6 +15,22 @@
   --amber-soft: #fff3df;
   --shadow: 0 12px 35px #203d3521;
 }
+.canvas-note { width: 240px; padding: 12px 16px 16px; border: 1px solid #dbc9a9; border-radius: 9px; background: var(--amber-soft); color: var(--ink); }
+.canvas-note.selected { border-color: var(--teal); }
+.canvas-note-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.canvas-note-heading > span { display: flex; gap: 6px; align-items: center; color: #80500d; font-size: 11px; font-weight: 600; }
+.canvas-note-heading button { min-width: 44px; min-height: 44px; padding: 0; margin: -8px -10px -4px 0; border: 0; background: transparent; }
+.canvas-note > strong { display: block; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.canvas-note > p { margin: 10px 0; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
+.canvas-note-link { display: block; color: #80500d; font-size: 10px; overflow-wrap: anywhere; }
+.add-canvas-note { width: 100%; min-height: 44px; margin-top: 6px; }
+.note-fields label { display: grid; gap: 7px; margin-top: 16px; font-size: 12px; }
+.note-fields select { width: 100%; min-width: 0; min-height: 44px; }
+.note-fields .note-count { display: block; margin-top: 4px; text-align: right; color: var(--muted); font-size: 10px; }
+.note-fields > button, .note-actions button { min-height: 44px; }
+.note-fields > button { width: 100%; margin-top: 10px; }
+.note-actions { display: flex; gap: 8px; margin-top: 20px; }
+.note-fields .delete-note { color: #a13e21; }
 * {
   box-sizing: border-box;
 }
@@ -2494,7 +2510,9 @@ select:focus-visible {
   top: 24px;
 }
 @media (max-width: 560px) {
-  .diagram-organizer { position: absolute; top: 70px; left: 14px; right: 14px; width: auto; }
+  .canvas-area:has(.diagram-organizer) { display: flex; flex-direction: column; height: auto; }
+  .canvas-area:has(.diagram-organizer) > .react-flow { order: 2; flex: none; height: 380px !important; }
+  .diagram-organizer { position: static; order: 1; width: auto; margin: 0 14px 14px; box-shadow: none; background: var(--paper); backdrop-filter: none; }
   .subsystems-panel {
     width: 100%;
     margin: 8px 0;

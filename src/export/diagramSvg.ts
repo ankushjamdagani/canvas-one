@@ -1,10 +1,12 @@
 import { validateGraph, type Project, type ModelNode } from "../domain/model";
 import { componentDefinition } from "../domain/componentCatalog";
 import { validateSubsystems, visibleSubsystems } from "../domain/subsystems";
+import { noteAttachmentLabel, noteKinds, type CanvasNote } from "../domain/notes";
 
 export interface DiagramSvg { svg: string; width: number; height: number }
 interface Box { x: number; y: number; width: number; height: number }
 const CARD_WIDTH = 215, CARD_HEIGHT = 112;
+const NOTE_WIDTH = 240, NOTE_COLLAPSED_HEIGHT = 80, NOTE_EXPANDED_HEIGHT = 200;
 
 /** XML 1.0 text: remove invalid control characters and escape every markup delimiter. */
 function xml(value: string): string {
@@ -44,13 +46,28 @@ function text(value: string, x: number, y: number, columns: number, count: numbe
 function rect(box: Box, fill: string, stroke: string, radius = 9, extra = ""): string {
   return `<rect x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" rx="${radius}" fill="${fill}" stroke="${stroke}" ${extra}/>`;
 }
+function noteShape(note: CanvasNote, project: Project): { shape: string; box: Box } {
+  const box = { x: note.position.x, y: note.position.y, width: NOTE_WIDTH, height: note.collapsed ? NOTE_COLLAPSED_HEIGHT : NOTE_EXPANDED_HEIGHT };
+  const type = noteKinds[note.kind];
+  const attachment = note.attachment ? (noteAttachmentLabel(note, project) ?? "Linked item unavailable") : undefined;
+  const full = [type, note.title, note.body, attachment].filter(Boolean).join(" — ");
+  const body = note.collapsed ? "" : text(note.body, box.x + 14, box.y + 78, 31, 6, 10, "#5e5142");
+  const linked = attachment && !note.collapsed ? text(attachment, box.x + 14, box.y + 181, 31, 1, 10, "#80500d") : "";
+  const shape = `<g><title>${xml(full)}</title>` +
+    rect(box, "#fff3df", "#e0b76c", 9) +
+    text(type, box.x + 14, box.y + 20, 31, 1, 10, "#80500d", 600) +
+    text(note.title, box.x + 14, box.y + 43, 29, 2, 13, "#243b41", 600) +
+    body + linked + "</g>";
+  return { shape, box };
+}
 
 /** A standalone vector rendition, independent of DOM, zoom, selection and worker state. */
 export function renderDiagramSvg(project: Project): DiagramSvg {
   if (project.graph.scenario !== "diagram") throw new Error("Choose Architecture diagram to export an image.");
   const errors = [...validateGraph(project.graph, false), ...validateSubsystems(project.subsystems)];
   if (errors.length) throw new Error(errors[0]);
-  if (!project.graph.nodes.length) throw new Error("Add a component before exporting the diagram.");
+  const notes = project.graph.notes ?? [];
+  if (!project.graph.nodes.length && !notes.length) throw new Error("Add a component or note before exporting the diagram.");
   // Bound absolute coordinates as well as extent to avoid precision loss in SVG geometry.
   if (project.graph.nodes.some((node) => Math.abs(node.position.x) > 1_000_000 || Math.abs(node.position.y) > 1_000_000))
     throw new Error("Move components closer to the canvas origin before exporting.");
@@ -94,6 +111,12 @@ export function renderDiagramSvg(project: Project): DiagramSvg {
       text(type, box.x + 14, box.y + 61, 29, 1, 10, "#087f84", 600) +
       text(node.description || "Architecture component", box.x + 14, box.y + 80, 30, 2, 10, "#5e7267") + "</g>";
   });
+  const noteShapes: string[] = [];
+  for (const note of notes) {
+    const rendered = noteShape(note, project);
+    bounds.push(rendered.box);
+    noteShapes.push(rendered.shape);
+  }
   const edgeShapes: string[] = [], labelShapes: string[] = [];
   project.graph.edges.forEach((edge, index) => {
     const sourceId = endpoints.get(edge.source) ?? edge.source;
@@ -132,7 +155,7 @@ export function renderDiagramSvg(project: Project): DiagramSvg {
   const width = Math.ceil(Math.max(...bounds.map((box) => box.x + box.width)) - minX + 32);
   const height = Math.ceil(Math.max(...bounds.map((box) => box.y + box.height)) - minY + 32);
   if (width > 100_000 || height > 100_000) throw new Error("Move components closer together before exporting this diagram.");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}" role="img" aria-labelledby="diagram-title" font-family="Arial, Helvetica, sans-serif"><title id="diagram-title">${xml(project.name)} — Architecture diagram</title><desc>Entire diagram with current subsystem collapse state. Visual architecture only. Full component notes are available in element titles.</desc><defs><marker id="diagram-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#087f84"/></marker></defs><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="#ffffff"/>${groupShapes.join("")}${edgeShapes.join("")}${nodeShapes.join("")}${collapsedShapes.join("")}${labelShapes.join("")}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}" role="img" aria-labelledby="diagram-title" font-family="Arial, Helvetica, sans-serif"><title id="diagram-title">${xml(project.name)} — Architecture diagram</title><desc>Entire diagram with current subsystem collapse state. Visual architecture only. Full component notes are available in element titles.</desc><defs><marker id="diagram-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#087f84"/></marker></defs><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="#ffffff"/>${groupShapes.join("")}${edgeShapes.join("")}${nodeShapes.join("")}${collapsedShapes.join("")}${labelShapes.join("")}${noteShapes.join("")}</svg>`;
   return { svg, width, height };
 }
 

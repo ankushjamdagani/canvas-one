@@ -7,7 +7,7 @@ export function DiagramExport({ project }: { project: Project }) {
   const [pending, setPending] = useState<DiagramExportFormat | null>(null);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
-  const disabled = project.graph.nodes.length === 0 || pending !== null;
+  const disabled = project.graph.nodes.length === 0 && !(project.graph.notes?.length) || pending !== null;
   const run = async (format: DiagramExportFormat) => {
     setPending(format);
     setMessage(`Preparing ${format.toUpperCase()}…`);

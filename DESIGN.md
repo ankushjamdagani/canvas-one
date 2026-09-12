@@ -228,3 +228,11 @@ Selected component cards retain the teal outline. Alignment does not reframe the
 Diagram image actions sit in the existing bottom guidance strip, keeping the canvas unobstructed. The copy states **Entire diagram · current subsystem view** and pairs two 44px actions for SVG and PNG. At narrower desktop widths the strip wraps; on mobile the actions share the available row. Pending, success, and retryable error feedback occupy a stable status line.
 
 Exports are clean white-background renditions of the full graph using its model positions, compact cards, typed connection paths, labels, and current subsystem collapse state. They omit editor selection, controls, footnotes, pan, and zoom. SVG keeps full vector dimensions and metadata titles. PNG rasterizes the same SVG at up to 2× scale after capping both sides to 8192 pixels and total area to 16 million pixels.
+
+## Canvas notes
+
+Canvas notes extend the existing light docked Operate workspace as restrained, typed design context. The card is 240px wide with an amber-soft fill, a `#dbc9a9` border and `#80500d` type ink; selection changes the border to teal. Titles and body copy wrap within the card, while long body text is truncated to seven lines on canvas. The note heading's collapse control, the organizer's Add canvas note action and inspector actions use a 44px minimum touch target.
+
+Adding a canvas note from the organizer selects it and opens the docked Canvas note inspector. The inspector edits type, title, text and semantic attachments to components, connections or subsystems, with Apply note and Cancel preserving the existing draft behavior. Full note text remains available in the inspector with the 1,000-character count; unavailable attachments remain explicit. The footer states that notes are design context with no simulation behavior, and note changes or deletion can be undone.
+
+On mobile, the organizer moves into document flow above the 380px canvas, so its controls cannot overlap the graph. The note editor follows the canvas and export controls in the same flow. Notes move, collapse, persist and export with the architecture while leaving simulation configuration and results unchanged.

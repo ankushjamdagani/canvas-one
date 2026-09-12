@@ -22,7 +22,7 @@ Diagram organization supports multi-selection through Shift-click and a visible 
 
 Diagram-only SVG and PNG downloads render the complete architecture independently of the editor viewport. They retain component and connection metadata and the current subsystem collapse state. SVG provides a portable vector rendition; PNG uses a white background and bounded high-resolution scale. JSON remains the editable project backup.
 
-The next explanatory canvas milestone is sticky notes for decisions, assumptions, future scope, questions and general design context. Notes should remain distinct from executable components, support optional links to nodes, connections or subsystems, persist with projects/checkpoints/exports, and never affect simulation semantics.
+Canvas notes are implemented as typed design context separate from executable components. The five types are decision, assumption, future scope, question and general note; notes support an 80-character title, a 1,000-character body, collapse/expand, movement, deletion, and optional links to nodes, connections or subsystems. Notes persist with projects, checkpoints and JSON exports without entering simulation semantics. SVG/PNG exports include the note layout; visible copy is compact and full note content is retained in SVG titles.
 
 ## Capabilities and Constraints
 
@@ -51,7 +51,6 @@ The component catalog spans clients, edge, compute, data, messaging and operatio
 
 ## Future product goals
 
-- **Canvas notes:** Add restrained, typed sticky notes for decision rationale, assumptions, future scope, questions and freeform explanations. Notes should be movable, editable, optionally attached to architecture elements, collapsible for clarity, and included in SVG/PNG/JSON persistence without entering the simulation model.
 - **Team architecture workspaces:** Support shared team workspaces where named architectures are saved centrally, members can collaborate on revisions, and a team can review and finalize a chosen design. This requires explicit identity, roles and access control, concurrent editing or conflict resolution, comments/review state, and durable revision history.
 - **Authored architecture revisions:** Every finalized change should record its author, timestamp, reason for change, linked ticket or issue, and an explanatory commit-style message. Revisions should be comparable, reviewable, restorable, and clearly separate draft work from an agreed final architecture.
 

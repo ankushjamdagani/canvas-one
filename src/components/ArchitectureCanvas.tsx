@@ -42,6 +42,7 @@ import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
 import { TrafficEdge, type TrafficConnection } from "./TrafficEdge";
 import { DiagramOrganization } from "./DiagramOrganization";
+import { CanvasNoteNode, noteAttachmentLabel, type NoteFlowNode } from "./CanvasNotes";
 export const icons = {
   balancer: Network,
   traffic: ArrowRight,
@@ -151,7 +152,7 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
     </div>
   );
 }
-const nodeTypes = { component: ComponentNode, subsystem: SubsystemNode };
+const nodeTypes = { component: ComponentNode, subsystem: SubsystemNode, note: CanvasNoteNode };
 const edgeTypes = { traffic: TrafficEdge };
 export function ArchitectureCanvas({
   metrics,
@@ -251,7 +252,7 @@ export function ArchitectureCanvas({
     }, 80);
     return () => clearTimeout(timer);
   }, [expandedKey, flow]);
-  const nodeIdentity = g.nodes.map((node) => node.id).join(",");
+  const nodeIdentity = [...g.nodes, ...(isDiagramGraph(g) ? g.notes ?? [] : [])].map((node) => node.id).join(",");
   const nodeSet = useRef(nodeIdentity);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
   // Keep renderer measurements between metric updates. Dropping them makes
@@ -265,7 +266,7 @@ export function ArchitectureCanvas({
     const timer = setTimeout(() => {
       if (mobile) {
         const node =
-          g.nodes.find((n) => n.id === editor.selected) ?? g.nodes[0];
+          [...g.nodes, ...(g.notes ?? [])].find((n) => n.id === editor.selected) ?? g.nodes[0];
         if (node)
           flow.setCenter(node.position.x + 107, node.position.y + 40, {
             zoom: 0.9,
@@ -305,7 +306,13 @@ export function ArchitectureCanvas({
       })),
     [g, editor.selected, editor.selectedNodeIds, editor.project.expandedNodeIds, metrics, dimensions],
   );
-  const { nodes, endpoints } = projectSubsystems(baseNodes, groups, metrics);
+  const { nodes: architectureNodes, endpoints } = projectSubsystems(baseNodes, groups, metrics);
+  const noteNodes: NoteFlowNode[] = isDiagramGraph(g) ? (g.notes ?? []).map(note => ({
+    id: note.id, type: "note", position: note.position, measured: dimensions[note.id],
+    selected: editor.selected === note.id, deletable: false, connectable: false,
+    data: { note, attachmentLabel: noteAttachmentLabel(note, editor.project) },
+  })) : [];
+  const nodes: Node[] = [...architectureNodes, ...noteNodes];
   const expectedRate = rateAt(g.settings, metrics?.time ?? 0);
   const edges: TrafficConnection[] = useMemo(
     () =>
@@ -388,7 +395,7 @@ export function ArchitectureCanvas({
       const directlyMoved = new Set(positions.flatMap((change) => change.type === "position" ? [change.id] : []));
       const next = applyNodeChanges(positions, nodes);
       const moved = new Map(
-        g.nodes.map((node) => [
+        [...g.nodes, ...(isDiagramGraph(g) ? g.notes ?? [] : [])].map((node) => [
           node.id,
           next.find((n) => n.id === node.id)?.position ?? node.position,
         ]),
@@ -480,6 +487,10 @@ export function ArchitectureCanvas({
       <Controls showInteractive={false} position="bottom-left" />
     </ReactFlow>
     <DiagramOrganization
+      onAddNote={() => {
+        const box = canvasRef.current?.getBoundingClientRect();
+        if (box) { setSelectedEdges([]); editor.addNote(flow.screenToFlowPosition({ x: box.left + box.width / 2 - 100, y: box.top + box.height * 0.65 })); }
+      }}
       dimensions={dimensions}
       onSelectComponent={(id) => { setSelectedEdges([]); editor.select(id, true); }}
       onSelectionModeChange={(active) => { if (active) setSelectedEdges([]); editor.setSelectionMode(active); }}

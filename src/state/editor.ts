@@ -4,6 +4,7 @@ import { architectureTemplate } from "../domain/architectureTemplates";
 import { visibleSubsystems } from "../domain/subsystems";
 import { MAX_SAVED_RUNS, type SavedRun } from "../domain/results";
 import { create } from "zustand";
+import { MAX_NOTES, validateNotes, type CanvasNote, type NoteKind } from "../domain/notes";
 import {
   clone,
   makeNode,
@@ -17,6 +18,9 @@ import {
   type Settings,
 } from "../domain/model";
 interface Editor {
+  addNote: (position: { x: number; y: number }, kind?: NoteKind) => void;
+  updateNote: (id: string, patch: Partial<Pick<CanvasNote, "title" | "body" | "kind" | "collapsed" | "attachment" | "position">>) => boolean;
+  removeNote: (id: string) => void;
   project: Project;
   createSubsystem: (name: string, ids: string[]) => void;
   toggleSubsystem: (id: string) => void;
@@ -65,6 +69,28 @@ function replaceGraph(target: Graph, source: Graph) {
 }
 export const useEditor = create<Editor>((set, get) => ({
   project: newProject(),
+  addNote: (position, kind = "general") => {
+    const graph = get().project.graph;
+    if (graph.scenario !== "diagram" || (graph.notes?.length ?? 0) >= MAX_NOTES) return;
+    const note: CanvasNote = { id: crypto.randomUUID(), kind, title: "Untitled note", body: "", position, collapsed: false };
+    if (validateNotes([note]).length) return;
+    get().change(g => { (g.notes ??= []).push(note); });
+    set({ selected: note.id, selectedNodeIds: [], selectionMode: false });
+  },
+  updateNote: (id, patch) => {
+    const graph = get().project.graph;
+    const note = graph.notes?.find(n => n.id === id);
+    if (graph.scenario !== "diagram" || !note) return false;
+    const next = { ...note, ...patch };
+    if (validateNotes([next]).length || JSON.stringify(note) === JSON.stringify(next)) return false;
+    get().change(g => { Object.assign(g.notes!.find(n => n.id === id)!, patch); });
+    return true;
+  },
+  removeNote: id => {
+    if (!get().project.graph.notes?.some(n => n.id === id)) return;
+    get().change(g => { g.notes = g.notes?.filter(n => n.id !== id); });
+    set({ selected: null, selectedNodeIds: [] });
+  },
   createSubsystem: (name, nodeIds) => {
     const active = visibleSubsystems(get().project);
     const used = new Set(active.flatMap((group) => group.nodeIds));
@@ -173,6 +199,8 @@ export const useEditor = create<Editor>((set, get) => ({
     set((state) => {
       const hidden = new Set(visibleSubsystems(state.project).filter((group) => group.collapsed).flatMap((group) => group.nodeIds));
       const isNode = !!selected && !hidden.has(selected) && state.project.graph.nodes.some((node) => node.id === selected);
+      if (state.project.graph.scenario === "diagram" && state.project.graph.notes?.some(note => note.id === selected))
+        return { selected, selectedNodeIds: [] };
       if (state.project.graph.scenario === "diagram" && !isNode)
         return { selected: null, selectedNodeIds: [] };
       if (!isNode || state.project.graph.scenario !== "diagram")
@@ -258,6 +286,10 @@ export const useEditor = create<Editor>((set, get) => ({
         ...s.project,
         graph: {
           ...s.project.graph,
+          ...(s.project.graph.notes ? { notes: s.project.graph.notes.map(note => {
+            const update = positions.find(p => p.id === note.id);
+            return update && Number.isFinite(update.position.x) && Number.isFinite(update.position.y) && Math.abs(update.position.x) <= 1_000_000 && Math.abs(update.position.y) <= 1_000_000 ? { ...note, position: update.position } : note;
+          }) } : {}),
           nodes: s.project.graph.nodes.map((n) => {
             const updated = positions.find((p) => p.id === n.id);
             return updated ? { ...n, position: updated.position } : n;
@@ -423,7 +455,7 @@ export const useEditor = create<Editor>((set, get) => ({
             past: s.past.slice(0, -1),
             future: [s.project.graph, ...s.future],
             revision: s.revision + 1,
-            selected: graph.nodes.some((node) => node.id === s.selected) ? s.selected : null,
+            selected: graph.nodes.some((node) => node.id === s.selected) || graph.notes?.some(note => note.id === s.selected) ? s.selected : null,
             selectedNodeIds: s.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)),
           }; })()
         : {},
@@ -442,7 +474,7 @@ export const useEditor = create<Editor>((set, get) => ({
             past: [...s.past, s.project.graph],
             future: s.future.slice(1),
             revision: s.revision + 1,
-            selected: graph.nodes.some((node) => node.id === s.selected) ? s.selected : null,
+            selected: graph.nodes.some((node) => node.id === s.selected) || graph.notes?.some(note => note.id === s.selected) ? s.selected : null,
             selectedNodeIds: s.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)),
           }; })()
         : {},

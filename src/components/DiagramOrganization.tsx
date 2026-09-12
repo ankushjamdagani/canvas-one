@@ -3,7 +3,7 @@ import { alignNodes, distributeNodes, type Alignment, type LayoutAxis, type Layo
 import { visibleSubsystems } from "../domain/subsystems";
 import { useEditor } from "../state/editor";
 
-export function DiagramOrganization({ dimensions, onSelectComponent, onSelectionModeChange }: { dimensions: Record<string, { width: number; height: number }>; onSelectComponent: (id: string) => void; onSelectionModeChange: (active: boolean) => void }) {
+export function DiagramOrganization({ dimensions, onSelectComponent, onSelectionModeChange, onAddNote }: { dimensions: Record<string, { width: number; height: number }>; onSelectComponent: (id: string) => void; onSelectionModeChange: (active: boolean) => void; onAddNote: () => void }) {
   const editor = useEditor();
   if (editor.project.graph.scenario !== "diagram") return null;
   const collapsed = new Set(visibleSubsystems(editor.project).filter((group) => group.collapsed).flatMap((group) => group.nodeIds));
@@ -32,6 +32,7 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
     <button className={`selection-mode-toggle ${editor.selectionMode ? "active" : ""}`} aria-pressed={editor.selectionMode} onClick={() => onSelectionModeChange(!editor.selectionMode)}>
       <CheckSquare2 size={15} />{editor.selectionMode ? "Finish selecting" : "Select components"}
     </button>
+    <button className="add-canvas-note" onClick={onAddNote} disabled={(editor.project.graph.notes?.length ?? 0) >= 100}>Add canvas note</button>
     {editor.selectionMode && <fieldset className="diagram-selection-list">
       <legend>Visible components</legend>
       {visible.map((node) => <label key={node.id}><input type="checkbox" checked={selectedIds.includes(node.id)} onChange={() => onSelectComponent(node.id)} /> <span>{node.name}</span></label>)}

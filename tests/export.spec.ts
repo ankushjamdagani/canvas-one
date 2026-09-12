@@ -31,7 +31,10 @@ test("diagram SVG and PNG downloads contain the entire current subsystem view wi
   for (let attempt = 0; attempt < 5 && !offscreen; attempt++) {
     const previous = await page.locator(".react-flow__viewport").evaluate((element) => (element as HTMLElement).style.transform);
     await page.getByRole("button", { name: "Zoom In" }).click();
-    await expect.poll(() => page.locator(".react-flow__viewport").evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(previous);
+    await expect.poll(async () => {
+      const current = await page.locator(".react-flow__viewport").evaluate((element) => (element as HTMLElement).style.transform);
+      return current !== previous || await hasOffscreenNode();
+    }).toBe(true);
     offscreen = await hasOffscreenNode();
   }
   expect(offscreen).toBe(true);

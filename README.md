@@ -8,11 +8,13 @@ Choose **Architecture diagram** to compose a system from 29 searchable building 
 
 Select a connection to name the relationship, record its protocol, and classify it as synchronous, asynchronous, or data flow. Those choices appear as solid, dashed, or dotted paths and persist with checkpoints and exports.
 
+Choose **Add canvas note** to place design context beside the architecture. Notes have five types—**Decision**, **Assumption**, **Future scope**, **Question**, and **General note**—and support an 80-character title, 1,000-character body, collapse/expand, and an optional link to a component, connection, or subsystem. Select a note to edit it in the inspector, then choose **Apply note** or **Cancel**. Moving, collapsing, deleting, and restoring notes are undoable; linked notes stay where they were placed, including when their target is temporarily unavailable.
+
 Open **Architecture templates** for three editable starters: **Real-time chat**, **Ecommerce checkout**, and **Event processing**. Choose a template to read its purpose, then use **Load template**. Loading replaces the current diagram as one edit, so Undo restores the exact prior graph. Template nodes, notes, and labeled connections behave like anything drawn manually and persist through checkpoints and JSON export/import. These starters illustrate flows; they are not executable simulations or production recommendations.
 
 Organize a diagram by Shift-clicking cards, or choose **Select components** to use the keyboard- and touch-accessible checklist. Two or more selected components can align by any edge; three or more can distribute with equal horizontal or vertical gaps when the available span is large enough. Dragging one selected card moves the whole selection. Each alignment, distribution, or group drag is one Undo/Redo step and changes positions only. Collapsed subsystem members stay out of the selection list.
 
-Use **Download SVG** or **Download PNG** below the diagram to export the entire architecture independently of the current pan, zoom, or selection. Exports preserve the current subsystem collapse state and connection flow styles. SVG stays editable and searchable; PNG renders on white at up to 2× scale within safe browser image limits. Exports use compact standard cards and system fonts; long visible text is shortened, with full metadata retained in SVG titles. PNG is capped at 8192 pixels per side and 16 million pixels total. These image downloads complement the existing JSON project backup.
+Use **Download SVG** or **Download PNG** below the diagram to export the entire architecture independently of the current pan, zoom, or selection. Exports preserve the current subsystem collapse state, connection flow styles, and canvas notes. SVG stays editable and searchable; PNG renders on white at up to 2× scale within safe browser image limits. Exports use compact standard cards and system fonts; long visible text is shortened, with full component and note content retained in SVG titles. PNG is capped at 8192 pixels per side and 16 million pixels total. These image downloads complement the existing JSON project backup.
 
 ## Run locally
 
@@ -57,7 +59,7 @@ Select empty canvas space (or configure the traffic source), then choose **Stead
 
 The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
 
-Profiles save with local projects and checkpoints. JSON exports use **version 7** and include lookup, load-balanced lookup, background jobs, worker counts, service instances and saved results. Imports accept the current format only; existing browser-local projects are not deleted. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
+Profiles save with local projects and checkpoints. JSON exports use **version 7** and include lookup, load-balanced lookup, background jobs, worker counts, service instances, canvas-note metadata and saved results. Canvas notes are retained in checkpoints and excluded from the executable worker model. Imports accept the current format only; existing browser-local projects are not deleted. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
 
 ## Save and compare experiments
 

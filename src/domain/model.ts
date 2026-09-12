@@ -1,4 +1,5 @@
 import type { Subsystem } from "./subsystems";
+import { validateNotes } from "./notes";
 import type { SavedRun } from "./results";
 import { rateAt, validateProfile, type TrafficProfile } from "./workload";
 export type ComponentKind =
@@ -47,6 +48,8 @@ export interface Settings {
   profile?: TrafficProfile;
 }
 export interface Graph {
+  /** Canvas presentation metadata. Never executable nodes or simulation inputs. */
+  notes?: import("./notes").CanvasNote[];
   /** Learning-guide metadata, excluded from the simulation signature. */
   guideId?: string;
   scenario?: "lookup" | "jobs" | "diagram";
@@ -196,6 +199,7 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
       "This file is missing a graph, connections, or experiment settings.",
     ];
   const { nodes, edges, settings: s } = graph;
+  errors.push(...validateNotes(graph.notes));
   if (
     graph.guideId !== undefined &&
     (typeof graph.guideId !== "string" || graph.guideId.length > 80)
@@ -222,6 +226,8 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     return ["Components and connections need valid IDs."];
   if (new Set(edges.map((e) => e.id)).size !== edges.length) errors.push("Connection IDs must be unique.");
   const ids = new Set(nodes.map((n) => n.id));
+  if (Array.isArray(graph.notes) && graph.notes.some((note) => note && ids.has(note.id)))
+    errors.push("Canvas note IDs must differ from component IDs.");
   if (ids.size !== nodes.length) errors.push("Component IDs must be unique.");
   for (const n of nodes) {
     if (

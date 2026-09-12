@@ -14,7 +14,8 @@ export function useSimulation(graph: Graph, projectId = "") {
     [result, setResult] = useState<RunResult | null>(null),
     [error, setError] = useState("");
   const lastProject = useRef(projectId);
-  const { guideId: _guideId, ...simulationGraph } = graph;
+  const { notes: _notes, ...workerGraph } = graph;
+  const { guideId: _guideId, ...simulationGraph } = workerGraph;
   const signature = JSON.stringify({
     ...simulationGraph,
     nodes: graph.nodes.map(
@@ -32,7 +33,7 @@ export function useSimulation(graph: Graph, projectId = "") {
       worker.current?.postMessage({ type: "pause", runId: active.current.id });
     active.current = null;
     if (isDiagramGraph(graph) || validateGraph(graph).length) return;
-    const run = { id: crypto.randomUUID(), graph: clone(graph) };
+    const run = { id: crypto.randomUUID(), graph: clone(workerGraph) };
     active.current = run;
     worker.current?.postMessage({
       type: "reset",

@@ -10,13 +10,15 @@ Diagram mode now exports the complete current subsystem view as standalone SVG o
 
 Connection semantics now persist on diagram edges: optional 60-character relationship label, 30-character protocol, and sync/async/data classification. Selected edges open a touch-safe canvas editor and render solid/dashed/dotted paths respectively.
 
+Canvas notes are implemented as presentation metadata on diagram graphs. They support five types (decision, assumption, future scope, question and general note), 80-character titles, 1,000-character bodies and up to 100 notes. **Add canvas note** creates a note and selects it; the inspector applies or cancels edits. Notes can move, collapse, and delete through undoable history. Optional node, edge and subsystem attachments remain in place and preserve unresolved targets so undo can restore the link. Checkpoints and version-7 JSON exports preserve notes separately from the executable worker model. SVG/PNG export includes notes with compact visible text; SVG titles retain full note content.
+
 Current finite-cache semantics: keys depend on seed, request ordinal and normalized URL popularity independently of arrivals. Finite LRU begins empty, decides at cache completion and fills only on live database completion. TTL starts at fill; hits refresh recency only. Expired active work holds its slot; timeout-before-database-completion cannot fill. There is no miss coalescing, write or invalidation model. All service instances share the cache. Observed hit rate uses completed hits plus misses, excluding pre-decision rejection/expiry.
 
-User workflow preference: use Gemini through `agy` for code exploration and minor implementations (`agy models` discovers models), not direct Gemini CLI. Gemini3.8Flash through agy generated observedCacheHitRate and tests; origin corrected the named type import and reviewed the output. Optional further source review is pending explicit source-sharing approval and does not block this milestone.
+Agent workflow is defined in `AGENTS.md`: use the current lead model for complex architecture, integration and review; use bounded `gpt-5.6-luna` scout, implementer and verifier children when independent work benefits from delegation; optionally use external `agy` only for bounded, low-risk proposals with parent verification. Use graphify's existing-graph fast path for code exploration and verify source before editing.
 
-## Current status — canvas organization implemented and verified
+## Current status — canvas notes and canvas organization implemented
 
-The user authorized all remaining concrete steps and explicitly removed backward-compatibility requirements. Completed the agreed three milestones: background jobs, canvas subsystem composition, and guided experiments. No additional milestones are being pursued automatically. No push or deployment.
+The user authorized all remaining concrete steps and explicitly removed backward-compatibility requirements. Completed the agreed milestones: background jobs, canvas subsystem composition, guided experiments, and typed canvas notes. No additional milestones are being pursued automatically. No push or deployment.
 
 ### Checkpoints
 
@@ -71,8 +73,8 @@ Workspace: /Users/ankushjamdagani/personal/system-design-planner. Preview: http:
 
 Latest image-export verification: 115 unit tests, production build (608.58 KB /192.18 KB gzip main entry), and all 37 production Chromium journeys pass. SVG metadata is escaped; PNG source sizing occurs before decoding. Full notes are in SVG titles, and visible text is bounded. No additional milestone is started automatically.
 
-## Product goals recorded for future work
+Current canvas-notes verification (10 September 2026): all 127 unit tests across 24 files pass; TypeScript and the production build pass (617.09 KB main entry / 194.52 KB gzip). The complete production Chromium suite passes all 39 journeys with 5 workers in 38.3 seconds, including export, notes, organization, mobile containment and pause/resume. Both focused export journeys also pass. Earlier intermittent timing failures did not reproduce in this run; this does not establish that all flakiness is eliminated. SVG metadata is escaped, full note content is retained in SVG titles, and visible export text is bounded. The existing bundle-size warning remains. Verification is complete; no new milestone is started automatically.
 
-The next explanatory milestone is typed sticky notes on the diagram canvas: decisions, assumptions, future scope, questions and general notes, optionally attached to nodes, connections or subsystems. They must persist through checkpoints and image/JSON exports while remaining outside executable simulation semantics.
+## Product goals recorded for future work
 
 The longer-term collaboration goal is shared team architecture workspaces. Teams should save named architectures, collaborate on proposed changes, review and finalize a selected design, and retain durable authored revisions. Each revision should record author, timestamp, reason for change, linked ticket or issue, and a commit-style explanation, with draft/final state, comparison and restore support. This remains future scope; current projects are browser-local and there is no cloud synchronization, identity, access control or multi-user conflict model yet.

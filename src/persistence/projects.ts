@@ -43,6 +43,10 @@ export function importProject(text: string): Project {
     ...validateGraph(p.graph, false),
     ...validateSubsystems(p.subsystems),
   ];
+  const noteGroupCollision = (graph: Project["graph"]) => Array.isArray(graph?.notes) &&
+    graph.notes.some(note => note && (p.subsystems ?? []).some((group: { id: string }) => group?.id === note.id));
+  if (Array.isArray(p.subsystems) && noteGroupCollision(p.graph))
+    errors.push("Canvas note IDs must differ from subsystem IDs.");
   if (
     (p.subsystems ?? []).some((group: { id: string }) =>
       p.graph?.nodes?.some((node: { id: string }) => node.id === group.id),
@@ -58,6 +62,8 @@ export function importProject(text: string): Project {
     )
       throw new Error("A checkpoint is invalid.");
     errors.push(...validateGraph(checkpoint.graph, false));
+    if (Array.isArray(p.subsystems) && noteGroupCollision(checkpoint.graph))
+      errors.push("Canvas note IDs must differ from subsystem IDs.");
   }
   if (errors.length) throw new Error(errors[0]);
   const expanded = p.expandedNodeIds ?? [];
