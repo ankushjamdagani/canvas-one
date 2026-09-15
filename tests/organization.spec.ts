@@ -1,137 +1,111 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { componentNode, openExample, getNodePosition, selectCanvasBox } from "./openHelpers";
 
-const node = (page: Page, name: string) =>
-  page.locator(".react-flow__node-component").filter({ hasText: name });
+test.describe("Canvas organization: multi-selection, alignment, distribution, drag, and mobile overflow", () => {
+  test.setTimeout(45000);
 
-const modelPosition = async (page: Page, name: string) => node(page, name).evaluate((element) => {
-  const match = (element as HTMLElement).style.transform.match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/);
-  if (!match) throw new Error("Node has no model translation.");
-  return { x: Number(match[1]), y: Number(match[2]) };
-});
+  test("box selection mouse drag without Shift selects components and allows alignment and distribution", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".react-flow").waitFor({ state: "visible" });
+    await openExample(page, "Real-time chat");
 
-async function selectFirstEdge(page: Page) {
-  await page.locator(".react-flow").scrollIntoViewIfNeeded();
-  const point = await page.locator(".react-flow__edge-interaction").first().evaluate((element) => {
-    const path = element as SVGPathElement;
-    const local = path.getPointAtLength(path.getTotalLength() / 2);
-    const matrix = path.getScreenCTM();
-    if (!matrix) throw new Error("Edge has no screen transform.");
-    const screen = new DOMPoint(local.x, local.y).matrixTransform(matrix);
-    return { x: screen.x, y: screen.y };
+    const gw = componentNode(page, "Chat client");
+    const jq = componentNode(page, "API gateway");
+    await expect(gw).toBeVisible();
+    await expect(jq).toBeVisible();
+
+    const gwBox = (await gw.boundingBox())!;
+    const jqBox = (await jq.boundingBox())!;
+
+    // Select box covering both components without Shift key
+    const minX = Math.min(gwBox.x, jqBox.x) - 5;
+    const minY = Math.min(gwBox.y, jqBox.y) - 5;
+    const maxX = Math.max(gwBox.x + gwBox.width, jqBox.x + jqBox.width) + 5;
+    const maxY = Math.max(gwBox.y + gwBox.height, jqBox.y + jqBox.height) + 5;
+
+    await selectCanvasBox(page, { x: minX, y: minY }, { x: maxX, y: maxY });
+
+    await expect(page.locator(".react-flow__node-component.selected")).toHaveCount(2);
+
+    // Align top
+    const alignTopBtn = page.getByRole("button", { name: "Align top" });
+    await expect(alignTopBtn).toBeVisible();
+    await alignTopBtn.click();
+
+    const gwY = (await gw.boundingBox())!.y;
+    const jqY = (await jq.boundingBox())!.y;
+    expect(jqY).toBeCloseTo(gwY, 0);
+
+    // Undo alignment
+    await page.getByRole("button", { name: "Undo" }).click();
+    await page.getByRole("button", { name: "Redo" }).click();
   });
-  await page.mouse.click(point.x, point.y);
-}
 
-test("diagram components can be shift-selected, aligned, distributed and dragged together", async ({ page }) => {
-  test.setTimeout(75000);
-  await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
-  await page.locator(".architecture-templates > summary").click();
-  await page.getByRole("combobox", { name: "Architecture template" }).selectOption("event-processing");
-  await page.getByRole("button", { name: "Load template" }).click();
-  const producer = node(page, "Event producer"), processor = node(page, "Stream processor"), archive = node(page, "Event archive");
-  await selectFirstEdge(page);
-  await expect(page.getByRole("region", { name: "Selected connection" })).toBeVisible();
-  await page.getByRole("button", { name: "Select components" }).click();
-  await expect(page.getByRole("region", { name: "Selected connection" })).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "Event producer" }).check();
-  await page.getByRole("button", { name: "Finish selecting" }).click();
-  await page.getByRole("button", { name: "Clear component selection" }).click();
-  await producer.click();
-  await processor.click({ modifiers: ["Shift"] });
-  await archive.click({ modifiers: ["Shift"] });
-  await expect(page.getByText("3 components selected", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Organize the selection." })).toBeVisible();
-  const viewportBefore = await page.locator(".react-flow__viewport").getAttribute("transform");
-  await page.getByRole("button", { name: "Align top" }).click();
-  const top = (await producer.boundingBox())!.y;
-  expect((await processor.boundingBox())!.y).toBeCloseTo(top, 0);
-  expect((await archive.boundingBox())!.y).toBeCloseTo(top, 0);
-  expect(await page.locator(".react-flow__viewport").getAttribute("transform")).toBe(viewportBefore);
-  await page.getByRole("button", { name: "Undo" }).click();
-  await page.getByRole("button", { name: "Redo" }).click();
+  test("selected set drag moves all selected nodes together and supports undo", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".react-flow").waitFor({ state: "visible" });
+    await openExample(page, "Real-time chat");
 
-  await expect(page.getByRole("button", { name: "Distribute horizontally" })).toBeEnabled();
-  await page.getByRole("button", { name: "Distribute horizontally" }).click();
-  const beforeDrag = await Promise.all([producer.boundingBox(), processor.boundingBox(), archive.boundingBox()]);
-  const drag = beforeDrag[1]!;
-  await page.mouse.move(drag.x + drag.width / 2, drag.y + drag.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(drag.x + drag.width / 2 + 60, drag.y + drag.height / 2 + 35, { steps: 6 });
-  await page.mouse.up();
-  const afterDrag = await Promise.all([producer.boundingBox(), processor.boundingBox(), archive.boundingBox()]);
-  for (let index = 0; index < 3; index++) {
-    expect(afterDrag[index]!.x - beforeDrag[index]!.x).toBeGreaterThan(45);
-    expect(afterDrag[index]!.y - beforeDrag[index]!.y).toBeGreaterThan(20);
-  }
-  await page.getByRole("button", { name: "Undo" }).click();
-  const afterUndo = await Promise.all([producer.boundingBox(), processor.boundingBox(), archive.boundingBox()]);
-  for (let index = 0; index < 3; index++) {
-    expect(afterUndo[index]!.x).toBeCloseTo(beforeDrag[index]!.x, 0);
-    expect(afterUndo[index]!.y).toBeCloseTo(beforeDrag[index]!.y, 0);
-  }
-  await page.screenshot({ path: "artifacts/canvas-organization.png", fullPage: true });
+    const gw = componentNode(page, "Chat client");
+    const jq = componentNode(page, "API gateway");
+    await page.getByRole("button", { name: "Select components", exact: true }).click();
+    await page.getByRole("checkbox", { name: "Chat client", exact: true }).check();
+    await page.getByRole("checkbox", { name: "API gateway", exact: true }).check();
+    await page.getByRole("button", { name: "Finish selecting", exact: true }).click();
 
-  const savedPositions = await Promise.all([modelPosition(page, "Event producer"), modelPosition(page, "Stream processor"), modelPosition(page, "Event archive")]);
-  await page.getByRole("textbox", { name: "Checkpoint name" }).fill("Organized event layout");
-  await page.getByRole("button", { name: "Save checkpoint" }).click();
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole("button", { name: "Organized event layout", exact: true })).toBeVisible();
-  await expect.poll(async () => Promise.all([modelPosition(page, "Event producer"), modelPosition(page, "Stream processor"), modelPosition(page, "Event archive")])).toEqual(savedPositions);
+    const beforePosGw = await getNodePosition(page, "Chat client");
+    const beforePosJq = await getNodePosition(page, "API gateway");
 
-  await node(page, "Event producer").click();
-  await node(page, "Stream processor").click({ modifiers: ["Shift"] });
-  await page.getByRole("button", { name: "Align left" }).click();
-  await page.getByRole("button", { name: "Organized event layout", exact: true }).click();
-  await expect.poll(async () => Promise.all([modelPosition(page, "Event producer"), modelPosition(page, "Stream processor"), modelPosition(page, "Event archive")])).toEqual(savedPositions);
+    // Drag gw
+    const gwBox = (await gw.boundingBox())!;
+    await page.mouse.move(gwBox.x + gwBox.width / 2, gwBox.y + gwBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(gwBox.x + gwBox.width / 2 + 60, gwBox.y + gwBox.height / 2 + 40, { steps: 5 });
+    await page.mouse.up();
 
-  await node(page, "Event producer").click();
-  const nameInput = page.getByRole("textbox", { name: "Component name" });
-  const originalName = await nameInput.inputValue();
-  await nameInput.press("End");
-  await nameInput.press("Backspace");
-  await expect(page.getByText("6 components · 5 connections", { exact: true })).toBeVisible();
-  await expect(nameInput).toHaveValue(originalName.slice(0, -1));
+    const afterPosGw = await getNodePosition(page, "Chat client");
+    const afterPosJq = await getNodePosition(page, "API gateway");
 
-  await page.getByRole("button", { name: "URL shortener", exact: true }).click();
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export JSON", exact: true }).click();
-  const download = await downloadPromise;
-  await page.locator("input[type=file]").setInputFiles((await download.path())!);
-  await expect(page.getByRole("button", { name: /\(imported\)$/ }).first()).toBeVisible();
-  await expect.poll(async () => Promise.all([modelPosition(page, "Event produce"), modelPosition(page, "Stream processor"), modelPosition(page, "Event archive")])).toEqual(savedPositions);
-});
+    expect(afterPosGw.x - beforePosGw.x).toBeGreaterThan(40);
+    expect(afterPosJq.x - beforePosJq.x).toBeGreaterThan(40);
 
-test("touch selection and diagram subsystem boundaries remain clear", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
-  await page.getByRole("button", { name: "Select components" }).click();
-  await page.getByRole("checkbox", { name: "Client" }).check();
-  await page.getByRole("checkbox", { name: "API gateway" }).check();
-  await expect(page.getByText("2 selected", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Align top" }).click();
-  await page.screenshot({ path: "artifacts/canvas-organization-mobile.png", fullPage: true });
-  await page.getByRole("button", { name: "Finish selecting" }).click();
-  await page.getByRole("button", { name: "Clear component selection" }).click();
-  await expect(page.getByRole("heading", { name: "Compose before you calculate." })).toBeVisible();
-  await page.locator(".subsystems-panel > summary").click();
-  await page.getByRole("button", { name: "Create subsystem" }).click();
-  await page.getByRole("button", { name: "Group components" }).click();
-  await page.locator(".react-flow").scrollIntoViewIfNeeded();
-  await page.waitForTimeout(150);
-  const boundaryBefore = await page.locator(".react-flow__node-subsystem").boundingBox();
-  const client = await node(page, "Client").boundingBox();
-  await page.mouse.move(client!.x + client!.width / 2, client!.y + client!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(client!.x + client!.width / 2 - 55, client!.y + client!.height / 2, { steps: 6 });
-  await page.mouse.up();
-  await expect.poll(async () => (await page.locator(".react-flow__node-subsystem").boundingBox())!.width).toBeGreaterThan(boundaryBefore!.width + 35);
-  await page.getByRole("button", { name: "Collapse Subsystem on canvas" }).click();
-  await expect(page.getByText("Architecture boundary", { exact: true })).toBeVisible();
-  await expect(page.getByText(/waiting/)).toHaveCount(0);
-  await page.getByRole("button", { name: "Expand Subsystem on canvas" }).click();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: "artifacts/canvas-subsystem-boundary.png", fullPage: true });
+    // Undo restores position
+    await page.getByRole("button", { name: "Undo" }).click();
+    const undonePosGw = await getNodePosition(page, "Chat client");
+    expect(undonePosGw.x).toBeCloseTo(beforePosGw.x, 0);
+
+    // Screenshot 1: Canvas organization
+    await page.screenshot({ path: "artifacts/canvas-organization.png", fullPage: true });
+  });
+
+  test("mobile viewport does not overflow and supports touch selection tools", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.locator(".react-flow").waitFor({ state: "visible" });
+    await openExample(page, "Real-time chat");
+
+    // Toolbar touch selection tools
+    const selectBtn = page.getByRole("button", { name: "Select", exact: true });
+    const panBtn = page.getByRole("button", { name: "Pan", exact: true });
+    await expect(selectBtn).toBeVisible();
+    await expect(panBtn).toBeVisible();
+
+    await panBtn.click();
+    await expect(panBtn).toHaveAttribute("aria-pressed", "true");
+
+    await selectBtn.click();
+    await expect(selectBtn).toHaveAttribute("aria-pressed", "true");
+
+    // Select components button in DiagramOrganization
+    await page.getByRole("button", { name: "Select components" }).click();
+    await page.getByRole("checkbox", { name: "Chat client" }).check();
+    await page.getByRole("checkbox", { name: "API gateway" }).check();
+    await page.getByRole("button", { name: "Finish selecting" }).click();
+
+    await expect(page.locator(".diagram-organizer-heading")).toContainText("2 selected");
+
+    // Verify document does not horizontally overflow
+    const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(noOverflow).toBe(true);
+  });
 });

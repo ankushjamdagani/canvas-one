@@ -1,4 +1,7 @@
 import type { Subsystem } from "./subsystems";
+import type { BehaviorConfig, ExecutionEdge, ExecutionGraph, WorkloadDefinition } from "./execution";
+import { compileExecution } from "./execution";
+export type { BehaviorConfig, ExecutionEdge, ExecutionGraph, WorkloadDefinition } from "./execution";
 import { validateNotes } from "./notes";
 import type { SavedRun } from "./results";
 import { rateAt, validateProfile, type TrafficProfile } from "./workload";
@@ -31,13 +34,16 @@ export interface ModelNode {
   description?: string;
   /** Diagram-only type caption for generic architecture components. */
   customType?: string;
+  /** Open-system execution behavior configuration. When present, authoritative over legacy scalar inputs. */
+  behavior?: BehaviorConfig;
 }
-export interface ModelEdge {
+export interface ModelEdge extends Partial<Omit<ExecutionEdge, "id" | "source" | "target">> {
   id: string;
   source: string;
   target: string;
   label?: string;
   protocol?: string;
+  /** Legacy communication semantics; ignored by open runtime in favor of edge.transport. */
   communication?: "sync" | "async" | "data";
 }
 export interface Settings {
@@ -53,6 +59,9 @@ export interface Graph {
   /** Learning-guide metadata, excluded from the simulation signature. */
   guideId?: string;
   scenario?: "lookup" | "jobs" | "diagram";
+  /** Target execution version. When set to 'open-system/1', open runtime is used. */
+  executionVersion?: "open-system/1";
+  workloads?: WorkloadDefinition[];
   nodes: ModelNode[];
   edges: ModelEdge[];
   settings: Settings;
@@ -94,14 +103,26 @@ export const labels: Record<ComponentKind, string> = {
 };
 export const MAX_SERVICE_WORKERS = 16;
 export function workerCount(node: ModelNode): number {
+  if (node.behavior) {
+    if (node.behavior.type === "source" || node.behavior.type === "broker") {
+      return 0;
+    }
+    return node.behavior.concurrency;
+  }
   return node.kind === "service" || node.kind === "worker"
     ? (node.workers ?? 1)
     : 1;
 }
 export function totalCapacity(node: ModelNode): number {
+  if (node.behavior) {
+    const count = workerCount(node);
+    return node.behavior.capacity * count;
+  }
   return node.capacity * workerCount(node);
 }
 export function makeNode(kind: ComponentKind, x: number, y: number): ModelNode {
+  // Legacy scalar fields remain compatibility scaffolding for legacy engines/tests.
+  // For open-system graphs, node.behavior is authoritative.
   return {
     id: crypto.randomUUID(),
     kind,
@@ -144,6 +165,12 @@ export function baseline(): Graph {
     })),
     settings: { traffic: 100, seed: 42, duration: 30, timeoutMs: 2000 },
   };
+}
+export function isOpenGraph(graph: Graph): graph is Graph & ExecutionGraph {
+  return graph.executionVersion === "open-system/1";
+}
+export function supportsFreeCanvas(graph: Graph): boolean {
+  return isOpenGraph(graph) || isDiagramGraph(graph);
 }
 export const isJobGraph = (graph: Graph) => graph.scenario === "jobs";
 export const isDiagramGraph = (graph: Graph) => graph.scenario === "diagram";
@@ -206,6 +233,35 @@ export function validateGraph(graph: Graph, requireRunnable = true): string[] {
     (typeof graph.guideId !== "string" || graph.guideId.length > 80)
   )
     errors.push("Experiment guide metadata is invalid.");
+  if (graph.executionVersion !== undefined) {
+    if (graph.executionVersion !== "open-system/1") {
+      errors.push("Unsupported execution version: " + String(graph.executionVersion));
+      return [...new Set(errors)];
+    }
+    const openResult = compileExecution(graph, requireRunnable);
+    errors.push(...openResult.issues.filter(issue => issue.severity === "error").map(issue => issue.message));
+    if (!openResult.plan) return [...new Set(errors)];
+    const elementIds = new Set([...nodes.map(n => n.id), ...edges.map(e => e.id)]);
+    if (Array.isArray(graph.notes) && graph.notes.some(note => note && elementIds.has(note.id)))
+      errors.push("Canvas note IDs must differ from component and connection IDs.");
+    for (const n of nodes) {
+      if (n.description !== undefined && (typeof n.description !== "string" || n.description.length > 240))
+        errors.push("Component notes must be 240 characters or fewer.");
+      if (
+        n.customType !== undefined &&
+        (typeof n.customType !== "string" || !n.customType.trim() || n.customType.length > 60)
+      )
+        errors.push("Custom component type labels must be 1–60 characters.");
+      if (n.kind === "custom" && n.customType === undefined)
+        errors.push("Custom components need a type label.");
+    }
+    for (const edge of edges) {
+      if (edge.label !== undefined && (typeof edge.label !== "string" || edge.label.length > 60)) errors.push("Connection labels must be 60 characters or fewer.");
+      if (edge.protocol !== undefined && (typeof edge.protocol !== "string" || edge.protocol.length > 30)) errors.push("Connection protocols must be 30 characters or fewer.");
+    }
+    return [...new Set(errors)];
+  }
+
   if (
     graph.scenario !== undefined &&
     !["lookup", "jobs", "diagram"].includes(graph.scenario)

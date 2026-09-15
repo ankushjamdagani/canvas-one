@@ -1,6 +1,8 @@
 import { LatencyStats } from "./latency";
 import { Heap, randomGenerator } from "./primitives";
 import { JobSimulation } from "./jobs";
+import { OpenSimulationAdapter } from "./open/adapter";
+import { isOpenGraph } from "../domain/model";
 import { isJobGraph } from "../domain/model";
 import { KeyedCache } from "./keyed-cache";
 import { urlKey } from "./url-popularity";
@@ -274,11 +276,13 @@ class LookupSimulation {
 }
 
 export class Simulation {
-  private model: LookupSimulation | JobSimulation;
+  private model: LookupSimulation | JobSimulation | OpenSimulationAdapter;
   constructor(graph: Graph) {
-    this.model = isJobGraph(graph)
-      ? new JobSimulation(graph)
-      : new LookupSimulation(graph);
+    this.model = isOpenGraph(graph)
+      ? new OpenSimulationAdapter(graph)
+      : isJobGraph(graph)
+        ? new JobSimulation(graph)
+        : new LookupSimulation(graph);
   }
   advance(target: number): Metrics {
     return this.model.advance(target);

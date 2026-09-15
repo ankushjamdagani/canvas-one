@@ -1,7 +1,7 @@
 import { hasBalancer, serviceInstances } from "../domain/routing";
 import { failureCount } from "../domain/metrics";
 import { observedCacheHitRate } from "../domain/cache-metrics";
-import { isJobGraph } from "../domain/model";
+import { isJobGraph, isOpenGraph } from "../domain/model";
 import { useEffect, useState } from "react";
 import {
   X,
@@ -29,6 +29,7 @@ export function ResultsPanel({
   onRestore: (id: string) => void;
 }) {
   const editor = useEditor(),
+    readOnly = editor.readOnly,
     runs = editor.project.savedRuns ?? [];
   const [currentId, setCurrentId] = useState(
       selectedId ?? runs.at(-1)?.id ?? "",
@@ -68,7 +69,7 @@ export function ResultsPanel({
       {deleted && (
         <div className="result-deleted" role="status">
           “{deleted.name}” deleted.
-          <button onClick={undo}>
+          <button disabled={readOnly} onClick={undo}>
             <RotateCcw size={13} />
             Undo delete
           </button>
@@ -137,100 +138,129 @@ export function ResultsPanel({
             <div className="result-table-wrap">
               <table className="result-table">
                 <caption>Observed simulation results</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Metric</th>
-                    <th scope="col">Baseline</th>
-                    <th scope="col">Result</th>
-                    <th scope="col">Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    {
-                      label: "Completed /s",
-                      get: (r: SavedRun) => r.metrics.throughput,
-                      digits: 1,
-                    },
-                    {
-                      label: "p95 latency · ms",
-                      get: (r: SavedRun) => r.metrics.p95Latency,
-                      digits: 1,
-                    },
-                    {
-                      label: isJobGraph(current.graph)
-                        ? "Failed jobs"
-                        : "Failed requests",
-                      get: (r: SavedRun) => failureCount(r.metrics),
-                      digits: 0,
-                    },
-                    {
-                      label: "Generated",
-                      get: (r: SavedRun) => r.metrics.generated,
-                      digits: 0,
-                    },
-                    {
-                      label: "In flight at end",
-                      get: (r: SavedRun) => r.metrics.inFlight,
-                      digits: 0,
-                    },
-                    ...(isJobGraph(current.graph)
-                      ? [
-                          {
-                            label: "Producer acknowledged",
-                            get: (r: SavedRun) =>
-                              r.metrics.jobs?.acknowledged ?? 0,
-                            digits: 0,
-                          },
-                          {
-                            label: "Retries scheduled",
-                            get: (r: SavedRun) => r.metrics.jobs?.retries ?? 0,
-                            digits: 0,
-                          },
-                          {
-                            label: "Permanent failures",
-                            get: (r: SavedRun) => r.metrics.jobs?.failed ?? 0,
-                            digits: 0,
-                          },
-                        ]
-                      : [
-                          {
-                            label: "Database arrivals /s",
-                            get: (r: SavedRun) =>
-                              r.metrics.databaseLookups / r.metrics.time,
-                            digits: 1,
-                          },
-                        ]),
-                    ...(!isJobGraph(current.graph) ? [
-                      { label: "Observed cache hit rate · %", get: (r: SavedRun) => observedCacheHitRate(r.metrics), digits: 1 },
-                      { label: "Cache misses", get: (r: SavedRun) => r.metrics.cacheMisses, digits: 0 },
-                      { label: "Cache entries at end", get: (r: SavedRun) => r.metrics.cacheEntries, digits: 0 },
-                      { label: "Cache evictions", get: (r: SavedRun) => r.metrics.cacheEvictions, digits: 0 },
-                      { label: "Cache expirations", get: (r: SavedRun) => r.metrics.cacheExpirations, digits: 0 },
-                    ] : []),
-                  ].map((row) => {
-                    const b = baseline ? row.get(baseline) : null,
-                      c = row.get(current),
-                      difference = b === null || c === null ? null : c - b;
-                    const format = (v: number) =>
-                      v.toLocaleString(undefined, {
-                        minimumFractionDigits: row.digits,
-                        maximumFractionDigits: row.digits,
-                      });
-                    return (
-                      <tr key={row.label}>
-                        <th scope="row">{row.label}</th>
-                        <td>{b === null ? "—" : format(b)}</td>
-                        <td>{c === null ? "—" : format(c)}</td>
-                        <td>
-                          {difference === null || !status?.matched
-                            ? "—"
-                            : `${difference > 0 ? "+" : ""}${format(difference)}`}
-                        </td>
+                {isOpenGraph(current.graph) ? (
+                  <>
+                    <thead>
+                      <tr>
+                        <th scope="col">Root flow metric</th>
+                        <th scope="col">Baseline</th>
+                        <th scope="col">Result</th>
+                        <th scope="col">Change</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Throughput /s", get: (r: SavedRun) => r.metrics.execution?.roots.throughput ?? null, digits: 1 },
+                        { label: "p95 latency · ms", get: (r: SavedRun) => r.metrics.execution?.roots.p95Latency ?? null, digits: 1 },
+                        { label: "Mean latency · ms", get: (r: SavedRun) => r.metrics.execution?.roots.meanLatency ?? null, digits: 1 },
+                        { label: "Generated", get: (r: SavedRun) => r.metrics.execution?.roots.generated ?? null, digits: 0 },
+                        { label: "Succeeded", get: (r: SavedRun) => r.metrics.execution?.roots.succeeded ?? null, digits: 0 },
+                        { label: "Rejected", get: (r: SavedRun) => r.metrics.execution?.roots.rejected ?? null, digits: 0 },
+                        { label: "Failed", get: (r: SavedRun) => r.metrics.execution?.roots.failed ?? null, digits: 0 },
+                        { label: "Expired", get: (r: SavedRun) => r.metrics.execution?.roots.expired ?? null, digits: 0 },
+                        { label: "In flight at end", get: (r: SavedRun) => r.metrics.execution?.roots.inFlight ?? null, digits: 0 },
+                      ].map((row) => renderTableRow(row, baseline, current, status))}
+                      <tr className="result-table-divider">
+                        <th colSpan={4} scope="colgroup" style={{ textAlign: "left", paddingTop: "0.75rem", fontWeight: 600 }}>
+                          Asynchronous message flow
+                        </th>
+                      </tr>
+                      {[
+                        { label: "Message throughput /s", get: (r: SavedRun) => r.metrics.execution?.messages.throughput ?? null, digits: 1 },
+                        { label: "Message p95 latency · ms", get: (r: SavedRun) => r.metrics.execution?.messages.p95Latency ?? null, digits: 1 },
+                        { label: "Messages generated", get: (r: SavedRun) => r.metrics.execution?.messages.generated ?? null, digits: 0 },
+                        { label: "Messages succeeded", get: (r: SavedRun) => r.metrics.execution?.messages.succeeded ?? null, digits: 0 },
+                        { label: "Messages rejected", get: (r: SavedRun) => r.metrics.execution?.messages.rejected ?? null, digits: 0 },
+                        { label: "Messages failed", get: (r: SavedRun) => r.metrics.execution?.messages.failed ?? null, digits: 0 },
+                        { label: "Messages expired", get: (r: SavedRun) => r.metrics.execution?.messages.expired ?? null, digits: 0 },
+                        { label: "Messages in flight", get: (r: SavedRun) => r.metrics.execution?.messages.inFlight ?? null, digits: 0 },
+                      ].map((row) => renderTableRow(row, baseline, current, status))}
+                    </tbody>
+                  </>
+                ) : (
+                  <>
+                    <thead>
+                      <tr>
+                        <th scope="col">Metric</th>
+                        <th scope="col">Baseline</th>
+                        <th scope="col">Result</th>
+                        <th scope="col">Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        {
+                          label: "Completed /s",
+                          get: (r: SavedRun) => r.metrics.throughput,
+                          digits: 1,
+                        },
+                        {
+                          label: "p95 latency · ms",
+                          get: (r: SavedRun) => r.metrics.p95Latency,
+                          digits: 1,
+                        },
+                        {
+                          label: isJobGraph(current.graph)
+                            ? "Failed jobs"
+                            : "Failed requests",
+                          get: (r: SavedRun) => failureCount(r.metrics),
+                          digits: 0,
+                        },
+                        {
+                          label: "Generated",
+                          get: (r: SavedRun) => r.metrics.generated,
+                          digits: 0,
+                        },
+                        {
+                          label: "In flight at end",
+                          get: (r: SavedRun) => r.metrics.inFlight,
+                          digits: 0,
+                        },
+                        ...(isJobGraph(current.graph)
+                          ? [
+                              {
+                                label: "Producer acknowledged",
+                                get: (r: SavedRun) =>
+                                  r.metrics.jobs?.acknowledged ?? 0,
+                                digits: 0,
+                              },
+                              {
+                                label: "Retries scheduled",
+                                get: (r: SavedRun) => r.metrics.jobs?.retries ?? 0,
+                                digits: 0,
+                              },
+                              {
+                                label: "Permanent failures",
+                                get: (r: SavedRun) => r.metrics.jobs?.failed ?? 0,
+                                digits: 0,
+                              },
+                            ]
+                          : [
+                              {
+                                label: "Database arrivals /s",
+                                get: (r: SavedRun) =>
+                                  r.metrics.databaseLookups / r.metrics.time,
+                                digits: 1,
+                              },
+                            ]),
+                        ...(!isJobGraph(current.graph)
+                          ? [
+                              {
+                                label: "Observed cache hit rate · %",
+                                get: (r: SavedRun) =>
+                                  observedCacheHitRate(r.metrics),
+                                digits: 1,
+                              },
+                              { label: "Cache misses", get: (r: SavedRun) => r.metrics.cacheMisses, digits: 0 },
+                              { label: "Cache entries at end", get: (r: SavedRun) => r.metrics.cacheEntries, digits: 0 },
+                              { label: "Cache evictions", get: (r: SavedRun) => r.metrics.cacheEvictions, digits: 0 },
+                              { label: "Cache expirations", get: (r: SavedRun) => r.metrics.cacheExpirations, digits: 0 },
+                            ]
+                          : []),
+                      ].map((row) => renderTableRow(row, baseline, current, status))}
+                    </tbody>
+                  </>
+                )}
               </table>
             </div>
             <div className="result-chart-and-changes">
@@ -258,40 +288,111 @@ export function ResultsPanel({
               </p>
             </div>
           </div>
-          {hasBalancer(current.graph) && <details className="saved-routing">
-            <summary>Saved per-instance load · {current.name}</summary>
-            <div className="result-table-wrap"><table className="result-table">
-              <caption>Observed routing and processing in this saved result</caption>
-              <thead><tr><th scope="col">Instance</th><th scope="col">Routed</th><th scope="col">Waiting</th><th scope="col">Rejected here</th><th scope="col">Busy</th></tr></thead>
-              <tbody>{serviceInstances(current.graph).map((n) => { const m = current.metrics.nodes[n.id]; return <tr key={n.id}><th scope="row">{n.name}</th><td>{m.arrived.toLocaleString()}</td><td>{m.queued}</td><td>{m.rejected.toLocaleString()}</td><td>{(m.utilization * 100).toFixed(1)}%</td></tr>; })}</tbody>
-            </table></div>
-          </details>}
+          {isOpenGraph(current.graph) && current.metrics.execution && (
+            <details className="saved-routing">
+              <summary>Saved node observation · {current.name}</summary>
+              <div className="result-table-wrap">
+                <table className="result-table">
+                  <caption>Observed node queue, waiting, and resource occupancy</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Node</th>
+                      <th scope="col">Arrived</th>
+                      <th scope="col">Queued</th>
+                      <th scope="col">Waiting</th>
+                      <th scope="col">Rejected</th>
+                      <th scope="col">Workers</th>
+                      <th scope="col">Occupancy</th>
+                      <th scope="col">Utilization</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {current.graph.nodes.map((n) => {
+                      const emNode = current.metrics.execution?.nodes[n.id];
+                      if (!emNode) return null;
+                      return (
+                        <tr key={n.id}>
+                          <th scope="row">{n.name}</th>
+                          <td>{emNode.arrived.toLocaleString()}</td>
+                          <td>{emNode.queued.toLocaleString()}</td>
+                          <td>{emNode.waiting.toLocaleString()}</td>
+                          <td>{emNode.rejected.toLocaleString()}</td>
+                          <td>{emNode.activeWorkers}</td>
+                          <td>{(emNode.occupancy * 100).toFixed(1)}%</td>
+                          <td>{(emNode.utilization * 100).toFixed(1)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+          {!isOpenGraph(current.graph) && hasBalancer(current.graph) && (
+            <details className="saved-routing">
+              <summary>Saved per-instance load · {current.name}</summary>
+              <div className="result-table-wrap">
+                <table className="result-table">
+                  <caption>Observed routing and processing in this saved result</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Instance</th>
+                      <th scope="col">Routed</th>
+                      <th scope="col">Waiting</th>
+                      <th scope="col">Rejected here</th>
+                      <th scope="col">Busy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceInstances(current.graph).map((n) => {
+                      const m = current.metrics.nodes[n.id];
+                      return (
+                        <tr key={n.id}>
+                          <th scope="row">{n.name}</th>
+                          <td>{m.arrived.toLocaleString()}</td>
+                          <td>{m.queued}</td>
+                          <td>{m.rejected.toLocaleString()}</td>
+                          <td>{(m.utilization * 100).toFixed(1)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
           <div className="result-actions">
             <label>
               <span>Result name</span>
               <input
                 aria-label="Saved result name"
                 maxLength={80}
+                disabled={readOnly}
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 onBlur={() => {
-                  editor.renameRun(current.id, draftName);
-                  setDraftName(draftName.trim() || current.name);
+                  if (!readOnly) {
+                    editor.renameRun(current.id, draftName);
+                    setDraftName(draftName.trim() || current.name);
+                  }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") e.currentTarget.blur();
                 }}
               />
             </label>
-            <button onClick={() => onRestore(current.id)}>
+            <button disabled={readOnly} onClick={() => onRestore(current.id)}>
               <RotateCcw size={14} />
               Restore this model
             </button>
             <button
               className="delete-result"
+              disabled={readOnly}
               onClick={() => {
-                setDeleted(current);
-                editor.deleteRun(current.id);
+                if (!readOnly) {
+                  setDeleted(current);
+                  editor.deleteRun(current.id);
+                }
               }}
             >
               <Trash2 size={14} />
@@ -303,7 +404,44 @@ export function ResultsPanel({
     </section>
   );
 }
+function renderTableRow(
+  row: { label: string; get: (r: SavedRun) => number | null; digits: number },
+  baseline: SavedRun | undefined,
+  current: SavedRun,
+  status: { matched: boolean; message: string } | null,
+) {
+  const b = baseline ? row.get(baseline) : null,
+    c = row.get(current),
+    difference = b === null || c === null ? null : c - b;
+  const format = (v: number) =>
+    v.toLocaleString(undefined, {
+      minimumFractionDigits: row.digits,
+      maximumFractionDigits: row.digits,
+    });
+  return (
+    <tr key={row.label}>
+      <th scope="row">{row.label}</th>
+      <td>{b === null ? "—" : format(b)}</td>
+      <td>{c === null ? "—" : format(c)}</td>
+      <td>
+        {difference === null || !status?.matched
+          ? "—"
+          : `${difference > 0 ? "+" : ""}${format(difference)}`}
+      </td>
+    </tr>
+  );
+}
 function RunContext({ run }: { run: SavedRun }) {
+  if (isOpenGraph(run.graph)) {
+    const enabledWorkloads = run.graph.workloads?.filter((w) => w.enabled) ?? [];
+    const classCount = enabledWorkloads.reduce((sum, w) => sum + (w.classes?.length ?? 0), 0);
+    return <small className="run-context">
+      Open system · {run.graph.nodes.length} nodes<br />
+      {enabledWorkloads.length} enabled workloads · {classCount} request classes<br />
+      Seed {run.graph.settings.seed} · {run.graph.settings.duration}s<br />
+      {run.origin === "imported" ? "Imported result" : new Date(run.completedAt).toLocaleString()}
+    </small>;
+  }
   return (
     <small className="run-context">
       {isJobGraph(run.graph) ? "Background jobs" : hasBalancer(run.graph) ? `Round robin · ${serviceInstances(run.graph).length} instances` : "URL lookup"}

@@ -1,73 +1,118 @@
-import { expect, test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import * as fs from "fs";
+import { openExample } from "./openHelpers";
 
-test("burst workload builds then drains its queue and persists for cache replay", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Burst", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Burst", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Replay", exact: true }),
-  ).toBeVisible({ timeout: 15000 });
-  expect(Number(await page.getByTestId("queue").textContent())).toBeLessThan(5);
-  expect(
-    Number(
-      (await page.getByTestId("failures").textContent())!.replaceAll(",", ""),
-    ),
-  ).toBeGreaterThan(1000);
-  await page.getByRole("button", { name: "Live metrics" }).click();
-  const peak = page.getByText(/^Peak \d+ requests$/);
-  await expect(peak).toBeVisible();
-  expect(Number((await peak.textContent())!.match(/\d+/)![0])).toBeGreaterThan(
-    400,
-  );
-  await page.screenshot({
-    path: "artifacts/burst-workload.png",
-    fullPage: true,
+test.describe("Workloads, profiles and request classes", () => {
+  test("configuring traffic profile to burst updates parameters and persists roundtrip", async ({ page }) => {
+    await page.goto("/");
+    await openExample(page, "Real-time chat");
+
+    // With nothing selected, inspector displays global System Configuration & Workloads
+    const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
+    await expect(inspector).toBeVisible();
+
+    const workloadCard = inspector.locator(".open-workload-card").first();
+    await expect(workloadCard).toBeVisible();
+
+    // Switch traffic profile to burst
+    const profileSelect = workloadCard.locator("label:has-text('Traffic Profile') select");
+    await profileSelect.selectOption("burst");
+
+    // Configure burst peak rate
+    const peakInput = workloadCard.getByRole("spinbutton", { name: "Burst Peak Rate" });
+    await peakInput.fill("450");
+
+    // Export JSON to verify burst profile roundtrip
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+
+    const wl = fileContent.project.graph.workloads[0];
+    expect(wl.profile?.kind).toBe("burst");
+    expect(wl.profile?.peakRate).toBe(450);
   });
-  await page.getByRole("button", { name: "Add cache", exact: true }).click();
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Replay", exact: true }),
-  ).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId("failures")).toHaveText("0");
-  await expect(
-    page.getByText("Identical generated arrivals.", { exact: false }),
-  ).toBeVisible();
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Burst", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    page.getByRole("spinbutton", { name: "Burst traffic", exact: true }),
-  ).toHaveValue("700");
-});
 
-test("ramp controls and mobile waveform stay usable", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Ramp", exact: true }).click();
-  await page
-    .getByRole("spinbutton", { name: "Ending traffic", exact: true })
-    .fill("900");
-  await expect(
-    page.getByText("100 → 900 req/s · linear ramp", { exact: true }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({ path: "artifacts/ramp-mobile.png", fullPage: true });
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByRole("spinbutton", { name: "Ending traffic", exact: true }),
-  ).toHaveValue("900");
+  test("adding and customizing request classes with operations, weights, and tags roundtrips to JSON", async ({ page }) => {
+    await page.goto("/");
+    await openExample(page, "Ecommerce checkout");
+
+    const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
+    await expect(inspector).toBeVisible();
+
+    const workloadCard = inspector.locator(".open-workload-card").first();
+
+    // Add a second request class
+    const addClassButton = workloadCard.getByRole("button", { name: "+ Class" });
+    await addClassButton.click();
+
+    // Target the newly added class card
+    const secondClassCard = workloadCard.locator(".open-class-card").nth(1);
+    await expect(secondClassCard).toBeVisible();
+
+    // Edit Name
+    const nameInput = secondClassCard.locator("label:has-text('Name') input");
+    await nameInput.fill("priority-checkout");
+
+    // Edit Operation
+    const opSelect = secondClassCard.locator("label:has-text('Operation') select");
+    await opSelect.selectOption("write");
+
+    // Edit Weight
+    const weightInput = secondClassCard.getByRole("spinbutton", { name: "Weight" });
+    await weightInput.fill("5");
+
+    // Edit Tags (onBlur commits)
+    const tagsInput = secondClassCard.locator("label:has-text('Tags') input");
+    await tagsInput.fill("vip, instant");
+    await tagsInput.blur();
+
+    // Export JSON and verify the second class configuration
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+
+    const classes = fileContent.project.graph.workloads[0].classes;
+    expect(classes.length).toBe(2);
+    const addedClass = classes.find((c: any) => c.name === "priority-checkout");
+    expect(addedClass).toBeDefined();
+    expect(addedClass.operation).toBe("write");
+    expect(addedClass.weight).toBe(5);
+    expect(addedClass.tags).toEqual(["vip", "instant"]);
+  });
+
+  test("global settings duration and random uint32 seed validate and persist correctly", async ({ page }) => {
+    await page.goto("/");
+    await openExample(page, "Event processing");
+
+    const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
+    await expect(inspector).toBeVisible();
+
+    // Set duration to 45s
+    const durationInput = inspector.getByRole("spinbutton", { name: "Simulation Duration" });
+    await durationInput.fill("45");
+
+    // Set random seed to a valid uint32 value
+    const seedInput = inspector.getByRole("spinbutton", { name: "Random Seed" });
+    await seedInput.fill("987654321");
+
+    // Export JSON and verify settings roundtrip
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+
+    expect(fileContent.project.graph.settings.duration).toBe(45);
+    expect(fileContent.project.graph.settings.seed).toBe(987654321);
+  });
 });

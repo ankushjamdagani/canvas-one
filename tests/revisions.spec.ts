@@ -3,10 +3,11 @@ import { expect, test } from "@playwright/test";
 for (const mobile of [false, true]) test(`authored revision save, finalization, restore and persistence${mobile ? " on mobile" : ""}`, async ({ page }) => {
   if (mobile) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
   await page.locator(".project-switch").click();
-  await page.locator(".revisions-panel summary").click();
   const panel = page.locator(".revisions-panel");
+  if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await panel.locator("summary").click();
+  }
   await panel.getByLabel("Revision name", { exact: true }).fill("Checkout proposal");
   await panel.getByLabel("Author name", { exact: true }).fill("Alex");
   await panel.getByLabel("Reason for change", { exact: true }).fill("Make ownership explicit.");
@@ -21,10 +22,15 @@ for (const mobile of [false, true]) test(`authored revision save, finalization, 
   await page.getByRole("button", { name: "Add canvas note", exact: true }).click();
   await expect(page.locator(".canvas-note")).toHaveCount(1);
   await page.locator(".project-switch").click();
-  await page.locator(".revisions-panel summary").click();
+  if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await panel.locator("summary").click();
+  }
   await panel.getByLabel("Review revision", { exact: true }).selectOption({ label: "Checkout proposal · final" });
   await expect(panel.getByText("Note added: Untitled note", { exact: true })).toBeVisible();
   await page.screenshot({ path: `artifacts/revisions${mobile ? "-mobile" : ""}.png`, fullPage: true });
+  const canvasBox = await page.locator(".react-flow").boundingBox();
+  expect(canvasBox).not.toBeNull();
+  expect(canvasBox!.height).toBeGreaterThan(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await panel.getByRole("button", { name: "Restore to canvas", exact: true }).click();
   await expect(page.locator(".canvas-note")).toHaveCount(0);
@@ -34,7 +40,9 @@ for (const mobile of [false, true]) test(`authored revision save, finalization, 
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
   await page.reload();
   await page.locator(".project-switch").click();
-  await page.locator(".revisions-panel summary").click();
+  if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await panel.locator("summary").click();
+  }
   await panel.getByLabel("Review revision", { exact: true }).selectOption({ label: "Checkout proposal · final" });
   await expect(panel.getByRole("heading", { name: "Checkout proposal · final" })).toBeVisible();
 });

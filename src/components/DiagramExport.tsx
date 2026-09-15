@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Project } from "../domain/model";
 import { downloadDiagram, type DiagramExportFormat } from "../export/downloadDiagram";
 
+/** Diagram visual image export panel. */
 export function DiagramExport({ project }: { project: Project }) {
   const [pending, setPending] = useState<DiagramExportFormat | null>(null);
   const [message, setMessage] = useState("");
@@ -22,12 +23,12 @@ export function DiagramExport({ project }: { project: Project }) {
       setPending(null);
     }
   };
-  return <section className="diagram-export" aria-label="Export diagram">
-    <div className="diagram-export-copy"><strong>Entire diagram · current subsystem view</strong><span>PNG uses up to 2× scale within safe image limits.</span></div>
+  return <section className="diagram-export" aria-label="Export canvas">
+    <div className="diagram-export-copy"><strong>Entire canvas · current subsystem view</strong><span>PNG uses up to 2× scale within safe image limits.</span></div>
     <div className="diagram-export-actions">
       <button disabled={disabled} onClick={() => run("svg")}>{pending === "svg" ? <LoaderCircle className="export-spinner" size={15} /> : <Download size={15} />}{pending === "svg" ? "Preparing…" : "Download SVG"}</button>
       <button disabled={disabled} onClick={() => run("png")}>{pending === "png" ? <LoaderCircle className="export-spinner" size={15} /> : <FileImage size={15} />}{pending === "png" ? "Preparing…" : "Download PNG"}</button>
     </div>
-    {message && <span className={`diagram-export-message ${failed ? "failed" : ""}`} role={failed ? "alert" : "status"}>{message}</span>}
+    <span className={`diagram-export-message ${failed ? "failed" : ""}`} role={failed ? "alert" : "status"}>{message || "\u00a0"}</span>
   </section>;
 }

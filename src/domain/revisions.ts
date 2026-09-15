@@ -73,6 +73,8 @@ export function compareArchitectures(before: ArchitectureSnapshot, after: Archit
   compare("Subsystem", before.subsystems, after.subsystems);
   if (stable(before.graph.settings) !== stable(after.graph.settings)) changes.push(`Workload settings changed: ${JSON.stringify(before.graph.settings)} → ${JSON.stringify(after.graph.settings)}`);
   if (before.graph.scenario !== after.graph.scenario) changes.push("Scenario changed");
+  if (before.graph.executionVersion !== after.graph.executionVersion) changes.push(`Execution version changed: ${before.graph.executionVersion ?? "legacy"} → ${after.graph.executionVersion ?? "legacy"}`);
+  if (stable(before.graph.workloads) !== stable(after.graph.workloads)) changes.push(`Workload definitions changed`);
   if (before.graph.guideId !== after.graph.guideId) changes.push("Guided experiment changed");
   if (stable([...before.expandedNodeIds].sort()) !== stable([...after.expandedNodeIds].sort())) changes.push("Expanded component views changed");
   return changes;

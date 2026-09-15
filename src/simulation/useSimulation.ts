@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { validateGraph, clone, isDiagramGraph, type Graph } from "../domain/model";
+import { executionSignature } from "../domain/openGraph";
 import type { Metrics } from "../domain/metrics";
 import type { RunResult } from "../domain/results";
 export type { RunResult } from "../domain/results";
@@ -15,13 +16,7 @@ export function useSimulation(graph: Graph, projectId = "") {
     [error, setError] = useState("");
   const lastProject = useRef(projectId);
   const { notes: _notes, ...workerGraph } = graph;
-  const { guideId: _guideId, ...simulationGraph } = workerGraph;
-  const signature = JSON.stringify({
-    ...simulationGraph,
-    nodes: graph.nodes.map(
-      ({ position: _position, name: _name, ...node }) => node,
-    ),
-  });
+  const signature = executionSignature(graph);
   const reset = () => {
     if (latest.current?.metrics.finished) setPrevious(latest.current);
     latest.current = null;
@@ -54,6 +49,13 @@ export function useSimulation(graph: Graph, projectId = "") {
         setRunning(false);
         return;
       }
+      if (event.data.metrics?.execution?.incomplete) {
+        setError(event.data.metrics.execution.incomplete);
+        setRunning(false);
+        latest.current = null;
+        setMetrics(event.data.metrics);
+        return;
+      }
       const observed: RunResult = { ...run, metrics: event.data.metrics };
       latest.current = observed;
       setMetrics(observed.metrics);
@@ -75,6 +77,7 @@ export function useSimulation(graph: Graph, projectId = "") {
     }
   }, [signature, projectId]);
   const toggle = () => {
+    if (metrics?.execution?.incomplete) return;
     if (running) {
       worker.current?.postMessage({ type: "pause", runId: active.current?.id });
       setRunning(false);

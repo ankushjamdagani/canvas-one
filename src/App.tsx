@@ -1,6 +1,3 @@
-import { hasBalancer } from "./domain/routing";
-import { RevisionsPanel } from "./components/RevisionsPanel";
-import { experiments } from "./domain/experiments";
 import { SubsystemsPanel } from "./components/SubsystemsPanel";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
@@ -25,35 +22,45 @@ import {
   TriangleAlert,
   Search,
 } from "lucide-react";
+import "./components/openWorkspace.css";
 import { useEditor } from "./state/editor";
 import {
-  newProject,
-  isJobGraph,
-  isDiagramGraph,
-  labels,
+  isOpenGraph,
   validateGraph,
-  type ComponentKind,
   type Project,
 } from "./domain/model";
+import { newOpenProject, createRunnableCopy } from "./domain/openGraph";
 import { componentCatalog, componentCategories } from "./domain/componentCatalog";
-import { architectureTemplates, type ArchitectureTemplateId } from "./domain/architectureTemplates";
+import { openExample } from "./domain/openExamples";
 import {
   repository,
   exportProject,
   importProject,
 } from "./persistence/projects";
-import { profileLabel } from "./domain/workload";
 import { useSimulation } from "./simulation/useSimulation";
 import { ArchitectureCanvas, icons } from "./components/ArchitectureCanvas";
 import { Inspector } from "./components/Inspector";
+import { OpenMetricsPanel } from "./components/OpenMetricsPanel";
+import { ExamplesPanel } from "./components/ExamplesPanel";
+import { DiagramExport } from "./components/DiagramExport";
+
 const ResultsPanel = lazy(() =>
   import("./components/ResultsPanel").then((module) => ({
     default: module.ResultsPanel,
   })),
 );
+const RevisionsPanel = lazy(() =>
+  import("./components/RevisionsPanel").then((module) => ({
+    default: module.RevisionsPanel,
+  })),
+);
+const OpenInspector = lazy(() =>
+  import("./components/OpenInspector").then((module) => ({
+    default: module.OpenInspector,
+  })),
+);
+
 import { createSavedRun, defaultRunName } from "./domain/results";
-import { MetricsPanel } from "./components/MetricsPanel";
-import { DiagramExport } from "./components/DiagramExport";
 export default function App() {
   const editor = useEditor(),
     { project } = editor,
@@ -68,13 +75,15 @@ export default function App() {
     [checkpointName, setCheckpointName] = useState(""),
     [notice, setNotice] = useState("");
   const [componentSearch, setComponentSearch] = useState("");
-  const [architectureTemplateId, setArchitectureTemplateId] = useState<ArchitectureTemplateId | "">("");
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false),
     [selectedResult, setSelectedResult] = useState<string | null>(null),
     [savingResult, setSavingResult] = useState(false),
     [resultName, setResultName] = useState("");
-  const jobsMode = isJobGraph(graph);
-  const diagramMode = isDiagramGraph(graph);
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  const isOpen = isOpenGraph(graph);
+  const isReadOnly = editor.readOnly;
   const savedRuns = project.savedRuns ?? [];
   const resultSaved =
     !!simulation.result &&
@@ -87,8 +96,12 @@ export default function App() {
   useEffect(() => {
     setSavingResult(false);
   }, [simulation.result?.id]);
+  const guide = graph.guideId
+    ? openExample(graph.guideId)
+    : null;
+
   const saveResult = () => {
-    if (!simulation.result) return;
+    if (!simulation.result || isReadOnly) return;
     try {
       const result = createSavedRun(simulation.result, resultName);
       if (!editor.saveRun(result)) {
@@ -110,8 +123,7 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null),
     saveQueue = useRef(Promise.resolve()),
     boot = useRef(false);
-  const errors = validateGraph(graph),
-    hasCache = graph.nodes.some((n) => n.kind === "cache");
+  const errors = validateGraph(graph);
   useEffect(() => {
     if (boot.current) return;
     boot.current = true;
@@ -119,7 +131,7 @@ export default function App() {
       .list()
       .then((list) => {
         setProjects(list);
-        if (list.length) editor.load(list[0]);
+        if (list.length) editor.load(list[0], !isOpenGraph(list[0].graph));
         setReady(true);
       })
       .catch(() => {
@@ -131,6 +143,10 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!ready) return;
+    if (editor.readOnly) {
+      setSaved("Read-only archive");
+      return;
+    }
     setSaved("Saving…");
     const copy = structuredClone(project);
     const timer = setTimeout(() => {
@@ -138,7 +154,7 @@ export default function App() {
         .catch(() => {})
         .then(async () => {
           await repository.save(copy);
-          if (useEditor.getState().project.updatedAt === copy.updatedAt)
+          if (useEditor.getState().project.id === copy.id && useEditor.getState().project.updatedAt === copy.updatedAt)
             setSaved("Saved locally");
           setProjects(await repository.list());
         })
@@ -150,7 +166,7 @@ export default function App() {
         });
     }, 250);
     return () => clearTimeout(timer);
-  }, [project, ready]);
+  }, [project, ready, editor.readOnly]);
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 4000);
@@ -159,8 +175,10 @@ export default function App() {
   const switchProject = async (p: Project) => {
     try {
       await saveQueue.current;
-      await repository.save(project);
-      editor.load(p);
+      if (!editor.readOnly) await repository.save(project);
+      const isReadOnlyTarget = !isOpenGraph(p.graph);
+      editor.load(p, isReadOnlyTarget);
+      if (isReadOnlyTarget) setSaved("Read-only archive");
       setProjectPanel(false);
     } catch {
       setError(
@@ -169,31 +187,70 @@ export default function App() {
     }
   };
   const download = () => {
-    const a = document.createElement("a"),
-      url = URL.createObjectURL(
-        new Blob([exportProject(project)], { type: "application/json" }),
-      );
-    a.href = url;
-    a.download = `${project.name.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}.system-studio.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      const a = document.createElement("a"),
+        url = URL.createObjectURL(
+          new Blob([exportProject(project)], { type: "application/json" }),
+        );
+      a.href = url;
+      a.download = `${project.name.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}.system-studio.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not export project.");
+    }
   };
   const importFile = async (file?: File) => {
     if (!file) return;
     try {
       const p = importProject(await file.text());
-      await repository.save(project);
+      if (!editor.readOnly) {
+        await repository.save(project);
+      }
+      const isReadOnlyImport = !isOpenGraph(p.graph);
       await repository.save(p);
-      editor.load(p);
+      editor.load(p, isReadOnlyImport);
+      if (isReadOnlyImport) {
+        setSaved("Read-only archive");
+      }
       setProjectPanel(false);
-      setNotice("Project imported as a new local copy.");
+      setNotice(
+        isReadOnlyImport
+          ? "Archive imported for inspection. Original preserved."
+          : "Project imported as a new local copy.",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not import this file.");
     }
     if (fileInput.current) fileInput.current.value = "";
   };
+
+  const handleCreateRunnableCopy = async () => {
+    try {
+      const copy = createRunnableCopy(project);
+      await repository.save(copy);
+      editor.load(copy, false);
+      setProjects(await repository.list());
+      setNotice("Created runnable open copy. Original archive preserved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not copy archive.");
+    }
+  };
+
   return (
     <div className="studio">
+      {isReadOnly && (
+        <div className="archive-banner" role="status">
+          <div className="archive-banner-copy">
+            <TriangleAlert size={16} />
+            <strong>Read-only archive</strong> — Legacy system preserved for inspection.
+          </div>
+          <div className="archive-banner-actions">
+            <button onClick={download}>Export original</button>
+            <button onClick={handleCreateRunnableCopy}>Create runnable copy</button>
+          </div>
+        </div>
+      )}
       <aside className="library">
         <div className="brand">
           <Workflow size={25} />
@@ -210,91 +267,85 @@ export default function App() {
           <FolderOpen size={15} />
         </button>
         <div className="scenario-picker">
-          <label>
-            <span>Experiment path</span>
-            <select
-              aria-label="Experiment path"
-              value={diagramMode ? "diagram" : jobsMode ? "jobs" : hasBalancer(graph) ? "balanced" : "lookup"}
-              onChange={(e) =>
-                editor.useScenario(e.target.value as "jobs" | "lookup" | "balanced" | "diagram")
-              }
-            >
-              <option value="lookup">URL lookup</option>
-              <option value="jobs">Background jobs</option>
-              <option value="balanced">Load-balanced lookup</option>
-              <option value="diagram">Architecture diagram</option>
-            </select>
-          </label>
-          <p>Loads a starter model. Undo restores your canvas.</p>
+          <button
+            className="subtle"
+            style={{ width: "100%", justifyContent: "center", display: "flex", gap: 6 }}
+            onClick={() => setExamplesOpen(true)}
+            disabled={isReadOnly}
+          >
+            <Workflow size={15} />
+            <span>Examples & tutorials</span>
+          </button>
+          <p>Explore verified starters and guided exercises.</p>
         </div>
-        {!diagramMode && <div className="guided-picker">
-          <label>
-            <span>Guided experiment</span>
-            <select
-              aria-label="Guided experiment"
-              value={project.graph.guideId ?? ""}
-              onChange={(e) => editor.loadExperiment(e.target.value)}
-            >
-              <option value="">Explore freely</option>
-              {experiments.map((experiment) => (
-                <option key={experiment.id} value={experiment.id}>
-                  {experiment.title}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>}
+
         <div className="library-section">
           <h2>Components</h2>
-          <p>{diagramMode ? "Search and add building blocks" : "Click to add to your canvas"}</p>
-          {diagramMode ? (
-            <>
-              <details className="architecture-templates">
-                <summary>Architecture templates</summary>
-                <p>Loading replaces the current diagram. You can Undo to restore it.</p>
-                <label>
-                  <span>Template</span>
-                  <select aria-label="Architecture template" value={architectureTemplateId} onChange={(event) => setArchitectureTemplateId(event.target.value as ArchitectureTemplateId | "")}>
-                    <option value="">Choose a template</option>
-                    {architectureTemplates.map((template) => <option value={template.id} key={template.id}>{template.title}</option>)}
-                  </select>
-                </label>
-                {architectureTemplateId && <p className="template-purpose">{architectureTemplates.find((template) => template.id === architectureTemplateId)?.purpose}</p>}
-                <button className="load-template" disabled={!architectureTemplateId} onClick={() => architectureTemplateId && editor.loadArchitectureTemplate(architectureTemplateId)}>Load template</button>
-              </details>
-              <label className="component-search">
-                <Search size={14} />
-                <input aria-label="Search components" placeholder="Search components" value={componentSearch} onChange={(event) => setComponentSearch(event.target.value)} />
-              </label>
-              <div className="component-catalog">
-                {componentCategories.map((category) => {
-                  const matches = componentCatalog.filter((item) => item.category === category && `${item.label} ${item.description}`.toLowerCase().includes(componentSearch.trim().toLowerCase()));
-                  if (!matches.length) return null;
-                  return <section key={category} className="component-category"><h3>{category}</h3>{matches.map((item) => { const Icon = icons[item.kind]; return <button className="library-item" key={item.kind} disabled={graph.nodes.length >= 100} onClick={() => editor.add(item.kind)} title={graph.nodes.length >= 100 ? "This diagram has reached 100 components." : item.description}><Icon size={20} /><span>{item.label}</span><Plus size={14} /></button>; })}</section>;
-                })}
-                {!componentCatalog.some((item) => `${item.label} ${item.description}`.toLowerCase().includes(componentSearch.trim().toLowerCase())) && <p className="component-empty">No components match. Try “storage”, “edge”, or “queue”.</p>}
-              </div>
-            </>
-          ) : (jobsMode
-            ? (["traffic", "queue", "worker"] as ComponentKind[])
-            : (["traffic", "balancer", "service", "database", "cache"] as ComponentKind[])
-          ).map((kind) => {
-            const Icon = icons[kind];
-            return (
-              <button
-                className="library-item"
-                key={kind}
-                disabled={kind === "balancer" && hasBalancer(graph)}
-                onClick={() => editor.add(kind)}
-              >
-                <Icon size={20} />
-                <span>{labels[kind]}</span>
-                <Plus size={14} />
-              </button>
-            );
-          })}
+          <p>Search and add components to your system</p>
+          <label className="component-search">
+            <Search size={14} />
+            <input
+              aria-label="Search components"
+              placeholder="Search components"
+              value={componentSearch}
+              onChange={(event) => setComponentSearch(event.target.value)}
+              disabled={isReadOnly}
+            />
+          </label>
+          <div className="component-catalog">
+            {componentCategories.map((category) => {
+              const matches = componentCatalog.filter(
+                (item) =>
+                  item.category === category &&
+                  `${item.label} ${item.description}`
+                    .toLowerCase()
+                    .includes(componentSearch.trim().toLowerCase()),
+              );
+              if (!matches.length) return null;
+              return (
+                <section key={category} className="component-category">
+                  <h3>{category}</h3>
+                  {matches.map((item) => {
+                    const Icon = icons[item.kind];
+                    const atNodeLimit = graph.nodes.length >= 100;
+                    const atWorkloadLimit =
+                      item.kind === "traffic" && (graph.workloads?.length ?? 0) >= 20;
+                    const disabled = isReadOnly || atNodeLimit || atWorkloadLimit;
+                    return (
+                      <button
+                        className="library-item"
+                        key={item.kind}
+                        disabled={disabled}
+                        onClick={() => editor.add(item.kind)}
+                        title={
+                          atNodeLimit
+                            ? "System has reached the 100-node limit."
+                            : atWorkloadLimit
+                              ? "Maximum 20 workloads reached."
+                              : item.description
+                        }
+                      >
+                        <Icon size={20} />
+                        <span>{item.label}</span>
+                        <Plus size={14} />
+                      </button>
+                    );
+                  })}
+                </section>
+              );
+            })}
+            {!componentCatalog.some((item) =>
+              `${item.label} ${item.description}`
+                .toLowerCase()
+                .includes(componentSearch.trim().toLowerCase()),
+            ) && (
+              <p className="component-empty">
+                No components match. Try “storage”, “edge”, or “queue”.
+              </p>
+            )}
+          </div>
           <div className="library-caption">
-            {diagramMode ? "Diagram components are visual. Simulation remains available in the executable experiment paths." : jobsMode ? "Queue admission and worker processing." : "Add a load balancer, then service instances to share traffic."}
+            Max 100 components and 20 workloads. Connect components to configure message and call flow.
           </div>
         </div>
         <details className="checkpoints" open={window.innerWidth > 560}>
@@ -307,6 +358,7 @@ export default function App() {
               {project.checkpoints.map((c) => (
                 <button
                   key={c.id}
+                  disabled={isReadOnly}
                   onClick={() => {
                     editor.restore(c.id);
                     setNotice(`Restored “${c.name}”.`);
@@ -321,31 +373,41 @@ export default function App() {
           ) : (
             <p>Keep a version before trying something new.</p>
           )}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              editor.checkpoint(
-                checkpointName.trim() ||
-                  `Checkpoint ${project.checkpoints.length + 1}`,
-              );
-              setCheckpointName("");
-              setNotice(
-                "Checkpoint saved with the current model and settings.",
-              );
-            }}
-          >
-            <input
-              aria-label="Checkpoint name"
-              placeholder="Name this checkpoint"
-              value={checkpointName}
-              maxLength={80}
-              onChange={(e) => setCheckpointName(e.target.value)}
-            />
-            <button className="subtle" type="submit">
+          <fieldset disabled={isReadOnly} style={{ border: "none", padding: 0, margin: 0 }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (isReadOnly) return;
+                const ok = editor.checkpoint(
+                  checkpointName.trim() ||
+                    `Checkpoint ${project.checkpoints.length + 1}`,
+                );
+                if (ok) {
+                  setCheckpointName("");
+                  setNotice(
+                    "Checkpoint saved with the current model and settings.",
+                  );
+                } else {
+                  setError(
+                    "Could not save checkpoint. Maximum limit reached.",
+                  );
+                }
+              }}
+            >
+              <input
+                aria-label="Checkpoint name"
+                placeholder="Name this checkpoint"
+                value={checkpointName}
+                maxLength={80}
+                onChange={(e) => setCheckpointName(e.target.value)}
+                disabled={isReadOnly}
+              />
+              <button className="subtle" type="submit" disabled={isReadOnly}>
               <Plus size={14} />
               Save checkpoint
             </button>
-          </form>
+            </form>
+          </fieldset>
         </details>
         <SubsystemsPanel key={project.id} />
         <div className="saved-runs-library">
@@ -414,8 +476,8 @@ export default function App() {
               <Redo2 size={17} />
             </button>
             <span className="toolbar-divider" />
-            <span className="workspace-label">Architecture playground</span>
-            {graph.guideId && (
+            <span className="workspace-label">Design and simulate your system</span>
+            {guide && (
               <button
                 aria-label="Show experiment guide"
                 onClick={() => editor.select(null)}
@@ -432,8 +494,9 @@ export default function App() {
               {saved}
             </span>
             <button
+              data-testid="run-button"
               className="primary"
-              disabled={diagramMode || !!errors.length || !ready}
+              disabled={!isOpen || !!errors.length || !ready || isReadOnly}
               onClick={simulation.toggle}
             >
               {simulation.running ? (
@@ -441,17 +504,18 @@ export default function App() {
               ) : (
                 <Play size={15} fill="currentColor" />
               )}
-              {diagramMode ? "Diagram only" : simulation.running
-                ? "Pause"
-                : simulation.metrics?.finished
-                  ? "Replay"
-                  : simulation.metrics?.time
-                    ? "Resume"
-                    : "Run"}
+              {simulation.running
+                  ? "Pause"
+                  : simulation.metrics?.finished
+                    ? "Replay"
+                    : simulation.metrics?.time
+                      ? "Resume"
+                      : "Run"}
             </button>
             <button
+              data-testid="reset-button"
               onClick={simulation.reset}
-              disabled={diagramMode || !!errors.length}
+              disabled={isReadOnly || !!errors.length}
               className="reset-button"
             >
               <RotateCcw size={15} />
@@ -462,19 +526,32 @@ export default function App() {
         <div className="canvas-shell">
           <div className="experiment-heading">
             <div>
-              <h1>{diagramMode ? "Map the whole system." : jobsMode ? "Follow a job." : "Follow a request."}</h1>
-              <p>{diagramMode ? "Choose components. Connect responsibilities. Name the boundaries." : "Find the bottleneck. Change one thing. Replay."}</p>
+              <h1>{guide ? guide.title : "Design and simulate your system"}</h1>
+              <p>
+                {guide
+                  ? guide.purpose
+                  : "Configure component behaviors, wire calls and messages, and observe modeled system performance."}
+              </p>
               <p className="mobile-pan-hint">
-                {diagramMode ? "Drag to explore the architecture →" : "Drag the canvas to follow the request →"}
+                Drag the canvas to pan across components →
               </p>
             </div>
-            <span className="tag">
-              {diagramMode ? "Architecture diagram" : jobsMode
-                ? "Background jobs experiment"
-                : "URL shortener experiment"}
-            </span>
+            {guide ? (
+              <span className="tag">{guide.title}</span>
+            ) : (
+              <span className="tag">Open system</span>
+            )}
           </div>
           <div className="canvas-area">
+            {graph.nodes.length === 0 && (
+              <div className="canvas-empty-prompt">
+                <h2>Empty canvas</h2>
+                <p>Add components from the library or choose an example architecture to begin.</p>
+                <div className="canvas-empty-actions">
+                  <button className="primary" onClick={() => setExamplesOpen(true)}>Choose example</button>
+                </div>
+              </div>
+            )}
             <ReactFlowProvider key={project.id}>
               <ArchitectureCanvas
                 metrics={simulation.metrics}
@@ -482,67 +559,49 @@ export default function App() {
               />
             </ReactFlowProvider>
           </div>
-          {!diagramMode && <div className="experiment-guide">
+          {guide && !isReadOnly && <section className="optional-tutorial" aria-label="Tutorial instructions"><h2>{guide.title}</h2><ol>{guide.steps.map(step => <li key={step}>{step}</li>)}</ol></section>}
+          <div className="experiment-guide">
             <div className="guide-copy">
               <span
                 className={`guide-status ${simulation.running ? "running" : ""}`}
               />
               <div>
                 <strong>
-                  {simulation.running
-                    ? "Watching requests move through your system"
-                    : simulation.metrics?.finished
-                      ? "Run complete. What changed?"
-                      : "One experiment, three moments"}
+                  {simulation.error
+                    ? "Simulation stopped"
+                    : simulation.metrics?.execution?.incomplete
+                      ? "Simulation reached resource boundary"
+                      : simulation.running
+                        ? "Simulation running"
+                        : simulation.metrics?.finished
+                          ? "Simulation completed"
+                          : "Interactive system model"}
                 </strong>
                 <span>
-                  {simulation.running
-                    ? `4× playback · ${profileLabel(graph.settings)}`
-                    : jobsMode
-                      ? "Compare admission, completion and retries. Scale workers to drain the queue."
-                      : hasBalancer(graph) ? "Compare instance queues, then inspect the shared database bottleneck." : "Run the baseline, raise the traffic, then give the database some help."}
+                  {simulation.error || simulation.metrics?.execution?.incomplete || (
+                    simulation.running
+                      ? `Observing traffic · duration ${graph.settings.duration}s`
+                      : "Adjust component behaviors, workloads, and run simulation."
+                  )}
                 </span>
               </div>
             </div>
             <div className="scenario-actions">
-              <button
-                className={
-                  graph.settings.traffic === 100 &&
-                  (!graph.settings.profile ||
-                    graph.settings.profile.kind === "steady")
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  editor.settings({
-                    traffic: 100,
-                    profile: { kind: "steady" },
-                  });
-                  editor.select(null);
-                }}
-              >
-                100 req/s
-              </button>
-              <button
-                className={
-                  graph.settings.traffic === 700 &&
-                  (!graph.settings.profile ||
-                    graph.settings.profile.kind === "steady")
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  editor.settings({
-                    traffic: 700,
-                    profile: { kind: "steady" },
-                  });
-                  editor.select(
-                    graph.nodes.find((n) => n.kind === "database")?.id ?? null,
-                  );
-                }}
-              >
-                700 req/s
-              </button>
+              {guide && (
+                <button
+                  className="subtle"
+                  onClick={() => {
+                    editor.change((g) => {
+                      delete g.guideId;
+                    });
+                  }}
+                  title="Dismiss guide instructions"
+                >
+                  <X size={13} />
+                  <span>Dismiss guide</span>
+                </button>
+              )}
+              <button onClick={() => setShowExportModal(!showExportModal)}>Export canvas</button>
               {simulation.result && (
                 <button
                   disabled={resultSaved}
@@ -555,22 +614,6 @@ export default function App() {
                   {resultSaved ? "Result saved" : "Save result"}
                 </button>
               )}
-              <button
-                disabled={hasCache || !!errors.length || jobsMode}
-                onClick={() => {
-                  editor.insertCache();
-                  setNotice(
-                    "Cache connected. Before and after checkpoints saved. Replay the same workload.",
-                  );
-                }}
-              >
-                <Plus size={14} />
-                {jobsMode
-                  ? "Queue → workers"
-                  : hasCache
-                    ? "Cache added"
-                    : "Add cache"}
-              </button>
             </div>
             {savingResult && simulation.result && (
               <form
@@ -598,12 +641,17 @@ export default function App() {
                 </button>
               </form>
             )}
-          </div>}
+          </div>
+          {showExportModal && (
+            <div style={{ padding: "8px 16px", background: "#f8faf9", borderTop: "1px solid #dce5e1" }}>
+              <DiagramExport project={project} />
+            </div>
+          )}
           {errors.length > 0 && (
             <div className="validation" role="alert">
               <TriangleAlert size={18} />
               <div>
-                <strong>Connect a supported request path to run</strong>
+                <strong>Graph has draft errors</strong>
                 {errors.map((e) => (
                   <p key={e}>{e}</p>
                 ))}
@@ -634,23 +682,31 @@ export default function App() {
                   "Saved model and workload restored. Run to replay; Undo returns to your previous canvas.",
                 );
               }}
-            />
+              />
           </Suspense>
-        ) : diagramMode ? (
-          <section className="diagram-status" aria-label="Diagram guidance">
-            <div className="diagram-status-copy"><strong>{graph.nodes.length} components · {graph.edges.length} connections</strong>
-            <span>{graph.nodes.length >= 100 ? "Component limit reached. " : ""}{graph.edges.length >= 200 ? "Connection limit reached." : "Drag from a handle to connect. Select a connection to describe its flow or delete it."}</span></div>
-            <DiagramExport project={project} />
-          </section>
         ) : (
-          <MetricsPanel
-            metrics={simulation.metrics}
-            previous={simulation.previous}
-            graph={graph}
-          />
+          <OpenMetricsPanel
+              metrics={simulation.metrics}
+              previous={simulation.previous}
+              graph={graph}
+            />
         )}
       </main>
-      <Inspector metrics={simulation.metrics} />
+      {isOpen ? (
+        <Suspense fallback={<aside className="inspector" />}>
+          <OpenInspector metrics={simulation.metrics} />
+        </Suspense>
+      ) : (
+        <fieldset disabled={true} style={{ display: "contents", border: "none", margin: 0, padding: 0 }}>
+          <Inspector metrics={simulation.metrics} />
+        </fieldset>
+      )}
+      {examplesOpen && (
+        <ExamplesPanel
+          onSelect={(graph) => editor.replaceSystem(graph)}
+          onClose={() => setExamplesOpen(false)}
+        />
+      )}
       {projectPanel && (
         <section className="project-panel" aria-label="Local projects">
           <div className="panel-title">
@@ -667,6 +723,7 @@ export default function App() {
             <input
               aria-label="Project name"
               maxLength={80}
+              disabled={isReadOnly}
               value={project.name}
               onChange={(e) => editor.rename(e.target.value)}
             />
@@ -686,14 +743,18 @@ export default function App() {
               </button>
             ))}
           </div>
-          <RevisionsPanel key={project.id} />
+            <Suspense fallback={null}>
+              <RevisionsPanel key={project.id} />
+            </Suspense>
           <button
             className="subtle"
-            onClick={() =>
-              switchProject(
-                newProject(`Untitled project ${projects.length + 1}`),
-              )
-            }
+            onClick={async () => {
+              try {
+                await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not create project.");
+              }
+            }}
           >
             <Plus size={15} />
             New project
@@ -727,65 +788,33 @@ export default function App() {
             <h2>What this simulation assumes</h2>
             <button
               aria-label="Close assumptions"
-              onClick={() => setAssumptions(false)}
-            >
+              onClick={() => setAssumptions(false)}>
               <X size={18} />
             </button>
           </div>
           <p>
-            An educational model for understanding cause and effect. Moving dots
-            show direction, not individual requests or measured speed.
-            Capacities are illustrative, not real hardware measurements.
+            Arbitrary configured directed behavior graph with illustrative capacities, not actual code execution.
           </p>
           <dl>
-            <dt>Arrival pattern</dt>
+            <dt>Sources & Workloads</dt>
             <dd>
-              Seeded Poisson arrivals follow the configured steady, burst or
-              linear-ramp rate. Replay preserves every arrival when seed and the
-              complete traffic profile stay the same.
+              Sources consume zero CPU and hold unlimited logical wait queues. Seeded arrivals support steady, burst, or ramp distributions.
             </dd>
-            <dt>Processing & queues</dt>
+            <dt>Concurrency & Holding</dt>
             <dd>
-              Services have 1–16 parallel workers, each processing at the
-              configured per-worker capacity. Total capacity is workers ×
-              per-worker capacity; processing time per request remains 1 ÷
-              per-worker capacity. Database and cache each have one processor.
-              One bounded FIFO queue per component excludes active work.
-              Arrivals are rejected only when all workers are busy and the queue
-              is full. Worker utilization is occupied processor time divided by
-              workers × elapsed time.
+              Components hold processing concurrency slots across synchronous downstream calls. FIFO queues retry locally before fan-out.
             </dd>
-            <dt>Load balancing & instances</dt>
-            <dd>Optional round-robin routing sends arrivals to 1–8 service instances in their listed order. Each instance owns 1–16 workers and one queue. The balancer is instantaneous with no capacity limit or queue. Equal turns are independent of instance capacity; full queues reject without rerouting. All instances share the optional cache and database. Moving nodes does not change routing order.</dd>
-            <dt>Cache</dt>
+            <dt>Calls & Routers</dt>
             <dd>
-              Fixed probability is a simple independent hit assumption. Finite LRU
-              starts empty and fills on live database completion; hits refresh
-              recency, while TTL starts at fill and does not refresh on hits.
-              Expired keys miss; capacity evicts the least recently used live key.
-              Hits return after cache processing; misses reach the database.
-              No miss coalescing, writes or invalidations are simulated.
+              Synchronous calls wait for all their parallel branches. Routers choose one branch using round-robin, weights, or conditions. Cache hits return locally; misses call the configured origin.
             </dd>
-            <dt>Timeouts & responses</dt>
+            <dt>Brokers & Messages</dt>
             <dd>
-              One deadline from arrival, including a fixed 8 ms response
-              overhead. Timed-out work already processing finishes but cannot
-              succeed. Expired waiting requests are removed.
+              Messages acknowledge admission after the configured acknowledgement and return delays. Acknowledgement does not mean completion. Competing and broadcast broker reservations deliver messages to consumers.
             </dd>
-            <dt>End of an experiment</dt>
+            <dt>TTL & Limits</dt>
             <dd>
-              The run stops at its configured duration. Outstanding requests
-              remain counted as in flight. Successful-request latency excludes
-              failures. Utilization and throughput are averages since the start.
-            </dd>
-            <dt>Scope</dt>
-            <dd>
-              Two paths: URL lookup and queued background jobs. Job retries use
-              a fixed backoff and an original-submission deadline. Producer
-              acknowledgements confirm queue admission after 8 ms, not
-              completion. Retrying jobs can fail permanently if the queue is
-              full. No state replication, network contention, health checks or worker crashes. Moving
-              a node changes only the view.
+              Messages inherit hop limits and TTL deadlines. Processing cleans up expired items. In-flight operations beyond the simulation horizon are accounted for. When simulation limits are hit, results are flagged as incomplete.
             </dd>
           </dl>
         </section>

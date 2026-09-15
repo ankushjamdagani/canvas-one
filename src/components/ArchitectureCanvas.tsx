@@ -11,6 +11,7 @@ import {
   Handle,
   Position,
   MarkerType,
+  SelectionMode,
   type NodeProps,
   type Node,
   type OnNodesChange,
@@ -33,16 +34,19 @@ import {
   ChevronRight,
   MonitorSmartphone, Smartphone, RadioTower, Globe2, ShieldCheck, Waypoints, Braces,
   Boxes, CalendarClock, FileStack, Search, Warehouse, Radio, BellRing, Activity,
-  ChartNoAxesCombined, KeyRound, PlugZap,
+  ChartNoAxesCombined, KeyRound, PlugZap, MousePointer, Hand,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
-import { isDiagramGraph, totalCapacity, type ModelNode, type Settings } from "../domain/model";
+import { isDiagramGraph, isOpenGraph, supportsFreeCanvas, totalCapacity, type ModelNode, type Settings } from "../domain/model";
 import { rateAt } from "../domain/workload";
 import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
 import { TrafficEdge, type TrafficConnection } from "./TrafficEdge";
 import { DiagramOrganization } from "./DiagramOrganization";
 import { CanvasNoteNode, noteAttachmentLabel, type NoteFlowNode } from "./CanvasNotes";
+import { CanvasContextMenu, type ContextMenuTarget } from "./CanvasContextMenu";
+import { defaultExecutionEdge } from "../domain/behaviorDefaults";
+import { OpenConnectionEditor } from "./OpenConnectionEditor";
 export const icons = {
   balancer: Network,
   traffic: ArrowRight,
@@ -81,11 +85,15 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
     Icon = icons[n.kind];
   const toggleExpanded = useEditor((s) => s.toggleExpanded);
   const overloaded = hasRun && (m?.utilization ?? 0) > 0.95;
+  const isOpen = n.behavior !== undefined;
+  const execMetrics = data.fullMetrics?.execution;
+  const nodeCounters = execMetrics?.nodes?.[n.id];
+
   return (
     <div
       className={`component-node ${diagram ? "diagram-node" : ""} ${expanded ? "expanded-node" : ""} ${selected ? "selected" : ""} ${overloaded ? "overloaded" : ""}`}
     >
-      {(diagram || n.kind !== "traffic") && (
+      {(diagram || isOpen || n.kind !== "traffic") && (
         <Handle type="target" position={Position.Left} />
       )}
       <div className="node-header">
@@ -97,6 +105,8 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           <span>
             {diagram
               ? (n.kind === "custom" ? n.customType : n.description) || "Architecture component"
+              : isOpen
+              ? `${n.behavior?.type ?? "processor"}${n.behavior && !["source", "broker"].includes(n.behavior.type) ? ` · ${n.behavior.capacity} /s per slot` : ""}`
               : n.kind === "traffic"
               ? `${rate.toLocaleString()} req/s`
               : n.kind === "balancer" ? "Round-robin routing"
@@ -120,26 +130,54 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </button>}
       </div>
-      {expanded && !diagram && (n.kind === "balancer" ? <div className="component-internals"><RoutingPanel metrics={data.fullMetrics} /></div> :
-        <ComponentInternals
-          node={n}
-          settings={data.settings}
-          metrics={m}
-          totals={data.totals}
-          hasRun={hasRun}
-        />
+      {expanded && !diagram && (
+        isOpen ? (
+          <div className="component-internals">
+            <div className="component-internals-grid">
+              <div><span>Type:</span> <strong>{n.behavior?.type}</strong></div>
+              {n.behavior && !["source", "broker"].includes(n.behavior.type) && <>
+                <div><span>Capacity per slot:</span> <strong>{n.behavior.capacity} /s</strong></div>
+                <div><span>Concurrency:</span> <strong>{n.behavior.concurrency}</strong></div>
+              </>}
+              {n.behavior?.type !== "source" && <div><span>Queue limit:</span> <strong>{n.behavior?.queueLimit ?? "—"}</strong></div>}
+              {nodeCounters && (
+                <>
+                  <div><span>Processing:</span> <strong>{nodeCounters.processing ?? 0}</strong></div>
+                  <div><span>Waiting:</span> <strong>{nodeCounters.waiting ?? 0}</strong></div>
+                  <div><span>Retrying:</span> <strong>{nodeCounters.retrying ?? 0}</strong></div>
+                  <div><span>Reserved:</span> <strong>{nodeCounters.reserved ?? 0}</strong></div>
+                  <div><span>Queue:</span> <strong>{nodeCounters.queued ?? 0}</strong></div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : n.kind === "balancer" ? (
+          <div className="component-internals"><RoutingPanel metrics={data.fullMetrics} /></div>
+        ) : (
+          <ComponentInternals
+            node={n}
+            settings={data.settings}
+            metrics={m}
+            totals={data.totals}
+            hasRun={hasRun}
+          />
+        )
       )}
       {overloaded && (
         <span className="node-alert">
           <AlertTriangle size={13} />
         </span>
       )}
-      {(diagram || !["database", "worker"].includes(n.kind)) && (
+      {(diagram || isOpen || !["database", "worker"].includes(n.kind)) && (
         <Handle type="source" position={Position.Right} />
       )}
       <div className={`node-footnote ${overloaded ? "warning-text" : ""}`}>
         {diagram
           ? "Connect freely · diagram only"
+          : isOpen
+          ? (nodeCounters
+              ? `${nodeCounters.completed ?? 0} done · ${nodeCounters.failed ?? 0} failed`
+              : "Configured behavior")
           : n.kind === "traffic"
           ? "Seeded arrival stream"
           : n.kind === "balancer" ? (hasRun ? `${m?.arrived.toLocaleString() ?? 0} routed · no rerouting` : "Equal turns · independent queues")
@@ -166,6 +204,71 @@ export function ArchitectureCanvas({
   const groups = visibleSubsystems(editor.project);
   const flow = useReactFlow();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [contextMenuTarget, setContextMenuTarget] = useState<ContextMenuTarget | null>(null);
+  const [dragMode, setDragMode] = useState<"select" | "pan">("select");
+  const isFree = supportsFreeCanvas(g);
+
+  useEffect(() => {
+    setContextMenuTarget(null);
+  }, [editor.project.id]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Check if canvas container has focus or contains activeElement
+      if (!canvasRef.current?.contains(document.activeElement)) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === "g" || e.key === "G")) {
+        e.preventDefault();
+        const selected = editor.selectedNodeIds;
+        if (selected.length >= 2) {
+          const rect = canvasRef.current?.getBoundingClientRect();
+          setContextMenuTarget({
+            x: rect ? rect.left + rect.width / 2 : 200,
+            y: rect ? rect.top + rect.height / 2 : 200,
+            kind: "components",
+            componentIds: selected,
+          });
+        }
+      } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+        e.preventDefault();
+        const selected = editor.selectedNodeIds;
+        const rect = canvasRef.current?.getBoundingClientRect();
+        const x = rect ? rect.left + rect.width / 2 : 200;
+        const y = rect ? rect.top + rect.height / 2 : 200;
+        if (selected.length > 0) {
+          setContextMenuTarget({
+            x,
+            y,
+            kind: "components",
+            componentIds: selected,
+          });
+        } else if (editor.selected && groups.some((grp) => grp.id === editor.selected)) {
+          setContextMenuTarget({
+            x,
+            y,
+            kind: "subsystem",
+            subsystemId: editor.selected,
+          });
+        }
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [editor.selectedNodeIds, editor.selected, groups]);
+
   useEffect(() => {
     const element = canvasRef.current;
     if (!element) return;
@@ -252,7 +355,7 @@ export function ArchitectureCanvas({
     }, 80);
     return () => clearTimeout(timer);
   }, [expandedKey, flow]);
-  const nodeIdentity = [...g.nodes, ...(isDiagramGraph(g) ? g.notes ?? [] : [])].map((node) => node.id).join(",");
+  const nodeIdentity = [...g.nodes, ...(supportsFreeCanvas(g) ? g.notes ?? [] : [])].map((node) => node.id).join(",");
   const nodeSet = useRef(nodeIdentity);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
   // Keep renderer measurements between metric updates. Dropping them makes
@@ -282,8 +385,8 @@ export function ArchitectureCanvas({
         type: "component",
         position: n.position,
         measured: dimensions[n.id],
-        selected: isDiagramGraph(g) ? editor.selectedNodeIds.includes(n.id) : editor.selected === n.id,
-        deletable: !isDiagramGraph(g),
+        selected: supportsFreeCanvas(g) ? editor.selectedNodeIds.includes(n.id) : editor.selected === n.id,
+        deletable: !supportsFreeCanvas(g),
         data: {
           fullMetrics: metrics,
           model: n,
@@ -307,12 +410,12 @@ export function ArchitectureCanvas({
     [g, editor.selected, editor.selectedNodeIds, editor.project.expandedNodeIds, metrics, dimensions],
   );
   const { nodes: architectureNodes, endpoints } = projectSubsystems(baseNodes, groups, metrics);
-  const noteNodes: NoteFlowNode[] = isDiagramGraph(g) ? (g.notes ?? []).map(note => ({
+  const noteNodes: NoteFlowNode[] = supportsFreeCanvas(g) ? (g.notes ?? []).map(note => ({
     id: note.id, type: "note", position: note.position, measured: dimensions[note.id],
     selected: editor.selected === note.id, deletable: false, connectable: false,
     data: { note, attachmentLabel: noteAttachmentLabel(note, editor.project) },
   })) : [];
-  const nodes: Node[] = [...architectureNodes, ...noteNodes];
+  const nodes: Node[] = [...architectureNodes.map(node => node.type === "subsystem" ? { ...node, selected: editor.selected === node.id } : node), ...noteNodes];
   const expectedRate = rateAt(g.settings, metrics?.time ?? 0);
   const edges: TrafficConnection[] = useMemo(
     () =>
@@ -327,19 +430,22 @@ export function ArchitectureCanvas({
           const source = g.nodes.find((n) => n.id === e.source);
           const balanced = hasBalancer(g), count = serviceInstances(g).length;
           const observed = !!metrics?.time && metrics.edges?.[e.id] !== undefined;
+          const isOpen = isOpenGraph(g);
+          const isMessage = (e as unknown as { transport?: string }).transport === "message";
           return {
             ...e,
             source: endpoints.get(e.source) ?? e.source,
             target: endpoints.get(e.target) ?? e.target,
             selected: selectedEdges.includes(e.id),
             type: "traffic",
+            animated: false,
             data: {
               running: running && pageVisible,
-              showLabel: !isDiagramGraph(g),
+              showLabel: !isDiagramGraph(g) && (!isOpen || !!metrics?.time),
               label: e.label,
               protocol: e.protocol,
-              communication: e.communication ?? "sync",
-              rateLabel: observed ? "observed" : g.nodes.find((n) => n.kind === "cache")?.cacheMode === "lru" && target?.kind === "database" ? "capacity" :
+              communication: isOpen ? (isMessage ? "async" : "sync") : (e.communication ?? "sync"),
+              rateLabel: observed ? "observed" : isOpen ? "" : g.nodes.find((n) => n.kind === "cache")?.cacheMode === "lru" && target?.kind === "database" ? "capacity" :
                 target?.kind === "worker"
                   ? metrics?.time
                     ? "attempts observed"
@@ -347,7 +453,7 @@ export function ArchitectureCanvas({
                   : target?.kind === "queue"
                     ? "offered"
                     : "expected",
-              rate: observed ? metrics!.edges![e.id] / metrics!.time : balanced && (target?.kind === "service" || source?.kind === "service") ? expectedRate / count :
+              rate: observed ? metrics!.edges![e.id] / metrics!.time : isOpen ? 0 : balanced && (target?.kind === "service" || source?.kind === "service") ? expectedRate / count :
                 target?.kind === "worker"
                   ? metrics?.time
                     ? (metrics.nodes[target.id]?.arrived ?? 0) / metrics.time
@@ -360,7 +466,7 @@ export function ArchitectureCanvas({
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
-              color: "#07858b",
+              color: isMessage ? "#a76108" : "#087f84",
               width: 15,
               height: 15,
             },
@@ -377,6 +483,14 @@ export function ArchitectureCanvas({
     ],
   );
   const onNodesChange: OnNodesChange = (changes) => {
+    const selections = changes.filter(change => change.type === "select" && g.nodes.some(node => node.id === change.id));
+    if (isFree && selections.length) {
+      const ids = new Set(useEditor.getState().selectedNodeIds);
+      for (const change of selections) if (change.type === "select") {
+        if (change.selected) ids.add(change.id); else ids.delete(change.id);
+      }
+      editor.selectNodes([...ids]);
+    }
     for (const change of changes) {
       if (change.type === "dimensions" && change.dimensions) {
         const size = change.dimensions;
@@ -395,7 +509,7 @@ export function ArchitectureCanvas({
       const directlyMoved = new Set(positions.flatMap((change) => change.type === "position" ? [change.id] : []));
       const next = applyNodeChanges(positions, nodes);
       const moved = new Map(
-        [...g.nodes, ...(isDiagramGraph(g) ? g.notes ?? [] : [])].map((node) => [
+        [...g.nodes, ...(supportsFreeCanvas(g) ? g.notes ?? [] : [])].map((node) => [
           node.id,
           next.find((n) => n.id === node.id)?.position ?? node.position,
         ]),
@@ -418,49 +532,220 @@ export function ArchitectureCanvas({
     }
   };
   return (
-    <>
-    <ReactFlow
+    <div
       ref={canvasRef}
+      className="system-canvas"
+      style={{ width: "100%", height: "100%", position: "relative", minHeight: 380 }}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Delete" || e.key === "Backspace") {
+          const target = e.target as HTMLElement | null;
+          if (
+            target &&
+            (target.tagName === "INPUT" ||
+              target.tagName === "TEXTAREA" ||
+              target.tagName === "SELECT" ||
+              target.isContentEditable)
+          ) {
+            return;
+          }
+          if (editor.readOnly) return;
+          if (isFree) {
+            const selectedNodes = editor.selectedNodeIds;
+            const selectedNoteId = editor.selected && g.notes?.some(n => n.id === editor.selected) ? editor.selected : null;
+            if (selectedNodes.length > 0) {
+              e.preventDefault();
+              editor.change((draft) => {
+                const nodeSet = new Set(selectedNodes);
+                draft.nodes = draft.nodes.filter((n) => !nodeSet.has(n.id));
+                draft.edges = draft.edges.filter(
+                  (edge) => !nodeSet.has(edge.source) && !nodeSet.has(edge.target),
+                );
+                if (draft.workloads) {
+                  draft.workloads = draft.workloads.filter((w) => !nodeSet.has(w.entryNodeId));
+                }
+              });
+              editor.selectNodes([]);
+            } else if (selectedNoteId) {
+              e.preventDefault();
+              editor.removeNote(selectedNoteId);
+            }
+          }
+        }
+      }}
+    >
+    <div className="canvas-actions-toolbar" role="toolbar" aria-label="Canvas selection tools">
+      <button
+        type="button"
+        className={`canvas-toolbar-btn ${dragMode === "select" ? "active" : ""}`}
+        aria-pressed={dragMode === "select"}
+        title="Select tool (box select)"
+        onClick={() => setDragMode("select")}
+      >
+        <MousePointer size={15} />
+        <span>Select</span>
+      </button>
+      <button
+        type="button"
+        className={`canvas-toolbar-btn ${dragMode === "pan" ? "active" : ""}`}
+        aria-pressed={dragMode === "pan"}
+        title="Pan tool (drag canvas)"
+        onClick={() => setDragMode("pan")}
+      >
+        <Hand size={15} />
+        <span>Pan</span>
+      </button>
+      <button
+        type="button"
+        className="canvas-toolbar-btn"
+        disabled={editor.selectedNodeIds.length === 0 && (!editor.selected || !groups.some(g => g.id === editor.selected))}
+        title="Actions for selected items"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (editor.selectedNodeIds.length > 0) {
+            setContextMenuTarget({
+              x: rect.left,
+              y: rect.bottom + 6,
+              kind: "components",
+              componentIds: editor.selectedNodeIds,
+            });
+          } else if (editor.selected && groups.some(g => g.id === editor.selected)) {
+            setContextMenuTarget({
+              x: rect.left,
+              y: rect.bottom + 6,
+              kind: "subsystem",
+              subsystemId: editor.selected,
+            });
+          }
+        }}
+      >
+        <Boxes size={15} />
+        <span>Selection actions</span>
+      </button>
+    </div>
+
+    <ReactFlow
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      nodesDraggable={!editor.readOnly}
+      nodesConnectable={!editor.readOnly}
+      elementsSelectable={true}
+      selectionOnDrag={!editor.readOnly && dragMode === "select"}
+      selectionMode={SelectionMode.Partial}
+      selectionKeyCode={null}
+      panActivationKeyCode="Space"
+      panOnDrag={dragMode === "pan" ? [0, 1] : [1]}
       onNodesChange={onNodesChange}
       onNodeDragStart={(_, node) => {
-        if (isDiagramGraph(g) && !editor.selectedNodeIds.includes(node.id)) editor.select(node.id);
+        if (isFree && !editor.selectedNodeIds.includes(node.id)) {
+          editor.select(node.id);
+        }
+        editor.beginMove();
+      }}
+      onSelectionDragStart={() => {
         editor.beginMove();
       }}
       onEdgesChange={(changes) => {
-        for (const c of changes) if (c.type === "select") {
-          if (c.selected) editor.select(null);
-          setSelectedEdges((ids) => c.selected
-            ? [...new Set([...ids, c.id])]
-            : ids.filter((id) => id !== c.id));
+        for (const c of changes) if (c.type === "select" && !c.selected) {
+          setSelectedEdges((ids) => ids.filter((id) => id !== c.id));
         }
+      }}
+      onEdgeClick={(_, edge) => {
+        editor.select(null);
+        setSelectedEdges([edge.id]);
       }}
       onNodeClick={(event, n) => {
         setSelectedEdges([]);
-        editor.select(n.id, isDiagramGraph(g) && (event.shiftKey || editor.selectionMode));
+        setContextMenuTarget(null);
+        if (n.type === "subsystem") {
+          editor.select(n.id);
+          return;
+        }
+        if (isFree && editor.selectedNodeIds.includes(n.id) && editor.selectedNodeIds.length > 1 && !event.shiftKey && !editor.selectionMode) {
+          // Do not collapse multi-selection on simple click so context menu / drag can act on the group
+          return;
+        }
+        editor.select(n.id, isFree && (event.shiftKey || editor.selectionMode));
       }}
-      onPaneClick={() => { editor.select(null); setSelectedEdges([]); }}
-      onConnect={(c) =>
-        !groups.some(
-          (group) => group.id === c.source || group.id === c.target,
-        ) &&
-        editor.change((g) => {
-          if (isDiagramGraph(g) && g.edges.length >= 200) return;
-          if (
-            !g.edges.some((e) => e.source === c.source && e.target === c.target)
-          )
-            g.edges.push({ ...c, id: crypto.randomUUID() });
-        })
-      }
-      onEdgesDelete={(deleted) =>
-        editor.change((g) => {
-          g.edges = g.edges.filter((e) => !deleted.some((d) => d.id === e.id));
-        })
-      }
-      onNodesDelete={(deleted) => !isDiagramGraph(g) && deleted.forEach((n) => editor.remove(n.id))}
+      onNodeContextMenu={(event, node) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (node.type === "subsystem") {
+          editor.select(node.id);
+          setContextMenuTarget({
+            x: event.clientX,
+            y: event.clientY,
+            kind: "subsystem",
+            subsystemId: node.id,
+          });
+          return;
+        }
+        if (node.type === "component") {
+          let ids = editor.selectedNodeIds;
+          if (!ids.includes(node.id)) {
+            ids = [node.id];
+            editor.selectNodes(ids);
+          }
+          setContextMenuTarget({
+            x: event.clientX,
+            y: event.clientY,
+            kind: "components",
+            componentIds: ids,
+          });
+        }
+      }}
+      onSelectionContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (editor.selectedNodeIds.length > 0) {
+          setContextMenuTarget({
+            x: event.clientX,
+            y: event.clientY,
+            kind: "components",
+            componentIds: editor.selectedNodeIds,
+          });
+        }
+      }}
+      onPaneClick={() => {
+        editor.select(null);
+        setSelectedEdges([]);
+        setContextMenuTarget(null);
+      }}
+      onConnect={(c) => {
+        if (editor.readOnly) return;
+        if (!c.source || !c.target) return;
+        if (groups.some((group) => group.id === c.source || group.id === c.target)) return;
+        if (c.source === c.target) return;
+
+        editor.change((draft) => {
+          if (draft.edges.length >= 200) return;
+          if (draft.edges.some((e) => e.source === c.source && e.target === c.target)) return;
+
+          if (isOpenGraph(draft)) {
+            const sourceNode = draft.nodes.find((n) => n.id === c.source);
+            const targetNode = draft.nodes.find((n) => n.id === c.target);
+            const newEdge = defaultExecutionEdge(c.source, c.target, targetNode?.behavior);
+            if (sourceNode?.behavior?.type === "broker") {
+              newEdge.transport = "message";
+            }
+            (draft.edges as unknown as typeof newEdge[]).push(newEdge);
+          } else {
+            draft.edges.push({ ...c, id: crypto.randomUUID() });
+          }
+        });
+      }}
+      onEdgesDelete={(deleted) => {
+        if (editor.readOnly) return;
+        editor.change((draft) => {
+          draft.edges = draft.edges.filter((e) => !deleted.some((d) => d.id === e.id));
+        });
+      }}
+      onNodesDelete={(deleted) => {
+        if (editor.readOnly || isFree) return;
+        deleted.forEach((n) => editor.remove(n.id));
+      }}
       onMoveEnd={(_, viewport) =>
         editor.viewport({
           ...viewport,
@@ -480,13 +765,19 @@ export function ArchitectureCanvas({
       maxZoom={1.8}
       fitView={initialFit.current && !mobile}
       fitViewOptions={{ padding: 0.23, maxZoom: 1 }}
-      deleteKeyCode={isDiagramGraph(g) ? null : ["Backspace", "Delete"]}
+      deleteKeyCode={null}
       proOptions={{ hideAttribution: true }}
     >
       <Background color="#d6e0dc" gap={20} size={1} />
       <Controls showInteractive={false} position="bottom-left" />
     </ReactFlow>
-    <DiagramOrganization
+
+    <CanvasContextMenu
+      target={contextMenuTarget}
+      onClose={() => setContextMenuTarget(null)}
+    />
+
+    {(editor.selectedNodeIds.length > 0 || editor.selectionMode) ? <DiagramOrganization
       onAddNote={() => {
         const box = canvasRef.current?.getBoundingClientRect();
         if (box) { setSelectedEdges([]); editor.addNote(flow.screenToFlowPosition({ x: box.left + box.width / 2 - 100, y: box.top + box.height * 0.65 })); }
@@ -494,12 +785,19 @@ export function ArchitectureCanvas({
       dimensions={dimensions}
       onSelectComponent={(id) => { setSelectedEdges([]); editor.select(id, true); }}
       onSelectionModeChange={(active) => { if (active) setSelectedEdges([]); editor.setSelectionMode(active); }}
-    />
+    /> : <div className="canvas-organization-entry">
+      <button onClick={() => editor.setSelectionMode(true)}>Select components</button>
+      <button onClick={() => {
+        const box = canvasRef.current?.getBoundingClientRect();
+        if (box) editor.addNote(flow.screenToFlowPosition({ x: box.left + box.width / 2 - 100, y: box.top + box.height * 0.65 }));
+      }} disabled={editor.readOnly}>Add canvas note</button>
+    </div>}
+    {!!selectedEdges.length && isOpenGraph(g) && <OpenConnectionEditor edgeId={selectedEdges[0]} onClose={() => setSelectedEdges([])} />}
     {!!selectedEdges.length && isDiagramGraph(g) && (() => { const edge = g.edges.find((item) => item.id === selectedEdges[0]); if (!edge) return null; return <section className="connection-editor" aria-label="Selected connection">
       <div className="connection-editor-heading"><strong>Connection</strong><button aria-label="Delete connection" onClick={() => { editor.change((graph) => { graph.edges = graph.edges.filter((item) => !selectedEdges.includes(item.id)); }); setSelectedEdges([]); }}><Trash2 size={14} /></button></div>
       <label><span>Label</span><input aria-label="Connection label" maxLength={60} placeholder="Reads, publishes, uploads…" value={edge.label ?? ""} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.label = event.target.value; })} /></label>
       <div className="connection-editor-row"><label><span>Protocol</span><input aria-label="Connection protocol" maxLength={30} placeholder="HTTPS, gRPC…" value={edge.protocol ?? ""} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.protocol = event.target.value; })} /></label><label><span>Flow</span><select aria-label="Connection flow" value={edge.communication ?? "sync"} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.communication = event.target.value as "sync" | "async" | "data"; })}><option value="sync">Synchronous</option><option value="async">Asynchronous</option><option value="data">Data flow</option></select></label></div>
     </section>; })()}
-    </>
+    </div>
   );
 }

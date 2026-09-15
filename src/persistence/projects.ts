@@ -16,23 +16,29 @@ export const repository = {
   get: (id: string) => projects.get(id),
 };
 export function exportProject(project: Project) {
-  return JSON.stringify(
-    { format: "system-studio", version: 7, project },
+  const isOpen = project.graph.executionVersion === "open-system/1";
+  const text = JSON.stringify(
+    { format: "system-studio", version: isOpen ? 8 : 7, project },
     null,
     2,
   );
+  if (isOpen && text.length > 2_000_000) throw new Error("Project files must be smaller than 2 MB. Export fewer saved snapshots or results.");
+  return text;
 }
 export function importProject(text: string): Project {
   if (text.length > 2_000_000)
     throw new Error("Project files must be smaller than 2 MB.");
   const data = JSON.parse(text);
-  if (data?.format !== "system-studio" || data.version !== 7)
+  if (data?.format !== "system-studio" || (data.version !== 7 && data.version !== 8))
     throw new Error(
-      "Unsupported file. Import a current System studio version-7 export. Older portable formats are no longer imported; existing local projects are not deleted.",
+      "Unsupported file. Import a System studio version-8 export or version-7 archive. Older portable formats are no longer imported; existing local projects are not deleted.",
     );
+  const isVersion8 = data.version === 8;
   const p = data.project;
+  if (!p || typeof p !== "object") {
+    throw new Error("Project structure is invalid.");
+  }
   if (
-    !p ||
     typeof p.name !== "string" ||
     !p.name.trim() ||
     p.name.length > 80 ||
@@ -40,11 +46,27 @@ export function importProject(text: string): Project {
     p.checkpoints.length > 50
   )
     throw new Error("Project name or checkpoints are invalid.");
+
+  if (isVersion8) {
+    if (p.graph?.executionVersion !== "open-system/1") {
+      throw new Error("Format version 8 requires an open-system execution graph.");
+    }
+  } else {
+    if (p.graph?.executionVersion === "open-system/1") {
+      throw new Error("Format version 7 cannot contain open-system execution graphs.");
+    }
+  }
+
   const errors = [
     ...validateGraph(p.graph, false),
     ...validateSubsystems(p.subsystems),
     ...validateRevisions(p.revisions),
   ];
+  if (errors.length) throw new Error(errors[0]);
+  for (const revision of p.revisions ?? []) {
+    if ((revision.graph.executionVersion === "open-system/1") !== isVersion8)
+      throw new Error("Revision model does not match the portable format version.");
+  }
   const noteGroupCollision = (graph: Project["graph"]) => Array.isArray(graph?.notes) &&
     graph.notes.some(note => note && (p.subsystems ?? []).some((group: { id: string }) => group?.id === note.id));
   if (Array.isArray(p.subsystems) && noteGroupCollision(p.graph))
@@ -63,6 +85,11 @@ export function importProject(text: string): Project {
       !Number.isFinite(checkpoint.createdAt)
     )
       throw new Error("A checkpoint is invalid.");
+    if (isVersion8 && checkpoint.graph?.executionVersion !== "open-system/1") {
+      throw new Error("Format version 8 checkpoints must be open-system graphs.");
+    } else if (!isVersion8 && checkpoint.graph?.executionVersion === "open-system/1") {
+      throw new Error("Format version 7 checkpoints cannot be open-system graphs.");
+    }
     errors.push(...validateGraph(checkpoint.graph, false));
     if (Array.isArray(p.subsystems) && noteGroupCollision(checkpoint.graph))
       errors.push("Canvas note IDs must differ from subsystem IDs.");
@@ -80,6 +107,12 @@ export function importProject(text: string): Project {
     throw new Error(
       `A project can contain up to ${MAX_SAVED_RUNS} saved results.`,
     );
+  for (const run of savedRuns) {
+    if (!run || typeof run !== "object") throw new Error("A saved result is invalid.");
+    const runIsOpen = run.modelVersion === "open-system/1" || run.graph?.executionVersion === "open-system/1";
+    if (isVersion8 && !runIsOpen) throw new Error("Format version 8 saved results must be open-system results.");
+    if (!isVersion8 && runIsOpen) throw new Error("Format version 7 saved results cannot be open-system results.");
+  }
   for (const run of savedRuns) {
     const problems = validateSavedRun(run);
     if (problems.length) throw new Error(problems[0]);

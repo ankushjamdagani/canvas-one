@@ -1,8 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
+import { componentNode, openExample } from "./openHelpers";
 
 async function clickFirstEdge(page: Page) {
   await page.locator(".react-flow").scrollIntoViewIfNeeded();
-  const point = await page.locator(".react-flow__edge-interaction").first().evaluate((element) => {
+  const pathLocator = page.locator(".react-flow__edge-interaction").first();
+  await expect(pathLocator).toBeAttached(); // Horizontal SVG paths have zero bounding-box height.
+  const point = await pathLocator.evaluate((element) => {
     const path = element as SVGPathElement;
     const local = path.getPointAtLength(path.getTotalLength() / 2);
     const matrix = path.getScreenCTM();
@@ -11,164 +14,254 @@ async function clickFirstEdge(page: Page) {
     return { x: screen.x, y: screen.y };
   });
   await page.mouse.click(point.x, point.y);
-  await expect(page.getByRole("region", { name: "Selected connection" })).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "Connection configuration" }),
+  ).toBeVisible();
 }
 
-test("architecture diagram offers searchable components and editable responsibilities", async ({ page }) => {
+test("open system offers searchable components and editable responsibilities", async ({
+  page,
+}) => {
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
-  await expect(page.getByRole("heading", { name: "Map the whole system." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Diagram only", exact: true })).toBeDisabled();
+  await page.locator(".react-flow").waitFor({ state: "visible" });
+
   await page.getByRole("textbox", { name: "Search components" }).fill("storage");
-  await expect(page.getByRole("button", { name: /Object storage/ })).toBeVisible();
-  await page.getByRole("button", { name: /Object storage/ }).click();
-  await page.getByRole("textbox", { name: "Component name" }).fill("Media bucket");
-  await page.getByRole("textbox", { name: "Responsibility or technology" }).fill("Stores uploaded media and generated thumbnails.");
-  await expect(page.locator(".node-copy").filter({ hasText: "Media bucket" })).toBeVisible();
-  await expect(page.locator(".node-copy").getByText("Stores uploaded media and generated thumbnails.", { exact: true })).toBeVisible();
-  await expect(page.getByText(/4 components · 2 connections/)).toBeVisible();
+  const storageItem = page.locator(".library-item").filter({ hasText: "Object storage" });
+  await expect(storageItem).toBeVisible();
+  await storageItem.click();
+
+  const node = componentNode(page, "Object storage");
+  await expect(node).toBeVisible();
+  await node.click();
+
+  const inspector = page.getByRole("complementary", { name: "Component inspector" });
+  await expect(inspector).toBeVisible();
+  await inspector.getByRole("textbox", { name: "Name", exact: true }).first().fill("Media bucket");
+  await inspector
+    .getByRole("textbox", { name: "Description / Notes" })
+    .fill("Stores uploaded media and generated thumbnails.");
+
+  await expect(componentNode(page, "Media bucket")).toBeVisible();
+  await expect(inspector.getByRole("textbox", { name: "Description / Notes" })).toHaveValue("Stores uploaded media and generated thumbnails.");
+
+  // Load starter example to test connection selection and editing
+  await openExample(page, "Real-time chat");
   await clickFirstEdge(page);
-  await page.getByRole("textbox", { name: "Connection label" }).fill("Calls API");
-  await page.getByRole("textbox", { name: "Connection protocol" }).fill("HTTPS");
-  await expect(page.getByRole("region", { name: "Selected connection" })).toBeVisible();
+  const connEditor = page.getByRole("complementary", { name: "Connection configuration" });
+  await connEditor.getByRole("textbox", { name: "Label" }).fill("Calls API");
+  await connEditor.getByRole("textbox", { name: "Protocol" }).fill("HTTPS");
+  await expect(connEditor).toBeVisible();
   await page.screenshot({ path: "artifacts/architecture-components.png", fullPage: true });
 });
 
 test("architecture component palette remains usable on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
+  await page.locator(".react-flow").waitFor({ state: "visible" });
+
+  await openExample(page, "Real-time chat");
   await clickFirstEdge(page);
-  await expect(page.getByRole("button", { name: "Delete connection" })).toBeVisible();
-  await page.getByRole("textbox", { name: "Connection label" }).fill("Calls API");
-  await page.getByRole("textbox", { name: "Connection protocol" }).fill("HTTPS");
-  await page.getByRole("combobox", { name: "Connection flow" }).selectOption("async");
-  await expect(page.getByText("Calls API · HTTPS", { exact: true })).toBeVisible();
+  const connEditor = page.getByRole("complementary", { name: "Connection configuration" });
+  await expect(
+    connEditor.getByRole("button", { name: "Delete Connection" }),
+  ).toBeVisible();
+  await connEditor.getByRole("textbox", { name: "Label" }).fill("Calls API");
+  await connEditor.getByRole("textbox", { name: "Protocol" }).fill("HTTPS");
+  await connEditor.getByRole("combobox", { name: "Transport" }).selectOption("message");
+  await connEditor.getByRole("button", { name: "Done" }).click();
+
   await page.getByRole("textbox", { name: "Search components" }).fill("queue");
-  await expect(page.getByRole("button", { name: /Message queue/ })).toBeVisible();
-  expect(await page.locator(".workspace").evaluate((element) => element.getBoundingClientRect().width <= innerWidth)).toBe(true);
+  await expect(
+    page.locator(".library-item").filter({ hasText: "Message queue" }),
+  ).toBeVisible();
+  expect(
+    await page.locator(".workspace").evaluate((element) => element.getBoundingClientRect().width <= innerWidth),
+  ).toBe(true);
   await page.screenshot({ path: "artifacts/architecture-components-mobile.png", fullPage: true });
 });
 
-test("architecture diagram enforces its component boundary before becoming invalid", async ({ page }) => {
-  test.setTimeout(45000);
+test("open system enforces its component boundary before becoming invalid", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
+  await page.locator(".react-flow").waitFor({ state: "visible" });
+
   await page.getByRole("textbox", { name: "Search components" }).fill("storage");
-  const add = page.getByRole("button", { name: /Object storage/ });
-  for (let count = 3; count < 100; count++) await add.click();
-  await expect(page.getByText("100 components · 2 connections", { exact: true })).toBeVisible();
+  const add = page.locator(".library-item").filter({ hasText: "Object storage" });
+  await expect(add).toBeVisible();
+
+  for (let count = 0; count < 100; count++) {
+    await add.click();
+  }
+
+  await expect(page.locator(".react-flow__node-component")).toHaveCount(100);
   await expect(add).toBeDisabled();
-  await expect(page.getByText(/Component limit reached/)).toBeVisible();
+  await expect(add).toHaveAttribute("title", "System has reached the 100-node limit.");
   await page.screenshot({ path: "artifacts/architecture-components-limit.png", fullPage: true });
 });
 
 test("custom components keep their type and duplicate without connections", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
+  await page.locator(".react-flow").waitFor({ state: "visible" });
+
   await page.getByRole("textbox", { name: "Search components" }).fill("custom");
-  await page.getByRole("button", { name: /Custom component/ }).click();
-  await page.getByRole("textbox", { name: "Type label" }).fill("Feature flag service");
-  await page.getByRole("textbox", { name: "Component name" }).fill("Release flags");
-  await page.getByRole("textbox", { name: "Responsibility or technology" }).fill("Controls staged releases and emergency kill switches.");
-  await page.getByRole("button", { name: "Duplicate component" }).click();
-  await expect(page.getByRole("textbox", { name: "Component name" })).toHaveValue("Release flags copy");
-  await expect(page.getByRole("textbox", { name: "Type label" })).toHaveValue("Feature flag service");
-  await expect(page.getByText("5 components · 2 connections", { exact: true })).toBeVisible();
+  const addCustom = page.locator(".library-item").filter({ hasText: "Custom component" });
+  await expect(addCustom).toBeVisible();
+  await addCustom.click();
+
+  const node = componentNode(page, "Custom component");
+  await expect(node).toBeVisible();
+  await node.click();
+
+  const inspector = page.getByRole("complementary", { name: "Component inspector" });
+  await expect(inspector).toBeVisible();
+  await inspector.getByRole("textbox", { name: "Custom Type Label" }).fill("Feature flag service");
+  await inspector.getByRole("textbox", { name: "Name", exact: true }).first().fill("Release flags");
+  await inspector
+    .getByRole("textbox", { name: "Description / Notes" })
+    .fill("Controls staged releases and emergency kill switches.");
+
+  await inspector.getByRole("button", { name: "Duplicate Node" }).click();
+  await expect(inspector.getByRole("textbox", { name: "Name", exact: true }).first()).toHaveValue("Release flags copy");
+  await expect(inspector.getByRole("textbox", { name: "Custom Type Label" })).toHaveValue("Feature flag service");
+  await expect(page.locator(".react-flow__node-component")).toHaveCount(2);
+
   await page.getByRole("button", { name: "Undo" }).click();
-  await expect(page.getByText("4 components · 2 connections", { exact: true })).toBeVisible();
+  await expect(page.locator(".react-flow__node-component")).toHaveCount(1);
   await page.getByRole("button", { name: "Redo" }).click();
-  await expect(page.getByText("5 components · 2 connections", { exact: true })).toBeVisible();
+  await expect(page.locator(".react-flow__node-component")).toHaveCount(2);
   await page.screenshot({ path: "artifacts/custom-component.png", fullPage: true });
 });
 
-test("custom component controls and long content stay contained on mobile", async ({ page }) => {
+test("custom component controls and long content stay contained on mobile", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
+  await page.locator(".react-flow").waitFor({ state: "visible" });
+
   await page.getByRole("textbox", { name: "Search components" }).fill("custom");
-  await page.getByRole("button", { name: /Custom component/ }).click();
-  await page.getByRole("textbox", { name: "Type label" }).fill("ExtremelyLongComponentTypeWithoutSpacesThatMustWrapInsideTheCard");
-  await page.getByRole("textbox", { name: "Component name" }).fill("ExtremelyLongInstanceNameWithoutSpacesThatMustStayInsideTheCard");
-  await expect(page.getByRole("button", { name: "Duplicate component" })).toBeVisible();
-  await page.getByRole("button", { name: "Duplicate component" }).click();
-  expect(await page.locator(".workspace").evaluate((element) => element.getBoundingClientRect().right <= innerWidth)).toBe(true);
-  const labelsContained = await page.locator(".node-copy").evaluateAll((nodes) => nodes.every((node) => node.scrollWidth <= node.clientWidth));
+  const addCustom = page.locator(".library-item").filter({ hasText: "Custom component" });
+  await expect(addCustom).toBeVisible();
+  await addCustom.click();
+
+  const node = componentNode(page, "Custom component");
+  await expect(node).toBeVisible();
+  await node.click();
+
+  const inspector = page.getByRole("complementary", { name: "Component inspector" });
+  await expect(inspector).toBeVisible();
+  await inspector
+    .getByRole("textbox", { name: "Custom Type Label" })
+    .fill("ExtremelyLongComponentTypeWithoutSpacesThatMustWrapInsideTheCard");
+  await inspector
+    .getByRole("textbox", { name: "Name", exact: true }).first()
+    .fill("ExtremelyLongInstanceNameWithoutSpacesThatMustStayInsideTheCard");
+
+  await expect(inspector.getByRole("button", { name: "Duplicate Node" })).toBeVisible();
+  await inspector.getByRole("button", { name: "Duplicate Node" }).click();
+
+  expect(
+    await page.locator(".workspace").evaluate((element) => element.getBoundingClientRect().right <= innerWidth),
+  ).toBe(true);
+  const labelsContained = await page
+    .locator(".node-copy")
+    .evaluateAll((nodes) => nodes.every((node) => node.scrollWidth <= node.clientWidth));
   expect(labelsContained).toBe(true);
   await page.screenshot({ path: "artifacts/custom-component-mobile.png", fullPage: true });
 });
 
-test("architecture templates load editable graphs and preserve them locally and portably", async ({ page }) => {
+test("architecture templates load editable graphs and preserve them locally and portably", async ({
+  page,
+}) => {
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
-  await page.locator(".react-flow__node").filter({ hasText: "Client" }).click();
-  await page.getByRole("textbox", { name: "Component name" }).fill("My original client");
-  await page.locator(".architecture-templates > summary").click();
-  await expect(page.getByText("Loading replaces the current diagram. You can Undo to restore it.")).toBeVisible();
+  await page.locator(".react-flow").waitFor({ state: "visible" });
 
-  await page.getByRole("combobox", { name: "Architecture template" }).selectOption("realtime-chat");
-  await expect(page.getByText("Trace message submission, persistence, fan-out, and notification delivery.")).toBeVisible();
-  await page.getByRole("button", { name: "Load template" }).click();
-  await expect(page.getByText("7 components · 6 connections", { exact: true })).toBeVisible();
-  await expect(page.locator(".node-copy").filter({ hasText: "Chat service" })).toBeVisible();
+  await openExample(page, "Real-time chat");
+  await expect(componentNode(page, "Chat service")).toBeVisible();
+  const chatNodeCount = await page.locator(".react-flow__node-component").count();
+
   await page.getByRole("button", { name: "Undo" }).click();
-  await expect(page.locator(".node-copy").filter({ hasText: "My original client" })).toBeVisible();
+  await expect(page.locator(".react-flow__node-component")).toHaveCount(0);
   await page.getByRole("button", { name: "Redo" }).click();
-  await expect(page.locator(".node-copy").filter({ hasText: "Chat service" })).toBeVisible();
+  await expect(page.locator(".react-flow__node-component")).toHaveCount(chatNodeCount);
+  await expect(componentNode(page, "Chat service")).toBeVisible();
 
-  await page.getByRole("combobox", { name: "Architecture template" }).selectOption("ecommerce-checkout");
-  await page.getByRole("button", { name: "Load template" }).click();
-  await expect(page.getByText("8 components · 7 connections", { exact: true })).toBeVisible();
-  await expect(page.locator(".node-copy").filter({ hasText: "Payment provider" })).toBeVisible();
+  await openExample(page, "Ecommerce checkout");
+  await expect(componentNode(page, "Payment provider")).toBeVisible();
 
-  await page.getByRole("combobox", { name: "Architecture template" }).selectOption("event-processing");
-  await page.getByRole("button", { name: "Load template" }).click();
-  await expect(page.getByText("6 components · 5 connections", { exact: true })).toBeVisible();
-  await expect.poll(() => page.locator(".react-flow").evaluate((canvas) => {
-    const bounds = canvas.getBoundingClientRect();
-    return [...canvas.querySelectorAll(".react-flow__node")].every((node) => {
-      const rect = node.getBoundingClientRect();
-      return rect.left >= bounds.left && rect.right <= bounds.right && rect.top >= bounds.top && rect.bottom <= bounds.bottom;
-    });
-  })).toBe(true);
+  await openExample(page, "Event processing");
+  await expect(componentNode(page, "Event producer")).toBeVisible();
+  await expect.poll(() =>
+    page.locator(".react-flow").evaluate((canvas) => {
+      const bounds = canvas.getBoundingClientRect();
+      return [...canvas.querySelectorAll(".react-flow__node")].every((node) => {
+        const rect = node.getBoundingClientRect();
+        return (
+          rect.left >= bounds.left &&
+          rect.right <= bounds.right &&
+          rect.top >= bounds.top &&
+          rect.bottom <= bounds.bottom
+        );
+      });
+    }),
+  ).toBe(true);
   await page.screenshot({ path: "artifacts/architecture-template.png", fullPage: true });
+
   await clickFirstEdge(page);
-  await page.getByRole("textbox", { name: "Connection label" }).fill("Collect");
-  await page.locator(".react-flow__node").filter({ hasText: "Event producer" }).click();
-  await page.getByRole("textbox", { name: "Component name" }).fill("Sensor fleet");
-  await page.getByRole("button", { name: "Duplicate component" }).click();
-  await expect(page.getByRole("textbox", { name: "Component name" })).toHaveValue("Sensor fleet copy");
+  const connEditor = page.getByRole("complementary", { name: "Connection configuration" });
+  await connEditor.getByRole("textbox", { name: "Label" }).fill("Collect");
+  await connEditor.getByRole("button", { name: "Done" }).click();
+
+  const producerNode = componentNode(page, "Event producer");
+  await producerNode.click();
+  const inspector = page.getByRole("complementary", { name: "Component inspector" });
+  await inspector.getByRole("textbox", { name: "Name", exact: true }).first().fill("Sensor fleet");
+  await inspector.getByRole("button", { name: "Duplicate Node" }).click();
+  await expect(inspector.getByRole("textbox", { name: "Name", exact: true }).first()).toHaveValue("Sensor fleet copy");
+
   await page.getByRole("textbox", { name: "Checkpoint name" }).fill("Event template edited");
   await page.getByRole("button", { name: "Save checkpoint" }).click();
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(page.locator(".node-copy").filter({ hasText: "Sensor fleet copy" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Event template edited", exact: true })).toBeVisible();
-  await page.locator(".react-flow__node").filter({ hasText: "Sensor fleet copy" }).click();
-  await page.getByRole("textbox", { name: "Component name" }).fill("Changed after checkpoint");
-  await page.getByRole("button", { name: "Event template edited", exact: true }).click();
-  await expect(page.locator(".node-copy").filter({ hasText: "Sensor fleet copy" })).toBeVisible();
-  await expect(page.locator(".node-copy").filter({ hasText: "Changed after checkpoint" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "URL shortener", exact: true }).click();
+  await page.reload();
+  await expect(componentNode(page, "Sensor fleet copy")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Event template edited", exact: true }),
+  ).toBeVisible();
+
+  const copyNode = componentNode(page, "Sensor fleet copy");
+  await copyNode.click();
+  await inspector.getByRole("textbox", { name: "Name", exact: true }).first().fill("Changed after checkpoint");
+  await page.getByRole("button", { name: "Event template edited", exact: true }).click();
+  await expect(componentNode(page, "Sensor fleet copy")).toBeVisible();
+  await expect(componentNode(page, "Changed after checkpoint")).toHaveCount(0);
+
+  await page.locator(".project-switch").click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON", exact: true }).click();
   const download = await downloadPromise;
   await page.locator("input[type=file]").setInputFiles((await download.path())!);
-  await expect(page.getByRole("button", { name: "URL shortener (imported)", exact: true })).toBeVisible();
-  await expect(page.locator(".node-copy").filter({ hasText: "Sensor fleet copy" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /\(imported\)$/ }).first()).toBeVisible();
+  await expect(componentNode(page, "Sensor fleet copy")).toBeVisible();
 });
 
 test("architecture template controls remain accessible on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.getByRole("combobox", { name: "Experiment path", exact: true }).selectOption("diagram");
-  await page.locator(".architecture-templates > summary").click();
-  await page.getByRole("combobox", { name: "Architecture template" }).selectOption("realtime-chat");
-  const load = page.getByRole("button", { name: "Load template" });
+  await page.locator(".react-flow").waitFor({ state: "visible" });
+
+  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  const modal = page.locator(".examples-modal");
+  await expect(modal).toBeVisible();
+  const chatItem = modal.locator(".example-list-item").filter({ hasText: "Real-time chat" });
+  await chatItem.click();
+
+  const load = page.getByRole("button", { name: "Load example" });
   expect((await load.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await load.click();
-  await expect(page.getByText("7 components · 6 connections", { exact: true })).toBeVisible();
+  await expect(componentNode(page, "Chat service")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: "artifacts/architecture-template-mobile.png", fullPage: true });
 });

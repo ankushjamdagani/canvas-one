@@ -8,11 +8,11 @@ Open the project selector, then **Architecture revisions**. Save a draft with a 
 
 There are up to 20 snapshots per project, including final copies. Names are self-reported and final status records a local decision; this is browser-local history, with no authenticated authors, team approval or cloud sync.
 
-An interactive architecture-learning workspace. Explore URL lookups and queued background jobs, inspect component internals, group subsystems, run seeded workloads, and compare saved results.
+An interactive architecture-learning workspace on one unified canvas. Start blank or load optional examples/tutorials, configure all 29 catalog component kinds and workloads, inspect internals, group subsystems, run seeded performance models, and compare saved results.
 
-## Architecture diagrams
+## Unified canvas
 
-Choose **Architecture diagram** to compose a system from 29 searchable building blocks across clients, edge, compute, data, messaging and operations. Use **Custom component** when the built-in catalog does not describe a dependency, then edit its type label, instance name and responsibility or technology notes. Connect up to 100 components freely. Select any component and choose **Duplicate component** to copy its configuration into a new, unconnected node; Undo and Redo treat that copy as one edit. Diagram components are visual by design; exact executable experiments remain separate, so a component never implies simulation behavior it does not implement.
+Compose a system from 29 searchable building blocks across clients, edge, compute, data, messaging and operations. Every component can be configured with explicit capacity, queueing, concurrency, failure, retry, cache, broker, and workload behavior. Use **Custom component** when needed, then edit its type label, instance name and notes. Connect up to 100 components freely. The simulator models performance behavior and does not execute application code or reproduce a cloud provider.
 
 Select a connection to name the relationship, record its protocol, and classify it as synchronous, asynchronous, or data flow. Those choices appear as solid, dashed, or dotted paths and persist with checkpoints and exports.
 
@@ -35,9 +35,9 @@ npm run dev
 
 Open http://localhost:5173. Production build: `npm run build`.
 
-## Guided experiments
+## Examples & tutorials
 
-Choose a **Guided experiment** in the library:
+Open **Examples & tutorials** for optional starters and guided exercises:
 
 - **Relieve database pressure:** compare overloaded URL lookups before and after adding cache.
 - **Scale a worker pool:** compare one worker with four at unchanged per-worker speed.
@@ -102,7 +102,7 @@ Missing worker count defaults to one. Portable exports/imports use the current v
 
 ## Load-balanced service instances
 
-Choose **Load-balanced lookup** in Experiment path. The instantaneous round-robin balancer sends each arrival to the next service instance in listed order. Each instance has its own worker pool and bounded FIFO queue; a full queue rejects that arrival and never reroutes it. Add up to eight instances from the expanded Load balancer panel; a new instance copies the first instance’s capacity, worker count and queue limit. Instances share the optional cache and database, so horizontal scaling can move the bottleneck downstream. The routing panel reports expected equal share before a run and routed, waiting, rejected and busy values after it. Moving or renaming nodes does not change routing order.
+The optional load-balanced example uses an instantaneous round-robin balancer. Each instance has its own worker pool and bounded FIFO queue; a full queue rejects that arrival and never reroutes it. Add up to eight instances from the expanded Load balancer panel; a new instance copies the first instance’s capacity, worker count and queue limit. Instances share the optional cache and database, so horizontal scaling can move the bottleneck downstream. The routing panel reports expected equal share before a run and routed, waiting, rejected and busy values after it.
 
 ## URL popularity and finite caches
 
@@ -112,7 +112,7 @@ The default **Fixed probability** cache is a deliberately simple configured assu
 
 ## Background jobs
 
-Choose **Background jobs** in Experiment path. Switching loads a starter graph and supports Undo. The path is producer → bounded job queue → worker pool. Expand the queue or worker to edit settings atomically. Failure probability is sampled independently for each seeded job attempt; retries use a fixed delay and join the FIFO tail, up to the configured limit.
+The optional background-job example uses a producer → bounded job queue → worker pool. Expand the queue or worker to edit settings atomically. Failure probability is sampled independently for each seeded job attempt; retries use a fixed delay and join the FIFO tail, up to the configured limit.
 
 Producer acknowledgment follows successful queue admission after 8 ms. It is separate from job completion and may occur even if the job subsequently fails or expires. The deadline starts at original submission and includes waiting, attempts and retry backoff. Backoff does not occupy a worker; already-processing expired work does. A full queue rejects initial admission; full retry re-entry or exhausted retries permanently fail the job. No crash recovery, duplicate delivery or real durable broker is modeled.
 

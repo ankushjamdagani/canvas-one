@@ -39,7 +39,9 @@ self.onmessage = (
       const metrics = simulation!.advance(time + 0.5);
       time = metrics.time;
       self.postMessage({ type: "metrics", runId, metrics });
-      if (metrics.finished) pause();
+      if (metrics.finished || metrics.execution?.incomplete) {
+        pause();
+      }
     }, 125);
   } catch (error) {
     pause();

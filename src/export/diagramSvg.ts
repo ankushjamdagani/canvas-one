@@ -1,4 +1,4 @@
-import { validateGraph, type Project, type ModelNode } from "../domain/model";
+import { validateGraph, supportsFreeCanvas, type Project, type ModelNode } from "../domain/model";
 import { componentDefinition } from "../domain/componentCatalog";
 import { validateSubsystems, visibleSubsystems } from "../domain/subsystems";
 import { noteAttachmentLabel, noteKinds, type CanvasNote } from "../domain/notes";
@@ -63,7 +63,9 @@ function noteShape(note: CanvasNote, project: Project): { shape: string; box: Bo
 
 /** A standalone vector rendition, independent of DOM, zoom, selection and worker state. */
 export function renderDiagramSvg(project: Project): DiagramSvg {
-  if (project.graph.scenario !== "diagram") throw new Error("Choose Architecture diagram to export an image.");
+  if (!supportsFreeCanvas(project.graph)) {
+    throw new Error("Choose Architecture diagram to export an image.");
+  }
   const errors = [...validateGraph(project.graph, false), ...validateSubsystems(project.subsystems)];
   if (errors.length) throw new Error(errors[0]);
   const notes = project.graph.notes ?? [];
@@ -137,7 +139,16 @@ export function renderDiagramSvg(project: Project): DiagramSvg {
       labelX = (sx + tx) / 2; labelY = lane;
     }
     points.forEach(([x, y]) => bounds.push({ x, y, width: 0, height: 0 }));
-    const dash = edge.communication === "async" ? ' stroke-dasharray="7 5"' : edge.communication === "data" ? ' stroke-dasharray="2 4"' : "";
+    let dash = "";
+    if (edge.transport === "message") {
+      dash = ' stroke-dasharray="7 5"';
+    } else if (edge.transport === "call") {
+      dash = "";
+    } else if (edge.communication === "async") {
+      dash = ' stroke-dasharray="7 5"';
+    } else if (edge.communication === "data") {
+      dash = ' stroke-dasharray="2 4"';
+    }
     edgeShapes.push(`<path d="${points.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ")}" fill="none" stroke="#72b4b2" stroke-width="1.5" stroke-linejoin="round" marker-end="url(#diagram-arrow)"${dash}/>`);
     const label = [edge.label, edge.protocol].filter(Boolean).join(" · ");
     if (label) {
@@ -155,7 +166,12 @@ export function renderDiagramSvg(project: Project): DiagramSvg {
   const width = Math.ceil(Math.max(...bounds.map((box) => box.x + box.width)) - minX + 32);
   const height = Math.ceil(Math.max(...bounds.map((box) => box.y + box.height)) - minY + 32);
   if (width > 100_000 || height > 100_000) throw new Error("Move components closer together before exporting this diagram.");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}" role="img" aria-labelledby="diagram-title" font-family="Arial, Helvetica, sans-serif"><title id="diagram-title">${xml(project.name)} — Architecture diagram</title><desc>Entire diagram with current subsystem collapse state. Visual architecture only. Full component notes are available in element titles.</desc><defs><marker id="diagram-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#087f84"/></marker></defs><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="#ffffff"/>${groupShapes.join("")}${edgeShapes.join("")}${nodeShapes.join("")}${collapsedShapes.join("")}${labelShapes.join("")}${noteShapes.join("")}</svg>`;
+  const isVisualOnly = project.graph.scenario === "diagram";
+  const titleDesc = isVisualOnly
+    ? `<title id="diagram-title">${xml(project.name)} — Architecture diagram</title><desc>Entire diagram with current subsystem collapse state. Visual architecture only. Full component notes are available in element titles.</desc>`
+    : `<title id="diagram-title">${xml(project.name)} — System design</title><desc>Entire canvas with current subsystem collapse state. Configured system snapshot. Full component notes are available in element titles.</desc>`;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${minX} ${minY} ${width} ${height}" role="img" aria-labelledby="diagram-title" font-family="Arial, Helvetica, sans-serif">${titleDesc}<defs><marker id="diagram-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#087f84"/></marker></defs><rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="#ffffff"/>${groupShapes.join("")}${edgeShapes.join("")}${nodeShapes.join("")}${collapsedShapes.join("")}${labelShapes.join("")}${noteShapes.join("")}</svg>`;
   return { svg, width, height };
 }
 

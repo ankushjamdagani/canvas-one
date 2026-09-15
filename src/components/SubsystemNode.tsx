@@ -8,6 +8,7 @@ export type SubsystemCanvasNode = Node<
 >;
 export function SubsystemNode({ data }: NodeProps<SubsystemCanvasNode>) {
   const toggle = useEditor((state) => state.toggleSubsystem),
+    isReadOnly = useEditor((state) => state.readOnly),
     group = data.group;
   return (
     <div
@@ -24,9 +25,12 @@ export function SubsystemNode({ data }: NodeProps<SubsystemCanvasNode>) {
           className="nodrag nopan"
           aria-label={`${group.collapsed ? "Expand" : "Collapse"} ${group.name} on canvas`}
           aria-expanded={!group.collapsed}
+          disabled={isReadOnly}
           onClick={(event) => {
             event.stopPropagation();
-            toggle(group.id);
+            if (!isReadOnly) {
+              toggle(group.id);
+            }
           }}
         >
           {group.collapsed ? (

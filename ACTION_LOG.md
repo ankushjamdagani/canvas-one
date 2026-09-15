@@ -108,3 +108,60 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Changed: [`tests/revisions.spec.ts`](tests/revisions.spec.ts), [`ACTION_LOG.md`](ACTION_LOG.md), [`HANDOFF.md`](HANDOFF.md).
 - Verification: `npm test` passed 133 tests across 25 files; `npm run build` passed with standard chunk warning; `npx playwright test tests/notes.spec.ts` (2 passed); `npx playwright test tests/revisions.spec.ts` (2 passed across desktop and mobile, regenerating `artifacts/revisions.png` and `artifacts/revisions-mobile.png`); `git diff --check` passed.
 - Follow-up: local authored revisions milestone is committed and tested; future team workspaces remain scoped for shared backend/cloud identity.
+
+## 2026-09-12 — Next-plan review
+
+- Reviewed the current roadmap; recommended shared team workspaces as the next milestone, starting with identity, permissions, shared persistence and conflict handling, followed by team review.
+- Evidence: HANDOFF.md, PRODUCT.md, recent action history and current persistence source, located through graphify. No sub-agents used; no product changes or tests run. This is a proposed sequence, not an implementation commitment.
+
+## 2026-09-12 — Shared team architecture plan saved
+
+- Saved the agreed plan in `specs/shared-team-architecture.md`, creating `specs/`, and recorded it in `ACTION_LOG.md`.
+- Tools: apply_patch; no sub-agents. Documentation only; implementation has not started. Verification: inspected the saved plan and diff; `git diff --check` passed. No product tests required or run.
+
+## 2026-09-12 — Open simulator improvement planning started
+
+- Status: planning in progress; clarified that fixed lookup/job engines drive experiment paths and component restrictions, while the broad catalog is visual-only. Proposed a unified executable canvas and direct selection-to-subsystem grouping; simulation scope and example policy await user choices.
+- Tools/skills: graphify navigation and current-source inspection; Impeccable context from this session. `agy models` succeeded with elevated runtime permissions and lists `gemini-3.8-flash-low`; confirmation that this means the requested “3.8 flash light” is pending. No implementation delegation or product tests ran.
+
+## 2026-09-12 — Open simulator implementation plan saved
+
+- Saved the open-simulator implementation plan in `specs/open-system-simulator.md`: unified executable components, optional examples/tutorials, explicit request/message accounting, right-click subsystem grouping, persistence policy and bounded `agy` implementation packets.
+- User confirmed performance modeling, optional examples and `gemini-3.8-flash-low`. Tools/skills: graphify, current-source inspection, Impeccable planning guidance and apply_patch. No implementation agents were launched; product implementation has not started.
+- Verification: reviewed the spec against current model, engine, persistence and grouping boundaries; documentation whitespace checks passed. Product tests were not run for this planning-only change.
+
+## 2026-09-13 — Open simulator implementation resumed but delegated kernel blocked
+
+- Integrated boundary: `src/domain/execution.ts`, `src/domain/behaviorDefaults.ts` and focused compiler tests from the `agy` Gemini packet; all 141 unit tests pass.
+- Blocked: the next `agy` packet for the synchronous execution kernel (`gemini-3.8-flash-low`) was rejected by automatic approval because the account usage limit has not reset. No workaround or substitute implementation was used.
+
+## 2026-09-13 — Resume requires explicit source-transfer approval
+
+- Status: resumed delegation, but automatic approval rejected sending execution contracts, behavior defaults and a kernel correction brief to external agy/Gemini because explicit source-transfer approval was not established. No source was sent by this attempt and no rejected kernel was integrated.
+- Updated the implementation status and `HANDOFF.md` with the verified 141-test boundary and precise recovery instructions. Tools: local inspection and apply_patch; no new product tests were needed or run. Documentation whitespace checks passed. Awaiting approval for task-relevant source transfer to the requested model.
+
+## 2026-09-13 — Open runtime progress after source-transfer approval
+
+- Status: implementation continues. User approved task-relevant source transfer; delegated synchronous kernel and routing/cache packets to external agy with gemini-3.8-flash-low. Lead reviewed/corrected accounting, cancellation ordering, random draws and cache expiry, then integrated `src/simulation/open/`. Messaging delegation is underway; worker, persistence and UI remain unchanged.
+- Verification: 171 unit tests across 29 files, TypeScript and diff whitespace checks pass. Used graphify navigation, direct source review and apply_patch; no internal agents, browser checks or deployment. Full requested app improvements are not yet complete.
+
+## 2026-09-13 — Runtime, worker and persistence integration
+
+- Status: implementation continues. Integrated agy/Gemini gemini-3.8-flash-low message/broker packets, open graph conversion/worker bridge and format-8 saved-results/persistence packets. Lead corrected reservation/FIFO accounting, validation boundaries, sample rates and malformed generated tests. Original data remains available as version-7 archives; new-result counts use separate root/message partitions.
+- Verification: 214 unit tests and production build passed; subsequent imported-ID coverage passed in focused checks. Used graphify navigation, source review and apply_patch. Editor-state delegation is underway; visible canvas/editor changes, browser verification and full task completion remain pending. No internal agents or deployment.
+
+## 2026-09-14 — Unified open simulator UI integrated
+
+- Implemented the approved unified executable canvas: all 29 components, configured behavior and workload inspectors, optional starter/tutorial examples, root/background-message metrics, right-click subsystem grouping with undo/redo, box-select/touch controls, connection editing, read-only version-7 archives with runnable copies, and open-system SVG/PNG export labeling.
+- Integrated files include [`src/App.tsx`](src/App.tsx), canvas/editor components, [`src/domain/openExamples.ts`](src/domain/openExamples.ts), and [`specs/open-system-simulator.md`](specs/open-system-simulator.md). Delegation used the user-authorized agy Gemini `gemini-3.8-flash-low` packets; lead reviewed and corrected generated patches.
+- Verification: 233 unit tests passed, production build passed, `git diff --check` passed. Local browser checks passed core examples, full simulation accounting, persistence, grouping keyboard flow, selected-set drag, and mobile no-overflow. Remaining browser suite cleanup is limited to two selection assertion selectors and one rename Save selector; no deployment or commit performed.
+
+## 2026-09-14 — Verification status correction
+
+- Correction to the preceding entry: remaining work was not limited to three selectors. Several browser suites still targeted removed modes; box selection was being cleared by automatic edge selection, and canvas overlays blocked controls. This resume fixed those interactions and migrated the remaining suites through authorized agy/Gemini delegation. Full browser verification remains in progress; no completion or deployment is claimed yet.
+
+## 2026-09-15 — Delegated verification completed
+
+- Resumed the approved agy workflow with `gemini-3.8-flash-low`: delegated documentation reconciliation and integrated current unified-canvas wording in [`README.md`](README.md) and [`PRODUCT.md`](PRODUCT.md). The docs now describe optional examples/tutorials, explicit behavior modeling, root/background-message metrics, version-8 exports and version-7 read-only archives.
+- Lead corrections included edge-selection handling, compact export status layout, cache/workload field visibility, archive mutation guards, and truthful saved-result metrics. Full production Chromium verification passed: 44 tests across the migrated and existing suites. Unit tests passed: 233 tests across 36 files. Production build and `git diff --check` passed; the existing bundle-size warning remains.
+- No commit, push, deployment, cloud sync, or external product write was performed.

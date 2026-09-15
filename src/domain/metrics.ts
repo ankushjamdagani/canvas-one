@@ -1,3 +1,5 @@
+import type { OpenMetrics } from "../simulation/open/kernel";
+
 export interface NodeMetrics {
   arrived: number;
   completed: number;
@@ -28,6 +30,8 @@ export interface JobMetrics {
 export interface Metrics {
   /** Actual edge traversals; routing includes rejected destination arrivals. */
   edges?: Record<string, number>;
+  /** Detailed open-system execution metrics when running under open runtime. */
+  execution?: OpenMetrics;
   jobs?: JobMetrics;
   time: number;
   generated: number;
@@ -51,4 +55,4 @@ export interface Metrics {
 }
 
 export const failureCount = (m: Metrics) =>
-  m.dropped + m.timedOut + (m.jobs?.failed ?? 0);
+  m.dropped + m.timedOut + (m.execution?.roots.failed ?? m.jobs?.failed ?? 0);

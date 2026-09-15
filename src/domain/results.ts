@@ -7,11 +7,12 @@ import {
   type ModelNode,
 } from "./model";
 import { failureCount, type Metrics } from "./metrics";
-import { sameGraphWorkload, profileLabel } from "./workload";
+import { sameGraphWorkload, profileLabel, defaultWorkloadComparisonStatus } from "./workload";
+import { validateOpenResult } from "./openResults";
 
 export const MODEL_VERSION = "url-lookup/5";
 export const modelVersion = (graph: Graph) =>
-  isJobGraph(graph) ? "background-jobs/1" : MODEL_VERSION;
+  graph.executionVersion === "open-system/1" ? "open-system/1" : isJobGraph(graph) ? "background-jobs/1" : MODEL_VERSION;
 export const MAX_SAVED_RUNS = 20;
 export interface RunResult {
   id: string;
@@ -25,6 +26,10 @@ export interface SavedRun extends RunResult {
   origin: "simulation" | "imported";
 }
 export function defaultRunName(graph: Graph) {
+  if (graph.executionVersion === "open-system/1") {
+    const count = graph.workloads?.length ?? 0;
+    return `${count} workload${count === 1 ? "" : "s"} · ${graph.settings.duration}s system run`.slice(0, 80);
+  }
   if (isJobGraph(graph))
     return `${profileLabel(graph.settings)} · background jobs`.slice(0, 80);
   const instances = graph.nodes.filter((n) => n.kind === "service");
@@ -65,12 +70,15 @@ export function validateSavedRun(run: SavedRun): string[] {
     !Number.isFinite(run.completedAt)
   )
     return ["Saved results need a valid name and completion time."];
-  if (![MODEL_VERSION, "background-jobs/1"].includes(run.modelVersion))
+  if (![MODEL_VERSION, "background-jobs/1", "open-system/1"].includes(run.modelVersion))
     return ["This saved result uses an unsupported simulation model version."];
-  const graphErrors = validateGraph(run.graph);
+  const graphErrors = validateGraph(run.graph, true);
   if (graphErrors.length) return graphErrors;
   if (run.modelVersion !== modelVersion(run.graph))
     return ["Saved result model does not match its experiment path."];
+  if (run.modelVersion === "open-system/1") {
+    return validateOpenResult(run.graph, run.metrics);
+  }
   const m = run.metrics;
   const values = [
     "time",
@@ -219,10 +227,13 @@ export function comparisonStatus(a: SavedRun, b: SavedRun) {
   if (a.modelVersion !== b.modelVersion)
     return {
       matched: false,
-      message:
-        "Different simulation model versions. Results are not directly comparable.",
+      message: "Different simulation model versions. Results are not directly comparable.",
     };
-  if (!sameGraphWorkload(a.graph, b.graph))
+  const workloadMatched = sameGraphWorkload(a.graph, b.graph);
+  if (a.modelVersion === "open-system/1") {
+    return defaultWorkloadComparisonStatus(a.graph, b.graph, workloadMatched, a.metrics.generated === b.metrics.generated);
+  }
+  if (!workloadMatched)
     return {
       matched: false,
       message:
@@ -242,6 +253,92 @@ export function comparisonStatus(a: SavedRun, b: SavedRun) {
 }
 export function modelChanges(a: Graph, b: Graph): string[] {
   const changes: string[] = [];
+  if (a.executionVersion === "open-system/1" || b.executionVersion === "open-system/1") {
+    const beforeNodes = a.nodes, afterNodes = b.nodes;
+    const matched = new Set<string>();
+    const pairs: { before?: ModelNode; after?: ModelNode }[] = beforeNodes.map((before) => {
+      const after = afterNodes.find((n) => n.id === before.id);
+      if (after) matched.add(after.id);
+      return { before, after };
+    });
+    for (const after of afterNodes.filter((n) => !matched.has(n.id))) pairs.push({ before: undefined, after });
+
+    for (const { before, after } of pairs) {
+      if (!before && after) {
+        changes.push(`${after.name} added.`);
+        continue;
+      }
+      if (before && !after) {
+        changes.push(`${before.name} removed.`);
+        continue;
+      }
+      if (!before || !after) continue;
+
+      const bb = before.behavior, ab = after.behavior;
+      if (bb && ab) {
+        if (bb.type !== ab.type) {
+          changes.push(`${after.name} behavior type: ${bb.type} → ${ab.type}.`);
+        }
+        if (bb.capacity !== ab.capacity) {
+          changes.push(`${after.name} capacity: ${bb.capacity} → ${ab.capacity} req/s.`);
+        }
+        if (bb.concurrency !== ab.concurrency) {
+          changes.push(`${after.name} concurrency: ${bb.concurrency} → ${ab.concurrency}.`);
+        }
+        if (bb.queueLimit !== ab.queueLimit) {
+          changes.push(`${after.name} queue limit: ${bb.queueLimit} → ${ab.queueLimit} slots.`);
+        }
+        if (bb.failureRate !== ab.failureRate) {
+          changes.push(`${after.name} failure rate: ${bb.failureRate}% → ${ab.failureRate}%.`);
+        }
+        if (bb.maxRetries !== ab.maxRetries) {
+          changes.push(`${after.name} max retries: ${bb.maxRetries} → ${ab.maxRetries}.`);
+        }
+        if (bb.retryDelayMs !== ab.retryDelayMs) {
+          changes.push(`${after.name} retry delay: ${bb.retryDelayMs} → ${ab.retryDelayMs} ms.`);
+        }
+        if (bb.type === "storage" && ab.type === "storage" && bb.writeCapacity !== ab.writeCapacity) {
+          changes.push(`${after.name} write capacity: ${bb.writeCapacity} → ${ab.writeCapacity} req/s.`);
+        }
+        if (bb.type === "cache" && ab.type === "cache") {
+          if (bb.mode !== ab.mode) changes.push(`${after.name} cache mode: ${bb.mode} → ${ab.mode}.`);
+          if (bb.hitRate !== ab.hitRate) changes.push(`${after.name} cache hit rate: ${bb.hitRate}% → ${ab.hitRate}%.`);
+          if (bb.entries !== ab.entries) changes.push(`${after.name} cache entries: ${bb.entries} → ${ab.entries}.`);
+          if (bb.ttlMs !== ab.ttlMs) changes.push(`${after.name} cache TTL: ${bb.ttlMs} → ${ab.ttlMs} ms.`);
+        }
+        if (bb.type === "router" && ab.type === "router" && bb.strategy !== ab.strategy) {
+          changes.push(`${after.name} routing strategy: ${bb.strategy} → ${ab.strategy}.`);
+        }
+        if (bb.type === "broker" && ab.type === "broker" && bb.delivery !== ab.delivery) {
+          changes.push(`${after.name} broker delivery: ${bb.delivery} → ${ab.delivery}.`);
+        }
+      }
+    }
+
+    const edgeSig = (e: import("./model").ModelEdge) =>
+      JSON.stringify({ source: e.source, target: e.target, transport: e.transport, latencyMs: e.latencyMs,
+        returnLatencyMs: e.returnLatencyMs, ackDelayMs: e.ackDelayMs, messageTtlMs: e.messageTtlMs,
+        weight: e.weight, condition: e.condition, fallback: e.fallback, needsReview: e.needsReview });
+    const beforeEdges = new Map(a.edges.map(e => [e.id, e]));
+    const afterEdges = new Map(b.edges.map(e => [e.id, e]));
+    let edgesChanged = false;
+    if (a.edges.length !== b.edges.length) {
+      edgesChanged = true;
+    } else {
+      for (const [id, be] of beforeEdges) {
+        const ae = afterEdges.get(id);
+        if (!ae || edgeSig(be) !== edgeSig(ae)) {
+          edgesChanged = true;
+          break;
+        }
+      }
+    }
+    if (edgesChanged) {
+      changes.push("Connections changed; inspect each saved model for its routing path.");
+    }
+    return changes;
+  }
+
   const beforeNodes = a.nodes.filter((n) => n.kind !== "traffic"), afterNodes = b.nodes.filter((n) => n.kind !== "traffic");
   const matched = new Set<string>();
   const pairs: { before?: ModelNode; after?: ModelNode }[] = beforeNodes.map((before) => {

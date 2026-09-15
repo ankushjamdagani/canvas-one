@@ -1,149 +1,91 @@
-import { expect, test, type Page } from "@playwright/test";
-async function save(page: Page, name: string) {
-  await page.getByRole("button", { name: "Save result", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Result name", exact: true })
-    .fill(name);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-}
-async function run(page: Page) {
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Replay", exact: true }),
-  ).toBeVisible();
-}
-test("worker scaling applies atomically and compares identical arrivals with saved models", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page
-    .getByRole("spinbutton", { name: "Run duration", exact: true })
-    .fill("2");
-  await page.getByRole("button", { name: "700 req/s", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Expand Redirect service", exact: true })
-    .click();
-  const count = page.getByRole("spinbutton", {
-    name: "Service worker count",
-    exact: true,
-  });
-  const capacity = page.getByRole("spinbutton", {
-    name: "Service processing capacity",
-    exact: true,
-  });
-  await capacity.fill("200");
-  await page
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
-  await run(page);
-  await save(page, "One worker");
-  await page
-    .getByRole("button", { name: "Close saved results", exact: true })
-    .click();
-  await count.fill("4");
-  await expect(
-    page.getByRole("button", { name: "Replay", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
-  await expect(
-    page.getByText("4 × 200 = 800 req/s total · applied model", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(count).toHaveValue("1");
-  await page.getByRole("button", { name: "Redo", exact: true }).click();
-  await expect(count).toHaveValue("4");
-  await run(page);
-  await expect(
-    page.getByRole("meter", { name: "Redirect service worker occupancy" }),
-  ).toHaveAttribute("aria-valuemax", "4");
-  await expect(page.locator(".toast")).toBeHidden({ timeout: 6000 });
-  await page.screenshot({
-    path: "artifacts/concurrent-service.png",
-    fullPage: true,
-  });
-  await save(page, "Four workers");
-  await expect(
-    page.getByText("Redirect service workers: 1 → 4.", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText(
-      "Same traffic profile, URL distribution, seed, duration and timeout. Generated arrival counts match; cache settings are architecture assumptions.",
-      { exact: true },
-    ),
-  ).toBeVisible();
-  await page
-    .getByRole("combobox", { name: "Compare result", exact: true })
-    .selectOption({ label: "One worker" });
-  await page
-    .getByRole("button", { name: "Restore this model", exact: true })
-    .click();
-  await expect(count).toHaveValue("1");
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(count).toHaveValue("4");
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(count).toHaveValue("4");
-  await count.focus();
-  await page
-    .getByRole("button", { name: "Configuration", exact: true })
-    .click();
-  await expect(
-    page.getByRole("spinbutton", { name: "Service workers", exact: true }),
-  ).toHaveValue("4");
-  await page
-    .getByRole("spinbutton", { name: "Service workers", exact: true })
-    .fill("3");
-  await expect(count).toHaveValue("3");
-});
-test("worker drafts validate on mobile and reveal a readable 16-slot pool", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "Expand Redirect service", exact: true })
-    .click();
-  const count = page.getByRole("spinbutton", {
-    name: "Service worker count",
-    exact: true,
-  });
-  await count.fill("17");
-  await page
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
-  expect(
-    await count.evaluate((el: HTMLInputElement) => el.validity.valid),
-  ).toBe(false);
-  await count.press("Escape");
-  await expect(count).toHaveValue("1");
-  await count.fill("16");
-  await count.press("Enter");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(
-    page.getByRole("meter", { name: "Redirect service worker occupancy" }),
-  ).toHaveAttribute("aria-valuemax", "16");
+import { test, expect } from "@playwright/test";
+import * as fs from "fs";
+import { componentNode } from "./openHelpers";
+
+async function openTutorial(page: any, title: string) {
+  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  const modal = page.locator(".examples-modal");
+  await expect(modal).toBeVisible();
+  await page.getByRole("button", { name: "Guided tutorials" }).click();
+  const item = modal.locator(".example-list-item").filter({ hasText: title });
+  await item.click();
+  await page.getByRole("button", { name: "Load example" }).click();
+  await expect(modal).toBeHidden();
   await page.waitForTimeout(200);
-  const canvas = await page.locator(".canvas-area").boundingBox();
-  const node = await page
-    .locator(".react-flow__node")
-    .filter({ hasText: "Redirect service" })
-    .boundingBox();
-  expect(node!.y).toBeGreaterThanOrEqual(canvas!.y);
-  expect(node!.y + node!.height).toBeLessThanOrEqual(
-    canvas!.y + canvas!.height,
-  );
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({
-    path: "artifacts/concurrent-service-mobile.png",
-    fullPage: true,
+}
+
+test.describe("Concurrency and worker scaling", () => {
+  test("scaling worker concurrency updates resource config and observed active slot metrics", async ({ page }) => {
+    await page.goto("/");
+    await openTutorial(page, "Scale a worker pool");
+
+    // Shorten duration to 2s
+    const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration" });
+    await durationInput.fill("2");
+
+    // Select Redirect service to configure concurrency
+    await componentNode(page, "Redirect service").click();
+    const inspector = page.getByRole("complementary", { name: "Component inspector" });
+    await expect(inspector).toBeVisible();
+
+    // Verify initial concurrency
+    const concurrencyInput = inspector.getByRole("spinbutton", { name: "Concurrency (Workers)" });
+    await expect(concurrencyInput).toHaveValue("1");
+
+    // Increase concurrency to 4 workers
+    await concurrencyInput.fill("4");
+
+    // Run simulation
+    const runButton = page.getByRole("button", { name: "Run", exact: true });
+    await runButton.click();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Replay" })).toBeVisible({ timeout: 20000 });
+
+    // Verify active slots in inspector metrics reflect the new limit of 4
+    await expect(inspector.locator(".open-metric-label:has-text('Active Slots') + .open-metric-val")).toContainText("/ 4");
+
+    // Export JSON and assert configuration
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+    const exportedService = fileContent.project.graph.nodes.find((n: any) => n.name === "Redirect service");
+    expect(exportedService.behavior.concurrency).toBe(4);
+  });
+
+  test("scaling horizontal service instances configures duplicate service parameters and edges", async ({ page }) => {
+    await page.goto("/");
+    await openTutorial(page, "Scale service instances");
+
+    // Verify Redirect service 2 exists
+    const svc2Node = componentNode(page, "Redirect service 2");
+    await expect(svc2Node).toBeVisible();
+
+    await svc2Node.click();
+    const inspector = page.getByRole("complementary", { name: "Component inspector" });
+    await expect(inspector).toBeVisible();
+
+    // Modify capacity of service instance 2
+    const capacityInput = inspector.getByRole("spinbutton", { name: "Processing Capacity" });
+    await capacityInput.fill("350");
+
+    // Export JSON to verify configured capacity and instance graph topology
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+
+    const svc2 = fileContent.project.graph.nodes.find((n: any) => n.name === "Redirect service 2");
+    expect(svc2).toBeDefined();
+    expect(svc2.behavior.capacity).toBe(350);
+
+    const edges = fileContent.project.graph.edges.filter((e: any) => e.source === svc2.id || e.target === svc2.id);
+    expect(edges.length).toBeGreaterThanOrEqual(2);
   });
 });

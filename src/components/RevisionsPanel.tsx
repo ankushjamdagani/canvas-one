@@ -5,6 +5,7 @@ import { useEditor } from "../state/editor";
 const empty: RevisionDetails = { name: "", author: "", reason: "", message: "", issue: "" };
 export function RevisionsPanel() {
   const editor = useEditor();
+  const readOnly = editor.readOnly;
   const revisions = editor.project.revisions ?? [];
   const [details, setDetails] = useState(empty);
   const [selected, setSelected] = useState("");
@@ -18,9 +19,13 @@ export function RevisionsPanel() {
   return <details className="revisions-panel">
     <summary>Architecture revisions · {revisions.length}</summary>
     <p className="small muted">Immutable snapshots saved in this browser. Author names are self-reported; final status records your decision.</p>
-    {!composing && <button disabled={full} onClick={() => setComposing(true)}>New revision</button>}
+    {!composing && <button disabled={full || readOnly} onClick={() => setComposing(true)}>New revision</button>}
     {composing && <form onSubmit={event => {
       event.preventDefault();
+      if (readOnly) {
+        setNotice("Viewing archive. Revision creation is disabled.");
+        return;
+      }
       const clean = Object.fromEntries(Object.entries(details).map(([k, v]) => [k, v.trim()])) as unknown as RevisionDetails;
       const errors = validateRevisionDetails(clean);
       if (errors.length) { setNotice(errors[0]); return; }
@@ -35,7 +40,7 @@ export function RevisionsPanel() {
         <span>{label}</span>
         {key === "reason" || key === "message" ? <textarea required maxLength={maxLength} value={details[key]} onChange={e => setDetails({ ...details, [key]: e.target.value })} /> : <input type={key === "issue" ? "url" : "text"} required={key !== "issue"} maxLength={maxLength} value={details[key]} onChange={e => setDetails({ ...details, [key]: e.target.value })} />}
       </label>)}
-      <button disabled={full} type="submit">Save draft revision</button>
+      <button disabled={full || readOnly} type="submit">Save draft revision</button>
       {revisions.length > 0 && <button type="button" onClick={() => setComposing(false)}>Cancel revision</button>}
     </form>}
     {full && <p className="field-help">All {MAX_REVISIONS} revision slots are used. Export a backup and start a new project to continue.</p>}
@@ -58,10 +63,16 @@ export function RevisionsPanel() {
         </select></label>
         {changes.length ? <ul className="revision-changes">{changes.map((c, i) => <li key={i}>{c}</li>)}</ul> : <p>No architecture changes.</p>}
         <div className="panel-actions">
-          {revision.status === "draft" && <button disabled={full || revisions.some(r => r.sourceId === revision.id && r.status === "final")} onClick={() => {
+          {revision.status === "draft" && <button disabled={full || readOnly || revisions.some(r => r.sourceId === revision.id && r.status === "final")} onClick={() => {
+            if (readOnly) return;
             if (editor.finalizeRevision(revision.id)) { setSelected(useEditor.getState().project.revisions!.at(-1)!.id); setNotice("Final copy saved from this draft. Current canvas edits are not included."); }
           }}>Finalize this draft</button>}
-          <button onClick={() => { editor.restoreRevision(revision.id); setTarget(""); setNotice("Revision restored to the canvas. Use Undo to recover the previous canvas."); }}>Restore to canvas</button>
+          <button disabled={readOnly} onClick={() => {
+            if (readOnly) return;
+            editor.restoreRevision(revision.id);
+            setTarget("");
+            setNotice("Revision restored to the canvas. Use Undo to recover the previous canvas.");
+          }}>Restore to canvas</button>
         </div>
       </article>}
     </> : <p className="small muted">No revisions yet. Save the current architecture with its rationale.</p>}

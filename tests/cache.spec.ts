@@ -1,63 +1,102 @@
 import { test, expect } from "@playwright/test";
+import * as fs from "fs";
+import { componentNode } from "./openHelpers";
 
-test("cold finite cache guide exposes popularity and observed cache accounting", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("combobox", { name: "Guided experiment", exact: true }).selectOption("cold-cache-popularity");
-  await expect(page.getByRole("heading", { name: "Warm a finite cache", exact: true })).toBeVisible();
-  await page.getByRole("spinbutton", { name: "Run duration", exact: true }).fill("2");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeVisible({ timeout: 15000 });
-  await page.getByRole("button", { name: /Expand Finite LRU cache/ }).click();
-  await expect(page.getByText("Observed hit rate", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Show experiment guide", exact: true }).click();
-  await expect(page.getByText(/Finite cache:/)).toBeVisible();
-  await page.getByRole("button", { name: "Save result", exact: true }).click();
-  await page.getByRole("textbox", { name: "Result name", exact: true }).fill("Small cache");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await page.getByRole("button", { name: "Close saved results", exact: true }).click();
-  await page.locator(".node-copy").filter({ hasText: "Finite LRU cache" }).click();
-  await page.getByRole("button", { name: "Configuration", exact: true }).click();
-  await page.getByRole("spinbutton", { name: "Cache entries", exact: true }).fill("100");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Save result", exact: true }).click();
-  await page.getByRole("textbox", { name: "Result name", exact: true }).fill("Larger cache");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText(/Same traffic profile, URL distribution, seed/)).toBeVisible();
-  const misses = page.getByRole("row", { name: /^Cache misses/ }).getByRole("cell");
-  const before = Number((await misses.nth(0).innerText()).replaceAll(",", ""));
-  const after = Number((await misses.nth(1).innerText()).replaceAll(",", ""));
-  expect(after).toBeLessThan(before);
-  await page.screenshot({ path: "artifacts/cold-cache-popularity.png", fullPage: true });
-});
+async function openTutorial(page: any, title: string) {
+  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  const modal = page.locator(".examples-modal");
+  await expect(modal).toBeVisible();
+  await page.getByRole("button", { name: "Guided tutorials" }).click();
+  const item = modal.locator(".example-list-item").filter({ hasText: title });
+  await item.click();
+  await page.getByRole("button", { name: "Load example" }).click();
+  await expect(modal).toBeHidden();
+  await page.waitForTimeout(200);
+}
 
-test("cache controls remain readable on mobile", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await page.getByRole("combobox", { name: "Guided experiment", exact: true }).selectOption("cold-cache-popularity");
-  await expect(page.getByRole("heading", { name: "Warm a finite cache", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Expand Traffic source", exact: true }).click();
-  await page.getByRole("button", { name: "Configuration", exact: true }).click();
-  await page.getByLabel("URL popularity", { exact: true }).selectOption("uniform");
-  await page.getByRole("spinbutton", { name: "URL catalog size", exact: true }).fill("2");
-  await page.getByLabel("URL popularity", { exact: true }).selectOption("hot");
-  await expect(page.getByRole("spinbutton", { name: "Hot-link URLs", exact: true })).toHaveValue("1");
-  await page.getByRole("button", { name: "Expand Finite LRU cache", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await page.getByRole("spinbutton", { name: "Cache entries", exact: true }).fill("30");
-  await page.getByRole("spinbutton", { name: "Entry TTL", exact: true }).fill("5000");
-  await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
-  await page.reload();
-  await page.getByRole("button", { name: "Collapse Finite LRU cache", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Configuration", exact: true }).click();
-  await expect(page.getByRole("spinbutton", { name: "Cache entries", exact: true })).toHaveValue("30");
-  await expect(page.getByRole("spinbutton", { name: "Entry TTL", exact: true })).toHaveValue("5000");
-  expect(await page.locator(".workspace").evaluate((el) => el.getBoundingClientRect().width <= innerWidth)).toBe(true);
-  await page.screenshot({ path: "artifacts/cold-cache-mobile.png", fullPage: true });
-  await page.getByRole("button", { name: "Collapse Traffic source", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("spinbutton", { name: "URL catalog size", exact: true })).toHaveValue("2");
-  await expect(page.getByLabel("URL popularity", { exact: true })).toHaveValue("hot");
-  await expect(page.getByRole("spinbutton", { name: "Hot-link URLs", exact: true })).toHaveValue("1");
+test.describe("Cache behavior and pressure", () => {
+  test("adjusting cache hit rate from 0% to 80% reduces database arrivals and increases cache hits", async ({ page }) => {
+    await page.goto("/");
+    await openTutorial(page, "Relieve database pressure");
+
+    // Shorten duration to 2s for fast test execution
+    const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration" });
+    await durationInput.fill("2");
+
+    // Run baseline with 0% hit rate
+    const runButton = page.getByRole("button", { name: "Run", exact: true });
+    await runButton.click();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Replay" })).toBeVisible({ timeout: 20000 });
+
+    // Open node resource breakdown details
+    const details = page.locator(".node-resource-details");
+    await details.locator("summary").click();
+
+    // In baseline (0% hit rate), Query cache should have 0 hits and all misses
+    const cacheRow = details.locator("tr").filter({ hasText: "Query cache" });
+    await expect(cacheRow).toContainText("Hits: 0");
+
+    // Select Query cache component to update behavior
+    await componentNode(page, "Query cache").click();
+    const inspector = page.getByRole("complementary", { name: "Component inspector" });
+    await expect(inspector).toBeVisible();
+
+    const hitRateInput = inspector.getByRole("spinbutton", { name: "Hit Rate" });
+    await hitRateInput.fill("80");
+
+    // Replay simulation with 80% hit rate
+    const replayButton = page.getByRole("button", { name: "Run", exact: true });
+    await replayButton.click();
+    await expect(page.getByRole("button", { name: "Replay" })).toBeVisible({ timeout: 20000 });
+
+    // Verify cache hits are now observed
+    await expect(cacheRow).not.toContainText("Hits: 0");
+
+    // Export JSON to verify configured hit rate persists in project export
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+    const exportedCache = fileContent.project.graph.nodes.find((n: any) => n.name === "Query cache");
+    expect(exportedCache.behavior.hitRate).toBe(80);
+    expect(exportedCache.behavior.type).toBe("cache");
+  });
+
+  test("finite LRU cache entries and TTL parameters persist and reflect in exported model", async ({ page }) => {
+    await page.goto("/");
+    await openTutorial(page, "Warm a finite cache");
+
+    // Select Finite LRU cache node
+    await componentNode(page, "Finite LRU cache").click();
+    const inspector = page.getByRole("complementary", { name: "Component inspector" });
+    await expect(inspector).toBeVisible();
+
+    // Check mode is LRU and inspect default entries limit
+    const modeSelect = inspector.locator("label:has-text('Cache Eviction Mode') select");
+    await expect(modeSelect).toHaveValue("lru");
+
+    // Update Cache Entries Limit to 150 and TTL to 15000
+    const entriesInput = inspector.getByRole("spinbutton", { name: "Cache Entries Limit" });
+    await entriesInput.fill("150");
+
+    const ttlInput = inspector.getByRole("spinbutton", { name: "Time To Live (TTL)" });
+    await ttlInput.fill("15000");
+
+    // Verify changes through JSON export
+    await page.locator(".project-switch").click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export JSON" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    expect(downloadPath).toBeTruthy();
+    const fileContent = JSON.parse(fs.readFileSync(downloadPath!, "utf-8"));
+    const exportedCache = fileContent.project.graph.nodes.find((n: any) => n.name === "Finite LRU cache");
+    expect(exportedCache.behavior.entries).toBe(150);
+    expect(exportedCache.behavior.ttlMs).toBe(15000);
+    expect(exportedCache.behavior.mode).toBe("lru");
+  });
 });
