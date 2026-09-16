@@ -351,3 +351,26 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Repository integrity: inspected modified specs and product documentation to verify consistency across `specs/shared-team-architecture.md`, `PRODUCT.md`, and `HANDOFF.md`.
 - **Limitations & follow-up decisions**:
   - Implementation remains future scope as planned; current product retains browser-local persistence and offline execution.
+
+## 2026-09-16 — Left Menu Bar (Control Rail) and Nested Menu with Floating Panels
+
+- **Requested outcome**:
+  1. Redesign Menu UI/UX into a Left Menu Bar (Control Rail) containing all workspace controls, including components.
+  2. Implement nested options with either floating panels or floating nested lists.
+  3. Keep the canvas clean, maximize visible space, and preserve full test invariants across desktop and mobile.
+- **Files changed**:
+  - [`src/App.tsx`](src/App.tsx):
+    - Added `.canvas-first-left-rail` toolbar with dedicated action buttons: Main Menu / Projects (`.project-switch`), Add Component catalog toggle (`button[aria-label="Add component"]`), Workloads inspector toggle (`button[aria-label="Workloads"]`), Architecture Revisions trigger, Export trigger, Saved Runs trigger, and bottom Undo/Redo controls.
+    - Updated topbar row to streamline project name input and simulation execution controls (`Run`, `Reset`), eliminating duplicate topbar controls.
+    - Refined primary nested menu under `.project-switch` into structured nested sections (Create project, Checkpoints, Export options, Switch project, Architecture Revisions, Saved runs & comparisons, and Model assumptions).
+  - [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Added styling for `.canvas-first-left-rail`, `.canvas-first-rail-group`, `.canvas-first-rail-bottom`, `.canvas-first-rail-btn`, and active/hover states with teal accents.
+    - Converted `.canvas-first-catalog-drawer` into a floating panel positioned next to the left rail with glassmorphism backdrop blur and elevated shadow, leaving canvas dimensions unobstructed.
+    - Configured `.canvas-first-menu-backdrop` and `.canvas-first-primary-menu` z-index layering (`z-index: 1000` / `1050`) with offset bounds (`left: 54px` on desktop, `top: 86px` on mobile) to guarantee rail buttons and backdrop click-dismiss never conflict.
+    - Added responsive styling for mobile viewports (<560px), adapting the rail into a clean horizontal tool row with icon-only buttons.
+- **Verification performed**:
+  - Full unit test suite: All 233 tests passed across 36 test files (`npm test`, 2.57s).
+  - Full end-to-end journey test suite: All 45 tests passed across 5 workers (`npm run test:e2e`, 40.9s), validating desktop workflows, mobile workflows, note creation, revision snapshots, template loading, and export downloads.
+  - `git diff --check`: passed cleanly with 0 errors.
+- **Limitations & follow-up decisions**:
+  - None. Offline execution, format-8 persistence, and exact simulation metrics remain completely unchanged.

@@ -239,6 +239,7 @@ export default function App() {
     }
   };
   const download = () => {
+    setProjectPanel(false);
     try {
       const a = document.createElement("a"),
         url = URL.createObjectURL(
@@ -253,6 +254,7 @@ export default function App() {
     }
   };
   const importFile = async (file?: File) => {
+    setProjectPanel(false);
     if (!file) return;
     try {
       const p = importProject(await file.text());
@@ -314,18 +316,6 @@ export default function App() {
             </span>
           </div>
 
-          <button
-            className={`canvas-first-btn project-switch ${projectPanel ? "active" : ""}`}
-            onClick={() => setProjectPanel(!projectPanel)}
-            aria-expanded={projectPanel}
-            title={`Project: ${project.name}`}
-            aria-label={project.name}
-          >
-            <Menu size={14} />
-            <span>Menu</span>
-            <ChevronDown size={12} />
-          </button>
-
           <div className="canvas-first-project-rename-group">
             <input
               aria-label="Project name"
@@ -367,64 +357,6 @@ export default function App() {
 
         <div className="canvas-first-topbar-row canvas-first-topbar-row-tools">
           <button
-            className={`canvas-first-btn ${catalogDrawerOpen ? "active" : ""}`}
-            onClick={() => setCatalogDrawerOpen(!catalogDrawerOpen)}
-            aria-expanded={catalogDrawerOpen}
-          >
-            <Plus size={14} />
-            <span>Add component</span>
-          </button>
-
-          <button
-            className={`canvas-first-btn ${inspectorMode === 'workloads' ? "active" : ""}`}
-            onClick={() => {
-              setSelectedEdgeId(null);
-              editor.select(null);
-              setInspectorMode(inspectorMode === 'workloads' ? null : 'workloads');
-            }}
-            aria-expanded={inspectorMode === 'workloads'}
-          >
-            <SlidersHorizontal size={14} />
-            <span>Workloads</span>
-          </button>
-
-          <div className="canvas-first-btn-group" role="group" aria-label="History actions">
-            <button
-              className="canvas-first-icon-btn"
-              aria-label="Undo"
-              title="Undo model edit"
-              disabled={!editor.past.length}
-              onClick={editor.undo}
-            >
-              <Undo2 size={16} />
-            </button>
-            <button
-              className="canvas-first-icon-btn"
-              aria-label="Redo"
-              title="Redo model edit"
-              disabled={!editor.future.length}
-              onClick={editor.redo}
-            >
-              <Redo2 size={16} />
-            </button>
-          </div>
-
-          {guide && (
-            <button
-              className={`canvas-first-btn ${inspectorMode === 'tutorial' ? "active" : ""}`}
-              aria-label="Show experiment guide"
-              onClick={() => {
-                setSelectedEdgeId(null);
-                editor.select(null);
-                setInspectorMode(inspectorMode === 'tutorial' ? null : 'tutorial');
-              }}
-            >
-              <Info size={14} />
-              <span>Guide</span>
-            </button>
-          )}
-
-          <button
             data-testid="run-button"
             className="canvas-first-btn primary"
             disabled={!isOpen || !!errors.length || !ready || isReadOnly}
@@ -458,7 +390,131 @@ export default function App() {
 
       {/* Main Workspace Body */}
       <div className="canvas-first-body">
-        {/* Component Catalog Drawer */}
+        {/* Left Control Rail / Menu Bar */}
+        <aside className="canvas-first-left-rail" role="toolbar" aria-label="Workspace controls">
+          <div className="canvas-first-rail-group">
+            <button
+              className={`canvas-first-rail-btn project-switch ${projectPanel ? "active" : ""}`}
+              onClick={() => {
+                if (!projectPanel) setCatalogDrawerOpen(false);
+                setProjectPanel(!projectPanel);
+              }}
+              aria-expanded={projectPanel}
+              title={`Menu: ${project.name}`}
+              aria-label={project.name}
+            >
+              <Menu size={18} />
+              <span className="canvas-first-rail-label">Menu</span>
+            </button>
+
+            <button
+              className={`canvas-first-rail-btn ${catalogDrawerOpen ? "active" : ""}`}
+              onClick={() => {
+                if (!catalogDrawerOpen) setProjectPanel(false);
+                setCatalogDrawerOpen(!catalogDrawerOpen);
+              }}
+              aria-expanded={catalogDrawerOpen}
+              aria-label="Add component"
+              title="Add component (Components catalog)"
+            >
+              <Plus size={18} />
+              <span className="canvas-first-rail-label">Add</span>
+            </button>
+
+            <button
+              className={`canvas-first-rail-btn ${inspectorMode === 'workloads' ? "active" : ""}`}
+              onClick={() => {
+                setSelectedEdgeId(null);
+                editor.select(null);
+                setInspectorMode(inspectorMode === 'workloads' ? null : 'workloads');
+              }}
+              aria-expanded={inspectorMode === 'workloads'}
+              aria-label="Workloads"
+              title="Workloads configuration"
+            >
+              <SlidersHorizontal size={18} />
+              <span className="canvas-first-rail-label">Workloads</span>
+            </button>
+
+            <button
+              className="canvas-first-rail-btn"
+              onClick={() => {
+                setCatalogDrawerOpen(false);
+                setProjectPanel(true);
+              }}
+              aria-label="Architecture Revisions"
+              title="Revisions & Checkpoints"
+            >
+              <GitBranch size={18} />
+              <span className="canvas-first-rail-label">Revisions</span>
+            </button>
+
+            <button
+              className="canvas-first-rail-btn"
+              onClick={() => {
+                setProjectPanel(false);
+                setCatalogDrawerOpen(false);
+                setShowExportModal(true);
+              }}
+              aria-label="Export options"
+              title="Export canvas or JSON"
+            >
+              <Download size={18} />
+              <span className="canvas-first-rail-label">Export</span>
+            </button>
+
+            <button
+              className="canvas-first-rail-btn"
+              onClick={() => {
+                setProjectPanel(false);
+                setCatalogDrawerOpen(false);
+                setResultsOpen(true);
+              }}
+              aria-label="Saved runs"
+              title="Saved runs & comparisons"
+            >
+              <BarChart3 size={18} />
+              <span className="canvas-first-rail-label">Runs</span>
+            </button>
+          </div>
+
+          <div className="canvas-first-rail-bottom">
+            <button
+              className="canvas-first-rail-btn"
+              aria-label="Undo"
+              title="Undo model edit"
+              disabled={!editor.past.length}
+              onClick={editor.undo}
+            >
+              <Undo2 size={16} />
+            </button>
+            <button
+              className="canvas-first-rail-btn"
+              aria-label="Redo"
+              title="Redo model edit"
+              disabled={!editor.future.length}
+              onClick={editor.redo}
+            >
+              <Redo2 size={16} />
+            </button>
+            {guide && (
+              <button
+                className={`canvas-first-rail-btn ${inspectorMode === 'tutorial' ? "active" : ""}`}
+                aria-label="Show experiment guide"
+                title="Experiment guide"
+                onClick={() => {
+                  setSelectedEdgeId(null);
+                  editor.select(null);
+                  setInspectorMode(inspectorMode === 'tutorial' ? null : 'tutorial');
+                }}
+              >
+                <Info size={16} />
+              </button>
+            )}
+          </div>
+        </aside>
+
+        {/* Component Catalog Drawer (Floating Panel) */}
         {catalogDrawerOpen && (
           <aside className="canvas-first-catalog-drawer library" aria-label="Component catalog">
             <div className="canvas-first-catalog-header">
@@ -912,7 +968,10 @@ export default function App() {
             aria-label="Local projects"
           >
             <div className="canvas-first-primary-menu-header">
-              <h3>Project & Workspace Tools</h3>
+              <div className="canvas-first-primary-menu-title-row">
+                <Workflow size={16} className="canvas-first-menu-brand-icon" />
+                <h3>Project & Workspace Menu</h3>
+              </div>
               <button
                 aria-label="Close projects"
                 className="canvas-first-icon-btn"
@@ -922,300 +981,302 @@ export default function App() {
               </button>
             </div>
 
-            {/* 1. Create project (Blank, From template, Tutorial/Examples) */}
-            <details className="canvas-first-nested-group" open>
-              <summary className="canvas-first-nested-header">
-                <span className="canvas-first-nested-title">
-                  <Plus size={14} /> Create project
-                </span>
-                <ChevronDown size={13} className="canvas-first-nested-chevron" />
-              </summary>
-              <div className="canvas-first-nested-content">
-                <button
-                  type="button"
-                  className="canvas-first-menu-action-btn"
-                  onClick={async () => {
-                    try {
-                      await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
-                      setProjectPanel(false);
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "Could not create project.");
-                    }
-                  }}
-                >
-                  <FilePlus size={14} />
-                  <span>Blank system</span>
-                </button>
-
-                <div className="canvas-first-nested-subgroup">
-                  <span className="canvas-first-nested-subtitle">
-                    <Layers size={13} /> From template
+            <div className="canvas-first-nested-menu-tree">
+              {/* 1. Create project */}
+              <div className="canvas-first-nested-item">
+                <div className="canvas-first-nested-header-row">
+                  <span className="canvas-first-nested-title">
+                    <Plus size={14} /> Create project
                   </span>
-                  <div className="canvas-first-template-buttons">
-                    <button
-                      type="button"
-                      className="canvas-first-btn subtle"
-                      onClick={() => {
-                        editor.loadArchitectureTemplate("chat");
-                        setProjectPanel(false);
-                        setNotice("Loaded Real-time chat template.");
-                      }}
-                      disabled={isReadOnly}
-                    >
-                      Real-time chat
-                    </button>
-                    <button
-                      type="button"
-                      className="canvas-first-btn subtle"
-                      onClick={() => {
-                        editor.loadArchitectureTemplate("ecommerce");
-                        setProjectPanel(false);
-                        setNotice("Loaded Ecommerce checkout template.");
-                      }}
-                      disabled={isReadOnly}
-                    >
-                      Ecommerce checkout
-                    </button>
-                    <button
-                      type="button"
-                      className="canvas-first-btn subtle"
-                      onClick={() => {
-                        editor.loadArchitectureTemplate("events");
-                        setProjectPanel(false);
-                        setNotice("Loaded Event processing template.");
-                      }}
-                      disabled={isReadOnly}
-                    >
-                      Event processing
-                    </button>
-                  </div>
+                  <span className="canvas-first-nested-badge">Templates</span>
                 </div>
-
-                <button
-                  type="button"
-                  className="canvas-first-menu-action-btn"
-                  onClick={() => {
-                    setProjectPanel(false);
-                    setExamplesOpen(true);
-                  }}
-                  disabled={isReadOnly}
-                >
-                  <Workflow size={14} />
-                  <span>Examples & tutorials</span>
-                </button>
-              </div>
-            </details>
-
-            {/* 2. Checkpoints options */}
-            <details className="canvas-first-nested-group checkpoints" open>
-              <summary className="canvas-first-nested-header section-heading">
-                <span className="canvas-first-nested-title">
-                  <BookmarkPlus size={14} /> Checkpoints options
-                </span>
-                <ChevronDown size={13} className="canvas-first-nested-chevron" />
-              </summary>
-              <div className="canvas-first-nested-content">
-                {project.checkpoints.length ? (
-                  <div className="checkpoint-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
-                    {project.checkpoints.map((c) => (
-                      <button
-                        key={c.id}
-                        disabled={isReadOnly}
-                        onClick={() => {
-                          editor.restore(c.id);
-                          setProjectPanel(false);
-                          setNotice(`Restored “${c.name}”.`);
-                        }}
-                      >
-                        <span className="checkpoint-dot" />
-                        <span>{c.name}</span>
-                        <ChevronRight size={13} />
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="small muted">Keep a version before trying something new.</p>
-                )}
-                <fieldset disabled={isReadOnly} style={{ border: "none", padding: 0, margin: "8px 0 0 0" }}>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (isReadOnly) return;
-                      const ok = editor.checkpoint(
-                        checkpointName.trim() || `Checkpoint ${project.checkpoints.length + 1}`
-                      );
-                      if (ok) {
-                        setCheckpointName("");
-                        setNotice("Checkpoint saved with the current model and settings.");
-                      } else {
-                        setError("Could not save checkpoint. Maximum limit reached.");
+                <div className="canvas-first-nested-content">
+                  <button
+                    type="button"
+                    className="canvas-first-menu-action-btn"
+                    onClick={async () => {
+                      try {
+                        await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
+                        setProjectPanel(false);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Could not create project.");
                       }
                     }}
                   >
-                    <input
-                      aria-label="Checkpoint name"
-                      placeholder="Name this checkpoint"
-                      value={checkpointName}
-                      maxLength={80}
-                      onChange={(e) => setCheckpointName(e.target.value)}
-                      disabled={isReadOnly}
-                    />
-                    <button className="subtle" type="submit" disabled={isReadOnly}>
-                      <Plus size={14} />
-                      Save checkpoint
-                    </button>
-                  </form>
-                </fieldset>
-              </div>
-            </details>
+                    <FilePlus size={14} />
+                    <span>Blank system</span>
+                  </button>
 
-            {/* 3. Export options */}
-            <details className="canvas-first-nested-group" open>
-              <summary className="canvas-first-nested-header">
-                <span className="canvas-first-nested-title">
-                  <Download size={14} /> Export options
-                </span>
-                <ChevronDown size={13} className="canvas-first-nested-chevron" />
-              </summary>
-              <div className="canvas-first-nested-content">
-                <div className="canvas-first-menu-row">
+                  <div className="canvas-first-nested-subgroup">
+                    <span className="canvas-first-nested-subtitle">
+                      <Layers size={13} /> From template
+                    </span>
+                    <div className="canvas-first-template-buttons">
+                      <button
+                        type="button"
+                        className="canvas-first-btn subtle"
+                        onClick={() => {
+                          editor.loadArchitectureTemplate("chat");
+                          setProjectPanel(false);
+                          setNotice("Loaded Real-time chat template.");
+                        }}
+                        disabled={isReadOnly}
+                      >
+                        Real-time chat
+                      </button>
+                      <button
+                        type="button"
+                        className="canvas-first-btn subtle"
+                        onClick={() => {
+                          editor.loadArchitectureTemplate("ecommerce");
+                          setProjectPanel(false);
+                          setNotice("Loaded Ecommerce checkout template.");
+                        }}
+                        disabled={isReadOnly}
+                      >
+                        Ecommerce checkout
+                      </button>
+                      <button
+                        type="button"
+                        className="canvas-first-btn subtle"
+                        onClick={() => {
+                          editor.loadArchitectureTemplate("events");
+                          setProjectPanel(false);
+                          setNotice("Loaded Event processing template.");
+                        }}
+                        disabled={isReadOnly}
+                      >
+                        Event processing
+                      </button>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    className="canvas-first-btn"
+                    className="canvas-first-menu-action-btn"
                     onClick={() => {
                       setProjectPanel(false);
-                      setShowExportModal(true);
+                      setExamplesOpen(true);
                     }}
+                    disabled={isReadOnly}
                   >
-                    <Image size={14} />
-                    Export canvas
-                  </button>
-                  <button type="button" className="canvas-first-btn" onClick={download}>
-                    <Download size={14} />
-                    Export JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="canvas-first-btn"
-                    onClick={() => fileInput.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Import JSON
+                    <Workflow size={14} />
+                    <span>Examples & tutorials</span>
                   </button>
                 </div>
               </div>
-            </details>
 
-            {/* 4. Switch project */}
-            <details className="canvas-first-nested-group" open>
-              <summary className="canvas-first-nested-header">
-                <span className="canvas-first-nested-title">
-                  <FolderOpen size={14} /> Switch project ({projects.length})
-                </span>
-                <ChevronDown size={13} className="canvas-first-nested-chevron" />
-              </summary>
-              <div className="canvas-first-nested-content">
-                <div className="project-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
-                  {projects.map((p) => (
-                    <button key={p.id} onClick={() => switchProject(p)} aria-label={p.name}>
-                      <FolderOpen size={16} />
-                      <span>
-                        <strong>{p.name}</strong>
-                        <small>{new Date(p.updatedAt).toLocaleDateString()} · {p.graph.nodes.length} components</small>
-                      </span>
-                      {p.id === project.id && <Check size={16} />}
-                    </button>
-                  ))}
+              {/* 2. Checkpoints options */}
+              <div className="canvas-first-nested-item checkpoints">
+                <div className="canvas-first-nested-header-row section-heading">
+                  <span className="canvas-first-nested-title">
+                    <BookmarkPlus size={14} /> Checkpoints options
+                  </span>
+                  <span className="canvas-first-nested-badge">{project.checkpoints.length} saved</span>
                 </div>
-                <button
-                  type="button"
-                  className="canvas-first-btn"
-                  onClick={async () => {
-                    try {
-                      await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "Could not create project.");
-                    }
-                  }}
-                >
-                  <Plus size={14} /> New project
-                </button>
-              </div>
-            </details>
-
-            {/* 5. Architecture Revisions */}
-            <details className="canvas-first-nested-group revisions-group" open>
-              <summary className="canvas-first-nested-header">
-                <span className="canvas-first-nested-title">
-                  <GitBranch size={14} /> Architecture Revisions
-                </span>
-                <ChevronDown size={13} className="canvas-first-nested-chevron" />
-              </summary>
-              <div className="canvas-first-nested-content">
-                <Suspense fallback={null}>
-                  <RevisionsPanel key={project.id} />
-                </Suspense>
-              </div>
-            </details>
-
-            {/* 6. Saved Runs & Results */}
-            <details className="canvas-first-nested-group" open>
-              <summary className="canvas-first-nested-header">
-                <span className="canvas-first-nested-title">
-                  <BarChart3 size={14} /> Saved runs & comparisons ({savedRuns.length})
-                </span>
-                <ChevronDown size={13} className="canvas-first-nested-chevron" />
-              </summary>
-              <div className="canvas-first-nested-content">
-                <div className="saved-runs-library">
-                  <button
-                    className="saved-runs-heading"
-                    onClick={() => {
-                      setProjectPanel(false);
-                      setResultsOpen(true);
-                    }}
-                  >
-                    <BarChart3 size={16} />
-                    <span>Saved runs</span>
-                    <small>{savedRuns.length}</small>
-                  </button>
-                  {savedRuns.length ? (
-                    <div className="saved-runs-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                      {savedRuns.slice().reverse().map((run) => (
+                <div className="canvas-first-nested-content">
+                  {project.checkpoints.length ? (
+                    <div className="checkpoint-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
+                      {project.checkpoints.map((c) => (
                         <button
-                          key={run.id}
+                          key={c.id}
+                          disabled={isReadOnly}
                           onClick={() => {
-                            setSelectedResult(run.id);
+                            editor.restore(c.id);
                             setProjectPanel(false);
-                            setResultsOpen(true);
+                            setNotice(`Restored “${c.name}”.`);
                           }}
-                          title={run.name}
                         >
-                          <span>{run.name}</span>
+                          <span className="checkpoint-dot" />
+                          <span>{c.name}</span>
                           <ChevronRight size={13} />
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <p className="small muted">Finish a run, then save its result to compare later.</p>
+                    <p className="small muted">Keep a version before trying something new.</p>
                   )}
+                  <fieldset disabled={isReadOnly} style={{ border: "none", padding: 0, margin: "8px 0 0 0" }}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (isReadOnly) return;
+                        const ok = editor.checkpoint(
+                          checkpointName.trim() || `Checkpoint ${project.checkpoints.length + 1}`
+                        );
+                        if (ok) {
+                          setCheckpointName("");
+                          setNotice("Checkpoint saved with the current model and settings.");
+                        } else {
+                          setError("Could not save checkpoint. Maximum limit reached.");
+                        }
+                      }}
+                    >
+                      <input
+                        aria-label="Checkpoint name"
+                        placeholder="Name this checkpoint"
+                        value={checkpointName}
+                        maxLength={80}
+                        onChange={(e) => setCheckpointName(e.target.value)}
+                        disabled={isReadOnly}
+                      />
+                      <button className="subtle" type="submit" disabled={isReadOnly}>
+                        <Plus size={14} />
+                        Save checkpoint
+                      </button>
+                    </form>
+                  </fieldset>
                 </div>
               </div>
-            </details>
 
-            {/* 7. Model Semantics */}
-            <div className="canvas-first-nested-footer">
-              <button
-                className="assumptions-link canvas-first-btn subtle"
-                onClick={() => {
-                  setProjectPanel(false);
-                  setAssumptions(true);
-                }}
-              >
-                <Info size={15} />
-                <span>How the model works</span>
-                <ArrowUpRight size={13} />
-              </button>
+              {/* 3. Export options */}
+              <div className="canvas-first-nested-item">
+                <div className="canvas-first-nested-header-row">
+                  <span className="canvas-first-nested-title">
+                    <Download size={14} /> Export options
+                  </span>
+                  <span className="canvas-first-nested-badge">Canvas / JSON</span>
+                </div>
+                <div className="canvas-first-nested-content">
+                  <div className="canvas-first-menu-row">
+                    <button
+                      type="button"
+                      className="canvas-first-btn"
+                      onClick={() => {
+                        setProjectPanel(false);
+                        setShowExportModal(true);
+                      }}
+                    >
+                      <Image size={14} />
+                      Export canvas
+                    </button>
+                    <button type="button" className="canvas-first-btn" onClick={download}>
+                      <Download size={14} />
+                      Export JSON
+                    </button>
+                    <button
+                      type="button"
+                      className="canvas-first-btn"
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      <Upload size={14} />
+                      Import JSON
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Switch project */}
+              <div className="canvas-first-nested-item">
+                <div className="canvas-first-nested-header-row">
+                  <span className="canvas-first-nested-title">
+                    <FolderOpen size={14} /> Switch project
+                  </span>
+                  <span className="canvas-first-nested-badge">{projects.length} projects</span>
+                </div>
+                <div className="canvas-first-nested-content">
+                  <div className="project-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
+                    {projects.map((p) => (
+                      <button key={p.id} onClick={() => switchProject(p)} aria-label={p.name}>
+                        <FolderOpen size={16} />
+                        <span>
+                          <strong>{p.name}</strong>
+                          <small>{new Date(p.updatedAt).toLocaleDateString()} · {p.graph.nodes.length} components</small>
+                        </span>
+                        {p.id === project.id && <Check size={16} />}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="canvas-first-btn"
+                    onClick={async () => {
+                      try {
+                        await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Could not create project.");
+                      }
+                    }}
+                  >
+                    <Plus size={14} /> New project
+                  </button>
+                </div>
+              </div>
+
+              {/* 5. Architecture Revisions */}
+              <div className="canvas-first-nested-item revisions-group">
+                <div className="canvas-first-nested-header-row">
+                  <span className="canvas-first-nested-title">
+                    <GitBranch size={14} /> Architecture Revisions
+                  </span>
+                  <span className="canvas-first-nested-badge">Snapshots</span>
+                </div>
+                <div className="canvas-first-nested-content">
+                  <Suspense fallback={null}>
+                    <RevisionsPanel key={project.id} />
+                  </Suspense>
+                </div>
+              </div>
+
+              {/* 6. Saved Runs & Results */}
+              <div className="canvas-first-nested-item">
+                <div className="canvas-first-nested-header-row">
+                  <span className="canvas-first-nested-title">
+                    <BarChart3 size={14} /> Saved runs & comparisons
+                  </span>
+                  <span className="canvas-first-nested-badge">{savedRuns.length} runs</span>
+                </div>
+                <div className="canvas-first-nested-content">
+                  <div className="saved-runs-library">
+                    <button
+                      className="saved-runs-heading"
+                      onClick={() => {
+                        setProjectPanel(false);
+                        setResultsOpen(true);
+                      }}
+                    >
+                      <BarChart3 size={16} />
+                      <span>Saved runs</span>
+                      <small>{savedRuns.length}</small>
+                    </button>
+                    {savedRuns.length ? (
+                      <div className="saved-runs-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                        {savedRuns.slice().reverse().map((run) => (
+                          <button
+                            key={run.id}
+                            onClick={() => {
+                              setSelectedResult(run.id);
+                              setProjectPanel(false);
+                              setResultsOpen(true);
+                            }}
+                            title={run.name}
+                          >
+                            <span>{run.name}</span>
+                            <ChevronRight size={13} />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="small muted">Finish a run, then save its result to compare later.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. Model Semantics */}
+              <div className="canvas-first-nested-footer">
+                <button
+                  className="assumptions-link canvas-first-btn subtle"
+                  onClick={() => {
+                    setProjectPanel(false);
+                    setAssumptions(true);
+                  }}
+                >
+                  <Info size={15} />
+                  <span>How the model works</span>
+                  <ArrowUpRight size={13} />
+                </button>
+              </div>
             </div>
           </section>
         </div>
