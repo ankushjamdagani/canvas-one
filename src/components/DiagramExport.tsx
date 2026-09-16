@@ -23,11 +23,11 @@ export function DiagramExport({ project }: { project: Project }) {
       setPending(null);
     }
   };
-  return <section className="diagram-export" aria-label="Export canvas">
+  return <section data-testid="diagram-export" className="diagram-export" aria-label="Export canvas">
     <div className="diagram-export-copy"><strong>Entire canvas · current subsystem view</strong><span>PNG uses up to 2× scale within safe image limits.</span></div>
     <div className="diagram-export-actions">
-      <button disabled={disabled} onClick={() => run("svg")}>{pending === "svg" ? <LoaderCircle className="export-spinner" size={15} /> : <Download size={15} />}{pending === "svg" ? "Preparing…" : "Download SVG"}</button>
-      <button disabled={disabled} onClick={() => run("png")}>{pending === "png" ? <LoaderCircle className="export-spinner" size={15} /> : <FileImage size={15} />}{pending === "png" ? "Preparing…" : "Download PNG"}</button>
+      <button data-testid="export-svg-btn" disabled={disabled} onClick={() => run("svg")}>{pending === "svg" ? <LoaderCircle className="export-spinner" size={15} /> : <Download size={15} />}{pending === "svg" ? "Preparing…" : "Download SVG"}</button>
+      <button data-testid="export-png-btn" disabled={disabled} onClick={() => run("png")}>{pending === "png" ? <LoaderCircle className="export-spinner" size={15} /> : <FileImage size={15} />}{pending === "png" ? "Preparing…" : "Download PNG"}</button>
     </div>
     <span className={`diagram-export-message ${failed ? "failed" : ""}`} role={failed ? "alert" : "status"}>{message || "\u00a0"}</span>
   </section>;

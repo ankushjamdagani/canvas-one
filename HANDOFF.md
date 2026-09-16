@@ -22,11 +22,15 @@ Integrated in the worktree:
 - Consolidated Canvas Floating Dock (`.canvas-floating-dock`) grouping Undo, Redo, Select, Pan, Group, Add Note, Zoom In/Out, and Fit View directly at the bottom-center of the canvas.
 - Single unified Studio Menu (`.studio-menu-card`, `src/components/StudioMenu.tsx`) anchored to `.project-switch` dropdown in the topbar, integrating project switching, `+ New project`, starter templates, checkpoint creation and rollback, revisions, portable JSON export/import, and saved comparisons.
 - Floating Component Catalog panel and Architecture Revisions panel (`.canvas-first-catalog-drawer`) floating seamlessly over the canvas, preserving zoom and avoiding layout shifts.
+- Tailwind CSS v4 integration via `@tailwindcss/vite` and `@theme inline` with Zinc/Neutral shadcn design tokens in `src/styles.css`.
+- Reusable shadcn-ui component primitives in `src/components/ui/`: `Button`, `Dialog`, `DropdownMenu`, `Tooltip`, `Badge`, `Input`, `Separator`, `Tabs`.
+- Decomposed layout architecture in `src/components/layout/`: `TopBar.tsx`, `ActivityRail.tsx`, `CanvasFloatingDock.tsx`, and `ResultsStrip.tsx` extracted from monolithic `App.tsx`.
+- Semantic `data-testid` test identifiers across layout chrome, activity rail, dock, and results strip, with IPv4 loopback alignment in `playwright.config.ts`.
 
 Current verification baseline:
-- 233 unit tests across 36 files (`npm test`, 2.38s).
-- Passing production build (`npm run build`, 330ms).
-- 45 passing production Chromium journeys across 5 workers (`npx playwright test`, 40.3s).
+- 233 unit tests across 36 files (`npm test`, 2.18s).
+- Passing production build (`npm run build`, 508ms).
+- 45 passing production Chromium journeys across 5 workers (`TEST_PRODUCTION=1 npm run test:e2e`, 25.7s).
 - Clean whitespace and format (`git diff --check`).
 
 Authored architecture revisions are now implemented as optional `Project.revisions` metadata. Up to 20 immutable draft/final snapshots include graph (and notes), subsystems and expanded component views, with author, timestamp, reason, explanation and optional http/https issue URL. Finalization creates a new final copy linked to the saved draft; it does not capture current canvas edits. Project controls provide comparison against current canvas or another revision and restore. Restore uses a history entry with optional view metadata so Undo/Redo restores graph and presentation together; ordinary graph edits keep the previous dormant-subsystem behavior. Project identity, camera, checkpoints and saved results remain intact. Version-7 exports/imports preserve revision IDs and links within a new project copy. Authors are self-reported; no shared accounts, team approval or cloud sync is implemented.

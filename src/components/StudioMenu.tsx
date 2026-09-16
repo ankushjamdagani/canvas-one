@@ -81,6 +81,7 @@ export function StudioMenu({
   return (
     <div className="scope-menu-backdrop" onClick={onClose}>
       <section
+        data-testid="studio-menu"
         className="scope-menu-card studio-menu-card"
         onClick={(e) => e.stopPropagation()}
         role="region"
@@ -105,6 +106,7 @@ export function StudioMenu({
 
           <div className="scope-menu-header-actions">
             <button
+              data-testid="studio-menu-close"
               type="button"
               className="scope-menu-close-btn"
               onClick={onClose}

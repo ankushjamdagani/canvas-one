@@ -626,3 +626,26 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Community labels are placeholders after CLI rebuilds, and the doc/image semantic layer still dates from 2026-09-09; both need an LLM pass (`graphify label`, `/graphify --update`).
   - `graphify hook install` writes a `.gitattributes` merge driver for `graphify-out/graph.json`; removed, since that file is no longer tracked and the untracked file would permanently dirty the worktree. Re-running hook install will recreate it.
   - Three `SKILL.md.bak` files from the 0.9.5 skill copies remain in the platform config directories.
+
+## 2026-09-17 — Frontend Architecture Modernization: Tailwind CSS v4, shadcn/ui & Layout Refactoring
+
+- **Outcome**: Successfully modernized frontend architecture by establishing Tailwind CSS v4 tooling with `@tailwindcss/vite`, configuring Zinc/Neutral design tokens via `@theme`, building reusable shadcn-ui primitives (`Button`, `Dialog`, `DropdownMenu`, `Tooltip`, `Badge`, `Input`, `Separator`, `Tabs`), decomposing monolithic `App.tsx` into modular layout components (`TopBar`, `ActivityRail`, `CanvasFloatingDock`, `ResultsStrip`), and migrating E2E helpers to semantic `data-testid` selectors.
+- **Files and systems changed**:
+  - `package.json`, `package-lock.json`: Added `@tailwindcss/vite` 4.3.3, `tailwindcss` 4.3.3, `clsx`, `tailwind-merge`, `class-variance-authority`, and Radix UI primitive packages (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-tooltip`, `@radix-ui/react-slot`, `@radix-ui/react-tabs`, `@radix-ui/react-separator`).
+  - `vite.config.ts`, `tsconfig.json`: Added `@tailwindcss/vite` plugin and `@/*` path mapping alias.
+  - `src/lib/utils.ts`: Created standard `cn` utility helper combining `clsx` and `twMerge`.
+  - `src/styles.css`: Added `@import "tailwindcss";`, `@theme inline` mapping, and Zinc/Neutral CSS variables for light and dark modes while maintaining existing custom canvas variables.
+  - `src/components/ui/`: Created shadcn-ui primitives: [button.tsx](src/components/ui/button.tsx), [dialog.tsx](src/components/ui/dialog.tsx), [dropdown-menu.tsx](src/components/ui/dropdown-menu.tsx), [tooltip.tsx](src/components/ui/tooltip.tsx), [badge.tsx](src/components/ui/badge.tsx), [input.tsx](src/components/ui/input.tsx), [separator.tsx](src/components/ui/separator.tsx), [tabs.tsx](src/components/ui/tabs.tsx).
+  - `src/components/layout/`: Extracted layout components: [TopBar.tsx](src/components/layout/TopBar.tsx), [ActivityRail.tsx](src/components/layout/ActivityRail.tsx), [CanvasFloatingDock.tsx](src/components/layout/CanvasFloatingDock.tsx), [ResultsStrip.tsx](src/components/layout/ResultsStrip.tsx).
+  - `src/App.tsx`, `src/components/ArchitectureCanvas.tsx`: Refactored to compose layout components, reducing inline layout complexity.
+  - `src/components/StudioMenu.tsx`, `src/components/ExamplesPanel.tsx`, `src/components/DiagramExport.tsx`: Added semantic `data-testid` test hooks.
+  - `playwright.config.ts`, `tests/openHelpers.ts`: Aligned test runner baseURL to IPv4 loopback (`127.0.0.1`) and updated helper locators to query `data-testid` with fallback to roles/classes.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: `/grill-me` architectural interview and alignment; Tailwind CSS v4 & Radix UI setup; Playwright Test.
+- **Verification performed**:
+  - `npm test`: All 233 unit tests pass across 36 files (2.18s).
+  - `npm run build`: Production build passes cleanly in 508ms.
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass across 5 workers in 25.7s.
+  - `git diff --check`: Clean formatting with 0 whitespace errors.
+- **Limitations & follow-up**:
+  - Remaining panels (e.g. `OpenInspector`, `SubsystemsPanel`) can progressively adopt shadcn primitives in future scoped iterations without touching canvas core simulation models.

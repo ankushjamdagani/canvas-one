@@ -45,7 +45,7 @@ export function ExamplesPanel({
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }}>
-      <div className="examples-modal">
+      <div data-testid="examples-modal" className="examples-modal">
         <div className="examples-modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Sparkles size={18} color="#087f84" />

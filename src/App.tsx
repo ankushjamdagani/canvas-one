@@ -33,6 +33,9 @@ import {
 } from "lucide-react";
 import "./components/openWorkspace.css";
 import "./components/canvasFirst.css";
+import { TopBar } from "./components/layout/TopBar";
+import { ActivityRail } from "./components/layout/ActivityRail";
+import { ResultsStrip } from "./components/layout/ResultsStrip";
 import { StudioMenu } from "./components/StudioMenu";
 import { useEditor } from "./state/editor";
 import {
@@ -314,206 +317,70 @@ export default function App() {
       )}
 
       {/* Top bar */}
-      {/* Top bar */}
-      <header className="canvas-first-topbar studio-header experiment-heading" role="banner">
-        <div className="canvas-first-topbar-row canvas-first-topbar-row-main">
-          <div className="canvas-first-brand brand">
-            <Workflow size={20} />
-            <span>
-              System studio<span className="brand-dot">.</span>
-            </span>
-          </div>
-
-          <div className="canvas-first-project-switcher-group">
-            <button
-              type="button"
-              className={`canvas-first-btn subtle project-switch workspace-switch project-menu-btn ${projectMenuOpen ? "active" : ""}`}
-              onClick={() => {
-                setLeftDrawerMode(null);
-                setProjectMenuOpen(!projectMenuOpen);
-              }}
-              aria-expanded={projectMenuOpen}
-              aria-label={project.name}
-              title={`Switch or manage projects: ${project.name}`}
-            >
-              <FolderOpen size={16} />
-              <span className="project-switch-name">{project.name}</span>
-              <ChevronDown size={13} className={`project-switch-chevron ${projectMenuOpen ? "open" : ""}`} />
-            </button>
-
-            <input
-              aria-label="Project name"
-              className="canvas-first-project-name-input"
-              value={projectNameInput}
-              onChange={(e) => setProjectNameInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.currentTarget.blur();
-                  handleSaveProjectName();
-                }
-              }}
-              onBlur={handleSaveProjectName}
-              disabled={isReadOnly}
-              maxLength={80}
-              placeholder="Project name"
-              title="Click to rename project"
-            />
-            {projectNameInput.trim() !== project.name && projectNameInput.trim().length > 0 && (
-              <button
-                type="button"
-                className="canvas-first-btn canvas-first-project-save-btn"
-                onClick={handleSaveProjectName}
-                aria-label="Save project name"
-                title="Save project name"
-                disabled={isReadOnly || !projectNameInput.trim()}
-              >
-                <Check size={13} />
-                <span>Save</span>
-              </button>
-            )}
-          </div>
-
-          <span className="save-status" role="status">
-            <span
-              className={`save-dot ${saved === "Save failed" ? "failed" : ""}`}
-            />
-            {saved}
-          </span>
-        </div>
-
-        <div className="canvas-first-topbar-row canvas-first-topbar-row-tools">
-          <button
-            data-testid="run-button"
-            className="canvas-first-btn primary"
-            disabled={!isOpen || !!errors.length || !ready || isReadOnly}
-            onClick={simulation.toggle}
-          >
-            {simulation.running ? (
-              <Pause size={14} />
-            ) : (
-              <Play size={14} fill="currentColor" />
-            )}
-            {simulation.running
-              ? "Pause"
-              : simulation.metrics?.finished
-                ? "Replay"
-                : simulation.metrics?.time
-                  ? "Resume"
-                  : "Run"}
-          </button>
-
-          <button
-            data-testid="reset-button"
-            onClick={simulation.reset}
-            disabled={isReadOnly || !!errors.length}
-            className="canvas-first-btn reset-button"
-          >
-            <RotateCcw size={14} />
-            <span>Reset</span>
-          </button>
-        </div>
-      </header>
+      <TopBar
+        projectName={project.name}
+        isReadOnly={isReadOnly}
+        projectNameInput={projectNameInput}
+        setProjectNameInput={setProjectNameInput}
+        onSaveProjectName={handleSaveProjectName}
+        projectMenuOpen={projectMenuOpen}
+        onToggleProjectMenu={() => {
+          setLeftDrawerMode(null);
+          setProjectMenuOpen(!projectMenuOpen);
+        }}
+        saved={saved}
+        simulationRunning={simulation.running}
+        simulationFinished={simulation.metrics?.finished}
+        simulationTime={simulation.metrics?.time}
+        simulationError={simulation.error}
+        onToggleSimulation={simulation.toggle}
+        onResetSimulation={simulation.reset}
+        canRun={isOpen && !errors.length && ready && !isReadOnly}
+        canReset={!isReadOnly && !errors.length}
+      />
 
       {/* Main Workspace Body */}
       <div className="canvas-first-body">
         {/* Left Control Rail / Activity Bar */}
-        <aside className="canvas-first-left-rail" role="toolbar" aria-label="Workspace controls">
-          <div className="canvas-first-rail-group">
-            <button
-              className={`canvas-first-rail-btn ${leftDrawerMode === 'components' ? "active" : ""}`}
-              onClick={() => {
-                setProjectMenuOpen(false);
-                setLeftDrawerMode(leftDrawerMode === 'components' ? null : 'components');
-              }}
-              aria-expanded={leftDrawerMode === 'components'}
-              aria-label="Add component"
-              title="Add component (Components catalog)"
-            >
-              <Plus size={18} />
-              <span className="canvas-first-rail-label">Add</span>
-            </button>
-
-            <button
-              className={`canvas-first-rail-btn ${inspectorMode === 'workloads' ? "active" : ""}`}
-              onClick={() => {
-                setSelectedEdgeId(null);
-                editor.select(null);
-                setLeftDrawerMode(null);
-                setInspectorMode(inspectorMode === 'workloads' ? null : 'workloads');
-              }}
-              aria-expanded={inspectorMode === 'workloads'}
-              aria-label="Workloads"
-              title="Workloads configuration"
-            >
-              <SlidersHorizontal size={18} />
-              <span className="canvas-first-rail-label">Workloads</span>
-            </button>
-
-            <button
-              className={`canvas-first-rail-btn ${leftDrawerMode === 'revisions' ? "active" : ""}`}
-              onClick={() => {
-                setProjectMenuOpen(false);
-                setLeftDrawerMode(leftDrawerMode === 'revisions' ? null : 'revisions');
-              }}
-              aria-expanded={leftDrawerMode === 'revisions'}
-              aria-label="Architecture Revisions"
-              title="Revisions & Checkpoints"
-            >
-              <GitBranch size={18} />
-              <span className="canvas-first-rail-label">Revisions</span>
-            </button>
-
-            <button
-              className={`canvas-first-rail-btn ${resultsOpen ? "active" : ""}`}
-              onClick={() => {
-                setProjectMenuOpen(false);
-                setLeftDrawerMode(null);
-                setResultsOpen(!resultsOpen);
-              }}
-              aria-expanded={resultsOpen}
-              aria-label="Saved runs"
-              title="Saved runs & comparisons"
-            >
-              <BarChart3 size={18} />
-              <span className="canvas-first-rail-label">Runs</span>
-            </button>
-          </div>
-
-          <div className="canvas-first-rail-bottom">
-            <button
-              className="canvas-first-rail-btn"
-              onClick={() => {
-                setLeftDrawerMode(null);
-                setShowExportModal(true);
-              }}
-              aria-label="Export options"
-              title="Export canvas or JSON"
-            >
-              <Download size={18} />
-              <span className="canvas-first-rail-label">Export</span>
-            </button>
-
-            {guide && (
-              <button
-                className={`canvas-first-rail-btn ${inspectorMode === 'tutorial' ? "active" : ""}`}
-                aria-label="Show experiment guide"
-                title="Experiment guide"
-                onClick={() => {
-                  setSelectedEdgeId(null);
-                  editor.select(null);
-                  setInspectorMode(inspectorMode === 'tutorial' ? null : 'tutorial');
-                }}
-              >
-                <Info size={16} />
-                <span className="canvas-first-rail-label">Guide</span>
-              </button>
-            )}
-          </div>
-        </aside>
+        <ActivityRail
+          leftDrawerMode={leftDrawerMode}
+          onToggleComponents={() => {
+            setProjectMenuOpen(false);
+            setLeftDrawerMode(leftDrawerMode === "components" ? null : "components");
+          }}
+          inspectorMode={inspectorMode}
+          onToggleWorkloads={() => {
+            setSelectedEdgeId(null);
+            editor.select(null);
+            setLeftDrawerMode(null);
+            setInspectorMode(inspectorMode === "workloads" ? null : "workloads");
+          }}
+          onToggleRevisions={() => {
+            setProjectMenuOpen(false);
+            setLeftDrawerMode(leftDrawerMode === "revisions" ? null : "revisions");
+          }}
+          resultsOpen={resultsOpen}
+          onToggleResults={() => {
+            setProjectMenuOpen(false);
+            setLeftDrawerMode(null);
+            setResultsOpen(!resultsOpen);
+          }}
+          onOpenExport={() => {
+            setLeftDrawerMode(null);
+            setShowExportModal(true);
+          }}
+          hasGuide={!!guide}
+          onToggleGuide={() => {
+            setSelectedEdgeId(null);
+            editor.select(null);
+            setInspectorMode(inspectorMode === "tutorial" ? null : "tutorial");
+          }}
+        />
 
         {/* Multi-Purpose Left Drawer Panel */}
         {leftDrawerMode && (
           <aside
+            data-testid={leftDrawerMode === 'components' ? "catalog-drawer" : "revisions-drawer"}
             className="canvas-first-catalog-drawer library"
             aria-label={
               leftDrawerMode === 'components'
@@ -683,129 +550,43 @@ export default function App() {
           </div>
 
           {/* Compact Results & Readiness Strip */}
-          <div className="canvas-first-strip" role="region" aria-label="Simulation status and results">
-            <div className="canvas-first-strip-info">
-              {(simulation.metrics?.time ?? 0) > 0 ? (
-                <>
-                  <span className="canvas-first-strip-stat">
-                    <span className={`canvas-first-strip-dot ${simulation.running ? "running" : simulation.metrics?.finished ? "finished" : "stopped"}`} />
-                    <strong>
-                      {simulation.error
-                        ? "Simulation stopped"
-                        : simulation.metrics?.execution?.incomplete
-                          ? "Resource boundary"
-                          : simulation.running
-                            ? "Running"
-                            : simulation.metrics?.finished
-                              ? "Completed"
-                              : "Paused"}
-                    </strong>
-                  </span>
-                  <span className="canvas-first-strip-stat">
-                    <span>Time:</span>
-                    <strong>{simulation.metrics?.time.toFixed(1)}s</strong>
-                    <span className="muted">/ {graph.settings.duration}s</span>
-                  </span>
-                  {(() => {
-                    const roots = simulation.metrics?.execution?.roots;
-                    const throughputVal = roots?.throughput ?? simulation.metrics?.throughput;
-                    const p95Val = roots?.p95Latency ?? simulation.metrics?.p95Latency;
-                    const failures = (roots?.rejected ?? simulation.metrics?.dropped ?? 0) +
-                      (roots?.failed ?? simulation.metrics?.timedOut ?? 0) +
-                      (roots?.expired ?? 0);
-                    return (
-                      <>
-                        <span className="canvas-first-strip-stat">
-                          <span>Throughput:</span>
-                          <strong data-testid="throughput">
-                            {throughputVal !== undefined ? `${throughputVal.toFixed(1)} req/s` : "0 req/s"}
-                          </strong>
-                        </span>
-                        <span className="canvas-first-strip-stat">
-                          <span>p95:</span>
-                          <strong data-testid="p95">
-                            {p95Val !== undefined && p95Val !== null
-                              ? `${p95Val.toFixed(1)}ms`
-                              : "—"}
-                          </strong>
-                        </span>
-                        <span className={`canvas-first-strip-stat ${failures > 0 ? "danger" : ""}`}>
-                          <span>Failures:</span>
-                          <strong data-testid="failures">{failures}</strong>
-                        </span>
-                      </>
-                    );
-                  })()}
-                  {simulation.metrics?.execution?.incomplete && (
-                    <span className="canvas-first-strip-stat incomplete">
-                      <strong>Incomplete run</strong>
-                    </span>
-                  )}
-                </>
-              ) : (
-                <div className="canvas-first-readiness">
-                  {graph.nodes.length === 0 ? (
-                    <span className="canvas-first-strip-stat muted">
-                      <span className="canvas-first-strip-dot idle" />
-                      <span>Empty canvas · Add components or load an example to begin</span>
-                    </span>
-                  ) : errors.length > 0 ? (
-                    <span
-                      className="canvas-first-strip-stat danger"
-                      title={errors.join("\n")}
-                      style={{ cursor: "help" }}
-                    >
-                      <TriangleAlert size={14} />
-                      <strong>{errors.length} draft error{errors.length > 1 ? "s" : ""}</strong>
-                      <span className="muted" style={{ fontSize: "11px", marginLeft: "4px" }}>
-                        ({errors[0]})
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="canvas-first-strip-stat muted">
-                      <span className={`canvas-first-strip-dot ${ready ? "ready" : "idle"}`} />
-                      <span>Ready to simulate · {graph.nodes.length} components, {graph.workloads?.length ?? 0} workloads</span>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="canvas-first-strip-actions">
-              {(simulation.metrics?.time ?? 0) > 0 && (
-                <>
-                  <button
-                    className={`canvas-first-btn subtle ${showDetails ? "active" : ""}`}
-                    onClick={() => setShowDetails(!showDetails)}
-                  >
-                    {showDetails ? "Hide details" : "Details"}
-                  </button>
-                  <button
-                    className="canvas-first-btn subtle"
-                    onClick={() => setResultsOpen(true)}
-                  >
-                    Compare ({savedRuns.length})
-                  </button>
-                  {simulation.result && !simulation.metrics?.execution?.incomplete && !simulation.error && (
-                    <button
-                      className="canvas-first-btn"
-                      disabled={resultSaved}
-                      onClick={() => {
-                        setResultName(defaultRunName(simulation.result!.graph));
-                        setSavingResult(true);
-                      }}
-                    >
-                      <BookmarkPlus size={14} />
-                      {resultSaved ? "Result saved" : "Save result"}
-                    </button>
-                  )}
-                </>
-              )}
-              <button className="canvas-first-btn subtle" onClick={() => setShowExportModal(!showExportModal)}>
-                Export canvas
-              </button>
-            </div>
-          </div>
+          {(() => {
+            const roots = simulation.metrics?.execution?.roots;
+            const throughputVal = roots?.throughput ?? simulation.metrics?.throughput;
+            const p95Val = roots?.p95Latency ?? simulation.metrics?.p95Latency;
+            const failures =
+              (roots?.rejected ?? simulation.metrics?.dropped ?? 0) +
+              (roots?.failed ?? simulation.metrics?.timedOut ?? 0) +
+              (roots?.expired ?? 0);
+            return (
+              <ResultsStrip
+                simulationTime={simulation.metrics?.time ?? 0}
+                simulationRunning={simulation.running}
+                simulationFinished={simulation.metrics?.finished}
+                simulationError={simulation.error}
+                incomplete={simulation.metrics?.execution?.incomplete}
+                duration={graph.settings.duration}
+                throughput={throughputVal}
+                p95Latency={p95Val}
+                failures={failures}
+                nodeCount={graph.nodes.length}
+                workloadCount={graph.workloads?.length ?? 0}
+                errors={errors}
+                ready={ready}
+                showDetails={showDetails}
+                onToggleDetails={() => setShowDetails(!showDetails)}
+                savedRunsCount={savedRuns.length}
+                onOpenSavedRuns={() => setResultsOpen(true)}
+                canSaveResult={!!(simulation.result && !simulation.metrics?.execution?.incomplete && !simulation.error)}
+                resultSaved={resultSaved}
+                onSaveResultClick={() => {
+                  setResultName(defaultRunName(simulation.result!.graph));
+                  setSavingResult(true);
+                }}
+                onOpenExport={() => setShowExportModal(!showExportModal)}
+              />
+            );
+          })()}
 
           {/* Saving Result Form */}
           {savingResult && simulation.result && (

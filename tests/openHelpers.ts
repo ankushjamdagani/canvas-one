@@ -13,10 +13,11 @@ export async function openExample(page: Page, title: string) {
   if (await directBtn.first().isVisible()) {
     await directBtn.first().click();
   } else {
-    await page.locator(".project-switch").click();
+    const switchBtn = page.getByTestId("project-switch-btn").or(page.locator(".project-switch"));
+    await switchBtn.click();
     await page.getByRole("button", { name: "Examples & tutorials" }).click();
   }
-  const modal = page.locator(".examples-modal");
+  const modal = page.getByTestId("examples-modal").or(page.locator(".examples-modal"));
   await expect(modal).toBeVisible();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
@@ -43,16 +44,18 @@ export async function selectCanvasBox(page: Page, start: { x: number; y: number 
 export async function openWorkloads(page: Page): Promise<Locator> {
   const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
   if (!(await inspector.isVisible())) {
-    await page.getByRole("button", { name: "Workloads" }).click();
+    const workloadsBtn = page.getByTestId("rail-workloads-btn").or(page.getByRole("button", { name: "Workloads" }));
+    await workloadsBtn.click();
     await expect(inspector).toBeVisible();
   }
   return inspector;
 }
 
 export async function openCatalog(page: Page): Promise<Locator> {
-  const drawer = page.getByRole("complementary", { name: "Component catalog" });
+  const drawer = page.getByTestId("catalog-drawer").or(page.getByRole("complementary", { name: "Component catalog" }));
   if (!(await drawer.isVisible())) {
-    await page.getByRole("button", { name: "Add component" }).first().click();
+    const addBtn = page.getByTestId("rail-add-component-btn").or(page.getByRole("button", { name: "Add component" }));
+    await addBtn.first().click();
     await expect(drawer).toBeVisible();
   }
   return drawer;
@@ -61,16 +64,18 @@ export async function openCatalog(page: Page): Promise<Locator> {
 export async function openMetricsDetails(page: Page): Promise<Locator> {
   const panel = page.locator(".open-metrics-panel");
   if (!(await panel.isVisible())) {
-    await page.getByRole("button", { name: "Details" }).click();
+    const detailsBtn = page.getByTestId("details-btn").or(page.getByRole("button", { name: "Details" }));
+    await detailsBtn.click();
     await expect(panel).toBeVisible();
   }
   return panel;
 }
 
 export async function openSavedRuns(page: Page): Promise<Locator> {
-  const heading = page.getByRole("button", { name: /Saved runs/ });
+  const heading = page.getByTestId("rail-runs-btn").or(page.getByRole("button", { name: /Saved runs/ }));
   if (!(await heading.first().isVisible())) {
-    await page.locator(".project-switch").click();
+    const switchBtn = page.getByTestId("project-switch-btn").or(page.locator(".project-switch"));
+    await switchBtn.click();
   }
   await page.getByRole("button", { name: /Saved runs/ }).first().click();
   const panel = page.getByRole("region", { name: "Saved experiment results" });

@@ -3,6 +3,7 @@ import { hasBalancer, serviceInstances } from "../domain/routing";
 import { visibleSubsystems } from "../domain/subsystems";
 import { SubsystemNode } from "./SubsystemNode";
 import { projectSubsystems } from "./subsystemProjection";
+import { CanvasFloatingDock } from "./layout/CanvasFloatingDock";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
@@ -854,153 +855,49 @@ export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
     </ReactFlow>
 
     {/* Consolidated Floating Canvas Controls Dock */}
-    <div className="canvas-floating-dock" role="toolbar" aria-label="Canvas controls">
-      {/* History: Undo & Redo */}
-      <div className="canvas-dock-group">
-        <button
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Undo"
-          title="Undo model edit (Cmd+Z)"
-          disabled={!editor.past.length}
-          onClick={editor.undo}
-        >
-          <Undo2 size={15} />
-          <span className="sr-only">Undo</span>
-        </button>
-        <button
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Redo"
-          title="Redo model edit (Cmd+Shift+Z)"
-          disabled={!editor.future.length}
-          onClick={editor.redo}
-        >
-          <Redo2 size={15} />
-          <span className="sr-only">Redo</span>
-        </button>
-      </div>
-
-      <div className="canvas-dock-divider" />
-
-      {/* Tool Modes: Select & Pan */}
-      <div className="canvas-dock-group">
-        <button
-          type="button"
-          className={`canvas-dock-btn ${dragMode === "select" ? "active" : ""}`}
-          aria-label="Select"
-          aria-pressed={dragMode === "select"}
-          title="Select tool (box select)"
-          onClick={() => setDragMode("select")}
-        >
-          <MousePointer size={15} />
-          <span className="canvas-dock-text">Select</span>
-        </button>
-        <button
-          type="button"
-          className={`canvas-dock-btn ${dragMode === "pan" ? "active" : ""}`}
-          aria-label="Pan"
-          aria-pressed={dragMode === "pan"}
-          title="Pan tool (drag canvas)"
-          onClick={() => setDragMode("pan")}
-        >
-          <Hand size={15} />
-          <span className="canvas-dock-text">Pan</span>
-        </button>
-      </div>
-
-      <div className="canvas-dock-divider" />
-
-      {/* Group & Canvas Actions */}
-      <div className="canvas-dock-group">
-        <button
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Selection actions"
-          title="Group / selection actions"
-          disabled={editor.selectedNodeIds.length === 0 && (!editor.selected || !groups.some((g) => g.id === editor.selected))}
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            if (editor.selectedNodeIds.length > 0) {
-              setContextMenuTarget({
-                x: rect.left,
-                y: Math.max(10, rect.top - 180),
-                kind: "components",
-                componentIds: editor.selectedNodeIds,
-              });
-            } else if (editor.selected && groups.some((g) => g.id === editor.selected)) {
-              setContextMenuTarget({
-                x: rect.left,
-                y: Math.max(10, rect.top - 180),
-                kind: "subsystem",
-                subsystemId: editor.selected,
-              });
-            }
-          }}
-        >
-          <Boxes size={15} />
-          <span className="canvas-dock-text">Group</span>
-        </button>
-        <button
-          type="button"
-          className="canvas-dock-btn add-canvas-note"
-          aria-label="Add canvas note"
-          title="Add canvas note"
-          disabled={editor.readOnly || (editor.project.graph.notes?.length ?? 0) >= 100}
-          onClick={() => {
-            const box = canvasRef.current?.getBoundingClientRect();
-            if (box) {
-              setSelectedEdges([]);
-              editor.addNote(
-                flow.screenToFlowPosition({
-                  x: box.left + box.width / 2 - 100,
-                  y: box.top + box.height * 0.65,
-                })
-              );
-            }
-          }}
-        >
-          <StickyNote size={15} />
-          <span className="canvas-dock-text">Add canvas note</span>
-        </button>
-      </div>
-
-      <div className="canvas-dock-divider" />
-
-      {/* Zoom Controls */}
-      <div className="canvas-dock-group">
-        <button
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Zoom In"
-          title="Zoom in"
-          onClick={() => flow.zoomIn()}
-        >
-          <Plus size={15} />
-          <span className="sr-only">Zoom In</span>
-        </button>
-        <button
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Zoom Out"
-          title="Zoom out"
-          onClick={() => flow.zoomOut()}
-        >
-          <Minus size={15} />
-          <span className="sr-only">Zoom Out</span>
-        </button>
-        <button
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Fit view"
-          title="Fit view"
-          onClick={() => flow.fitView({ padding: 0.23 })}
-        >
-          <Maximize2 size={15} />
-          <span className="sr-only">Fit view</span>
-        </button>
-      </div>
-    </div>
+    <CanvasFloatingDock
+      canUndo={editor.past.length > 0}
+      canRedo={editor.future.length > 0}
+      onUndo={editor.undo}
+      onRedo={editor.redo}
+      dragMode={dragMode}
+      onSetDragMode={setDragMode}
+      canGroup={editor.selectedNodeIds.length > 0 || (!!editor.selected && groups.some((g) => g.id === editor.selected))}
+      onGroupClick={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (editor.selectedNodeIds.length > 0) {
+          setContextMenuTarget({
+            x: rect.left,
+            y: Math.max(10, rect.top - 180),
+            kind: "components",
+            componentIds: editor.selectedNodeIds,
+          });
+        } else if (editor.selected && groups.some((g) => g.id === editor.selected)) {
+          setContextMenuTarget({
+            x: rect.left,
+            y: Math.max(10, rect.top - 180),
+            kind: "subsystem",
+            subsystemId: editor.selected,
+          });
+        }
+      }}
+      canAddNote={!editor.readOnly && (editor.project.graph.notes?.length ?? 0) < 100}
+      onAddNote={() => {
+        const box = canvasRef.current?.getBoundingClientRect();
+        if (box) {
+          setSelectedEdges([]);
+          editor.addNote(
+            flow.screenToFlowPosition({
+              x: box.left + box.width / 2 - 100,
+              y: box.top + box.height * 0.65,
+            })
+          );
+        }
+      }}
+      onZoomIn={() => flow.zoomIn()}
+      onZoomOut={() => flow.zoomOut()}
+      onFitView={() => flow.fitView({ padding: 0.23 })}
+    />
 
     <CanvasContextMenu
       target={contextMenuTarget}
