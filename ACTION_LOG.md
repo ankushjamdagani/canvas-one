@@ -741,3 +741,42 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `git diff --check`: Clean formatting with 0 whitespace errors.
 - **Limitations & follow-up**:
   - Frontend modernization with Tailwind CSS v4 and shadcn-ui component primitives is fully complete across the entire codebase.
+
+## 2026-09-17 — Comprehensive shadcn Primitives Expansion and Component Library Modernization Completed
+
+- **Outcome**: Successfully completed comprehensive adoption of shadcn-ui component primitives (from `ui.shadcn.com/docs/components`) and Tailwind CSS v4 classes across the entire application, eliminating raw controls and legacy CSS styles while strictly maintaining simulation invariants, model/view separation, and 100% E2E test coverage.
+- **Files and systems changed**:
+  - Installed official shadcn-ui primitives in `src/components/ui/`:
+    - [`card.tsx`](src/components/ui/card.tsx): `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`.
+    - [`label.tsx`](src/components/ui/label.tsx): `Label` with `@radix-ui/react-label`.
+    - [`switch.tsx`](src/components/ui/switch.tsx): `Switch` with `@radix-ui/react-switch`.
+    - [`checkbox.tsx`](src/components/ui/checkbox.tsx): `Checkbox` with `@radix-ui/react-checkbox`.
+    - [`radio-group.tsx`](src/components/ui/radio-group.tsx): `RadioGroup`, `RadioGroupItem` with `@radix-ui/react-radio-group`.
+    - [`scroll-area.tsx`](src/components/ui/scroll-area.tsx): `ScrollArea`, `ScrollBar` with `@radix-ui/react-scroll-area`.
+    - [`alert.tsx`](src/components/ui/alert.tsx): `Alert`, `AlertTitle`, `AlertDescription` with cva variants.
+    - [`popover.tsx`](src/components/ui/popover.tsx): `Popover`, `PopoverTrigger`, `PopoverContent` with `@radix-ui/react-popover`.
+    - [`collapsible.tsx`](src/components/ui/collapsible.tsx): `Collapsible` with `@radix-ui/react-collapsible`.
+  - Modernized application components:
+    - [`src/components/layout/CanvasFloatingDock.tsx`](src/components/layout/CanvasFloatingDock.tsx): Upgraded with shadcn `Button`, `Separator`, `Tooltip`, and Tailwind flexbox/backdrop layout.
+    - [`src/components/layout/ActivityRail.tsx`](src/components/layout/ActivityRail.tsx): Upgraded navigation buttons with shadcn `Button`, `Separator`, `Tooltip`, and responsive styling.
+    - [`src/components/layout/TopBar.tsx`](src/components/layout/TopBar.tsx): Modernized project rename, simulations triggers, and tool buttons with shadcn `Button`, `Input`, `Separator`, and `Tooltip`.
+    - [`src/components/ExamplesPanel.tsx`](src/components/ExamplesPanel.tsx): Replaced custom modal with shadcn `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `Tabs`, `TabsList`, `TabsTrigger`, and `Badge`.
+    - [`src/components/StudioMenu.tsx`](src/components/StudioMenu.tsx): Replaced custom containers with shadcn `Card`, `ScrollArea`, `Separator`, `Button`, `Badge`, and `Input`.
+    - [`src/components/Inspector.tsx`](src/components/Inspector.tsx): Upgraded explanation/configuration tabs with shadcn `Tabs`, name field with shadcn `Input`, and suggestion triggers with shadcn `Button`.
+    - [`src/components/OpenWorkloadControls.tsx`](src/components/OpenWorkloadControls.tsx): Replaced raw checkbox with shadcn `Switch` and `Label`.
+    - [`src/components/OpenConnectionEditor.tsx`](src/components/OpenConnectionEditor.tsx): Replaced fallback route raw checkbox with shadcn `Switch` and `Label`.
+    - [`src/components/DiagramOrganization.tsx`](src/components/DiagramOrganization.tsx): Replaced raw checkboxes with shadcn `Checkbox` and `Label`.
+    - [`src/components/OpenInspector.tsx`](src/components/OpenInspector.tsx): Upgraded close buttons with shadcn `Button variant="ghost" size="icon"`, error banner with shadcn `Alert`, and action buttons with styled shadcn `Button`.
+    - [`src/components/WorkloadControls.tsx`](src/components/WorkloadControls.tsx): Modernized traffic pattern buttons with shadcn `Button` group.
+    - [`src/components/RoutingPanel.tsx`](src/components/RoutingPanel.tsx): Modernized service instance buttons with shadcn `Button variant="link"`.
+    - [`src/components/layout/ResultsStrip.tsx`](src/components/layout/ResultsStrip.tsx): Upgraded action triggers (Details, Compare, Save result, Export canvas) with shadcn `Button`.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: shadcn-ui primitives, Tailwind CSS v4, Graphify AST update, Vitest, Playwright Test, Modern Web Guidance, Impeccable Design Taste.
+- **Verification performed**:
+  - `npm test`: All 233 unit tests pass across 36 test files in 1.65s.
+  - `npm run build`: Clean compilation and Vite production build in 385ms with zero errors.
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 Playwright E2E production Chromium journeys pass with 100% stability across 5 parallel workers in 24.7s.
+  - `graphify update .`: AST-extracted 143/143 files without LLM cost; updated graph to 1151 nodes, 2978 edges, 99 communities.
+  - `git diff --check`: Clean formatting with 0 whitespace errors.
+- **Limitations & follow-up**:
+  - Full modernization with shadcn-ui and Tailwind CSS is complete across all components and layouts in the workspace. All simulation invariants and persistence formats remain strictly preserved.

@@ -24,6 +24,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { useEditor } from "../state/editor";
 import { expectedDatabaseRate } from "../domain/model";
 import type { Metrics } from "../simulation/engine";
@@ -149,20 +151,26 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
         <strong>{n.name}</strong>
         {overloaded && <Badge variant="destructive" className="tag amber">At risk</Badge>}
       </div>
-      <div className="tabs">
-        <button
-          className={tab === "explanation" ? "active" : ""}
-          onClick={() => setTab("explanation")}
-        >
-          Explanation
-        </button>
-        <button
-          className={tab === "configuration" ? "active" : ""}
-          onClick={() => setTab("configuration")}
-        >
-          Configuration
-        </button>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "explanation" | "configuration")} className="w-full">
+        <div className="tabs">
+          <TabsList className="grid w-full grid-cols-2 h-8 p-0.5 bg-muted/60">
+            <TabsTrigger
+              value="explanation"
+              role="button"
+              className={cn("text-xs font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs", tab === "explanation" && "active")}
+            >
+              Explanation
+            </TabsTrigger>
+            <TabsTrigger
+              value="configuration"
+              role="button"
+              className={cn("text-xs font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs", tab === "configuration" && "active")}
+            >
+              Configuration
+            </TabsTrigger>
+          </TabsList>
+        </div>
+      </Tabs>
       <div className="inspector-body">
         <Button
           variant="outline"
@@ -179,9 +187,10 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
           <>
             <label className="field">
               <span>Component name</span>
-              <input
+              <Input
                 value={n.name}
                 maxLength={80}
+                className="h-8 text-xs mt-1"
                 onChange={(e) =>
                   editor.updateNode(n.id, { name: e.target.value })
                 }
@@ -325,20 +334,29 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
             <h3>Try a change</h3>
             {!g.nodes.some((n) => n.kind === "cache") &&
             n.kind === "database" ? (
-              <button className="suggestion" onClick={editor.insertCache}>
-                <LayersIcon />
-                Add a cache
+              <Button
+                variant="outline"
+                className="suggestion w-full justify-between h-auto py-2 px-3 text-xs mb-1"
+                onClick={editor.insertCache}
+              >
+                <span className="flex items-center gap-2">
+                  <LayersIcon />
+                  Add a cache
+                </span>
                 <ArrowRight size={16} />
-              </button>
+              </Button>
             ) : (
-              <button
-                className="suggestion"
+              <Button
+                variant="outline"
+                className="suggestion w-full justify-between h-auto py-2 px-3 text-xs mb-1"
                 onClick={() => setTab("configuration")}
               >
-                <SlidersHorizontal size={16} />
-                Adjust configuration
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal size={16} />
+                  Adjust configuration
+                </span>
                 <ArrowRight size={16} />
-              </button>
+              </Button>
             )}
             <p className="small muted">
               Prediction above uses configured rates. Live metrics below come

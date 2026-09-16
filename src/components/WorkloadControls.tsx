@@ -2,6 +2,7 @@ import { useEditor } from "../state/editor";
 import { profileLabel, type TrafficProfile } from "../domain/workload";
 import { NumberField } from "./NumberField";
 import { WorkloadChart } from "./WorkloadChart";
+import { Button } from "@/components/ui/button";
 
 export function WorkloadControls() {
   const { project, settings: update } = useEditor(),
@@ -26,16 +27,19 @@ export function WorkloadControls() {
     <div className="workload-controls">
       <fieldset className="workload-selector">
         <legend>Traffic pattern</legend>
-        <div>
+        <div className="grid grid-cols-3 gap-1 p-1 bg-muted/60 rounded-md">
           {(["steady", "burst", "ramp"] as const).map((k) => (
-            <button
+            <Button
               type="button"
+              variant={kind === k ? "default" : "ghost"}
+              size="sm"
               key={k}
+              className={`h-7 text-xs font-medium ${kind === k ? "bg-background text-foreground shadow-xs hover:bg-background" : "text-muted-foreground hover:text-foreground"}`}
               aria-pressed={kind === k}
               onClick={() => choose(k)}
             >
               {k === "steady" ? "Steady" : k === "burst" ? "Burst" : "Ramp"}
-            </button>
+            </Button>
           ))}
         </div>
       </fieldset>

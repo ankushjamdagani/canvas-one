@@ -10,6 +10,15 @@ import {
   Minus,
   Maximize2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 export interface CanvasFloatingDockProps {
   canUndo: boolean;
@@ -43,138 +52,208 @@ export function CanvasFloatingDock({
   onFitView,
 }: CanvasFloatingDockProps) {
   return (
-    <div
-      data-testid="canvas-floating-dock"
-      className="canvas-floating-dock"
-      role="toolbar"
-      aria-label="Canvas controls"
-    >
-      {/* History: Undo & Redo */}
-      <div className="canvas-dock-group">
-        <button
-          data-testid="dock-undo-btn"
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Undo"
-          title="Undo model edit (Cmd+Z)"
-          disabled={!canUndo}
-          onClick={onUndo}
-        >
-          <Undo2 size={15} />
-          <span className="sr-only">Undo</span>
-        </button>
-        <button
-          data-testid="dock-redo-btn"
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Redo"
-          title="Redo model edit (Cmd+Shift+Z)"
-          disabled={!canRedo}
-          onClick={onRedo}
-        >
-          <Redo2 size={15} />
-          <span className="sr-only">Redo</span>
-        </button>
+    <TooltipProvider delayDuration={250}>
+      <div
+        data-testid="canvas-floating-dock"
+        className={cn(
+          "canvas-floating-dock",
+          "flex items-center gap-1 rounded-lg border border-border bg-background/95 backdrop-blur-md px-1.5 py-1 shadow-md select-none"
+        )}
+        role="toolbar"
+        aria-label="Canvas controls"
+      >
+        {/* History: Undo & Redo */}
+        <div className="canvas-dock-group flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-undo-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                aria-label="Undo"
+                disabled={!canUndo}
+                onClick={onUndo}
+              >
+                <Undo2 size={15} />
+                <span className="sr-only">Undo</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Undo model edit (Cmd+Z)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-redo-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                aria-label="Redo"
+                disabled={!canRedo}
+                onClick={onRedo}
+              >
+                <Redo2 size={15} />
+                <span className="sr-only">Redo</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Redo model edit (Cmd+Shift+Z)</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Separator orientation="vertical" className="canvas-dock-divider h-4 mx-0.5 bg-border" />
+
+        {/* Tool Modes: Select & Pan */}
+        <div className="canvas-dock-group flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-select-btn"
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground",
+                  dragMode === "select" && "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
+                )}
+                aria-label="Select"
+                aria-pressed={dragMode === "select"}
+                onClick={() => onSetDragMode("select")}
+              >
+                <MousePointer size={14} />
+                <span className="canvas-dock-text ml-1">Select</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Select tool (box select)</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-pan-btn"
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground",
+                  dragMode === "pan" && "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
+                )}
+                aria-label="Pan"
+                aria-pressed={dragMode === "pan"}
+                onClick={() => onSetDragMode("pan")}
+              >
+                <Hand size={14} />
+                <span className="canvas-dock-text ml-1">Pan</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Pan tool (drag canvas)</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Separator orientation="vertical" className="canvas-dock-divider h-4 mx-0.5 bg-border" />
+
+        {/* Group & Canvas Actions */}
+        <div className="canvas-dock-group flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-group-btn"
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                aria-label="Selection actions"
+                disabled={!canGroup}
+                onClick={onGroupClick}
+              >
+                <Boxes size={14} />
+                <span className="canvas-dock-text ml-1">Group</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Group / selection actions</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-add-note-btn"
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="canvas-dock-btn add-canvas-note h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                aria-label="Add canvas note"
+                disabled={!canAddNote}
+                onClick={onAddNote}
+              >
+                <StickyNote size={14} />
+                <span className="canvas-dock-text ml-1">Add canvas note</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Add canvas note</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Separator orientation="vertical" className="canvas-dock-divider h-4 mx-0.5 bg-border" />
+
+        {/* Zoom Controls */}
+        <div className="canvas-dock-group flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-zoom-in-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground"
+                aria-label="Zoom In"
+                onClick={onZoomIn}
+              >
+                <Plus size={15} />
+                <span className="sr-only">Zoom In</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Zoom in</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-zoom-out-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground"
+                aria-label="Zoom Out"
+                onClick={onZoomOut}
+              >
+                <Minus size={15} />
+                <span className="sr-only">Zoom Out</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Zoom out</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-fit-view-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground"
+                aria-label="Fit view"
+                onClick={onFitView}
+              >
+                <Maximize2 size={15} />
+                <span className="sr-only">Fit view</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Fit view</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-
-      <div className="canvas-dock-divider" />
-
-      {/* Tool Modes: Select & Pan */}
-      <div className="canvas-dock-group">
-        <button
-          data-testid="dock-select-btn"
-          type="button"
-          className={`canvas-dock-btn ${dragMode === "select" ? "active" : ""}`}
-          aria-label="Select"
-          aria-pressed={dragMode === "select"}
-          title="Select tool (box select)"
-          onClick={() => onSetDragMode("select")}
-        >
-          <MousePointer size={15} />
-          <span className="canvas-dock-text">Select</span>
-        </button>
-        <button
-          data-testid="dock-pan-btn"
-          type="button"
-          className={`canvas-dock-btn ${dragMode === "pan" ? "active" : ""}`}
-          aria-label="Pan"
-          aria-pressed={dragMode === "pan"}
-          title="Pan tool (drag canvas)"
-          onClick={() => onSetDragMode("pan")}
-        >
-          <Hand size={15} />
-          <span className="canvas-dock-text">Pan</span>
-        </button>
-      </div>
-
-      <div className="canvas-dock-divider" />
-
-      {/* Group & Canvas Actions */}
-      <div className="canvas-dock-group">
-        <button
-          data-testid="dock-group-btn"
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Selection actions"
-          title="Group / selection actions"
-          disabled={!canGroup}
-          onClick={onGroupClick}
-        >
-          <Boxes size={15} />
-          <span className="canvas-dock-text">Group</span>
-        </button>
-        <button
-          data-testid="dock-add-note-btn"
-          type="button"
-          className="canvas-dock-btn add-canvas-note"
-          aria-label="Add canvas note"
-          title="Add canvas note"
-          disabled={!canAddNote}
-          onClick={onAddNote}
-        >
-          <StickyNote size={15} />
-          <span className="canvas-dock-text">Add canvas note</span>
-        </button>
-      </div>
-
-      <div className="canvas-dock-divider" />
-
-      {/* Zoom Controls */}
-      <div className="canvas-dock-group">
-        <button
-          data-testid="dock-zoom-in-btn"
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Zoom In"
-          title="Zoom in"
-          onClick={onZoomIn}
-        >
-          <Plus size={15} />
-          <span className="sr-only">Zoom In</span>
-        </button>
-        <button
-          data-testid="dock-zoom-out-btn"
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Zoom Out"
-          title="Zoom out"
-          onClick={onZoomOut}
-        >
-          <Minus size={15} />
-          <span className="sr-only">Zoom Out</span>
-        </button>
-        <button
-          data-testid="dock-fit-view-btn"
-          type="button"
-          className="canvas-dock-btn"
-          aria-label="Fit view"
-          title="Fit view"
-          onClick={onFitView}
-        >
-          <Maximize2 size={15} />
-          <span className="sr-only">Fit view</span>
-        </button>
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

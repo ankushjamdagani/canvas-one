@@ -9,9 +9,10 @@ import { NoteInspector } from './CanvasNotes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import './openInspector.css';
 
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 
 export interface OpenInspectorProps {
   metrics: Metrics | null;
@@ -40,15 +41,16 @@ export function OpenInspector({
       <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>{title}</strong>
         {onClose && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Close inspector"
-            className="subtle"
-            style={{ padding: '4px', border: 0 }}
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
             onClick={onClose}
           >
-            <X size={16} />
-          </button>
+            <X size={15} />
+          </Button>
         )}
       </div>
       <fieldset disabled={readOnly} className="open-inspector-fieldset">
@@ -105,15 +107,16 @@ export function OpenInspector({
         <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong>Subsystem: {subsystem.name}</strong>
           {onClose && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label="Close inspector"
-              className="subtle"
-              style={{ padding: '4px', border: 0 }}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
               onClick={onClose}
             >
-              <X size={16} />
-            </button>
+              <X size={15} />
+            </Button>
           )}
         </div>
         <div className="inspector-body">
@@ -162,15 +165,16 @@ export function OpenInspector({
         <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong>{selectedNodeIds.length} Components Selected</strong>
           {onClose && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label="Close inspector"
-              className="subtle"
-              style={{ padding: '4px', border: 0 }}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
               onClick={onClose}
             >
-              <X size={16} />
-            </button>
+              <X size={15} />
+            </Button>
           )}
         </div>
         <div className="inspector-body">
@@ -280,15 +284,16 @@ export function OpenInspector({
             </Badge>
           </div>
           {onClose && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label="Close inspector"
-              className="subtle"
-              style={{ padding: '4px', border: 0, flexShrink: 0 }}
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
               onClick={onClose}
             >
-              <X size={16} />
-            </button>
+              <X size={15} />
+            </Button>
           )}
         </div>
 
@@ -354,9 +359,12 @@ export function OpenInspector({
                 the execution compiler will flag incompatible connection transports or routing rules.
               </p>
               {behaviorTypeChangeError && (
-                <div className="open-review-banner">
-                  <span className="open-review-banner-text">{behaviorTypeChangeError}</span>
-                </div>
+                <Alert variant="destructive" className="open-review-banner py-2 px-3 my-2 text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <AlertDescription className="open-review-banner-text text-xs">
+                    {behaviorTypeChangeError}
+                  </AlertDescription>
+                </Alert>
               )}
             </div>
 

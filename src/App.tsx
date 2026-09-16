@@ -609,20 +609,21 @@ export default function App() {
             >
               <label>
                 <span>Result name</span>
-                <input
+                <Input
                   aria-label="Result name"
                   maxLength={80}
                   value={resultName}
                   onChange={(event) => setResultName(event.target.value)}
                   autoFocus
+                  className="h-8 text-xs"
                 />
               </label>
-              <button type="submit" className="primary">
+              <Button type="submit" size="sm" className="primary">
                 Save
-              </button>
-              <button type="button" onClick={() => setSavingResult(false)}>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setSavingResult(false)}>
                 Cancel
-              </button>
+              </Button>
             </form>
           )}
 
@@ -833,11 +834,15 @@ export default function App() {
         <section className="assumptions-panel" aria-label="Model assumptions">
           <div className="panel-title">
             <h2>What this simulation assumes</h2>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 p-0"
               aria-label="Close assumptions"
               onClick={() => setAssumptions(false)}>
               <X size={18} />
-            </button>
+            </Button>
           </div>
           <p>
             Arbitrary configured directed behavior graph with illustrative capacities, not actual code execution.

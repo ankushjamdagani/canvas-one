@@ -1,5 +1,6 @@
 import * as React from "react";
 import { BookmarkPlus, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface ResultsStripProps {
   simulationTime: number;
@@ -157,40 +158,48 @@ export function ResultsStrip({
       <div className="canvas-first-strip-actions">
         {simulationTime > 0 && (
           <>
-            <button
+            <Button
               data-testid="details-btn"
-              className={`canvas-first-btn subtle ${showDetails ? "active" : ""}`}
+              variant={showDetails ? "secondary" : "ghost"}
+              size="sm"
+              className={`canvas-first-btn subtle h-7 px-2 text-xs ${showDetails ? "active" : ""}`}
               onClick={onToggleDetails}
             >
               {showDetails ? "Hide details" : "Details"}
-            </button>
-            <button
+            </Button>
+            <Button
               data-testid="compare-btn"
-              className="canvas-first-btn subtle"
+              variant="ghost"
+              size="sm"
+              className="canvas-first-btn subtle h-7 px-2 text-xs"
               onClick={onOpenSavedRuns}
             >
               Compare ({savedRunsCount})
-            </button>
+            </Button>
             {canSaveResult && (
-              <button
+              <Button
                 data-testid="save-result-btn"
-                className="canvas-first-btn"
+                variant="outline"
+                size="sm"
+                className="canvas-first-btn h-7 px-2 text-xs gap-1.5"
                 disabled={resultSaved}
                 onClick={onSaveResultClick}
               >
                 <BookmarkPlus size={14} />
                 {resultSaved ? "Result saved" : "Save result"}
-              </button>
+              </Button>
             )}
           </>
         )}
-        <button
+        <Button
           data-testid="export-canvas-btn"
-          className="canvas-first-btn subtle"
+          variant="ghost"
+          size="sm"
+          className="canvas-first-btn subtle h-7 px-2 text-xs"
           onClick={onOpenExport}
         >
           Export canvas
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -6,6 +6,8 @@ import { useEditor } from '../state/editor';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export function OpenWorkloadControls({
   workloads,
@@ -118,15 +120,17 @@ export function OpenWorkloadControls({
                   )}
                 </div>
 
-                <label className="field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="checkbox"
+                <div className="flex items-center gap-2 py-1 mb-2">
+                  <Switch
+                    id={`wl-enabled-${wl.id}`}
                     checked={wl.enabled}
                     disabled={readOnly}
-                    onChange={(e) => editor.updateWorkload(wl.id, { enabled: e.target.checked })}
+                    onCheckedChange={(checked) => editor.updateWorkload(wl.id, { enabled: checked })}
                   />
-                  <span>Enabled</span>
-                </label>
+                  <Label htmlFor={`wl-enabled-${wl.id}`} className="text-xs font-medium cursor-pointer">
+                    Enabled
+                  </Label>
+                </div>
 
                 {!filterNodeId && (
                   <label className="field">

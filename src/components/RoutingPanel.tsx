@@ -13,7 +13,13 @@ export function RoutingPanel({ metrics }: { metrics: Metrics | null }) {
       {instances.map((node) => {
         const m = metrics?.nodes[node.id];
         return <li key={node.id}>
-          <button onClick={() => editor.select(node.id)}>{node.name}</button>
+          <Button
+            variant="link"
+            className="p-0 h-auto font-medium text-xs text-primary justify-start hover:underline"
+            onClick={() => editor.select(node.id)}
+          >
+            {node.name}
+          </Button>
           <span>{workerCount(node)} workers · {totalCapacity(node).toLocaleString()} req/s total</span>
           <span>{metrics?.time ? `${m?.arrived.toLocaleString() ?? 0} routed · ${m?.queued ?? 0} waiting · ${((m?.utilization ?? 0) * 100).toFixed(0)}% busy` : `Expected share: ${(100 / instances.length).toFixed(1)}%`}</span>
           {!!metrics?.time && <span>{m?.rejected.toLocaleString() ?? 0} rejected here</span>}

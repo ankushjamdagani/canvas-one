@@ -5,6 +5,8 @@ import { NumberField } from './NumberField';
 import type { ModelEdge } from '../domain/model';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export function OpenConnectionEditor({
   edgeId,
@@ -217,21 +219,22 @@ export function OpenConnectionEditor({
           {routerSource?.strategy === 'conditional' && (
             <div className="open-inspector-section" style={{ borderTop: '1px solid #e1e7e3', paddingTop: '8px' }}>
               <span className="open-inspector-section-title">Router Conditional Match</span>
-              <label className="field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="checkbox"
+              <div className="flex items-center gap-2 py-1 mb-2">
+                <Switch
+                  id="fallback-route-toggle"
                   checked={edge.fallback ?? false}
                   disabled={readOnly}
-                  onChange={(e) => {
-                    const fallback = e.target.checked;
+                  onCheckedChange={(checked) => {
                     patchEdge({
-                      fallback,
-                      ...(fallback ? { condition: undefined } : {}),
+                      fallback: checked,
+                      ...(checked ? { condition: undefined } : {}),
                     });
                   }}
                 />
-                <span>Fallback Route (Catch-all)</span>
-              </label>
+                <Label htmlFor="fallback-route-toggle" className="text-xs font-medium cursor-pointer">
+                  Fallback Route (Catch-all)
+                </Label>
+              </div>
 
               {!edge.fallback && (
                 <>

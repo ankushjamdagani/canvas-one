@@ -4,6 +4,7 @@ import { visibleSubsystems } from "../domain/subsystems";
 import { useEditor } from "../state/editor";
 import { supportsFreeCanvas } from "../domain/model";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function DiagramOrganization({ dimensions, onSelectComponent, onSelectionModeChange, onAddNote }: { dimensions: Record<string, { width: number; height: number }>; onSelectComponent: (id: string) => void; onSelectionModeChange: (active: boolean) => void; onAddNote: () => void }) {
   const editor = useEditor();
@@ -95,10 +96,29 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
         <CheckSquare2 size={14} />
         <span>{editor.selectionMode ? "Finish selecting" : "Select components"}</span>
       </Button>
-      {editor.selectionMode && <fieldset className="diagram-selection-list">
-        <legend>Visible components</legend>
-        {visible.map((node) => <label key={node.id}><input type="checkbox" checked={selectedIds.includes(node.id)} onChange={() => onSelectComponent(node.id)} /> <span>{node.name}</span></label>)}
-      </fieldset>}
+      {editor.selectionMode && (
+        <fieldset className="diagram-selection-list">
+          <legend>Visible components</legend>
+          {visible.map((node) => {
+            const isChecked = selectedIds.includes(node.id);
+            return (
+              <label key={node.id} className="flex items-center gap-2 py-0.5 text-xs cursor-pointer select-none">
+                <Checkbox
+                  id={`org-node-${node.id}`}
+                  aria-label={node.name}
+                  checked={isChecked}
+                  onCheckedChange={(checked) => {
+                    if (checked !== isChecked) {
+                      onSelectComponent(node.id);
+                    }
+                  }}
+                />
+                <span>{node.name}</span>
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
       {selectedIds.length >= 2 && <>
         <div className="organize-actions flex items-center gap-1" aria-label="Alignment actions">
           <Button
