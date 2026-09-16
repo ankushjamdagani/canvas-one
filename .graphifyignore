@@ -1,0 +1,10 @@
+# Vendored agent tooling — third-party skill bundles, not project source.
+# Their internal scripts dominated the graph (4584 of 5566 nodes) and drowned
+# out src/, tests/ and specs/ in query traversals.
+.agents/
+.claude/
+.codex/
+.impeccable/
+
+# Playwright run output — regenerated per test run.
+test-results/

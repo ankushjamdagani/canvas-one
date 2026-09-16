@@ -571,3 +571,31 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Limitations & follow-up decisions**:
   - Invariants for exact discrete-event simulation, format-8 project persistence, and format-7 read-only archives strictly maintained.
   - All canvas editing actions (select, pan, group, note, undo, redo, zoom) now live exclusively on the floating canvas dock.
+
+## 2026-09-16 — AI-Readiness Audit, Graph Refresh & Tri-Platform Agent Workflow
+
+- **Requested outcome**:
+  - Audit the repository for AI readiness (agents, skills, graphify, instruction files, MCP, hooks).
+  - Refresh the stale graphify code graph.
+  - Replace the split `AGENTS.md` / `AGENTS.test.md` instructions with a single tri-platform agent workflow in which the running model leads and the other two platforms act as delegates.
+- **Files and systems changed**:
+  - [`AGENTS.md`](AGENTS.md): Rewritten as the canonical tri-platform workflow (Codex · Claude · agy). Adds an identity table and the lead rule (the model reading the file is the lead), an efficiency tie-breaker order (Codex → Claude → agy), a three-row platform-strength table, and an explicit split between in-session subagents (§3a, max 3 children, exclusive file ownership) and cross-platform delegates (§3b, asynchronous hand-off only — an agent cannot invoke another platform). Retains the graphify fast-path policy, project invariants, verification baseline and action-summary rules from both source documents.
+  - `CLAUDE.md` → `AGENTS.md`, `GEMINI.md` → `AGENTS.md`: New symlinks so all three platforms load identical instructions from one source. Claude Code previously had no project instructions at all.
+  - `AGENTS.test.md`: Removed (`git rm`) after its dual-platform content was merged into `AGENTS.md`. Recoverable from history.
+  - [`.graphifyignore`](.graphifyignore): Created. Excludes vendored agent tooling (`.agents/`, `.claude/`, `.codex/`, `.impeccable/`) and `test-results/` from graph extraction.
+  - `graphify-out/`: Graph rebuilt (`graphify update --force`). Previous graph backed up to `graphify-out/2026-09-16/`.
+- **Platform / subagents**: Claude (lead). No child agents used — the work was a bounded audit plus two scoped edits, below the delegation threshold.
+- **Skills and tools applied**: `graphify` skill (existing-graph fast path, then `graphify update`); `graphify query` for verification.
+- **Verification performed**:
+  - `graphify update --force`: 143 files, 980 nodes, 2258 edges, 101 communities; `graph.html` regenerated (the pre-ignore rebuild hit 5566 nodes and was refused by the 5000-node viz limit).
+  - `graphify query "StudioMenu workspace menu canvas" --budget 800`: resolves `StudioMenu()` and traverses into `src/state/editor.ts`, `src/domain/model.ts` and `src/components/ArchitectureCanvas.tsx`, confirming the uncommitted branch work is now indexed.
+  - `head CLAUDE.md` / `head GEMINI.md`: both resolve through the symlink to the new `AGENTS.md`.
+  - No product code changed, so `npm test`, `npm run build` and `TEST_PRODUCTION=1 npm run test:e2e` were **not** run.
+- **Audit findings (no action taken)**:
+  - The pre-ignore graph was 82% vendored skill scripts (4584 of 5566 nodes from `.agents/`), which is why unscoped queries returned config-file noise.
+  - `.claude/skills` and `.codex/skills` were already symlinks into `.agents/skills`; no skill duplication exists. An earlier `diff -rq` reading was wrong because it followed the symlinks.
+  - No `.mcp.json` and no project-scoped MCP servers. No git hooks beyond samples — the graph has no auto-rebuild trigger and will go stale again.
+  - Doc/paper/image nodes still date from 2026-09-09; only the code (AST) layer was refreshed. A semantic re-extraction needs `/graphify --update` from an AI assistant.
+- **Limitations & follow-up decisions**:
+  - Community labels are placeholders (`community=10`) after the CLI rebuild; labeling requires an LLM pass over 101 communities.
+  - `graphify-out/cache/ast/` now holds 189 untracked files alongside 58 tracked ones, plus the dated backup directory. The tracking policy for `graphify-out/` is inconsistent and should be decided deliberately.
