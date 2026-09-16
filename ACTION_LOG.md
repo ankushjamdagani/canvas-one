@@ -599,3 +599,30 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Limitations & follow-up decisions**:
   - Community labels are placeholders (`community=10`) after the CLI rebuild; labeling requires an LLM pass over 101 communities.
   - `graphify-out/cache/ast/` now holds 189 untracked files alongside 58 tracked ones, plus the dated backup directory. The tracking policy for `graphify-out/` is inconsistent and should be decided deliberately.
+
+## 2026-09-16 — AI Tooling Wired for Automatic Pickup (rtk, headroom, graphify, Antigravity)
+
+- **Requested outcome**:
+  - Verify that `headroom`, `rtk`, `graphify` and the project skills are actually configured for AI models to pick up automatically, rather than merely documented.
+  - Close the gaps found, keeping the worktree clean so the hand-off protocol in [`AGENTS.md`](AGENTS.md) section 3b still holds.
+- **Audit result**: skills and graphify were genuinely wired; `rtk` and `headroom` were documented but inert. `rtk gain` reported one command recorded since the instruction was added on 2026-09-10, and `headroom mcp status` reported "Not configured" for both Claude Code and Codex.
+- **Files and systems changed**:
+  - [`.claude/settings.json`](.claude/settings.json) (new, `56c8335`): `PreToolUse` hook on `Bash` running `command -v rtk >/dev/null 2>&1 && rtk hook claude || true`. Project-scoped rather than global; the guard makes it a no-op where rtk is absent instead of failing every Bash call.
+  - `.git/hooks/post-commit`, `.git/hooks/post-checkout` (`071784f`): graphify auto-rebuild, installed via `graphify hook install`. Not tracked by git — a fresh checkout must re-run that command.
+  - [`.gitignore`](.gitignore) (`5260d46`, `071784f`): graphify-out reduced to tracking only `cache/semantic/`, which is LLM output and costs tokens to rebuild. The post-commit hook rewrites the rest after every commit, so tracking it left a dirty tree on each commit.
+  - [`.agents/rules/graphify.md`](.agents/rules/graphify.md), [`.agents/workflows/graphify.md`](.agents/workflows/graphify.md) (new, `d66e7af`): Antigravity always-on graphify layer. Antigravity previously had no graphify access on any path.
+  - Outside the repo: headroom MCP registered for Claude Code and Codex; graphify skill installed for Antigravity at `~/.gemini/config/skills/`; graphify MCP server added to `~/.gemini/config/mcp_config.json`; graphifyy upgraded 0.9.5 to 0.9.63 and all three platform skill copies refreshed; the hook-scoped wording in `~/.claude/RTK.md` corrected to stop claiming global auto-rewrite.
+- **Platform / subagents**: Claude (lead). No child agents — bounded verification plus scoped config edits, below the delegation threshold.
+- **Skills and tools applied**: `graphify` skill and CLI, `update-config` skill for the hook schema, `rtk`, `headroom`.
+- **Verification performed**:
+  - rtk hook: pipe-tested both branches before writing (rewrites `git status` to `rtk git status`; silent exit 0 when rtk is absent). Confirmed live by counter movement — 2 before a plain `git status`, 3 after.
+  - graphify hook: fires on real commits, blocks for 0.148s, rebuild detached. Correctly skipped a markdown-only change set. Worktree clean before and after.
+  - graphify upgrade: rebuilt to 1022 nodes / 2574 links, up from 980 / 2258 on the same source. Hook script re-verified after upgrade — the 0.9.5 copy lacked worktree detection, `GRAPHIFY_OUT` support and a bash 3.2 fix.
+  - Antigravity MCP: answered a real `initialize` request with `serverInfo {"name":"graphify","version":"0.9.63"}`.
+  - No product code changed, so `npm test`, `npm run build` and `TEST_PRODUCTION=1 npm run test:e2e` were **not** run.
+- **Limitations & follow-up decisions**:
+  - **Not verified**: the Antigravity wiring has not been exercised inside Antigravity itself, only installed and smoke-tested from the shell. headroom MCP is registered but unused pending an agent restart.
+  - The global rtk hook was deliberately skipped; rtk stays manual outside this project. The headroom proxy is not running, which only affects the `ANTHROPIC_BASE_URL` compression path.
+  - Community labels are placeholders after CLI rebuilds, and the doc/image semantic layer still dates from 2026-09-09; both need an LLM pass (`graphify label`, `/graphify --update`).
+  - `graphify hook install` writes a `.gitattributes` merge driver for `graphify-out/graph.json`; removed, since that file is no longer tracked and the untracked file would permanently dirty the worktree. Re-running hook install will recreate it.
+  - Three `SKILL.md.bak` files from the 0.9.5 skill copies remain in the platform config directories.
