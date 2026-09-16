@@ -374,3 +374,75 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `git diff --check`: passed cleanly with 0 errors.
 - **Limitations & follow-up decisions**:
   - None. Offline execution, format-8 persistence, and exact simulation metrics remain completely unchanged.
+
+## 2026-09-16 — Multi-Agent Skill Installation: frontend-design, taste, and impeccable
+
+- **Requested outcome**:
+  - Add `frontend-design`, `taste` (including `design-taste-frontend`), and `impeccable` skills configured so they can be discovered and used seamlessly across OpenAI Codex, Anthropic Claude Code, and Google Gemini / Antigravity models.
+- **Files and systems changed**:
+  - Global Agent Skill Repositories configured:
+    - **Anthropic Claude Code** (`~/.claude/skills/`):
+      - Installed [`frontend-design`](file:///Users/ankushjamdagani/.claude/skills/frontend-design) (`anthropics/skills`).
+      - Installed [`taste`](file:///Users/ankushjamdagani/.claude/skills/taste) and [`design-taste-frontend`](file:///Users/ankushjamdagani/.claude/skills/design-taste-frontend) (`Leonxlnx/taste-skill`).
+      - Installed [`impeccable`](file:///Users/ankushjamdagani/.claude/skills/impeccable) v4.3.1 (`pbakaus/impeccable`).
+    - **OpenAI Codex** (`~/.codex/skills/`):
+      - Installed [`frontend-design`](file:///Users/ankushjamdagani/.codex/skills/frontend-design).
+      - Installed [`taste`](file:///Users/ankushjamdagani/.codex/skills/taste) and [`design-taste-frontend`](file:///Users/ankushjamdagani/.codex/skills/design-taste-frontend).
+      - Installed [`impeccable`](file:///Users/ankushjamdagani/.codex/skills/impeccable) with complete `reference/`, `scripts/`, and `agents/` directories.
+    - **Google Gemini / Antigravity** (`~/.gemini/config/skills/`):
+      - Installed [`frontend-design`](file:///Users/ankushjamdagani/.gemini/config/skills/frontend-design).
+      - Installed [`taste`](file:///Users/ankushjamdagani/.gemini/config/skills/taste) and [`design-taste-frontend`](file:///Users/ankushjamdagani/.gemini/config/skills/design-taste-frontend).
+      - Installed [`impeccable`](file:///Users/ankushjamdagani/.gemini/config/skills/impeccable) with full script/reference suite.
+    - **Shared Central Skill Registry** (`~/.agents/skills/`):
+      - Synced all three skills plus aliases to ensure CLI-level discoverability across all agent orchestrators.
+- **Verification performed**:
+  - Validated physical file existence, structure, and byte sizes for `SKILL.md` in all 4 root directories (`~/.claude/skills`, `~/.codex/skills`, `~/.gemini/config/skills`, and `~/.agents/skills`).
+  - Verified presence of all required subdirectories (`agents/`, `reference/`, `scripts/`) for `impeccable` across all targets.
+  - Executed `npx skills ls -g` verifying that `Antigravity`, `Claude Code`, and `Codex` are confirmed active consumers for each installed skill.
+- **Limitations & follow-up decisions**:
+  - None. Skills are globally discoverable and active for immediate interactive use.
+
+## 2026-09-16 — GSAP Package Addition and Official GSAP AI Skills Setup
+
+- **Requested outcome**:
+  - Install GreenSock Animation Platform (`gsap` and `@gsap/react`) into the project.
+  - Install the official GreenSock AI skills (`greensock/gsap-skills`) across all model environments (Claude Code, OpenAI Codex, and Google Gemini / Antigravity).
+- **Files and systems changed**:
+  - Project configuration:
+    - [`package.json`](package.json): Added `"gsap": "3.15.0"` and `"@gsap/react": "2.1.2"` pinned dependencies without caret notation.
+    - [`package-lock.json`](package-lock.json): Updated with lockfile entries.
+  - Global Agent Skill Repositories configured with full official GSAP suite (`gsap`, `gsap-core`, `gsap-react`, `gsap-timeline`, `gsap-scrolltrigger`, `gsap-plugins`, `gsap-performance`, `gsap-utils`, `gsap-frameworks`):
+    - **Anthropic Claude Code** (`~/.claude/skills/`): Added all 9 skills including `gsap` umbrella.
+    - **OpenAI Codex** (`~/.codex/skills/`): Added all 9 skills including `gsap` umbrella.
+    - **Google Gemini / Antigravity** (`~/.gemini/config/skills/`): Added all 9 skills including `gsap` umbrella.
+    - **Shared Central Registry** (`~/.agents/skills/`): Added all 9 skills including `gsap` umbrella.
+- **Verification performed**:
+  - `npm run build`: TypeScript compile and Vite build passed with 0 errors.
+  - `npm test`: All 233 unit tests passed across 36 test files (4.86s).
+  - Directory verification: Inspected and verified presence of all 9 GSAP skill directories in `~/.claude/skills`, `~/.codex/skills`, `~/.gemini/config/skills`, and `~/.agents/skills`.
+  - `git diff --check`: Passed cleanly with 0 whitespace issues or errors.
+- **Limitations & follow-up decisions**:
+  - None. Both packages and AI skills are live and ready for use.
+
+## 2026-09-16 — Project-Scoped Skills Integration and unwitty.dev Import
+
+- **Requested outcome**:
+  - Add all installed design, GSAP, and quality skills to the current project scope (`system-design-planner`).
+  - Import relevant skills from `~/personal/unwitty.dev` into the project scope.
+  - Wire project-level skill directories for multi-agent support (Claude Code, OpenAI Codex, and Google Gemini / Antigravity).
+- **Files and systems changed**:
+  - Project skills directory created:
+    - [`.agents/skills/`](.agents/skills/): Established project-scoped central skills repository containing 21 skills:
+      - **Design & Craft**: `frontend-design`, `taste`, `design-taste-frontend`, `impeccable`, `hallmark`, `canvas-design`.
+      - **GSAP Animation Suite**: `gsap`, `gsap-core`, `gsap-react`, `gsap-timeline`, `gsap-scrolltrigger`, `gsap-plugins`, `gsap-performance`, `gsap-utils`, `gsap-frameworks`.
+      - **Web Quality, Performance & Audit** (imported from `~/personal/unwitty.dev`): `accessibility`, `performance`, `best-practices`, `web-quality-audit`, `core-web-vitals`, `seo`.
+  - Multi-Agent symlink structures:
+    - [`.claude/skills/`](.claude/skills/): Mapped symlinks pointing to `../../.agents/skills/<skill>` for instant Claude Code detection.
+    - [`.codex/skills/`](.codex/skills/): Mapped symlinks pointing to `../../.agents/skills/<skill>` for instant OpenAI Codex detection.
+- **Verification performed**:
+  - `npx skills ls`: Verified all 21 skills are detected and active at project scope across Antigravity, Claude Code, Codex, and Cursor.
+  - `npm run build`: Build succeeded with 0 errors.
+  - `npm test`: All 233 unit tests passed across 36 test files (2.38s).
+  - `git diff --check`: Passed cleanly with 0 whitespace errors.
+- **Limitations & follow-up decisions**:
+  - None. All skills are available locally in the project repository for all agent CLI and IDE environments.
