@@ -1016,7 +1016,7 @@ export default function App() {
                         type="button"
                         className="canvas-first-btn subtle"
                         onClick={() => {
-                          editor.loadArchitectureTemplate("chat");
+                          editor.loadArchitectureTemplate("realtime-chat");
                           setProjectPanel(false);
                           setNotice("Loaded Real-time chat template.");
                         }}
@@ -1028,7 +1028,7 @@ export default function App() {
                         type="button"
                         className="canvas-first-btn subtle"
                         onClick={() => {
-                          editor.loadArchitectureTemplate("ecommerce");
+                          editor.loadArchitectureTemplate("ecommerce-checkout");
                           setProjectPanel(false);
                           setNotice("Loaded Ecommerce checkout template.");
                         }}
@@ -1040,7 +1040,7 @@ export default function App() {
                         type="button"
                         className="canvas-first-btn subtle"
                         onClick={() => {
-                          editor.loadArchitectureTemplate("events");
+                          editor.loadArchitectureTemplate("event-processing");
                           setProjectPanel(false);
                           setNotice("Loaded Event processing template.");
                         }}

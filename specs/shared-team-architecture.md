@@ -108,10 +108,42 @@ Extend the existing light docked editor. Local projects remain available without
   - Provide an impact analysis view that evaluates whether the remote modification affects local components, connections, or simulation parameters.
   - Differentiate between non-breaking changes (internal implementation tweaks in external system) and potential impacts (latency increase, throughput reduction, or schema changes that require local architectural adjustments).
 
-## 5. Interface and delivery
+## 5. Collaboration with AI: Visual architecture playground & implementation planning
 
-- Add presence and connection/save status above the canvas, member settings beside the workspace selector, a docked revision-review panel, and an external system links drawer.
-- Support canvas overlays and filter controls for concurrent partial revisions and external system boundary indicators.
+**Grounding AI engineering on a visual canvas**
+
+- Position System Studio as the shared decision-making playground between software architects and AI coding agents.
+- Prevent unconstrained "vibe coding": eliminate the failure mode where AI models make critical, opaque architectural choices (e.g., synchronous bottlenecks, unbuffered queues, missing cache invalidation, single points of failure) implicitly and invisibly while generating source code.
+- Provide a visual-first workflow where the high-level implementation plan of a project is explicitly mapped, inspected, and validated on the canvas before downstream code generation begins.
+
+**Visual implementation plan formulation**
+
+- Decompose project requirements, PRDs, and user stories into concrete visual architecture graphs:
+  - Component allocation across layers (clients, edge, compute services, queues, datastores, caches).
+  - Explicit communication semantics (sync RPC, async streaming, data pipelines) with defined protocol notes and latency budgets.
+  - Sizing and workload parameters: baseline vs. peak traffic, concurrency limits, worker pool counts, and timeout constraints.
+  - Canvas design notes documenting critical assumptions, open questions, and deliberate architectural tradeoffs.
+
+**Bi-directional revision cycles & co-design**
+
+- Leverage the scoped subsystem revision engine for interactive human-AI deliberation:
+  - **AI-proposed revisions:** The AI agent analyzes requirements or existing bottlenecks and submits candidate revisions (e.g., "Add Redis cache layer to relieve database overload", "Introduce Kafka buffer for burst absorption", "Split monolithic service into load-balanced workers").
+  - **Visual diffing and comparison:** The developer visually compares the AI's proposal against the current baseline or alternative revisions, highlighting added/removed components, modified parameters, and rerouted edges.
+  - **Simulation-backed validation:** The developer and AI test proposed revisions under identical seeded traffic patterns (steady, burst, ramp) to empirically evaluate performance, queue stability, and failure modes before accepting changes.
+  - **Collaborative refinement:** The developer annotates the canvas with feedback or adjusts parameters directly, triggering iterative revisions with the AI agent until consensus is reached.
+
+**Plan conclusion & downstream code handoff**
+
+- Once the architecture converges, the developer marks the agreed revision as **Finalized**.
+- Export structured, machine-readable implementation artifacts:
+  - System architecture manifest (components, connections, protocols, capacity limits).
+  - Component responsibility briefs and interface contracts.
+  - Phased, step-by-step implementation plans for downstream coding agents (e.g., Codex, Claude Code, Antigravity) to execute in codebases with zero architectural ambiguity.
+
+## 6. Interface and delivery
+
+- Add presence and connection/save status above the canvas, member settings beside the workspace selector, a docked revision-review panel, an external system links drawer, and an AI co-design revision assistant trigger.
+- Support canvas overlays and filter controls for concurrent partial revisions, AI revision proposal diffs, and external system boundary indicators.
 - Show clear states for connecting, saving, saved, reconnecting, read-only access and recoverable rejected edits. Disable unavailable actions with a reason.
 - Preserve existing visual tokens and editor composition. On mobile, settings and review panels follow document flow; controls remain keyboard accessible and status changes are announced.
 - Deliver Supabase migrations and access policies, local development fixtures, a collaboration-service container, environment examples, health/readiness endpoints and deployment instructions.
@@ -119,7 +151,7 @@ Extend the existing light docked editor. Local projects remain available without
 - Add structured operational logs for connection failures, denied actions, persistence failures and revision transitions; omit document contents and tokens.
 - Live provisioning is separate. Google OAuth credentials, a Supabase project and production host settings are deployment inputs, not prerequisites for local integration tests.
 
-## 6. Implementation order and acceptance
+## 7. Implementation order and acceptance
 
 Implement in this order:
 
@@ -128,7 +160,8 @@ Implement in this order:
 3. Shared editor adapter, selective undo and personal simulation snapshots.
 4. Workspace UI, invitations, scoped revisions, review cycles, comments and published results.
 5. Cross-project external system linking, typed dependency contracts, and change impact detection.
-6. Full regression verification and deployment documentation.
+6. AI collaboration adapter, revision generation/review integration, and plan conclusion export.
+7. Full regression verification and deployment documentation.
 
 Required acceptance checks:
 
@@ -137,6 +170,9 @@ Required acceptance checks:
 - Multiple concurrent revisions targeting different or overlapping subsystems can be tracked simultaneously, with distinct visual identification on the canvas and clear review status.
 - Scoped reviews display isolated diffs and component-specific feedback threads without locking unrelated subsystems.
 - External project links correctly bind to remote architectures, display link types, and flag remote changes for local impact assessment.
+- AI revision proposals cleanly map into the scoped revision schema without corrupting canvas or simulation state.
+- Visual comparisons accurately highlight AI-suggested structural and configuration differences.
+- Finalized architecture states export comprehensive structured implementation plans for downstream agent consumption.
 - A server restart preserves every acknowledged change; storage failures never display “Saved.”
 - Viewer writes, cross-workspace access, expired invitations, removed-member edits and self-approval fail through direct API/WebSocket attempts.
 - Revision capture includes acknowledged edits exactly; later changes cannot alter the reviewed snapshot. Retrying finalization creates no duplicate final.
