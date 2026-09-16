@@ -33,6 +33,9 @@ import {
 } from "lucide-react";
 import "./components/openWorkspace.css";
 import "./components/canvasFirst.css";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { TopBar } from "./components/layout/TopBar";
 import { ActivityRail } from "./components/layout/ActivityRail";
 import { ResultsStrip } from "./components/layout/ResultsStrip";
@@ -393,27 +396,29 @@ export default function App() {
                 {leftDrawerMode === 'components' && "Components"}
                 {leftDrawerMode === 'revisions' && "Revisions & Checkpoints"}
               </h2>
-              <button
+              <Button
                 type="button"
-                className="canvas-first-btn subtle"
-                style={{ padding: '4px 8px', border: 0 }}
+                variant="ghost"
+                size="icon"
+                className="canvas-first-btn subtle h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                 aria-label="Close component drawer"
                 onClick={() => setLeftDrawerMode(null)}
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
 
             {leftDrawerMode === 'components' && (
               <>
                 <label className="component-search">
                   <Search size={14} />
-                  <input
+                  <Input
                     aria-label="Search components"
                     placeholder="Search components"
                     value={componentSearch}
                     onChange={(event) => setComponentSearch(event.target.value)}
                     disabled={isReadOnly}
+                    className="border-0 shadow-none focus-visible:ring-0 bg-transparent px-1 h-auto text-xs"
                   />
                 </label>
                 <div className="component-catalog">
@@ -428,7 +433,12 @@ export default function App() {
                     if (!matches.length) return null;
                     return (
                       <section key={category} className={`component-category category-${category.toLowerCase()}`}>
-                        <h3>{category}</h3>
+                        <div className="flex items-center justify-between mb-1">
+                          <h3>{category}</h3>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-mono font-normal text-muted-foreground border-border/60">
+                            {matches.length}
+                          </Badge>
+                        </div>
                         {matches.map((item) => {
                           const Icon = icons[item.kind];
                           const atNodeLimit = graph.nodes.length >= 100;

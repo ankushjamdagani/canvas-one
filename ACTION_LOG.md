@@ -663,3 +663,22 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `npm test`: All 233 unit tests pass.
   - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass (26.4s).
   - `git diff --check`: Clean whitespace.
+
+## 2026-09-17 — Modernization of Inspector, Component Catalog Drawer & Modal Overlays
+
+- **Outcome**: Completed modernization across all three remaining requested areas using Tailwind CSS v4 and shadcn-ui primitives (`Button`, `Input`, `Badge`) while preserving strict simulation invariants, drag-and-drop mechanics, keyboard shortcuts, and ARIA roles/labels.
+- **Files and systems changed**:
+  - [`src/components/OpenInspector.tsx`](src/components/OpenInspector.tsx): Upgraded subsystem expand/collapse and ungroup buttons, behavior indicator badge, Name and Custom Type text inputs, and bottom action buttons (Generate Traffic, Duplicate Node, Delete Node) using shadcn primitives. Preserved native `<select>` controls for execution behavior and delivery mode for test compatibility.
+  - [`src/App.tsx`](src/App.tsx): Upgraded component catalog drawer search bar with shadcn `Input`, added category count badges with `Badge`, and standardized drawer close button with `Button` (`variant="ghost"`, `size="icon"`). Preserved HTML5 drag-and-drop and test class hooks (`.library-item`).
+  - [`src/components/ExamplesPanel.tsx`](src/components/ExamplesPanel.tsx): Replaced header close button and dialog actions with shadcn `Button`, added item kind badges, and styled tab switches while retaining exact `.examples-modal` and `.example-list-item` hooks.
+  - [`src/components/StudioMenu.tsx`](src/components/StudioMenu.tsx): Upgraded header close button, project action triggers (New project, Blank system, Examples & tutorials, Saved runs) with shadcn `Button` and `Badge`, and modernized checkpoint creation input with shadcn `Input` and `Button`.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: shadcn/ui primitives, Tailwind CSS v4, Graphify AST update, Vitest, Playwright Test.
+- **Verification performed**:
+  - `npm run build`: Success in 502ms.
+  - `npm test`: All 233 unit tests pass across 36 files (2.26s).
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass across 5 workers in 27.8s.
+  - `graphify update .`: AST-extracted 132/132 files; rebuilt graph with 1099 nodes, 2761 edges, 98 communities.
+  - `git diff --check`: 0 whitespace errors.
+- **Limitations & follow-up**:
+  - All requested modernization steps ("Proceed with all 3") are complete and verified with zero regression on simulation behavior or E2E tests.

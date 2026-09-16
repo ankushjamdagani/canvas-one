@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { X, BookOpen, Sparkles } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 import { openExamples, type OpenExample } from "../domain/openExamples";
 import type { Graph } from "../domain/model";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export function ExamplesPanel({
   onSelect,
@@ -48,22 +51,29 @@ export function ExamplesPanel({
       <div data-testid="examples-modal" className="examples-modal">
         <div className="examples-modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Sparkles size={18} color="#087f84" />
+            <Sparkles size={18} className="text-primary" />
             <h2 id="examples-title">System examples</h2>
           </div>
-          <button aria-label="Close examples" onClick={onClose} className="subtle">
-            <X size={18} />
-          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Close examples"
+            onClick={onClose}
+            className="subtle h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <X size={16} />
+          </Button>
         </div>
         <div className="examples-tabs">
           <button
-            className={tab === "starter" ? "active" : ""}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded transition-colors", tab === "starter" ? "active" : "")}
             onClick={() => handleTabChange("starter")}
           >
             Starter architectures
           </button>
           <button
-            className={tab === "tutorial" ? "active" : ""}
+            className={cn("px-3 py-1.5 text-xs font-medium rounded transition-colors", tab === "tutorial" ? "active" : "")}
             onClick={() => handleTabChange("tutorial")}
           >
             Guided tutorials
@@ -76,10 +86,15 @@ export function ExamplesPanel({
                 key={ex.id}
                 role="option"
                 aria-selected={current?.id === ex.id}
-                className={`example-list-item ${current?.id === ex.id ? "selected" : ""}`}
+                className={cn("example-list-item", current?.id === ex.id && "selected")}
                 onClick={() => setSelectedId(ex.id)}
               >
-                <strong>{ex.title}</strong>
+                <div className="flex items-center justify-between w-full">
+                  <strong>{ex.title}</strong>
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 font-normal uppercase opacity-70">
+                    {ex.kind}
+                  </Badge>
+                </div>
                 <span>{ex.purpose}</span>
               </button>
             ))}
@@ -94,11 +109,13 @@ export function ExamplesPanel({
                   <li key={i}>{step}</li>
                 ))}
               </ol>
-              <div className="example-preview-actions">
-                <button className="primary" onClick={handleLoad}>
+              <div className="example-preview-actions flex items-center gap-2">
+                <Button className="primary" onClick={handleLoad}>
                   Load example
-                </button>
-                <button onClick={onClose}>Cancel</button>
+                </Button>
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
               </div>
             </div>
           )}

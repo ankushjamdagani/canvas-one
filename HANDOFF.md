@@ -25,12 +25,16 @@ Integrated in the worktree:
 - Tailwind CSS v4 integration via `@tailwindcss/vite` and `@theme inline` with Zinc/Neutral shadcn design tokens in `src/styles.css`.
 - Reusable shadcn-ui component primitives in `src/components/ui/`: `Button`, `Dialog`, `DropdownMenu`, `Tooltip`, `Badge`, `Input`, `Separator`, `Tabs`.
 - Decomposed layout architecture in `src/components/layout/`: `TopBar.tsx`, `ActivityRail.tsx`, `CanvasFloatingDock.tsx`, and `ResultsStrip.tsx` extracted from monolithic `App.tsx`.
+- Form controls modernization: `NumberField`, `JobControls`, and `ServiceModelEditor` upgraded to shadcn `Input` and `Button` primitives.
+- OpenInspector modernization (`src/components/OpenInspector.tsx`): Subsystem action buttons, behavior badges, identity text inputs, and node action buttons (Generate Traffic, Duplicate Node, Delete Node) upgraded with shadcn `Button`, `Badge`, and `Input`.
+- Component catalog drawer modernization (`src/App.tsx`): Standardized search bar with shadcn `Input` and search icon, category count badges with `Badge`, and drawer close trigger with `Button`.
+- Modal overlays modernization: `ExamplesPanel.tsx` and `StudioMenu.tsx` upgraded with shadcn `Button`, `Badge`, and `Input` while strictly preserving accessible ARIA roles, labels, and keyboard navigation.
 - Semantic `data-testid` test identifiers across layout chrome, activity rail, dock, and results strip, with IPv4 loopback alignment in `playwright.config.ts`.
 
 Current verification baseline:
-- 233 unit tests across 36 files (`npm test`, 2.18s).
-- Passing production build (`npm run build`, 508ms).
-- 45 passing production Chromium journeys across 5 workers (`TEST_PRODUCTION=1 npm run test:e2e`, 25.7s).
+- 233 unit tests across 36 files (`npm test`, 2.26s).
+- Passing production build (`npm run build`, 502ms).
+- 45 passing production Chromium journeys across 5 workers (`TEST_PRODUCTION=1 npm run test:e2e`, 27.8s).
 - Clean whitespace and format (`git diff --check`).
 
 Authored architecture revisions are now implemented as optional `Project.revisions` metadata. Up to 20 immutable draft/final snapshots include graph (and notes), subsystems and expanded component views, with author, timestamp, reason, explanation and optional http/https issue URL. Finalization creates a new final copy linked to the saved draft; it does not capture current canvas edits. Project controls provide comparison against current canvas or another revision and restore. Restore uses a history entry with optional view metadata so Undo/Redo restores graph and presentation together; ordinary graph edits keep the previous dormant-subsystem behavior. Project identity, camera, checkpoints and saved results remain intact. Version-7 exports/imports preserve revision IDs and links within a new project copy. Authors are self-reported; no shared accounts, team approval or cloud sync is implemented.

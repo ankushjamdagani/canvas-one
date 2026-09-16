@@ -22,6 +22,9 @@ import {
 } from "lucide-react";
 import type { Project, Checkpoint } from "../domain/model";
 import type { SavedRun } from "../domain/results";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import "./workspaceMenu.css";
 
 const RevisionsPanel = lazy(() =>
@@ -96,7 +99,9 @@ export function StudioMenu({
             <div className="scope-menu-titles">
               <div className="scope-menu-title-row">
                 <h2>{currentProject.name}</h2>
-                <span className="scope-menu-badge teal">Active System</span>
+                <Badge variant="secondary" className="scope-menu-badge teal bg-teal-500/15 text-teal-600 dark:text-teal-400 border-0 font-medium">
+                  Active System
+                </Badge>
               </div>
               <p className="scope-menu-subtitle">
                 {currentProject.graph.nodes.length} components · {projects.length} saved systems
@@ -105,15 +110,17 @@ export function StudioMenu({
           </div>
 
           <div className="scope-menu-header-actions">
-            <button
+            <Button
               data-testid="studio-menu-close"
               type="button"
-              className="scope-menu-close-btn"
+              variant="ghost"
+              size="icon"
+              className="scope-menu-close-btn h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
               onClick={onClose}
               aria-label="Close projects"
             >
               <X size={16} />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -155,14 +162,14 @@ export function StudioMenu({
               ))}
             </div>
 
-            <button
+            <Button
               type="button"
-              className="scope-action-btn primary-action"
+              className="scope-action-btn primary-action w-full justify-center"
               onClick={onCreateProject}
             >
               <Plus size={14} />
               <span>New project</span>
-            </button>
+            </Button>
           </div>
 
           {/* Section 2: Starters & Templates */}
@@ -174,14 +181,15 @@ export function StudioMenu({
               <span className="scope-menu-badge">Templates</span>
             </div>
 
-            <button
+            <Button
               type="button"
-              className="scope-action-btn"
+              variant="outline"
+              className="scope-action-btn w-full justify-start"
               onClick={onCreateProject}
             >
               <FilePlus size={14} />
               <span>Blank system</span>
-            </button>
+            </Button>
 
             <div className="scope-template-grid">
               <button
@@ -230,15 +238,16 @@ export function StudioMenu({
               </button>
             </div>
 
-            <button
+            <Button
               type="button"
-              className="scope-action-btn"
+              variant="outline"
+              className="scope-action-btn w-full justify-start"
               onClick={onOpenExamples}
               disabled={isReadOnly}
             >
               <Workflow size={14} />
               <span>Examples & tutorials</span>
-            </button>
+            </Button>
           </div>
 
           {/* Section 3: Checkpoints */}
@@ -292,22 +301,23 @@ export function StudioMenu({
                   }
                 }}
               >
-                <input
-                  className="scope-checkpoint-input"
+                <Input
+                  className="scope-checkpoint-input h-9 text-xs"
                   aria-label="Checkpoint name"
                   placeholder="Name this checkpoint"
                   value={checkpointName}
                   onChange={(e) => setCheckpointName(e.target.value)}
                   maxLength={60}
                 />
-                <button
+                <Button
                   type="submit"
+                  size="sm"
                   className="scope-action-btn primary-action"
                   style={{ width: "auto", flexShrink: 0 }}
                 >
                   <BookmarkPlus size={14} />
                   <span>Save checkpoint</span>
-                </button>
+                </Button>
               </form>
             </fieldset>
           </div>
@@ -381,9 +391,10 @@ export function StudioMenu({
               <span className="scope-menu-badge">{savedRuns.length} runs</span>
             </div>
 
-            <button
+            <Button
               type="button"
-              className="scope-action-btn"
+              variant="outline"
+              className="scope-action-btn w-full justify-start"
               aria-label="Saved runs"
               onClick={() => {
                 onClose();
@@ -392,10 +403,10 @@ export function StudioMenu({
             >
               <BarChart3 size={14} />
               <span>Saved runs</span>
-              <span className="scope-menu-badge" style={{ marginLeft: "auto" }}>
+              <Badge variant="secondary" className="scope-menu-badge ml-auto text-[10px] px-1.5 py-0 h-4 font-normal">
                 {savedRuns.length}
-              </span>
-            </button>
+              </Badge>
+            </Button>
           </div>
         </div>
 

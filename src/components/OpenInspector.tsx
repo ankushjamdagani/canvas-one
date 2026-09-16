@@ -6,6 +6,9 @@ import { useEditor } from '../state/editor';
 import { NumberField } from './NumberField';
 import { OpenWorkloadControls } from './OpenWorkloadControls';
 import { NoteInspector } from './CanvasNotes';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import './openInspector.css';
 
 import { X } from 'lucide-react';
@@ -123,17 +126,19 @@ export function OpenInspector({
               Right-click the subsystem shell on the canvas to expand, collapse, or dissolve this group.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-              <button
+              <Button
                 type="button"
-                className="open-inspector-btn"
+                variant="outline"
+                className="open-inspector-btn w-full justify-center"
                 onClick={() => editor.toggleSubsystem(subsystem.id)}
                 aria-label={`${subsystem.collapsed ? "Expand" : "Collapse"} subsystem ${subsystem.name}`}
               >
                 {subsystem.collapsed ? "Expand subsystem" : "Collapse subsystem"}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="open-inspector-btn danger"
+                variant="destructive"
+                className="open-inspector-btn danger w-full justify-center"
                 disabled={readOnly}
                 onClick={() => {
                   editor.dissolveSubsystem(subsystem.id);
@@ -142,7 +147,7 @@ export function OpenInspector({
                 aria-label={`Ungroup ${subsystem.name}`}
               >
                 Ungroup
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -270,7 +275,9 @@ export function OpenInspector({
         <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
             <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedNode.name}</strong>
-            <span className="open-inspector-behavior-badge">{behavior.type}</span>
+            <Badge variant="secondary" className="open-inspector-behavior-badge uppercase font-mono text-[10px] tracking-wider">
+              {behavior.type}
+            </Badge>
           </div>
           {onClose && (
             <button
@@ -292,11 +299,12 @@ export function OpenInspector({
               <span className="open-inspector-section-title">Identity & Metadata</span>
               <label className="field">
                 <span>Name</span>
-                <input
+                <Input
                   type="text"
                   maxLength={80}
                   value={selectedNode.name}
                   onChange={(e) => handleNameChange(e.target.value)}
+                  className="h-8"
                 />
               </label>
 
@@ -313,12 +321,13 @@ export function OpenInspector({
 
               <label className="field">
                 <span>Custom Type Label</span>
-                <input
+                <Input
                   type="text"
                   maxLength={60}
                   value={selectedNode.customType ?? ''}
                   onChange={(e) => handleCustomTypeChange(e.target.value)}
                   placeholder="e.g., Auth Service, Payment DB"
+                  className="h-8"
                 />
               </label>
             </div>
@@ -567,31 +576,33 @@ export function OpenInspector({
             )}
 
             {/* Inline Actions */}
-            <div className="open-inspector-actions">
-              <button
+            <div className="open-inspector-actions flex flex-col gap-2 pt-2">
+              <Button
                 type="button"
-                className="open-inspector-btn primary"
+                className="open-inspector-btn primary w-full"
                 onClick={handleGenerateTraffic}
                 disabled={readOnly || (graph.workloads?.length ?? 0) >= 20}
               >
                 Generate Traffic
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="open-inspector-btn"
+                variant="outline"
+                className="open-inspector-btn w-full"
                 onClick={handleDuplicate}
                 disabled={readOnly || graph.nodes.length >= 100}
               >
                 Duplicate Node
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="open-inspector-btn danger"
+                variant="destructive"
+                className="open-inspector-btn danger w-full"
                 onClick={handleDelete}
                 disabled={readOnly}
               >
                 Delete Node
-              </button>
+              </Button>
             </div>
           </div>
         </fieldset>
