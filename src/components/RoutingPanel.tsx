@@ -2,6 +2,8 @@ import { useEditor } from "../state/editor";
 import { MAX_SERVICE_INSTANCES, serviceInstances } from "../domain/routing";
 import { totalCapacity, workerCount } from "../domain/model";
 import type { Metrics } from "../domain/metrics";
+import { Button } from "@/components/ui/button";
+
 export function RoutingPanel({ metrics }: { metrics: Metrics | null }) {
   const editor = useEditor(), instances = serviceInstances(editor.project.graph);
   return <section className="routing-panel nodrag nopan" aria-label="Service instance routing">
@@ -18,7 +20,15 @@ export function RoutingPanel({ metrics }: { metrics: Metrics | null }) {
         </li>;
       })}
     </ol>
-    <button className="suggestion" disabled={instances.length >= MAX_SERVICE_INSTANCES || !instances.length} onClick={editor.addServiceInstance}>Add service instance</button>
+    <Button
+      size="sm"
+      variant="outline"
+      className="suggestion w-full justify-center text-xs mt-2"
+      disabled={instances.length >= MAX_SERVICE_INSTANCES || !instances.length}
+      onClick={editor.addServiceInstance}
+    >
+      Add service instance
+    </Button>
     <p>Up to 8 instances. A new instance copies the first instance’s settings. Each owns a worker pool and FIFO queue; all share the downstream cache/database.</p>
   </section>;
 }

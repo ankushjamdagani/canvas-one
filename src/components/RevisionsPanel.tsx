@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { architectureSnapshot, compareArchitectures, MAX_REVISIONS, validateRevisionDetails, type RevisionDetails } from "../domain/revisions";
 import { useEditor } from "../state/editor";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const empty: RevisionDetails = { name: "", author: "", reason: "", message: "", issue: "" };
 export function RevisionsPanel() {
@@ -19,7 +21,17 @@ export function RevisionsPanel() {
   return <details className="revisions-panel">
     <summary>Architecture revisions · {revisions.length}</summary>
     <p className="small muted">Immutable snapshots saved in this browser. Author names are self-reported; final status records your decision.</p>
-    {!composing && <button disabled={full || readOnly} onClick={() => setComposing(true)}>New revision</button>}
+    {!composing && (
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-full justify-center text-xs mt-2"
+        disabled={full || readOnly}
+        onClick={() => setComposing(true)}
+      >
+        New revision
+      </Button>
+    )}
     {composing && <form onSubmit={event => {
       event.preventDefault();
       if (readOnly) {
@@ -38,10 +50,35 @@ export function RevisionsPanel() {
       <h3>Save a revision</h3>
       {([['name', 'Revision name', 80], ['author', 'Author name', 80], ['reason', 'Reason for change', 500], ['message', 'Change explanation', 1000], ['issue', 'Linked issue URL (optional)', 240]] as const).map(([key, label, maxLength]) => <label className="field" key={key}>
         <span>{label}</span>
-        {key === "reason" || key === "message" ? <textarea required maxLength={maxLength} value={details[key]} onChange={e => setDetails({ ...details, [key]: e.target.value })} /> : <input type={key === "issue" ? "url" : "text"} required={key !== "issue"} maxLength={maxLength} value={details[key]} onChange={e => setDetails({ ...details, [key]: e.target.value })} />}
+        {key === "reason" || key === "message" ? (
+          <textarea
+            required
+            maxLength={maxLength}
+            value={details[key]}
+            onChange={e => setDetails({ ...details, [key]: e.target.value })}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        ) : (
+          <Input
+            type={key === "issue" ? "url" : "text"}
+            required={key !== "issue"}
+            maxLength={maxLength}
+            value={details[key]}
+            onChange={e => setDetails({ ...details, [key]: e.target.value })}
+            className="h-8 text-xs"
+          />
+        )}
       </label>)}
-      <button disabled={full || readOnly} type="submit">Save draft revision</button>
-      {revisions.length > 0 && <button type="button" onClick={() => setComposing(false)}>Cancel revision</button>}
+      <div className="flex items-center gap-2 mt-2">
+        <Button size="sm" disabled={full || readOnly} type="submit" className="text-xs">
+          Save draft revision
+        </Button>
+        {revisions.length > 0 && (
+          <Button size="sm" variant="outline" type="button" onClick={() => setComposing(false)} className="text-xs">
+            Cancel revision
+          </Button>
+        )}
+      </div>
     </form>}
     {full && <p className="field-help">All {MAX_REVISIONS} revision slots are used. Export a backup and start a new project to continue.</p>}
     <p role="status">{notice}</p>
@@ -62,17 +99,37 @@ export function RevisionsPanel() {
           {revisions.filter(r => r.id !== selected).map(r => <option value={r.id} key={r.id}>{r.name} · {r.status}</option>)}
         </select></label>
         {changes.length ? <ul className="revision-changes">{changes.map((c, i) => <li key={i}>{c}</li>)}</ul> : <p>No architecture changes.</p>}
-        <div className="panel-actions">
-          {revision.status === "draft" && <button disabled={full || readOnly || revisions.some(r => r.sourceId === revision.id && r.status === "final")} onClick={() => {
-            if (readOnly) return;
-            if (editor.finalizeRevision(revision.id)) { setSelected(useEditor.getState().project.revisions!.at(-1)!.id); setNotice("Final copy saved from this draft. Current canvas edits are not included."); }
-          }}>Finalize this draft</button>}
-          <button disabled={readOnly} onClick={() => {
-            if (readOnly) return;
-            editor.restoreRevision(revision.id);
-            setTarget("");
-            setNotice("Revision restored to the canvas. Use Undo to recover the previous canvas.");
-          }}>Restore to canvas</button>
+        <div className="panel-actions flex items-center gap-2 mt-3">
+          {revision.status === "draft" && (
+            <Button
+              size="sm"
+              disabled={full || readOnly || revisions.some(r => r.sourceId === revision.id && r.status === "final")}
+              onClick={() => {
+                if (readOnly) return;
+                if (editor.finalizeRevision(revision.id)) {
+                  setSelected(useEditor.getState().project.revisions!.at(-1)!.id);
+                  setNotice("Final copy saved from this draft. Current canvas edits are not included.");
+                }
+              }}
+              className="text-xs"
+            >
+              Finalize this draft
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={readOnly}
+            onClick={() => {
+              if (readOnly) return;
+              editor.restoreRevision(revision.id);
+              setTarget("");
+              setNotice("Revision restored to the canvas. Use Undo to recover the previous canvas.");
+            }}
+            className="text-xs"
+          >
+            Restore to canvas
+          </Button>
         </div>
       </article>}
     </> : <p className="small muted">No revisions yet. Save the current architecture with its rationale.</p>}

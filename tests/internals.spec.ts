@@ -12,6 +12,7 @@ test("expansion shows the same live model and survives local reopen", async ({
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await page.waitForTimeout(800);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
 
   const before = await page.getByTestId("throughput").textContent();
 
@@ -20,7 +21,6 @@ test("expansion shows the same live model and survives local reopen", async ({
   await dbNode.getByRole("button", { name: /Expand Message database/ }).click();
 
   await expect(dbNode.locator(".component-internals")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
   expect(await page.getByTestId("throughput").textContent()).toBe(before);
 
   await dbNode.getByRole("button", { name: /Collapse Message database/ }).click();

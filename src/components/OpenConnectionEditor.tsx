@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { useEditor } from '../state/editor';
 import { NumberField } from './NumberField';
 import type { ModelEdge } from '../domain/model';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export function OpenConnectionEditor({
   edgeId,
@@ -27,9 +29,9 @@ export function OpenConnectionEditor({
           <strong>Connection Not Found</strong>
         </div>
         <p className="open-inspector-help-text">The selected connection was removed or is missing.</p>
-        <button type="button" className="open-inspector-btn" onClick={onClose}>
+        <Button type="button" size="sm" variant="outline" onClick={onClose}>
           Close
-        </button>
+        </Button>
       </aside>
     );
   }
@@ -67,23 +69,25 @@ export function OpenConnectionEditor({
       <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>Connection Settings</strong>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <button
+          <Button
             type="button"
-            className="open-inspector-btn"
-            style={{ padding: '2px 8px', fontSize: '11px' }}
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-xs"
             onClick={onClose}
           >
             Done
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label="Close inspector"
-            className="subtle"
-            style={{ padding: '2px', display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
             onClick={onClose}
           >
             <X size={15} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -98,36 +102,39 @@ export function OpenConnectionEditor({
               <span className="open-review-banner-text">
                 Review Required: This connection topology or behavior changed. Please confirm or update the transport properties below.
               </span>
-              <button
+              <Button
                 type="button"
-                className="open-inspector-btn primary"
+                size="sm"
+                className="h-6 px-2 text-xs"
                 onClick={handleConfirmConnection}
                 disabled={readOnly}
               >
                 Confirm Connection
-              </button>
+              </Button>
             </div>
           )}
 
           <label className="field">
             <span>Label</span>
-            <input
+            <Input
               type="text"
               maxLength={60}
               value={edge.label ?? ''}
               onChange={(e) => patchEdge({ label: e.target.value.slice(0, 60) })}
               placeholder="e.g., HTTP / gRPC / Publishes to"
+              className="h-8 text-xs"
             />
           </label>
 
           <label className="field">
             <span>Protocol</span>
-            <input
+            <Input
               type="text"
               maxLength={30}
               value={edge.protocol ?? ''}
               onChange={(e) => patchEdge({ protocol: e.target.value.slice(0, 30) })}
               placeholder="e.g., https, grpc, amqp"
+              className="h-8 text-xs"
             />
           </label>
 
@@ -251,12 +258,13 @@ export function OpenConnectionEditor({
 
                   <label className="field">
                     <span>Match Value</span>
-                    <input
+                    <Input
                       type="text"
                       maxLength={80}
                       value={edge.condition?.value ?? ''}
                       placeholder={edge.condition?.field === 'operation' ? 'read or write' : 'Value to match'}
                       disabled={readOnly}
+                      className="h-8 text-xs"
                       onChange={(e) => {
                         patchEdge({
                           condition: {
@@ -273,14 +281,16 @@ export function OpenConnectionEditor({
           )}
 
           <div className="open-inspector-actions">
-            <button
+            <Button
               type="button"
-              className="open-inspector-btn danger"
+              variant="destructive"
+              size="sm"
+              className="w-full text-xs"
               onClick={handleDelete}
               disabled={readOnly}
             >
               Delete Connection
-            </button>
+            </Button>
           </div>
         </div>
       </fieldset>

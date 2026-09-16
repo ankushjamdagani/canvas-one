@@ -74,6 +74,7 @@ test("diagram SVG and PNG downloads contain the entire current subsystem view wi
   await page.getByPlaceholder("Subsystem name").fill("Event platform");
   await page.getByRole("button", { name: "Group", exact: true }).click();
   await page.getByRole("button", { name: "Collapse subsystem Event platform", exact: true }).click();
+  await page.waitForTimeout(150);
   const collapsedViewport = await page.locator(".react-flow__viewport").evaluate((element) => (element as HTMLElement).style.transform);
   const collapsedSvg = await textOf(await downloadFrom(page, "Download SVG"));
   expect(collapsedSvg).toContain("Event platform");

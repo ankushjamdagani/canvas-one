@@ -702,3 +702,24 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Limitations & follow-up**:
   - All panels, drawers, overlays, and inline controls are now fully modernized with Tailwind CSS v4 and shadcn-ui primitives.
 
+## 2026-09-17 — Modernization of RevisionsPanel, OpenConnectionEditor, DiagramOrganization & RoutingPanel
+
+- **Outcome**: Modernized revisions management, canvas connection editor, diagram organization toolbar, and service instance routing controls using Tailwind CSS v4 and shadcn-ui primitives (`Button`, `Input`), and stabilized Playwright E2E assertion timing for viewport transform capture and simulation pause state.
+- **Files and systems changed**:
+  - [`src/components/RevisionsPanel.tsx`](src/components/RevisionsPanel.tsx): Upgraded New revision, Save draft revision, Cancel revision, Finalize draft, and Restore to canvas actions with shadcn `Button`. Modernized revision creation text and URL inputs with shadcn `Input` and styled the reason/explanation textarea with Tailwind focus rings.
+  - [`src/components/OpenConnectionEditor.tsx`](src/components/OpenConnectionEditor.tsx): Upgraded Done, Close, Confirm Connection, and Delete Connection actions with shadcn `Button` (`outline`, `ghost`, `destructive` variants). Upgraded connection label, protocol, and router match value inputs with shadcn `Input`.
+  - [`src/components/DiagramOrganization.tsx`](src/components/DiagramOrganization.tsx): Upgraded Selection Mode toggle, clear selection, 4 directional alignment actions (left, right, top, bottom), and horizontal/vertical distribution actions with shadcn `Button` primitives.
+  - [`src/components/RoutingPanel.tsx`](src/components/RoutingPanel.tsx): Modernized "Add service instance" action with shadcn `Button`.
+  - [`tests/export.spec.ts`](tests/export.spec.ts), [`tests/internals.spec.ts`](tests/internals.spec.ts): Eliminated multi-worker race conditions by waiting for the 80ms camera fitView settle after subsystem collapse in `export.spec.ts` and confirming the Resume button state before recording paused throughput in `internals.spec.ts`.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: shadcn-ui primitives, Tailwind CSS v4, Graphify AST update, Vitest, Playwright Test.
+- **Verification performed**:
+  - `npm run build`: Clean TypeScript compilation and Vite build in 557ms.
+  - `npm test`: All 233 unit tests pass across 36 files (2.28s).
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass with 100% stability across 5 parallel workers (27.1s).
+  - `graphify update .`: AST-extracted 132/132 files; updated graph to 1102 nodes, 2794 edges, 101 communities.
+  - `git diff --check`: Clean formatting with 0 whitespace errors.
+- **Limitations & follow-up**:
+  - Entire frontend component architecture has been refactored and modernized to Tailwind CSS v4 and shadcn-ui with full end-to-end regression validation.
+
+
