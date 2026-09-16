@@ -3,6 +3,9 @@ import type { WorkloadDefinition, RequestClass } from '../domain/execution';
 import { defaultWorkload } from '../domain/behaviorDefaults';
 import { NumberField } from './NumberField';
 import { useEditor } from '../state/editor';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 export function OpenWorkloadControls({
   workloads,
@@ -43,14 +46,15 @@ export function OpenWorkloadControls({
           {filterNodeId ? 'Attached Workloads' : 'All Workloads'} ({displayedWorkloads.length})
         </span>
         {!readOnly && (graph.workloads?.length ?? 0) < 20 && nodes.length > 0 && (
-          <button
+          <Button
             type="button"
-            className="open-inspector-btn"
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-xs"
             onClick={handleAddWorkload}
-            style={{ padding: '2px 8px', fontSize: '11px' }}
           >
             + Add Workload
-          </button>
+          </Button>
         )}
       </div>
 
@@ -81,9 +85,16 @@ export function OpenWorkloadControls({
                     </span>
                   </div>
                   <div className="open-workload-summary-meta">
-                    <span className={`open-workload-badge ${wl.enabled ? 'enabled' : 'disabled'}`}>
+                    <Badge
+                      variant={wl.enabled ? 'secondary' : 'outline'}
+                      className={`open-workload-badge text-[10px] px-1.5 py-0 ${
+                        wl.enabled
+                          ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
                       {wl.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
+                    </Badge>
                     <span className="open-workload-arrival-text">{arrivalSummary}</span>
                   </div>
                 </div>
@@ -95,14 +106,15 @@ export function OpenWorkloadControls({
                     Parameters & Settings
                   </span>
                   {!readOnly && (
-                    <button
+                    <Button
                       type="button"
-                      className="open-inspector-btn danger"
+                      variant="destructive"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
                       onClick={() => editor.removeWorkload(wl.id)}
-                      style={{ padding: '2px 6px', fontSize: '11px' }}
                     >
                       Remove
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -283,10 +295,11 @@ export function OpenWorkloadControls({
                     Request Classes ({wl.classes.length}/20)
                   </span>
                   {!readOnly && wl.classes.length < 20 && (
-                    <button
+                    <Button
                       type="button"
-                      className="open-inspector-btn"
-                      style={{ padding: '1px 6px', fontSize: '11px' }}
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
                       onClick={() => {
                         const newClass: RequestClass = {
                           id: crypto.randomUUID(),
@@ -307,7 +320,7 @@ export function OpenWorkloadControls({
                       }}
                     >
                       + Class
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -316,10 +329,11 @@ export function OpenWorkloadControls({
                     <div className="open-class-header">
                       <span>Class {cIdx + 1}: {cls.name}</span>
                       {!readOnly && wl.classes.length > 1 && (
-                        <button
+                        <Button
                           type="button"
-                          className="open-inspector-btn danger"
-                          style={{ padding: '1px 4px', fontSize: '11px' }}
+                          variant="destructive"
+                          size="sm"
+                          className="h-5 px-1.5 text-xs"
                           onClick={() => {
                             editor.updateWorkload(wl.id, {
                               classes: wl.classes.filter((c) => c.id !== cls.id),
@@ -327,17 +341,18 @@ export function OpenWorkloadControls({
                           }}
                         >
                           Delete
-                        </button>
+                        </Button>
                       )}
                     </div>
 
                     <label className="field">
                       <span>Name</span>
-                      <input
+                      <Input
                         type="text"
                         maxLength={80}
                         value={cls.name}
                         disabled={readOnly}
+                        className="h-8 text-xs"
                         onChange={(e) => {
                           const updated = wl.classes.map((c) =>
                             c.id === cls.id ? { ...c, name: e.target.value.slice(0, 80) } : c
@@ -381,11 +396,12 @@ export function OpenWorkloadControls({
 
                     <label className="field">
                       <span>Tags (comma-separated, max 20)</span>
-                      <input
+                      <Input
                         type="text"
                         key={`${cls.id}:${JSON.stringify(cls.tags)}`}
                         defaultValue={cls.tags.join(', ')}
                         disabled={readOnly}
+                        className="h-8 text-xs"
                         onBlur={(e) => {
                           const tags = e.target.value
                             .split(',')

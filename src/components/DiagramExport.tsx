@@ -2,6 +2,7 @@ import { Download, FileImage, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import type { Project } from "../domain/model";
 import { downloadDiagram, type DiagramExportFormat } from "../export/downloadDiagram";
+import { Button } from "@/components/ui/button";
 
 /** Diagram visual image export panel. */
 export function DiagramExport({ project }: { project: Project }) {
@@ -25,9 +26,15 @@ export function DiagramExport({ project }: { project: Project }) {
   };
   return <section data-testid="diagram-export" className="diagram-export" aria-label="Export canvas">
     <div className="diagram-export-copy"><strong>Entire canvas · current subsystem view</strong><span>PNG uses up to 2× scale within safe image limits.</span></div>
-    <div className="diagram-export-actions">
-      <button data-testid="export-svg-btn" disabled={disabled} onClick={() => run("svg")}>{pending === "svg" ? <LoaderCircle className="export-spinner" size={15} /> : <Download size={15} />}{pending === "svg" ? "Preparing…" : "Download SVG"}</button>
-      <button data-testid="export-png-btn" disabled={disabled} onClick={() => run("png")}>{pending === "png" ? <LoaderCircle className="export-spinner" size={15} /> : <FileImage size={15} />}{pending === "png" ? "Preparing…" : "Download PNG"}</button>
+    <div className="diagram-export-actions flex items-center gap-2">
+      <Button data-testid="export-svg-btn" disabled={disabled} onClick={() => run("svg")} size="sm" className="h-9 px-3 text-xs">
+        {pending === "svg" ? <LoaderCircle className="export-spinner animate-spin" size={15} /> : <Download size={15} />}
+        {pending === "svg" ? "Preparing…" : "Download SVG"}
+      </Button>
+      <Button data-testid="export-png-btn" disabled={disabled} onClick={() => run("png")} variant="outline" size="sm" className="h-9 px-3 text-xs">
+        {pending === "png" ? <LoaderCircle className="export-spinner animate-spin" size={15} /> : <FileImage size={15} />}
+        {pending === "png" ? "Preparing…" : "Download PNG"}
+      </Button>
     </div>
     <span className={`diagram-export-message ${failed ? "failed" : ""}`} role={failed ? "alert" : "status"}>{message || "\u00a0"}</span>
   </section>;

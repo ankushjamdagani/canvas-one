@@ -4,6 +4,8 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { noteKinds, noteAttachmentLabel, type CanvasNote, type NoteKind } from "../domain/notes";
 import { visibleSubsystems } from "../domain/subsystems";
 import { useEditor } from "../state/editor";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export type NoteFlowNode = Node<{ note: CanvasNote; attachmentLabel?: string }, "note">;
 export function CanvasNoteNode({ data, selected }: NodeProps<NoteFlowNode>) {
@@ -38,7 +40,16 @@ export function NoteInspector({ note }: { note: CanvasNote }) {
     }} onKeyDown={event => { if (event.key === "Escape") setDraft(note); }}>
       <p>Capture the reasoning behind this design. Drag the note to place it on the canvas.</p>
       <label>Note type<select value={draft.kind} onChange={event => setDraft({ ...draft, kind: event.target.value as NoteKind })}>{Object.entries(noteKinds).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <label>Note title<input autoFocus maxLength={80} required value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} /></label>
+      <label>Note title
+        <Input
+          autoFocus
+          maxLength={80}
+          required
+          value={draft.title}
+          onChange={event => setDraft({ ...draft, title: event.target.value })}
+          className="h-8 mt-1"
+        />
+      </label>
       <label>Note text<textarea rows={7} maxLength={1000} value={draft.body} onChange={event => setDraft({ ...draft, body: event.target.value })} /></label>
       <span className="note-count">{draft.body.length} / 1000</span>
       <label>Link note to<select value={attachment} onChange={event => {
@@ -47,9 +58,34 @@ export function NoteInspector({ note }: { note: CanvasNote }) {
         setDraft({ ...draft, attachment: value ? { kind: value.slice(0, separator) as "node" | "edge" | "subsystem", id: value.slice(separator + 1) } : undefined });
       }}><option value="">No attachment</option>{attachment && !targets.some(t => t.value === attachment) && <option value={attachment}>Linked item unavailable</option>}{targets.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
       <p>Links record context. Moving a component leaves the note in place.</p>
-      <div className="note-actions"><button type="submit" disabled={!dirty || !draft.title.trim()}>Apply note</button><button type="button" disabled={!dirty} onClick={() => setDraft(note)}>Cancel</button></div>
-      <button type="button" aria-pressed={note.collapsed} onClick={() => editor.updateNote(note.id, { collapsed: !note.collapsed })}>{note.collapsed ? "Expand note" : "Collapse note"}</button>
-      <button type="button" className="delete-note" onClick={() => editor.removeNote(note.id)}><Trash2 size={15} />Delete note</button>
+      <div className="note-actions flex items-center gap-2">
+        <Button type="submit" disabled={!dirty || !draft.title.trim()} size="sm">
+          Apply note
+        </Button>
+        <Button type="button" variant="outline" disabled={!dirty} onClick={() => setDraft(note)} size="sm">
+          Cancel
+        </Button>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full justify-center"
+        aria-pressed={note.collapsed}
+        onClick={() => editor.updateNote(note.id, { collapsed: !note.collapsed })}
+      >
+        {note.collapsed ? "Expand note" : "Collapse note"}
+      </Button>
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        className="delete-note w-full justify-center"
+        onClick={() => editor.removeNote(note.id)}
+      >
+        <Trash2 size={15} />
+        Delete note
+      </Button>
       <p>Changes and deletion can be undone.</p>
     </form>
     <div className="inspector-bottom"><StickyNote size={14} /><span>Design context · no simulation behavior</span></div>

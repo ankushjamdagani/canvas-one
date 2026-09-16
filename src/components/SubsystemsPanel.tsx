@@ -2,6 +2,8 @@ import { Boxes, ChevronDown, ChevronRight, Ungroup } from "lucide-react";
 import { useEditor } from "../state/editor";
 import { visibleSubsystems } from "../domain/subsystems";
 import { isDiagramGraph } from "../domain/model";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export function SubsystemsPanel() {
   const editor = useEditor();
@@ -39,22 +41,27 @@ export function SubsystemsPanel() {
                 )}
                 <span>{group.name}</span>
                 {!isVisible && (
-                  <span className="subsystems-badge dormant" title="Contains missing components">
+                  <Badge variant="secondary" className="subsystems-badge dormant text-[10px] px-1 py-0 h-4 text-amber-600 dark:text-amber-400" title="Contains missing components">
                     dormant
-                  </span>
+                  </Badge>
                 )}
-                <span className="subsystems-badge">{group.nodeIds.length}</span>
+                <Badge variant="outline" className="subsystems-badge text-[10px] px-1.5 py-0 h-4 font-mono font-normal">
+                  {group.nodeIds.length}
+                </Badge>
               </button>
               <div className="subsystems-actions">
-                <button
-                  className="subsystems-action-btn"
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="subsystems-action-btn h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                   aria-label={`Ungroup ${group.name}`}
                   title="Ungroup; keep every component"
                   disabled={isReadOnly}
                   onClick={() => editor.dissolveSubsystem(group.id)}
                 >
                   <Ungroup size={14} />
-                </button>
+                </Button>
               </div>
             </div>
           );

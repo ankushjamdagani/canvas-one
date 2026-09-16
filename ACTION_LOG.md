@@ -682,3 +682,23 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `git diff --check`: 0 whitespace errors.
 - **Limitations & follow-up**:
   - All requested modernization steps ("Proceed with all 3") are complete and verified with zero regression on simulation behavior or E2E tests.
+
+## 2026-09-17 — Modernization of DiagramExport, CanvasNotes, SubsystemsPanel & OpenWorkloadControls
+
+- **Outcome**: Modernized remaining secondary components and sub-panels across the workspace using Tailwind CSS v4 and shadcn-ui primitives (`Button`, `Input`, `Badge`) while strictly preserving discrete-event simulation accounting, graph persistence, ARIA attributes, and all 45 Playwright E2E test flows.
+- **Files and systems changed**:
+  - [`src/components/DiagramExport.tsx`](src/components/DiagramExport.tsx): Upgraded standalone SVG and PNG export triggers using shadcn `Button` (`export-svg-btn`, `export-png-btn`).
+  - [`src/components/CanvasNotes.tsx`](src/components/CanvasNotes.tsx): Upgraded `NoteInspector` title field with shadcn `Input`, and replaced Apply, Cancel, Collapse/Expand, and Delete actions with shadcn `Button` primitives.
+  - [`src/components/SubsystemsPanel.tsx`](src/components/SubsystemsPanel.tsx): Replaced subsystem component count badges and dormant badge with shadcn `Badge`, and upgraded the Ungroup action to shadcn `Button`.
+  - [`src/components/OpenWorkloadControls.tsx`](src/components/OpenWorkloadControls.tsx): Upgraded Add Workload and Remove Workload actions with shadcn `Button`, workload enabled/disabled indicator with shadcn `Badge`, and request class Add/Delete actions with `Button` and Name/Tags text fields with shadcn `Input`.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: shadcn-ui primitives, Tailwind CSS v4, Graphify AST update, Vitest, Playwright Test.
+- **Verification performed**:
+  - `npm run build`: Production bundle built cleanly in 558ms with zero TypeScript or Vite errors.
+  - `npm test`: All 233 unit tests pass across 36 files (2.30s).
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass across 5 workers in 26.6s.
+  - `graphify update .`: AST extracted 132/132 files without LLM costs; updated graph to 1101 nodes, 2779 edges, 101 communities.
+  - `git diff --check`: Clean formatting with 0 whitespace errors.
+- **Limitations & follow-up**:
+  - All panels, drawers, overlays, and inline controls are now fully modernized with Tailwind CSS v4 and shadcn-ui primitives.
+
