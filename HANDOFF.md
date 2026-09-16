@@ -106,4 +106,7 @@ Current authored revisions verification (12 September 2026): all 133 unit tests 
 
 ## Product goals recorded for future work
 
-The longer-term collaboration goal is shared team architecture workspaces. Local authored revisions now provide metadata, draft/final snapshots, comparison and restore. Shared storage, authenticated authorship, team review, access control and a multi-user conflict model remain future scope; current projects are browser-local.
+The longer-term collaboration goal is shared team architecture workspaces. Local authored revisions now provide metadata, draft/final snapshots, comparison and restore. Future collaboration scope expands this with:
+- Shared storage, authenticated authorship, team review, access control and a multi-user conflict model.
+- Scoped subsystem revisions and concurrent review cycles: dedicated UX for proposing, reviewing, and tracking changes to specific subsystems or component groups, supporting multiple in-flight revisions simultaneously with distinct canvas identification and targeted feedback threads.
+- Cross-project architecture linking and impact analysis: enabling independent teams to maintain their own system architectures and connect them via typed external links (sync RPC, async streams, shared data, schema contracts), with automated detection and impact analysis when linked external services change.

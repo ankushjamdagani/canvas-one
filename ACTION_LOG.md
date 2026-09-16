@@ -331,3 +331,23 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Code hygiene: `git diff --check` passed with 0 errors.
 - **Limitations & follow-up decisions**:
   - None. Exact simulation accounting, format-8 persistence, and read-only archive handling remain completely intact. No commit, push, or deployment was performed.
+
+## 2026-09-16 - Add external project linking, impact analysis, and scoped subsystem revisions with review UX to future collaboration roadmap
+
+- **Requested outcome**:
+  1. Expand future collaboration scope to support linking system designs with external design projects across multiple teams, with typed link semantics and automated change/impact detection on downstream systems when external services evolve.
+  2. Add dedicated review and feedback UX for changes to parts/subsystems of an existing architecture, supporting multiple concurrent active revisions with distinct canvas identification and targeted review cycles.
+- **Files changed**:
+  - [`specs/shared-team-architecture.md`](specs/shared-team-architecture.md):
+    - Added *Scoped subsystem revisions and concurrent review cycles* to Section 3: defined scoped change proposals, multi-revision concurrency (different or overlapping subsystems), distinct visual identification (revision IDs, status badges, canvas highlight overlays, navigation rail), scoped diffs, inline feedback threads, and conflict resolution during merge into baseline.
+    - Added Section 4 *Cross-project architecture linking and external impact analysis*: defined multi-team federated architectures, external system proxy nodes, typed external link semantics (synchronous RPC, asynchronous streams, shared storage, contract/schema boundaries), and change detection with impact evaluation for contract drift, latency SLA breaches, and capacity modifications.
+    - Updated Section 5 *Interface and delivery* and Section 6 *Implementation order and acceptance* to incorporate revision overlays, external link drawers, and acceptance criteria for concurrent partial revisions and external link change alerts.
+  - [`PRODUCT.md`](PRODUCT.md):
+    - Expanded *Future product goals* with dedicated entries for scoped partial-system revisions with concurrent review UX and cross-project architecture linking with external impact analysis.
+  - [`HANDOFF.md`](HANDOFF.md):
+    - Updated *Product goals recorded for future work* to record the expanded collaboration roadmap covering scoped subsystem revisions, concurrent review cycles, and federated external project linking with change impact analysis.
+- **Verification performed**:
+  - `git diff --check`: passed cleanly with 0 errors.
+  - Repository integrity: inspected modified specs and product documentation to verify consistency across `specs/shared-team-architecture.md`, `PRODUCT.md`, and `HANDOFF.md`.
+- **Limitations & follow-up decisions**:
+  - Implementation remains future scope as planned; current product retains browser-local persistence and offline execution.

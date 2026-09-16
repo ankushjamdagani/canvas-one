@@ -57,6 +57,20 @@ Extend the existing light docked editor. Local projects remain available without
 - Maintain one selected final revision per architecture while preserving previous finals. Finalization never freezes the live draft.
 - Paginate team history instead of inheriting the local 20-revision limit. Reuse existing snapshot comparison logic, excluding personal viewing preferences from team change summaries.
 
+**Scoped subsystem revisions and concurrent review cycles**
+
+- Provide a dedicated UX for proposing, reviewing, and tracking changes to specific subsystems, component clusters, or bounded parts of an existing architecture, rather than requiring monolithic whole-system snapshots for every incremental proposal.
+- Support multiple concurrent revisions in play simultaneously: different teams or engineers can have active revisions targeting different subsystems (e.g., ingest pipeline vs. notification service) or competing revision proposals for the same subsystem.
+- Make all active revisions easily identifiable:
+  - Each revision carries a unique identifier, descriptive title, author identity, timestamp, target subsystem/component scope, and lifecycle state (**Draft → In review → Changes requested → Approved → Finalized**).
+  - The canvas provides visual revision overlays, scoped badges, and highlight filters so users can toggle and immediately see which components and connections belong to which in-flight revision.
+  - A revision navigation rail displays active revisions, their scope, author, and review status, enabling instant switching between the live baseline and any active revision proposal.
+- Structured review cycles:
+  - Scoped diff inspection highlights additions, removals, and property adjustments exclusively within the targeted subsystem boundary.
+  - Inline feedback and review threads attach directly to specific modified components or subsystem boundaries.
+  - Reviewers can approve or request changes on the scoped proposal.
+  - Merging an approved partial revision into the baseline executes an atomic integration check to detect conflicts with concurrent changes to overlapping nodes or connections before applying.
+
 **Independent simulations**
 
 - Refactor `src/simulation/useSimulation.ts` so a shared-project run remains bound to its starting graph. Remote configuration changes do not reset that run.
@@ -70,9 +84,34 @@ Extend the existing light docked editor. Local projects remain available without
 - Existing local revisions, checkpoints and results remain local. Publishing the current architecture does not convert self-reported history into authenticated team history.
 - Retain version-7 local import/export. Shared current-state or selected-revision exports produce independent local copies without membership, credentials or team approval claims. Full team audit-history export is deferred.
 
-## 4. Interface and delivery
+## 4. Cross-project architecture linking and external impact analysis
 
-- Add presence and connection/save status above the canvas, member settings beside the workspace selector, and a docked revision-review panel.
+**Multi-team federated architectures**
+
+- Enable architectures to link with external system design projects owned and maintained by other teams, workspaces, or organizations.
+- Each team maintains autonomy over their own system architecture while explicitly modeling cross-system dependencies.
+- Provide external boundary interface components (external system proxies) on the canvas that represent remote systems and link directly to the target project and revision ID.
+
+**Typed external links**
+
+- External links support explicit, typed dependency semantics to clarify integration boundaries:
+  - **Synchronous RPC / Request-Response:** Represents REST, gRPC, or GraphQL dependencies with associated latency budgets, timeout contracts, and expected throughput.
+  - **Asynchronous Event / Stream:** Represents message broker or event stream pub-sub dependencies (e.g., Kafka, SQS) with message format contracts and delivery semantics.
+  - **Shared Data / Storage:** Represents direct database access, read-replicas, or data warehouse pipelines with consistency and access-pattern contracts.
+  - **Contract / Schema Dependency:** Represents shared API specs, protobuf contracts, or external interface boundaries.
+
+**Change detection and impact analysis**
+
+- Track upstream and downstream versions across linked external systems.
+- When an external linked system updates (e.g., publishes a new final revision, modifies capacity or latency profiles, changes interface contracts, or deprecates endpoints):
+  - The local system flags the external boundary link with a visible change indicator (e.g., "External service updated to revision 3.0").
+  - Provide an impact analysis view that evaluates whether the remote modification affects local components, connections, or simulation parameters.
+  - Differentiate between non-breaking changes (internal implementation tweaks in external system) and potential impacts (latency increase, throughput reduction, or schema changes that require local architectural adjustments).
+
+## 5. Interface and delivery
+
+- Add presence and connection/save status above the canvas, member settings beside the workspace selector, a docked revision-review panel, and an external system links drawer.
+- Support canvas overlays and filter controls for concurrent partial revisions and external system boundary indicators.
 - Show clear states for connecting, saving, saved, reconnecting, read-only access and recoverable rejected edits. Disable unavailable actions with a reason.
 - Preserve existing visual tokens and editor composition. On mobile, settings and review panels follow document flow; controls remain keyboard accessible and status changes are announced.
 - Deliver Supabase migrations and access policies, local development fixtures, a collaboration-service container, environment examples, health/readiness endpoints and deployment instructions.
@@ -80,20 +119,24 @@ Extend the existing light docked editor. Local projects remain available without
 - Add structured operational logs for connection failures, denied actions, persistence failures and revision transitions; omit document contents and tokens.
 - Live provisioning is separate. Google OAuth credentials, a Supabase project and production host settings are deployment inputs, not prerequisites for local integration tests.
 
-## 5. Implementation order and acceptance
+## 6. Implementation order and acceptance
 
 Implement in this order:
 
 1. Shared contracts, database permissions and authentication.
 2. Collaboration persistence, recovery and a two-client editing test.
 3. Shared editor adapter, selective undo and personal simulation snapshots.
-4. Workspace UI, invitations, revisions, comments and published results.
-5. Full regression verification and deployment documentation.
+4. Workspace UI, invitations, scoped revisions, review cycles, comments and published results.
+5. Cross-project external system linking, typed dependency contracts, and change impact detection.
+6. Full regression verification and deployment documentation.
 
 Required acceptance checks:
 
 - Two browser sessions converge after concurrent edits, dragging, deletion, undo and reconnect.
 - Concurrent edits preserve structural limits and never overwrite an entire document accidentally.
+- Multiple concurrent revisions targeting different or overlapping subsystems can be tracked simultaneously, with distinct visual identification on the canvas and clear review status.
+- Scoped reviews display isolated diffs and component-specific feedback threads without locking unrelated subsystems.
+- External project links correctly bind to remote architectures, display link types, and flag remote changes for local impact assessment.
 - A server restart preserves every acknowledged change; storage failures never display “Saved.”
 - Viewer writes, cross-workspace access, expired invitations, removed-member edits and self-approval fail through direct API/WebSocket attempts.
 - Revision capture includes acknowledged edits exactly; later changes cannot alter the reviewed snapshot. Retrying finalization creates no duplicate final.
