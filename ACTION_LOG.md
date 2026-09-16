@@ -649,3 +649,17 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `git diff --check`: Clean formatting with 0 whitespace errors.
 - **Limitations & follow-up**:
   - Remaining panels (e.g. `OpenInspector`, `SubsystemsPanel`) can progressively adopt shadcn primitives in future scoped iterations without touching canvas core simulation models.
+
+## 2026-09-17 — Form Controls Modernization: NumberField, JobControls & ServiceModelEditor
+
+- **Outcome**: Upgraded inline form components across inspector and service/worker settings to use shadcn `Input` and `Button` primitives with Tailwind styling while preserving all accessible ARIA names and strict validation bounds.
+- **Files and systems changed**:
+  - `src/components/NumberField.tsx`: Replaced raw input with shadcn `Input`.
+  - `src/components/JobControls.tsx`: Replaced raw inputs and submit/cancel buttons with shadcn `Input` and `Button` (sm variant).
+  - `src/components/ServiceModelEditor.tsx`: Replaced raw inputs and buttons with shadcn `Input` and `Button`.
+- **Platform / subagents**: agy (lead).
+- **Verification performed**:
+  - `npm run build`: Zero compilation errors.
+  - `npm test`: All 233 unit tests pass.
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass (26.4s).
+  - `git diff --check`: Clean whitespace.

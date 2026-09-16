@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { workerCount, totalCapacity, type ModelNode } from "../domain/model";
 import { useEditor } from "../state/editor";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 type Field = {
   key:
     | "capacity"
@@ -113,7 +115,7 @@ export function JobControls({ node }: { node: ModelNode }) {
         {fields.map((f) => (
           <label key={f.key}>
             <span>{f.label}</span>
-            <input
+            <Input
               aria-label={`${node.name} ${f.label}`}
               type="number"
               min={f.min}
@@ -133,16 +135,18 @@ export function JobControls({ node }: { node: ModelNode }) {
         </p>
       )}
       <div className="internal-edit-actions">
-        <button type="submit" disabled={!dirty}>
+        <Button type="submit" disabled={!dirty} size="sm">
           Apply job settings
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={!dirty}
           onClick={() => setDraft(values)}
         >
           Cancel
-        </button>
+        </Button>
       </div>
       <p className="internal-caption">
         Apply resets the run. Undo restores settings.

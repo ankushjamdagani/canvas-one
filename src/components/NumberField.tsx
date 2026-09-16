@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+
 export function NumberField({
   label,
   value,
@@ -19,7 +21,7 @@ export function NumberField({
     <label className="field">
       <span>{label}</span>
       <div className="input-unit">
-        <input
+        <Input
           aria-label={label}
           type="number"
           min={min}

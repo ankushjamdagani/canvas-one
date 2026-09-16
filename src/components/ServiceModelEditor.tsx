@@ -5,6 +5,8 @@ import {
   type ModelNode,
 } from "../domain/model";
 import { useEditor } from "../state/editor";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export function ServiceModelEditor({ node }: { node: ModelNode }) {
   const updateNode = useEditor((state) => state.updateNode);
@@ -78,7 +80,7 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
       <div className="internal-edit-fields">
         <label>
           <span>Per worker · req/s</span>
-          <input
+          <Input
             aria-label="Service processing capacity"
             type="number"
             min={1}
@@ -91,7 +93,7 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
         </label>
         <label>
           <span>Queue · slots</span>
-          <input
+          <Input
             aria-label="Service queue limit"
             type="number"
             min={0}
@@ -105,7 +107,7 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
       </div>
       <label className="worker-count-field">
         <span>Workers</span>
-        <input
+        <Input
           aria-label="Service worker count"
           type="number"
           min={1}
@@ -122,12 +124,18 @@ export function ServiceModelEditor({ node }: { node: ModelNode }) {
         applied model
       </p>
       <div className="internal-edit-actions">
-        <button type="submit" disabled={!dirty}>
+        <Button type="submit" disabled={!dirty} size="sm">
           Apply changes
-        </button>
-        <button type="button" disabled={!dirty} onClick={resetDraft}>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!dirty}
+          onClick={resetDraft}
+        >
           Cancel
-        </button>
+        </Button>
       </div>
       <p className="internal-caption">
         Applying resets the run. Undo restores settings.
