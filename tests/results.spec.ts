@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openExample, componentNode } from "./openHelpers";
+import { openExample, componentNode, openWorkloads, openSavedRuns } from "./openHelpers";
 
 async function finishRun(page: import("@playwright/test").Page) {
   const runBtn = page.getByRole("button", { name: "Run", exact: true });
@@ -21,13 +21,19 @@ async function saveResult(page: import("@playwright/test").Page, name: string) {
 }
 
 async function openTutorial(page: import("@playwright/test").Page, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials", exact: true }).click();
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
-  await page.getByRole("button", { name: "Guided tutorials", exact: true }).click();
+  await modal.getByRole("button", { name: "Guided tutorials" }).click();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
-  await page.getByRole("button", { name: "Load example", exact: true }).click();
+  await page.getByRole("button", { name: "Load example" }).click();
   await expect(modal).toBeHidden();
   await page.waitForTimeout(200);
 }
@@ -41,6 +47,7 @@ test("saved cache comparison survives reopen and restores the exact model", asyn
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
 
   await openTutorial(page, "Relieve database pressure");
+  await openWorkloads(page);
   const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration", exact: true });
   await durationInput.fill("2");
 
@@ -83,10 +90,7 @@ test("saved cache comparison survives reopen and restores the exact model", asyn
   await page.reload();
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: /Saved runs/, exact: false }).click();
-  await expect(
-    page.getByRole("region", { name: "Saved experiment results", exact: true }),
-  ).toBeVisible();
+  await openSavedRuns(page);
 
   await page.getByRole("combobox", { name: "Compare result", exact: true }).selectOption({ label: "With cache" });
 
@@ -126,6 +130,7 @@ test("exports stored metrics with provenance and supports delete undo on mobile"
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
 
   await openExample(page, "Real-time chat");
+  await openWorkloads(page);
   const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration", exact: true });
   await durationInput.fill("2");
 
@@ -144,7 +149,7 @@ test("exports stored metrics with provenance and supports delete undo on mobile"
     page.getByText(/Project imported as a new local copy|Archive imported for inspection/),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: /Saved runs/, exact: false }).click();
+  await openSavedRuns(page);
   await expect(
     page.getByRole("region", { name: "Saved experiment results", exact: true }),
   ).toBeVisible();
@@ -189,7 +194,7 @@ test("saved results code loads only when the panel is opened", async ({ page }) 
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
   expect(modules).toHaveLength(0);
 
-  await page.getByRole("button", { name: /Saved runs/, exact: false }).click();
+  await openSavedRuns(page);
   await expect(page.getByRole("region", { name: "Saved experiment results" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Close saved results" })).toBeVisible();
   expect(modules.length).toBeGreaterThan(0);
@@ -263,7 +268,7 @@ test("read-only archive import displays archive banner and preserves original wh
   await page.reload();
   await expect(archiveBanner).toBeVisible();
   await expect(page.getByRole("button", { name: "Run", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: /Saved runs/ }).click();
+  await openSavedRuns(page);
   await page.getByRole("button", { name: "Close saved results" }).click();
   expect((await records()).find(p => p.id === original.id)).toEqual(original);
 

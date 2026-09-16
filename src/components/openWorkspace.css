@@ -63,6 +63,7 @@
   position: fixed;
   inset: 0;
   background: rgba(18, 30, 27, 0.45);
+  backdrop-filter: blur(4px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -144,12 +145,20 @@
 }
 
 .example-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
   text-align: left;
+  white-space: normal;
+  width: 100%;
+  box-sizing: border-box;
   background: transparent;
   border: 1px solid transparent;
   padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .example-list-item:hover {

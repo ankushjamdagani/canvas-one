@@ -9,7 +9,13 @@ export const subsystemNode = (page: Page, name?: string): Locator => {
 };
 
 export async function openExample(page: Page, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
@@ -32,4 +38,42 @@ export async function selectCanvasBox(page: Page, start: { x: number; y: number 
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 5 });
   await page.mouse.up();
+}
+
+export async function openWorkloads(page: Page): Promise<Locator> {
+  const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
+  if (!(await inspector.isVisible())) {
+    await page.getByRole("button", { name: "Workloads" }).click();
+    await expect(inspector).toBeVisible();
+  }
+  return inspector;
+}
+
+export async function openCatalog(page: Page): Promise<Locator> {
+  const drawer = page.getByRole("complementary", { name: "Component catalog" });
+  if (!(await drawer.isVisible())) {
+    await page.getByRole("button", { name: "Add component" }).first().click();
+    await expect(drawer).toBeVisible();
+  }
+  return drawer;
+}
+
+export async function openMetricsDetails(page: Page): Promise<Locator> {
+  const panel = page.locator(".open-metrics-panel");
+  if (!(await panel.isVisible())) {
+    await page.getByRole("button", { name: "Details" }).click();
+    await expect(panel).toBeVisible();
+  }
+  return panel;
+}
+
+export async function openSavedRuns(page: Page): Promise<Locator> {
+  const heading = page.getByRole("button", { name: /Saved runs/ });
+  if (!(await heading.first().isVisible())) {
+    await page.locator(".project-switch").click();
+  }
+  await page.getByRole("button", { name: /Saved runs/ }).first().click();
+  const panel = page.getByRole("region", { name: "Saved experiment results" });
+  await expect(panel).toBeVisible();
+  return panel;
 }

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { componentNode, openExample } from "./openHelpers";
+import { componentNode, openExample, openCatalog } from "./openHelpers";
 
 test("expansion shows the same live model and survives local reopen", async ({
   page,
@@ -50,6 +50,7 @@ test("expansion shows the same live model and survives local reopen", async ({
   await expect(reloadedDb.locator(".component-internals")).toBeVisible();
 
   // Add cache component from catalog and expand it
+  await openCatalog(page);
   await page.getByRole("textbox", { name: "Search components" }).fill("cache");
   const cacheItem = page.locator(".library-item").filter({ hasText: "Cache" });
   await expect(cacheItem).toBeVisible();

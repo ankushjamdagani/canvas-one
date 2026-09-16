@@ -1,14 +1,20 @@
 import { test, expect } from "@playwright/test";
-import { componentNode } from "./openHelpers";
+import { componentNode, openWorkloads, openMetricsDetails } from "./openHelpers";
 
 async function openTutorial(page: import("@playwright/test").Page, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials", exact: true }).click();
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
-  await page.getByRole("button", { name: "Guided tutorials", exact: true }).click();
+  await modal.getByRole("button", { name: "Guided tutorials" }).click();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
-  await page.getByRole("button", { name: "Load example", exact: true }).click();
+  await page.getByRole("button", { name: "Load example" }).click();
   await expect(modal).toBeHidden();
   await page.waitForTimeout(200);
 }
@@ -29,9 +35,7 @@ test("load-balanced router exposes editable instances and observed round-robin l
   const routerStrategy = inspector.locator("label:has-text('Routing Strategy') select");
   await expect(routerStrategy).toHaveValue("round-robin");
 
-  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 65 } });
-  const globalInspector = page.getByRole("complementary", { name: "System configuration inspector", exact: true });
-  await expect(globalInspector).toBeVisible();
+  const globalInspector = await openWorkloads(page);
   const durationInput = globalInspector.getByRole("spinbutton", { name: "Simulation Duration", exact: true });
   await durationInput.fill("2");
 
@@ -40,6 +44,7 @@ test("load-balanced router exposes editable instances and observed round-robin l
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeVisible({ timeout: 20000 });
 
+  await openMetricsDetails(page);
   const details = page.locator(".node-resource-details");
   await details.locator("summary").click();
 

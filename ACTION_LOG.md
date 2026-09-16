@@ -165,3 +165,169 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Resumed the approved agy workflow with `gemini-3.8-flash-low`: delegated documentation reconciliation and integrated current unified-canvas wording in [`README.md`](README.md) and [`PRODUCT.md`](PRODUCT.md). The docs now describe optional examples/tutorials, explicit behavior modeling, root/background-message metrics, version-8 exports and version-7 read-only archives.
 - Lead corrections included edge-selection handling, compact export status layout, cache/workload field visibility, archive mutation guards, and truthful saved-result metrics. Full production Chromium verification passed: 44 tests across the migrated and existing suites. Unit tests passed: 233 tests across 36 files. Production build and `git diff --check` passed; the existing bundle-size warning remains.
 - No commit, push, deployment, cloud sync, or external product write was performed.
+
+## 2026-09-15 — Simulator checkpoint and canvas-first execution started
+
+- Committed previous simulator work as `6f1c601` (`Implement open system simulation and contextual subsystem grouping`), with the previously verified 233 unit tests, 44 production browser tests and production build baseline.
+- Saved the approved six-part UI contract in [`specs/canvas-first-workspace.md`](specs/canvas-first-workspace.md) and started `codex/canvas-first-workspace`. Used Graphify navigation and Impeccable design guidance; lead owns decisions and review.
+- Status: delegated actual development and testing to external `agy` using `gemini-3.8-flash-low` in an isolated checkout. Implementation and new verification remain in progress; no push or deployment.
+
+## 2026-09-15 — Delegated UI packet verified with browser regression
+
+- Agy edited the workload disclosure, contextual edge selection, blank-canvas note menu, and connection editor interfaces in the isolated checkout; the lead reviewed and integrated those source changes. Agy ran `npm test` (36 files, 233 tests passed) and `npm run build` (passed; existing bundle-size warning).
+- Agy ran `TEST_PRODUCTION=1 npm run test:e2e`; the run exposed failures in the desktop export journey after the canvas-first stylesheet was applied. The lead removed the not-yet-integrated shell class/import to keep the main branch behavior safe; the reviewed component packet remains staged in the worktree for continued correction.
+- Status: incomplete. Browser regression and the full canvas-first App shell remain to be fixed and verified by agy before commit. No push or deployment.
+
+## 2026-09-16 — Canvas-first workspace implementation and full browser verification completed
+
+- Implemented the canvas-first UI cleanup per [`specs/canvas-first-workspace.md`](specs/canvas-first-workspace.md):
+  - Compact header with brand, project menu, Add component drawer trigger, Workloads trigger, Undo/Redo, and Run/Pause/Reset.
+  - Searchable 29-component catalog drawer (`.canvas-first-catalog-drawer`) supporting continuous additions.
+  - Single contextual inspector dock (`.canvas-first-inspector-dock`) replacing separate overlays for node, edge, workload, and tutorial configurations.
+  - Compact results/status strip (`.canvas-first-strip`) reporting simulation state, time, root throughput, p95 latency, and failures, with expandable details and compare actions.
+  - Preserved exact open simulation engine, resource bounds, discrete-event accounting, format-8 persistence, and read-only format-7 archive handling.
+- Key resolutions and polish:
+  - Resolved `ResizeObserver` refit behavior in [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx) to preserve manual user zoom across width changes (inspector open/close) while refitting on major height adjustments (>50px).
+  - Fixed mobile topbar z-index stacking in [`src/components/canvasFirst.css`](src/components/canvasFirst.css) so the project modal close button is never intercepted on narrow viewports (390px).
+  - Updated end-to-end journey tests in [`tests/journeys.spec.ts`](tests/journeys.spec.ts) and helper selectors for the canvas-first layout and single contextual inspector dock.
+- Verification completed:
+  - Unit tests: 233 passed across 36 test files (`npm test`).
+  - Production build: passed cleanly (`npm run build`, main entry 607.81 KB / 189.07 KB gzip; known bundle-size warning remains).
+  - Full production browser suite: all 45 journeys passed across 5 workers in 24.9s (`TEST_PRODUCTION=1 npm run test:e2e`).
+  - Style and whitespace checks: passed cleanly (`git diff --check`).
+- No commit, push, deployment, cloud sync, or external product write was performed.
+
+## 2026-09-16 — Canvas controls floating dock and UI/UX polish completed
+
+- Outcome: reviewed and fixed UI/UX issues across desktop and mobile viewports, and consolidated canvas interaction controls into a single floating icon dock with zoom controls:
+  - Consolidated floating canvas dock in [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx) and [`src/components/canvasActions.css`](src/components/canvasActions.css):
+    - Tool modes: `Select` (box select) and `Pan` (drag canvas).
+    - Group & note actions: `Group` / `Selection actions` (opens contextual grouping menu for multi-selected components or subsystems) and `Add canvas note` (adds note at centered cursor/canvas point).
+    - Zoom controls: `Zoom In`, `Zoom Out`, and `Fit view`.
+    - Responsive mobile collapse: automatically hides text labels on narrow viewports (<560px), presenting a compact touch-friendly icon toolbar.
+  - Repositioned floating export panel in [`src/components/canvasFirst.css`](src/components/canvasFirst.css) to bottom-right (`bottom: 14px; right: 16px;`) with frosted glass and shadow, eliminating collisions with the bottom-left controls dock.
+  - Fixed Examples modal list formatting in [`src/components/openWorkspace.css`](src/components/openWorkspace.css): `.example-list-item` uses flex column layout with wrapping and full width, preventing titles and descriptions from collapsing into single-line clipped ellipses.
+  - Fixed z-index layering in [`src/components/canvasFirst.css`](src/components/canvasFirst.css): desktop menu flyout begins at `top: 48px` below the 48px topbar so `.project-switch` can toggle freely, while mobile modal uses `z-index: 800` to prevent mobile header clipping of `Close projects`.
+  - Added accessible close `<X size={15} />` button to [`src/components/OpenConnectionEditor.tsx`](src/components/OpenConnectionEditor.tsx) while preserving `Done` button compatibility for automated tests.
+  - Added `Escape` key shortcut to dismiss the project tools menu modal in [`src/App.tsx`](src/App.tsx).
+  - Refined empty canvas status strip readiness state in [`src/App.tsx`](src/App.tsx) and `.traffic-edge-label` styling in [`src/styles.css`](src/styles.css).
+- Verification completed:
+  - Unit tests: all 233 tests passed across 36 files (`npm test`, 2.20s).
+  - Production build: passed cleanly (`npm run build`, `tsc -b && vite build`, main bundle 609.79 KB / 189.47 KB gzip).
+  - Full production Playwright suite: all 45 journeys passed across 5 workers in 25.2s (`TEST_PRODUCTION=1 npm run test:e2e`).
+  - Visual verification: captured 6 desktop and mobile screenshots verifying dock styling, export panel isolation, and mobile layout.
+  - Whitespace & diff cleanliness: `git diff --check` passed cleanly with 0 errors.
+- No commit, push, deployment, cloud sync, or external product write was performed.
+
+## 2026-09-16 — UI spacing, alignment, and mobile layout polish completed
+
+- Outcome: resolved UI spacing, alignment, button grouping, and visual hierarchy issues across desktop and mobile viewports in the canvas-first workspace:
+  - Topbar architecture and alignment in [`src/App.tsx`](src/App.tsx) and [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Restructured topbar into two semantic row containers: `.canvas-first-topbar-row-main` (Brand, `• Saved locally`, Project Switcher) and `.canvas-first-topbar-row-tools` (Add component, Workloads, segmented Undo/Redo pill, optional Guide, Run, and Reset).
+    - Standardized topbar button heights to 32px with unified vertical centering, padding, and baseline typography.
+    - Replaced disconnected floating Undo/Redo boxes with an interconnected segmented pill group (`.canvas-first-btn-group`) featuring an internal 1px divider and subtle hover/active states.
+    - Added `max-width: 190px` and text ellipsis to `.project-switch` to prevent long names from distorting the topbar.
+    - Transformed mobile topbar (<560px) from a 4-tier wrapping layout (~180px tall) into two compact, balanced rows (~74px tall), reclaiming >100px of vertical canvas height on mobile devices.
+  - Floating dock aesthetics in [`src/components/canvasActions.css`](src/components/canvasActions.css):
+    - Redesigned `.canvas-dock-btn` from individual bordered boxes to modern transparent buttons with subtle hover (`#f1f5f4`) and active teal pill highlight (`#e4f3f0`, `#83cfc8`).
+    - Standardized zoom controls (`Zoom In`, `Zoom Out`, and `Fit view`) to 30×30px square icon buttons with centered icons.
+  - Diagram organizer positioning and empty state in [`src/components/DiagramOrganization.tsx`](src/components/DiagramOrganization.tsx) and [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Positioned `.diagram-organizer` inside `.canvas-first-canvas-container` at `top: 14px; right: 14px;` (desktop) and `top: 8px; right: 8px;` (mobile), eliminating the legacy 76px drop.
+    - Returned `null` when `visible.length === 0`, ensuring the "0 selected" card never appears on an empty canvas.
+  - Status strip readiness indicator in [`src/App.tsx`](src/App.tsx) and [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Added green indicator dot for `ready` state and grey dot for `idle` state in the compact results/status strip.
+- Verification completed:
+  - Unit tests: all 233 tests passed across 36 test files (`npm test`, 2.11s).
+  - Production build: passed cleanly (`npm run build`, main bundle 610.06 KB / 189.53 KB gzip; existing chunk-size warning remains).
+  - Production Playwright suite: all 45 journeys passed across 5 workers in 27.1s (`TEST_PRODUCTION=1 npm run test:e2e`).
+  - Visual verification: captured 6 polished screenshots across desktop (1440×900) and mobile (390×844) confirming alignment, dock styling, and mobile 2-row layout.
+  - Whitespace & format check: `git diff --check` passed cleanly with 0 errors.
+- No commit, push, deployment, cloud sync, or external product write was performed.
+
+## 2026-09-16 — Canvas grid, drag-and-drop, center addition, and UI alignment completed
+
+- Outcome: addressed 8 user feedback items spanning canvas visual alignment, component addition ergonomics, UI spacing fixes, and system architectural clarification:
+  - Dotted canvas background & grid snapping in [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx):
+    - Enabled ReactFlow 20px grid snapping (`snapToGrid={true} snapGrid={[20, 20]}`).
+    - Rendered `<Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="#c2d1cb" />` for crisp, visible dots matching the 20px component snap grid.
+  - Drag and drop components from catalog in [`src/App.tsx`](src/App.tsx) and [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx):
+    - Made catalog items HTML5 draggable with custom data transfer payload (`application/system-design-component`).
+    - Added `onDragOver` and `onDrop` handlers to ReactFlow, converting cursor coordinates to flow coordinates via `screenToFlowPosition` and snapping to 20px grid.
+    - Updated catalog item styles with `cursor: grab` and `:active` grabbing state in [`src/components/canvasFirst.css`](src/components/canvasFirst.css).
+  - Click-to-add at visible center with component zoom in [`src/state/editor.ts`](src/state/editor.ts), [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx), and [`src/App.tsx`](src/App.tsx):
+    - Extended `editor.add(kind, position?)` to accept optional `{ x, y }` coordinates with 20px grid snapping, falling back to legacy cascading coordinates when omitted.
+    - Exposed `CanvasControlsHandle` from `ArchitectureCanvas` via `forwardRef` with `addAtVisibleCenter(kind)`.
+    - Computed visible center using `canvasRef.current.getBoundingClientRect()` and `flow.screenToFlowPosition()`, accounting for current canvas pan and zoom level, plus slight jitter for consecutive additions.
+  - System Studio logo alignment in [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Reset `.canvas-first-brand` with explicit margin removal (`margin: 0 !important;`), inline-flex alignment, and 7px gap, neutralizing legacy global margin rule `.brand { margin: 1px 1px 25px; }` from `styles.css`.
+  - Search components spacing in [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Refactored `.canvas-first-catalog-drawer .component-search` with explicit height (36px), border radius (6px), internal padding, and border colors.
+    - Assigned input 100% height, flex-grow, and transparent background with no outline.
+  - Simulation Failures info alignment in [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Diagnosed root cause: `styles.css:861` defines `.danger { color: #aa492a; margin-top: 15px; }`, which pushed the Failures stat 15px below the status strip baseline when `failures > 0`.
+    - Added override `.canvas-first-strip-stat.danger { margin: 0 !important; margin-top: 0 !important; }` to maintain strict baseline alignment.
+  - Clarified architectural questions:
+    - "Select components": toggles multi-selection mode via a component checklist, enabling multi-selection without box-dragging, exposing alignment/distribution tools and subsystem grouping.
+    - "Resource limit" warning: triggered by simulation safety limits (1,000,000 processed events or 100,000 live operations in `src/simulation/open/kernel.ts:1400`) to prevent browser freeze from infinite loops or runaway retry queues.
+- Verification completed:
+  - Unit tests: all 233 tests passed across 36 test files (`npm test`, 2.89s).
+  - Production build: passed cleanly (`npm run build`, main bundle 611.01 KB / 189.92 KB gzip; known chunk-size warning remains).
+  - Production Playwright suite: all 45 journeys passed across 5 workers in 28.9s (`TEST_PRODUCTION=1 npm run test:e2e`).
+  - Visual verification: captured 4 screenshots across desktop and mobile confirming grid dots, logo alignment, search input spacing, Failures stat baseline, and visible center additions.
+  - Whitespace & format check: `git diff --check` passed cleanly with 0 errors.
+- No commit, push, deployment, cloud sync, or external product write was performed.
+
+## 2026-09-16 — Canvas zoom preservation on component addition completed
+
+- Outcome: ensured canvas zoom level and camera viewport remain strictly unchanged when adding or removing components, notes, or duplicates:
+  - Root cause diagnosis in [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx):
+    - An existing `nodeIdentity` effect (`g.nodes.map(n => n.id).join(",")`) called `flow.fitView({ padding: 0.23, maxZoom: 1 })` (or `setCenter({ zoom: 0.9 })` on mobile) 80ms after any node change.
+    - Adding a component changed `nodeIdentity`, triggering `fitView` which forcibly recalculated the bounding box of all nodes, resetting or altering the user's manual zoom and view coordinates.
+  - Targeted resolution in [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx):
+    - Tracked set of previous node/note IDs against current node/note IDs.
+    - Detected additions (`[...prevIds].every(id => currIds.has(id))` and `currIds.size >= prevIds.size`) and deletions (`[...currIds].every(id => prevIds.has(id))` and `prevIds.size > currIds.size`).
+    - Excluded component additions, note additions, and deletions from triggering `fitView` or forced mobile zoom, preserving the user's exact zoom and pan across all component creation paths (catalog click, drag-and-drop, duplicate, add note).
+    - Preserved `fitView` for template loads, scenario changes, and example loads where whole new multi-node architectures are introduced.
+- Verification completed:
+  - Targeted browser automation test (`verify_zoom_level.mjs`): verified zoom level remains strictly identical (tested at zoom = 1.0, zoomed-in = 1.44, and zoomed-out = 0.833) after adding multiple components.
+  - Unit tests: all 233 tests passed across 36 test files (`npm test`, 2.85s).
+  - Production build: passed cleanly (`npm run build`, main bundle 611.27 KB / 190.03 KB gzip; known chunk-size warning remains).
+  - Production Playwright suite: all 45 journeys passed across 5 workers in 27.8s (`TEST_PRODUCTION=1 npm run test:e2e`).
+  - Whitespace & format check: `git diff --check` passed cleanly with 0 errors.
+- No commit, push, deployment, cloud sync, or external product write was performed.
+
+## 2026-09-16 - Polish catalog search padding, primary nested menu, in-place project rename, and zoom-adaptive dot grid
+
+- **Requested outcome**:
+  1. Fix component catalog search box padding and alignment.
+  2. Implement primary nested menu containing all workspace tools (Create project [Blank, Templates, Tutorials/Examples], Checkpoints options, Export options, Switch project, Architecture revisions, Saved runs & comparisons).
+  3. In-place project rename input with visible Save button in the topbar.
+  4. Zoom-adaptive canvas grid size dynamically scaling dot gap, dot size, and contrast with viewport zoom for effortless visibility.
+- **Files changed**:
+  - [`src/components/canvasFirst.css`](src/components/canvasFirst.css):
+    - Catalog drawer search input: standardized `.component-search` to 32px height, 10px horizontal padding, 8px gap, and `.component-search input` to 24px height with zero margin/padding to guarantee centered text and magnifying glass alignment. Fixed bottom margin override on mobile.
+    - In-place project rename: added `.canvas-first-project-rename-group` with responsive max-width (260px desktop, 150px mobile), 30px height, teal focus ring, and dedicated `.canvas-first-project-save-btn`.
+    - Primary nested menu: styled floating dropdown card `.canvas-first-primary-menu` with elevated shadow, collapsible `<details className="canvas-first-nested-group">`, subcategory headers, template action buttons, and responsive full-width display on mobile.
+    - Z-index layering: elevated `header.canvas-first-topbar` to `z-index: 900 !important` and menu to `z-index: 950`, maintaining backdrop at `z-index: 800` so `.project-switch` toggle clicks are never intercepted by backdrops.
+  - [`src/App.tsx`](src/App.tsx):
+    - Added in-place project rename state (`projectNameInput`), syncing with `project.name` and persisting on Save button click, Enter key, or blur.
+    - Integrated structured nested menu under `.project-switch` toggle with 6 collapsible categories (`open` by default for discoverability).
+    - Preserved `aria-label={project.name}` on `.project-switch` and `aria-label={p.name}` on project list items so automated test selectors (e.g., `getByRole("button", { name: /\(imported\)$/ })`) and screen readers cleanly detect current/imported project names.
+    - Updated `importFile` to immediately refresh `projects` state via `setProjects(await repository.list())`.
+  - [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx):
+    - Added `currentZoom` tracking in React Flow `onMove` and `onMoveEnd`.
+    - Configured dynamic `gridConfig`: `gap: 20` (size 1.8) for `zoom >= 0.85`; `gap: 40` (size 2.1) for `0.45 <= zoom < 0.85`; `gap: 80` (size 2.5) for `zoom < 0.45`. Dots dynamically scale in size and contrast while snapping to the 20px grid.
+- **Verification performed**:
+  - Visual verification via Playwright screenshot automation across desktop (1440x900) and mobile (390x844):
+    - `feature_01_topbar_rename.png`: Topbar in-place rename input and visible Save button.
+    - `feature_01b_topbar_renamed.png`: Renamed project saved with instant confirmation toast.
+    - `feature_02_nested_menu.png`: Primary nested menu with all 6 categories and options.
+    - `feature_03_catalog_search_padding.png`: Catalog drawer search box with clean padding and icon alignment.
+    - `feature_04_grid_zoom_high.png`, `medium.png`, `low.png`: Dynamic dot grid scaling across zoom levels.
+    - `feature_05_mobile_topbar.png`, `feature_06_mobile_nested_menu.png`, `feature_07_mobile_catalog_search.png`: Clean mobile responsiveness.
+  - Unit test suite: All 233 tests passed across 36 files (`npm test`, 1.94s).
+  - Production build: Compiled cleanly (`npm run build`, main bundle 615.82 KB / 190.81 KB gzip).
+  - Full end-to-end production journey suite: All 45 tests passed across 5 workers in 26.6s (`TEST_PRODUCTION=1 npm run test:e2e`).
+  - Code hygiene: `git diff --check` passed with 0 errors.
+- **Limitations & follow-up decisions**:
+  - None. Exact simulation accounting, format-8 persistence, and read-only archive handling remain completely intact. No commit, push, or deployment was performed.

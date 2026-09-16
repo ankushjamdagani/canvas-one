@@ -1,12 +1,18 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "fs";
-import { componentNode } from "./openHelpers";
+import { componentNode, openWorkloads, openMetricsDetails } from "./openHelpers";
 
 async function openTutorial(page: any, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
-  await page.getByRole("button", { name: "Guided tutorials" }).click();
+  await modal.getByRole("button", { name: "Guided tutorials" }).click();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
   await page.getByRole("button", { name: "Load example" }).click();
@@ -20,6 +26,7 @@ test.describe("Job burst and retry behavior", () => {
     await openTutorial(page, "Absorb a job burst");
 
     // Shorten duration to 2s
+    await openWorkloads(page);
     const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration" });
     await durationInput.fill("2");
 
@@ -38,6 +45,7 @@ test.describe("Job burst and retry behavior", () => {
     await expect(page.getByRole("button", { name: "Replay" })).toBeVisible({ timeout: 20000 });
 
     // Root requests and background messages are tracked in the metrics cards
+    await openMetricsDetails(page);
     const metricsPanel = page.locator(".open-metrics-panel");
     await expect(metricsPanel).toBeVisible();
 
@@ -61,6 +69,7 @@ test.describe("Job burst and retry behavior", () => {
     await openTutorial(page, "Understand retry cost");
 
     // Shorten duration to 2s
+    await openWorkloads(page);
     const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration" });
     await durationInput.fill("2");
 
@@ -83,6 +92,7 @@ test.describe("Job burst and retry behavior", () => {
     await expect(page.getByRole("button", { name: "Replay" })).toBeVisible({ timeout: 20000 });
 
     // Check node breakdown for retries counter
+    await openMetricsDetails(page);
     const details = page.locator(".node-resource-details");
     await details.locator("summary").click();
     const workerRow = details.locator("tr").filter({ hasText: "Job worker" });

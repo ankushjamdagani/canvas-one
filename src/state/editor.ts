@@ -68,7 +68,7 @@ interface Editor {
   change: (fn: (g: Graph) => void) => void;
   updateNode: (id: string, patch: Partial<ModelNode>) => void;
   settings: (patch: Partial<Settings>) => void;
-  add: (kind: ComponentKind) => boolean | void;
+  add: (kind: ComponentKind, position?: { x: number; y: number }) => boolean | void;
   duplicateNode: (id: string) => boolean;
   generateTraffic: (id: string) => boolean;
   updateWorkload: (id: string, patch: Partial<WorkloadDefinition>) => void;
@@ -535,16 +535,20 @@ export const useEditor = create<Editor>((rawSet, get) => {
       get().change((g) => { id = addServiceInstance(g)?.id; });
       if (id) get().select(id);
     },
-    add: (kind) => {
+    add: (kind, position) => {
       if (get().readOnly) return false;
       const graph = get().project.graph;
+      const defaultX = 220 + graph.nodes.length * 35;
+      const defaultY = 350;
+      const posX = position ? Math.round(position.x / 20) * 20 : defaultX;
+      const posY = position ? Math.round(position.y / 20) * 20 : defaultY;
       if (isOpenGraph(graph)) {
         if (graph.nodes.length >= 100) return false;
         if (kind === "traffic" && (graph.workloads?.length ?? 0) >= 20) return false;
         const node = makeOpenNode(
           kind,
-          220 + graph.nodes.length * 35,
-          350,
+          posX,
+          posY,
         );
         get().change((g) => {
           g.nodes.push(node);
@@ -562,8 +566,8 @@ export const useEditor = create<Editor>((rawSet, get) => {
       if (kind === "service" && hasBalancer(get().project.graph)) { get().addServiceInstance(); return; }
       const node = makeNode(
         kind,
-        220 + get().project.graph.nodes.length * 35,
-        350,
+        posX,
+        posY,
       );
       get().change((g) => {
         g.nodes.push(node);

@@ -8,7 +8,21 @@ import { OpenWorkloadControls } from './OpenWorkloadControls';
 import { NoteInspector } from './CanvasNotes';
 import './openInspector.css';
 
-export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
+import { X } from 'lucide-react';
+
+export interface OpenInspectorProps {
+  metrics: Metrics | null;
+  mode?: 'selection' | 'workloads';
+  onOpenWorkloads?: () => void;
+  onClose?: () => void;
+}
+
+export function OpenInspector({
+  metrics,
+  mode = 'selection',
+  onOpenWorkloads,
+  onClose,
+}: OpenInspectorProps) {
   const editor = useEditor();
   const readOnly = editor.readOnly;
   const project = editor.project;
@@ -17,6 +31,58 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
   const selectedNodeIds = editor.selectedNodeIds;
 
   const [behaviorTypeChangeError, setBehaviorTypeChangeError] = useState<string | null>(null);
+
+  const renderGlobalWorkloads = (title: string) => (
+    <aside className="inspector open-inspector-container" aria-label="System configuration inspector">
+      <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <strong>{title}</strong>
+        {onClose && (
+          <button
+            type="button"
+            aria-label="Close inspector"
+            className="subtle"
+            style={{ padding: '4px', border: 0 }}
+            onClick={onClose}
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+      <fieldset disabled={readOnly} className="open-inspector-fieldset">
+        <div className="inspector-body">
+          <div className="open-inspector-section">
+            <span className="open-inspector-section-title">Execution Settings</span>
+            <NumberField
+              label="Simulation Duration"
+              unit="s"
+              value={graph.settings.duration}
+              min={1}
+              max={300}
+              onChange={(val) => editor.settings({ duration: val })}
+            />
+
+            <NumberField
+              label="Random Seed"
+              value={graph.settings.seed}
+              min={0}
+              max={4294967295}
+              onChange={(val) => editor.settings({ seed: val })}
+            />
+          </div>
+
+          <OpenWorkloadControls
+            workloads={graph.workloads ?? []}
+            readOnly={readOnly}
+          />
+        </div>
+      </fieldset>
+    </aside>
+  );
+
+  // When mode is workloads, render global duration, seed, and all workloads regardless of selection
+  if (mode === 'workloads') {
+    return renderGlobalWorkloads('System Configuration & Workloads');
+  }
 
   // Note selected
   if (selectedId && graph.notes?.some((n) => n.id === selectedId)) {
@@ -33,8 +99,19 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
   if (subsystem) {
     return (
       <aside className="inspector open-inspector-container" aria-label="Subsystem inspector">
-        <div className="inspector-heading">
+        <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong>Subsystem: {subsystem.name}</strong>
+          {onClose && (
+            <button
+              type="button"
+              aria-label="Close inspector"
+              className="subtle"
+              style={{ padding: '4px', border: 0 }}
+              onClick={onClose}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
         <div className="inspector-body">
           <div className="open-inspector-section">
@@ -45,6 +122,28 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
             <p className="open-inspector-help-text">
               Right-click the subsystem shell on the canvas to expand, collapse, or dissolve this group.
             </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+              <button
+                type="button"
+                className="open-inspector-btn"
+                onClick={() => editor.toggleSubsystem(subsystem.id)}
+                aria-label={`${subsystem.collapsed ? "Expand" : "Collapse"} subsystem ${subsystem.name}`}
+              >
+                {subsystem.collapsed ? "Expand subsystem" : "Collapse subsystem"}
+              </button>
+              <button
+                type="button"
+                className="open-inspector-btn danger"
+                disabled={readOnly}
+                onClick={() => {
+                  editor.dissolveSubsystem(subsystem.id);
+                  onClose?.();
+                }}
+                aria-label={`Ungroup ${subsystem.name}`}
+              >
+                Ungroup
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -55,8 +154,19 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
   if (selectedNodeIds.length > 1) {
     return (
       <aside className="inspector open-inspector-container" aria-label="Multiple selection inspector">
-        <div className="inspector-heading">
+        <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong>{selectedNodeIds.length} Components Selected</strong>
+          {onClose && (
+            <button
+              type="button"
+              aria-label="Close inspector"
+              className="subtle"
+              style={{ padding: '4px', border: 0 }}
+              onClick={onClose}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
         <div className="inspector-body">
           <div className="open-inspector-section">
@@ -148,7 +258,9 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
     };
 
     const handleGenerateTraffic = () => {
-      if (!editor.generateTraffic(selectedNode.id)) {
+      if (editor.generateTraffic(selectedNode.id)) {
+        onOpenWorkloads?.();
+      } else {
         setBehaviorTypeChangeError('Unable to generate traffic: workload limit (20) reached.');
       }
     };
@@ -156,8 +268,21 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
     return (
       <aside className="inspector open-inspector-container" aria-label="Component inspector">
         <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <strong>{selectedNode.name}</strong>
-          <span className="open-inspector-behavior-badge">{behavior.type}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
+            <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedNode.name}</strong>
+            <span className="open-inspector-behavior-badge">{behavior.type}</span>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              aria-label="Close inspector"
+              className="subtle"
+              style={{ padding: '4px', border: 0, flexShrink: 0 }}
+              onClick={onClose}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         <fieldset disabled={readOnly} className="open-inspector-fieldset">
@@ -432,12 +557,14 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
               </div>
             )}
 
-            {/* Workloads for this node */}
-            <OpenWorkloadControls
-              workloads={graph.workloads ?? []}
-              filterNodeId={selectedNode.id}
-              readOnly={readOnly}
-            />
+            {/* Workloads for this node (hidden when dedicated workloads panel/callback provided) */}
+            {!onOpenWorkloads && (
+              <OpenWorkloadControls
+                workloads={graph.workloads ?? []}
+                filterNodeId={selectedNode.id}
+                readOnly={readOnly}
+              />
+            )}
 
             {/* Inline Actions */}
             <div className="open-inspector-actions">
@@ -473,39 +600,5 @@ export function OpenInspector({ metrics }: { metrics: Metrics | null }) {
   }
 
   // Nothing selected: Global System & Workloads Inspector
-  return (
-    <aside className="inspector open-inspector-container" aria-label="System configuration inspector">
-      <div className="inspector-heading">
-        <strong>System Configuration</strong>
-      </div>
-      <fieldset disabled={readOnly} className="open-inspector-fieldset">
-        <div className="inspector-body">
-          <div className="open-inspector-section">
-            <span className="open-inspector-section-title">Execution Settings</span>
-            <NumberField
-              label="Simulation Duration"
-              unit="s"
-              value={graph.settings.duration}
-              min={1}
-              max={300}
-              onChange={(val) => editor.settings({ duration: val })}
-            />
-
-            <NumberField
-              label="Random Seed"
-              value={graph.settings.seed}
-              min={0}
-              max={4294967295}
-              onChange={(val) => editor.settings({ seed: val })}
-            />
-          </div>
-
-          <OpenWorkloadControls
-            workloads={graph.workloads ?? []}
-            readOnly={readOnly}
-          />
-        </div>
-      </fieldset>
-    </aside>
-  );
+  return renderGlobalWorkloads('System Configuration');
 }

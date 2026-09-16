@@ -1,12 +1,18 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "fs";
-import { componentNode } from "./openHelpers";
+import { componentNode, openWorkloads, openMetricsDetails } from "./openHelpers";
 
-async function openTutorial(page: any, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+async function openTutorial(page: import("@playwright/test").Page, title: string) {
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
-  await page.getByRole("button", { name: "Guided tutorials" }).click();
+  await modal.getByRole("button", { name: "Guided tutorials" }).click();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
   await page.getByRole("button", { name: "Load example" }).click();
@@ -20,6 +26,7 @@ test.describe("Cache behavior and pressure", () => {
     await openTutorial(page, "Relieve database pressure");
 
     // Shorten duration to 2s for fast test execution
+    await openWorkloads(page);
     const durationInput = page.getByRole("spinbutton", { name: "Simulation Duration" });
     await durationInput.fill("2");
 
@@ -30,6 +37,7 @@ test.describe("Cache behavior and pressure", () => {
     await expect(page.getByRole("button", { name: "Replay" })).toBeVisible({ timeout: 20000 });
 
     // Open node resource breakdown details
+    await openMetricsDetails(page);
     const details = page.locator(".node-resource-details");
     await details.locator("summary").click();
 

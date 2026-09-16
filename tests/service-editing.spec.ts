@@ -1,14 +1,20 @@
 import { expect, test } from "@playwright/test";
-import { componentNode } from "./openHelpers";
+import { componentNode, openWorkloads, openSavedRuns } from "./openHelpers";
 
 async function openGuidedTutorial(page: import("@playwright/test").Page, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials", exact: true }).click();
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
-  await page.getByRole("button", { name: "Guided tutorials", exact: true }).click();
+  await modal.getByRole("button", { name: "Guided tutorials" }).click();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
-  await page.getByRole("button", { name: "Load example", exact: true }).click();
+  await page.getByRole("button", { name: "Load example" }).click();
   await expect(modal).toBeHidden();
   await page.waitForTimeout(200);
 }
@@ -21,9 +27,7 @@ test("service parameters edit immediately, undo redo, persist in project export 
 
   await openGuidedTutorial(page, "Scale service instances");
 
-  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 65 } });
-  const globalInspector = page.getByRole("complementary", { name: "System configuration inspector", exact: true });
-  await expect(globalInspector).toBeVisible();
+  const globalInspector = await openWorkloads(page);
   const durationInput = globalInspector.getByRole("spinbutton", { name: "Simulation Duration", exact: true });
   await durationInput.fill("2");
 
@@ -71,7 +75,7 @@ test("service parameters edit immediately, undo redo, persist in project export 
   await capacity.fill("300");
   await expect(capacity).toHaveValue("300");
 
-  await page.getByRole("button", { name: /Saved runs/, exact: false }).click();
+  await openSavedRuns(page);
   await expect(resultsPanel).toBeVisible();
   await resultsPanel.getByRole("combobox", { name: "Compare result", exact: true }).selectOption({ label: "Inline service model" });
   await resultsPanel.getByRole("button", { name: "Restore this model", exact: true }).click();

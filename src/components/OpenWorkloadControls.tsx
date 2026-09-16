@@ -62,42 +62,68 @@ export function OpenWorkloadControls({
           const entryName = entryNode ? entryNode.name : 'Unknown Node';
           const isPoisson = wl.intervalMs === undefined;
 
+          const arrivalSummary = isPoisson
+            ? wl.profile?.kind === 'burst'
+              ? `Burst: ${wl.rate} → ${wl.profile.peakRate} req/s`
+              : wl.profile?.kind === 'ramp'
+                ? `Ramp: ${wl.rate} → ${wl.profile.endRate} req/s`
+                : `${wl.rate} req/s steady`
+            : `Every ${wl.intervalMs ?? 1000}ms fixed`;
+
           return (
-            <div key={wl.id} className="open-workload-card">
-              <div className="open-workload-header">
-                <span className="open-workload-title">
-                  Workload {idx + 1}: {entryName}
-                </span>
-                {!readOnly && (
-                  <button
-                    type="button"
-                    className="open-inspector-btn danger"
-                    onClick={() => editor.removeWorkload(wl.id)}
-                    style={{ padding: '2px 6px', fontSize: '11px' }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
+            <details key={wl.id} className="open-workload-card" open>
+              <summary>
+                <div className="open-workload-summary-inner">
+                  <div className="open-workload-title-row">
+                    <span className="open-workload-chevron" aria-hidden="true">▶</span>
+                    <span className="open-workload-title">
+                      Workload {idx + 1}: {entryName}
+                    </span>
+                  </div>
+                  <div className="open-workload-summary-meta">
+                    <span className={`open-workload-badge ${wl.enabled ? 'enabled' : 'disabled'}`}>
+                      {wl.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <span className="open-workload-arrival-text">{arrivalSummary}</span>
+                  </div>
+                </div>
+              </summary>
 
-              <label className="field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="checkbox"
-                  checked={wl.enabled}
-                  disabled={readOnly}
-                  onChange={(e) => editor.updateWorkload(wl.id, { enabled: e.target.checked })}
-                />
-                <span>Enabled</span>
-              </label>
+              <div className="open-workload-fields">
+                <div className="open-workload-header">
+                  <span className="open-workload-title" style={{ fontSize: '11px', color: '#677773' }}>
+                    Parameters & Settings
+                  </span>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      className="open-inspector-btn danger"
+                      onClick={() => editor.removeWorkload(wl.id)}
+                      style={{ padding: '2px 6px', fontSize: '11px' }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
 
-              {!filterNodeId && (
-                <label className="field">
-                  <span>Entry Node</span>
-                  <select
-                    value={wl.entryNodeId}
+                <label className="field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={wl.enabled}
                     disabled={readOnly}
-                    onChange={(e) => editor.updateWorkload(wl.id, { entryNodeId: e.target.value })}
-                  >
+                    onChange={(e) => editor.updateWorkload(wl.id, { enabled: e.target.checked })}
+                  />
+                  <span>Enabled</span>
+                </label>
+
+                {!filterNodeId && (
+                  <label className="field">
+                    <span>Entry Node</span>
+                    <select
+                      value={wl.entryNodeId}
+                      disabled={readOnly}
+                      onChange={(e) => editor.updateWorkload(wl.id, { entryNodeId: e.target.value })}
+                    >
                     {nodes.map((n) => (
                       <option key={n.id} value={n.id}>
                         {n.name}
@@ -465,8 +491,9 @@ export function OpenWorkloadControls({
                 ))}
               </div>
             </div>
-          );
-        })
+          </details>
+        );
+      })
       )}
     </div>
   );

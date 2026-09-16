@@ -1,8 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { componentNode } from "./openHelpers";
+import { componentNode, openWorkloads } from "./openHelpers";
 
 async function openTutorial(page: import("@playwright/test").Page, title: string) {
-  await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  const directBtn = page.getByRole("button", { name: "Examples & tutorials" });
+  if (await directBtn.first().isVisible()) {
+    await directBtn.first().click();
+  } else {
+    await page.locator(".project-switch").click();
+    await page.getByRole("button", { name: "Examples & tutorials" }).click();
+  }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
   await modal.getByRole("button", { name: "Guided tutorials" }).click();
@@ -27,15 +33,13 @@ test("guided experiments load real models, explain observed outcomes and follow 
     coach.getByRole("heading", { name: "Understand retry cost", exact: true }),
   ).toBeVisible();
 
-  // Deselect node to view system settings inspector and set run duration
-  await page.locator(".react-flow__pane").click({ position: { x: 10, y: 60 } });
-  const sysInspector = page.getByRole("complementary", {
-    name: "System configuration inspector",
-  });
-  await expect(sysInspector).toBeVisible();
+  // Open system settings inspector to set run duration
+  const sysInspector = await openWorkloads(page);
   await sysInspector
     .getByRole("spinbutton", { name: "Simulation Duration", exact: true })
     .fill("2");
+
+  await page.getByRole("button", { name: "Show experiment guide", exact: true }).click();
 
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByRole("button", { name: "Replay", exact: true })).toBeVisible({

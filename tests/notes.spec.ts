@@ -32,6 +32,7 @@ test("authors, edits, deletes and restores a canvas note", async ({ page }) => {
   await expect(page.getByLabel("Decision: Use an edge cache")).toBeVisible();
   await expect(page.getByText("Linked to Storefront", { exact: true })).toBeVisible();
   const noteCard = page.getByLabel("Decision: Use an edge cache");
+  await noteCard.click();
   const beforeDrag = await noteCard.boundingBox();
   await page.mouse.move(beforeDrag!.x + beforeDrag!.width / 2, beforeDrag!.y + beforeDrag!.height / 2);
   await page.mouse.down();

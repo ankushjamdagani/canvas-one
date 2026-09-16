@@ -35,8 +35,8 @@ test("diagram SVG and PNG downloads contain the entire current subsystem view wi
   }
   expect(offscreen).toBe(true);
   await page.locator(".react-flow__node-component").filter({ hasText: "Event producer" }).click();
-  const viewport = await page.locator(".react-flow__viewport").evaluate((element) => (element as HTMLElement).style.transform);
   await expect(page.getByText("1 selected", { exact: true })).toBeVisible();
+  const viewport = await page.locator(".react-flow__viewport").evaluate((element) => (element as HTMLElement).style.transform);
 
 
   const svgDownload = await downloadFrom(page, "Download SVG");

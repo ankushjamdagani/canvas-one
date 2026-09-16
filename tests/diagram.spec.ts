@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { componentNode, openExample } from "./openHelpers";
+import { componentNode, openExample, openCatalog } from "./openHelpers";
 
 async function clickFirstEdge(page: Page) {
   await page.locator(".react-flow").scrollIntoViewIfNeeded();
@@ -25,6 +25,7 @@ test("open system offers searchable components and editable responsibilities", a
   await page.goto("/");
   await page.locator(".react-flow").waitFor({ state: "visible" });
 
+  await openCatalog(page);
   await page.getByRole("textbox", { name: "Search components" }).fill("storage");
   const storageItem = page.locator(".library-item").filter({ hasText: "Object storage" });
   await expect(storageItem).toBeVisible();
@@ -70,6 +71,7 @@ test("architecture component palette remains usable on mobile", async ({ page })
   await connEditor.getByRole("combobox", { name: "Transport" }).selectOption("message");
   await connEditor.getByRole("button", { name: "Done" }).click();
 
+  await openCatalog(page);
   await page.getByRole("textbox", { name: "Search components" }).fill("queue");
   await expect(
     page.locator(".library-item").filter({ hasText: "Message queue" }),
@@ -87,6 +89,7 @@ test("open system enforces its component boundary before becoming invalid", asyn
   await page.goto("/");
   await page.locator(".react-flow").waitFor({ state: "visible" });
 
+  await openCatalog(page);
   await page.getByRole("textbox", { name: "Search components" }).fill("storage");
   const add = page.locator(".library-item").filter({ hasText: "Object storage" });
   await expect(add).toBeVisible();
@@ -105,6 +108,7 @@ test("custom components keep their type and duplicate without connections", asyn
   await page.goto("/");
   await page.locator(".react-flow").waitFor({ state: "visible" });
 
+  await openCatalog(page);
   await page.getByRole("textbox", { name: "Search components" }).fill("custom");
   const addCustom = page.locator(".library-item").filter({ hasText: "Custom component" });
   await expect(addCustom).toBeVisible();
@@ -141,6 +145,7 @@ test("custom component controls and long content stay contained on mobile", asyn
   await page.goto("/");
   await page.locator(".react-flow").waitFor({ state: "visible" });
 
+  await openCatalog(page);
   await page.getByRole("textbox", { name: "Search components" }).fill("custom");
   const addCustom = page.locator(".library-item").filter({ hasText: "Custom component" });
   await expect(addCustom).toBeVisible();
@@ -221,19 +226,24 @@ test("architecture templates load editable graphs and preserve them locally and 
   await inspector.getByRole("button", { name: "Duplicate Node" }).click();
   await expect(inspector.getByRole("textbox", { name: "Name", exact: true }).first()).toHaveValue("Sensor fleet copy");
 
+  await page.locator(".project-switch").click();
   await page.getByRole("textbox", { name: "Checkpoint name" }).fill("Event template edited");
   await page.getByRole("button", { name: "Save checkpoint" }).click();
+  await page.locator(".project-switch").click();
   await expect(page.getByText("Saved locally", { exact: true })).toBeVisible();
 
   await page.reload();
   await expect(componentNode(page, "Sensor fleet copy")).toBeVisible();
+  await page.locator(".project-switch").click();
   await expect(
     page.getByRole("button", { name: "Event template edited", exact: true }),
   ).toBeVisible();
 
   const copyNode = componentNode(page, "Sensor fleet copy");
+  await page.locator(".project-switch").click();
   await copyNode.click();
   await inspector.getByRole("textbox", { name: "Name", exact: true }).first().fill("Changed after checkpoint");
+  await page.locator(".project-switch").click();
   await page.getByRole("button", { name: "Event template edited", exact: true }).click();
   await expect(componentNode(page, "Sensor fleet copy")).toBeVisible();
   await expect(componentNode(page, "Changed after checkpoint")).toHaveCount(0);

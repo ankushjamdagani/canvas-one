@@ -3,10 +3,11 @@ import { hasBalancer, serviceInstances } from "../domain/routing";
 import { visibleSubsystems } from "../domain/subsystems";
 import { SubsystemNode } from "./SubsystemNode";
 import { projectSubsystems } from "./subsystemProjection";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   Handle,
   Position,
@@ -35,9 +36,10 @@ import {
   MonitorSmartphone, Smartphone, RadioTower, Globe2, ShieldCheck, Waypoints, Braces,
   Boxes, CalendarClock, FileStack, Search, Warehouse, Radio, BellRing, Activity,
   ChartNoAxesCombined, KeyRound, PlugZap, MousePointer, Hand,
+  StickyNote, Plus, Minus, Maximize2, CheckSquare2,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
-import { isDiagramGraph, isOpenGraph, supportsFreeCanvas, totalCapacity, type ModelNode, type Settings } from "../domain/model";
+import { isDiagramGraph, isOpenGraph, supportsFreeCanvas, totalCapacity, type ComponentKind, type ModelNode, type Settings } from "../domain/model";
 import { rateAt } from "../domain/workload";
 import { ComponentInternals } from "./ComponentInternals";
 import type { Metrics } from "../simulation/engine";
@@ -192,13 +194,23 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
 }
 const nodeTypes = { component: ComponentNode, subsystem: SubsystemNode, note: CanvasNoteNode };
 const edgeTypes = { traffic: TrafficEdge };
-export function ArchitectureCanvas({
-  metrics,
-  running,
-}: {
+export interface CanvasControlsHandle {
+  addAtVisibleCenter: (kind: ComponentKind) => void;
+}
+
+export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
   metrics: Metrics | null;
   running: boolean;
-}) {
+  selectedEdgeId?: string | null;
+  onSelectedEdgeChange?: (id: string | null) => void;
+  onCanvasClear?: () => void;
+}>(function ArchitectureCanvas({
+  metrics,
+  running,
+  selectedEdgeId,
+  onSelectedEdgeChange,
+  onCanvasClear,
+}, ref) {
   const editor = useEditor(),
     g = editor.project.graph;
   const groups = visibleSubsystems(editor.project);
@@ -207,6 +219,47 @@ export function ArchitectureCanvas({
   const [contextMenuTarget, setContextMenuTarget] = useState<ContextMenuTarget | null>(null);
   const [dragMode, setDragMode] = useState<"select" | "pan">("select");
   const isFree = supportsFreeCanvas(g);
+
+  useImperativeHandle(ref, () => ({
+    addAtVisibleCenter: (kind: ComponentKind) => {
+      const box = canvasRef.current?.getBoundingClientRect();
+      if (!box) {
+        editor.add(kind);
+        return;
+      }
+      const screenCenter = {
+        x: box.left + box.width / 2,
+        y: box.top + box.height / 2,
+      };
+      const flowPos = flow.screenToFlowPosition(screenCenter);
+      const count = editor.project.graph.nodes.length;
+      const offset = (count % 6) * 20;
+      const snapped = {
+        x: Math.round((flowPos.x - 107 + offset) / 20) * 20,
+        y: Math.round((flowPos.y - 39 + offset) / 20) * 20,
+      };
+      editor.add(kind, snapped);
+    },
+  }));
+
+  const onDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    const kind = event.dataTransfer.getData("application/system-design-component") as ComponentKind;
+    if (!kind) return;
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    const position = flow.screenToFlowPosition({ x: clientX, y: clientY });
+    const snapped = {
+      x: Math.round((position.x - 107) / 20) * 20,
+      y: Math.round((position.y - 39) / 20) * 20,
+    };
+    editor.add(kind, snapped);
+  };
 
   useEffect(() => {
     setContextMenuTarget(null);
@@ -279,8 +332,8 @@ export function ArchitectureCanvas({
       const size = entry.contentRect;
       if (
         (previous &&
-          (Math.abs(size.width - previous.width) > 1 ||
-            Math.abs(size.height - previous.height) > 1)) ||
+          (Math.abs(size.height - previous.height) > 50 ||
+            (initialFit.current && Math.abs(size.width - previous.width) > 1))) ||
         (!previous &&
           editor.project.viewport.canvasHeight !== undefined &&
           Math.abs(editor.project.viewport.canvasHeight - size.height) > 1)
@@ -328,7 +381,23 @@ export function ArchitectureCanvas({
       editor.project.viewport.y === 0 &&
       editor.project.viewport.zoom === 1,
   );
+  useEffect(() => {
+    initialFit.current =
+      editor.project.viewport.x === 0 &&
+      editor.project.viewport.y === 0 &&
+      editor.project.viewport.zoom === 1;
+  }, [editor.project.id]);
   const mobile = window.innerWidth <= 560;
+  const [currentZoom, setCurrentZoom] = useState(editor.project.viewport.zoom ?? 1);
+  const gridConfig = useMemo(() => {
+    if (currentZoom >= 0.85) {
+      return { gap: 20, size: 1.8, color: "#8fa49c" };
+    }
+    if (currentZoom >= 0.45) {
+      return { gap: 40, size: 2.1, color: "#829890" };
+    }
+    return { gap: 80, size: 2.5, color: "#748a82" };
+  }, [currentZoom]);
   const [pageVisible, setPageVisible] = useState(!document.hidden);
   useEffect(() => {
     const update = () => setPageVisible(!document.hidden);
@@ -357,7 +426,18 @@ export function ArchitectureCanvas({
   }, [expandedKey, flow]);
   const nodeIdentity = [...g.nodes, ...(supportsFreeCanvas(g) ? g.notes ?? [] : [])].map((node) => node.id).join(",");
   const nodeSet = useRef(nodeIdentity);
-  const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
+  const [localSelectedEdges, setLocalSelectedEdges] = useState<string[]>([]);
+  const selectedEdges = onSelectedEdgeChange
+    ? (selectedEdgeId ? [selectedEdgeId] : [])
+    : localSelectedEdges;
+  const setSelectedEdges = (updater: string[] | ((prev: string[]) => string[])) => {
+    if (onSelectedEdgeChange) {
+      const next = typeof updater === "function" ? updater(selectedEdges) : updater;
+      onSelectedEdgeChange(next[0] ?? null);
+    } else {
+      setLocalSelectedEdges(updater);
+    }
+  };
   // Keep renderer measurements between metric updates. Dropping them makes
   // React Flow discard handle bounds and remount every edge on each sample.
   const [dimensions, setDimensions] = useState<
@@ -365,7 +445,20 @@ export function ArchitectureCanvas({
   >({});
   useEffect(() => {
     if (nodeSet.current === nodeIdentity) return;
+    const prevIds = new Set(nodeSet.current.split(",").filter(Boolean));
+    const currIds = new Set(nodeIdentity.split(",").filter(Boolean));
     nodeSet.current = nodeIdentity;
+
+    const isAddition =
+      (prevIds.size === 0 && currIds.size === 1) ||
+      (prevIds.size > 0 && currIds.size >= prevIds.size && [...prevIds].every((id) => currIds.has(id)));
+    const isDeletion =
+      prevIds.size > currIds.size && [...currIds].every((id) => prevIds.has(id));
+
+    if (isAddition || isDeletion) {
+      return;
+    }
+
     const timer = setTimeout(() => {
       if (mobile) {
         const node =
@@ -377,7 +470,7 @@ export function ArchitectureCanvas({
       } else flow.fitView({ padding: 0.23, maxZoom: 1, duration: 0 });
     }, 80);
     return () => clearTimeout(timer);
-  }, [nodeIdentity, flow]);
+  }, [nodeIdentity, flow, mobile, editor.selected, g.nodes, g.notes]);
   const baseNodes: ArchitectureNode[] = useMemo(
     () =>
       g.nodes.map((n) => ({
@@ -574,56 +667,6 @@ export function ArchitectureCanvas({
         }
       }}
     >
-    <div className="canvas-actions-toolbar" role="toolbar" aria-label="Canvas selection tools">
-      <button
-        type="button"
-        className={`canvas-toolbar-btn ${dragMode === "select" ? "active" : ""}`}
-        aria-pressed={dragMode === "select"}
-        title="Select tool (box select)"
-        onClick={() => setDragMode("select")}
-      >
-        <MousePointer size={15} />
-        <span>Select</span>
-      </button>
-      <button
-        type="button"
-        className={`canvas-toolbar-btn ${dragMode === "pan" ? "active" : ""}`}
-        aria-pressed={dragMode === "pan"}
-        title="Pan tool (drag canvas)"
-        onClick={() => setDragMode("pan")}
-      >
-        <Hand size={15} />
-        <span>Pan</span>
-      </button>
-      <button
-        type="button"
-        className="canvas-toolbar-btn"
-        disabled={editor.selectedNodeIds.length === 0 && (!editor.selected || !groups.some(g => g.id === editor.selected))}
-        title="Actions for selected items"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          if (editor.selectedNodeIds.length > 0) {
-            setContextMenuTarget({
-              x: rect.left,
-              y: rect.bottom + 6,
-              kind: "components",
-              componentIds: editor.selectedNodeIds,
-            });
-          } else if (editor.selected && groups.some(g => g.id === editor.selected)) {
-            setContextMenuTarget({
-              x: rect.left,
-              y: rect.bottom + 6,
-              kind: "subsystem",
-              subsystemId: editor.selected,
-            });
-          }
-        }}
-      >
-        <Boxes size={15} />
-        <span>Selection actions</span>
-      </button>
-    </div>
-
     <ReactFlow
       nodes={nodes}
       edges={edges}
@@ -712,6 +755,15 @@ export function ArchitectureCanvas({
         editor.select(null);
         setSelectedEdges([]);
         setContextMenuTarget(null);
+        onCanvasClear?.();
+      }}
+      onPaneContextMenu={(event) => {
+        event.preventDefault();
+        setContextMenuTarget({
+          x: event.clientX,
+          y: event.clientY,
+          kind: "none",
+        });
       }}
       onConnect={(c) => {
         if (editor.readOnly) return;
@@ -746,12 +798,17 @@ export function ArchitectureCanvas({
         if (editor.readOnly || isFree) return;
         deleted.forEach((n) => editor.remove(n.id));
       }}
-      onMoveEnd={(_, viewport) =>
+      onMove={(_, viewport) => {
+        setCurrentZoom(viewport.zoom);
+      }}
+      onMoveEnd={(_, viewport) => {
+        initialFit.current = false;
+        setCurrentZoom(viewport.zoom);
         editor.viewport({
           ...viewport,
           canvasHeight: canvasRef.current?.clientHeight,
-        })
-      }
+        });
+      }}
       defaultViewport={editor.project.viewport}
       onInit={(instance) => {
         if (initialFit.current && mobile && g.nodes[0])
@@ -767,32 +824,170 @@ export function ArchitectureCanvas({
       fitViewOptions={{ padding: 0.23, maxZoom: 1 }}
       deleteKeyCode={null}
       proOptions={{ hideAttribution: true }}
+      snapToGrid={true}
+      snapGrid={[20, 20]}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
-      <Background color="#d6e0dc" gap={20} size={1} />
-      <Controls showInteractive={false} position="bottom-left" />
+      <Background
+        variant={BackgroundVariant.Dots}
+        gap={gridConfig.gap}
+        size={gridConfig.size}
+        color={gridConfig.color}
+      />
     </ReactFlow>
+
+    {/* Consolidated Floating Canvas Controls Dock */}
+    <div className="canvas-floating-dock" role="toolbar" aria-label="Canvas controls">
+      {/* Tool Modes: Select & Pan */}
+      <div className="canvas-dock-group">
+        <button
+          type="button"
+          className={`canvas-dock-btn ${dragMode === "select" ? "active" : ""}`}
+          aria-label="Select"
+          aria-pressed={dragMode === "select"}
+          title="Select tool (box select)"
+          onClick={() => setDragMode("select")}
+        >
+          <MousePointer size={15} />
+          <span className="canvas-dock-text">Select</span>
+        </button>
+        <button
+          type="button"
+          className={`canvas-dock-btn ${dragMode === "pan" ? "active" : ""}`}
+          aria-label="Pan"
+          aria-pressed={dragMode === "pan"}
+          title="Pan tool (drag canvas)"
+          onClick={() => setDragMode("pan")}
+        >
+          <Hand size={15} />
+          <span className="canvas-dock-text">Pan</span>
+        </button>
+      </div>
+
+      <div className="canvas-dock-divider" />
+
+      {/* Group & Canvas Actions */}
+      <div className="canvas-dock-group">
+        <button
+          type="button"
+          className="canvas-dock-btn"
+          aria-label="Selection actions"
+          title="Group / selection actions"
+          disabled={editor.selectedNodeIds.length === 0 && (!editor.selected || !groups.some((g) => g.id === editor.selected))}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (editor.selectedNodeIds.length > 0) {
+              setContextMenuTarget({
+                x: rect.left,
+                y: Math.max(10, rect.top - 180),
+                kind: "components",
+                componentIds: editor.selectedNodeIds,
+              });
+            } else if (editor.selected && groups.some((g) => g.id === editor.selected)) {
+              setContextMenuTarget({
+                x: rect.left,
+                y: Math.max(10, rect.top - 180),
+                kind: "subsystem",
+                subsystemId: editor.selected,
+              });
+            }
+          }}
+        >
+          <Boxes size={15} />
+          <span className="canvas-dock-text">Group</span>
+        </button>
+        <button
+          type="button"
+          className="canvas-dock-btn add-canvas-note"
+          aria-label="Add canvas note"
+          title="Add canvas note"
+          disabled={editor.readOnly || (editor.project.graph.notes?.length ?? 0) >= 100}
+          onClick={() => {
+            const box = canvasRef.current?.getBoundingClientRect();
+            if (box) {
+              setSelectedEdges([]);
+              editor.addNote(
+                flow.screenToFlowPosition({
+                  x: box.left + box.width / 2 - 100,
+                  y: box.top + box.height * 0.65,
+                })
+              );
+            }
+          }}
+        >
+          <StickyNote size={15} />
+          <span className="canvas-dock-text">Add canvas note</span>
+        </button>
+      </div>
+
+      <div className="canvas-dock-divider" />
+
+      {/* Zoom Controls */}
+      <div className="canvas-dock-group">
+        <button
+          type="button"
+          className="canvas-dock-btn"
+          aria-label="Zoom In"
+          title="Zoom in"
+          onClick={() => flow.zoomIn()}
+        >
+          <Plus size={15} />
+          <span className="sr-only">Zoom In</span>
+        </button>
+        <button
+          type="button"
+          className="canvas-dock-btn"
+          aria-label="Zoom Out"
+          title="Zoom out"
+          onClick={() => flow.zoomOut()}
+        >
+          <Minus size={15} />
+          <span className="sr-only">Zoom Out</span>
+        </button>
+        <button
+          type="button"
+          className="canvas-dock-btn"
+          aria-label="Fit view"
+          title="Fit view"
+          onClick={() => flow.fitView({ padding: 0.23 })}
+        >
+          <Maximize2 size={15} />
+          <span className="sr-only">Fit view</span>
+        </button>
+      </div>
+    </div>
 
     <CanvasContextMenu
       target={contextMenuTarget}
       onClose={() => setContextMenuTarget(null)}
+      screenToFlowPosition={flow.screenToFlowPosition}
     />
 
-    {(editor.selectedNodeIds.length > 0 || editor.selectionMode) ? <DiagramOrganization
+    <DiagramOrganization
       onAddNote={() => {
         const box = canvasRef.current?.getBoundingClientRect();
-        if (box) { setSelectedEdges([]); editor.addNote(flow.screenToFlowPosition({ x: box.left + box.width / 2 - 100, y: box.top + box.height * 0.65 })); }
+        if (box) {
+          setSelectedEdges([]);
+          editor.addNote(
+            flow.screenToFlowPosition({
+              x: box.left + box.width / 2 - 100,
+              y: box.top + box.height * 0.65,
+            })
+          );
+        }
       }}
       dimensions={dimensions}
-      onSelectComponent={(id) => { setSelectedEdges([]); editor.select(id, true); }}
-      onSelectionModeChange={(active) => { if (active) setSelectedEdges([]); editor.setSelectionMode(active); }}
-    /> : <div className="canvas-organization-entry">
-      <button onClick={() => editor.setSelectionMode(true)}>Select components</button>
-      <button onClick={() => {
-        const box = canvasRef.current?.getBoundingClientRect();
-        if (box) editor.addNote(flow.screenToFlowPosition({ x: box.left + box.width / 2 - 100, y: box.top + box.height * 0.65 }));
-      }} disabled={editor.readOnly}>Add canvas note</button>
-    </div>}
-    {!!selectedEdges.length && isOpenGraph(g) && <OpenConnectionEditor edgeId={selectedEdges[0]} onClose={() => setSelectedEdges([])} />}
+      onSelectComponent={(id) => {
+        setSelectedEdges([]);
+        editor.select(id, true);
+      }}
+      onSelectionModeChange={(active) => {
+        if (active) setSelectedEdges([]);
+        editor.setSelectionMode(active);
+      }}
+    />
+    {!onSelectedEdgeChange && !!selectedEdges.length && isOpenGraph(g) && <OpenConnectionEditor edgeId={selectedEdges[0]} onClose={() => setSelectedEdges([])} />}
     {!!selectedEdges.length && isDiagramGraph(g) && (() => { const edge = g.edges.find((item) => item.id === selectedEdges[0]); if (!edge) return null; return <section className="connection-editor" aria-label="Selected connection">
       <div className="connection-editor-heading"><strong>Connection</strong><button aria-label="Delete connection" onClick={() => { editor.change((graph) => { graph.edges = graph.edges.filter((item) => !selectedEdges.includes(item.id)); }); setSelectedEdges([]); }}><Trash2 size={14} /></button></div>
       <label><span>Label</span><input aria-label="Connection label" maxLength={60} placeholder="Reads, publishes, uploads…" value={edge.label ?? ""} onChange={(event) => editor.change((graph) => { const item = graph.edges.find((candidate) => candidate.id === edge.id); if (item) item.label = event.target.value; })} /></label>
@@ -800,4 +995,4 @@ export function ArchitectureCanvas({
     </section>; })()}
     </div>
   );
-}
+});

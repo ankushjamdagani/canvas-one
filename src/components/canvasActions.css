@@ -1,62 +1,135 @@
-.canvas-actions-toolbar {
+/* Screen-reader utility */
+.sr-only {
   position: absolute;
-  top: 14px;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Consolidated Floating Canvas Dock */
+.canvas-floating-dock {
+  position: absolute;
+  bottom: 14px;
   left: 14px;
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid #e1e7e3;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid #dce5e1;
   border-radius: 8px;
-  padding: 4px 6px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  padding: 3px 4px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
   font-family: inherit;
 }
 
-.canvas-organization-entry { position: absolute; top: 76px; right: 14px; display: flex; gap: 6px; z-index: 7; }
-.canvas-organization-entry button { min-height: 36px; padding: 8px; background: white; border: 1px solid #d6e0dc; border-radius: 6px; }
+.canvas-dock-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 
-.canvas-toolbar-btn {
+.canvas-dock-divider {
+  width: 1px;
+  height: 18px;
+  background: #e1e7e3;
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+.canvas-dock-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 4px 10px;
-  background: #ffffff;
-  border: 1px solid #e1e7e3;
+  gap: 5px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 6px;
-  color: #243b41;
-  font-size: 12px;
+  color: #475569;
+  font-size: 11.5px;
   font-weight: 500;
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
+  transition: all 0.15s ease;
 }
 
-.canvas-toolbar-btn:hover:not(:disabled) {
-  background: #fafbf9;
-  border-color: #677773;
+.canvas-dock-btn:hover:not(:disabled) {
+  background: #f1f5f4;
+  border-color: transparent;
+  color: #087f84;
 }
 
-.canvas-toolbar-btn:focus-visible {
+.canvas-dock-btn:focus-visible {
   outline: 2px solid #087f84;
   outline-offset: 1px;
 }
 
-.canvas-toolbar-btn.active {
+.canvas-dock-btn.active {
   background: #e4f3f0;
-  border-color: #087f84;
+  border-color: #83cfc8;
   color: #086b70;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(8, 127, 132, 0.08);
 }
 
-.canvas-toolbar-btn:disabled {
-  opacity: 0.55;
+.canvas-dock-btn:disabled {
+  opacity: 0.38;
   cursor: not-allowed;
-  pointer-events: none;
 }
+
+.canvas-dock-btn[aria-label="Zoom In"],
+.canvas-dock-btn[aria-label="Zoom Out"],
+.canvas-dock-btn[aria-label="Fit view"] {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
+.canvas-dock-text {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .canvas-floating-dock {
+    bottom: 8px;
+    left: 8px;
+    padding: 2px;
+    gap: 2px;
+    max-width: calc(100% - 16px);
+    overflow-x: auto;
+  }
+  .canvas-dock-btn {
+    height: 34px;
+    min-width: 34px;
+    padding: 0 4px;
+  }
+  .canvas-dock-btn[aria-label="Zoom In"],
+  .canvas-dock-btn[aria-label="Zoom Out"],
+  .canvas-dock-btn[aria-label="Fit view"] {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+  .canvas-dock-text {
+    display: none;
+  }
+}
+
+/* Backward compatibility classes if needed */
+.canvas-actions-toolbar { display: none; }
+.canvas-organization-entry { display: none; }
 
 .canvas-context-menu {
   position: fixed;

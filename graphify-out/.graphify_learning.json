@@ -1,5 +1,38 @@
 {
-  "generated_at": "2026-09-10T00:03:23.210330+00:00",
-  "nodes": {},
+  "generated_at": "2026-09-15T06:34:15.600227+00:00",
+  "nodes": {
+    "src_domain_model_checkpoint": {
+      "code_fingerprint": "249c4f7caf568d1c1eda4bb64421983cc80915cd9431552c960cc4ca47999517",
+      "label": "Checkpoint",
+      "last": "2026-09-10T00:09:16.373123+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-10T00:09:16.373123+00:00",
+          "outcome": "useful",
+          "q": "Resume the implementation"
+        }
+      ],
+      "score": 0.885412468,
+      "source_file": "src/domain/model.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_domain_model_graph": {
+      "code_fingerprint": "249c4f7caf568d1c1eda4bb64421983cc80915cd9431552c960cc4ca47999517",
+      "label": "Graph",
+      "last": "2026-09-10T00:09:16.373123+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-10T00:09:16.373123+00:00",
+          "outcome": "useful",
+          "q": "Resume the implementation"
+        }
+      ],
+      "score": 0.885412468,
+      "source_file": "src/domain/model.ts",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
   "version": 1
 }

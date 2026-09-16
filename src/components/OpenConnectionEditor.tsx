@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { useEditor } from '../state/editor';
 import { NumberField } from './NumberField';
 import type { ModelEdge } from '../domain/model';
@@ -6,18 +7,22 @@ import type { ModelEdge } from '../domain/model';
 export function OpenConnectionEditor({
   edgeId,
   onClose,
+  docked = false,
 }: {
   edgeId: string;
   onClose: () => void;
+  docked?: boolean;
 }) {
   const editor = useEditor();
   const readOnly = editor.readOnly;
   const graph = editor.project.graph;
   const edge = graph.edges.find((e) => e.id === edgeId);
 
+  const containerClass = `inspector ${docked ? "open-connection-editor-docked" : "open-connection-editor"}`;
+
   if (!edge) {
     return (
-      <aside className="inspector open-connection-editor" aria-label="Connection editor">
+      <aside className={containerClass} aria-label="Connection editor">
         <div className="inspector-heading">
           <strong>Connection Not Found</strong>
         </div>
@@ -58,17 +63,28 @@ export function OpenConnectionEditor({
   };
 
   return (
-    <aside className="inspector open-connection-editor" aria-label="Connection configuration">
+    <aside className={containerClass} aria-label="Connection configuration">
       <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong>Connection Settings</strong>
-        <button
-          type="button"
-          className="open-inspector-btn"
-          style={{ padding: '2px 8px', fontSize: '11px' }}
-          onClick={onClose}
-        >
-          Done
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            type="button"
+            className="open-inspector-btn"
+            style={{ padding: '2px 8px', fontSize: '11px' }}
+            onClick={onClose}
+          >
+            Done
+          </button>
+          <button
+            type="button"
+            aria-label="Close inspector"
+            className="subtle"
+            style={{ padding: '2px', display: 'flex', alignItems: 'center', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            onClick={onClose}
+          >
+            <X size={15} />
+          </button>
+        </div>
       </div>
 
       <fieldset disabled={readOnly} className="open-inspector-fieldset">

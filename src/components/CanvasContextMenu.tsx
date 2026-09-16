@@ -16,9 +16,10 @@ export interface ContextMenuTarget {
 interface CanvasContextMenuProps {
   target: ContextMenuTarget | null;
   onClose: () => void;
+  screenToFlowPosition?: (pos: { x: number; y: number }) => { x: number; y: number };
 }
 
-export function CanvasContextMenu({ target, onClose }: CanvasContextMenuProps) {
+export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: CanvasContextMenuProps) {
   const editor = useEditor();
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -285,6 +286,24 @@ export function CanvasContextMenu({ target, onClose }: CanvasContextMenuProps) {
         </>
       );
     }
+  } else if (target.kind === "none") {
+    content = (
+      <button
+        role="menuitem"
+        className="canvas-menu-item"
+        disabled={isReadOnly || (editor.project.graph.notes?.length ?? 0) >= 100}
+        onClick={() => {
+          const flowPos = screenToFlowPosition
+            ? screenToFlowPosition({ x: target.x, y: target.y })
+            : { x: target.x, y: target.y };
+          editor.addNote(flowPos);
+          onClose();
+        }}
+      >
+        <Edit2 size={16} />
+        Add canvas note
+      </button>
+    );
   } else {
     return null;
   }

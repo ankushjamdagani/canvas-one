@@ -10,6 +10,7 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
   const isReadOnly = editor.readOnly;
   const collapsed = new Set(visibleSubsystems(editor.project).filter((group) => group.collapsed).flatMap((group) => group.nodeIds));
   const visible = editor.project.graph.nodes.filter((node) => !collapsed.has(node.id));
+  if (visible.length === 0) return null;
   const layoutNodes: LayoutNode[] = visible.map((node) => ({
     id: node.id,
     position: node.position,
@@ -36,7 +37,6 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
     <button className={`selection-mode-toggle ${editor.selectionMode ? "active" : ""}`} aria-pressed={editor.selectionMode} onClick={() => onSelectionModeChange(!editor.selectionMode)}>
       <CheckSquare2 size={15} />{editor.selectionMode ? "Finish selecting" : "Select components"}
     </button>
-    <button className="add-canvas-note" onClick={onAddNote} disabled={isReadOnly || (editor.project.graph.notes?.length ?? 0) >= 100}>Add canvas note</button>
     {editor.selectionMode && <fieldset className="diagram-selection-list">
       <legend>Visible components</legend>
       {visible.map((node) => <label key={node.id}><input type="checkbox" checked={selectedIds.includes(node.id)} onChange={() => onSelectComponent(node.id)} /> <span>{node.name}</span></label>)}

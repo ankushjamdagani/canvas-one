@@ -115,6 +115,80 @@
   gap: 8px;
 }
 
+.open-workload-card summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.open-workload-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.open-workload-summary-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.open-workload-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.open-workload-chevron {
+  font-size: 9px;
+  color: #677773;
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+details[open] > summary .open-workload-chevron {
+  transform: rotate(90deg);
+}
+
+.open-workload-summary-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  padding-left: 15px;
+}
+
+.open-workload-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #eef7f5;
+  color: #087f84;
+}
+
+.open-workload-badge.disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.open-workload-arrival-text {
+  color: #677773;
+  font-size: 11px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.open-workload-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f4f2;
+}
+
 .open-workload-header {
   display: flex;
   align-items: center;

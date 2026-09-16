@@ -1,15 +1,14 @@
 import { test, expect } from "@playwright/test";
 import * as fs from "fs";
-import { openExample } from "./openHelpers";
+import { openExample, openWorkloads } from "./openHelpers";
 
 test.describe("Workloads, profiles and request classes", () => {
   test("configuring traffic profile to burst updates parameters and persists roundtrip", async ({ page }) => {
     await page.goto("/");
     await openExample(page, "Real-time chat");
 
-    // With nothing selected, inspector displays global System Configuration & Workloads
-    const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
-    await expect(inspector).toBeVisible();
+    // Open Workloads panel to view and configure workloads
+    const inspector = await openWorkloads(page);
 
     const workloadCard = inspector.locator(".open-workload-card").first();
     await expect(workloadCard).toBeVisible();
@@ -40,10 +39,10 @@ test.describe("Workloads, profiles and request classes", () => {
     await page.goto("/");
     await openExample(page, "Ecommerce checkout");
 
-    const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
-    await expect(inspector).toBeVisible();
+    const inspector = await openWorkloads(page);
 
     const workloadCard = inspector.locator(".open-workload-card").first();
+    await expect(workloadCard).toBeVisible();
 
     // Add a second request class
     const addClassButton = workloadCard.getByRole("button", { name: "+ Class" });
@@ -92,8 +91,7 @@ test.describe("Workloads, profiles and request classes", () => {
     await page.goto("/");
     await openExample(page, "Event processing");
 
-    const inspector = page.getByRole("complementary", { name: "System configuration inspector" });
-    await expect(inspector).toBeVisible();
+    const inspector = await openWorkloads(page);
 
     // Set duration to 45s
     const durationInput = inspector.getByRole("spinbutton", { name: "Simulation Duration" });
