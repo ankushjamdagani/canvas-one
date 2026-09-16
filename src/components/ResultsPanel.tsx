@@ -18,6 +18,8 @@ import {
   type SavedRun,
 } from "../domain/results";
 import { profileLabel } from "../domain/workload";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function ResultsPanel({
   selectedId,
@@ -62,17 +64,29 @@ export function ResultsPanel({
           <h2>Saved results</h2>
           <span>{runs.length} / 20 · stored in this browser</span>
         </div>
-        <button aria-label="Close saved results" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Close saved results"
+          className="h-7 w-7 p-0"
+          onClick={onClose}
+        >
           <X size={17} />
-        </button>
+        </Button>
       </header>
       {deleted && (
         <div className="result-deleted" role="status">
           “{deleted.name}” deleted.
-          <button disabled={readOnly} onClick={undo}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-xs gap-1"
+            disabled={readOnly}
+            onClick={undo}
+          >
             <RotateCcw size={13} />
             Undo delete
-          </button>
+          </Button>
         </div>
       )}
       {!current ? (
@@ -364,8 +378,9 @@ export function ResultsPanel({
           <div className="result-actions">
             <label>
               <span>Result name</span>
-              <input
+              <Input
                 aria-label="Saved result name"
+                className="h-8 text-xs"
                 maxLength={80}
                 disabled={readOnly}
                 value={draftName}
@@ -381,12 +396,20 @@ export function ResultsPanel({
                 }}
               />
             </label>
-            <button disabled={readOnly} onClick={() => onRestore(current.id)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              disabled={readOnly}
+              onClick={() => onRestore(current.id)}
+            >
               <RotateCcw size={14} />
               Restore this model
-            </button>
-            <button
-              className="delete-result"
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="delete-result h-8 text-xs gap-1.5"
               disabled={readOnly}
               onClick={() => {
                 if (!readOnly) {
@@ -397,7 +420,7 @@ export function ResultsPanel({
             >
               <Trash2 size={14} />
               Delete result
-            </button>
+            </Button>
           </div>
         </div>
       )}

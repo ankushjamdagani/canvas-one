@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Boxes, Edit2, ChevronRight, ChevronDown, Ungroup } from "lucide-react";
 import { useEditor } from "../state/editor";
 import { groupingReason } from "../domain/grouping";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import "./canvasActions.css";
 
 export interface ContextMenuTarget {
@@ -98,33 +100,30 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
   // Arrow key navigation inside menu
   const handleMenuKeyDown = (e: React.KeyboardEvent) => {
     if (formMode) return;
-    const items = Array.from(
-      menuRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [],
-    );
-    if (!items.length) return;
-    const activeIndex = items.findIndex((item) => item === document.activeElement);
-
+    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []);
+    if (!buttons.length) return;
+    const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      const next = activeIndex === -1 || activeIndex === items.length - 1 ? 0 : activeIndex + 1;
-      items[next]?.focus();
+      const nextIndex = currentIndex < buttons.length - 1 ? currentIndex + 1 : 0;
+      buttons[nextIndex]?.focus();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      const prev = activeIndex <= 0 ? items.length - 1 : activeIndex - 1;
-      items[prev]?.focus();
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : buttons.length - 1;
+      buttons[prevIndex]?.focus();
     } else if (e.key === "Home") {
       e.preventDefault();
-      items[0]?.focus();
+      buttons[0]?.focus();
     } else if (e.key === "End") {
       e.preventDefault();
-      items[items.length - 1]?.focus();
+      buttons[buttons.length - 1]?.focus();
     }
   };
 
   if (!target) return null;
 
-  const isReadOnly = editor.readOnly;
   const subsystems = editor.project.subsystems ?? [];
+  const isReadOnly = editor.readOnly;
 
   let content = null;
 
@@ -149,31 +148,34 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
           <label className="canvas-menu-form-label" htmlFor="new-subsystem-name">
             New Subsystem
           </label>
-          <input
+          <Input
             id="new-subsystem-name"
             ref={inputRef}
-            className="canvas-menu-input"
+            className="canvas-menu-input h-8 text-xs mb-2"
             maxLength={80}
             required
             placeholder="Subsystem name"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
           />
-          <div className="canvas-menu-form-actions">
-            <button
+          <div className="canvas-menu-form-actions flex items-center gap-2 justify-end">
+            <Button
               type="button"
-              className="canvas-menu-btn-secondary"
+              variant="outline"
+              size="sm"
+              className="canvas-menu-btn-secondary h-7 px-2 text-xs"
               onClick={() => setFormMode(null)}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="canvas-menu-btn-primary"
+              size="sm"
+              className="canvas-menu-btn-primary h-7 px-3 text-xs"
               disabled={!nameInput.trim()}
             >
               Group
-            </button>
+            </Button>
           </div>
         </form>
       );
@@ -216,30 +218,33 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
           <label className="canvas-menu-form-label" htmlFor="rename-subsystem-name">
             Rename Subsystem
           </label>
-          <input
+          <Input
             id="rename-subsystem-name"
             ref={inputRef}
-            className="canvas-menu-input"
+            className="canvas-menu-input h-8 text-xs mb-2"
             maxLength={80}
             required
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
           />
-          <div className="canvas-menu-form-actions">
-            <button
+          <div className="canvas-menu-form-actions flex items-center gap-2 justify-end">
+            <Button
               type="button"
-              className="canvas-menu-btn-secondary"
+              variant="outline"
+              size="sm"
+              className="canvas-menu-btn-secondary h-7 px-2 text-xs"
               onClick={() => setFormMode(null)}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="canvas-menu-btn-primary"
+              size="sm"
+              className="canvas-menu-btn-primary h-7 px-3 text-xs"
               disabled={!nameInput.trim() || nameInput.trim() === group.name}
             >
               Save
-            </button>
+            </Button>
           </div>
         </form>
       );

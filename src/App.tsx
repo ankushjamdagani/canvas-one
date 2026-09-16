@@ -716,15 +716,16 @@ export default function App() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{guide.title}</h2>
                     </div>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="icon"
                       aria-label="Close tutorial"
-                      className="subtle"
-                      style={{ padding: '4px', border: 0 }}
+                      className="subtle h-7 w-7 p-0"
                       onClick={() => setInspectorMode(null)}
                     >
                       <X size={16} />
-                    </button>
+                    </Button>
                   </div>
                   <div className="inspector-body" style={{ padding: '16px' }}>
                     <p style={{ fontSize: '12px', color: '#55665f', marginBottom: '14px', lineHeight: 1.4 }}>
@@ -736,10 +737,11 @@ export default function App() {
                       ))}
                     </ol>
                     <div style={{ marginTop: '20px' }}>
-                      <button
+                      <Button
                         type="button"
-                        className="subtle"
-                        style={{ width: '100%', justifyContent: 'center' }}
+                        variant="outline"
+                        size="sm"
+                        className="subtle w-full justify-center text-xs"
                         onClick={() => {
                           editor.change((g) => {
                             delete g.guideId;
@@ -748,7 +750,7 @@ export default function App() {
                         }}
                       >
                         Dismiss guide
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </section>

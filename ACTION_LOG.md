@@ -722,4 +722,22 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Limitations & follow-up**:
   - Entire frontend component architecture has been refactored and modernized to Tailwind CSS v4 and shadcn-ui with full end-to-end regression validation.
 
+## 2026-09-17 — Canvas Context Menu, ResultsPanel, App Tutorial & Inspector Modernization Completed
 
+- **Outcome**: Completed the final modernization phase across the application with Tailwind CSS v4 and shadcn-ui component primitives (`Button`, `Input`, `Badge`), ensuring 100% of panels, forms, and context menus are modernized while strictly preserving discrete-event simulation invariants, exact persistence schemas, ARIA roles/labels, and full keyboard accessibility.
+- **Files and systems changed**:
+  - [`src/components/CanvasContextMenu.tsx`](src/components/CanvasContextMenu.tsx): Replaced raw inputs and action buttons in subsystem creation and rename dialogs with shadcn `Input` and `Button` (`outline` and default variants). Restored full keyboard navigation (ArrowDown, ArrowUp, Home, End).
+  - [`src/App.tsx`](src/App.tsx): Upgraded tutorial panel close `<X size={16} />` button to shadcn `Button` (`variant="ghost"`, `size="icon"`) and "Dismiss guide" button to shadcn `Button` (`variant="outline"`, `size="sm"`).
+  - [`src/components/ResultsPanel.tsx`](src/components/ResultsPanel.tsx): Modernized panel close button, undo delete trigger, saved result name text field, "Restore this model" button, and "Delete result" button with shadcn `Button` and `Input` primitives.
+  - [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx): Modernized inline diagram connection editor delete button (`Button variant="ghost"`) and label/protocol text inputs (`Input`).
+  - [`src/components/Inspector.tsx`](src/components/Inspector.tsx): Upgraded diagram inspector category badge (`Badge`), component name / type label inputs (`Input`), duplicate component button (`Button variant="outline"`), delete component button (`Button variant="ghost"`), inspect internals button (`Button variant="outline"`), and configuration delete component button (`Button variant="ghost"`).
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: shadcn-ui primitives, Tailwind CSS v4, Graphify AST update, Vitest, Playwright Test.
+- **Verification performed**:
+  - `npm run build`: Clean TypeScript compilation and Vite build in 550ms with zero errors.
+  - `npm test`: All 233 unit tests pass across 36 files (2.59s).
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 production Chromium journeys pass across 5 parallel workers (30.0s).
+  - `graphify update .`: AST-extracted 133/133 files without LLM costs; updated graph to 1103 nodes, 2813 edges, 100 communities.
+  - `git diff --check`: Clean formatting with 0 whitespace errors.
+- **Limitations & follow-up**:
+  - Frontend modernization with Tailwind CSS v4 and shadcn-ui component primitives is fully complete across the entire codebase.

@@ -38,13 +38,18 @@ Integrated in the worktree:
   - `src/components/OpenConnectionEditor.tsx`: Done/close triggers, Confirm Connection, and Delete Connection actions modernized with shadcn `Button`; connection label, protocol, and match value inputs upgraded with shadcn `Input`.
   - `src/components/DiagramOrganization.tsx`: Selection mode toggle, clear selection, 4 directional alignment buttons, and horizontal/vertical distribution actions upgraded with shadcn `Button`.
   - `src/components/RoutingPanel.tsx`: Add service instance action modernized with shadcn `Button`.
+  - `src/components/CanvasContextMenu.tsx`: Subsystem creation and renaming dialog inputs and actions modernized with shadcn `Input` and `Button`, with full ArrowDown/ArrowUp/Home/End keyboard accessibility.
+  - `src/components/ResultsPanel.tsx`: Close button, undo delete trigger, saved result name input, model restore, and delete result buttons upgraded with shadcn `Button` and `Input`.
+  - `src/components/ArchitectureCanvas.tsx`: Diagram connection editor delete action and label/protocol inputs modernized with shadcn `Button` and `Input`.
+  - `src/components/Inspector.tsx`: Diagram category badge, name/custom-type inputs, duplicate component button, delete component button, and inspect internals toggle modernized with shadcn `Button`, `Input`, and `Badge`.
+  - `src/App.tsx`: Tutorial guide close and dismiss actions modernized with shadcn `Button`.
 - Semantic `data-testid` test identifiers across layout chrome, activity rail, dock, and results strip, with IPv4 loopback alignment in `playwright.config.ts`.
 - E2E timing resilience: Settle wait added after subsystem collapse before capturing `collapsedViewport` in `tests/export.spec.ts`, and pause confirmation added before asserting throughput in `tests/internals.spec.ts`.
 
 Current verification baseline:
-- 233 unit tests across 36 files (`npm test`, 2.28s).
-- Passing production build (`npm run build`, 557ms).
-- 45 passing production Chromium journeys across 5 workers (`TEST_PRODUCTION=1 npm run test:e2e`, 27.1s).
+- 233 unit tests across 36 files (`npm test`, 2.59s).
+- Passing production build (`npm run build`, 550ms).
+- 45 passing production Chromium journeys across 5 workers (`TEST_PRODUCTION=1 npm run test:e2e`, 30.0s).
 - Clean whitespace and format (`git diff --check`).
 
 Authored architecture revisions are now implemented as optional `Project.revisions` metadata. Up to 20 immutable draft/final snapshots include graph (and notes), subsystems and expanded component views, with author, timestamp, reason, explanation and optional http/https issue URL. Finalization creates a new final copy linked to the saved draft; it does not capture current canvas edits. Project controls provide comparison against current canvas or another revision and restore. Restore uses a history entry with optional view metadata so Undo/Redo restores graph and presentation together; ordinary graph edits keep the previous dormant-subsystem behavior. Project identity, camera, checkpoints and saved results remain intact. Version-7 exports/imports preserve revision IDs and links within a new project copy. Authors are self-reported; no shared accounts, team approval or cloud sync is implemented.

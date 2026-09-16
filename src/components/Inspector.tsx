@@ -21,6 +21,9 @@ import {
   ScanLine,
   Copy,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useEditor } from "../state/editor";
 import { expectedDatabaseRate } from "../domain/model";
 import type { Metrics } from "../simulation/engine";
@@ -125,16 +128,16 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
   if (isDiagramGraph(g)) {
     const definition = componentDefinition(n.kind);
     return <aside className="inspector">
-      <div className="inspector-heading"><Icon size={22} /><strong>{n.name}</strong><span className="tag">{definition.category}</span></div>
+      <div className="inspector-heading"><Icon size={22} /><strong>{n.name}</strong><Badge variant="outline" className="tag">{definition.category}</Badge></div>
       <div className="inspector-body diagram-inspector">
         <div className="status-callout"><Icon size={22} /><div><strong>{n.kind === "custom" ? n.customType : definition.label}</strong><p>{definition.description}</p></div></div>
-        {n.kind === "custom" && <label className="field"><span>Type label</span><input value={n.customType ?? ""} maxLength={60} onChange={(event) => editor.updateNode(n.id, { customType: event.target.value })} /></label>}
-        <label className="field"><span>Component name</span><input value={n.name} maxLength={80} onChange={(event) => editor.updateNode(n.id, { name: event.target.value })} /></label>
+        {n.kind === "custom" && <label className="field"><span>Type label</span><Input className="h-8 text-xs" value={n.customType ?? ""} maxLength={60} onChange={(event) => editor.updateNode(n.id, { customType: event.target.value })} /></label>}
+        <label className="field"><span>Component name</span><Input className="h-8 text-xs" value={n.name} maxLength={80} onChange={(event) => editor.updateNode(n.id, { name: event.target.value })} /></label>
         <label className="field"><span>Responsibility or technology</span><textarea value={n.description ?? ""} maxLength={240} rows={5} placeholder="What does this component own? Add a technology, protocol, or design decision." onChange={(event) => editor.updateNode(n.id, { description: event.target.value })} /></label>
         <div className="note"><Info size={16} /><p>Connect either side of the component. Diagram components document architecture; they do not invent simulation behavior.</p></div>
-        <button className="duplicate-component" disabled={g.nodes.length >= 100} onClick={() => editor.duplicateNode(n.id)}><Copy size={15} />Duplicate component</button>
+        <Button variant="outline" size="sm" className="duplicate-component w-full justify-center gap-1.5 h-8 text-xs" disabled={g.nodes.length >= 100} onClick={() => editor.duplicateNode(n.id)}><Copy size={15} />Duplicate component</Button>
         {g.nodes.length >= 100 && <p className="field-help" role="status">Duplication is unavailable at 100 components. Delete one to make room.</p>}
-        <button className="danger subtle" onClick={() => editor.remove(n.id)}><Trash2 size={15} />Delete component</button>
+        <Button variant="ghost" size="sm" className="danger subtle w-full justify-center gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => editor.remove(n.id)}><Trash2 size={15} />Delete component</Button>
       </div>
       <div className="inspector-bottom"><Info size={14} /><span>Diagram layer · freely connected</span></div>
     </aside>;
@@ -144,7 +147,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
       <div className="inspector-heading">
         <Icon size={22} />
         <strong>{n.name}</strong>
-        {overloaded && <span className="tag amber">At risk</span>}
+        {overloaded && <Badge variant="destructive" className="tag amber">At risk</Badge>}
       </div>
       <div className="tabs">
         <button
@@ -161,15 +164,17 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
         </button>
       </div>
       <div className="inspector-body">
-        <button
-          className="inspect-internals"
+        <Button
+          variant="outline"
+          size="sm"
+          className="inspect-internals w-full justify-center gap-1.5 h-8 text-xs mb-3"
           onClick={() => editor.toggleExpanded(n.id)}
         >
           <ScanLine size={16} />
           {editor.project.expandedNodeIds?.includes(n.id)
             ? "Hide internals on canvas"
             : "Show internals on canvas"}
-        </button>
+        </Button>
         {tab === "configuration" ? (
           <>
             <label className="field">
@@ -241,13 +246,15 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
                 Changing a parameter starts a fresh experiment.
               </p>
             </div>
-            <button
-              className="danger subtle"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="danger subtle w-full justify-center gap-1.5 h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
               onClick={() => editor.remove(n.id)}
             >
               <Trash2 size={15} />
               Delete component
-            </button>
+            </Button>
           </>
         ) : n.kind === "balancer" ? <RoutingPanel metrics={metrics} /> : (
           <>
