@@ -18,14 +18,15 @@ Integrated in the worktree:
 - Primary nested menu dropdown card (`.canvas-first-primary-menu`) under `.project-switch` toggle with 6 collapsible categories (`open` by default): Create project (Blank, From template [Chat, Ecommerce, Events], Tutorials/Examples), Checkpoints options, Export options (Canvas, JSON, Import), Switch project with active project checkmark, Architecture Revisions, and Saved runs & comparisons with direct restore. Topbar elevated to `z-index: 900` over backdrop (`z-index: 800`) to guarantee `.project-switch` toggle clicks are never intercepted.
 - In-place project rename input (`aria-label="Project name"`) and visible `✓ Save` button (`.canvas-first-project-save-btn`) in the topbar row, supporting instant renaming on Save click, Enter key, or blur with accessible toast feedback.
 - Zoom-adaptive canvas dot grid dynamically scaling gap (20px at zoom ≥ 0.85, 40px at 0.45–0.85, 80px below 0.45), dot radius (1.8 to 2.5), and contrast for effortless visibility at every camera distance without dot crowding or moiré patterns.
-- Left Menu Bar (Control Rail) (`.canvas-first-left-rail`) housing primary workspace controls: Main Menu / Projects toggle (`.project-switch`), Add Component catalog toggle (`button[aria-label="Add component"]`), Workloads inspector toggle (`button[aria-label="Workloads"]`), Architecture Revisions trigger, Export trigger, Saved Runs trigger, and bottom segmented Undo/Redo actions.
-- Floating Component Catalog panel (`.canvas-first-catalog-drawer`) floating seamlessly over canvas with backdrop blur, leaving the full canvas visible and avoiding layout shifts.
-- Floating nested menu card with elevated shadow, grouped categories, and responsive horizontal adaptation on mobile (<560px).
+- Left Studio Activity Bar (`.canvas-first-left-rail`) housing primary workspace activity buttons: Add Component catalog toggle (`button[aria-label="Add component"]`), Workloads inspector toggle (`button[aria-label="Workloads"]`), Architecture Revisions drawer toggle (`button[aria-label="Architecture Revisions"]`), Saved Runs trigger (`button[aria-label="Saved runs"]`), and bottom utility Export (`button[aria-label="Export options"]`) and Guide.
+- Consolidated Canvas Floating Dock (`.canvas-floating-dock`) grouping Undo, Redo, Select, Pan, Group, Add Note, Zoom In/Out, and Fit View directly at the bottom-center of the canvas.
+- Single unified Studio Menu (`.studio-menu-card`, `src/components/StudioMenu.tsx`) anchored to `.project-switch` dropdown in the topbar, integrating project switching, `+ New project`, starter templates, checkpoint creation and rollback, revisions, portable JSON export/import, and saved comparisons.
+- Floating Component Catalog panel and Architecture Revisions panel (`.canvas-first-catalog-drawer`) floating seamlessly over the canvas, preserving zoom and avoiding layout shifts.
 
 Current verification baseline:
-- 233 unit tests across 36 files (`npm test`, 2.57s).
-- Passing production build (`npm run build`).
-- 45 passing production Chromium journeys across 5 workers (`npm run test:e2e`).
+- 233 unit tests across 36 files (`npm test`, 2.38s).
+- Passing production build (`npm run build`, 330ms).
+- 45 passing production Chromium journeys across 5 workers (`npx playwright test`, 40.3s).
 - Clean whitespace and format (`git diff --check`).
 
 Authored architecture revisions are now implemented as optional `Project.revisions` metadata. Up to 20 immutable draft/final snapshots include graph (and notes), subsystems and expanded component views, with author, timestamp, reason, explanation and optional http/https issue URL. Finalization creates a new final copy linked to the saved draft; it does not capture current canvas edits. Project controls provide comparison against current canvas or another revision and restore. Restore uses a history entry with optional view metadata so Undo/Redo restores graph and presentation together; ordinary graph edits keep the previous dormant-subsystem behavior. Project identity, camera, checkpoints and saved results remain intact. Version-7 exports/imports preserve revision IDs and links within a new project copy. Authors are self-reported; no shared accounts, team approval or cloud sync is implemented.

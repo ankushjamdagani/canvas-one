@@ -478,3 +478,96 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Consistency check: Verified consistent terminology, concepts, and alignment across `specs/shared-team-architecture.md`, `PRODUCT.md`, and `HANDOFF.md`.
 - **Limitations & follow-up decisions**:
   - Pure documentation and specification update; no runtime code or simulation logic changed. Implementation remains future scope.
+
+## 2026-09-16 — UI/UX Craft Polish: Semantic Card Architecture, Recessed Footers, Contextual Multi-Select, and Inline Renaming
+
+- **Requested outcome**:
+  - Implement Phase 1 of the visual and ergonomic overhaul to establish a "beautiful, tasty, and elegant" standard across the canvas-first workspace.
+  - Deliver semantic category color coding on component cards, integrated recessed footers for metrics and notes, smooth accordion chevrons, streamlined contextual multi-select controls, and seamless inline project renaming.
+- **Files and systems changed**:
+  - [`src/components/ArchitectureCanvas.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ArchitectureCanvas.tsx): Injected semantic category indicator strips, category-tinted icon wrappers, smooth rotating `ChevronDown` for expand/collapse disclosure, built-in recessed `.node-footnote`, and stabilized mobile centering logic (`y + 39` on header center rather than panning with measured variable card height).
+  - [`src/components/DiagramOrganization.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/DiagramOrganization.tsx): Streamlined into a sleek, minimal pill when idle or single-selected while expanding automatically into the full alignment, distribution, and layout toolset when multi-selection (>1 node or `selectionMode`) is engaged; retained accessible "Select components" button.
+  - [`src/App.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/App.tsx): Converted topbar project name input into a borderless, hover-subtle inline editable heading that auto-saves on blur and Enter, conditionally revealing the `✓ Save` button only when dirty.
+  - [`src/components/canvasFirst.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/canvasFirst.css): Added complete design token styling for semantic category strips (Clients, Edge, Compute, Data, Messaging, Operations), category-tinted icon containers, 12px/10px typographic hierarchy, rotating chevrons, recessed footer trays, compact organizer pill, inline rename states, and lowered mobile left-rail z-index (`z-index: 20`) to eliminate canvas interception.
+- **Verification performed**:
+  - `npm test`: All 233 unit tests passed across 36 files (2.01s).
+  - `npx playwright test tests/internals.spec.ts:111`: Passed in 1.6s, verifying mobile expansion and interaction.
+  - `npm run test:e2e`: All 45 Playwright end-to-end tests passed across desktop and mobile viewports (26.9s).
+  - `npm run build`: Production build cleanly succeeded with TypeScript checking and Vite bundler.
+  - `git diff --check`: 0 whitespace or formatting issues.
+- **Limitations & follow-up decisions**:
+  - All Phase 1 deliverables completed with zero regressions on simulation invariant contracts, format-8 persistence, or format-7 archive reading.
+  - Phase 2 (connection line routing aesthetics and inspector dock elevation) remains ready for subsequent execution.
+
+## 2026-09-16 — UI/UX Overhaul Completed: Frosted Glass Materiality, Inspector Craft, Observability Dashboard, and Micro-Interactions
+
+- **Requested outcome**:
+  - Complete the remaining UI/UX phases (Phase 2 & Phase 3) to achieve a state-of-the-art, "beautiful, tasty, and elegant" developer experience across the entire application.
+  - Elevate the Catalog Drawer with frosted glass materiality, semantic category indicators, and draggable card hover states.
+  - Upgrade the Inspector Dock with refined input styling, sticky header, and behavior badges.
+  - Modernize the live simulation observability strip with glowing pulse indicators, strict tabular numeric formatting, and tactile micro-interactions.
+- **Files and systems changed**:
+  - [`src/App.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/App.tsx): Added category-specific styling classes (`category-${category.toLowerCase()}`) to component catalog sections.
+  - [`src/components/canvasFirst.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/canvasFirst.css):
+    - Added frosted glass styling (`backdrop-filter: blur(16px)`, `rgba(255, 255, 255, 0.95)`, `box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05)`) to the Catalog Drawer.
+    - Added colored dot indicators (`• CLIENTS`, `• EDGE`, `• COMPUTE`, `• DATA`, `• MESSAGING`, `• OPERATIONS`) and category-tinted icons to library items.
+    - Refined Left Rail active states with subtle teal pills (`#f0fdfa`, `#0f766e`, `#ccfbf1`) and tactile button scaling (`:active { transform: scale(0.94); }`).
+    - Styled Inspector Dock inputs (`input`, `select`, `textarea`) with 6px border radius, subtle `#dce5e1` borders, and focus highlight rings (`0 0 0 2px rgba(8, 127, 132, 0.15)`).
+    - Added glowing emerald animation (`@keyframes pulse-emerald-glow`) for active simulation runs, and strict tabular numeric alignment across the bottom status strip and results table.
+    - Injected tactile press feedback (`:active { transform: scale(0.97); }`) across all primary workspace buttons.
+- **Verification performed**:
+  - `npm test`: All 233 unit tests passed across 36 files (1.77s).
+  - `npm run test:e2e`: All 45 Playwright end-to-end tests passed across desktop and mobile viewports (29.0s).
+  - `npm run build`: Production build succeeded cleanly with Vite and TypeScript.
+  - `git diff --check`: 0 whitespace errors.
+  - Headless browser visual audit: Captured 11 high-resolution screenshots confirming refined frosted glass catalog drawer, elevated inspector dock, glowing simulation strip, and responsive mobile layouts.
+- **Limitations & follow-up decisions**:
+  - UI/UX overhaul across all 3 phases is fully realized and verified.
+  - Core invariants (discrete-event simulation accounting, format-8 project persistence, format-7 archive compatibility) remain strictly preserved.
+
+## 2026-09-16 — Workspace Scope and Project Scope Menu Separation & UI Redesign
+
+- **Requested outcome**:
+  - Cleanly separate the monolithic project and workspace menu into two distinct, dedicated scopes:
+    1. **Workspace Scope Menu**: System switching, new system creation, starter architecture templates, guided tutorials & examples, global saved runs, and simulation assumptions.
+    2. **Project Scope Menu**: Active project management, version checkpoints, architecture revisions, and diagram/JSON exports.
+  - Provide a modern, high-aesthetic developer UI with smooth backdrop blurs, tactile feedback, clean typography, responsive CSS grid layouts, and sticky header controls.
+  - Preserve 100% of existing unit and end-to-end test contracts across desktop and mobile viewports.
+- **Files and systems changed**:
+  - [`src/components/WorkspaceMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/WorkspaceMenu.tsx): Created dedicated component for workspace-scope operations (`role="region"` `aria-label="Local projects"`), project list with component counters and active checkmarks, "+ New project", template starters ("Real-time chat", "Ecommerce checkout", "Event processing"), "Examples & tutorials", "Saved runs", and "How the model works".
+  - [`src/components/ProjectMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ProjectMenu.tsx): Created dedicated component for active project options (`role="region"` `aria-label="Project options"`), checkpoint creation and restore list, lazy-loaded `<RevisionsPanel />`, and export tiles ("Export canvas", "Export JSON", "Import JSON").
+  - [`src/components/workspaceMenu.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/workspaceMenu.css): Built unified design system for `.scope-menu-card`, `.scope-menu-backdrop`, `.scope-template-grid`, `.scope-export-tiles`, sticky `.scope-menu-header`, and mobile CSS grid header layout (`grid-template-areas: "title close" "actions actions"`).
+  - [`src/App.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/App.tsx): Added distinct `workspaceMenuOpen` and `projectMenuOpen` states, Topbar "Project options" trigger button with keyboard accessibility, Left Rail "Workspace" and "Project" controls, and seamless scope-switching actions between both menus.
+  - [`src/components/canvasFirst.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/canvasFirst.css): Scoped mobile left-rail z-index (`z-index: 20 !important`) to guarantee no background buttons intercept modal touch targets.
+  - [`tests/diagram.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/diagram.spec.ts), [`tests/results.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/results.spec.ts), [`tests/revisions.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/revisions.spec.ts), [`tests/workloads.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/workloads.spec.ts), [`tests/journeys.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/journeys.spec.ts): Updated project-scoped checkpoint and export steps to target the dedicated Project Menu trigger (`.project-menu-btn`).
+- **Verification performed**:
+  - `npm test`: All 233 unit tests passed across 36 test files (2.19s).
+  - `npx playwright test tests/results.spec.ts tests/revisions.spec.ts tests/diagram.spec.ts tests/workloads.spec.ts tests/journeys.spec.ts`: All 20 tests passed across desktop and mobile viewports (25.4s).
+  - `npm run build`: Production build cleanly completed with zero TypeScript errors in 330ms with code-split lazy loading.
+  - Visual verification: Captured and inspected desktop and mobile screenshots for both Workspace and Project menus, verifying layout hierarchy, untruncated titles, and tactile styling.
+- **Limitations & follow-up decisions**:
+  - Both menus maintain bidirectional navigation (`Project options →` and `← Workspace`) for fast workflow switching.
+  - Invariants for local project persistence, simulation accounting, and portable JSON export/import fully verified.
+
+## 2026-09-16 — Unified Studio Activity Bar, Studio Menu Popover, and Canvas Dock Controls
+
+- **Requested outcome**:
+  - Eliminate confusing, distributed, and inconsistent controls scattered across the topbar, left rail, status bars, and floating docks.
+  - Re-architect the workspace navigation into a cohesive Studio Activity Bar (Add component, Workloads inspector, Architecture Revisions drawer, Saved Runs panel, and Export).
+  - Unify project switching, blank system creation, architecture templates, checkpoints, and export/backup into a single anchored `.project-switch` Studio Menu popover card.
+  - Consolidate canvas undo and redo directly into the canvas floating dock alongside pan, select, group, note, and zoom tools.
+  - Maintain 100% backward compatibility and test contracts across all 233 unit tests and all 45 Playwright E2E tests across desktop and mobile viewports.
+- **Files and systems changed**:
+  - [`src/components/StudioMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/StudioMenu.tsx): Built comprehensive unified popover card containing active project status, project switching list, new project creation, architecture template cards ("Real-time chat", "Ecommerce checkout", "Event processing"), "Examples & tutorials", Checkpoint management, lazy-loaded `<RevisionsPanel />`, and export/import tiles ("Export canvas", "Export JSON", "Import JSON") with exact accessible names.
+  - [`src/components/workspaceMenu.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/workspaceMenu.css): Implemented clean frosted-glass backdrop, `.studio-menu-card` slide animation, scrollable sections, badge counters, and responsive mobile container queries.
+  - [`src/App.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/App.tsx): Streamlined topbar header with single `.project-switch` dropdown trigger and in-place name editing; refactored Left Rail into clean Studio Activity Bar; replaced multi-state drawer with dedicated `'components' | 'revisions'` modes and direct `<ResultsPanel>` trigger on Runs; removed duplicate Undo/Redo buttons from Left Rail to eliminate locator conflicts.
+  - [`src/components/ArchitectureCanvas.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ArchitectureCanvas.tsx): Embedded Undo and Redo buttons directly into `.canvas-floating-dock` so canvas editing operations are grouped where diagram work happens.
+  - [`src/components/canvasFirst.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/canvasFirst.css): Refined 60px Left Rail styling, floating dock button grouping, and topbar switcher styling.
+- **Verification performed**:
+  - `npm test`: All 233 unit tests passed across 36 test files (2.38s).
+  - `npx playwright test`: All 45 end-to-end tests passed across desktop and mobile viewports (40.3s).
+  - `npm run build`: Production TypeScript compilation and Vite bundling passed cleanly in 330ms with code-split lazy loaded panels.
+  - Visual verification: Captured and inspected desktop and mobile screenshots (`artifacts/studio-workspace-overview.png`, `artifacts/studio-menu-open.png`, `artifacts/studio-components-drawer.png`, `artifacts/studio-revisions-drawer.png`, `artifacts/studio-mobile-menu.png`).
+- **Limitations & follow-up decisions**:
+  - Invariants for exact discrete-event simulation, format-8 project persistence, and format-7 read-only archives strictly maintained.
+  - All canvas editing actions (select, pan, group, note, undo, redo, zoom) now live exclusively on the floating canvas dock.

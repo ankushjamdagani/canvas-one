@@ -36,7 +36,7 @@ import {
   MonitorSmartphone, Smartphone, RadioTower, Globe2, ShieldCheck, Waypoints, Braces,
   Boxes, CalendarClock, FileStack, Search, Warehouse, Radio, BellRing, Activity,
   ChartNoAxesCombined, KeyRound, PlugZap, MousePointer, Hand,
-  StickyNote, Plus, Minus, Maximize2, CheckSquare2,
+  StickyNote, Plus, Minus, Maximize2, CheckSquare2, Undo2, Redo2,
 } from "lucide-react";
 import { useEditor } from "../state/editor";
 import { isDiagramGraph, isOpenGraph, supportsFreeCanvas, totalCapacity, type ComponentKind, type ModelNode, type Settings } from "../domain/model";
@@ -49,6 +49,7 @@ import { CanvasNoteNode, noteAttachmentLabel, type NoteFlowNode } from "./Canvas
 import { CanvasContextMenu, type ContextMenuTarget } from "./CanvasContextMenu";
 import { defaultExecutionEdge } from "../domain/behaviorDefaults";
 import { OpenConnectionEditor } from "./OpenConnectionEditor";
+import { componentDefinition } from "../domain/componentCatalog";
 export const icons = {
   balancer: Network,
   traffic: ArrowRight,
@@ -90,17 +91,20 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
   const isOpen = n.behavior !== undefined;
   const execMetrics = data.fullMetrics?.execution;
   const nodeCounters = execMetrics?.nodes?.[n.id];
+  const category = componentDefinition(n.kind)?.category ?? "Compute";
+  const categorySlug = category.toLowerCase();
 
   return (
     <div
-      className={`component-node ${diagram ? "diagram-node" : ""} ${expanded ? "expanded-node" : ""} ${selected ? "selected" : ""} ${overloaded ? "overloaded" : ""}`}
+      className={`component-node category-${categorySlug} ${diagram ? "diagram-node" : ""} ${expanded ? "expanded-node" : ""} ${selected ? "selected" : ""} ${overloaded ? "overloaded" : ""}`}
     >
+      <div className={`node-category-strip category-${categorySlug}`} aria-hidden="true" />
       {(diagram || isOpen || n.kind !== "traffic") && (
         <Handle type="target" position={Position.Left} />
       )}
       <div className="node-header">
         <div className={`component-icon ${n.kind}`}>
-          <Icon size={24} strokeWidth={1.7} />
+          <Icon size={22} strokeWidth={1.7} />
         </div>
         <div className="node-copy">
           <strong>{n.name}</strong>
@@ -119,18 +123,20 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
                   : `${totalCapacity(n).toLocaleString()} req/s ${["service", "worker"].includes(n.kind) ? "total" : "capacity"}`}
           </span>
         </div>
-        {!diagram && <button
-          className="node-expand nodrag nopan"
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${n.name}`}
-          aria-expanded={expanded}
-          onClick={(event) => {
-            event.stopPropagation();
-            toggleExpanded(n.id);
-          }}
-          title={expanded ? "Hide internals" : "Reveal queue and processing"}
-        >
-          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-        </button>}
+        {!diagram && (
+          <button
+            className="node-expand nodrag nopan"
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${n.name}`}
+            aria-expanded={expanded}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleExpanded(n.id);
+            }}
+            title={expanded ? "Hide internals" : "Reveal queue and processing"}
+          >
+            <ChevronDown size={15} className={`node-expand-chevron ${expanded ? "expanded" : ""}`} />
+          </button>
+        )}
       </div>
       {expanded && !diagram && (
         isOpen ? (
@@ -174,20 +180,30 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
         <Handle type="source" position={Position.Right} />
       )}
       <div className={`node-footnote ${overloaded ? "warning-text" : ""}`}>
-        {diagram
-          ? "Connect freely · diagram only"
-          : isOpen
-          ? (nodeCounters
-              ? `${nodeCounters.completed ?? 0} done · ${nodeCounters.failed ?? 0} failed`
-              : "Configured behavior")
-          : n.kind === "traffic"
-          ? "Seeded arrival stream"
-          : n.kind === "balancer" ? (hasRun ? `${m?.arrived.toLocaleString() ?? 0} routed · no rerouting` : "Equal turns · independent queues")
-          : hasRun
-            ? `${m?.queued ?? 0} queued · ${((m?.utilization ?? 0) * 100).toFixed(0)}% busy`
-            : n.kind === "cache"
-              ? "Hits return · misses continue"
-              : "FIFO · bounded queue"}
+        {diagram ? (
+          <div className="node-footnote-diagram">
+            <span className={`node-cat-pill category-${categorySlug}`}>{category}</span>
+            <span className="node-footnote-text">Architecture node</span>
+          </div>
+        ) : isOpen ? (
+          nodeCounters ? (
+            <span className="node-counters">
+              <strong>{nodeCounters.completed ?? 0}</strong> done · <strong>{nodeCounters.failed ?? 0}</strong> failed
+            </span>
+          ) : (
+            "Configured behavior"
+          )
+        ) : n.kind === "traffic" ? (
+          "Seeded arrival stream"
+        ) : n.kind === "balancer" ? (
+          hasRun ? `${m?.arrived.toLocaleString() ?? 0} routed · no rerouting` : "Equal turns · independent queues"
+        ) : hasRun ? (
+          `${m?.queued ?? 0} queued · ${((m?.utilization ?? 0) * 100).toFixed(0)}% busy`
+        ) : n.kind === "cache" ? (
+          "Hits return · misses continue"
+        ) : (
+          "FIFO · bounded queue"
+        )}
       </div>
     </div>
   );
@@ -348,7 +364,7 @@ export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
               nodes[0];
             flow.setCenter(
               selected.position.x + 107,
-              selected.position.y + (selected.measured?.height ?? 78) / 2,
+              selected.position.y + 39,
               { zoom: 0.9 },
             );
           } else {
@@ -417,7 +433,7 @@ export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
         if (selected)
           flow.setCenter(
             selected.position.x + 107,
-            selected.position.y + (selected.measured?.height ?? 78) / 2,
+            selected.position.y + 39,
             { zoom: 0.9 },
           );
       } else flow.fitView({ padding: 0.15, maxZoom: 1 });
@@ -839,6 +855,34 @@ export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
 
     {/* Consolidated Floating Canvas Controls Dock */}
     <div className="canvas-floating-dock" role="toolbar" aria-label="Canvas controls">
+      {/* History: Undo & Redo */}
+      <div className="canvas-dock-group">
+        <button
+          type="button"
+          className="canvas-dock-btn"
+          aria-label="Undo"
+          title="Undo model edit (Cmd+Z)"
+          disabled={!editor.past.length}
+          onClick={editor.undo}
+        >
+          <Undo2 size={15} />
+          <span className="sr-only">Undo</span>
+        </button>
+        <button
+          type="button"
+          className="canvas-dock-btn"
+          aria-label="Redo"
+          title="Redo model edit (Cmd+Shift+Z)"
+          disabled={!editor.future.length}
+          onClick={editor.redo}
+        >
+          <Redo2 size={15} />
+          <span className="sr-only">Redo</span>
+        </button>
+      </div>
+
+      <div className="canvas-dock-divider" />
+
       {/* Tool Modes: Select & Pan */}
       <div className="canvas-dock-group">
         <button

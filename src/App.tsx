@@ -28,9 +28,12 @@ import {
   FilePlus,
   Image,
   GitBranch,
+  LayoutGrid,
+  FolderGit2,
 } from "lucide-react";
 import "./components/openWorkspace.css";
 import "./components/canvasFirst.css";
+import { StudioMenu } from "./components/StudioMenu";
 import { useEditor } from "./state/editor";
 import {
   isOpenGraph,
@@ -58,14 +61,14 @@ const ResultsPanel = lazy(() =>
     default: module.ResultsPanel,
   })),
 );
-const RevisionsPanel = lazy(() =>
-  import("./components/RevisionsPanel").then((module) => ({
-    default: module.RevisionsPanel,
-  })),
-);
 const OpenInspector = lazy(() =>
   import("./components/OpenInspector").then((module) => ({
     default: module.OpenInspector,
+  })),
+);
+const RevisionsPanel = lazy(() =>
+  import("./components/RevisionsPanel").then((module) => ({
+    default: module.RevisionsPanel,
   })),
 );
 
@@ -79,10 +82,12 @@ export default function App() {
     [saved, setSaved] = useState("Loading…"),
     [error, setError] = useState(""),
     [projects, setProjects] = useState<Project[]>([]),
-    [projectPanel, setProjectPanel] = useState(false),
+    [projectMenuOpen, setProjectMenuOpen] = useState(false),
+    [leftDrawerMode, setLeftDrawerMode] = useState<'components' | 'revisions' | null>(null),
     [assumptions, setAssumptions] = useState(false),
-    [checkpointName, setCheckpointName] = useState(""),
     [notice, setNotice] = useState("");
+  const catalogDrawerOpen = leftDrawerMode === 'components';
+  const setCatalogDrawerOpen = (open: boolean) => setLeftDrawerMode(open ? 'components' : null);
   const [componentSearch, setComponentSearch] = useState("");
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [resultsOpen, setResultsOpen] = useState(false),
@@ -90,7 +95,6 @@ export default function App() {
     [savingResult, setSavingResult] = useState(false),
     [resultName, setResultName] = useState("");
   const [showExportModal, setShowExportModal] = useState(false);
-  const [catalogDrawerOpen, setCatalogDrawerOpen] = useState(false);
   const [inspectorMode, setInspectorMode] = useState<'workloads' | 'tutorial' | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
@@ -117,10 +121,11 @@ export default function App() {
     setResultsOpen(false);
     setSelectedResult(null);
     setSavingResult(false);
-    setCatalogDrawerOpen(false);
+    setLeftDrawerMode(null);
     setInspectorMode(null);
     setSelectedEdgeId(null);
     setShowDetails(false);
+    setProjectMenuOpen(false);
   }, [project.id]);
   useEffect(() => {
     setSavingResult(false);
@@ -215,15 +220,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [notice]);
   useEffect(() => {
-    if (!projectPanel) return;
+    if (!projectMenuOpen && !leftDrawerMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setProjectPanel(false);
+        setProjectMenuOpen(false);
+        setLeftDrawerMode(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [projectPanel]);
+  }, [projectMenuOpen, leftDrawerMode]);
   const switchProject = async (p: Project) => {
     try {
       await saveQueue.current;
@@ -231,7 +237,7 @@ export default function App() {
       const isReadOnlyTarget = !isOpenGraph(p.graph);
       editor.load(p, isReadOnlyTarget);
       if (isReadOnlyTarget) setSaved("Read-only archive");
-      setProjectPanel(false);
+      setProjectMenuOpen(false);
     } catch {
       setError(
         "Could not save the current project. Export it before switching.",
@@ -239,7 +245,7 @@ export default function App() {
     }
   };
   const download = () => {
-    setProjectPanel(false);
+    setProjectMenuOpen(false);
     try {
       const a = document.createElement("a"),
         url = URL.createObjectURL(
@@ -254,7 +260,7 @@ export default function App() {
     }
   };
   const importFile = async (file?: File) => {
-    setProjectPanel(false);
+    setProjectMenuOpen(false);
     if (!file) return;
     try {
       const p = importProject(await file.text());
@@ -273,6 +279,7 @@ export default function App() {
           ? "Archive imported for inspection. Original preserved."
           : "Project imported as a new local copy.",
       );
+      setProjectMenuOpen(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not import this file.");
     }
@@ -307,6 +314,7 @@ export default function App() {
       )}
 
       {/* Top bar */}
+      {/* Top bar */}
       <header className="canvas-first-topbar studio-header experiment-heading" role="banner">
         <div className="canvas-first-topbar-row canvas-first-topbar-row-main">
           <div className="canvas-first-brand brand">
@@ -316,7 +324,23 @@ export default function App() {
             </span>
           </div>
 
-          <div className="canvas-first-project-rename-group">
+          <div className="canvas-first-project-switcher-group">
+            <button
+              type="button"
+              className={`canvas-first-btn subtle project-switch workspace-switch project-menu-btn ${projectMenuOpen ? "active" : ""}`}
+              onClick={() => {
+                setLeftDrawerMode(null);
+                setProjectMenuOpen(!projectMenuOpen);
+              }}
+              aria-expanded={projectMenuOpen}
+              aria-label={project.name}
+              title={`Switch or manage projects: ${project.name}`}
+            >
+              <FolderOpen size={16} />
+              <span className="project-switch-name">{project.name}</span>
+              <ChevronDown size={13} className={`project-switch-chevron ${projectMenuOpen ? "open" : ""}`} />
+            </button>
+
             <input
               aria-label="Project name"
               className="canvas-first-project-name-input"
@@ -332,19 +356,21 @@ export default function App() {
               disabled={isReadOnly}
               maxLength={80}
               placeholder="Project name"
-              title="Click to edit project name"
+              title="Click to rename project"
             />
-            <button
-              type="button"
-              className="canvas-first-btn canvas-first-project-save-btn"
-              onClick={handleSaveProjectName}
-              aria-label="Save project name"
-              title="Save project name"
-              disabled={isReadOnly || !projectNameInput.trim()}
-            >
-              <Check size={13} />
-              <span>Save</span>
-            </button>
+            {projectNameInput.trim() !== project.name && projectNameInput.trim().length > 0 && (
+              <button
+                type="button"
+                className="canvas-first-btn canvas-first-project-save-btn"
+                onClick={handleSaveProjectName}
+                aria-label="Save project name"
+                title="Save project name"
+                disabled={isReadOnly || !projectNameInput.trim()}
+              >
+                <Check size={13} />
+                <span>Save</span>
+              </button>
+            )}
           </div>
 
           <span className="save-status" role="status">
@@ -390,30 +416,16 @@ export default function App() {
 
       {/* Main Workspace Body */}
       <div className="canvas-first-body">
-        {/* Left Control Rail / Menu Bar */}
+        {/* Left Control Rail / Activity Bar */}
         <aside className="canvas-first-left-rail" role="toolbar" aria-label="Workspace controls">
           <div className="canvas-first-rail-group">
             <button
-              className={`canvas-first-rail-btn project-switch ${projectPanel ? "active" : ""}`}
+              className={`canvas-first-rail-btn ${leftDrawerMode === 'components' ? "active" : ""}`}
               onClick={() => {
-                if (!projectPanel) setCatalogDrawerOpen(false);
-                setProjectPanel(!projectPanel);
+                setProjectMenuOpen(false);
+                setLeftDrawerMode(leftDrawerMode === 'components' ? null : 'components');
               }}
-              aria-expanded={projectPanel}
-              title={`Menu: ${project.name}`}
-              aria-label={project.name}
-            >
-              <Menu size={18} />
-              <span className="canvas-first-rail-label">Menu</span>
-            </button>
-
-            <button
-              className={`canvas-first-rail-btn ${catalogDrawerOpen ? "active" : ""}`}
-              onClick={() => {
-                if (!catalogDrawerOpen) setProjectPanel(false);
-                setCatalogDrawerOpen(!catalogDrawerOpen);
-              }}
-              aria-expanded={catalogDrawerOpen}
+              aria-expanded={leftDrawerMode === 'components'}
               aria-label="Add component"
               title="Add component (Components catalog)"
             >
@@ -426,6 +438,7 @@ export default function App() {
               onClick={() => {
                 setSelectedEdgeId(null);
                 editor.select(null);
+                setLeftDrawerMode(null);
                 setInspectorMode(inspectorMode === 'workloads' ? null : 'workloads');
               }}
               aria-expanded={inspectorMode === 'workloads'}
@@ -437,11 +450,12 @@ export default function App() {
             </button>
 
             <button
-              className="canvas-first-rail-btn"
+              className={`canvas-first-rail-btn ${leftDrawerMode === 'revisions' ? "active" : ""}`}
               onClick={() => {
-                setCatalogDrawerOpen(false);
-                setProjectPanel(true);
+                setProjectMenuOpen(false);
+                setLeftDrawerMode(leftDrawerMode === 'revisions' ? null : 'revisions');
               }}
+              aria-expanded={leftDrawerMode === 'revisions'}
               aria-label="Architecture Revisions"
               title="Revisions & Checkpoints"
             >
@@ -450,26 +464,13 @@ export default function App() {
             </button>
 
             <button
-              className="canvas-first-rail-btn"
+              className={`canvas-first-rail-btn ${resultsOpen ? "active" : ""}`}
               onClick={() => {
-                setProjectPanel(false);
-                setCatalogDrawerOpen(false);
-                setShowExportModal(true);
+                setProjectMenuOpen(false);
+                setLeftDrawerMode(null);
+                setResultsOpen(!resultsOpen);
               }}
-              aria-label="Export options"
-              title="Export canvas or JSON"
-            >
-              <Download size={18} />
-              <span className="canvas-first-rail-label">Export</span>
-            </button>
-
-            <button
-              className="canvas-first-rail-btn"
-              onClick={() => {
-                setProjectPanel(false);
-                setCatalogDrawerOpen(false);
-                setResultsOpen(true);
-              }}
+              aria-expanded={resultsOpen}
               aria-label="Saved runs"
               title="Saved runs & comparisons"
             >
@@ -481,22 +482,17 @@ export default function App() {
           <div className="canvas-first-rail-bottom">
             <button
               className="canvas-first-rail-btn"
-              aria-label="Undo"
-              title="Undo model edit"
-              disabled={!editor.past.length}
-              onClick={editor.undo}
+              onClick={() => {
+                setLeftDrawerMode(null);
+                setShowExportModal(true);
+              }}
+              aria-label="Export options"
+              title="Export canvas or JSON"
             >
-              <Undo2 size={16} />
+              <Download size={18} />
+              <span className="canvas-first-rail-label">Export</span>
             </button>
-            <button
-              className="canvas-first-rail-btn"
-              aria-label="Redo"
-              title="Redo model edit"
-              disabled={!editor.future.length}
-              onClick={editor.redo}
-            >
-              <Redo2 size={16} />
-            </button>
+
             {guide && (
               <button
                 className={`canvas-first-rail-btn ${inspectorMode === 'tutorial' ? "active" : ""}`}
@@ -509,103 +505,127 @@ export default function App() {
                 }}
               >
                 <Info size={16} />
+                <span className="canvas-first-rail-label">Guide</span>
               </button>
             )}
           </div>
         </aside>
 
-        {/* Component Catalog Drawer (Floating Panel) */}
-        {catalogDrawerOpen && (
-          <aside className="canvas-first-catalog-drawer library" aria-label="Component catalog">
+        {/* Multi-Purpose Left Drawer Panel */}
+        {leftDrawerMode && (
+          <aside
+            className="canvas-first-catalog-drawer library"
+            aria-label={
+              leftDrawerMode === 'components'
+                ? "Component catalog"
+                : "Architecture revisions"
+            }
+          >
             <div className="canvas-first-catalog-header">
-              <h2>Components</h2>
+              <h2>
+                {leftDrawerMode === 'components' && "Components"}
+                {leftDrawerMode === 'revisions' && "Revisions & Checkpoints"}
+              </h2>
               <button
                 type="button"
                 className="canvas-first-btn subtle"
                 style={{ padding: '4px 8px', border: 0 }}
                 aria-label="Close component drawer"
-                onClick={() => setCatalogDrawerOpen(false)}
+                onClick={() => setLeftDrawerMode(null)}
               >
                 <X size={16} />
               </button>
             </div>
-            <label className="component-search">
-              <Search size={14} />
-              <input
-                aria-label="Search components"
-                placeholder="Search components"
-                value={componentSearch}
-                onChange={(event) => setComponentSearch(event.target.value)}
-                disabled={isReadOnly}
-              />
-            </label>
-            <div className="component-catalog">
-              {componentCategories.map((category) => {
-                const matches = componentCatalog.filter(
-                  (item) =>
-                    item.category === category &&
+
+            {leftDrawerMode === 'components' && (
+              <>
+                <label className="component-search">
+                  <Search size={14} />
+                  <input
+                    aria-label="Search components"
+                    placeholder="Search components"
+                    value={componentSearch}
+                    onChange={(event) => setComponentSearch(event.target.value)}
+                    disabled={isReadOnly}
+                  />
+                </label>
+                <div className="component-catalog">
+                  {componentCategories.map((category) => {
+                    const matches = componentCatalog.filter(
+                      (item) =>
+                        item.category === category &&
+                        `${item.label} ${item.description}`
+                          .toLowerCase()
+                          .includes(componentSearch.trim().toLowerCase()),
+                    );
+                    if (!matches.length) return null;
+                    return (
+                      <section key={category} className={`component-category category-${category.toLowerCase()}`}>
+                        <h3>{category}</h3>
+                        {matches.map((item) => {
+                          const Icon = icons[item.kind];
+                          const atNodeLimit = graph.nodes.length >= 100;
+                          const atWorkloadLimit =
+                            item.kind === "traffic" && (graph.workloads?.length ?? 0) >= 20;
+                          const disabled = isReadOnly || atNodeLimit || atWorkloadLimit;
+                          return (
+                            <button
+                              className="library-item"
+                              key={item.kind}
+                              disabled={disabled}
+                              draggable={!disabled}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("application/system-design-component", item.kind);
+                                e.dataTransfer.effectAllowed = "copy";
+                              }}
+                              onClick={() => {
+                                if (canvasControlsRef.current) {
+                                  canvasControlsRef.current.addAtVisibleCenter(item.kind);
+                                } else {
+                                  editor.add(item.kind);
+                                }
+                              }}
+                              title={
+                                atNodeLimit
+                                  ? "System has reached the 100-node limit."
+                                  : atWorkloadLimit
+                                    ? "Maximum 20 workloads reached."
+                                    : item.description
+                              }
+                            >
+                              <Icon size={18} />
+                              <span>{item.label}</span>
+                              <Plus size={14} />
+                            </button>
+                          );
+                        })}
+                      </section>
+                    );
+                  })}
+                  {!componentCatalog.some((item) =>
                     `${item.label} ${item.description}`
                       .toLowerCase()
                       .includes(componentSearch.trim().toLowerCase()),
-                );
-                if (!matches.length) return null;
-                return (
-                  <section key={category} className="component-category">
-                    <h3>{category}</h3>
-                    {matches.map((item) => {
-                      const Icon = icons[item.kind];
-                      const atNodeLimit = graph.nodes.length >= 100;
-                      const atWorkloadLimit =
-                        item.kind === "traffic" && (graph.workloads?.length ?? 0) >= 20;
-                      const disabled = isReadOnly || atNodeLimit || atWorkloadLimit;
-                      return (
-                        <button
-                          className="library-item"
-                          key={item.kind}
-                          disabled={disabled}
-                          draggable={!disabled}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData("application/system-design-component", item.kind);
-                            e.dataTransfer.effectAllowed = "copy";
-                          }}
-                          onClick={() => {
-                            if (canvasControlsRef.current) {
-                              canvasControlsRef.current.addAtVisibleCenter(item.kind);
-                            } else {
-                              editor.add(item.kind);
-                            }
-                          }}
-                          title={
-                            atNodeLimit
-                              ? "System has reached the 100-node limit."
-                              : atWorkloadLimit
-                                ? "Maximum 20 workloads reached."
-                                : item.description
-                          }
-                        >
-                          <Icon size={18} />
-                          <span>{item.label}</span>
-                          <Plus size={14} />
-                        </button>
-                      );
-                    })}
-                  </section>
-                );
-              })}
-              {!componentCatalog.some((item) =>
-                `${item.label} ${item.description}`
-                  .toLowerCase()
-                  .includes(componentSearch.trim().toLowerCase()),
-              ) && (
-                <p className="component-empty">
-                  No components match. Try “storage”, “edge”, or “queue”.
-                </p>
-              )}
-            </div>
-            <div className="library-caption">
-              Max 100 components and 20 workloads. Connect components to configure message and call flow.
-            </div>
-            <SubsystemsPanel key={project.id} />
+                  ) && (
+                    <p className="component-empty">
+                      No components match. Try “storage”, “edge”, or “queue”.
+                    </p>
+                  )}
+                </div>
+                <div className="library-caption">
+                  Max 100 components and 20 workloads. Connect components to configure message and call flow.
+                </div>
+                <SubsystemsPanel key={project.id} />
+              </>
+            )}
+
+            {leftDrawerMode === 'revisions' && (
+              <div className="drawer-revisions-content" style={{ padding: '4px 0', overflowY: 'auto' }}>
+                <Suspense fallback={<div className="scope-loading">Loading revisions…</div>}>
+                  <RevisionsPanel key={project.id} />
+                </Suspense>
+              </div>
+            )}
           </aside>
         )}
 
@@ -958,329 +978,55 @@ export default function App() {
         />
       )}
 
-      {/* Primary Nested Menu */}
-      {projectPanel && (
-        <div className="canvas-first-menu-backdrop" onClick={() => setProjectPanel(false)}>
-          <section
-            className="canvas-first-primary-menu project-panel"
-            onClick={(e) => e.stopPropagation()}
-            role="region"
-            aria-label="Local projects"
-          >
-            <div className="canvas-first-primary-menu-header">
-              <div className="canvas-first-primary-menu-title-row">
-                <Workflow size={16} className="canvas-first-menu-brand-icon" />
-                <h3>Project & Workspace Menu</h3>
-              </div>
-              <button
-                aria-label="Close projects"
-                className="canvas-first-icon-btn"
-                onClick={() => setProjectPanel(false)}
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="canvas-first-nested-menu-tree">
-              {/* 1. Create project */}
-              <div className="canvas-first-nested-item">
-                <div className="canvas-first-nested-header-row">
-                  <span className="canvas-first-nested-title">
-                    <Plus size={14} /> Create project
-                  </span>
-                  <span className="canvas-first-nested-badge">Templates</span>
-                </div>
-                <div className="canvas-first-nested-content">
-                  <button
-                    type="button"
-                    className="canvas-first-menu-action-btn"
-                    onClick={async () => {
-                      try {
-                        await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
-                        setProjectPanel(false);
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "Could not create project.");
-                      }
-                    }}
-                  >
-                    <FilePlus size={14} />
-                    <span>Blank system</span>
-                  </button>
-
-                  <div className="canvas-first-nested-subgroup">
-                    <span className="canvas-first-nested-subtitle">
-                      <Layers size={13} /> From template
-                    </span>
-                    <div className="canvas-first-template-buttons">
-                      <button
-                        type="button"
-                        className="canvas-first-btn subtle"
-                        onClick={() => {
-                          editor.loadArchitectureTemplate("realtime-chat");
-                          setProjectPanel(false);
-                          setNotice("Loaded Real-time chat template.");
-                        }}
-                        disabled={isReadOnly}
-                      >
-                        Real-time chat
-                      </button>
-                      <button
-                        type="button"
-                        className="canvas-first-btn subtle"
-                        onClick={() => {
-                          editor.loadArchitectureTemplate("ecommerce-checkout");
-                          setProjectPanel(false);
-                          setNotice("Loaded Ecommerce checkout template.");
-                        }}
-                        disabled={isReadOnly}
-                      >
-                        Ecommerce checkout
-                      </button>
-                      <button
-                        type="button"
-                        className="canvas-first-btn subtle"
-                        onClick={() => {
-                          editor.loadArchitectureTemplate("event-processing");
-                          setProjectPanel(false);
-                          setNotice("Loaded Event processing template.");
-                        }}
-                        disabled={isReadOnly}
-                      >
-                        Event processing
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="canvas-first-menu-action-btn"
-                    onClick={() => {
-                      setProjectPanel(false);
-                      setExamplesOpen(true);
-                    }}
-                    disabled={isReadOnly}
-                  >
-                    <Workflow size={14} />
-                    <span>Examples & tutorials</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Checkpoints options */}
-              <div className="canvas-first-nested-item checkpoints">
-                <div className="canvas-first-nested-header-row section-heading">
-                  <span className="canvas-first-nested-title">
-                    <BookmarkPlus size={14} /> Checkpoints options
-                  </span>
-                  <span className="canvas-first-nested-badge">{project.checkpoints.length} saved</span>
-                </div>
-                <div className="canvas-first-nested-content">
-                  {project.checkpoints.length ? (
-                    <div className="checkpoint-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
-                      {project.checkpoints.map((c) => (
-                        <button
-                          key={c.id}
-                          disabled={isReadOnly}
-                          onClick={() => {
-                            editor.restore(c.id);
-                            setProjectPanel(false);
-                            setNotice(`Restored “${c.name}”.`);
-                          }}
-                        >
-                          <span className="checkpoint-dot" />
-                          <span>{c.name}</span>
-                          <ChevronRight size={13} />
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="small muted">Keep a version before trying something new.</p>
-                  )}
-                  <fieldset disabled={isReadOnly} style={{ border: "none", padding: 0, margin: "8px 0 0 0" }}>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (isReadOnly) return;
-                        const ok = editor.checkpoint(
-                          checkpointName.trim() || `Checkpoint ${project.checkpoints.length + 1}`
-                        );
-                        if (ok) {
-                          setCheckpointName("");
-                          setNotice("Checkpoint saved with the current model and settings.");
-                        } else {
-                          setError("Could not save checkpoint. Maximum limit reached.");
-                        }
-                      }}
-                    >
-                      <input
-                        aria-label="Checkpoint name"
-                        placeholder="Name this checkpoint"
-                        value={checkpointName}
-                        maxLength={80}
-                        onChange={(e) => setCheckpointName(e.target.value)}
-                        disabled={isReadOnly}
-                      />
-                      <button className="subtle" type="submit" disabled={isReadOnly}>
-                        <Plus size={14} />
-                        Save checkpoint
-                      </button>
-                    </form>
-                  </fieldset>
-                </div>
-              </div>
-
-              {/* 3. Export options */}
-              <div className="canvas-first-nested-item">
-                <div className="canvas-first-nested-header-row">
-                  <span className="canvas-first-nested-title">
-                    <Download size={14} /> Export options
-                  </span>
-                  <span className="canvas-first-nested-badge">Canvas / JSON</span>
-                </div>
-                <div className="canvas-first-nested-content">
-                  <div className="canvas-first-menu-row">
-                    <button
-                      type="button"
-                      className="canvas-first-btn"
-                      onClick={() => {
-                        setProjectPanel(false);
-                        setShowExportModal(true);
-                      }}
-                    >
-                      <Image size={14} />
-                      Export canvas
-                    </button>
-                    <button type="button" className="canvas-first-btn" onClick={download}>
-                      <Download size={14} />
-                      Export JSON
-                    </button>
-                    <button
-                      type="button"
-                      className="canvas-first-btn"
-                      onClick={() => fileInput.current?.click()}
-                    >
-                      <Upload size={14} />
-                      Import JSON
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Switch project */}
-              <div className="canvas-first-nested-item">
-                <div className="canvas-first-nested-header-row">
-                  <span className="canvas-first-nested-title">
-                    <FolderOpen size={14} /> Switch project
-                  </span>
-                  <span className="canvas-first-nested-badge">{projects.length} projects</span>
-                </div>
-                <div className="canvas-first-nested-content">
-                  <div className="project-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
-                    {projects.map((p) => (
-                      <button key={p.id} onClick={() => switchProject(p)} aria-label={p.name}>
-                        <FolderOpen size={16} />
-                        <span>
-                          <strong>{p.name}</strong>
-                          <small>{new Date(p.updatedAt).toLocaleDateString()} · {p.graph.nodes.length} components</small>
-                        </span>
-                        {p.id === project.id && <Check size={16} />}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="canvas-first-btn"
-                    onClick={async () => {
-                      try {
-                        await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
-                      } catch (err) {
-                        setError(err instanceof Error ? err.message : "Could not create project.");
-                      }
-                    }}
-                  >
-                    <Plus size={14} /> New project
-                  </button>
-                </div>
-              </div>
-
-              {/* 5. Architecture Revisions */}
-              <div className="canvas-first-nested-item revisions-group">
-                <div className="canvas-first-nested-header-row">
-                  <span className="canvas-first-nested-title">
-                    <GitBranch size={14} /> Architecture Revisions
-                  </span>
-                  <span className="canvas-first-nested-badge">Snapshots</span>
-                </div>
-                <div className="canvas-first-nested-content">
-                  <Suspense fallback={null}>
-                    <RevisionsPanel key={project.id} />
-                  </Suspense>
-                </div>
-              </div>
-
-              {/* 6. Saved Runs & Results */}
-              <div className="canvas-first-nested-item">
-                <div className="canvas-first-nested-header-row">
-                  <span className="canvas-first-nested-title">
-                    <BarChart3 size={14} /> Saved runs & comparisons
-                  </span>
-                  <span className="canvas-first-nested-badge">{savedRuns.length} runs</span>
-                </div>
-                <div className="canvas-first-nested-content">
-                  <div className="saved-runs-library">
-                    <button
-                      className="saved-runs-heading"
-                      onClick={() => {
-                        setProjectPanel(false);
-                        setResultsOpen(true);
-                      }}
-                    >
-                      <BarChart3 size={16} />
-                      <span>Saved runs</span>
-                      <small>{savedRuns.length}</small>
-                    </button>
-                    {savedRuns.length ? (
-                      <div className="saved-runs-list" style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                        {savedRuns.slice().reverse().map((run) => (
-                          <button
-                            key={run.id}
-                            onClick={() => {
-                              setSelectedResult(run.id);
-                              setProjectPanel(false);
-                              setResultsOpen(true);
-                            }}
-                            title={run.name}
-                          >
-                            <span>{run.name}</span>
-                            <ChevronRight size={13} />
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="small muted">Finish a run, then save its result to compare later.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* 7. Model Semantics */}
-              <div className="canvas-first-nested-footer">
-                <button
-                  className="assumptions-link canvas-first-btn subtle"
-                  onClick={() => {
-                    setProjectPanel(false);
-                    setAssumptions(true);
-                  }}
-                >
-                  <Info size={15} />
-                  <span>How the model works</span>
-                  <ArrowUpRight size={13} />
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
+      {/* Unified Studio Menu */}
+      <StudioMenu
+        isOpen={projectMenuOpen}
+        onClose={() => setProjectMenuOpen(false)}
+        projects={projects}
+        currentProject={project}
+        editor={editor}
+        onSwitchProject={switchProject}
+        onCreateProject={async () => {
+          try {
+            await switchProject(newOpenProject(`Untitled system ${projects.length + 1}`));
+            setProjectMenuOpen(false);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not create project.");
+          }
+        }}
+        onLoadTemplate={(templateId) => {
+          editor.loadArchitectureTemplate(templateId);
+          setProjectMenuOpen(false);
+          const labels: Record<string, string> = {
+            "realtime-chat": "Real-time chat",
+            "ecommerce-checkout": "Ecommerce checkout",
+            "event-processing": "Event processing",
+          };
+          setNotice(`Loaded ${labels[templateId] ?? templateId} template.`);
+        }}
+        onOpenExamples={() => {
+          setProjectMenuOpen(false);
+          setExamplesOpen(true);
+        }}
+        onOpenSavedRuns={() => {
+          setProjectMenuOpen(false);
+          setResultsOpen(true);
+        }}
+        onOpenAssumptions={() => {
+          setProjectMenuOpen(false);
+          setAssumptions(true);
+        }}
+        onOpenExportModal={() => {
+          setProjectMenuOpen(false);
+          setShowExportModal(true);
+        }}
+        onDownloadJson={download}
+        onImportJson={() => fileInput.current?.click()}
+        savedRuns={savedRuns}
+        isReadOnly={isReadOnly}
+        setNotice={setNotice}
+        setError={setError}
+      />
 
       <input
         ref={fileInput}
