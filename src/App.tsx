@@ -307,14 +307,14 @@ export default function App() {
   return (
     <div className="studio canvas-first">
       {isReadOnly && (
-        <div className="archive-banner" role="status">
-          <div className="archive-banner-copy">
-            <TriangleAlert size={16} />
-            <strong>Read-only archive</strong> — Legacy system preserved for inspection.
+        <div className="archive-banner flex items-center justify-between gap-3 bg-amber-500/10 border-b border-amber-600/30 px-4 py-2 text-xs text-amber-800 dark:text-amber-300 shrink-0 z-20" role="status">
+          <div className="archive-banner-copy flex items-center gap-2">
+            <TriangleAlert size={15} className="shrink-0 text-amber-600 dark:text-amber-400" />
+            <span><strong>Read-only archive</strong> — Legacy system preserved for inspection.</span>
           </div>
-          <div className="archive-banner-actions">
-            <button onClick={download}>Export original</button>
-            <button onClick={handleCreateRunnableCopy}>Create runnable copy</button>
+          <div className="archive-banner-actions flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-background/80 border-amber-600/30 hover:bg-amber-500/15" onClick={download}>Export original</Button>
+            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-background/80 border-amber-600/30 hover:bg-amber-500/15 font-medium" onClick={handleCreateRunnableCopy}>Create runnable copy</Button>
           </div>
         </div>
       )}
@@ -384,15 +384,15 @@ export default function App() {
         {leftDrawerMode && (
           <aside
             data-testid={leftDrawerMode === 'components' ? "catalog-drawer" : "revisions-drawer"}
-            className="canvas-first-catalog-drawer library"
+            className="canvas-first-catalog-drawer library w-[270px] shrink-0 h-full overflow-y-auto bg-card border-r border-border flex flex-col z-20 p-4 box-border"
             aria-label={
               leftDrawerMode === 'components'
                 ? "Component catalog"
                 : "Architecture revisions"
             }
           >
-            <div className="canvas-first-catalog-header">
-              <h2>
+            <div className="canvas-first-catalog-header flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-foreground m-0">
                 {leftDrawerMode === 'components' && "Components"}
                 {leftDrawerMode === 'revisions' && "Revisions & Checkpoints"}
               </h2>
@@ -410,7 +410,7 @@ export default function App() {
 
             {leftDrawerMode === 'components' && (
               <>
-                <label className="component-search">
+                <label className="component-search flex items-center gap-2 border border-border rounded-md px-2.5 py-1 mb-3 bg-background focus-within:ring-2 focus-within:ring-teal-600/20 focus-within:border-teal-600 transition-all">
                   <Search size={14} />
                   <Input
                     aria-label="Search components"
@@ -447,7 +447,7 @@ export default function App() {
                           const disabled = isReadOnly || atNodeLimit || atWorkloadLimit;
                           return (
                             <button
-                              className="library-item"
+                              className="library-item flex items-center gap-2.5 px-2.5 py-2 border border-border/60 rounded-md bg-card text-foreground text-xs font-medium cursor-grab active:cursor-grabbing hover:bg-accent/60 hover:border-border transition-all w-full mb-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-left select-none"
                               key={item.kind}
                               disabled={disabled}
                               draggable={!disabled}
@@ -510,16 +510,16 @@ export default function App() {
         <main className="canvas-first-workspace workspace">
           <div className="canvas-first-canvas-container canvas-shell canvas-area">
             {graph.nodes.length === 0 && (
-              <div className="canvas-first-empty-prompt" role="region" aria-label="Empty canvas">
-                <h2>Empty canvas</h2>
-                <p>Add components from the library or choose an example architecture to begin.</p>
-                <div className="canvas-first-empty-actions">
-                  <button className="canvas-first-btn primary" onClick={() => setCatalogDrawerOpen(true)}>
+              <div className="canvas-first-empty-prompt absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center bg-card/95 backdrop-blur-md border border-border rounded-xl p-8 z-10 shadow-lg max-w-sm w-full mx-4" role="region" aria-label="Empty canvas">
+                <h2 className="text-base font-semibold text-foreground mb-1.5">Empty canvas</h2>
+                <p className="text-xs text-muted-foreground mb-5 leading-relaxed">Add components from the library or choose an example architecture to begin.</p>
+                <div className="canvas-first-empty-actions flex items-center justify-center gap-2.5">
+                  <Button className="canvas-first-btn primary bg-teal-600 hover:bg-teal-700 text-white text-xs h-8 gap-1.5" onClick={() => setCatalogDrawerOpen(true)}>
                     <Plus size={14} /> Add component
-                  </button>
-                  <button className="canvas-first-btn subtle" onClick={() => setExamplesOpen(true)}>
+                  </Button>
+                  <Button variant="outline" className="canvas-first-btn subtle text-xs h-8 gap-1.5" onClick={() => setExamplesOpen(true)}>
                     <Workflow size={14} /> <span>Examples & tutorials</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -546,15 +546,17 @@ export default function App() {
 
             {/* Floating Export Panel */}
             {showExportModal && (
-              <div className="canvas-first-export-panel">
+              <div className="canvas-first-export-panel absolute bottom-4 right-4 z-20 bg-card/95 backdrop-blur-md border border-border rounded-xl p-3 shadow-xl flex items-center gap-3 max-w-[calc(100%-32px)]">
                 <DiagramExport project={project} />
-                <button
-                  className="canvas-first-export-close"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="canvas-first-export-close h-7 w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
                   aria-label="Close export panel"
                   onClick={() => setShowExportModal(false)}
                 >
                   <X size={15} />
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -629,7 +631,7 @@ export default function App() {
 
           {/* Expandable Details Panel */}
           {showDetails && (
-            <div className="canvas-first-details-panel">
+            <div className="canvas-first-details-panel max-h-[320px] overflow-y-auto bg-card border-t border-border shrink-0 z-10">
               <OpenMetricsPanel
                 metrics={simulation.metrics}
                 previous={simulation.previous}
@@ -674,7 +676,7 @@ export default function App() {
           if (!isInspectorOpen) return null;
 
           return (
-            <aside className="canvas-first-inspector-dock inspector" aria-label="Inspector dock">
+            <aside className="canvas-first-inspector-dock inspector w-[340px] shrink-0 h-full overflow-y-auto bg-card border-l border-border flex flex-col z-20" aria-label="Inspector dock">
               {selectedEdgeId ? (
                 <OpenConnectionEditor
                   edgeId={selectedEdgeId}
@@ -712,32 +714,32 @@ export default function App() {
                   />
                 </Suspense>
               ) : inspectorMode === 'tutorial' && guide ? (
-                <section className="inspector open-inspector-container canvas-first-tutorial-panel optional-tutorial" role="region" aria-label="Tutorial instructions">
-                  <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h2 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{guide.title}</h2>
+                <section className="inspector open-inspector-container canvas-first-tutorial-panel optional-tutorial p-3 max-h-[180px] overflow-auto" role="region" aria-label="Tutorial instructions">
+                  <div className="inspector-heading flex items-center justify-between pb-2 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <h2 className="m-0 text-sm font-semibold text-foreground">{guide.title}</h2>
                     </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       aria-label="Close tutorial"
-                      className="subtle h-7 w-7 p-0"
+                      className="subtle h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                       onClick={() => setInspectorMode(null)}
                     >
                       <X size={16} />
                     </Button>
                   </div>
-                  <div className="inspector-body" style={{ padding: '16px' }}>
-                    <p style={{ fontSize: '12px', color: '#55665f', marginBottom: '14px', lineHeight: 1.4 }}>
+                  <div className="inspector-body p-3">
+                    <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
                       {guide.purpose}
                     </p>
-                    <ol style={{ paddingLeft: '20px', margin: 0, display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', lineHeight: 1.5, color: '#243b41' }}>
+                    <ol className="pl-5 m-0 flex flex-col gap-2 text-xs leading-relaxed text-foreground list-decimal">
                       {guide.steps.map((step) => (
                         <li key={step}>{step}</li>
                       ))}
                     </ol>
-                    <div style={{ marginTop: '20px' }}>
+                    <div className="mt-4">
                       <Button
                         type="button"
                         variant="outline"

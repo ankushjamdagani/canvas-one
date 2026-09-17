@@ -6,6 +6,7 @@ import { visibleSubsystems } from "../domain/subsystems";
 import { useEditor } from "../state/editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export type NoteFlowNode = Node<{ note: CanvasNote; attachmentLabel?: string }, "note">;
 export function CanvasNoteNode({ data, selected }: NodeProps<NoteFlowNode>) {
@@ -50,7 +51,15 @@ export function NoteInspector({ note }: { note: CanvasNote }) {
           className="h-8 mt-1"
         />
       </label>
-      <label>Note text<textarea rows={7} maxLength={1000} value={draft.body} onChange={event => setDraft({ ...draft, body: event.target.value })} /></label>
+      <label>Note text
+        <Textarea
+          rows={5}
+          maxLength={1000}
+          value={draft.body}
+          onChange={event => setDraft({ ...draft, body: event.target.value })}
+          className="mt-1"
+        />
+      </label>
       <span className="note-count">{draft.body.length} / 1000</span>
       <label>Link note to<select value={attachment} onChange={event => {
         const value = event.target.value;

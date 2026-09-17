@@ -35,10 +35,10 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
 
   if (!isExpanded) {
     return (
-      <section className="diagram-organizer compact" aria-label="Organize components">
+      <section className="diagram-organizer compact absolute top-3.5 right-3.5 z-10 p-1 bg-card/95 backdrop-blur-md border border-border rounded-lg shadow-md transition-all" aria-label="Organize components">
         {selectedIds.length === 1 && (
-          <div className="diagram-organizer-compact-row">
-            <span className="diagram-organizer-count">1 selected</span>
+          <div className="diagram-organizer-compact-row flex items-center justify-between gap-2 px-2 py-0.5 pb-1 border-b border-border/50 mb-1">
+            <span className="diagram-organizer-count text-[11px] font-semibold text-foreground">1 selected</span>
             <Button
               type="button"
               variant="ghost"
@@ -56,7 +56,7 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
           type="button"
           variant={editor.selectionMode ? "default" : "outline"}
           size="sm"
-          className={`selection-mode-toggle h-7 px-2 text-xs gap-1.5 ${editor.selectionMode ? "active" : ""}`}
+          className={`selection-mode-toggle h-7 px-2.5 text-xs gap-1.5 ${editor.selectionMode ? "active" : ""}`}
           aria-pressed={editor.selectionMode}
           onClick={() => onSelectionModeChange(!editor.selectionMode)}
         >
@@ -68,20 +68,23 @@ export function DiagramOrganization({ dimensions, onSelectComponent, onSelection
   }
 
   return (
-    <section className="diagram-organizer" aria-label="Organize components">
-      <div className="diagram-organizer-heading">
-        <div><strong>{selectedIds.length} selected</strong><span>Drag a box or click cards. Right-click to group.</span></div>
+    <section className="diagram-organizer absolute top-3.5 right-3.5 z-10 p-3 bg-card/95 backdrop-blur-md border border-border rounded-lg shadow-md flex flex-col gap-2.5 max-w-[240px]" aria-label="Organize components">
+      <div className="diagram-organizer-heading flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <strong className="text-xs font-semibold text-foreground">{selectedIds.length} selected</strong>
+          <span className="text-[10px] text-muted-foreground leading-tight">Drag a box or click cards. Right-click to group.</span>
+        </div>
         {selectedIds.length > 0 && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground shrink-0"
             aria-label="Clear component selection"
             title="Clear selection"
             onClick={() => editor.select(null)}
           >
-            <X size={15} />
+            <X size={14} />
           </Button>
         )}
       </div>

@@ -5,6 +5,7 @@ import { useEditor } from "../state/editor";
 import { groupingReason } from "../domain/grouping";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import "./canvasActions.css";
 
 export interface ContextMenuTarget {
@@ -135,7 +136,7 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
     if (formMode === "create") {
       content = (
         <form
-          className="canvas-menu-form"
+          className="canvas-menu-form flex flex-col gap-2 p-3"
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = nameInput.trim();
@@ -145,25 +146,25 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
             onClose();
           }}
         >
-          <label className="canvas-menu-form-label" htmlFor="new-subsystem-name">
+          <label className="canvas-menu-form-label text-xs font-semibold text-foreground mb-0.5 block" htmlFor="new-subsystem-name">
             New Subsystem
           </label>
           <Input
             id="new-subsystem-name"
             ref={inputRef}
-            className="canvas-menu-input h-8 text-xs mb-2"
+            className="canvas-menu-input h-8 text-xs mb-1 bg-background"
             maxLength={80}
             required
             placeholder="Subsystem name"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
           />
-          <div className="canvas-menu-form-actions flex items-center gap-2 justify-end">
+          <div className="canvas-menu-form-actions flex items-center gap-2 justify-end pt-1">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="canvas-menu-btn-secondary h-7 px-2 text-xs"
+              className="canvas-menu-btn-secondary h-7 px-2.5 text-xs"
               onClick={() => setFormMode(null)}
             >
               Cancel
@@ -184,17 +185,17 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
         <>
           <button
             role="menuitem"
-            className="canvas-menu-item"
+            className="canvas-menu-item flex items-center gap-2.5 w-full min-h-[36px] px-3.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left border-0 bg-transparent"
             disabled={!canGroup}
             onClick={() => {
               setNameInput("Subsystem");
               setFormMode("create");
             }}
           >
-            <Boxes size={16} />
-            Create subsystem ({selectedIds.length})
+            <Boxes size={15} className="shrink-0 text-muted-foreground" />
+            <span>Create subsystem ({selectedIds.length})</span>
           </button>
-          {reason && <div className="canvas-menu-hint">{reason}</div>}
+          {reason && <div className="canvas-menu-hint px-3.5 py-1 text-[11px] text-muted-foreground leading-snug">{reason}</div>}
         </>
       );
     }
@@ -205,7 +206,7 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
     if (formMode === "rename") {
       content = (
         <form
-          className="canvas-menu-form"
+          className="canvas-menu-form flex flex-col gap-2 p-3"
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = nameInput.trim();
@@ -215,24 +216,24 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
             onClose();
           }}
         >
-          <label className="canvas-menu-form-label" htmlFor="rename-subsystem-name">
+          <label className="canvas-menu-form-label text-xs font-semibold text-foreground mb-0.5 block" htmlFor="rename-subsystem-name">
             Rename Subsystem
           </label>
           <Input
             id="rename-subsystem-name"
             ref={inputRef}
-            className="canvas-menu-input h-8 text-xs mb-2"
+            className="canvas-menu-input h-8 text-xs mb-1 bg-background"
             maxLength={80}
             required
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
           />
-          <div className="canvas-menu-form-actions flex items-center gap-2 justify-end">
+          <div className="canvas-menu-form-actions flex items-center gap-2 justify-end pt-1">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="canvas-menu-btn-secondary h-7 px-2 text-xs"
+              className="canvas-menu-btn-secondary h-7 px-2.5 text-xs"
               onClick={() => setFormMode(null)}
             >
               Cancel
@@ -253,40 +254,40 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
         <>
           <button
             role="menuitem"
-            className="canvas-menu-item"
+            className="canvas-menu-item flex items-center gap-2.5 w-full min-h-[36px] px-3.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left border-0 bg-transparent"
             disabled={isReadOnly}
             onClick={() => {
               setNameInput(group.name);
               setFormMode("rename");
             }}
           >
-            <Edit2 size={16} />
-            Rename
+            <Edit2 size={15} className="shrink-0 text-muted-foreground" />
+            <span>Rename</span>
           </button>
           <button
             role="menuitem"
-            className="canvas-menu-item"
+            className="canvas-menu-item flex items-center gap-2.5 w-full min-h-[36px] px-3.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left border-0 bg-transparent"
             disabled={isReadOnly}
             onClick={() => {
               editor.toggleSubsystem(group.id);
               onClose();
             }}
           >
-            {group.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-            {group.collapsed ? "Expand subsystem" : "Collapse subsystem"}
+            {group.collapsed ? <ChevronRight size={15} className="shrink-0 text-muted-foreground" /> : <ChevronDown size={15} className="shrink-0 text-muted-foreground" />}
+            <span>{group.collapsed ? "Expand subsystem" : "Collapse subsystem"}</span>
           </button>
-          <div className="canvas-menu-separator" role="separator" />
+          <Separator className="canvas-menu-separator my-1" role="separator" />
           <button
             role="menuitem"
-            className="canvas-menu-item"
+            className="canvas-menu-item flex items-center gap-2.5 w-full min-h-[36px] px-3.5 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left border-0 bg-transparent"
             disabled={isReadOnly}
             onClick={() => {
               editor.dissolveSubsystem(group.id);
               onClose();
             }}
           >
-            <Ungroup size={16} />
-            Ungroup
+            <Ungroup size={15} className="shrink-0" />
+            <span>Ungroup</span>
           </button>
         </>
       );
@@ -295,7 +296,7 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
     content = (
       <button
         role="menuitem"
-        className="canvas-menu-item"
+        className="canvas-menu-item flex items-center gap-2.5 w-full min-h-[36px] px-3.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-left border-0 bg-transparent"
         disabled={isReadOnly || (editor.project.graph.notes?.length ?? 0) >= 100}
         onClick={() => {
           const flowPos = screenToFlowPosition
@@ -305,8 +306,8 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
           onClose();
         }}
       >
-        <Edit2 size={16} />
-        Add canvas note
+        <Edit2 size={15} className="shrink-0 text-muted-foreground" />
+        <span>Add canvas note</span>
       </button>
     );
   } else {
@@ -318,7 +319,7 @@ export function CanvasContextMenu({ target, onClose, screenToFlowPosition }: Can
       ref={menuRef}
       role="menu"
       tabIndex={-1}
-      className="canvas-context-menu"
+      className="canvas-context-menu fixed z-50 min-w-[220px] max-w-[min(320px,calc(100vw-24px))] max-h-[calc(100dvh-24px)] overflow-y-auto bg-card text-card-foreground border border-border rounded-xl py-1.5 shadow-2xl font-sans text-xs focus:outline-none"
       style={{ left: coords.x, top: coords.y }}
       onKeyDown={handleMenuKeyDown}
     >

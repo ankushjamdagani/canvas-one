@@ -18,13 +18,13 @@ export function SubsystemsPanel() {
         <h2>Subsystems</h2>
         <Boxes size={16} />
       </summary>
-      <div className="subsystems-panel-list">
+      <div className="subsystems-panel-list flex flex-col gap-1.5 mt-2">
         {allSubsystems.map((group) => {
           const isVisible = visibleIds.has(group.id);
           return (
-            <div className="subsystems-panel-item" key={group.id}>
+            <div className="subsystems-panel-item flex items-center justify-between gap-2 p-1.5 px-2 bg-card border border-border rounded-md hover:border-border/80 transition-colors" key={group.id}>
               <button
-                className="subsystems-panel-btn"
+                className="subsystems-panel-btn inline-flex items-center gap-2 flex-1 border-0 bg-transparent text-xs font-medium text-left cursor-pointer min-h-[32px] text-foreground hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                 disabled={!isVisible}
                 onClick={() => {
                   if (isVisible) {
@@ -35,11 +35,11 @@ export function SubsystemsPanel() {
                 aria-label={`${group.collapsed ? "Expand" : "Collapse"} subsystem ${group.name}`}
               >
                 {group.collapsed ? (
-                  <ChevronRight size={14} />
+                  <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
                 ) : (
-                  <ChevronDown size={14} />
+                  <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
                 )}
-                <span>{group.name}</span>
+                <span className="truncate">{group.name}</span>
                 {!isVisible && (
                   <Badge variant="secondary" className="subsystems-badge dormant text-[10px] px-1 py-0 h-4 text-amber-600 dark:text-amber-400" title="Contains missing components">
                     dormant
@@ -49,7 +49,7 @@ export function SubsystemsPanel() {
                   {group.nodeIds.length}
                 </Badge>
               </button>
-              <div className="subsystems-actions">
+              <div className="subsystems-actions shrink-0">
                 <Button
                   type="button"
                   variant="ghost"
@@ -67,10 +67,10 @@ export function SubsystemsPanel() {
           );
         })}
       </div>
-      <p className="subsystems-instructions">
+      <p className="subsystems-instructions text-xs text-muted-foreground mt-2 leading-relaxed">
         Select components on the canvas and right-click (or press Selection actions) to create or manage subsystems.
       </p>
-      <p>{isDiagramGraph(editor.project.graph) ? "Draw a named boundary around related components." : "Group the view. The model stays the same."}</p>
+      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{isDiagramGraph(editor.project.graph) ? "Draw a named boundary around related components." : "Group the view. The model stays the same."}</p>
     </details>
   );
 }

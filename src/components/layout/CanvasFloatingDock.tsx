@@ -57,7 +57,7 @@ export function CanvasFloatingDock({
         data-testid="canvas-floating-dock"
         className={cn(
           "canvas-floating-dock",
-          "flex items-center gap-1 rounded-lg border border-border bg-background/95 backdrop-blur-md px-1.5 py-1 shadow-md select-none"
+          "absolute bottom-2 left-2 sm:bottom-3.5 sm:left-3.5 z-10 flex max-w-[calc(100%-16px)] items-center gap-1 overflow-x-auto rounded-lg border border-border bg-background/95 backdrop-blur-md px-1.5 py-1 shadow-md select-none pointer-events-auto"
         )}
         role="toolbar"
         aria-label="Canvas controls"

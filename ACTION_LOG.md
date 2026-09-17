@@ -780,3 +780,70 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `git diff --check`: Clean formatting with 0 whitespace errors.
 - **Limitations & follow-up**:
   - Full modernization with shadcn-ui and Tailwind CSS is complete across all components and layouts in the workspace. All simulation invariants and persistence formats remain strictly preserved.
+
+## 2026-09-17 — Form Controls Modernization, Textarea Primitive & Visual Polish Completed
+
+- **Outcome**: Modernized form controls, textareas, selects, and cards across the entire application using shadcn-ui primitives, Tailwind CSS tokens, and refined craft per `/impeccable` and `/design-taste-frontend`, while maintaining 100% test passing and strict discrete-event simulation invariants.
+- **Files and systems changed**:
+  - Installed official shadcn-ui primitive:
+    - [`src/components/ui/textarea.tsx`](src/components/ui/textarea.tsx): `Textarea` component with semantic tokens (`border-input`, `bg-transparent`, `focus-visible:ring-ring`, `rounded-md`).
+  - Integrated `Textarea` across all multi-line form fields:
+    - [`src/components/RevisionsPanel.tsx`](src/components/RevisionsPanel.tsx): Replaced raw textareas for revision reason and explanation fields.
+    - [`src/components/OpenInspector.tsx`](src/components/OpenInspector.tsx): Replaced raw textarea for node description / operational context.
+    - [`src/components/CanvasNotes.tsx`](src/components/CanvasNotes.tsx): Replaced raw textarea for canvas note body.
+    - [`src/components/Inspector.tsx`](src/components/Inspector.tsx): Replaced raw textarea for component responsibility / technology field.
+  - Integrated `Separator` across inspectors:
+    - [`src/components/Inspector.tsx`](src/components/Inspector.tsx): Replaced legacy `.section-rule` divs with shadcn `Separator`.
+    - [`src/components/OpenConnectionEditor.tsx`](src/components/OpenConnectionEditor.tsx): Added `Separator` before conditional match section.
+  - Modernized form control styles and typography:
+    - [`src/styles.css`](src/styles.css): Modernized `<select>` with inline SVG chevron, semantic tokens (`var(--border)`, `var(--card)`, `var(--foreground)`), hover states, and focus ring. Modernized `.field` and `.input-unit` with `:focus-within` rings, tabular numeric unit labels, and crisp borders.
+    - [`src/components/openInspector.css`](src/components/openInspector.css): Modernized `.open-workload-card`, `.open-class-card`, `.open-connection-editor`, `.open-review-banner`, and `.open-metrics-grid` with semantic tokens and subtle elevations.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: shadcn-ui primitives, Tailwind CSS v4, Graphify AST update, Vitest, Playwright Test, Modern Web Guidance, Impeccable Design Taste.
+- **Verification performed**:
+  - `npm test`: All 233 unit tests pass across 36 test files in 1.78s.
+  - `npm run build`: Clean TypeScript compilation and Vite production build in 546ms with zero errors.
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 Playwright E2E production Chromium journeys pass with 100% stability across 5 parallel workers in 26.5s.
+  - `graphify update .`: AST-extracted 143/143 files without LLM cost; updated graph to 1155 nodes, 2999 edges, 110 communities.
+  - `git diff --check`: Clean formatting with 0 whitespace errors.
+- **Limitations & follow-up**:
+  - All form controls, inputs, textareas, selects, and dialogs in the application now utilize shadcn-ui components and Tailwind CSS v4 tokens, providing an elevated, unified visual language and tactile user experience.
+
+## 2026-09-17 — Best Practices Architecture Refactor & Minimal Vanilla CSS Migration Completed
+
+- **Outcome**: Comprehensive code review and refactoring applying software development and web best practices across the codebase: implemented React 19 Error Boundary architecture, HTML meta tags, enhanced WCAG 2.2 accessibility, purged over 1,400 lines of legacy vanilla CSS across 6 style modules, migrated components to Tailwind CSS v4 utility classes and shadcn primitives, while strictly preserving all simulation invariants, persistence format stability, and 100% test passing across all 233 unit tests and 45 Playwright E2E production journeys.
+- **Files and systems changed**:
+  - React & Web Architecture:
+    - [`src/components/ErrorBoundary.tsx`](src/components/ErrorBoundary.tsx): Created robust React Error Boundary component catching render crashes with user-friendly recovery actions ("Try Again", "Reload Application"), error details, and alert styling.
+    - [`src/main.tsx`](src/main.tsx): Wrapped root `<App />` with `<ErrorBoundary>` for enterprise resilience.
+    - [`index.html`](index.html): Added standard `<meta name="description">` and `<meta name="color-scheme" content="light dark">` tags for web standards and SEO.
+  - Component Tailwind Refactoring:
+    - [`src/components/layout/CanvasFloatingDock.tsx`](src/components/layout/CanvasFloatingDock.tsx): Converted dock container to `absolute bottom-2 left-2 sm:bottom-3.5 sm:left-3.5 z-10 flex max-w-[calc(100%-16px)]` eliminating parent document flow expansion.
+    - [`src/components/ArchitectureCanvas.tsx`](src/components/ArchitectureCanvas.tsx): Applied `overflow: hidden` on `.system-canvas` preventing container scroll offsets during viewport operations.
+    - [`src/components/CanvasContextMenu.tsx`](src/components/CanvasContextMenu.tsx): Converted menu shell and items from vanilla CSS to Tailwind utility classes.
+    - [`src/components/SubsystemsPanel.tsx`](src/components/SubsystemsPanel.tsx): Replaced custom styling with Tailwind flex, borders, and badges.
+    - [`src/components/OpenMetricsPanel.tsx`](src/components/OpenMetricsPanel.tsx): Replaced custom summary and card CSS with Tailwind grid and typography tokens.
+    - [`src/components/OpenConnectionEditor.tsx`](src/components/OpenConnectionEditor.tsx): Replaced custom editor CSS with clean Tailwind utility classes.
+    - [`src/components/OpenInspector.tsx`](src/components/OpenInspector.tsx): Cleaned legacy banner classes in favor of Tailwind flex, borders, and backgrounds.
+    - [`src/components/layout/TopBar.tsx`](src/components/layout/TopBar.tsx): Converted to single-row flex layout with strict non-wrapping and gap alignment.
+    - [`src/components/layout/ResultsStrip.tsx`](src/components/layout/ResultsStrip.tsx): Converted strip container, stat blocks, and control triggers to Tailwind styling.
+    - [`src/components/DiagramExport.tsx`](src/components/DiagramExport.tsx): Replaced export modal CSS with Tailwind classes.
+    - [`src/components/DiagramOrganization.tsx`](src/components/DiagramOrganization.tsx): Converted organization panel to Tailwind flex, badges, and buttons.
+    - [`src/App.tsx`](src/App.tsx): Replaced inline and custom CSS in drawer, empty state prompts, export panel, details panel, and inspector dock with Tailwind classes.
+  - Minimal Vanilla CSS Consolidation (1,400+ lines removed):
+    - [`src/components/canvasActions.css`](src/components/canvasActions.css): Minified from 352 lines to 9 lines (only context menu z-index and stubs retained).
+    - [`src/components/workspaceMenu.css`](src/components/workspaceMenu.css): Minified from 668 lines to 26 lines (retained keyframe animations and z-index: 1050).
+    - [`src/components/openWorkspace.css`](src/components/openWorkspace.css): Minified from 385 lines to 11 lines (retained mobile touch target and canvas heights).
+    - [`src/components/openInspector.css`](src/components/openInspector.css): Pruned redundant metric grid and review banner declarations.
+    - [`src/components/canvasFirst.css`](src/components/canvasFirst.css): Removed 190 lines of obsolete prototype menu backdrops and duplicates.
+- **Platform / subagents**: agy (lead).
+- **Skills and tools applied**: best-practices, modern-web-guidance, impeccable, design-taste-frontend, tailwindcss v4, Vitest, Playwright Test, Graphify.
+- **Verification performed**:
+  - `npx tsc -b`: 0 errors.
+  - `npm test`: All 233 unit tests pass across 36 test files in 2.02s.
+  - `npm run build`: Clean production build in 527ms with zero errors.
+  - `TEST_PRODUCTION=1 npm run test:e2e`: All 45 Playwright E2E production journeys pass with 100% stability across 5 parallel workers in 25.5s.
+  - `graphify update .`: AST-extracted 145/145 uncached files; updated knowledge graph to 1166 nodes, 3026 edges, 107 communities.
+  - `git diff --check`: 0 formatting or whitespace errors.
+- **Limitations & follow-up**:
+  - The codebase adheres strictly to modern web best practices, React 19 safety patterns, and Tailwind CSS utility styling with minimal vanilla CSS remaining only for necessary XYFlow SVG/canvas primitives and responsive touch rules.

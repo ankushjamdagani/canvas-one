@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Textarea } from '@/components/ui/textarea';
 import './openInspector.css';
 
 import { X, AlertCircle } from 'lucide-react';
@@ -315,12 +316,13 @@ export function OpenInspector({
 
               <label className="field">
                 <span>Description / Notes</span>
-                <textarea
+                <Textarea
                   rows={2}
                   maxLength={240}
                   value={selectedNode.description ?? ''}
                   onChange={(e) => handleDescriptionChange(e.target.value)}
                   placeholder="Operational context (max 240 chars)"
+                  className="min-h-[52px]"
                 />
               </label>
 
@@ -536,38 +538,38 @@ export function OpenInspector({
             {nodeMetrics && (
               <div className="open-inspector-section">
                 <span className="open-inspector-section-title">Observed Resource Metrics</span>
-                <div className="open-metrics-grid">
-                  <div className="open-metric-item">
-                    <span className="open-metric-label">Utilization</span>
-                    <span className="open-metric-val">{Math.round(nodeMetrics.utilization * 100)}%</span>
+                <div className="open-metrics-grid grid grid-cols-2 gap-2 bg-muted/40 p-2.5 rounded-lg border border-border mb-2">
+                  <div className="open-metric-item flex flex-col gap-0.5">
+                    <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Utilization</span>
+                    <span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{Math.round(nodeMetrics.utilization * 100)}%</span>
                   </div>
-                  <div className="open-metric-item">
-                    <span className="open-metric-label">Active Slots</span>
-                    <span className="open-metric-val">
+                  <div className="open-metric-item flex flex-col gap-0.5">
+                    <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Active Slots</span>
+                    <span className="open-metric-val text-xs font-bold text-foreground tabular-nums">
                       {nodeMetrics.activeWorkers} / {behavior.type === 'source' || behavior.type === 'broker' ? 0 : behavior.concurrency}
                     </span>
                   </div>
-                  <div className="open-metric-item">
-                    <span className="open-metric-label">Queue Waiting</span>
-                    <span className="open-metric-val">
+                  <div className="open-metric-item flex flex-col gap-0.5">
+                    <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Queue Waiting</span>
+                    <span className="open-metric-val text-xs font-bold text-foreground tabular-nums">
                       {nodeMetrics.queued} / {behavior.queueLimit}
                     </span>
                   </div>
-                  <div className="open-metric-item">
-                    <span className="open-metric-label">Completed</span>
-                    <span className="open-metric-val">{nodeMetrics.completed}</span>
+                  <div className="open-metric-item flex flex-col gap-0.5">
+                    <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Completed</span>
+                    <span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{nodeMetrics.completed}</span>
                   </div>
-                  <div className="open-metric-item">
-                    <span className="open-metric-label">Rejected</span>
-                    <span className="open-metric-val">{nodeMetrics.rejected}</span>
+                  <div className="open-metric-item flex flex-col gap-0.5">
+                    <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Rejected</span>
+                    <span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{nodeMetrics.rejected}</span>
                   </div>
-                  <div className="open-metric-item"><span className="open-metric-label">Slot occupancy</span><span className="open-metric-val">{Math.round(nodeMetrics.occupancy * 100)}%</span></div>
-                  <div className="open-metric-item"><span className="open-metric-label">Waiting for downstream</span><span className="open-metric-val">{nodeMetrics.waiting}</span></div>
-                  <div className="open-metric-item"><span className="open-metric-label">Expired / cancelled cleanup</span><span className="open-metric-val">{nodeMetrics.cleanupProcessing}</span></div>
+                  <div className="open-metric-item flex flex-col gap-0.5"><span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Slot occupancy</span><span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{Math.round(nodeMetrics.occupancy * 100)}%</span></div>
+                  <div className="open-metric-item flex flex-col gap-0.5"><span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Waiting for downstream</span><span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{nodeMetrics.waiting}</span></div>
+                  <div className="open-metric-item flex flex-col gap-0.5"><span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Expired / cancelled cleanup</span><span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{nodeMetrics.cleanupProcessing}</span></div>
                   {(
-                    <div className="open-metric-item">
-                      <span className="open-metric-label">Retrying</span>
-                      <span className="open-metric-val">{nodeMetrics.retrying}</span>
+                    <div className="open-metric-item flex flex-col gap-0.5">
+                      <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Retrying</span>
+                      <span className="open-metric-val text-xs font-bold text-foreground tabular-nums">{nodeMetrics.retrying}</span>
                     </div>
                   )}
                 </div>

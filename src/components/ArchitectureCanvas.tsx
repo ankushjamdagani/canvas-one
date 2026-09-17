@@ -489,7 +489,7 @@ export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
       } else flow.fitView({ padding: 0.23, maxZoom: 1, duration: 0 });
     }, 80);
     return () => clearTimeout(timer);
-  }, [nodeIdentity, flow, mobile, editor.selected, g.nodes, g.notes]);
+  }, [nodeIdentity, flow, mobile, mobile ? editor.selected : null]);
   const baseNodes: ArchitectureNode[] = useMemo(
     () =>
       g.nodes.map((n) => ({
@@ -647,7 +647,7 @@ export const ArchitectureCanvas = forwardRef<CanvasControlsHandle, {
     <div
       ref={canvasRef}
       className="system-canvas"
-      style={{ width: "100%", height: "100%", position: "relative", minHeight: 380 }}
+      style={{ width: "100%", height: "100%", position: "relative", minHeight: 380, overflow: "hidden" }}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Delete" || e.key === "Backspace") {

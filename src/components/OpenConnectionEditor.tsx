@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 export function OpenConnectionEditor({
   edgeId,
@@ -100,8 +101,8 @@ export function OpenConnectionEditor({
           </p>
 
           {edge.needsReview && (
-            <div className="open-review-banner">
-              <span className="open-review-banner-text">
+            <div className="open-review-banner bg-amber-500/10 border border-amber-600/30 rounded-md p-2.5 flex flex-col gap-1.5">
+              <span className="open-review-banner-text text-xs text-amber-800 dark:text-amber-300 font-medium">
                 Review Required: This connection topology or behavior changed. Please confirm or update the transport properties below.
               </span>
               <Button
@@ -217,8 +218,10 @@ export function OpenConnectionEditor({
           )}
 
           {routerSource?.strategy === 'conditional' && (
-            <div className="open-inspector-section" style={{ borderTop: '1px solid #e1e7e3', paddingTop: '8px' }}>
-              <span className="open-inspector-section-title">Router Conditional Match</span>
+            <>
+              <Separator className="my-2" />
+              <div className="open-inspector-section">
+                <span className="open-inspector-section-title">Router Conditional Match</span>
               <div className="flex items-center gap-2 py-1 mb-2">
                 <Switch
                   id="fallback-route-toggle"
@@ -281,7 +284,8 @@ export function OpenConnectionEditor({
                 </>
               )}
             </div>
-          )}
+          </>
+        )}
 
           <div className="open-inspector-actions">
             <Button

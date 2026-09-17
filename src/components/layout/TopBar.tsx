@@ -61,7 +61,7 @@ export function TopBar({
         data-testid="topbar"
         className={cn(
           "canvas-first-topbar studio-header experiment-heading",
-          "flex flex-wrap items-center justify-between px-3 py-1.5 border-b border-border bg-background/95 backdrop-blur-md z-30 select-none"
+          "flex items-center justify-between px-3 h-12 min-h-[48px] border-b border-border bg-background/95 backdrop-blur-md z-30 select-none"
         )}
         role="banner"
       >
@@ -154,7 +154,7 @@ export function TopBar({
           </span>
         </div>
 
-        <div className="canvas-first-topbar-row canvas-first-topbar-row-tools flex items-center gap-1.5 mt-1 sm:mt-0">
+        <div className="canvas-first-topbar-row canvas-first-topbar-row-tools flex items-center gap-1.5 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

@@ -23,7 +23,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useEditor } from "../state/editor";
@@ -56,7 +58,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
       <div className="inspector-body">
         <h2>Compose before you calculate.</h2>
         <p>Use the component library to map responsibilities, data stores, asynchronous paths, edge services, and operational dependencies.</p>
-        <div className="section-rule" />
+        <Separator className="my-4" />
         <h3>Build the path</h3>
         <p>Search the library, add a component, and drag between handles to connect it. Select any component to name its responsibility or record a technology choice.</p>
         <div className="note"><Info size={16} /><p>This is a visual architecture layer. Switch to an experiment path when you want exact queueing and capacity simulation.</p></div>
@@ -77,7 +79,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
             spend their time.
           </p>
           <ExperimentCoach project={editor.project} metrics={metrics} />
-          <div className="section-rule" />
+          <Separator className="my-4" />
           <WorkloadControls />
           <NumberField
             label="Workload seed"
@@ -135,7 +137,7 @@ export function Inspector({ metrics }: { metrics: Metrics | null }) {
         <div className="status-callout"><Icon size={22} /><div><strong>{n.kind === "custom" ? n.customType : definition.label}</strong><p>{definition.description}</p></div></div>
         {n.kind === "custom" && <label className="field"><span>Type label</span><Input className="h-8 text-xs" value={n.customType ?? ""} maxLength={60} onChange={(event) => editor.updateNode(n.id, { customType: event.target.value })} /></label>}
         <label className="field"><span>Component name</span><Input className="h-8 text-xs" value={n.name} maxLength={80} onChange={(event) => editor.updateNode(n.id, { name: event.target.value })} /></label>
-        <label className="field"><span>Responsibility or technology</span><textarea value={n.description ?? ""} maxLength={240} rows={5} placeholder="What does this component own? Add a technology, protocol, or design decision." onChange={(event) => editor.updateNode(n.id, { description: event.target.value })} /></label>
+        <label className="field"><span>Responsibility or technology</span><Textarea value={n.description ?? ""} maxLength={240} rows={4} placeholder="What does this component own? Add a technology, protocol, or design decision." onChange={(event) => editor.updateNode(n.id, { description: event.target.value })} className="mt-1 min-h-[72px]" /></label>
         <div className="note"><Info size={16} /><p>Connect either side of the component. Diagram components document architecture; they do not invent simulation behavior.</p></div>
         <Button variant="outline" size="sm" className="duplicate-component w-full justify-center gap-1.5 h-8 text-xs" disabled={g.nodes.length >= 100} onClick={() => editor.duplicateNode(n.id)}><Copy size={15} />Duplicate component</Button>
         {g.nodes.length >= 100 && <p className="field-help" role="status">Duplication is unavailable at 100 components. Delete one to make room.</p>}

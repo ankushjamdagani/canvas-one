@@ -3,6 +3,7 @@ import { architectureSnapshot, compareArchitectures, MAX_REVISIONS, validateRevi
 import { useEditor } from "../state/editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const empty: RevisionDetails = { name: "", author: "", reason: "", message: "", issue: "" };
 export function RevisionsPanel() {
@@ -51,12 +52,12 @@ export function RevisionsPanel() {
       {([['name', 'Revision name', 80], ['author', 'Author name', 80], ['reason', 'Reason for change', 500], ['message', 'Change explanation', 1000], ['issue', 'Linked issue URL (optional)', 240]] as const).map(([key, label, maxLength]) => <label className="field" key={key}>
         <span>{label}</span>
         {key === "reason" || key === "message" ? (
-          <textarea
+          <Textarea
             required
             maxLength={maxLength}
             value={details[key]}
             onChange={e => setDetails({ ...details, [key]: e.target.value })}
-            className="w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-[64px]"
           />
         ) : (
           <Input
