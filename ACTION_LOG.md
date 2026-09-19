@@ -847,3 +847,15 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `git diff --check`: 0 formatting or whitespace errors.
 - **Limitations & follow-up**:
   - The codebase adheres strictly to modern web best practices, React 19 safety patterns, and Tailwind CSS utility styling with minimal vanilla CSS remaining only for necessary XYFlow SVG/canvas primitives and responsive touch rules.
+
+## 2026-09-17
+
+### Design critique — canvas-first workspace (Claude, `/design:design-critique`)
+
+- **Outcome**: Structured critique delivered in-conversation; no code changed.
+- **Changed**: none (this log entry only).
+- **Platform and subagents**: Claude lead, no children.
+- **Skills and tools**: `design:design-critique`; built-in browser preview (`vite-dev` at 1440×900) with DOM/computed-style inspection.
+- **Verification**: Live walkthrough of empty state, examples dialog, loaded "Real-time chat" example, run, details dock, inspector, components library, workloads panel.
+- **Key findings**: (1) unlayered `button`/`input` rules in `src/styles.css:113-150` override Tailwind v4 utilities → active tool state and workload `Switch` render white/invisible, 16/34 buttons lose intended bg; (2) fitView scale 0.67 makes canvas text 6–8px effective, subtitles truncated; (3) docks never re-fit canvas; (4) examples dialog list overflows (`nowrap` 11px descriptions); (5) `--primary` is zinc while real primary is hard-coded teal, `--muted-foreground` undefined.
+- **Limitations and follow-up**: Dark mode, tablet/mobile, keyboard-only not reviewed. Suggested follow-up: remove/layer legacy global rules, raise canvas type scale, unify tokens.
