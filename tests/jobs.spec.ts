@@ -12,7 +12,7 @@ async function openTutorial(page: any, title: string) {
   }
   const modal = page.locator(".examples-modal");
   await expect(modal).toBeVisible();
-  await modal.getByRole("button", { name: "Guided tutorials" }).click();
+  await modal.getByRole("tab", { name: "Guided tutorials" }).click();
   const item = modal.locator(".example-list-item").filter({ hasText: title });
   await item.click();
   await page.getByRole("button", { name: "Load example" }).click();

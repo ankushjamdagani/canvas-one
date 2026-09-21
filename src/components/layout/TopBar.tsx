@@ -78,7 +78,7 @@ export function TopBar({
 
           <Separator orientation="vertical" className="h-4 mx-1 bg-border hidden sm:block" />
 
-          <div className="canvas-first-project-switcher-group flex items-center gap-1.5">
+          <div className="canvas-first-project-switcher-group flex items-center gap-1.5 min-w-0 shrink">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -87,19 +87,19 @@ export function TopBar({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "canvas-first-btn subtle project-switch workspace-switch project-menu-btn h-7 px-2 text-xs font-medium text-foreground hover:bg-accent flex items-center gap-1.5",
+                    "canvas-first-btn subtle project-switch workspace-switch project-menu-btn h-7 px-2 text-xs font-medium text-foreground hover:bg-accent flex items-center gap-1.5 shrink min-w-0 max-w-[120px] sm:max-w-none",
                     projectMenuOpen && "active bg-accent font-semibold"
                   )}
                   onClick={onToggleProjectMenu}
                   aria-expanded={projectMenuOpen}
                   aria-label={projectName}
                 >
-                  <FolderOpen size={14} className="text-muted-foreground" />
-                  <span className="project-switch-name font-medium">{projectName}</span>
+                  <FolderOpen size={14} className="text-muted-foreground shrink-0" />
+                  <span className="project-switch-name font-medium truncate">{projectName}</span>
                   <ChevronDown
                     size={12}
                     className={cn(
-                      "project-switch-chevron transition-transform duration-150 text-muted-foreground",
+                      "project-switch-chevron transition-transform duration-150 text-muted-foreground shrink-0",
                       projectMenuOpen && "open rotate-180"
                     )}
                   />
@@ -111,7 +111,7 @@ export function TopBar({
             <Input
               data-testid="project-name-input"
               aria-label="Project name"
-              className="canvas-first-project-name-input h-7 px-2 text-xs w-36 sm:w-44 border-transparent hover:border-input focus:border-ring transition-colors"
+              className="canvas-first-project-name-input h-7 px-1.5 sm:px-2 text-xs w-20 min-w-0 sm:w-36 md:w-44 border-transparent hover:border-input focus:border-ring transition-colors shrink"
               value={projectNameInput}
               onChange={(e) => setProjectNameInput(e.target.value)}
               onKeyDown={(e) => {
@@ -132,7 +132,7 @@ export function TopBar({
                   data-testid="project-save-btn"
                   type="button"
                   size="sm"
-                  className="canvas-first-btn canvas-first-project-save-btn h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1"
+                  className="canvas-first-btn canvas-first-project-save-btn h-7 px-2 text-xs bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-1 shrink-0"
                   onClick={onSaveProjectName}
                   aria-label="Save project name"
                   disabled={isReadOnly || !projectNameInput.trim()}
@@ -143,7 +143,7 @@ export function TopBar({
               )}
           </div>
 
-          <span data-testid="save-status" className="save-status text-[11px] text-muted-foreground flex items-center gap-1 ml-1" role="status">
+          <span data-testid="save-status" className="save-status text-[11px] text-muted-foreground flex items-center gap-1 ml-1 shrink-0 whitespace-nowrap" role="status">
             <span
               className={cn(
                 "save-dot inline-block w-1.5 h-1.5 rounded-full bg-emerald-500",

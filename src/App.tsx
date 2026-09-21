@@ -447,7 +447,7 @@ export default function App() {
                           const disabled = isReadOnly || atNodeLimit || atWorkloadLimit;
                           return (
                             <button
-                              className="library-item flex items-center gap-2.5 px-2.5 py-2 border border-border/60 rounded-md bg-card text-foreground text-xs font-medium cursor-grab active:cursor-grabbing hover:bg-accent/60 hover:border-border transition-all w-full mb-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-left select-none"
+                              className="library-item flex items-center gap-2.5 px-2.5 py-2 border border-border/60 rounded-md bg-card text-foreground text-xs font-medium cursor-grab active:cursor-grabbing hover:bg-accent/60 hover:border-border transition-colors duration-150 w-full mb-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-left select-none"
                               key={item.kind}
                               disabled={disabled}
                               draggable={!disabled}
@@ -510,14 +510,14 @@ export default function App() {
         <main className="canvas-first-workspace workspace">
           <div className="canvas-first-canvas-container canvas-shell canvas-area">
             {graph.nodes.length === 0 && (
-              <div className="canvas-first-empty-prompt absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center bg-card/95 backdrop-blur-md border border-border rounded-xl p-8 z-10 shadow-lg max-w-sm w-full mx-4" role="region" aria-label="Empty canvas">
+              <div className="canvas-first-empty-prompt absolute top-1/2 left-1/2 text-center bg-card/95 backdrop-blur-md border border-border rounded-xl p-6 sm:p-8 z-10 shadow-lg w-[calc(100%-32px)] max-w-sm" role="region" aria-label="Empty canvas">
                 <h2 className="text-base font-semibold text-foreground mb-1.5">Empty canvas</h2>
                 <p className="text-xs text-muted-foreground mb-5 leading-relaxed">Add components from the library or choose an example architecture to begin.</p>
-                <div className="canvas-first-empty-actions flex items-center justify-center gap-2.5">
-                  <Button className="canvas-first-btn primary bg-teal-600 hover:bg-teal-700 text-white text-xs h-8 gap-1.5" onClick={() => setCatalogDrawerOpen(true)}>
+                <div className="canvas-first-empty-actions flex flex-wrap items-center justify-center gap-2.5">
+                  <Button className="canvas-first-btn primary bg-teal-600 hover:bg-teal-700 text-white text-xs h-8 gap-1.5 shrink-0" onClick={() => setCatalogDrawerOpen(true)}>
                     <Plus size={14} /> Add component
                   </Button>
-                  <Button variant="outline" className="canvas-first-btn subtle text-xs h-8 gap-1.5" onClick={() => setExamplesOpen(true)}>
+                  <Button variant="outline" className="canvas-first-btn subtle text-xs h-8 gap-1.5 shrink-0" onClick={() => setExamplesOpen(true)}>
                     <Workflow size={14} /> <span>Examples & tutorials</span>
                   </Button>
                 </div>

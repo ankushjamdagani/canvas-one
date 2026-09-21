@@ -71,7 +71,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
                 aria-label="Undo"
                 disabled={!canUndo}
                 onClick={onUndo}
@@ -90,7 +90,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
                 aria-label="Redo"
                 disabled={!canRedo}
                 onClick={onRedo}
@@ -116,7 +116,9 @@ export function CanvasFloatingDock({
                 size="sm"
                 className={cn(
                   "canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground",
-                  dragMode === "select" && "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
+                  dragMode === "select"
+                    ? "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
+                    : "bg-transparent border-transparent"
                 )}
                 aria-label="Select"
                 aria-pressed={dragMode === "select"}
@@ -138,7 +140,9 @@ export function CanvasFloatingDock({
                 size="sm"
                 className={cn(
                   "canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground",
-                  dragMode === "pan" && "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
+                  dragMode === "pan"
+                    ? "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
+                    : "bg-transparent border-transparent"
                 )}
                 aria-label="Pan"
                 aria-pressed={dragMode === "pan"}
@@ -163,7 +167,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                className="canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
                 aria-label="Selection actions"
                 disabled={!canGroup}
                 onClick={onGroupClick}
@@ -182,7 +186,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="canvas-dock-btn add-canvas-note h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                className="canvas-dock-btn add-canvas-note h-7 w-auto min-h-0 mt-0 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
                 aria-label="Add canvas note"
                 disabled={!canAddNote}
                 onClick={onAddNote}
@@ -206,7 +210,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground bg-transparent border-transparent"
                 aria-label="Zoom In"
                 onClick={onZoomIn}
               >
@@ -224,7 +228,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground bg-transparent border-transparent"
                 aria-label="Zoom Out"
                 onClick={onZoomOut}
               >
@@ -242,7 +246,7 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground"
+                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground bg-transparent border-transparent"
                 aria-label="Fit view"
                 onClick={onFitView}
               >

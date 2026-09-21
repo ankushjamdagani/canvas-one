@@ -513,34 +513,56 @@ header.canvas-first-topbar * {
   color: #0f172a;
 }
 
+/* Canvas Floating Dock */
+.canvas-floating-dock .canvas-dock-btn {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.canvas-floating-dock .canvas-dock-btn:hover:not(:disabled) {
+  background: var(--accent, #f4f4f5);
+  border-color: transparent;
+}
+
+.canvas-floating-dock .canvas-dock-btn.active,
+.canvas-floating-dock .canvas-dock-btn[aria-pressed="true"] {
+  background-color: rgba(20, 184, 166, 0.15);
+  border-color: rgba(20, 184, 166, 0.3);
+  font-weight: 600;
+}
+
 /* Empty canvas prompt */
 .canvas-first-empty-prompt {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  translate: none;
   text-align: center;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(8px);
   border: 1px solid #dce5e1;
   border-radius: 12px;
-  padding: 32px 40px;
-  z-index: 5;
+  padding: 24px 20px;
+  z-index: 10;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-  max-width: 420px;
+  width: calc(100% - 32px);
+  max-width: 400px;
+  box-sizing: border-box;
 }
 
 .canvas-first-empty-prompt h2 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   margin: 0 0 8px 0;
   color: #111b17;
 }
 
 .canvas-first-empty-prompt p {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #55665f;
-  margin: 0 0 20px 0;
+  margin: 0 0 18px 0;
   line-height: 1.5;
 }
 
@@ -548,7 +570,8 @@ header.canvas-first-topbar * {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 /* Floating Export Panel */
@@ -878,24 +901,30 @@ header.canvas-first-topbar * {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 4px;
+    flex-wrap: nowrap;
   }
 
   .canvas-first-topbar-row-main .canvas-first-brand {
-    font-size: 13.5px;
+    font-size: 13px;
     margin-right: 0;
+    flex-shrink: 0;
   }
 
   .canvas-first-topbar-row-main .project-switch {
-    max-width: 140px;
-    padding: 0 8px;
+    max-width: 110px;
+    padding: 0 6px;
     font-size: 11px;
     height: 28px;
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .canvas-first-topbar-row-main .save-status {
     font-size: 10.5px;
     margin-left: 0;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .canvas-first-topbar-row-tools {
@@ -1002,8 +1031,8 @@ header.canvas-first-topbar * {
   }
 
   .canvas-first-canvas-container {
-    height: 390px;
-    min-height: 380px;
+    height: 420px;
+    min-height: 420px;
     flex: none;
   }
 

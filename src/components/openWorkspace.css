@@ -1,10 +1,11 @@
 /* Compatibility and layout fallbacks for canvas workspace */
 @media (max-width: 560px) {
   .canvas-area .system-canvas {
-    height: 420px !important;
-    flex: 0 0 420px;
+    height: 100% !important;
+    min-height: 420px;
+    flex: 1 1 auto;
   }
-  .examples-modal button {
-    min-height: 44px;
+  .examples-modal .example-preview-actions button {
+    min-height: 40px;
   }
 }
