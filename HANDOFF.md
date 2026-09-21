@@ -1,5 +1,15 @@
 # Development handoff
 
+## Active initiative — System Studio design revamp (21 September 2026)
+
+Planning entry point: [`specs/revamp/README.md`](specs/revamp/README.md). The user assigns Codex planning/verification, Claude senior review, and Gemini/agy implementation. No revamp application code has been implemented yet. Read the decision register and task ledger before continuing; the next cross-platform assignment is Claude's read-only RV-00 plan review.
+
+Confirmed scope: the supplied claude.design HTML ZIP, Evergreen paper, existing capabilities preserved, local-only branches/commits/publishing/merge, saved parts, customizable dock and movable/stacked/collapsed panels. Executable commits/publish require a completed run of their exact state; diagrams are exempt. Configuration uses atomic Apply/Cancel; branches preserve autosaved work. CSV/Mermaid exports and full adaptive phone editing are included; AI generation is deferred; Lucide is retained.
+
+Current source clarifies older persistence prose below: `src/persistence/projects.ts` exports legacy graphs as format 7 and open-system graphs as format 8; import validates both with model-matching rules. Do not remove either path based on historical format-7-only statements. New versioning schemas require a reviewed migration contract.
+
+Fresh verification: 233 unit tests pass; production build passes with a large-chunk warning; production Chromium suite has 46 passing and 5 failing mobile journeys out of 51. See [`specs/revamp/verification.md`](specs/revamp/verification.md) for exact commands and symptoms. Earlier passing browser baselines below are historical.
+
 ## Active work — canvas-first workspace (16 September 2026)
 
 The user authorized implementation of `specs/canvas-first-workspace.md` on branch `codex/canvas-first-workspace`. This scope delivers the 6-part canvas-first UI contract: compact top bar (brand, project switcher, catalog drawer trigger, workloads trigger, undo/redo, run/pause/reset), searchable 29-component catalog drawer, single contextual inspector dock (mutually exclusive node, edge, workload, and tutorial views), and compact status/results strip with expandable details and compare actions.

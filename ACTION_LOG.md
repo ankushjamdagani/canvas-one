@@ -859,3 +859,14 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: Live walkthrough of empty state, examples dialog, loaded "Real-time chat" example, run, details dock, inspector, components library, workloads panel.
 - **Key findings**: (1) unlayered `button`/`input` rules in `src/styles.css:113-150` override Tailwind v4 utilities → active tool state and workload `Switch` render white/invisible, 16/34 buttons lose intended bg; (2) fitView scale 0.67 makes canvas text 6–8px effective, subtitles truncated; (3) docks never re-fit canvas; (4) examples dialog list overflows (`nowrap` 11px descriptions); (5) `--primary` is zinc while real primary is hard-coded teal, `--muted-foreground` undefined.
 - **Limitations and follow-up**: Dark mode, tablet/mobile, keyboard-only not reviewed. Suggested follow-up: remove/layer legacy global rules, raise canvas type scale, unify tokens.
+
+## 2026-09-21
+
+### System Studio revamp planning and baseline (Codex)
+
+- **Outcome**: Initial revamp plan completed in `specs/revamp/README.md` and nine linked documents; recorded user decisions, requirements, design/source mapping, shadcn foundations, technical boundaries, parallel work packages and resumable handoffs. Application code unchanged.
+- **Changed**: `specs/revamp/`, current initiative/baseline in `HANDOFF.md`, this log; preserved supplied design ZIP under `artifacts/design/` as the reference source.
+- **Platform/subagents**: Codex lead for planning/verification; one read-only Luna scout mapped architecture/persistence/tests. Claude senior review and Gemini implementation are prepared user-driven handoffs, not executed work.
+- **Skills/tools**: graphify existing-graph query, shadcn, best-practices guidance, supplied claude.design reference, official shadcn documentation, RTK, apply_patch, Chromium reference rendering. Figma guidance was initially inspected; no Figma operation was needed or run.
+- **Verification**: `rtk npm test` passed 233 tests/36 files; `rtk npm run build` passed with existing large-chunk warning; `TEST_PRODUCTION=1 rtk npm run test:e2e` failed with 46 passed/5 mobile failures out of 51. Four design frames visually inspected; planning links and screen labels checked; `git diff --check` passed. Test-regenerated tracked screenshots preserved temporarily and restored to avoid unrelated artifact changes.
+- **Limitations/next**: Initial plan awaits Claude RV-00 review; detailed versioning/migration contracts are gated before implementation. Mobile failures and observed symptoms are recorded in `specs/revamp/verification.md`. No implementation, push or deployment.
