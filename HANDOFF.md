@@ -2,6 +2,8 @@
 
 ## Active initiative — System Studio design revamp (21 September 2026)
 
+Delegation update: the user requests automatic orchestration rather than manual platform switching. Codex may invoke installed Claude/Gemini CLIs for bounded review/implementation tasks, retaining the assigned roles and review gates. See `specs/revamp/handoffs.md`; the historical manual-only rule is superseded for this initiative.
+
 Future product goal (D22/R15): an AI buddy collaborates on application development through the canvas, with structured decisions, proposals, discussions and evidence rather than dependence on external Markdown/chat history. See `specs/revamp/ai-collaboration.md`. Enforce shared validated domain commands, stable revision-aware links, provenance and provider-independent adapters in current architecture. No AI implementation now; Claude RV-00/RV-02 must review these seams without adding speculative infrastructure.
 
 Latest pre-execution architecture decisions supersede conflicting history below: model-based runs across frontend/backend/fullstack, code/data flow, service flow and infrastructure; actual source execution later. One current model with no permanent diagram-only mode. Commits/publication require completed exact-scenario runs; incomplete work uses autosave/checkpoints. The user explicitly permits dropping old-data compatibility, including archive/conversion/legacy engine requirements; no existing data has been deleted. Plan for local, hosted and self-hosted bundles plus GitHub/server sync, async collaboration first and live coediting later. Read `specs/revamp/execution-model.md`, `legacy-retirement.md` and `deployment-and-sync.md`. RV-00 is expanded Claude review; implementation remains gated on that review and concrete RV-02 contracts.

@@ -886,3 +886,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents/tools**: Codex planning only; no subagents. Applied existing best-practices guidance to typed domain boundaries, validation, provenance, provider independence and scope discipline; used source-document reads, apply_patch and Git.
 - **Verification**: Planning-document links and `git diff --check` passed. Application suites not rerun for documentation-only changes; no AI behavior implemented or verified.
 - **Limitations/next**: Claude reviews extension seams in RV-00/RV-02; AI UI, providers, orchestration and code execution remain deferred. No application code, dependencies or project data changed; no push/deployment.
+
+### Direct cross-platform orchestration — status (Codex)
+
+- **Outcome**: User authorized direct delegation, superseding manual-only handoffs for this initiative. Updated HANDOFF, revamp handoffs and task ledger. Codex remains planner/verifier, Claude senior reviewer, Gemini implementer.
+- **Skills/tools**: Read delegate skill and all role files; inspected Claude/agy CLI help. Claude authentication works with approved sandbox escalation; `agy models` confirmed Gemini availability. Launched a read-only Claude Sonnet review (session 8739) against planning checkpoint 680827b; no Gemini implementation dispatched.
+- **Verification/status**: `git diff --check` passed before this log addition. Initial sandbox attempts failed on credential/local runtime access; approved retries succeeded. Review output and full RV-00 coverage remain pending. No app code changed or application tests rerun.

@@ -6,7 +6,7 @@ Statuses: READY → CLAIMED → IN_PROGRESS → REVIEW → ACCEPTED. BLOCKED rec
 |---|---|---|---|
 | PLAN | REVIEW | Codex | Expanded architecture documented; Claude review pending |
 | ARCH-01 | REVIEW | Codex planning | User decisions settled; S01–S05 and retirement/deployment proposals await senior review |
-| RV-00 | READY | Unclaimed; Claude intended | Review execution/retirement/deployment and future AI collaboration boundaries; read-only |
+| RV-00 | IN_PROGRESS | Claude CLI; Codex coordinator | Read-only initial architecture review dispatched against 680827b; result pending. Full source/design coverage still needs verification. |
 | RV-01 | BLOCKED | Unclaimed; Gemini intended | RV-00 accepted; freeze exact foundation files |
 | RV-02 | BLOCKED | Codex planning / Claude review | RV-00 findings; execution/current-schema contracts and R15 extension seams; no AI implementation |
 | RV-03 | BLOCKED | Unclaimed | RV-01/02 accepted |
