@@ -1,5 +1,7 @@
 # Verification and acceptance
 
+Scope revision, 2026-09-21: the baseline below is historical evidence for the starting app. D17–D20 now require model scenarios across S01–S05, permit dropping old-data compatibility and keep run-required commits without diagram exemptions. Do not retain obsolete tests merely to preserve their count; map each removed test to the retired requirement, and preserve meaningful retained-behavior assertions.
+
 ## Baseline recorded 2026-09-21
 
 Application source at `fb4a1ff` (`fix: improve TopBar responsiveness and add UI review regression tests`). Only design/planning files were added during this task; no app fixes were made.
@@ -38,15 +40,17 @@ Use scoped unit tests for reducers/domain operations, focused browser tests for 
 | Foundations | rest/hover/pressed/focus/disabled/invalid/loading; semantic tokens; readable zoom; overlay stacking and focus return |
 | Panels | 23A–G; side widths; float bounds; resize; stack; collapse/peek; Escape drag cancel; keyboard/touch equivalents; reload and narrow viewport |
 | Canvas | selected/unselected nodes; handles; free wiring; group/ungroup; notes; atomic move/undo; copy/duplicate; camera preserved through UI resize |
-| Inspector | valid multi-field Apply; invalid draft; Cancel; one undo; dirty close/switch; removed/stale target; live vs saved metrics; archive read-only |
+| Inspector | valid multi-field Apply; invalid draft; Cancel; one undo; dirty close/switch; removed/stale target; live vs saved data; scenario-specific behavior |
 | Parts | internal references remapped; external links excluded visibly; independent placement; limits; no inherited observed results; one undo; import validation |
 | Branches | independent autosaved work; save failure blocks switch; reload; per-branch history; dirty inspector gate; main edit creates draft |
-| Run evidence | exact fingerprint; workload/seed/duration mismatch; visual-only changes; incomplete/imported evidence; diagram exemption; completed run with request failures |
+| Run evidence | exact scenario/scope/refinement/assumption fingerprint; input/seed/budget mismatch; visual-only changes; incomplete/imported evidence; no diagram exemption; completion distinct from assertions |
 | Merge/publish | unchanged/identical/disjoint/conflicting fields; delete/edit; invalid edge/route/attachment; changed main; merged-state rerun; atomic failure; recoverable close/undo |
-| Migration | existing local projects untouched on failure; 7/8 legacy import; archive restrictions; new round-trip; bad IDs/references; quota/size limits |
+| Storage cutover | fresh current namespace; old database untouched; unsupported format rejected; current round-trip/reload; bad IDs/references; quota/size limits |
 | Results | idle/running/paused/completed/saved/imported; root vs message rates; real chart samples; empty values; unmatched comparisons; reveal correct node |
 | Export | full SVG/PNG view; JSON lossless; CSV units/provenance/formula safety; Mermaid escaping/loss disclosure; errors/retry |
 | Responsive | reference desktop widths, 1024×768, 768×1024, 390×844; one overlay on phones; non-zero canvas; 200% text zoom and long names |
+| Model families | S01 UI states/events, S02 service flow, S03 data transformations, S04 deployment failures, S05 fullstack/refinement; deterministic success/failure traces |
+| Local adapters | no remote dependency; personal/shared/artifact separation; author provenance; stale write/failure handling; no secrets in portable model |
 
 ## Visual acceptance
 
@@ -59,6 +63,10 @@ No invented percentage score declares fidelity. Claude records concrete discrepa
 1. Accepted decisions and contracts; no ambiguous destructive behavior.
 2. Unit tests, production build and full production E2E pass, including resolution of baseline mobile failures.
 3. Source-to-screen coverage and real-data actions verified; no prototype fixture values in production.
-4. Migration/recovery and archive checks pass; no worker/kernel accounting changes hidden in UI commits.
+4. Current storage/recovery, unsupported-version and S01–S05 checks pass; no worker/kernel changes hidden in UI commits.
 5. Claude review has no unresolved critical/high findings; remaining issues have explicit disposition.
 6. Codex records acceptance, scoped diff review and clean checkpoint. Push/deployment are separate actions.
+
+## Architecture follow-up verification
+
+The architecture follow-up performed read-only graph queries and direct source/caller checks, including corrections to the initial scout's reachability claims. Only planning documents changed. Application tests were not rerun; the baseline above is not a new pass claim. Documentation links, requirement references and whitespace are checked before checkpointing this revision. Claude review/Gemini execution remain pending.

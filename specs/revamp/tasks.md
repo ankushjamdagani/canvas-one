@@ -4,21 +4,25 @@ Statuses: READY → CLAIMED → IN_PROGRESS → REVIEW → ACCEPTED. BLOCKED rec
 
 | ID | Status | Owner | Blocking condition / next action |
 |---|---|---|---|
-| PLAN | ACCEPTED | Codex | Initial plan and baseline complete; senior review remains RV-00 |
-| RV-00 | READY | Unclaimed; Claude intended | Senior review of plan; read-only |
+| PLAN | REVIEW | Codex | Expanded architecture documented; Claude review pending |
+| ARCH-01 | REVIEW | Codex planning | User decisions settled; S01–S05 and retirement/deployment proposals await senior review |
+| RV-00 | READY | Unclaimed; Claude intended | Review expanded execution/retirement/deployment architecture; read-only |
 | RV-01 | BLOCKED | Unclaimed; Gemini intended | RV-00 accepted; freeze exact foundation files |
-| RV-02 | BLOCKED | Codex planning / Claude review | RV-00 findings; concrete contract and migration specification |
+| RV-02 | BLOCKED | Codex planning / Claude review | RV-00 findings; concrete execution/current-schema contracts |
 | RV-03 | BLOCKED | Unclaimed | RV-01/02 accepted |
 | RV-04 | BLOCKED | Unclaimed | RV-01/02 accepted |
 | RV-05 | BLOCKED | Unclaimed | RV-01/02; atomic editor API contract |
 | RV-06 | BLOCKED | Unclaimed | RV-01/02; fixtures then RV-09 integration |
 | RV-07 | BLOCKED | Unclaimed | RV-01/02 |
-| RV-08 | BLOCKED | Unclaimed | RV-02 schema/migration acceptance |
+| RV-08 | BLOCKED | Unclaimed | RV-02 current-schema acceptance; RV-14 run evidence API |
 | RV-09 | BLOCKED | Unclaimed | RV-02 |
 | RV-10 | BLOCKED | Unclaimed | RV-01/02 |
 | RV-11 | BLOCKED | Unclaimed | RV-01/02 and RV-08 API |
 | RV-12 | BLOCKED | Unclaimed | Assign per integration slice, reserve shared files |
 | RV-13 | BLOCKED | Codex verification / Claude review | Integrated release candidate |
+| RV-14 | BLOCKED | Unclaimed; Gemini intended | RV-02 typed scenario/runner contracts and S01–S05 fixtures |
+| RV-15 | BLOCKED | Unclaimed; Gemini intended | RV-02 current schema; retained behavior replacements and exact deletion manifest |
+| RV-16 | BLOCKED | Unclaimed; Gemini intended | RV-02 local adapter contracts; no remote-service implementation |
 
 ## Claim record (required per assignment)
 

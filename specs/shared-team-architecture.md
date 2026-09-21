@@ -2,6 +2,8 @@
 
 Status: implementation plan, saved 12 September 2026. Implementation has not started.
 
+2026-09-21 status clarification: historical proposal, not an approved dependency choice for the revamp. The user now requires planning for local-first, hosted and self-hosted bundles, GitHub/server sync, async collaboration first and live coediting later. Reassess the Supabase/Google/Hocuspocus choices and offline restrictions below against `specs/revamp/deployment-and-sync.md` before implementation. Preserve this document as prior design context.
+
 ## Summary
 
 Build a deploy-ready pilot supporting live architecture editing, private team workspaces and reviewed revisions.

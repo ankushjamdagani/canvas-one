@@ -1,5 +1,7 @@
 # Delivery plan and ownership
 
+Execution hold: the user decisions from ARCH-01 are recorded, but RV-00 must review the expanded model semantics, retirement and sync boundaries before implementation. RV-14/15/16 below add explicit model-run, retirement and local-adapter work. No hosted service or live coediting implementation is authorized by these packages.
+
 Codex is lead/planner/final verifier. Claude reviews plans, contracts and implementation. Gemini/agy performs implementation and integration edits. Cross-platform starts require the user's switch; the table is a plan, not a claim that agents were dispatched.
 
 ## Gates and parallel waves
@@ -19,6 +21,13 @@ flowchart TD
   C --> G
   C --> H
   C --> I[RV-08 Local versioning domain]
+  C --> O[RV-14 Model scenarios and runners]
+  C --> P[RV-15 Current-only cutover]
+  C --> Q[RV-16 Local adapters and sync boundaries]
+  O --> I
+  P --> M
+  Q --> M
+  O --> M
   C --> J[RV-09 Parts domain]
   B --> K[RV-10 Entry and transfer]
   C --> K
@@ -45,7 +54,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 - Owner: Claude, read-only review; Codex records decisions/updates planning docs.
 - Input: this plan, full source ZIP, decisions, HANDOFF and current source anchors.
-- Output: severity-ranked findings with requirement/screen/code evidence; approve or reject component boundaries, migration strategy, run identity, merge semantics and task split.
+- Output: severity-ranked findings with requirement/screen/code evidence; review S01–S05 semantics, old-code retirement, deployment independence, component boundaries, run identity, merge semantics and task split.
 - Exit: no unresolved critical/high architecture or data-loss finding. This is READY now.
 
 ### RV-01 — Foundation and design specimen
@@ -56,13 +65,13 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 - Deliver: semantic tokens, font/mark/icon mapping, vetted missing shadcn components, layered native styles, full state specimens and overlay stack policy.
 - Exit: R02/R11; component/browser checks and build; compare to foundation canvas. No domain behavior edits.
 
-### RV-02 — Executable contracts and migration specification
+### RV-02 — Executable contracts and current schema
 
 - Owner: Codex authors specification; Claude reviews. Gemini may produce bounded read-only fixture-size/compatibility evidence.
 - Owns: new contract specification and fixture descriptions under `specs/revamp/contracts/`; actual shared TypeScript contract creation is a later Gemini task with an exact file list.
 - Dependencies: RV-00; all D09–D14 settled.
-- Deliver: concrete data types, state transition tables, numeric limits, portable/Dexie versions, legacy mapping, run fingerprint fields, command/panel API, fixture catalog, parts boundary rules, merge cases, abort/recovery policy.
-- Exit: no unresolved storage/interaction contract before related implementation starts. Contract review is not satisfied by this high-level technical proposal alone.
+- Deliver: concrete system/view/behavior/scenario types, typed ports and structural relationships, S01–S05 fixtures, state transition tables, numeric limits, current portable/storage versions, run fingerprints, command/panel API, parts rules, merge cases and recovery policy. No old-data migration requirement. Freeze typed contracts before RV-14/15/16 proceed.
+- Exit: no unresolved storage/interaction/execution contract before related implementation starts. Contract review is not satisfied by the high-level architecture alone. Required scenario coverage must be non-empty; incomplete work stays in autosave/checkpoints.
 
 ### RV-03 — Shell, command palette and panel host
 
@@ -80,10 +89,10 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 ### RV-05 — Transactional inspector
 
-- Owner: Gemini; owns `OpenInspector.tsx`, `Inspector.tsx`, `OpenConnectionEditor.tsx`, `OpenWorkloadControls.tsx`, `ServiceModelEditor.tsx`, `NumberField.tsx`, `JobControls.tsx`, `RoutingPanel.tsx`, `SubsystemsPanel.tsx` and inspector tests after exact consumer inventory.
+- Owner: Gemini; owns current `OpenInspector.tsx`, `OpenConnectionEditor.tsx`, `OpenWorkloadControls.tsx`, `NumberField.tsx`, `SubsystemsPanel.tsx` and new typed behavior/scenario form files after exact inventory. Legacy Inspector/ServiceModelEditor/JobControls/RoutingPanel are RV-15-owned; do not modernize code scheduled for retirement.
 - Dependencies: RV-01/02; shared atomic editor API supplied by RV-12 integration task, not independently edited here.
 - Deliver: draft/validation/Apply/Cancel for configuration surfaces; measured section; dirty-navigation coordination.
-- Exit: R06/R11, no partial mutation, one-step undo, stale-target detection, archived controls remain read-only. Notes retain explicit apply behavior.
+- Exit: R06/R11/R13, no partial mutation, one-step undo, stale-target detection, scenario-specific fields and truthful readiness. Notes retain explicit apply behavior.
 
 ### RV-06 — Library presentation
 
@@ -103,9 +112,9 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 - Owner: Gemini in sequential microtasks; Claude adversarial review at each subgate; Codex verifies.
 - Owns: new `domain/versioning/`, new versioning repository files and tests. Existing `domain/model.ts`, `persistence/projects.ts`, `state/editor.ts` are integration-owned and patched only in reserved RV-12 slots.
-- Dependencies: accepted RV-02, including migration design.
-- Sequence: immutable snapshots/run identity → branch working copies → typed diff/merge → candidate run eligibility → transactional publish/undo → migration/import validation. Each subtask gets its own exact files/fixtures/checkpoint.
-- Exit: R08, deterministic three-way cases, completed-run gating, failure atomicity, legacy preservation, stale-head/quota/multi-tab cases. Do not hand the junior engineer this entire track as one unbounded prompt.
+- Dependencies: accepted RV-02; RV-14 run identity API (fixtures may precede completed runner).
+- Sequence: immutable snapshots/run identity → branch working copies → typed diff/merge → candidate run eligibility → transactional publish/undo → current-format validation. Each subtask gets its own exact files/fixtures/checkpoint.
+- Exit: R08, deterministic three-way cases, completed-scenario gating, failure atomicity, stale-head/quota/multi-tab cases. Do not hand the junior engineer this entire track as one unbounded prompt.
 
 ### RV-09 — Saved-part domain
 
@@ -125,7 +134,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 - Owner: Gemini; owns new `features/history/`, `RevisionsPanel.tsx`, history tests; `StudioMenu.tsx` replacement/removal through RV-12.
 - Dependencies: RV-01/02 and stable RV-08 APIs; fixtures may precede domain completion.
-- Deliver: 22A–F history/commit/publish/conflict views, diagram exemption, exact-state evidence and local attribution.
+- Deliver: 22A–F history/commit/publish/conflict views, autosave/checkpoint distinction, exact-state scenario evidence and local attribution. No diagram exemption.
 - Exit: R08/R11 end-to-end, no misleading verified/team labels, keyboard conflict resolution, cancelled/failed publish preserves state.
 
 ### RV-12 — Serialized integration slices
@@ -133,14 +142,35 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 - Owner: Gemini integration assignment; Claude reviews; Codex validates.
 - Owns exclusively: `App.tsx`, `state/editor.ts`, `domain/model.ts`, `persistence/projects.ts`, `StudioMenu.tsx`, shared CSS/contract/dependency edits when explicitly reserved, relevant integration tests.
 - Integrate foundation first, then shell/canvas, inspector, library, results/entry, versioning. Each slice must build and keep existing behaviors reachable; don't integrate incomplete mutation paths.
-- Exit: actual state wired, migration approved/tested, obsolete UI removed, no duplicated commands or fake fixtures in production. Merge conflict resolution is reviewed as new code.
+- Exit: actual state wired, current-only cutover tested, obsolete UI removed, no duplicated commands or fake fixtures in production. Merge conflict resolution is reviewed as new code.
 
 ### RV-13 — Release acceptance
 
 - Owner: Codex verification; Claude independent senior review; Gemini fixes only assigned findings.
 - Dependencies: integrated packages.
-- Deliver: full verification matrix, reference captures, known limitations and migration/recovery evidence.
-- Exit: R01–R12 satisfied, no critical/high unresolved findings, explicit disposition for remaining issues, clean worktree/checkpoint. No deployment or push implied.
+- Deliver: full verification matrix, S01–S05 fixtures, reference captures, known limitations and current storage/recovery evidence.
+- Exit: R01–R14 satisfied, no critical/high unresolved findings, explicit disposition for remaining issues, clean worktree/checkpoint. No deployment or push implied.
+
+### RV-14 — Model-based execution slices
+
+- Owner: Gemini under Codex contracts; Claude reviews every semantic slice. Owns new scenario/behavior/compiler/runner modules and focused tests, exact paths frozen in RV-02. Existing open kernel modifications require an explicit exclusive subtask; no UI worker owns kernel files.
+- Dependencies: RV-00/02. Retained engine behavior is first characterized and reused, not rewritten wholesale.
+- Sequence: typed scenario inputs/readiness → trace/run envelope → frontend state/event behavior (S01) → service mapping/timed resource adapter (S02) → declarative data operations (S03) → deployment/failure constraints (S04) → composed/refined end-to-end scenario (S05). Reviewer may reorder independent slices after interface freeze.
+- Exit: deterministic success/failure fixtures in all five cases; limits/cancellation/truncation explicit; no fabricated timing; no collapse-dependent execution; exact fingerprints and completion evidence available to RV-08. Actual code execution remains deferred.
+
+### RV-15 — Legacy retirement and storage cutover
+
+- Owner: Gemini; Claude reviews source reachability and deleted behavior. Owns obsolete `MetricsPanel.tsx`, legacy Inspector/internals/control families and legacy engine files after exact manifest; shares no files concurrently with RV-05. Existing model/editor/persistence/worker dispatch edits are reserved RV-12 integration slots.
+- Dependencies: RV-02 current schema; current examples and retained behavior replacements ready before removing their dependencies.
+- Sequence: verified orphan cleanup → current-only constructors/examples → storage namespace/unsupported-version handling → startup/dispatch cutover → obsolete UI/engines/codecs/tests/styles removal.
+- Exit: current capabilities tested, unsupported old formats clearly rejected, old database not silently erased, no legacy worker startup and no required archive viewer/converter. Document why each retired test no longer represents a product requirement.
+
+### RV-16 — Local adapters with future sync boundaries
+
+- Owner: Gemini; owns new local repository/run/artifact/preference adapter files and contract tests. Shared Dexie boot/config/serialization changes occur only in RV-12 slots.
+- Dependencies: RV-02.
+- Deliver: provider-independent current document IDs, revision-aware local transactions, separate run artifacts/preferences and author provenance. Record future GitHub/server outbox/expected-head protocol; do not build remote infrastructure now.
+- Exit: local operation needs no remote service; portable model has no credentials/vendor IDs; adapter tests cover save failure and stale writes. Future hosted/self-hosted and live coediting are separately scoped delivery tracks.
 
 ## Review budget and stop rules
 

@@ -1,12 +1,14 @@
 # Technical design
 
-Status: lead architecture proposal for Claude review. The implementation-ready contract gate must settle concrete schemas, limits and migration fixtures before Gemini changes persisted data.
+Status: lead architecture proposal for Claude review. The implementation-ready contract gate must settle current-only schemas, semantic run contracts, limits and storage cutover before Gemini changes persisted data.
+
+Read with [execution-model.md](execution-model.md), [deployment-and-sync.md](deployment-and-sync.md) and [legacy-retirement.md](legacy-retirement.md). D17–D20 supersede the initial diagram exemption, old-data preservation and narrow traffic-only assumptions. Detailed schemas remain an RV-02 gate.
 
 ## Current boundaries to preserve
 
-`src/App.tsx` composes project boot/save/switch, editor selection, simulation and UI state. `src/state/editor.ts` owns graph changes/history and enforces archive read-only behavior. `src/persistence/projects.ts` stores projects in Dexie database `system-studio`, schema version 1. UI and canvas metadata do not belong in executable behavior fields. Keep the exact kernel/accounting unchanged during the reskin.
+`src/App.tsx` composes project boot/save/switch, editor selection, simulation and UI state. `src/state/editor.ts` owns graph changes/history and currently enforces archive read-only behavior. `src/persistence/projects.ts` stores projects in Dexie database `system-studio`, schema version 1. These are current-state facts, not a requirement to preserve legacy architecture. Keep pure view metadata outside executable behavior; protect retained exact resource accounting while adding separately specified semantic run capabilities.
 
-Current portable behavior verified in source: legacy graphs export format 7, `open-system/1` graphs export format 8; import accepts 7/8 with matching nested snapshots/results. `HANDOFF.md` contains older conflicting prose; do not use it to delete either path. Existing imports are structurally validated, not rerun or authenticated. The existing 2,000,000-character import bound is not a measured byte-size guarantee.
+Current source exports legacy graphs as format 7 and open-system graphs as format 8. D19 allows both old readers/converters to be retired at the redesigned schema cutover. New imports remain structurally validated, never implicitly authenticated or verified by parsing. Choose explicit byte/record limits; the old 2,000,000-character check is not a byte-size contract.
 
 ## Target modules and dependency direction
 
@@ -17,7 +19,8 @@ Current portable behavior verified in source: legacy graphs export format 7, `op
 - `features/history/`: branch/history/publish/merge presentation.
 - `features/results/`: result presentation and measured-value adapters.
 - `domain/versioning/` and `domain/parts/`: pure typed operations, validation and deterministic diff/merge; no React/Dexie.
-- `persistence/`: validated local repositories, transactions and portable migration.
+- Domain scenario/behavior/compiler interfaces plus versioned runners: model-based execution across S01–S05; exact files reserved in RV-02.
+- `persistence/`: validated local repositories, transactions and current portable format; future sync adapters stay outside domain logic.
 
 These are proposed destinations for new code, not a mandate to move every existing file. Reuse existing editors/canvas with adapters, then retire old surfaces only once their capability map is complete. Domain operations return success/error results; UI never mutates snapshots directly.
 
@@ -29,27 +32,27 @@ These are proposed destinations for new code, not a mandate to move every existi
 | Panel preferences | panel ID, placement, open/collapsed state, order/stack, per-side widths, floating rect; open/close/place/collapse/resize/reset |
 | Inspector draft | target ID, base revision, editable draft, dirty/valid state, apply/cancel/conflict result |
 | Branch workspace | stable branch ID, display name, base commit, head commit, working snapshot, revision token; switch/create/archive/reopen |
-| Commit | immutable ID, parent(s), full architecture snapshot reference, message, timestamp, self-reported author, run evidence or diagram exemption |
+| Commit | immutable ID, parent(s), full system snapshot, message, timestamp, author provenance, non-empty required scenarios and exact-state run evidence |
 | Published version | immutable ID/version, commit, previous published head, source branch, title/rationale/ticket, evidence; compare/restore |
 | Merge result | common ancestor, ours/theirs, typed changes/conflicts/resolutions, validated candidate, expected-head token |
 | Saved part | ID/version, name/description/category, copied graph subset/view metadata, provenance; save/place/update-copy |
-| Run evidence | immutable completed result, executable fingerprint, engine version, workload/seed/duration, provenance, completion status |
+| Run evidence | immutable completed result, executable fingerprint, scenario/scope/refinement, runner/behavior versions, fixture/assumptions/seed, trace/assertions/metrics and provenance |
 
 Adapters keep existing `Project`, editor and saved results operational while feature UI is built from fixtures. Shared contract files have one owner. Branch or part IDs cannot be inferred from names or array order.
 
 ## Local versioning model
 
-Use an immutable commit DAG with branch head pointers and separate autosaved working snapshots. Published main is immutable history; editing it creates a draft branch on first edit. Existing graph undo/redo remains an editing-session mechanism, not the commit history. Checkpoints/revisions remain available as legacy snapshots; don't silently turn them into verified commits.
+Use an immutable commit DAG with branch head pointers and separate autosaved working snapshots. Published main is immutable history; editing it creates a draft branch on first edit. Graph undo/redo remains an editing-session mechanism, not commit history. New autosave/checkpoints preserve incomplete work without pretending it is committed. A fresh project may have a working branch with no qualifying commit yet.
 
 Keep the active working graph exposed to the current editor/simulation through a narrow adapter. Switching branches flushes that branch's save queue, safely handles failure, then loads the other working state and its view metadata. Do not discard an unsaved completed run. Unapplied inspector edits are a separate transient draft: request Apply/discard/cancel before a switch. Save failures must never be represented as successful switching or publication.
 
-For migration, retain original project records until a verified migration transaction succeeds; create a baseline branch and legacy-history references without inventing run evidence. Old format-7 archives keep read-only semantics. An explicit editable-copy operation, if added, is distinct from changing the archive.
+No legacy migration or archive support is required. Lead rollout proposal uses a new storage namespace, leaves old records untouched but unsupported and rejects incompatible imports. Do not create fake baseline commits to make an old project appear verified.
 
 ### Run eligibility
 
-Define a canonical executable fingerprint using normalized graph execution configuration, workload, seed, duration and engine/model version. Exclude camera, panel placement, selection and purely visual metadata. Store full snapshot content separately for visual history. Do not reuse the existing worker reset key without auditing its inclusion rules.
+Define a canonical executable fingerprint using normalized behavior, scenario inputs/initial state/scope, refinement selections, active assumptions, workload/resource model, seed/budgets and runner/model versions. Exclude camera, panel placement, selection and purely visual metadata. Deployment relationships that affect a fault scenario are executable, even though they appear in a structural view. Store full authored snapshot content separately. Do not reuse the existing worker reset key without auditing inclusion rules and canonical ordering.
 
-A completed run qualifies only for the same fingerprint. Paused, aborted, stale, failed-to-complete or imported/unverified evidence cannot silently satisfy a fresh local-run gate. Legacy imported results remain viewable. A diagram-only snapshot carries an explicit non-executable reason rather than fake metrics. An engine completion with observed request failures is still a completed run; do not demand zero failures unless the user defines a separate quality policy.
+A completed run qualifies only for the same fingerprint. Paused, aborted, stale, truncated or imported/unverified evidence cannot silently satisfy a fresh local-run gate. No diagram exception. Completion and successful assertions are distinct; a deliberately modeled failure can be a completed run. Show assertion failures prominently without inventing an additional mandatory zero-failure policy.
 
 Apply/merge changes invalidate eligibility when the executable fingerprint changes. A publish candidate formed by combining main and draft changes must itself have a qualifying completed run; running the old draft tip is insufficient. This often means resolve → validate → run merged candidate → review → publish, with candidate editing isolated from source branches.
 
@@ -57,7 +60,7 @@ Apply/merge changes invalidate eligibility when the executable fingerprint chang
 
 Use a common ancestor and stable entity IDs. Non-overlapping changes can merge; identical changes coalesce. Conflicting fields, delete-versus-edit, incompatible behavior-type changes, and invalid references become explicit conflicts. Treat executable configuration separately from notes/layout; do not silently drop the latter. Compare arrays by stable IDs where available, never by display order.
 
-Validate candidate topology, bounds, references, subsystems, notes, workloads and model compatibility after resolutions. Mixed engine/archive models are rejected rather than coerced. Ours/theirs/edit actions must state which branch is which; bulk resolution still validates and can be undone in the merge session.
+Validate candidate topology, bounds, typed ports/relationships, scenarios, behavior, subsystems and notes after resolutions. Unsupported schema/behavior versions are rejected rather than coerced. Ours/theirs/edit actions must state which branch is which; bulk resolution still validates and can be undone in the merge session.
 
 Publish transaction checks expected current main head, unique version and eligibility, writes immutable records, advances main, and optionally closes the draft. If main changed in another tab, reject the transaction and recompute merge; don't overwrite. Use local revision tokens and transactional compare-and-set. Cross-tab notifications are an enhancement; correctness cannot depend on receiving one.
 
@@ -73,11 +76,11 @@ Panel/dock preferences live in a separately versioned browser-local preferences 
 
 Draft fields allow intermediate text, including an empty numeric field, without corrupting domain state. Apply parses/validates the whole patch, checks the target still exists and base revision has not changed, and commits one editor history entry. Render measured data from the chosen live/saved run separately; do not update displayed measurements to imply a draft configuration has run. Selection changes cannot silently discard a dirty draft.
 
-## Persistence and portable migration gate
+## Persistence and portable cutover gate
 
-Branch/commit/part data requires explicit schema design. Do not stuff it into notes or silently extend format 8 in a way old readers drop history. RV-02 must specify the next portable version, validation rules, import behavior, byte/record budgets and Dexie migration strategy; the number is deliberately unassigned here until actual schema review. Preserve existing 7/8 readers and archive policies. Formats for standalone part transfer, if needed, are separately identified.
+System/view/scenario/branch/commit/part data requires explicit schema design. Do not stuff new semantics into notes or silently reuse format 8. RV-02 specifies the new portable version, strict supported-version behavior, byte/record budgets and fresh Dexie namespace; version numbers are unassigned until schema review. No backward-compatible reader/converter is required. Future sync references, artifact manifests and author provenance must fit the model without embedding vendor credentials. Standalone part transfer, if needed, has an explicit format.
 
-Test empty/large legacy projects, revisions/checkpoints/results, interrupted migration, quota failure, malformed references, duplicate IDs, stale writes, multi-tab main movement and round-trip exports. Record original-record retention and recovery behavior. Account for existing import size limits when storing full snapshots; choose deduplication/retention from measured fixture sizes, not arbitrary unlimited arrays.
+Test current empty/large projects, scenarios/checkpoints/results, interrupted writes, quota failure, malformed references, duplicate IDs, stale writes, multi-tab main movement and round-trip exports. Test old-version rejection and that startup leaves the previous database untouched. Choose snapshot/trace retention from measured fixture sizes, not unlimited arrays. Future async sync uses idempotent outbox delivery and expected-head updates, as specified in deployment-and-sync.md.
 
 ## Performance and integration
 

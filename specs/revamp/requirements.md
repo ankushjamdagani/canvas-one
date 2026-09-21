@@ -4,9 +4,9 @@ These IDs must appear in work packages and review evidence. Confirmed feature sc
 
 ## R01 — Preserve the product
 
-All currently supported project creation, rename/switch, templates, guides, configuration, traffic/workload editing, run/pause/resume/reset/replay, live metrics, saved results/compare/restore, checkpoints/revisions, diagram editing, notes, grouping, layout, JSON import/export and SVG/PNG export remain reachable. Archive restrictions remain effective in state actions, not just disabled UI.
+Preserve useful capabilities: project creation/rename/switch, templates/guides, configuration, scenario/workload editing, run controls, measured results/compare/restore, autosave/checkpoints, canvas authoring, notes/grouping/layout and JSON/SVG/PNG transfer. Replace old revision/mode UX with the agreed history/scenario model. D19 permits dropping old-data compatibility and obsolete implementations; archive viewers, legacy engine replay and old import formats are not required.
 
-Acceptance: existing unit and production browser journeys pass or are deliberately updated for approved interaction changes with equivalent assertions. A navigation relabel is not permission to delete a capability. Catalog totals are derived from actual entries; diagram-only components never claim executable behavior.
+Acceptance: tests for retained behavior pass; tests specific to removed modes/formats are deliberately retired with a recorded replacement/reason. Catalog totals derive from actual entries; a component claims only its explicitly modeled behavior. Deleting obsolete tests does not excuse a current capability regression.
 
 ## R02 — Foundation fidelity
 
@@ -18,7 +18,7 @@ Acceptance: reviewed specimen matrix plus browser computed-style checks on repre
 
 One project identity, a distinct branch switch target when versioning is ready, one main Run action, History/Library entry points, overflow/project actions and a searchable command surface. Every menu item invokes an available capability or states why it is unavailable. No fake sharing, team membership or generation controls.
 
-Acceptance: project switch flushes or safely handles autosave failure; rename preserves identity/history; Escape restores focus; command availability respects selection, archive state and simulation state. Browser-reserved shortcuts in specimens (e.g. Cmd+R/H) are not copied blindly. Define one collision-reviewed shortcut map, ignore text entry/composition and show platform-appropriate key labels.
+Acceptance: project switch flushes or safely handles autosave failure; rename preserves identity/history; Escape restores focus; command availability respects selection, model readiness and run state. Browser-reserved shortcuts in specimens (e.g. Cmd+R/H) are not copied blindly. Define one collision-reviewed shortcut map, ignore text entry/composition and show platform-appropriate key labels.
 
 ## R04 — Panel workspace
 
@@ -50,7 +50,7 @@ Acceptance: source and placed copies can be edited independently; imports cannot
 
 History presents working edits, immutable commits and published versions. A branch has its own working state and parent history. Publishing merges explicitly into local main, checks its expected head, resolves conflicts, validates the result and creates an immutable published record atomically. D09 governs run requirements; D11 governs branch switching.
 
-Acceptance: no uploads or authenticated-author claims; branch working state survives reload according to policy; run evidence matches the exact executable state, workload, seed and engine version; editing after a run invalidates eligibility where required. Publish cannot succeed with unresolved conflicts or a moved main head. Cancel/failed persistence leaves source and target intact. Older revisions/checkpoints/results remain accessible with truthful legacy labels. Diagram exceptions must be visible rather than producing a fake run.
+Acceptance: initially no uploads or authenticated-author claims; branch working state survives reload; run evidence matches exact executable state, scenario inputs/scope/assumptions, seed and runner version. Commit/publication requires completed evidence for its non-empty declared required scenario set; no diagram exemption. Autosave/checkpoints preserve incomplete work. Publish cannot succeed with unresolved conflicts or a moved main head. Cancel/failed persistence leaves source and target intact. Old-data compatibility is not required.
 
 ## R09 — Results and run evidence
 
@@ -73,3 +73,15 @@ Acceptance: desktop reference sizes plus 1024×768, 768×1024 and 390×844; 200%
 ## R12 — Resumable delivery
 
 Every implementation task has an owner, base commit, exact allowed files, dependencies, referenced screens/requirements, expected evidence and a checkpoint. Claude reviews foundations, state/persistence and each merged feature; Codex accepts/rejects against requirements. No task becomes DONE from an implementer's assertion alone.
+
+## R13 — Runnable models across use cases
+
+One authoring model supports behavioral scenarios for frontend, backend/service, code/data flow and infrastructure, with fullstack composition. Run uses modeled inputs and behavior, traces/assertions and optional timed resource simulation. Actual source-code execution is deferred. S01–S05 in `execution-model.md` define lead-proposed acceptance examples to refine in contract review.
+
+Acceptance: each family has a deterministic input/output fixture and a failure case; structural relationships never accidentally execute as calls; view collapse does not change behavior; aggregate/refined submodels do not double-count work. Missing behavior blocks the affected scenario with actionable issues; partial coverage is explicit. No latency/throughput is invented for purely logical runs.
+
+## R14 — Deployment-independent local core
+
+Design model, command, repository, run and sync boundaries for local, hosted and self-hosted bundles. Initial implementation stays local; GitHub/server sync and async team workflows are future delivery tracks; live coediting comes later. Model identity cannot depend on a specific auth or storage provider.
+
+Acceptance now: no credentials/vendor identity embedded in portable documents; stable IDs, explicit revision checks and separation of shared content/personal preferences/run artifacts. Future remote acceptance must distinguish saved-locally/synced/published, enforce permissions server-side and recover idempotently from interrupted sync. Self-hosting cannot require a company-hosted API.
