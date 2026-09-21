@@ -1,5 +1,9 @@
 # Cross-model handoffs and recovery
 
+## Current authorization
+
+2026-09-22: user explicitly requires planning only and multiple reviews of requirements, implementation design, execution and delegation. Automatic delegation is permitted for read-only review; implementation dispatch is prohibited until the user explicitly lifts this hold. Earlier READY foundation verdicts do not override this instruction. No blanket permission bypass flags or global permission changes are authorized. See `review-plan.md` for review rounds and acceptance evidence.
+
 ## First handoff — Claude senior review
 
 Run after the planning/source checkpoint is committed and the worktree is clean. The user now authorizes direct CLI delegation: Codex dispatches Claude review and Gemini implementation, captures results, and verifies them. Manual switching is a fallback only when authentication or tool access genuinely blocks dispatch. This overrides the older user-driven-only rule for this initiative. Keep scoped file ownership, isolated implementation worktrees, and review gates. Never bypass permission controls or claim a delegate ran without recorded results.
@@ -26,6 +30,8 @@ Additional required review scope (D22/R15): read `ai-collaboration.md`. The long
 4. The integrator applies one reviewed checkpoint at a time; reruns affected checks; resolves merge conflicts as reviewable edits. Codex verifies rather than implementing integration fixes.
 5. Agent output includes reproducible evidence and exact next action. A token-expired session is resumed from its checkpoint by another session/model only after ownership transfers.
 6. Codex updates central ledger; every completed platform task appends its action summary to ACTION_LOG and updates HANDOFF only when the latest runtime/resume state changes.
+
+Project dispatcher roles always override generic skill defaults: critic=Claude, reviewer=Claude, implementer=Gemini, coordinator/final verifier=Codex. Use the preflight, evidence, retry and interruption protocol in `review-plan.md`, not the generic skill shell loop verbatim. Coordinator records task summaries centrally on behalf of delegates; delegates do not concurrently edit ACTION_LOG/HANDOFF/tasks. RV-12 integration locks and RV-08/RV-14 subgates are tracked in `work/package-ledger.md`.
 
 ## Useful parallelism
 

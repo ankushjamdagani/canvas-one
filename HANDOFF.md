@@ -2,6 +2,10 @@
 
 ## Active initiative — System Studio design revamp (21 September 2026)
 
+2026-09-22 USER HOLD: planning and read-only reviews only. Do not implement, dispatch implementation, or treat a reviewer approval as permission to execute. Finalize requirements, implementation architecture, delivery/execution and delegation through multiple reviews first; only a later explicit user instruction lifts this hold. Gemini was stopped before edits; its isolated worktree is clean and its temporary node_modules symlink removed. Preserve planning documents.
+
+Current review state: P1 requirements, P2 architecture and P3 execution/delegation returned and were reconciled by Codex. Read `specs/revamp/review-plan.md`, `reviews/2026-09-22-disposition.md` and `contracts/README.md`. P4 closure and D26 publication-undo answer are pending. Run/transaction/fixture contracts are documentation drafts; RV-02d/e/f/g still require concrete schemas, measured limits and UI/transfer APIs before any future dependent implementation. Generic delegate skill shell loops are not approved for code dispatch without scoped preflight/recovery evidence.
+
 Delegation update: the user requests automatic orchestration rather than manual platform switching. Codex may invoke installed Claude/Gemini CLIs for bounded review/implementation tasks, retaining the assigned roles and review gates. See `specs/revamp/handoffs.md`; the historical manual-only rule is superseded for this initiative.
 
 Future product goal (D22/R15): an AI buddy collaborates on application development through the canvas, with structured decisions, proposals, discussions and evidence rather than dependence on external Markdown/chat history. See `specs/revamp/ai-collaboration.md`. Enforce shared validated domain commands, stable revision-aware links, provenance and provider-independent adapters in current architecture. No AI implementation now; Claude RV-00/RV-02 must review these seams without adding speculative infrastructure.

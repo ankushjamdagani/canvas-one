@@ -1,9 +1,9 @@
 # RV-01a — Tokens and core controls
 
 Owner: Gemini/agy executor; Codex coordinator; Claude reviewer.
-Status: READY; Claude bounded foundation verdict returned UNBLOCKED (session 34863). Fonts and additional composites in the reviewer's suggested sequence are assigned to later RV-01 slices; this exact file boundary remains authoritative.
-Base: planning checkpoint to be recorded at dispatch.
-Branch/worktree: to be assigned; never edit the coordinator checkout.
+Status: BLOCKED by explicit user implementation hold (2026-09-22). Prior Claude verdict is technical clearance only. Gemini attempt stopped before edits; no app implementation to undo.
+Base: 8b5e47d, historical dispatch checkpoint; rebase/review brief before any future dispatch.
+Branch/worktree: codex/revamp-foundation-a at /tmp/system-studio-foundation-a; clean, no active delegate, temporary dependency symlink removed. Never edit coordinator checkout.
 
 ## Exact owned files
 

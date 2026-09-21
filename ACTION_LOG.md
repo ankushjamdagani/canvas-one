@@ -905,3 +905,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Delegation**: Claude follow-up session 34863 returned UNBLOCKED for bounded RV-01a. A read-only Luna scout traced legacy callers/IDs; Codex verified key source anchors. Full RV-00/domain contract acceptance remains pending.
 - **Changed**: Planning/contract/review documents and exact RV-01a ownership brief only. No application code yet. Foundation implementation will run in an isolated Gemini worktree; fonts/remaining controls stay in later slices.
 - **Verification**: Existing graphify query and source reads; no fresh application tests. Detailed acceptance evidence will be recorded when implementation returns.
+
+## 2026-09-22
+
+### Planning-only hold and independent reviews — in progress (Codex)
+
+- **Outcome**: Stopped Gemini at user request; verified its isolated worktree has no source changes and removed only the task-created dependency symlink. No app implementation existed to undo. User hold explicitly blocks all implementation dispatch pending a later instruction.
+- **Changed**: Planning documents only: revised identity/transaction contracts, five-family fixtures, requirements and decisions, contrast evidence, contract/subtask registers, delegation/preflight/recovery protocol and durable P1/P2/P3 prompts/reports/disposition.
+- **Delegates**: Three independent Claude Sonnet 4.6 read-only reviews returned exit 0; requirements and delegation requested revisions, architecture accepted with pre-dispatch conditions. Codex corrected inaccurate reviewer claims using source/design evidence. Prior read-only Luna scout supplied bounded caller/ID evidence. Gemini attempt exited without edits; no implementation accepted.
+- **Verification**: Git diff against source baseline shows no changes to src/dependencies/tests; isolated worktree clean. Relative Markdown links checked; `git diff --check` passes. Measured source color contrast and inspected original 22D Undo publish text. No application tests rerun.
+- **Pending**: P4 closure review and D26 product answer; detailed RV-02 schema/budget/adapter/UI/export contracts remain pre-dispatch gates. No code, deployment or push.

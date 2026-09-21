@@ -30,6 +30,8 @@ Use the supplied font families, preferably packaged locally with licenses and on
 
 Focus-ring tints, 9px metadata and low-contrast colors require actual testing; visual reference fidelity is not an accessibility exemption. Centralize any approved correction.
 
+Measured planning corrections are recorded in [foundation-accessibility.md](contracts/foundation-accessibility.md). These semantic overrides take precedence over the raw token table for informative secondary/clay text and focus indicators; full browser state verification remains required.
+
 ## Component map
 
 | Design family | Foundation | Custom responsibility |

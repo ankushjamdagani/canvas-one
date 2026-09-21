@@ -1,6 +1,6 @@
 # System Studio revamp
 
-Status: initial visual plan recorded; architecture reopened before execution. No application implementation authorized for Codex. Updated 2026-09-21.
+Status: PLAN ONLY under explicit user hold, 2026-09-22. Finalize and repeatedly review requirements, implementation design, execution sequencing and delegation. No application implementation or implementation dispatch until the user explicitly lifts the hold. Codex remains planner/verifier.
 
 Long-term product direction: [AI collaboration through the canvas](ai-collaboration.md). The future buddy participates in structured decisions, proposals, runs and implementation review anchored to the project. Current contracts must support that evolution; no AI implementation is included now.
 
@@ -25,6 +25,7 @@ The deliverable is the supplied design brought into the existing product without
 7. [Delivery plan](delivery-plan.md): dependencies, exclusive ownership and work packages.
 8. [Verification](verification.md): baseline and acceptance gates.
 9. [Task ledger](tasks.md) and [handoff protocol](handoffs.md): claim/resume/review work.
+10. [Multi-review protocol](review-plan.md), [review disposition](reviews/2026-09-22-disposition.md) and [contract register](contracts/README.md): current plan acceptance, implementation hold and remaining pre-dispatch gates.
 
 ## Authority
 

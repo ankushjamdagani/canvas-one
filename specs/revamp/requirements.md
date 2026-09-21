@@ -24,7 +24,7 @@ Acceptance: project switch flushes or safely handles autosave failure; rename pr
 
 History and Library can dock left/right, float, stack on a side and collapse to a rail. Their contents retain state across placement changes. Header placement menus provide a full alternative to dragging. Dragging exposes targets; Escape cancels; pointer cancellation restores the pre-drag state. Widths are remembered per side. Reset width and close remain available.
 
-Acceptance: test each 23A–G state; keyboard placement/resize; touch placement; both side stacks; reopening; short viewport; window shrink and reload. Canvas geometry responds without losing the user's camera/selection. Floating rectangles are clamped so the header and close controls remain reachable. Panel operations do not create graph undo entries or reset simulation. Inspector occupancy policy is decided before integration.
+Acceptance: test each 23A–G state; keyboard placement/resize; touch placement; both side stacks; reopening; short viewport; window shrink and reload. Canvas geometry responds without losing the user's camera/selection. Floating rectangles are clamped so the header and close controls remain reachable. Panel operations do not create graph undo entries or reset simulation. Placement is not undoable through graph Cmd/Ctrl+Z; Escape cancels an in-progress placement/resize. Inspector occupancy follows D23 and its RV-02f numeric breakpoint/geometry contract.
 
 ## R05 — Canvas and dock
 
@@ -38,9 +38,15 @@ Configuration, validation and measured results remain separate. The new inspecto
 
 Draft acceptance: edit several fields without mutating the engine model; invalid Apply preserves the draft and focuses the first error; valid Apply updates atomically; Cancel restores the original values; one Undo reverses the whole Apply. Selection/project/branch changes and closing a dirty inspector use an explicit Apply/discard/cancel path. A run must use committed editor values; never silently run unapplied fields. Concurrent external changes to the same target are detected before Apply.
 
+Run with a dirty draft opens a choice: Apply and Run, Run applied version, or Cancel. Apply and Run validates/persists the atomic command first and starts only on success. Run applied version explicitly retains the unapplied draft and runs an immutable applied snapshot with that status visible. No automatic Apply or silent draft discard. This extends the confirmed Apply/Cancel policy consistently; new/run identity never observes raw form text.
+
+Workload editing acceptance: retain workload enablement, entry target, rate/interval/profile, timeout, named request classes, weights, operations, tags and key distribution where resource scenarios use them. Validate the whole draft atomically; add/remove/edit classes and workloads must survive reload and one-step undo without silently substituting defaults. Pure logical scenarios expose typed input events/fixtures rather than irrelevant traffic-rate fields. RV-05 owns this surface and R13 owns resulting run behavior.
+
 ## R07 — Library and reusable parts
 
 Catalog and saved parts share search, categories, list/grid views and a focus/touch-accessible detail surface. Dock entry and panel entry use the same content/actions. Include save-selection-as-part and placement; do not fabricate a team catalog.
+
+Library has one live instance. Invoking it from any command focuses and expands the existing panel, or opens it at its last valid placement if closed. Dock icon remains available and indicates open state; it does not create a second picker while the panel is open. History follows the same single-instance rule. An already focused open panel closes only through its explicit close/toggle command, not a generic focus/open command.
 
 Proposed copy contract: a placed part creates fresh IDs, remaps internal edges/note attachments/subsystems, preserves relative positions and valid configurations, and inserts once into undo history. No live link back to its source. External edges are not silently included. Save/placement rejects invalid selections or limits before partial mutation.
 
@@ -48,7 +54,7 @@ Acceptance: source and placed copies can be edited independently; imports cannot
 
 ## R08 — Local history, branches and publishing
 
-History presents working edits, immutable commits and published versions. A branch has its own working state and parent history. Publishing merges explicitly into local main, checks its expected head, resolves conflicts, validates the result and creates an immutable published record atomically. D09 governs run requirements; D11 governs branch switching.
+History presents working edits, immutable commits and published versions. A branch has its own working state and parent history. Publishing merges explicitly into local main, checks its expected head, resolves conflicts, validates the result and creates an immutable published record atomically. D20 governs run requirements; D11 governs branch switching. Publication undo is pending the explicit D26 product answer; its draft contract is not accepted scope while pending.
 
 Acceptance: initially no uploads or authenticated-author claims; branch working state survives reload; run evidence matches exact executable state, scenario inputs/scope/assumptions, seed and runner version. Commit/publication requires completed evidence for its non-empty declared required scenario set; no diagram exemption. Autosave/checkpoints preserve incomplete work. Publish cannot succeed with unresolved conflicts or a moved main head. Cancel/failed persistence leaves source and target intact. Old-data compatibility is not required.
 
@@ -64,11 +70,15 @@ Retain templates, blank canvas and validated import; refresh their presentation.
 
 JSON remains the lossless portable project format; Mermaid is an explicitly lossy diagram representation; CSV exports selected run metrics with units/provenance, protects spreadsheet formula interpretation and does not fabricate missing values. Export feature limitations are stated at the action, not buried in documentation.
 
+Minimum Mermaid output: selected authored view's element names, directed connections with available labels and relationship kinds, and wholly represented subsystem boundaries where Mermaid subgraphs can express them. Generate collision-free IDs independently of labels and escape untrusted labels. Notes, positions/appearance, typed behavior/resource configuration, scenarios, history and observed metrics are explicitly omitted; structural arrows are descriptive, not executable calls. No Mermaid import/round-trip promise. RV-02g defines exact syntax/escaping and unsupported nesting fallback before implementation.
+
 ## R11 — Accessible adaptive behavior
 
 Preserve full small-screen editing as confirmed in D14. Every hover/drag affordance has keyboard/touch access; visible focus and meaningful labels; overlays return focus; invalid fields link to errors; colors have textual equivalents. Review contrast against WCAG AA, including focus/non-text controls, and record any visual deviation needed.
 
 Acceptance: desktop reference sizes plus 1024×768, 768×1024 and 390×844; 200% text zoom; long names; empty/large data; reduced motion. Narrow screens contain the canvas and use usable panels without page-level horizontal scrolling. No introduction of a dark theme based solely on an alternative board.
+
+Evergreen paper is light-only in this scope, including when the OS prefers dark mode; native controls use the same light color scheme. A future dark theme needs its own design. Contrast corrections are centralized in [foundation accessibility](contracts/foundation-accessibility.md).
 
 ## R12 — Resumable delivery
 
@@ -79,6 +89,8 @@ Every implementation task has an owner, base commit, exact allowed files, depend
 One authoring model supports behavioral scenarios for frontend, backend/service, code/data flow and infrastructure, with fullstack composition. Run uses modeled inputs and behavior, traces/assertions and optional timed resource simulation. Actual source-code execution is deferred. S01–S05 in `execution-model.md` define lead-proposed acceptance examples to refine in contract review.
 
 Acceptance: each family has a deterministic input/output fixture and a failure case; structural relationships never accidentally execute as calls; view collapse does not change behavior; aggregate/refined submodels do not double-count work. Missing behavior blocks the affected scenario with actionable issues; partial coverage is explicit. No latency/throughput is invented for purely logical runs.
+
+The specific acceptance traces, outcomes and failure cases are defined in [execution slices](contracts/execution-slices.md); a trivial arbitrary example per family does not satisfy R13. Exact shared types and adapter interfaces remain gated through the [contract register](contracts/README.md).
 
 ## R14 — Deployment-independent local core
 

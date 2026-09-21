@@ -6,13 +6,15 @@ Status: lead draft for Claude review; detailed portable schema and measured stor
 
 All authored edits use one pure command validator/reducer with a repository adapter. UI and future AI invoke the same boundary. Request: `commandId`, `operationId` UUID, `projectId`, `branchId`, `expectedWorkingRevision`, `actor`, typed payload. Result is a discriminated union: `applied` (new revision, changed IDs, undo description), `invalid` (field/element issues), `stale` (expected/current revision), `missing`, or `storage-failed`. No raw patch/path API is exposed to future providers.
 
-Current actor provenance: `{actorId, kind: 'local-human', displayName}`. Persist stable local actor ID separate from mutable display text; display names are self-reported. Do not implement `ai-agent` authorization now. Future actor kinds use a versioned union extension. Identity/provenance conveys no access rights. Local timestamps are display metadata, never conflict ordering.
+Current actor provenance: `{actorId, kind: 'local-human', displayName}`. Persist stable local actor ID separate from mutable display text; display names are self-reported. Unknown actor kinds fail command validation. Do not implement `ai-agent` authorization now. Future actor kinds use a versioned union extension. Identity/provenance conveys no access rights. Local timestamps are display metadata, never conflict ordering.
 
-`operationId` is reused for retrying the exact same command, with request hash recorded atomically. Matching operation returns the original result; reuse with different content fails. Keep dedup records referenced by durable operations; transient session undo history is separately bounded. No server outbox is implemented in this phase.
+`operationId` is reused for retrying the exact same command. Compute its canonical request hash before entering the transaction, then record that ready hash atomically with the mutation result. Matching operation returns the original result; reuse with different content fails. Keep dedup records referenced by durable operations; transient session undo history is separately bounded. No server outbox is implemented in this phase.
 
 ## Inspector Apply
 
 Use a conservative document-level revision for v1. Capture `{projectId, branchId, targetIds, baseWorkingRevision, baseValues}` on opening a draft. Any authored change to that branch makes Apply stale; selection, viewport, panels and simulation ticks do not increment the authored revision. This can reject unrelated concurrent edits, which is preferable to silently overwriting them. No per-element revision subsystem is required initially.
+
+Persist viewport/panel/dock preferences through a separate preferences repository with its own revision token; selection and live simulation ticks remain transient. Preferences writes never touch workingRevision or authored autosave. Authored view layouts (element positions, notes, saved view membership) are content and do increment workingRevision, while remaining excluded from executable identity. The same-revision rule below applies to authored writers, not preferences.
 
 Apply parses the complete draft, validates target existence and all cross-references, validates expected branch/project and revision, then submits one compound command and one undo entry. Invalid or stale results preserve the draft. Stale UI offers reload/discard/cancel; no automatic overwrite. Cancel discards draft only. Branch/project switch or dirty-target change requests Apply/discard/cancel; failed Apply or save cancels navigation. Multi-selection uses the same single base revision and atomic validation.
 
@@ -26,6 +28,8 @@ Never await hashing, network, arbitrary callbacks or worker responses inside the
 
 ## History transition table
 
+Publication undo rows/paragraphs are a conditional draft pending D26; they are not accepted implementation scope. All other operations remain independently reviewable.
+
 | Action / precondition | Atomic effect | Rejection / recovery |
 |---|---|---|
 | New project | Create branch working copy with nullable head and revision 0 | No fabricated initial commit or run |
@@ -37,12 +41,14 @@ Never await hashing, network, arbitrary callbacks or worker responses inside the
 | Restore historical snapshot | Create/update an explicit working draft with source provenance; increment revision | Does not rewind immutable history or manufacture qualifying evidence |
 | Switch branch | Finish save of source working state, resolve inspector draft, then load target | Any save/conflict failure keeps source active |
 
-Undo publication uses stored previous-content snapshot and its matching completed evidence. It passes the same D20 gate: if evidence is unavailable, create a restore draft requiring a run instead. Source branch reopening is permitted only if its closure was performed by that publication and its recorded closure revision still matches; otherwise preserve its newer state and report that reopening was skipped. Descendant branches keep their existing immutable parent references; compensation does not erase or reparent descendants. A later main commit makes direct undo unavailable. First publication with no prior published content has no direct undo-to-empty commit; offer restore draft. Concurrent tabs race on expected main, so only one compensation can succeed.
+Undo publication uses stored previous-content snapshot and its matching completed evidence. Published/committed snapshots and required evidence are reference-pinned: independent deletion is rejected with `referenced-artifact`. Corruption/missing content yields `missing` with artifact IDs; do not fabricate a restore from partial evidence. If snapshot exists but evidence is unavailable, offer a restore draft requiring a run instead. Source branch reopening is permitted only if its closure was performed by that publication and its recorded closure revision still matches; otherwise preserve its newer state and report that reopening was skipped. Descendant branches keep their existing immutable parent references; compensation does not erase or reparent descendants. A later main commit makes direct undo unavailable. First publication with no prior published content returns `invalid` with `no-previous-publication`; UI disables direct undo with that reason and offers a separate restore-draft action. Concurrent tabs race on expected main, so only one compensation can succeed.
 
 ## Merge identity rules
 
 All mutable collection members that can be referenced independently have stable IDs: elements, ports, behavioral/structural edges, views and placements, notes, scenarios, workloads/classes, subsystems, transition rules and assertions. Constructors generate UUIDs; edits and round trips preserve IDs; cloning/part placement creates a complete remapping. Duplicate IDs or dangling references reject import/command before mutation.
 
 Three-way merge operates by ID and schema field, never display position. Both sides same change coalesce; one-sided changes apply; competing scalar values, delete/edit, incompatible kinds and reference breaks are conflicts. Ordered sequences (transition priority, data operations, event schedule) are whole-field conflicts initially; no guessed interleaving. An explicit reorder is authored content. Run artifacts, personal preferences and undo stacks are not merged as model fields.
+
+Conflict UI shows base/ours/theirs and labels actual branch names. A sequence conflict offers keep ours, keep theirs, or edit the ordered sequence using normal validated controls; it does not require retyping a whole JSON array. Scalar/entity conflicts stay granular. Resolution modifies the isolated candidate only and must pass full validation before run/publish. D25 records this conservative first-version behavior.
 
 Legacy ID stability is audit evidence only; the current-only schema enforces new invariants instead of preserving malformed old IDs. Existing `domain/revisions.ts` supports current snapshot/compare/finalize workflows and cannot be deleted until their new history equivalents are reachable and tested.

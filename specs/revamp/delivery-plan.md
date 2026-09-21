@@ -1,6 +1,6 @@
 # Delivery plan and ownership
 
-Execution hold: the user decisions from ARCH-01 are recorded, but RV-00 must review the expanded model semantics, retirement and sync boundaries before implementation. RV-14/15/16 below add explicit model-run, retirement and local-adapter work. No hosted service or live coediting implementation is authorized by these packages.
+Execution hold (explicit user instruction, 2026-09-22): planning and read-only reviews only. Even an accepted RV-00/RV-02 or independent foundation verdict does not authorize implementation. Requirements, implementation architecture, delivery execution and delegation require multiple reviews; only a later explicit user instruction lifts this hold. RV-14/15/16 define future scope. No hosted service or live coediting implementation is authorized by these packages.
 
 Codex is lead/planner/final verifier. Claude reviews plans, contracts and implementation. Gemini/agy performs implementation and integration edits. Codex dispatches the CLIs directly under the user's latest instruction. The task ledger records actual dispatch and acceptance; this table defines scope.
 
@@ -123,7 +123,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 - Owner: Gemini; owns new `domain/parts/`, part repository files and tests, excluding shared persistence configuration.
 - Dependencies: RV-02.
 - Deliver: validated capture, detached clone/remapping, local part versions and one-operation insertion payload.
-- Exit: R07; verify independent copies, excluded external links, collisions, notes/subsystems, limits and failed placement leaves state unchanged.
+- Exit: R07/R11; verify independent copies, excluded external links, collisions, notes/subsystems, limits and failed placement leaves state unchanged; keyboard placement and focus are verified at integration.
 
 ### RV-10 — Entry, CSV and Mermaid
 
