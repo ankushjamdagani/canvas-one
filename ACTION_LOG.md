@@ -879,3 +879,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Skills/tools**: graphify existing-graph queries, ripgrep/source inspection, official GitHub/Yjs documentation and local-first research, apply_patch. No new dependency installed.
 - **Verification**: Direct checks of App/worker/engine dispatch, model/behavior/compiler definitions, component import/render paths and active example dependencies. Documentation links and whitespace checked. Application suites not rerun; prior baseline remains 233 passing unit tests and 46/51 passing browser tests.
 - **Limitations/next**: Architecture is proposed for Claude RV-00 review; RV-02 must freeze typed scenarios/current schema and bounded execution contracts before Gemini starts. Future hosted/self-hosted/sync capabilities are architecture constraints, not implemented services. No deletion, push or deployment.
+
+### Future canvas-based AI buddy — architecture requirement (Codex)
+
+- **Outcome**: Recorded D22/R15: future human/AI application-development collaboration uses structured canvas decisions, proposals, discussions and evidence. Added `specs/revamp/ai-collaboration.md` and integrated extension constraints into technical/deployment plans, delivery gates, reviewer handoff, task ledger and HANDOFF.
+- **Platform/subagents/tools**: Codex planning only; no subagents. Applied existing best-practices guidance to typed domain boundaries, validation, provenance, provider independence and scope discipline; used source-document reads, apply_patch and Git.
+- **Verification**: Planning-document links and `git diff --check` passed. Application suites not rerun for documentation-only changes; no AI behavior implemented or verified.
+- **Limitations/next**: Claude reviews extension seams in RV-00/RV-02; AI UI, providers, orchestration and code execution remain deferred. No application code, dependencies or project data changed; no push/deployment.

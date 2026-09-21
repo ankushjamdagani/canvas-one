@@ -24,6 +24,10 @@ Current source exports legacy graphs as format 7 and open-system graphs as forma
 
 These are proposed destinations for new code, not a mandate to move every existing file. Reuse existing editors/canvas with adapters, then retire old surfaces only once their capability map is complete. Domain operations return success/error results; UI never mutates snapshots directly.
 
+## Future AI buddy boundary
+
+Follow [ai-collaboration.md](ai-collaboration.md): domain commands and candidate validation must be callable independently of React, with expected revisions, stable references, atomic operations and structured outcomes. A future AI adapter is another client of those operations, not a privileged path into editor/storage state. Reserve conceptual extension points for versioned decision/proposal/discussion/code-evidence records separate from executable behavior and personal presentation. Implement only presently used contracts; do not add AI providers, agent services or generic plugin frameworks now. Markdown is a possible report/export, not the future product database.
+
 ## Contracts to freeze in RV-02
 
 | Contract | Required information / operations |

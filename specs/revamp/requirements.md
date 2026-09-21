@@ -85,3 +85,9 @@ Acceptance: each family has a deterministic input/output fixture and a failure c
 Design model, command, repository, run and sync boundaries for local, hosted and self-hosted bundles. Initial implementation stays local; GitHub/server sync and async team workflows are future delivery tracks; live coediting comes later. Model identity cannot depend on a specific auth or storage provider.
 
 Acceptance now: no credentials/vendor identity embedded in portable documents; stable IDs, explicit revision checks and separation of shared content/personal preferences/run artifacts. Future remote acceptance must distinguish saved-locally/synced/published, enforce permissions server-side and recover idempotently from interrupted sync. Self-hosting cannot require a company-hosted API.
+
+## R15 — Future canvas-based AI collaboration
+
+The future AI buddy discusses and proposes app-development decisions/changes against structured project context. Canvas-linked decisions, proposals and evidence become durable records rather than depending on external Markdown or chat history. No AI service, chat UI, code agent or provider integration is included now.
+
+Acceptance now: current domain commands, stable references, candidate diff/validation, provenance and run identity can be reused by a later agent adapter without bypassing invariants or scraping the UI. RV-02 documents extension seams for future decision/proposal/code-evidence records without creating unused subsystems. Local operation remains independent of AI. See `ai-collaboration.md` for future workflow and review criteria.

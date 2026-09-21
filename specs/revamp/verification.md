@@ -51,6 +51,7 @@ Use scoped unit tests for reducers/domain operations, focused browser tests for 
 | Responsive | reference desktop widths, 1024×768, 768×1024, 390×844; one overlay on phones; non-zero canvas; 200% text zoom and long names |
 | Model families | S01 UI states/events, S02 service flow, S03 data transformations, S04 deployment failures, S05 fullstack/refinement; deterministic success/failure traces |
 | Local adapters | no remote dependency; personal/shared/artifact separation; author provenance; stale write/failure handling; no secrets in portable model |
+| Future AI seams (R15) | UI-independent validated commands; candidate diffs and revision checks; stable references/provenance; no agent bypass or required AI provider; no speculative AI services |
 
 ## Visual acceptance
 
@@ -70,3 +71,5 @@ No invented percentage score declares fidelity. Claude records concrete discrepa
 ## Architecture follow-up verification
 
 The architecture follow-up performed read-only graph queries and direct source/caller checks, including corrections to the initial scout's reachability claims. Only planning documents changed. Application tests were not rerun; the baseline above is not a new pass claim. Documentation links, requirement references and whitespace are checked before checkpointing this revision. Claude review/Gemini execution remain pending.
+
+The subsequent AI-buddy direction is documentation-only: D22/R15 and linked architecture/review criteria. Link and whitespace checks apply; application suites are not rerun and no AI behavior is verified or claimed.

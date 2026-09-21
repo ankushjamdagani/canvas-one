@@ -51,6 +51,7 @@ Browser-local save, remote sync and reviewed publication are separate states. UI
 - Author claims record origin: local self-reported actor versus authenticated server principal. A display name is never permission evidence.
 - Versioned portable representation and deterministic canonicalization. Unknown future behavior versions must not silently run with old semantics.
 - Repository/run/artifact/sync interfaces defined around actual use cases, not a universal abstraction framework. Implement only local adapters initially unless scope changes.
+- Future AI collaboration uses these same domain/security boundaries. Decision/proposal/evidence records are structured shared content when introduced; inference providers and credentials remain separate adapters. Local and self-hosted operation must not acquire a mandatory hosted AI dependency. See [AI collaboration](ai-collaboration.md).
 
 ## GitHub synchronization
 

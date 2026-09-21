@@ -2,6 +2,8 @@
 
 Status: initial visual plan recorded; architecture reopened before execution. No application implementation authorized for Codex. Updated 2026-09-21.
 
+Long-term product direction: [AI collaboration through the canvas](ai-collaboration.md). The future buddy participates in structured decisions, proposals, runs and implementation review anchored to the project. Current contracts must support that evolution; no AI implementation is included now.
+
 ## Architecture discussion takes precedence
 
 The user expanded the planning questions after the initial checkpoint. Read [execution model](execution-model.md), [deployment and sync](deployment-and-sync.md), and [legacy retirement](legacy-retirement.md) first. Model-based runnable experiences must cover frontend/backend/fullstack, code/data flow, service flow and infrastructure. Actual source execution and live coediting are later capabilities; async collaboration comes first. Old-data compatibility can be dropped. Commits/publication still require runs; incomplete work uses autosave/checkpoints, with no diagram exception. No implementation package may start from the old assumptions.

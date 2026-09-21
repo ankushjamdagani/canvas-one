@@ -4,6 +4,8 @@ Execution hold: the user decisions from ARCH-01 are recorded, but RV-00 must rev
 
 Codex is lead/planner/final verifier. Claude reviews plans, contracts and implementation. Gemini/agy performs implementation and integration edits. Cross-platform starts require the user's switch; the table is a plan, not a claim that agents were dispatched.
 
+R15/D22 applies to RV-00, RV-02 and RV-16: review future canvas-based AI collaboration seams in `ai-collaboration.md`. Require shared validated domain commands, stable revision-aware references and structured decision/proposal/evidence extension points. Do not create an AI execution package or install AI dependencies now.
+
 ## Gates and parallel waves
 
 ```mermaid
@@ -149,7 +151,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 - Owner: Codex verification; Claude independent senior review; Gemini fixes only assigned findings.
 - Dependencies: integrated packages.
 - Deliver: full verification matrix, S01–S05 fixtures, reference captures, known limitations and current storage/recovery evidence.
-- Exit: R01–R14 satisfied, no critical/high unresolved findings, explicit disposition for remaining issues, clean worktree/checkpoint. No deployment or push implied.
+- Exit: R01–R15 current-scope criteria satisfied, no critical/high unresolved findings, explicit disposition for remaining issues, clean worktree/checkpoint. R15 verifies extensible boundaries, not an implemented buddy. No deployment or push implied.
 
 ### RV-14 — Model-based execution slices
 

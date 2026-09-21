@@ -8,6 +8,8 @@ Run after the planning/source checkpoint is committed and the worktree is clean.
 
 The target platform is Claude; bounded task RV-00; files owned: none; expected verification: read-only source/design review and a concrete findings report. Codex records accepted findings in the plan.
 
+Additional required review scope (D22/R15): read `ai-collaboration.md`. The long-term product is human/AI app-development collaboration through structured canvas decisions/proposals/evidence. Check current contracts allow that without Markdown parsing, UI scraping, direct state writes or vendor coupling. Keep AI implementation out of scope; report both missing extension boundaries and unnecessary speculative abstractions.
+
 ## Gemini implementation template
 
 > Implement only task [ID/subtask] from the accepted revamp plan. Your base is [commit], worktree [path], allowed files [exact list]. Read [decision/contract versions], requirement IDs [IDs] and supplied reference screens [full labels]. Follow the shadcn foundation and retain existing simulation/persistence invariants. Execute these bounded steps: [steps]. Use these fixtures: [fixtures]. Run [commands/scenarios]. Stop if a required change exceeds ownership or the contract is ambiguous. Return commit, file list, screenshots, test results, limitations and next exact action. Do not mark accepted; Claude reviews and Codex verifies. Do not modify App/editor/persistence/global tokens unless explicitly listed.
