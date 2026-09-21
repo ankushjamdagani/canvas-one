@@ -922,3 +922,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: Archived closure prompt/report/status; updated planning ledger/resume guidance and corrected stale superseded decision references. No application implementation was made; Gemini session terminated and isolated worktree verified clean.
 - **Verification**: `git diff --check`; relative Markdown links; source/dependency/test diff against fb4a1ff empty; original published/merge design frames rendered and visually inspected. No application suites rerun or claimed. All review processes returned; none left running.
 - **Next**: Resolve D26 and continue RV-02d/e/f/g documentation with peer review. No code dispatch, push or deployment.
+
+### /delegate multi-agent orchestration skill — authored (Claude)
+
+- **Outcome**: Built platform-agnostic `/delegate` skill at `.agents/skills/delegate/` with Planner → Critic loop → parallel Executors → Reviewer loop pipeline. Rewrote `AGENTS.md` from scratch to be lean.
+- **Changed**: `.agents/skills/delegate/SKILL.md`, `.agents/skills/delegate/roles/planner.md`, `.agents/skills/delegate/roles/critic.md`, `.agents/skills/delegate/roles/reviewer.md`, `.agents/skills/delegate/roles/executor.md`; `.claude/skills/delegate` symlink; `docs/superpowers/specs/2026-09-21-delegate-skill-design.md`; `docs/superpowers/plans/2026-09-21-delegate-skill.md`; `AGENTS.md` rewritten (170 → 79 lines).
+- **Platform**: Claude lead; no subagents for final AGENTS.md rewrite.
+- **Verification**: YAML frontmatter validated; all 3 CLIs confirmed present (agy, codex, claude); agy stdin-pipe mode and `--model`+`--effort` flags verified; GPT-5 slugs verified from `~/.codex/models_cache.json`. No build/test run (no application code changed).
+- **Limitations**: Nothing committed — user approval required before commit. Spec/plan docs written but not tested end-to-end.
+- **Follow-up**: Commit skill files + AGENTS.md when user approves. End-to-end test by invoking `/delegate` from each platform CLI.
