@@ -892,3 +892,16 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: User authorized direct delegation, superseding manual-only handoffs for this initiative. Updated HANDOFF, revamp handoffs and task ledger. Codex remains planner/verifier, Claude senior reviewer, Gemini implementer.
 - **Skills/tools**: Read delegate skill and all role files; inspected Claude/agy CLI help. Claude authentication works with approved sandbox escalation; `agy models` confirmed Gemini availability. Launched a read-only Claude Sonnet review (session 8739) against planning checkpoint 680827b; no Gemini implementation dispatched.
 - **Verification/status**: `git diff --check` passed before this log addition. Initial sandbox attempts failed on credential/local runtime access; approved retries succeeded. Review output and full RV-00 coverage remain pending. No app code changed or application tests rerun.
+
+### Claude initial review returned — status (Codex)
+
+- **Outcome**: Claude CLI session 8739 exited successfully and returned RV-00 architecture findings. Main follow-ups: execution capability partition, canonical run fingerprint, explicit retirement ownership, transactional publish, stable IDs, inspector revision handling and command/provenance contracts.
+- **Status**: Initial delegated review complete; full RV-00 acceptance remains pending Codex validation and source/design coverage. Claude's proposed extra D21 user-confirmation gate is reviewer advice, not an established requirement; Codex must assess it against the user's technical-lead authorization.
+- **Changed/verification**: Updated task ledger and action log only. No implementation or application tests; retrieved actual Claude output, exit code 0.
+
+### Review disposition and first execution gate — in progress (Codex)
+
+- **Outcome**: Validated initial review claims; corrected test-only scenario caller claim and unnecessary D21 approval gate. Drafted canonical run identity and mutation/history contracts for peer review; clarified automatic orchestration and retirement/integration ownership.
+- **Delegation**: Claude follow-up session 34863 returned UNBLOCKED for bounded RV-01a. A read-only Luna scout traced legacy callers/IDs; Codex verified key source anchors. Full RV-00/domain contract acceptance remains pending.
+- **Changed**: Planning/contract/review documents and exact RV-01a ownership brief only. No application code yet. Foundation implementation will run in an isolated Gemini worktree; fonts/remaining controls stay in later slices.
+- **Verification**: Existing graphify query and source reads; no fresh application tests. Detailed acceptance evidence will be recorded when implementation returns.

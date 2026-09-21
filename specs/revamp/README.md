@@ -10,7 +10,7 @@ The user expanded the planning questions after the initial checkpoint. Read [exe
 
 ## Working agreement
 
-The user assigned Codex technical leadership, planning and verification; Claude senior engineering review; Gemini/agy implementation under bounded guidance. This overrides older platform-specialization preferences for this initiative. Cross-platform execution remains user-driven: no Claude or Gemini work has run during this planning session.
+The user assigned Codex technical leadership, planning and verification; Claude senior engineering review; Gemini/agy implementation under bounded guidance. This overrides older platform-specialization preferences for this initiative. Codex dispatches installed CLIs directly, tracks results and verifies them. Claude's initial architecture review has returned; see the task ledger for acceptance and follow-up status.
 
 The deliverable is the supplied design brought into the existing product without losing capabilities or inventing behavior. Evergreen paper is confirmed. Local branches/commits/publishing/merge, reusable saved parts, dock customization and movable/stacked/collapsed panels are confirmed scope. New features elsewhere in the boards require individual decisions.
 

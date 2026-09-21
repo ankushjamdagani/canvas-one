@@ -2,7 +2,7 @@
 
 Execution hold: the user decisions from ARCH-01 are recorded, but RV-00 must review the expanded model semantics, retirement and sync boundaries before implementation. RV-14/15/16 below add explicit model-run, retirement and local-adapter work. No hosted service or live coediting implementation is authorized by these packages.
 
-Codex is lead/planner/final verifier. Claude reviews plans, contracts and implementation. Gemini/agy performs implementation and integration edits. Cross-platform starts require the user's switch; the table is a plan, not a claim that agents were dispatched.
+Codex is lead/planner/final verifier. Claude reviews plans, contracts and implementation. Gemini/agy performs implementation and integration edits. Codex dispatches the CLIs directly under the user's latest instruction. The task ledger records actual dispatch and acceptance; this table defines scope.
 
 R15/D22 applies to RV-00, RV-02 and RV-16: review future canvas-based AI collaboration seams in `ai-collaboration.md`. Require shared validated domain commands, stable revision-aware references and structured decision/proposal/evidence extension points. Do not create an AI execution package or install AI dependencies now.
 
@@ -92,7 +92,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 ### RV-05 — Transactional inspector
 
 - Owner: Gemini; owns current `OpenInspector.tsx`, `OpenConnectionEditor.tsx`, `OpenWorkloadControls.tsx`, `NumberField.tsx`, `SubsystemsPanel.tsx` and new typed behavior/scenario form files after exact inventory. Legacy Inspector/ServiceModelEditor/JobControls/RoutingPanel are RV-15-owned; do not modernize code scheduled for retirement.
-- Dependencies: RV-01/02; shared atomic editor API supplied by RV-12 integration task, not independently edited here.
+- Dependencies: RV-01/02; RV-02 defines the atomic editor API, implemented in an exclusively assigned RV-12 integration slice. RV-05 may use contract fixtures before integration.
 - Deliver: draft/validation/Apply/Cancel for configuration surfaces; measured section; dirty-navigation coordination.
 - Exit: R06/R11/R13, no partial mutation, one-step undo, stale-target detection, scenario-specific fields and truthful readiness. Notes retain explicit apply behavior.
 
@@ -149,7 +149,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 ### RV-13 — Release acceptance
 
 - Owner: Codex verification; Claude independent senior review; Gemini fixes only assigned findings.
-- Dependencies: integrated packages.
+- Dependencies: integrated packages, explicitly including completed RV-14 S01–S05 coverage through RV-12.
 - Deliver: full verification matrix, S01–S05 fixtures, reference captures, known limitations and current storage/recovery evidence.
 - Exit: R01–R15 current-scope criteria satisfied, no critical/high unresolved findings, explicit disposition for remaining issues, clean worktree/checkpoint. R15 verifies extensible boundaries, not an implemented buddy. No deployment or push implied.
 
@@ -162,7 +162,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 ### RV-15 — Legacy retirement and storage cutover
 
-- Owner: Gemini; Claude reviews source reachability and deleted behavior. Owns obsolete `MetricsPanel.tsx`, legacy Inspector/internals/control families and legacy engine files after exact manifest; shares no files concurrently with RV-05. Existing model/editor/persistence/worker dispatch edits are reserved RV-12 integration slots.
+- Owner: Gemini; Claude reviews source reachability and deleted behavior. Owns obsolete `MetricsPanel.tsx`, legacy Inspector/internals/control families and legacy engine files after exact manifest; shares no files concurrently with RV-05. Retirement scope explicitly includes `architectureDiagram`, `isDiagramGraph`, legacy scenario constructors/actions and superseded `domain/revisions.ts` operations, after current replacements. Existing model/editor/persistence/worker dispatch edits are reserved RV-12 integration slots; RV-15 specifies deletion and RV-12 owns the serialized edits.
 - Dependencies: RV-02 current schema; current examples and retained behavior replacements ready before removing their dependencies.
 - Sequence: verified orphan cleanup → current-only constructors/examples → storage namespace/unsupported-version handling → startup/dispatch cutover → obsolete UI/engines/codecs/tests/styles removal.
 - Exit: current capabilities tested, unsupported old formats clearly rejected, old database not silently erased, no legacy worker startup and no required archive viewer/converter. Document why each retired test no longer represents a product requirement.

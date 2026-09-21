@@ -6,8 +6,9 @@ Statuses: READY → CLAIMED → IN_PROGRESS → REVIEW → ACCEPTED. BLOCKED rec
 |---|---|---|---|
 | PLAN | REVIEW | Codex | Expanded architecture documented; Claude review pending |
 | ARCH-01 | REVIEW | Codex planning | User decisions settled; S01–S05 and retirement/deployment proposals await senior review |
-| RV-00 | IN_PROGRESS | Claude CLI; Codex coordinator | Read-only initial architecture review dispatched against 680827b; result pending. Full source/design coverage still needs verification. |
+| RV-00 | REVIEW | Claude CLI; Codex coordinator | Initial architecture review returned successfully; Codex must validate findings and complete source/design coverage before acceptance. |
 | RV-01 | BLOCKED | Unclaimed; Gemini intended | RV-00 accepted; freeze exact foundation files |
+| RV-01a | READY | Gemini/agy intended | Claude explicitly cleared independent config/tokens/Button/Input/Badge scope; exact ownership in work/rv-01a.md. Remaining RV-01 and domain gates unchanged. |
 | RV-02 | BLOCKED | Codex planning / Claude review | RV-00 findings; execution/current-schema contracts and R15 extension seams; no AI implementation |
 | RV-03 | BLOCKED | Unclaimed | RV-01/02 accepted |
 | RV-04 | BLOCKED | Unclaimed | RV-01/02 accepted |
