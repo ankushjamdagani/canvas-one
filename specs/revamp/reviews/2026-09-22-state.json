@@ -14,5 +14,5 @@
     {"id":"P3", "started":1790022432.989621, "ended":1790022576.192333, "exitCode":0, "verdict":"revise", "prompt":"2026-09-22-delegation-prompt.txt", "report":"2026-09-22-delegation.md"}
   ],
   "disposition": "2026-09-22-disposition.md",
-  "closure": "pending"
+  "closure": {"id":"P4", "baseCommit":"6824bae", "started":1790023005.124005, "ended":1790023201.985006, "exitCode":0, "verdict":"pass-planning-baseline", "prompt":"2026-09-22-closure-prompt.txt", "report":"2026-09-22-closure.md", "implementationAuthorized":false}
 }

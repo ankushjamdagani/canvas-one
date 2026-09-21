@@ -111,5 +111,5 @@ Completion and passing assertions remain distinct. Lead default: a completed mod
 1. Preserve confirmed model-based-first scope, all-family coverage, run-required commits and removal of old-data compatibility.
 2. Codex/Claude refine S01–S05 into typed fixtures and exact expected outputs, assumptions, failure cases and useful comparisons.
 3. Claude reviews whether one bounded behavior model covers them without pretending to model unsupported systems.
-4. Freeze semantic contracts and revise storage/commit identity before RV-02 or dependent feature code.
+4. Freeze semantic contracts and revise storage/commit identity within RV-02 before any dependent feature code.
 5. Prototype one thin scenario slice under Gemini guidance, with deterministic fixtures, before committing to all use-case families.

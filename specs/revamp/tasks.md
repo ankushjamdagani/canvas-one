@@ -6,9 +6,9 @@ GLOBAL IMPLEMENTATION HOLD — user instruction 2026-09-22. All implementation t
 
 | ID | Status | Owner | Blocking condition / next action |
 |---|---|---|---|
-| PLAN | REVIEW | Codex | P1/P2/P3 returned, findings reconciled; P4 closure and D26 answer pending. User implementation hold remains. |
-| ARCH-01 | REVIEW | Codex planning | User decisions settled; S01–S05 and retirement/deployment proposals await senior review |
-| RV-00 | REVIEW | Claude CLI; Codex coordinator | Initial architecture review returned successfully; Codex must validate findings and complete source/design coverage before acceptance. |
+| PLAN | REVIEW | Codex | P4 passed planning baseline; D26 product answer and detailed RV-02d/e/f/g contracts remain pending. User implementation hold remains. |
+| ARCH-01 | ACCEPTED | Codex planning / Claude review | High-level architecture baseline passed P2/P4. This does not freeze detailed schemas or authorize implementation. |
+| RV-00 | ACCEPTED | Claude CLI; Codex coordinator | P1/P2/P3 reconciled; P4 passed baseline 6824bae. Remaining package-specific contracts and visual implementation checks are explicit gates. |
 | RV-01 | BLOCKED | Unclaimed; Gemini intended | RV-00 accepted; freeze exact foundation files |
 | RV-01a | BLOCKED | Unclaimed; prior Gemini attempt stopped | User implementation hold. No app edits occurred; clean isolated worktree at /tmp/system-studio-foundation-a. Prior review clearance is not execution permission. |
 | RV-02 | BLOCKED | Codex planning / Claude review | RV-00 findings; execution/current-schema contracts and R15 extension seams; no AI implementation |

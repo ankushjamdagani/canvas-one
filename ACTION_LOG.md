@@ -915,3 +915,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Delegates**: Three independent Claude Sonnet 4.6 read-only reviews returned exit 0; requirements and delegation requested revisions, architecture accepted with pre-dispatch conditions. Codex corrected inaccurate reviewer claims using source/design evidence. Prior read-only Luna scout supplied bounded caller/ID evidence. Gemini attempt exited without edits; no implementation accepted.
 - **Verification**: Git diff against source baseline shows no changes to src/dependencies/tests; isolated worktree clean. Relative Markdown links checked; `git diff --check` passes. Measured source color contrast and inspected original 22D Undo publish text. No application tests rerun.
 - **Pending**: P4 closure review and D26 product answer; detailed RV-02 schema/budget/adapter/UI/export contracts remain pre-dispatch gates. No code, deployment or push.
+
+### Multi-review planning baseline — reviewed, implementation held (Codex)
+
+- **Outcome**: Fresh Claude P4 closure returned PASS for planning baseline 6824bae after three independent reviews and lead reconciliation. Requirements, implementation architecture, sequencing and delegation are reviewed; D26 publication-undo scope and four detailed RV-02 contract packages remain visibly pending. Implementation remains prohibited until user lifts the hold.
+- **Changed**: Archived closure prompt/report/status; updated planning ledger/resume guidance and corrected stale superseded decision references. No application implementation was made; Gemini session terminated and isolated worktree verified clean.
+- **Verification**: `git diff --check`; relative Markdown links; source/dependency/test diff against fb4a1ff empty; original published/merge design frames rendered and visually inspected. No application suites rerun or claimed. All review processes returned; none left running.
+- **Next**: Resolve D26 and continue RV-02d/e/f/g documentation with peer review. No code dispatch, push or deployment.

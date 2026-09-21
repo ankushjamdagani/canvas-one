@@ -73,3 +73,11 @@ No invented percentage score declares fidelity. Claude records concrete discrepa
 The architecture follow-up performed read-only graph queries and direct source/caller checks, including corrections to the initial scout's reachability claims. Only planning documents changed. Application tests were not rerun; the baseline above is not a new pass claim. Documentation links, requirement references and whitespace are checked before checkpointing this revision. Claude review/Gemini execution remain pending.
 
 The subsequent AI-buddy direction is documentation-only: D22/R15 and linked architecture/review criteria. Link and whitespace checks apply; application suites are not rerun and no AI behavior is verified or claimed.
+
+## Planning review verification — 2026-09-22
+
+Three independent Claude reviews covered requirements, architecture and execution/delegation; after Codex revisions, a fresh P4 closure review passed planning baseline 6824bae. Raw prompts/reports and dispositions are in `reviews/2026-09-22-*`. This accepts the planning baseline, not absent RV-02 schemas or nonexistent implementation.
+
+Codex rendered and visually inspected original `22D published` and `22F compare and resolve` at their 1442×842 frame bounds, stripping exported scripts and preserving the supplied HTML/styles. Captures are `/tmp/system-studio-plan-reviews-20260922/published-reference.png` and `merge-reference.png` (temporary evidence, reproducible from tracked ZIP). The published banner visibly contains Undo publish; the conflict screen shows base/ours/theirs and edit actions. These are design-source renders, not app screenshots or implementation tests.
+
+`git diff fb4a1ff --exit-code -- src package.json package-lock.json tests` passed: app/source/dependencies/tests unchanged. The stopped Gemini worktree has empty tracked and untracked diffs after removal of its task-created dependency symlink. No app tests were rerun because no app implementation occurred. User implementation hold remains active.

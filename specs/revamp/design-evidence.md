@@ -43,7 +43,7 @@ The design uses a white dotted canvas, warm panels, compact hairline controls, g
 
 ## Conflicts to resolve explicitly
 
-- Source says all commits require runs, yet the history specimen includes “no run”. Preserve legacy history; gate new commit policy through D09.
+- Source says all commits require runs, yet a history specimen includes “no run”. D20 resolves this: new commits/publication require completed exact-state scenario evidence; incomplete work uses autosave/checkpoints. D19 drops legacy-history compatibility, and D09 is superseded.
 - `tokens/spacing.css` has panel width 300px; 23A uses 356px. Treat tokens as defaults and screen-specific geometry as contextual variants, not one universal width.
 - Directions has earlier and later navigation treatments. Use the separately targeted project/branch interaction in `22A nav live`, with approved features only.
 - README says no emoji; one menu specimen contains an emoji link icon. Apply consistent icon decision D13.

@@ -57,7 +57,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 - Owner: Claude, read-only review; Codex records decisions/updates planning docs.
 - Input: this plan, full source ZIP, decisions, HANDOFF and current source anchors.
 - Output: severity-ranked findings with requirement/screen/code evidence; review S01–S05 semantics, old-code retirement, deployment independence, component boundaries, run identity, merge semantics and task split.
-- Exit: no unresolved critical/high architecture or data-loss finding. This is READY now.
+- Exit: no unresolved critical/high architecture or data-loss finding in the planning baseline; concrete future contracts remain named pre-dispatch gates. Current verdict is recorded in tasks.md, not inferred from this scope description.
 
 ### RV-01 — Foundation and design specimen
 
@@ -71,7 +71,7 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 - Owner: Codex authors specification; Claude reviews. Gemini may produce bounded read-only fixture-size/compatibility evidence.
 - Owns: new contract specification and fixture descriptions under `specs/revamp/contracts/`; actual shared TypeScript contract creation is a later Gemini task with an exact file list.
-- Dependencies: RV-00; all D09–D14 settled.
+- Dependencies: accepted RV-00; current D10/D11/D17–D25 govern contracts. D09 is superseded; conditional publication-undo scope waits for D26.
 - Deliver: concrete system/view/behavior/scenario types, typed ports and structural relationships, S01–S05 fixtures, state transition tables, numeric limits, current portable/storage versions, run fingerprints, command/panel API, parts rules, merge cases and recovery policy. No old-data migration requirement. Freeze typed contracts before RV-14/15/16 proceed.
 - Exit: no unresolved storage/interaction/execution contract before related implementation starts. Contract review is not satisfied by the high-level architecture alone. Required scenario coverage must be non-empty; incomplete work stays in autosave/checkpoints.
 

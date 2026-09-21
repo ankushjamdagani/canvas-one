@@ -49,5 +49,7 @@ Codex lead disposition of three independent Claude Sonnet 4.6 read-only reviews.
 ## Remaining gates
 
 - D26 product answer: publication undo scope only; other planning continues.
-- P4 verifies these revisions, records any remaining high-risk contradictions and distinguishes plan acceptance from unfinished RV-02d/e/f/g contracts.
+- P4 returned PASS for planning baseline 6824bae, explicitly distinguishing plan acceptance from unfinished RV-02d/e/f/g contracts. See `2026-09-22-closure.md`.
 - No implementation until a new explicit user instruction lifts the hold; no technical review verdict overrides it.
+
+Lead post-review consistency pass removed remaining historical D09/legacy-preservation wording from design-evidence, corrected the circular phrase "before RV-02" to "within RV-02", and removed stale READY text. These are consistency corrections, not additional scope. Original published and merge frames were rendered and visually checked; reviewer source correction is confirmed beyond text search.
