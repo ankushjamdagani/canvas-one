@@ -9,16 +9,16 @@ Each entry is `{id,label,keywords,group,iconKey,shortcut:null|Shortcut,availabil
 | IDs | Payload / prerequisites | Shortcut |
 |---|---|---|
 | `project.create`, `.rename`, `.switch`, `.import`, `.export-json` | typed title/projectId/file; switch flushes save and resolves dirty draft | none |
-| `branch.create`, `.switch`, `.reopen` | parent/head or branchId and expected revision | none |
+| `branch.create`, `.switch`, `.reopen` | parent/head or branchId and expected revision; switch execute runs dirty-navigation guard before mutation | none |
 | `history.checkpoint`, `.commit`, `.prepare-publish`, `.publish`, `.restore` | snapshot/candidate IDs and expected heads; commit/publish full eligibility and clean draft | none |
-| `run.start`, `.pause`, `.resume`, `.cancel`, `.reset` | scenarioId for start; active runId otherwise; dirty drafts block start; reset cancels first | none |
+| `run.start`, `.pause`, `.resume`, `.cancel`, `.reset` | scenarioId for start; active runId otherwise; dirty drafts block start; reset cancels then clears live display, never saved evidence | none |
 | `edit.undo`, `.redo` | accepted command history only; blocked while persistence pending | Mod+Z / Mod+Shift+Z |
 | `selection.duplicate`, `.delete`, `.group`, `.ungroup`, `.align`, `.distribute` | validated selected IDs; align axis/edge, distribute axis | Delete/Backspace for delete only when canvas focus |
 | `canvas.select-tool`, `.pan-tool`, `.add-note`, `.zoom-in`, `.zoom-out`, `.fit`, `.expand`, `.collapse` | viewId, selected IDs where applicable | none |
 | `library.open`, `.close`, `history.open`, `.close`, `results.open`, `.close` | focus/open singleton; explicit close separate | none |
 | `part.capture`, `.place`, `.export`, `.import` | selection/part revision/anchor; [parts contract](parts-and-export.md) | none |
 | `inspector.apply`, `.cancel`, `.open`, `.close` | active draft handle/target | none |
-| `panel.place`, `.collapse`, `.expand`, `.resize`, `.reset-width` | panel ID and typed placement/size | none |
+| `panel.place`, `.collapse`, `.expand`, `.resize`, `.reset-width` | place payload `{panelId,placement:'left'|'right'|'floating',index:0|1}`; resize `{panelId,width,height:null|number}`; other panel actions `{panelId}` | none |
 | `dock.configure`, `.restore-defaults` | ordered visible command IDs | none |
 | `export.svg`, `.png`, `.csv`, `.mermaid` | view or immutable run ID | none |
 | `commands.open` | searchable dialog | F2 |
@@ -28,6 +28,10 @@ Mod means Meta on macOS, Ctrl elsewhere. F2 is deliberate: avoid browser Cmd/Ctr
 All authored command payloads are closed schemas owned by document/feature types; registry routes to the shared command boundary, never arbitrary JSON patches. Read-only/navigation commands do not create operation receipts. Preferences commands use preferences CAS, not workingRevision. Mutation result `applied.undo` is null for commit/publish/branch-history operations, descriptive reversible metadata only for ordinary authored edits. Publication can never be targeted by edit.undo.
 
 ## Draft adapter
+
+Registry types: `Shortcut={key:string,modifiers:('Mod'|'Shift'|'Alt')[],scope:'global'|'canvas'}`; match exact modifiers after platform resolution, unique normalized chord per scope. `CommandContext={projectId:Id|null,branchId:Id|null,workingRevision:number|null,selectedElementIds:Id[],selectedConnectionIds:Id[],activeViewId:Id|null,focusedSurface:'canvas'|'inspector'|'library'|'history'|'results'|'text'|'dialog',activeRunId:Id|null,runState:'idle'|'validating'|'running'|'paused'|'terminal',draftState:'clean'|'dirty'|'validating'|'saving'|'invalid'|'stale',storageState:'ready'|'saving'|'failed',branchState:'open'|'closed'|null,eligibility:'unknown'|'checking'|'eligible'|'ineligible'}`. Registry is exhaustive over CommandId, with typed payload per entry; no arbitrary execute string.
+
+Navigation availability may remain enabled with a dirty draft. Its execute handler invokes the asynchronous draft guard **before** changing selection, branch, project or overlay. On narrow screens replacing inspector with Library/History/results follows that same ordering: Stay/failed Apply leaves overlay and focus unchanged. Run differs: dirty draft makes start disabled with reason. Library/History open is a no-op if already expanded and focused; otherwise expands/focuses the existing singleton without toggling it closed.
 
 `openDraft(target:{projectId,branchId,kind:'element'|'connection'|'scenario'|'workload'|'selection',ids:Id[]},revision,values): DraftHandle`. Handle: `{draftId,target,baseWorkingRevision,baseValues,fields,dirty,issues,status:'clean'|'editing'|'validating'|'saving'|'invalid'|'stale'}`. Raw fields support incomplete strings; never store them in Document. `changeField(fieldId,rawValue)`, `validateDraft()`, `applyDraft()`, `cancelDraft()` are the only editor bridge methods. Field IDs are schema-owned known IDs, not unrestricted object paths. Multi-target drafts expose mixed values explicitly and apply only explicitly changed fields atomically.
 

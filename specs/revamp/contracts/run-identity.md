@@ -32,11 +32,12 @@ The compiler constructs a manifest from an immutable authored snapshot and a sce
 | Field | Required meaning |
 |---|---|
 | `identityVersion` | Literal `1` |
-| `modelSchemaVersion` | Current schema number, frozen with RV-02 storage contract |
+| `modelSchemaVersion` | Literal `studio-model/1`, as specified in document-and-runner.md |
 | `compilerVersion`, `runnerVersions` | Explicit semantic versions including resource-kernel adapter; sorted by runner ID |
 | `scenario` | ID, scenario revision, mode, designated inputs/events, initial state, assertions, deterministic seed, step/event/time budgets and effective assumptions |
 | `scope` | Sorted included element and behavioral-edge IDs, declared boundaries, excluded elements and boundary-response fixtures; no implicit traversal at runtime |
 | `elements` | Included stable IDs, behavior kind/version/config, typed ports, effective resource configuration where used |
+| `schemas` | Transitively referenced closed payload schemas, sorted by stable ID, including all typed shape/default/nullability fields |
 | `connections` | Executable edge IDs, endpoints/ports, kind and config; sorted by ID, with explicit priority where order matters |
 | `structuralConstraints` | Only relationships interpreted by compiler rules, including deployed-on constraints and outage targets; sorted by ID |
 | `refinements` | Exactly one aggregate/refined choice per selected element, pinned model versions and boundary mappings |
@@ -60,7 +61,7 @@ Only `completed` local evidence with every configured check evaluated and passin
 
 At commit/publish preparation, enumerate every scenario configured in the immutable candidate (D28), with at least one scenario. Each needs an immutable local completed, passing run whose fingerprint matches its current inputs/checks/model. No required-subset or disabled-scenario bypass exists; an incomplete configured scenario blocks eligibility. Store an evidence manifest with complete scenario ID inventory, fingerprint, run ID, completion, check outcomes and tested scope. Adding/editing/removing a scenario is a visible authored change; recompute the candidate inventory and invalidate prepared eligibility. Every configured scenario is required, but full element coverage is not inferred; show uncovered elements honestly.
 
-Changing the system or check definitions requires matching new evidence; never edit a saved run's assertion outcomes. No-check/empty-check scenarios cannot display passing verification: RV-02d must define non-vacuous success criteria before implementing eligibility. Diagnostic runs and autosave/checkpoints remain available for incomplete/failing work.
+Changing the system or check definitions requires matching new evidence; never edit a saved run's assertion outcomes. RV-02d defines non-vacuous eligibility as at least one evaluated passing assertion and at least one consumed external input/generated workload root, with all assertion subjects in compiled scope. Diagnostic zero-check runs show “Completed · no checks” and cannot qualify. Autosave/checkpoints remain available for incomplete/failing work. This does not claim author-written checks prove correctness or full coverage.
 
 Commit a complete authored snapshot even if only view metadata changed; existing matching evidence can qualify it. Reusing evidence does not claim the presentation was tested. Candidate merge snapshots are isolated; a changed fingerprint requires running that candidate before publish.
 
