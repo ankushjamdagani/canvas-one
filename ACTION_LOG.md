@@ -956,3 +956,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude Opus 5.5 inline; no subagents. The S05 review was inline, not an independent CLI process.
 - **Verification**: `node specs/revamp/fixtures/measure.mjs` runs; `s05.json` unchanged. Checked kernel.ts to confirm the child-callback wait. `git diff --check` run. No app code changed, so no app suites run.
 - **Limitations**: The S05 corrections are self-reviewed; RV-02 cannot be frozen until a fresh session does the closure review. The planned doc cleanup/restructure has not started.
+
+### S05 closure review — PASS (Claude)
+
+- **Outcome**: An independent read-only Claude subagent closed S05 B1/B2. It found one new blocker: the payload was undefined when a resource has several bridge call continuations. Fixed with a readiness rule plus accounting clarifications, and round 2 PASSED. All S01–S05 fixtures satisfy the new rules (script-checked port shapes). All named RV-02 findings are closed. Implementation hold remains.
+- **Changed**: `contracts/document-and-runner.md`, new `reviews/2026-09-23-contract-fixture-s05-closure-report.md`, disposition, contract register, tasks, fixture README, HANDOFF.
+- **Platform**: Claude coordinator plus one general-purpose subagent (read-only reviewer, two rounds).
+- **Verification**: Reviewer checked `kernel.ts` `selectOutgoing`/`handleChildResponse` and all fixture call-port shapes. `git diff --check` run. No app code changed.

@@ -22,4 +22,4 @@
 
 ## Lead disposition (same session)
 
-B1 and B2 are accepted as contract gaps, not fixture errors; `s05.json` is unchanged. Corrections were added to `document-and-runner.md` ("Bridge call frames and transport-only settlement"). They are lead corrections and **need an independent closure review** (a fresh Codex or Claude session) before S05 counts as PASS.
+B1 and B2 are accepted as contract gaps, not fixture errors; `s05.json` is unchanged. Corrections were added to `document-and-runner.md` ("Bridge call frames and transport-only settlement"). An independent closure review then PASSED them, after one more readiness-rule fix: [closure report](2026-09-23-contract-fixture-s05-closure-report.md).
