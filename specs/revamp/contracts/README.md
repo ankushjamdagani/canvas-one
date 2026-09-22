@@ -1,20 +1,20 @@
-# Contract register
+# Contracts (RV-02)
 
-All contracts remain planning artifacts under the 2026-09-22 implementation hold. A reviewed delivery plan and an implementation-ready contract are distinct acceptance levels; see [review plan](../review-plan.md).
+Implementation-level specs. They are planning artifacts: no TypeScript exists yet, and the user's implementation hold still applies. Every named review finding is closed ([review history](../reviews.md)).
 
-| Contract | Current artifact/status | Owner and acceptance gate |
-|---|---|---|
-| Canonical run identity | [run-identity.md](run-identity.md), revised draft | Codex authors; Claude reviews projection/closure/lifecycle; implementation golden vectors before runner acceptance |
-| Atomic commands/history | [transactions.md](transactions.md), revised draft | Codex authors; Claude reviews CAS/state transitions/reference integrity |
-| Five-family semantics | [execution-slices.md](execution-slices.md), draft | Codex authors; Claude verifies bounded fixtures and retained/new kernel partition |
-| Foundation accessibility | [foundation-accessibility.md](foundation-accessibility.md), measured planning evidence | Claude review; actual computed-style/browser acceptance in RV-01 |
-| Current document/schema and runner bridge | [document-and-runner.md](document-and-runner.md), D1–D8 closure PASS; S01–S05 fixtures PASS (S05 after bridge-frame corrections) | RV-02d: ready to freeze; runtime golden vectors are implementation acceptance |
-| Storage/portable/limits | [storage-and-limits.md](storage-and-limits.md) + [publication-metadata.md](publication-metadata.md), closure PASS; [fixture sizing](../fixtures/size-review.md) PASS | RV-02e: ceilings frozen for implementation validation; runtime/quota measurement is implementation acceptance |
-| Commands/panels/inspector | [commands-and-panels.md](commands-and-panels.md) + [command-inventory.md](command-inventory.md), CP-1–7 and inventory closure PASS | RV-02f: browser verification during implementation |
-| Parts/export | [parts-and-export.md](parts-and-export.md), PE-1–7 closure PASS | RV-02g: remapping depends on final document-schema freeze; parser/spreadsheet/browser verification later |
+| Contract | Covers |
+|---|---|
+| [model-and-runner.md](model-and-runner.md) | `studio-model/1` schema, behaviors, scenarios, runner/kernel interface, results, S01–S05 reference scenarios |
+| [run-identity.md](run-identity.md) | Canonical encoding, execution fingerprint, run lifecycle, commit/publish eligibility |
+| [transactions.md](transactions.md) | Command boundary, revisions and compare-and-set, inspector Apply, history transitions, three-way merge |
+| [storage.md](storage.md) | Tables, portable bundle v9, publication metadata, repository API, limits, retention |
+| [commands.md](commands.md) | Command registry, every payload/result, draft lifecycle, panel geometry and layering |
+| [parts-and-export.md](parts-and-export.md) | Saved parts, and JSON/SVG/PNG/CSV/Mermaid export |
 
-RV-02d/e/f/g are documentation/contract tasks owned by Codex with Claude review, not implementation. They must finish before the relevant future package is declared executable. No implementing agent may invent missing schema versions, limits or command semantics. Concrete shared TypeScript source creation is a later Gemini assignment after user hold release and contract acceptance.
+Accessibility token decisions are in [design.md](../design.md#accessibility-corrections). Fixtures and size measurements are in [fixtures/](../fixtures/README.md).
 
-Latest exact review scope and outstanding gates: [contract disposition](../reviews/2026-09-22-contract-disposition.md). [Fixture mapping](fixture-mapping.md) is a planning inventory, not executed fixture evidence. Targeted reviewer PASS closes the named findings; it does not silently accept unmeasured limits or lift the user hold.
+## Rules
 
-Schema/storage dependency order: document fields → canonical executable projection → fixture-size measurement → budgets/current storage version → exact repository API. Run/transaction drafts can be reviewed in parallel but cannot be finally frozen against an unknown document schema. Existing source `executionSignature` is a worker reset string, not canonical versioned evidence; its array-order dependence and narrower old-model projection prohibit reusing it as the new run hash.
+- Implementers must not invent schema versions, limits or command semantics that are missing here. They stop and ask.
+- Dependency order: document fields → execution projection → size measurement → budgets and storage version → repository API. Consumers are built only after the shared types they use are frozen.
+- A contract PASS doesn't cover runtime behavior. Golden hash vectors, runtime traces, browser geometry, Mermaid parsing, spreadsheet readers, quota, memory and latency are checked when the matching code exists ([verification.md](../verification.md)).

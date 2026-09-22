@@ -1,0 +1,237 @@
+# Commands, inspector drafts and panels (RV-02f)
+
+The single command registry, every command's exact payload and result, the inspector draft lifecycle and panel geometry. Placement and draft reducers are pure domain functions composed from existing Radix/shadcn primitives, not new overlay primitives.
+
+## 1. Registry
+
+- **Entry.** `{id, label, keywords, group, iconKey, shortcut:Shortcut|null, availability(context), execute(payload)}`. The registry is exhaustive over `CommandId`, with a typed payload per entry; there are no menu-local handlers and no arbitrary execute strings.
+- **Availability** returns `{enabled:true}` or `{enabled:false, reason, code}`. Disabled commands show their reason. Unsupported future features are absent, not fake buttons.
+- **Context** (read-only, never from the DOM): `CommandContext={projectId|null, branchId|null, workingRevision|null, selectedElementIds, selectedConnectionIds, activeViewId|null, focusedSurface:'canvas'|'inspector'|'library'|'history'|'results'|'text'|'dialog', activeRunId|null, runState:'idle'|'validating'|'running'|'paused'|'terminal', draftState:'clean'|'dirty'|'validating'|'saving'|'invalid'|'stale', storageState:'ready'|'saving'|'failed', branchState:'open'|'closed'|null, eligibility:'unknown'|'checking'|'eligible'|'ineligible'}`.
+- **Shortcuts.** `Shortcut={key, modifiers:('Mod'|'Shift'|'Alt')[], scope:'global'|'canvas'}`, unique per scope. Mod = Meta on macOS, Ctrl elsewhere.
+  - Only `edit.undo` Mod+Z, `edit.redo` Mod+Shift+Z, `selection.delete` Delete/Backspace (canvas focus only) and `commands.open` F2. F2 avoids browser Cmd/Ctrl+R/H/L and Ctrl+K collisions, and a visible button covers the case where the OS captures F2.
+  - No global single-letter shortcuts. Shortcuts are ignored during IME composition, in editable fields and nested dialogs, and on modifier mismatch; native text undo stays native. `preventDefault` fires only after an enabled registry match.
+  - Keyboard and menu share the same availability and validation, and tooltips/key hints come from the registry.
+- **Escape** first closes the top overlay, then cancels an active placement gesture. It never discards a dirty draft.
+- Payloads are closed schemas routed to the shared command boundary, never JSON patches. Navigation and read-only commands create no operation receipt. `edit.undo` can never target commits, publications or branch history.
+
+## 2. Envelopes and results
+
+Field types, where a payload or result doesn't show them inline:
+
+- **UUIDs.** `…Id` fields, bare `id` and `fileToken` are `Id`; `…Ids`, `ids`, `changedIds`, `conflictIds` and `removals` are `Id[]`.
+- **Not UUIDs** (these override the rule above):
+  - `commandId` is a registry `CommandId`.
+  - `panelId` is `PanelId`.
+  - `orderedCommandIds`/`hiddenCommandIds` are `DockCommandId[]`.
+  - `expectedHeadId` and `mainHeadId` are `ExpectedHead`.
+  - `snapshotId` is `Hash`.
+- **Revisions.** `…Revision` fields, and `expected`/`actual` in `stale`, are `Revision`. Artifact `revision` in `CommandValue` is `Revision|null`. Part `revision` is a safe integer, and `expectedLatestRevision` is a safe integer or null.
+- **Records.** `issues` is `Issue[]`; `repairs` is `RecordChange[]`; `evidence` is `EvidenceRef[]`; `metadata` is `PublicationMetadata`; `initialDocument` is `Document`; `selection` is `Selection`.
+- **Scalars.** `title`, `label`, `description`, `message` and `displayName` are strings; `x`, `y`, `width` and `height` are finite numbers; `keepSourceOpen` is boolean.
+
+Types: `Id` = UUID; `Hash` = lowercase SHA-256 hex; `Revision` = non-negative safe integer; `Empty={}`; `Point={x,y}` (finite canvas coordinates); `ViewRef={projectId,branchId,viewId}`; `Selection={elementIds,connectionIds,groupIds,noteIds}` (unique, same view/document); `ExpectedHead=Id|null`.
+
+| Envelope | Shape | Used by |
+|---|---|---|
+| Branch | `{commandId, operationId, projectId, branchId, expectedWorkingRevision, actor, payload}` | authored model/selection actions; checkpoint, commit, restore, publish; branch create/reopen; part.capture/place; undo/redo |
+| Project | the same, with `expectedProjectRevision` in place of branch/revision | project.rename (also carries branch envelope), part.import |
+| Bootstrap | explicit new IDs + `operationId` + `actor` | project.create, project.import |
+| Preference | `{expectedPreferenceRevision, payload}` | canvas zoom/fit, `panel.*`, `dock.*`; library/history open/close after the navigation guard |
+| Controller | explicit context; never persisted as an authored operation | navigation, run controls, exports (including project.export-json, which is read-only but still checks `expectedProjectRevision`), history prepare/resolve, inspector, results, commands, branch.switch |
+
+- `Actor={actorId, kind:'local-human', displayName}`. An empty name renders "Local user"; it is never authenticated.
+- A context mismatch is rejected; the command never falls back to the currently active branch.
+- A retry with the same operation ID is checked **before** stale checks and returns its original durable result.
+
+**Authored results.**
+- `{status:'applied', operationId, projectRevision, branchRevision|null, changedIds, undo:{entryId,label}|null, value}`
+- `{status:'invalid', issues}`
+- `{status:'stale', scope:'project'|'branch'|'preferences', expected, actual}`
+- `{status:'missing', ids}`
+- `{status:'failed', code:'quota'|'unavailable'|'referenced-artifact'|'operation-id-reused'|'limit'|'ineligible'|'conflict'|'unsupported-version'|'duplicate-version', issues}`
+
+The applied result is stored with its receipt. `undo.entryId` resolves only in its originating live session; retries and reloads don't recreate undo entries. `undo` is null for commit, publish and branch-history operations.
+
+**Controller results.** `{status:'done', value}`, `{status:'cancelled'}` (user cancel, not a failure), or invalid/stale/missing/failed as above.
+
+**`CommandValue`:**
+- `{kind:'none'}`
+- `{kind:'project', projectId, branchId}`
+- `{kind:'branch', branchId}`
+- `{kind:'artifact', artifactType:'checkpoint'|'commit'|'publication'|'part', id, revision|null}`
+- `{kind:'run', runId}`
+- `{kind:'candidate', candidateId, snapshotId:Hash, conflictIds}`
+- `{kind:'draft', draftId}`
+- `{kind:'download', downloadId}`
+
+`downloadId` is a local completion receipt, never file access.
+
+**File tokens.** A FileToken is an opaque local UUID bound to user-selected bytes, their hash and size. It expires on reload and can't be imported or supplied remotely. Bytes are hashed and validated outside transactions. Retries reuse the same operation ID and destination ID.
+
+## 3. Project, history and run commands
+
+| Command | Payload | Result / rules |
+|---|---|---|
+| project.create | `{newProjectId, title, initialDocument}` | project. Validated blank or template document; creates main + draft and a receipt in the new namespace. The same ID with a different request is rejected. |
+| project.rename | `{title, expectedProjectRevision}` | none. Updates project title and the active `Document.title` together; other branches and snapshots are untouched. |
+| project.switch | `{projectId, branchId\|null}` | project. Null = main. Runs the navigation guard, and flushes save / resolves the dirty draft first. |
+| project.import | `{fileToken, newProjectId, operationId}` | project. Full bundle validation; idempotent namespace; imported evidence is never trusted. |
+| project.export-json | `{projectId, expectedProjectRevision}` | download. Consistent read; stale is rejected. |
+| branch.create | `{newBranchId, label, source:'working'\|'head', expectedHeadId}` | branch. `working` copies current content and head ancestry; `head` copies the head snapshot (or the creation snapshot if unborn). The source is never altered. A head mismatch returns `failed/conflict` (issue `HEAD_MOVED`); a revision mismatch returns `stale`. |
+| branch.switch | `{projectId, branchId}` | branch. Runs the navigation guard. |
+| branch.reopen | `{expectedHeadId}` | branch. Closed, non-main branches only; branch revision++; no history or main change. |
+| history.checkpoint | `{checkpointId, label}` | artifact. Incomplete snapshots are allowed. |
+| history.commit | `{commitId, expectedHeadId, message, evidence:EvidenceRef[]}` | artifact. All-scenario eligibility; not on main. |
+| history.prepare-publish | `{projectId, sourceBranchId, sourceRevision, sourceHeadId, mainRevision, mainHeadId}` | candidate. Isolated; source and main clean; common ancestry required. |
+| history.resolve-conflict | `{candidateId, conflictId, resolution:{kind:'ours'\|'theirs'}\|{kind:'edited', record:EditableRecord\|null}}` | candidate. Edits the whole owning typed record; null = explicit deletion. Ordered fields are edited through the record's normal editor. |
+| history.publish | `{candidateId, publicationId, mergeCommitId, metadata, evidence, keepSourceOpen, expectedProjectRevision}` | artifact. `keepSourceOpen` defaults false; atomic source/main/project compare-and-set; no undo. |
+| history.restore | `{snapshotId, checkpointId, label}` | artifact. Checkpoints current work first, then replaces it in the same transaction. Not on main. |
+| run.start | `{projectId, target:{kind:'branch', branchId, expectedWorkingRevision}\|{kind:'candidate', candidateId}, scenarioId, runId}` | run. Pinned immutable target, clean draft, readiness, fresh start token. |
+| run.pause / resume / cancel / reset | `{runId}` | none. Stale IDs are rejected. Reset waits for cancel, then clears the display; saved evidence stays. |
+| edit.undo / redo | `{entryId}` | none. Live-session ownership; ordinary reversible authored edits only; blocked while a save is pending. |
+
+**Candidates** are immutable, controller-owned revisions.
+- Each resolution creates a new candidate and snapshot and invalidates the old candidate's eligibility.
+- A candidate keeps the expected project/source/main revisions, both heads, the merge base and its conflicts. It can't come from portable input, and it runs only once it passes readiness.
+- Reload discards unpublished candidates, leaving branch working copies unaffected. A superseded ID returns `failed/ineligible`; an unknown or expired one returns `missing`.
+
+**Revision policy.**
+- The project revision increments on every durable project mutation (branch writes, metadata, runs, parts, pruning). Branch commands compare only the branch revision, then bump the project revision, which avoids cross-branch conflicts. Rename also compares the project revision.
+- Publish compares project, source and main tokens, so unrelated writes may force a re-prepare. Saving candidate runs doesn't invalidate the candidate (its token tracks source/main revisions and heads); publish takes a fresh expected project revision after evidence is saved.
+- Main can't be committed to or restored directly; see [transactions.md §4](transactions.md#4-history-transitions).
+
+## 4. Model authoring and selection
+
+`EditableRecord` is `{recordKind, record}` for `element | connection | relation | schema | fixture | refinement | scenario | view`: a finite typed union, not paths.
+
+**`model.apply-records {changes:RecordChange[]}`**, where `RecordChange` is `{kind:'insert'|'replace', value:EditableRecord}` or `{kind:'remove', recordKind, id}`.
+- Replacements keep definition IDs and existing nested IDs; new members get fresh UUIDs.
+- The whole command is rejected on any of: a missing target, duplicate targets, unknown IDs or fields, invalid cross-references.
+- At most 1,000 changes; the final document must also fit document limits.
+- One gesture or Apply = one compound command = one undo entry.
+- Internal plumbing, not necessarily in command search.
+
+Domain intents (add component, connect, edit settings, scenarios, notes, views, drags) compile to this boundary. A future AI proposes the same typed changes for preview, with no bypass. Whole-document replacement is allowed only for create, import and restore.
+
+**Dependency preview.** `previewDependencies({projectId, branchId, expectedWorkingRevision, intent:'delete'|'capture', viewId, selection})` returns `{dependencyPreviewId, boundRevision, removals, repairs:RecordChange[], includedElementIds, excludedConnectionIds, issues}`.
+- The controller keeps the immutable record; callers pass only its ID. The UI shows all removals, repairs and inclusions before confirming.
+- A revision mismatch returns `stale(branch)`; an unknown or expired ID returns `missing`; an intent or selection mismatch returns `invalid`.
+- No receipt, no mutation.
+
+| Action | Payload | Rules |
+|---|---|---|
+| selection.duplicate | `{viewId, selection, offset:Point}` | Full fresh ID/reference mapping; one undo; refuses external required dependencies unless an explicit closure is approved |
+| selection.delete | `{viewId, selection, dependencyPreviewId}` | The preview binds the exact revision and the removals/repairs |
+| selection.group | `{viewId, elementIds, groupId, label}` | Nonempty, wholly ungrouped selection |
+| selection.ungroup | `{viewId, groupIds}` | Presentation groups only |
+| selection.align | `{viewId, elementIds, edge:'left'\|'center-x'\|'right'\|'top'\|'center-y'\|'bottom'}` | ≥2 placed elements; bounding-box alignment |
+| selection.distribute | `{viewId, elementIds, axis:'x'\|'y'}` | ≥3; endpoints fixed, equal gaps, stable-ID tie-break |
+| canvas.add-note | `{viewId, note:Note}` | One undo |
+| canvas.expand / collapse | `{viewId, target:{kind:'placement'\|'group', id}}` | Presentation only; no runner or refinement change |
+| canvas.select-tool / pan-tool | `Empty` | Transient mode |
+| canvas.zoom-in / zoom-out / fit | `{view:ViewRef}` | Preferences only. Factor 1.2 / its reciprocal, clamped 0.1–2, center-anchored. Fit covers all placements and notes with 32 px padding. |
+
+## 5. Inspector, panels, parts and exports
+
+`PanelId = 'library' | 'history'`. The inspector and results are separate contextual regions, never floating panels. `DraftTarget={kind:'element'|'connection'|'scenario'|'workload'|'selection', ids}`.
+
+| Action | Payload | Rules |
+|---|---|---|
+| inspector.open | `{projectId, branchId, target:DraftTarget, expectedWorkingRevision}` | draft. An empty target is rejected; dirty navigation is resolved first. |
+| inspector.apply / cancel | `{draftId}` | A failed Apply keeps the draft |
+| inspector.close | `{draftId\|null}` | Dirty guard, then close; null = already closed |
+| library.open / close, history.open / close | `Empty` | Singleton; dirty guard before replacing an overlay. Open on an already-expanded, focused panel is a no-op; otherwise it expands and focuses the panel and never toggles it closed. |
+| results.open | `{projectId, runId\|null}` | Null = current live run. A missing run shows an empty state, never fake data. |
+| results.close, commands.open | `Empty` | Transient |
+| panel.place | `{panelId, placement:'left'\|'right'\|'floating', index:0\|1}` | Floating reuses a valid `floatRect`, otherwise 360×480 centered, then clamped; `index` is ignored when floating |
+| panel.collapse / expand / reset-width | `{panelId}` | Reset affects the shared side width when docked, or restores the clamped default size when floating |
+| panel.resize | `{panelId, width, height\|null}` | Height is null when docked and required when floating. Out-of-bounds or non-finite values are rejected; gestures clamp before submitting. |
+| panel.move-floating | `{panelId, x, y}` | Drag, keyboard and menu share this action |
+| dock.configure | `{orderedCommandIds, hiddenCommandIds}` | Unique, disjoint, exact inventory; ≤16 visible |
+| dock.restore-defaults | `Empty` | One preference write |
+| part.capture | `{partId, revision, expectedLatestRevision\|null, viewId, elementIds, noteIds, label, description, dependencyPreviewId}` | artifact. Branch envelope binds the source; the project transaction stores the part. Increments the project revision, not `workingRevision`; no undo. |
+| part.place | `{partId, revision, viewId, anchor:Point}` | Atomic remap and insert; one undo |
+| part.export | `{projectId, partId, revision}` | download |
+| part.import | `{projectId, fileToken, partId, operationId, expectedProjectRevision}` | artifact, revision 1; fresh identity |
+| export.svg / png / mermaid | `{view:ViewRef, snapshotId}` | download. Pinned authored view; the branch/snapshot relationship is validated. |
+| export.csv | `{projectId, runId}` | download. Saved terminal run only. |
+
+- **Part revisions** must equal `expectedLatestRevision + 1` (or 1 when null). A mismatch is `invalid` at `payload.revision`, and concurrent edits return `stale`.
+- **Dock inventory** (`DockCommandId`), in order: canvas.select-tool, canvas.pan-tool, library.open, canvas.add-note, selection.group, edit.undo, edit.redo, canvas.zoom-out, canvas.zoom-in, canvas.fit, history.open, results.open, run.start, run.pause, run.resume, run.reset.
+  - The first ten are visible by default, and visible + hidden partition the list.
+  - Parameterized actions take the current context or open their form; payloads are never stored in preferences.
+  - Rearranging uses move-left/right buttons or the keyboard. On narrow widths, select/pan/Library stay and the rest go into an accessible overflow menu. Hidden actions remain in the command dialog.
+- **Preference conflicts.** A stale preference write is retried only after showing the current state; it never overwrites another tab's customization.
+- Adding a command requires a reviewed closed schema and exhaustive registry/validator coverage.
+
+## 6. Draft lifecycle
+
+- `openDraft(target, revision, values): DraftHandle`, where `DraftHandle={draftId, target, baseWorkingRevision, baseValues, fields, dirty, issues, status:'clean'|'editing'|'validating'|'saving'|'invalid'|'stale'}`.
+- The only bridge methods are `changeField(fieldId, rawValue)`, `validateDraft()`, `applyDraft()` and `cancelDraft()`. Field IDs are schema-owned. Raw strings (including incomplete ones) never enter the Document.
+- A multi-target draft shows mixed values and applies only changed fields.
+- **Apply** parses, validates the candidate and revision, persists one compound command, clears dirty state and adds one undo entry.
+  - While pending, duplicate submits and navigation are blocked. On a storage, validation or stale error the fields stay. No success toast before durability.
+  - Stale offers Reload (explicit discard), Keep editing (base unchanged) or Cancel navigation; it never silently rebases.
+  - If the target is deleted elsewhere, the draft is marked stale/missing and its text is kept until discarded.
+- **Cancel** discards the draft and reloads accepted values.
+- **Navigation guard.** Selection, branch, project and inspector-close all pass through one guard. Clean → proceed. Dirty → Apply / Discard / Stay: Apply proceeds only on success, Discard cancels then proceeds, and Stay keeps focus and selection. Navigation stays *enabled* while dirty; the guard runs before any change. On narrow screens, swapping the inspector for Library, History or results goes through the same guard, and a failed Apply leaves the overlay and focus unchanged.
+- **Run is disabled** while dirty, with the reason "Apply or Cancel configuration changes before running." There is no save-and-run shortcut.
+- Editing during a run is allowed. The run stays pinned, and Apply may make the displayed run stale.
+- Commit and publish resolve drafts first.
+- Closing a browser tab can't guarantee saving draft text. Use native unsaved-change prompts where supported, and never claim drafts are durable.
+
+## 7. Panels and geometry
+
+**Preferences** `studio-preferences/1`:
+- `{schema, revision, panels:{library, history}, sideWidths:{left, right}, dock:{orderedCommandIds, hiddenCommandIds}, cameras:[{projectId, viewId, x, y, zoom}]}`, with at most 50 cameras.
+- `PanelPreference={open, placement:'left'|'right'|'floating', collapsed, floatRect:{x, y, width, height}, stackOrder}`.
+- There is exactly one Library and one History. The inspector is a fixed-right contextual region on desktop; results sit in the bottom region.
+- Runtime-only state: `focusedPanel`, `lastFocusedSequence`, `activeOverlay`, selection, playback, drafts.
+
+**Reducer events:** `OPEN(panel)`, `CLOSE(panel)`, `FOCUS(panel)`, `PLACE(panel,placement,index)`, `COLLAPSE(panel)`, `EXPAND(panel)`, `RESIZE_SIDE(side,width)`, `RESET_SIDE(side)`, `RESIZE_FLOAT(panel,rect)`, `VIEWPORT_CHANGED(width,height)`, `BEGIN_GESTURE`, `PREVIEW_GESTURE`, `COMMIT_GESTURE`, `CANCEL_GESTURE`.
+- Only COMMIT persists. Escape and pointercancel restore the original state.
+- Responsive overrides never overwrite desktop preferences.
+- The reducer is pure: it returns state plus effect descriptors (save, announce, focus), with no DOM or DB access.
+
+**Breakpoints** (CSS px):
+
+| Width | Behavior |
+|---|---|
+| < 768 | One modal overlay at a time: a full-width sheet under the topbar, max remaining height. Inspector, Library, History and results replace one another (after the draft guard). Canvas tools stay reachable; nothing is hover-only. |
+| 768–1199 | Auxiliary panels are single overlays. The inspector may take 320 px only if the canvas keeps ≥360 px (after the 44 px rail and 16 px gutters); otherwise it becomes an overlay too. An auxiliary overlay can cover the inspector without losing its draft; focus returns afterwards. |
+| ≥ 1200 | Docking and floating. Side widths default 320, clamped 280–440; inspector 320; canvas min 480; rail 44; gutters 16. If occupancy exceeds width, collapse the least-recently-focused auxiliary panel (ties by panel ID) and repeat. The inspector is kept; if it alone doesn't fit, it becomes an overlay. When width returns, restore the preferred state without stealing focus. |
+
+- **Collapsed rail:** 44 px.
+- **Scrolling.** The inspector and results scroll their own content, never the page.
+- **Stacks.** Library and History can stack on one side, sharing its width with an equal initial split and accessible separators. The minimum expanded content is 160 px plus a 40 px header; if both don't fit, show one expanded panel and the other as a collapsed header.
+- **Floating.** Default 360×480, minimum 280×240, maximum = viewport minus 16 px margins, with the header and close button always inside. Below the minimum, switch to an overlay. The topbar reserves 54 px on desktop (measured height on mobile).
+- Keyboard resize steps are 10 px (Shift: 1 px), alongside a numeric positioning menu.
+- **Auto-collapse** announces which panel moved and why.
+- **Header menus** offer left/right/floating/collapse/reset/close and stack up/down.
+- The canvas camera stays put on layout change (no automatic fit), and the canvas gets correct geometry after each commit.
+
+**Layering:**
+
+| Layer | z |
+|---|---|
+| canvas | 0 |
+| dock | 10 |
+| docked chrome | 20 |
+| floating panels (focus order within) | 30 |
+| modal backdrop / modal | 50 / 60 |
+| modal-owned popovers | 70 |
+| tooltip | 80 |
+
+- Shared tokens and portal ownership only; no screen-local z-index escalation.
+- Docked panels are labelled complementary regions, not dialogs. Modals use shadcn Dialog/Sheet (focus trap, title, description, focus return).
+- Rail buttons are labelled. Resize handles expose separator semantics, their value and arrow keys.
+
+## 8. Acceptance
+
+- Reducer transition matrix; preference compare-and-set failures.
+- Dirty navigation from every entry point.
+- Singleton panels: stack, move, reload.
+- Viewports 1440 / 1200 / 1024 / 768 / 390, plus short heights and 200% text zoom.
+- Keyboard-only placement and resize; Escape/pointercancel; focus return; screen-reader announcements.
+
+The geometry numbers are an initial spec; a browser review confirms source fidelity before acceptance.

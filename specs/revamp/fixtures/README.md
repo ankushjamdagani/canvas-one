@@ -1,22 +1,39 @@
-# Five-family planning fixtures
+# Five-family fixtures
 
-These are authored specification data, **not executed simulations or saved passing results**. The application does not yet read studio-model/1. Expected assertions describe acceptance targets for Gemini's future implementation, with Claude review and Codex verification. No old user data was converted or deleted.
+Authored `studio-model/1` specification data. These are **not** executed simulations or passing results; their assertions are acceptance targets for the future runner. The app can't read this schema yet.
 
-| File | Scenarios | What it exercises |
+| File | Scenarios | Exercises |
 |---|---|---|
-| [s01.json](s01.json) | Invalid cart; duplicate submit; timeout/retry/stale response | Machine guards/effects, explicit call boundary, logical response release, request-ID bindings |
-| [s02.json](s02.json) | Allowed order; denied order | Call-entry machine, validation pipeline, decision/reply, broker/worker, separate request/message accounting |
-| [s03.json](s03.json) | Five-row normalization | Mixed-type external amount, strict validation error, trim/deduplicate/group-sum, exact EU/US totals |
-| [s04.json](s04.json) | Failover; active/queued outage; outage at completion | Explicit deployment, route detection/recovery, cancelled callbacks and exactly-once settlement |
-| [s05.json](s05.json) | Accepted+fulfilled; unavailable host then retry | Frontend through a real modeled capacity stage into business reply/message work; transport outcome reaches UI |
-| [combined.json](combined.json) | All 11 scenarios | Shared storage/size specimen containing all five authored models and views; each scenario keeps its explicit scope |
+| [s01.json](s01.json) | Invalid cart; duplicate submit; timeout/retry/stale response | Machine guards and effects, call boundary, logical response release, request-ID bindings |
+| [s02.json](s02.json) | Allowed order; denied order | Call-entry machine, validation pipeline, decision/reply, broker/worker, separate request and message accounting |
+| [s03.json](s03.json) | Five-row normalization | Mixed-type input, strict validation, trim/deduplicate/group-sum, exact EU/US totals |
+| [s04.json](s04.json) | Failover; active/queued outage; outage at completion | Deployment, route detection/recovery, cancelled callbacks, exactly-once settlement |
+| [s05.json](s05.json) | Accepted + fulfilled; unavailable host then retry | Frontend → modeled capacity → business reply/message; transport outcome reaches the UI |
+| [combined.json](combined.json) | All 11 | One document containing all five models, for storage sizing |
 
-Every definition has a deterministic fixture UUID; production constructors still generate fresh UUIDs. S04's two route edge IDs are explicitly ordered A then B because retained routing sorts by edge ID. No schema dependency is inferred from labels.
+- IDs are deterministic fixture UUIDs; production constructors generate fresh ones.
+- S04's two route edges are ordered A then B, because retained routing sorts by edge ID.
+- Expected behavior is described in [model-and-runner.md §11](../contracts/model-and-runner.md#11-reference-scenarios).
+- **Reviews:** all five fixtures PASS. S05 passed after the bridge-frame contract corrections ([history](../reviews.md)).
 
-Run the planning-only inventory with `node specs/revamp/fixtures/measure.mjs`. It reads these fixed files, checks duplicate UUID definitions, endpoint/channel/shape compatibility, fixture payloads, selected references and count/byte bounds, then prints canonical bytes/SHA-256. It is **not** the future full schema validator, executable compiler, kernel or browser test. Independent semantic reviews use exact data with consistent UUID aliases to reduce reviewer noise; full original data and measurement hashes remain authoritative.
+The fixtures prove the schema can represent these cases. They don't replace the full regression list in model-and-runner.md §12 (fulfillment failure/retry, malformed references, cancellation, refinement exclusivity, chunked scheduling). Runtime tests must also check trace-level facts: S03 row provenance, S04 per-arrival routes/timestamps, and S05 request IDs, journey and message-root linkage.
 
-The script also recreates a storable near-2-MiB document, a synthetic 100k-row trace encoding and a 100-branch/100-checkpoint recovery export in memory. Synthetic trace rows are sizing specimens only and are never saved as run evidence. The recovery export contains no fabricated commits or passing runs. These stress recipes measure serialization, not heap usage, event-loop responsiveness or database transaction performance.
+## Size measurements
 
-Implementation acceptance still requires all cases in [execution-slices](../contracts/execution-slices.md), including fulfillment failure/retry limits, malformed references, cancellation, refinement exclusivity and chunk-independent scheduling. The 11 fixtures are concrete representability/sizing witnesses, not an assertion that these other regression cases have already passed. S03 provenance and S04 exact per-arrival route/timestamp oracles must be checked directly in runtime trace tests in addition to authored scalar assertions.
+Run `node specs/revamp/fixtures/measure.mjs`. It checks for duplicate UUIDs, endpoint/channel/shape compatibility, fixture payloads, references and bounds, then prints canonical bytes and SHA-256 (full values in [measurements.json](measurements.json)). It is **not** the future validator, compiler or runner. It also rebuilds three synthetic stress specimens in memory; these never count as run evidence.
 
-Review status: S01–S04 and sizing PASS; S05 PASS after contract corrections ([review](../reviews/2026-09-23-contract-fixture-s05-report.md), [closure](../reviews/2026-09-23-contract-fixture-s05-closure-report.md)). Review and measured evidence are linked from the [contract register](../contracts/README.md). A reviewer PASS on a fixture's semantics cannot lift the user implementation hold.
+Measured 2026-09-22, Node v24.5.0:
+
+| Specimen | Canonical bytes | Note |
+|---|---:|---|
+| S01 / S02 / S03 / S04 / S05 | 21,777 / 17,836 / 5,319 / 16,819 / 31,483 | — |
+| Combined document | 92,412 | 25 elements, 19 connections, 15 schemas, 11 scenarios, 48 assertions; ~4.4% of 2 MiB; raw depth 13 |
+| Near-limit storable document | 2,096,128 | 1,024 B under 2 MiB; 100 unmodeled elements × 100 schemas; not runnable |
+| 100k synthetic trace rows | 47,655,521 | Over the 16 MiB cap, so row and byte caps must both be enforced (stop at the first) |
+| Recovery export | 148,164 | 100 branches, 100 checkpoints, no commits/runs; raw depth 17 |
+
+Findings:
+- The old transfer depth cap of 16 broke the legitimate recovery export (depth 17). The limits are now raw document depth 32 and envelope depth 40, with semantic depth still 8.
+- The byte invariant now covers the whole envelope, so exports always fit the import cap.
+- Keep the 2 MiB document, 1 MiB fixture, 64 MiB transfer and 128 MiB project ceilings for implementation validation. These measurements show headroom for the required examples, not performance, and they don't prove every maximum can be combined.
+- Raw depth doesn't validate the semantic depth-8 ceiling. That, plus runtime sizes, quota, transaction cost, cancellation latency, responsiveness and heap, is checked during implementation.

@@ -1,6 +1,6 @@
-# RV-02g — Detached parts and deterministic exports
+# Parts and exports (RV-02g)
 
-Status: proposed contract for Claude review, 2026-09-22. Implementation remains held. [Document schema](document-and-runner.md) and [storage](storage-and-limits.md) govern validation and versions.
+Saved parts (detached copies) and the JSON, SVG/PNG, CSV and Mermaid exports. [model-and-runner.md](model-and-runner.md) and [storage.md](storage.md) govern validation and versions.
 
 ## Capture and placement
 
@@ -14,11 +14,11 @@ Saved part identity `{id,revision,label,description,content}` uses revision inte
 
 Placement first builds a fresh UUID mapping for **all** independently identified members, including port/state/transition/effect/operation/schema-field/fixture/refinement/mapping/group/note IDs. Rewrite typed references using schema-owned reference descriptors, never string search (user text and literal payload strings must not change). Insert all copied model entities and dependencies plus view placements atomically into the destination working copy at selected anchor (default viewport center in canvas coordinates). Schema/fixture copies are detached even if content equal; no accidental shared editing. Validate destination total limits and all cross-references before one accepted command/undo step. Saving/exporting a part does not mutate the source document. Imported parts cannot import trusted metrics, actors, commands or scripts.
 
+Reference-remap coverage is explicit: Note.attachedElementIds and Group.elementIds; Placement.elementId; Connection source/target elementId+portId; Relation parentId/childId/elementId/hostId/sourceId/targetId; Port schemaId/responseSchemaId; schema-field IDs; machine state IDs/initialStateId, transition from/to/eventPortId, emit and schedule-event portIds, contextSchemaId/initialContextFixtureId, responseBindings (id/callPortId/eventPortId); pipeline input/output/error schema and port IDs and validate.schemaId; decision inputSchemaId/inputPortId and case/fallback output ports; resource entryPortId; Fixture.schemaId; Refinement owner/member IDs and every portMapping outer/inner elementId+portId. Rename each definition ID once and rewrite every typed reference. Literal user payload values and labels are not references. Unknown fields already reject; coverage tests fail if a future typed reference lacks remapping.
+
 Acceptance includes self-contained machine and pipeline parts, refined service, internal/external wiring preview, attached notes/partial groups, UUID collisions, target document near limits, save failure and one-step undo. Remap golden fixture checks every reference kind; unknown new reference fields fail coverage rather than preserve stale IDs.
 
 ## JSON, images and files
-
-Reference-remap coverage is explicit: Note.attachedElementIds and Group.elementIds; Placement.elementId; Connection source/target elementId+portId; Relation parentId/childId/elementId/hostId/sourceId/targetId; Port schemaId/responseSchemaId; schema-field IDs; machine state IDs/initialStateId, transition from/to/eventPortId, emit portId, contextSchemaId/initialContextFixtureId; pipeline input/output/error schema IDs and validate.schemaId; decision input schema and output ports; Fixture.schemaId; Refinement owner/member IDs and every portMapping outer/inner elementId+portId. Rename each definition ID once and rewrite every typed reference. Literal user payload values and labels are not references. Unknown fields already reject; coverage tests fail if a future typed reference lacks remapping.
 
 JSON v9 follows ProjectBundle exactly; unsupported versions reject, no legacy conversion. Stable serialization uses canonical-json-v1; downloadable extension `.json`, MIME `application/json;charset=utf-8`. Project export announces that transient preferences/undo and bulk traces are excluded; run summaries and authored history remain included. Export to file does not mark imported evidence trusted on reimport.
 

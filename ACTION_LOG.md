@@ -963,3 +963,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: `contracts/document-and-runner.md`, new `reviews/2026-09-23-contract-fixture-s05-closure-report.md`, disposition, contract register, tasks, fixture README, HANDOFF.
 - **Platform**: Claude coordinator plus one general-purpose subagent (read-only reviewer, two rounds).
 - **Verification**: Reviewer checked `kernel.ts` `selectOutgoing`/`handleChildResponse` and all fixture call-port shapes. `git diff --check` run. No app code changed.
+
+### Revamp plan consolidated (Claude)
+
+- **Outcome**: Restructured `specs/revamp/` for reviewability per user request: 127 → 24 files, 38k → 22.5k words of planning docs, plus 107 raw review files replaced by a one-page `reviews.md`. Duplicated rules (hold, roles, eligibility, publish policy) now stated once; wording tightened. No product scope, decision, contract field or limit changed intentionally.
+- **Structure**: README, decisions, requirements, architecture (technical design + execution model + legacy retirement + condensed future boundaries), design (evidence + components + accessibility), delivery (plan + ledger + sub-steps, slim process rules; generic dispatch mechanics deferred to `/delegate`), verification, reviews; contracts 11 → 6 (model-and-runner, run-identity, transactions, storage, commands, parts-and-export); fixtures README absorbs size review. Deleted stale `work/rv-01a.md` brief and handoff templates.
+- **Platform**: Claude only; one earlier read-only review subagent (S05 closure). User chose options for reviews, future docs, process and contracts.
+- **Verification**: Link/anchor check over all revamp Markdown passes; `measure.mjs` runs; fixture JSON unchanged. Independent read-only subagent reviewed the merge against `09d2c8b`: 20 drift findings (2 high: payload-type convention, pipeline port-channel rule), all fixed and confirmed in a second pass. No app code changed; suites not run.
+- **Other**: Removed the clean stale worktree `/tmp/system-studio-foundation-a` (branch kept). Side task to harden `/delegate` is running in a separate session.

@@ -1,60 +1,59 @@
-# RV-02b — Mutation and history contracts
+# Mutations, history and merge (RV-02b)
 
-Status: lead draft for Claude review; detailed portable schema and measured storage budgets remain separate RV-02 gates. No compatibility conversion is required.
+How authored changes, commits, publication and merges are applied safely. Exact command payloads and results are in [commands.md](commands.md); records, the publish transaction's storage and limits are in [storage.md](storage.md).
 
-The [closed command inventory](command-inventory.md) supplies exact request/result unions, including project revision and bootstrap/controller distinctions. Its named failed codes replace the older storage-failed shorthand below. Main direct commit/restore rejects; preserve main working edits by creating a branch from working content and switching before committing/restoring. Only publication advances main history. Project.title is current navigation metadata; Document.title is a branch/historical caption, so rename updates the active caption atomically without rewriting other branches or immutable snapshots.
+## 1. Command boundary
 
-## Shared command boundary
+- All authored edits go through one pure validator/reducer plus a repository adapter. The UI and any future AI use the same boundary; there is no raw patch or path API.
+- The reducer computes a candidate without mutating current state. The editor shows it only after persistence succeeds. The initial UI disables controls while saving; optimistic display would need explicit pending/rollback behavior.
+- **Actor.** `{actorId, kind:'local-human', displayName}`. The stable ID is separate from the self-reported name, and unknown kinds are rejected. Provenance grants no rights. Future actor kinds (e.g. AI) arrive as a versioned union extension; none are implemented now. Local timestamps are for display, never for ordering conflicts.
+- **Idempotency.** Retrying a command reuses its `operationId`. The request hash is computed before the transaction and stored atomically with the result. The same ID with the same content returns the original result; with different content it fails (`operation-id-reused`). Receipts live as long as their durable operations; session undo is bounded separately. No server outbox yet.
 
-All authored edits use one pure command validator/reducer with a repository adapter. UI and future AI invoke the same boundary. Request: `commandId`, `operationId` UUID, `projectId`, `branchId`, `expectedWorkingRevision`, `actor`, typed payload. Result is a discriminated union: `applied` (new revision, changed IDs, undo description), `invalid` (field/element issues), `stale` (expected/current revision), `missing`, or `storage-failed`. No raw patch/path API is exposed to future providers.
+## 2. Revisions and compare-and-set
 
-Current actor provenance: `{actorId, kind: 'local-human', displayName}`. Persist stable local actor ID separate from mutable display text; display names are self-reported. Unknown actor kinds fail command validation. Do not implement `ai-agent` authorization now. Future actor kinds use a versioned union extension. Identity/provenance conveys no access rights. Local timestamps are display metadata, never conflict ordering.
+- v1 uses one document-level revision per branch. Any authored change to the branch makes an open draft stale. This is conservative — it can reject unrelated concurrent edits — and that is preferable to silent overwrites.
+- **Authored content** includes view layout (positions, notes, saved views). It increments `workingRevision` but stays out of the execution fingerprint.
+- **Preferences** (camera, panels, dock) use their own repository and revision, and never touch `workingRevision`. Selection and live simulation ticks are transient.
+- Every writer (autosave, checkpoint, commit, publish, restore) runs one read-write Dexie transaction over the affected tables. It reads current records, compares expected revisions/heads, rejects if stale, writes immutable rows, moves pointers and commits. An abort leaves every old row intact.
+- Never await hashing, network, callbacks or workers inside a transaction.
+- Cross-tab messages are advisory, sent after commit. If the current branch changed elsewhere, prompt reload/reconcile; never save an older in-memory graph over it.
 
-`operationId` is reused for retrying the exact same command. Compute its canonical request hash before entering the transaction, then record that ready hash atomically with the mutation result. Matching operation returns the original result; reuse with different content fails. Keep dedup records referenced by durable operations; transient session undo history is separately bounded. No server outbox is implemented in this phase.
+## 3. Inspector Apply
 
-## Inspector Apply
+- Opening a draft captures `{projectId, branchId, targetIds, baseWorkingRevision, baseValues}`.
+- Apply parses the whole draft, checks target existence, cross-references and revision, then submits **one compound command = one undo entry**. Multi-selection works the same way.
+- Invalid or stale Apply keeps the draft. Stale offers reload/discard/cancel; nothing is overwritten automatically.
+- Cancel discards the draft only.
+- Switching branch or project, or changing the target, with a dirty draft asks Apply / Discard / Stay. A failed Apply or save cancels the navigation.
+- **Run requires a clean draft (D25).** Apply or Cancel first; there's no "run last applied version" option. Commit and publish review also resolve dirty drafts first. Drafts never become run inputs.
 
-Use a conservative document-level revision for v1. Capture `{projectId, branchId, targetIds, baseWorkingRevision, baseValues}` on opening a draft. Any authored change to that branch makes Apply stale; selection, viewport, panels and simulation ticks do not increment the authored revision. This can reject unrelated concurrent edits, which is preferable to silently overwriting them. No per-element revision subsystem is required initially.
+## 4. History transitions
 
-Persist viewport/panel/dock preferences through a separate preferences repository with its own revision token; selection and live simulation ticks remain transient. Preferences writes never touch workingRevision or authored autosave. Authored view layouts (element positions, notes, saved view membership) are content and do increment workingRevision, while remaining excluded from executable identity. The same-revision rule below applies to authored writers, not preferences.
+| Action | Precondition | Atomic effect | On failure |
+|---|---|---|---|
+| New project | — | Main + open draft branch share the creation snapshot; nullable heads; revision 0 | No fabricated commit or run |
+| Checkpoint | Storable snapshot (incomplete OK) | Immutable named snapshot, with no commit status | Working copy intact; retry |
+| Commit | Non-main branch; passing evidence for every scenario ([run-identity.md §5](run-identity.md#5-eligibility)) | Commit with parent = branch head; advance head; revision++ | Empty scenario set, stale revision, failing or missing evidence reject everything |
+| Prepare publish | Source has a committed head and no uncommitted changes; main has no uncommitted changes | Isolated merged candidate from the common ancestor, recording expected source/main heads, revisions and candidate snapshot | Missing or ambiguous merge base blocks; never invent ancestry |
+| Publish | Candidate eligible; tokens unchanged | Merge commit + publication; advance main head and working snapshot together; both revisions++; close source (default) | Any token change or failing evidence rejects; source stays open; re-prepare |
+| Reopen branch | Closed, non-main | Set open via revision check; branch revision++; work and history preserved | Stale rejects; main and publications unchanged |
+| Restore snapshot | Non-main branch | Save current working state as a checkpoint, then replace working content | History heads unchanged; no qualifying evidence created |
+| Switch branch | — | Flush source save, resolve draft, load target | Any failure keeps the source active |
 
-Apply parses the complete draft, validates target existence and all cross-references, validates expected branch/project and revision, then submits one compound command and one undo entry. Invalid or stale results preserve the draft. Stale UI offers reload/discard/cancel; no automatic overwrite. Cancel discards draft only. Branch/project switch or dirty-target change requests Apply/discard/cancel; failed Apply or save cancels navigation. Multi-selection uses the same single base revision and atomic validation.
+- **Main** is changed only by publication. Direct commit or restore on main is rejected. To keep main working edits, create a branch from working content and switch to it.
+- **No publication undo (D26).** There is no undo command, compensating record or main rewind. Corrections are new commits and publications through the same gate. Reopening a branch is not undo. Keeping the source branch open is an opt-in that defaults off (D29).
+- **Pinning.** Committed/published snapshots and their evidence can't be deleted independently (`referenced-artifact`). Missing or corrupt content returns `missing` with IDs; restore content is never fabricated.
+- **Titles.** `Project.title` is navigation metadata; `Document.title` is a per-branch caption. Rename updates both in one command without rewriting other branches or snapshots.
 
-The reducer computes a candidate without mutating current state. Persistence success publishes the accepted candidate to editor state. If optimistic display is later desired it requires explicit pending/error/rollback behavior; initial implementation uses pending controls during save.
+## 5. Merge
 
-Run readiness includes a clean-configuration-draft prerequisite (D25). Apply or Cancel is required before a new run; there is no last-applied-version bypass. Apply must finish validation/persistence before Run is enabled. Configuration drafts remain transient and never become execution inputs. Commit/publish review likewise cannot silently ignore a dirty draft: resolve it first, then evaluate candidate evidence.
-
-## Local compare-and-set
-
-New database namespace and schema are frozen by the storage contract, independent of old `system-studio`. `workingRevision` and branch/main head values live in records; no index on revision is needed solely for CAS. Use one read-write Dexie transaction covering affected branch/project/commit/publication/run-evidence/operation tables. Read current records, compare expected values, reject if stale, write immutable rows and update pointers, then commit. Database abort leaves all old rows/pointers intact.
-
-Never await hashing, network, arbitrary callbacks or worker responses inside the transaction. Cross-tab messages update views after commit; the transaction is authoritative. Every writer—including autosave, checkpoint, commit, publish and restore—uses the same revision check. An externally changed current branch prompts reload/reconcile; never silently saves an older in-memory graph over it.
-
-## History transition table
-
-Publication undo is excluded by D26. Commit and publish require every configured scenario to complete with passing checks (D27/D28); no scenario-subset selector or failure waiver.
-
-| Action / precondition | Atomic effect | Rejection / recovery |
-|---|---|---|
-| New project | Create branch working copy with nullable head and revision 0 | No fabricated initial commit or run |
-| Checkpoint incomplete model | Save named immutable authored snapshot, no commit status | Quota failure leaves working copy; show retry |
-| Commit with completed passing evidence for every configured scenario | Add immutable commit with parent current branch head; advance branch head; increment branch revision | Empty scenario set, stale working revision, failed checks or missing evidence reject everything |
-| Prepare publish | Resolve common ancestor and isolated merged candidate with expected source/main heads and revisions | Missing merge base blocks; do not invent common ancestry |
-| Publish candidate | Validate all candidate scenarios/evidence; add merge commit/publication, advance main and close source branch by default in one transaction | Any changed expected head/revision or failing/missing evidence rejects; recompute candidate; source stays open on failure |
-| Reopen closed source branch | Set branch open through expected-revision transaction, preserve its working snapshot/history | Stale revision rejects; does not change main or any publication |
-| Restore historical snapshot | Create/update an explicit working draft with source provenance; increment revision | Does not rewind immutable history or manufacture qualifying evidence |
-| Switch branch | Finish save of source working state, resolve inspector draft, then load target | Any save/conflict failure keeps source active |
-
-No undo-publication command, compensation record or main-rewind action exists. Corrections are ordinary new draft/commit/publication work and must satisfy the same all-scenario passing gate. Published/committed snapshots and required evidence are reference-pinned: independent deletion is rejected with `referenced-artifact`. Corruption/missing content yields `missing` with artifact IDs; never fabricate restore content from partial evidence. Restore affects only a working draft, not published history. Closing/reopening a source branch preserves its work and descendants' immutable references; reopening is not publication undo. The source revision checked during publish prevents concurrently saved work from being closed unnoticed. Optional keep-open selection, if exposed, defaults off under D29.
-
-## Merge identity rules
-
-Publish preparation additionally requires a committed source head and workingSnapshot equal to that head snapshot; main must have no unsaved/uncommitted authored changes. Reject with a recovery choice to commit source work or preserve main work in a branch before retrying. Never discard either working copy. Storage contract specifies unborn-main initial snapshot ancestry and ambiguous-best-base rejection. Publish advances main working snapshot/head together and increments both branch revisions; source keeps its snapshot/head while closing by default. Every prepared token includes source/main heads, working revisions and exact candidate snapshot ID. Any change invalidates the token. Project title and Document title are renamed by one compound command to avoid competing identity metadata.
-
-All mutable collection members that can be referenced independently have stable IDs: elements, ports, behavioral/structural edges, views and placements, notes, scenarios, workloads/classes, subsystems, transition rules and assertions. Constructors generate UUIDs; edits and round trips preserve IDs; cloning/part placement creates a complete remapping. Duplicate IDs or dangling references reject import/command before mutation.
-
-Three-way merge operates by ID and schema field, never display position. Both sides same change coalesce; one-sided changes apply; competing scalar values, delete/edit, incompatible kinds and reference breaks are conflicts. Ordered sequences (transition priority, data operations, event schedule) are whole-field conflicts initially; no guessed interleaving. An explicit reorder is authored content. Run artifacts, personal preferences and undo stacks are not merged as model fields.
-
-Conflict UI shows base/ours/theirs and labels actual branch names. A sequence conflict offers keep ours, keep theirs, or edit the ordered sequence using normal validated controls; it does not require retyping a whole JSON array. Scalar/entity conflicts stay granular. Resolution modifies the isolated candidate only and must pass full validation before run/publish. D25 records this conservative first-version behavior.
-
-Legacy ID stability is audit evidence only; the current-only schema enforces new invariants instead of preserving malformed old IDs. Existing `domain/revisions.ts` supports current snapshot/compare/finalize workflows and cannot be deleted until their new history equivalents are reachable and tested.
+- Every independently referenced member has a stable ID: elements, ports, edges, views, placements, notes, scenarios, workloads/classes, transitions, assertions, and so on. Constructors generate UUIDs; edits and round trips preserve them; cloning and parts remap them all. Duplicate or dangling IDs are rejected before mutation.
+- Three-way merge works by ID and schema field, never display position:
+  - An identical change on both sides coalesces.
+  - A one-sided change applies.
+  - These become conflicts: competing scalars, delete vs edit, incompatible kinds, broken references.
+  - Ordered sequences (transition priority, operations, event schedules) conflict as a whole field; there's no guessed interleaving. An explicit reorder is authored content.
+- Run artifacts, preferences and undo stacks are not merged.
+- **Conflict UI** shows base / ours / theirs with real branch names. Scalar and entity conflicts are resolved individually. A sequence conflict offers keep ours, keep theirs, or edit the sequence with normal validated controls (never raw JSON). Resolutions change only the isolated candidate, which must fully validate before it can run or publish.
+- Every prepared token covers source/main heads, working revisions and the candidate snapshot ID; any change invalidates it.
+- Existing `domain/revisions.ts` stays until its new history equivalents are reachable and tested.
