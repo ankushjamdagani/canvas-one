@@ -1,0 +1,916 @@
+{
+  "schema": "studio-model/1",
+  "id": "ee027a58-f3d3-51be-b647-dbcb0963be95",
+  "title": "S04 Infrastructure",
+  "elements": [
+    {
+      "id": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+      "label": "Router",
+      "description": "Planning fixture",
+      "visualKind": "balancer",
+      "ports": [
+        {
+          "id": "6c72d782-0c7a-5aed-99a3-1079d82068a3",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+          "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
+        },
+        {
+          "id": "316d0b95-c9eb-56eb-88a5-c10552e1f7c9",
+          "label": "A",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+          "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
+        },
+        {
+          "id": "01328d4b-3f41-5dc2-9bf2-5883daaf01af",
+          "label": "B",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+          "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "router",
+          "capacity": 10,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0,
+          "strategy": "round-robin"
+        },
+        "entryPortId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+      }
+    },
+    {
+      "id": "ec155572-83d4-5ad5-b77a-e26a2eaabdfb",
+      "label": "A",
+      "description": "Planning fixture",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "4b98356c-d83a-5bfc-ba44-1f43eacd5fef",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+          "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "processor",
+          "capacity": 10,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0
+        },
+        "entryPortId": "4b98356c-d83a-5bfc-ba44-1f43eacd5fef"
+      }
+    },
+    {
+      "id": "ae615f97-2661-5d23-9565-d88605af2e9e",
+      "label": "B",
+      "description": "Planning fixture",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "9048af20-516f-5e82-b89e-f001742ce93d",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+          "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "processor",
+          "capacity": 10,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0
+        },
+        "entryPortId": "9048af20-516f-5e82-b89e-f001742ce93d"
+      }
+    },
+    {
+      "id": "d6260354-c011-5765-bbfa-167ea06dc1a9",
+      "label": "H1",
+      "description": "Planning fixture",
+      "visualKind": "host",
+      "ports": [],
+      "behavior": {
+        "kind": "host",
+        "version": 1
+      }
+    },
+    {
+      "id": "e5083d81-8e2c-5b4a-ae98-3a8dc0d9d9da",
+      "label": "H2",
+      "description": "Planning fixture",
+      "visualKind": "host",
+      "ports": [],
+      "behavior": {
+        "kind": "host",
+        "version": 1
+      }
+    },
+    {
+      "id": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+      "label": "Slow service",
+      "description": "Planning fixture",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "da4ddd06-2e40-5c7e-9042-370a5a7722e0",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+          "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "processor",
+          "capacity": 1,
+          "concurrency": 1,
+          "queueLimit": 1,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0
+        },
+        "entryPortId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+      }
+    },
+    {
+      "id": "0e7a7834-a263-5861-9d6a-5ceaeed9efb8",
+      "label": "H3",
+      "description": "Planning fixture",
+      "visualKind": "host",
+      "ports": [],
+      "behavior": {
+        "kind": "host",
+        "version": 1
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "label": "route A",
+      "kind": "call",
+      "source": {
+        "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+        "portId": "316d0b95-c9eb-56eb-88a5-c10552e1f7c9"
+      },
+      "target": {
+        "elementId": "ec155572-83d4-5ad5-b77a-e26a2eaabdfb",
+        "portId": "4b98356c-d83a-5bfc-ba44-1f43eacd5fef"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "returnLatencyMs": 0
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "label": "route B",
+      "kind": "call",
+      "source": {
+        "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+        "portId": "01328d4b-3f41-5dc2-9bf2-5883daaf01af"
+      },
+      "target": {
+        "elementId": "ae615f97-2661-5d23-9565-d88605af2e9e",
+        "portId": "9048af20-516f-5e82-b89e-f001742ce93d"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "returnLatencyMs": 0
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "508e7916-07e2-5481-9b14-42e0a97fcce7",
+      "label": "Runs on",
+      "kind": "deployed-on",
+      "elementId": "ec155572-83d4-5ad5-b77a-e26a2eaabdfb",
+      "hostId": "d6260354-c011-5765-bbfa-167ea06dc1a9"
+    },
+    {
+      "id": "12590011-fbe8-51a8-aacf-b374ac9d80f0",
+      "label": "Runs on",
+      "kind": "deployed-on",
+      "elementId": "ae615f97-2661-5d23-9565-d88605af2e9e",
+      "hostId": "e5083d81-8e2c-5b4a-ae98-3a8dc0d9d9da"
+    },
+    {
+      "id": "b9ce21ec-f3f8-5797-a381-e634abf71032",
+      "label": "Runs on",
+      "kind": "deployed-on",
+      "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+      "hostId": "0e7a7834-a263-5861-9d6a-5ceaeed9efb8"
+    }
+  ],
+  "schemas": [
+    {
+      "id": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+      "label": "Request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "key",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "d463e843-eb1d-5ed0-b8a6-7247ad771cfa"
+          }
+        ]
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+      "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
+      "value": {
+        "key": "K"
+      }
+    }
+  ],
+  "refinements": [],
+  "scenarios": [
+    {
+      "id": "6bb5e348-f4e0-5dc8-8519-a5a9cf49fa00",
+      "label": "Failover routing",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+        "ec155572-83d4-5ad5-b77a-e26a2eaabdfb",
+        "ae615f97-2661-5d23-9565-d88605af2e9e",
+        "d6260354-c011-5765-bbfa-167ea06dc1a9",
+        "e5083d81-8e2c-5b4a-ae98-3a8dc0d9d9da"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+          "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "a3d781da-c13d-57b8-8c55-286e3b2705a5",
+          "entry": {
+            "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+            "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "88bca50e-ffc4-58e8-8c77-5e2ff75e5bb9",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "6e79eb5e-018d-57da-ba53-e2ef960b5bc8",
+          "entry": {
+            "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+            "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "88bca50e-ffc4-58e8-8c77-5e2ff75e5bb9",
+          "atMs": 1000,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "6f1b0018-bb0c-561e-a98c-c33387b509ce",
+          "entry": {
+            "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+            "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "88bca50e-ffc4-58e8-8c77-5e2ff75e5bb9",
+          "atMs": 2000,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "dbcf8913-e619-599c-8ab7-0f733db0f255",
+          "entry": {
+            "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+            "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "88bca50e-ffc4-58e8-8c77-5e2ff75e5bb9",
+          "atMs": 3000,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "3cba1306-a2db-564f-8f2a-92a4b4aa9ec2",
+          "entry": {
+            "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+            "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "88bca50e-ffc4-58e8-8c77-5e2ff75e5bb9",
+          "atMs": 4000,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "caf12f83-113a-5abc-9197-3f3a37e29315",
+          "entry": {
+            "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+            "portId": "6c72d782-0c7a-5aed-99a3-1079d82068a3"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "88bca50e-ffc4-58e8-8c77-5e2ff75e5bb9",
+          "atMs": 5000,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        }
+      ],
+      "workloads": [],
+      "faults": [
+        {
+          "id": "17033481-b5a9-5f8f-9ddc-919e3a787960",
+          "hostId": "d6260354-c011-5765-bbfa-167ea06dc1a9",
+          "downAtMs": 2000,
+          "upAtMs": 4000,
+          "detectionDelayMs": 1000,
+          "recoveryDetectionDelayMs": 1000,
+          "activePolicy": "fail",
+          "queuedPolicy": "reject",
+          "routeReset": "first-healthy"
+        }
+      ],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "c62dabb0-d6f4-59af-817d-9ac7ac5b6b72",
+          "label": "root/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 6
+        },
+        {
+          "id": "83aecd74-5e3e-5fa2-807e-0f5d9009a5cc",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 5
+        },
+        {
+          "id": "944582e7-11c5-56fc-8f67-081e55d32f08",
+          "label": "root/rejected",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "faae1b2c-86dc-5d61-9858-0db34e588d8e",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    },
+    {
+      "id": "d8e1a626-985f-5325-bea3-c631d26d2438",
+      "label": "Active queued outage",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+        "0e7a7834-a263-5861-9d6a-5ceaeed9efb8"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+          "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "a5a83e6b-47a2-5001-be30-8fbb7164de08",
+          "entry": {
+            "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+            "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "91a6b188-cd42-5fa1-961b-5a1c51d9beb1",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "a6efff18-3a23-5d80-8dad-43fe2501413d",
+          "entry": {
+            "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+            "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "91a6b188-cd42-5fa1-961b-5a1c51d9beb1",
+          "atMs": 250,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "284bdc5a-9774-52a8-a353-5765b2ad8edd",
+          "entry": {
+            "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+            "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "91a6b188-cd42-5fa1-961b-5a1c51d9beb1",
+          "atMs": 1600,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        }
+      ],
+      "workloads": [],
+      "faults": [
+        {
+          "id": "c99afa22-a6d2-5921-abb0-3c05073bd406",
+          "hostId": "0e7a7834-a263-5861-9d6a-5ceaeed9efb8",
+          "downAtMs": 500,
+          "upAtMs": 1500,
+          "detectionDelayMs": 0,
+          "recoveryDetectionDelayMs": 0,
+          "activePolicy": "fail",
+          "queuedPolicy": "reject",
+          "routeReset": "first-healthy"
+        }
+      ],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "2aa2b871-66cb-5a8a-8678-0bcfa4e3ef0a",
+          "label": "root/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 3
+        },
+        {
+          "id": "42e9ec8c-1bcc-5274-9f14-ed5f9b1e837b",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "0b139a1b-68dc-591b-b805-4cf110f9b55f",
+          "label": "root/failed",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "failed"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "f5536f40-db67-5176-b15a-816f1b08d8bf",
+          "label": "root/rejected",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "f400f330-5060-50ed-b140-1774ba3acb4c",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    },
+    {
+      "id": "1e30f06d-8d23-5fe8-94c8-032318e4bd72",
+      "label": "Outage at completion",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+        "0e7a7834-a263-5861-9d6a-5ceaeed9efb8"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+          "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "6e248322-b0a1-5d3f-b484-7ad4549caaab",
+          "entry": {
+            "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+            "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "02820cf2-f339-5702-8d5d-b3b7432186f6",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "72e82303-f6d1-5775-bd40-bc8e132739cf",
+          "entry": {
+            "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+            "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "02820cf2-f339-5702-8d5d-b3b7432186f6",
+          "atMs": 250,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        },
+        {
+          "id": "c245ac8a-817c-53a5-b744-011ed135b71c",
+          "entry": {
+            "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+            "portId": "da4ddd06-2e40-5c7e-9042-370a5a7722e0"
+          },
+          "fixtureId": "716e198c-0028-5332-a99c-bf1fbf1bc58a",
+          "journeyId": "02820cf2-f339-5702-8d5d-b3b7432186f6",
+          "atMs": 1600,
+          "payloadBindings": [],
+          "resource": {
+            "requestClassId": "760c8d98-4aee-54c7-8f0f-6999e4842d47",
+            "operation": "read",
+            "key": null,
+            "tags": [
+              "order"
+            ],
+            "deadlineMs": 9000
+          }
+        }
+      ],
+      "workloads": [],
+      "faults": [
+        {
+          "id": "6d43fec6-e669-5984-8bba-643bd98a5e58",
+          "hostId": "0e7a7834-a263-5861-9d6a-5ceaeed9efb8",
+          "downAtMs": 1000,
+          "upAtMs": 1500,
+          "detectionDelayMs": 0,
+          "recoveryDetectionDelayMs": 0,
+          "activePolicy": "fail",
+          "queuedPolicy": "reject",
+          "routeReset": "first-healthy"
+        }
+      ],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "3032fb24-0aa4-5ed0-a5db-fde66318b464",
+          "label": "root/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 3
+        },
+        {
+          "id": "dad4d204-1715-504b-83f6-7b69d5c7ee09",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "30d3a574-0835-52b0-9fb1-0677c0e87ba3",
+          "label": "root/failed",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "failed"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "04d578d8-3846-5a9f-83d3-44231e32dbe4",
+          "label": "root/rejected",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "3ef65f96-8932-58df-a0db-2a5c9b612669",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    }
+  ],
+  "views": [
+    {
+      "id": "5cc320a6-0e4c-53ba-a1b1-0ea4ff29e3ab",
+      "label": "Overview",
+      "placements": [
+        {
+          "id": "a155d1a3-7f12-50aa-ae39-18b0cdf30d13",
+          "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
+          "x": 0,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "20de1c57-6523-5e98-8e66-ebad5a6a4d22",
+          "elementId": "ec155572-83d4-5ad5-b77a-e26a2eaabdfb",
+          "x": 240,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "7d957a74-3e10-5f85-9ce6-934f2f14d6e0",
+          "elementId": "ae615f97-2661-5d23-9565-d88605af2e9e",
+          "x": 480,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "46e9c9c8-d140-5c64-9075-9df4f5fc537f",
+          "elementId": "d6260354-c011-5765-bbfa-167ea06dc1a9",
+          "x": 720,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "a8e7b857-474e-5b6f-bd9d-ced00c35281c",
+          "elementId": "e5083d81-8e2c-5b4a-ae98-3a8dc0d9d9da",
+          "x": 0,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "716da57c-9b53-57f2-a04d-c4f177fc8ffe",
+          "elementId": "d8df2ae3-4f39-5e19-96f4-be7f386ac859",
+          "x": 240,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "bf697523-bf89-5c77-8166-ac9458bc6eb9",
+          "elementId": "0e7a7834-a263-5861-9d6a-5ceaeed9efb8",
+          "x": 480,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        }
+      ],
+      "connectionIds": [
+        "10000000-0000-4000-8000-000000000001",
+        "10000000-0000-4000-8000-000000000002"
+      ],
+      "relationIds": [
+        "508e7916-07e2-5481-9b14-42e0a97fcce7",
+        "12590011-fbe8-51a8-aacf-b374ac9d80f0",
+        "b9ce21ec-f3f8-5797-a381-e634abf71032"
+      ],
+      "groups": [],
+      "notes": []
+    }
+  ]
+}

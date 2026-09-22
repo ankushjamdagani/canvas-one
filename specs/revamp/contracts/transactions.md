@@ -2,6 +2,8 @@
 
 Status: lead draft for Claude review; detailed portable schema and measured storage budgets remain separate RV-02 gates. No compatibility conversion is required.
 
+The [closed command inventory](command-inventory.md) supplies exact request/result unions, including project revision and bootstrap/controller distinctions. Its named failed codes replace the older storage-failed shorthand below. Main direct commit/restore rejects; preserve main working edits by creating a branch from working content and switching before committing/restoring. Only publication advances main history. Project.title is current navigation metadata; Document.title is a branch/historical caption, so rename updates the active caption atomically without rewriting other branches or immutable snapshots.
+
 ## Shared command boundary
 
 All authored edits use one pure command validator/reducer with a repository adapter. UI and future AI invoke the same boundary. Request: `commandId`, `operationId` UUID, `projectId`, `branchId`, `expectedWorkingRevision`, `actor`, typed payload. Result is a discriminated union: `applied` (new revision, changed IDs, undo description), `invalid` (field/element issues), `stale` (expected/current revision), `missing`, or `storage-failed`. No raw patch/path API is exposed to future providers.

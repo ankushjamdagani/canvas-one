@@ -36,3 +36,20 @@ Review transport: schema/storage/UI r2 and delegation r2 used Claude Sonnet 4.6,
 Known findings above are closed; full RV-02 is not yet ACCEPTED. Before final freeze, author and independently inventory complete S01–S05 serialized fixtures, measure canonical byte sizes and budget headroom, and reconcile the consolidated closed schemas. The latter must include publication-form metadata from decisions.md (version/title/rationale/ticket) and the exact per-command payload/result inventory currently described by registry rows. These are existing RV-02d/e/f deliverables, not new product scope and not permission for an implementer to guess.
 
 Runtime performance, browser panel behavior and parser/spreadsheet tests are future implementation acceptance checks. Conservative specified ceilings are not measured runtime guarantees. Claude's “ready for implementation hold lift” is a reviewer's scoped conclusion, not user authorization or completion of the remaining fixture/schema gates.
+
+## Final contract round — inventory, publication metadata, fixtures, sizing
+
+Codex drafted this round after `7201e8a` and ran its reviews on 2026-09-22, but ran out of tokens before recording it. Claude recorded it on 2026-09-23 from the actual state/report files. All review processes are terminal.
+
+| Scope | Evidence | Disposition |
+|---|---|---|
+| Command inventory + publication metadata | [inventory](2026-09-22-contract-inventory-report.md) REVISE (6+5), then [closure](2026-09-22-contract-inventory-closure-report.md) PASS | All 11 closed. The reviewer's open caveat on C5 is verified: `transactions.md` now states that direct commit/restore into main is rejected. |
+| S01 fixture | Broad attempt timed out (exit 124); [focused](2026-09-22-contract-fixture-s01-focused-report.md) PASS | Accepted. |
+| S02 fixture | Broad attempt timed out; [focused](2026-09-22-contract-fixture-s02-focused-report.md) PASS | Accepted. |
+| S03 fixture | [report](2026-09-22-contract-fixture-s03-report.md) PASS | Accepted. |
+| S04 fixture | [report](2026-09-22-contract-fixture-s04-report.md) REVISE (4), then [sizing/faults closure](2026-09-22-contract-sizing-faults-closure-report.md) PASS | B1/B3/B4 fixed in the contract (down-host admission rejects; round-robin reset at failure and recovery detection; service time is 1000/capacity ms). B2 (a `failed:0` assertion) rebutted: root conservation already forces 0. |
+| Sizing | [size-review](../fixtures/size-review.md), same closure PASS | Transfer depth corrected to document 32 / envelope 40. Reviewer note: the semantic-depth-8 ceiling isn't measured by raw depth; left to implementation acceptance. |
+| S05 fixture | 2026-09-22 attempt timed out; [2026-09-23 review](2026-09-23-contract-fixture-s05-report.md) REVISE (2) | Contract gaps, not fixture errors: bridge call-frame settlement (B1) and payload echo on transport-only settlement (B2). Lead corrections added to `document-and-runner.md`. **An independent closure review is still pending.** |
+| Cross-fixture "logical"/"timed" reviews | Both timed out, no output | Superseded by the per-fixture reviews above. No verdict inferred. |
+
+Remaining before RV-02 can be frozen: an independent closure review of the S05 corrections. Everything else in RV-02d/e/f/g has a targeted PASS. Runtime, browser, parser and quota checks remain implementation acceptance gates. The user's implementation hold still applies.

@@ -1,0 +1,1811 @@
+{
+  "schema": "studio-model/1",
+  "id": "abff058e-b523-538d-a7b2-f62efebc5b11",
+  "title": "S05 Fullstack",
+  "elements": [
+    {
+      "id": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+      "label": "Checkout",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09",
+          "label": "submit",
+          "direction": "in",
+          "channel": "event",
+          "schemaId": "5c15c734-060b-5974-beb9-f2b380732a37",
+          "responseSchemaId": null
+        },
+        {
+          "id": "57b92e94-36e2-5674-af70-c99140365fda",
+          "label": "response",
+          "direction": "in",
+          "channel": "event",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        },
+        {
+          "id": "27277cc7-f945-5f23-9d8c-4b8cfd783c3a",
+          "label": "timeout",
+          "direction": "in",
+          "channel": "event",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        },
+        {
+          "id": "536f3532-59fa-59ae-950f-0012086e7f38",
+          "label": "create order",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+        }
+      ],
+      "behavior": {
+        "kind": "machine",
+        "version": 1,
+        "states": [
+          {
+            "id": "50fca322-d906-5f85-abfe-3530b158deda",
+            "label": "editing"
+          },
+          {
+            "id": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "label": "submitting"
+          },
+          {
+            "id": "a8367eec-3b2b-51da-b486-bc414309c7b2",
+            "label": "succeeded"
+          },
+          {
+            "id": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "label": "failed"
+          }
+        ],
+        "initialStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+        "contextSchemaId": "7b030a73-285a-51a2-bdee-2e4b5dbd1820",
+        "initialContextFixtureId": "83fe11a8-1bbc-56ac-b46b-f5a64c550c3f",
+        "transitions": [
+          {
+            "id": "ca8a62f3-5b55-50a0-8b99-1bbdcb6c0797",
+            "fromStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "eventPortId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09",
+            "guard": {
+              "op": "all",
+              "guards": [
+                {
+                  "op": "nonEmpty",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  }
+                },
+                {
+                  "op": "every",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "itemGuard": {
+                    "op": "positiveInteger",
+                    "value": {
+                      "kind": "read",
+                      "source": "input",
+                      "path": [
+                        "quantity"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "toStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "effects": [
+              {
+                "id": "2bb09ed2-bf2b-5dea-95b7-e470903e052c",
+                "kind": "request-id",
+                "path": [
+                  "active"
+                ]
+              },
+              {
+                "id": "0a65bc18-90a5-58c5-a9f3-555a6b7261e5",
+                "kind": "emit",
+                "portId": "536f3532-59fa-59ae-950f-0012086e7f38",
+                "value": {
+                  "kind": "record",
+                  "fields": [
+                    {
+                      "key": "requestId",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "active"
+                        ]
+                      }
+                    },
+                    {
+                      "key": "payment",
+                      "value": {
+                        "kind": "literal",
+                        "value": "allow"
+                      }
+                    },
+                    {
+                      "key": "items",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "items"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "correlation": {
+                  "kind": "context-request",
+                  "path": [
+                    "active"
+                  ]
+                }
+              },
+              {
+                "id": "df4de09b-fdc2-5c4f-b7b2-59d8106b684a",
+                "kind": "trace",
+                "code": "order-command"
+              }
+            ]
+          },
+          {
+            "id": "a0d579f7-2f03-5474-b915-986156d5d5f8",
+            "fromStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "eventPortId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09",
+            "guard": null,
+            "toStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "effects": [
+              {
+                "id": "07dbbb38-cedc-5601-bbfc-d0b200781133",
+                "kind": "trace",
+                "code": "invalid-cart"
+              }
+            ]
+          },
+          {
+            "id": "5f764c6b-a83d-56b6-80bc-9415e16ba6d3",
+            "fromStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "eventPortId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09",
+            "guard": {
+              "op": "all",
+              "guards": [
+                {
+                  "op": "nonEmpty",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  }
+                },
+                {
+                  "op": "every",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "itemGuard": {
+                    "op": "positiveInteger",
+                    "value": {
+                      "kind": "read",
+                      "source": "input",
+                      "path": [
+                        "quantity"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "toStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "effects": [
+              {
+                "id": "2363707c-2f93-56dc-ab5f-fac87018f21f",
+                "kind": "request-id",
+                "path": [
+                  "active"
+                ]
+              },
+              {
+                "id": "3eb8b032-7e77-522e-ab55-f65a2add69d3",
+                "kind": "emit",
+                "portId": "536f3532-59fa-59ae-950f-0012086e7f38",
+                "value": {
+                  "kind": "record",
+                  "fields": [
+                    {
+                      "key": "requestId",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "active"
+                        ]
+                      }
+                    },
+                    {
+                      "key": "payment",
+                      "value": {
+                        "kind": "literal",
+                        "value": "allow"
+                      }
+                    },
+                    {
+                      "key": "items",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "items"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "correlation": {
+                  "kind": "context-request",
+                  "path": [
+                    "active"
+                  ]
+                }
+              },
+              {
+                "id": "7abc0f25-f03e-5113-84e8-52b3543c2aeb",
+                "kind": "trace",
+                "code": "order-command"
+              }
+            ]
+          },
+          {
+            "id": "b2b42486-56af-57f5-bc7a-edb79ea9d558",
+            "fromStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "eventPortId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09",
+            "guard": null,
+            "toStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "effects": [
+              {
+                "id": "b3dabdd6-d2f6-519e-aa39-84e96a28aa14",
+                "kind": "trace",
+                "code": "invalid-cart"
+              }
+            ]
+          },
+          {
+            "id": "a4107210-8a34-538a-b467-2cbe7cb1d7b8",
+            "fromStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "eventPortId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09",
+            "guard": null,
+            "toStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "effects": [
+              {
+                "id": "f2ad6854-9b48-51d4-8836-a09045081246",
+                "kind": "trace",
+                "code": "ignored-duplicate"
+              }
+            ]
+          },
+          {
+            "id": "dff28c54-d15a-5510-9604-a87aaab99b38",
+            "fromStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda",
+            "guard": {
+              "op": "all",
+              "guards": [
+                {
+                  "op": "equals",
+                  "left": {
+                    "kind": "read",
+                    "source": "input",
+                    "path": [
+                      "requestId"
+                    ]
+                  },
+                  "right": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "active"
+                    ]
+                  }
+                },
+                {
+                  "op": "equals",
+                  "left": {
+                    "kind": "outcome"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "succeeded"
+                  }
+                }
+              ]
+            },
+            "toStateId": "a8367eec-3b2b-51da-b486-bc414309c7b2",
+            "effects": [
+              {
+                "id": "e5aecbf6-8ec0-5556-a10f-0ab20b6910bd",
+                "kind": "assign",
+                "path": [
+                  "active"
+                ],
+                "value": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              {
+                "id": "a4d02b96-6bae-5f30-868d-24068b5100b2",
+                "kind": "trace",
+                "code": "ui-success"
+              }
+            ]
+          },
+          {
+            "id": "b520bde7-339e-5d0d-9ac5-2bcb0f588966",
+            "fromStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda",
+            "guard": {
+              "op": "equals",
+              "left": {
+                "kind": "read",
+                "source": "input",
+                "path": [
+                  "requestId"
+                ]
+              },
+              "right": {
+                "kind": "read",
+                "source": "context",
+                "path": [
+                  "active"
+                ]
+              }
+            },
+            "toStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "effects": [
+              {
+                "id": "32790eba-acf7-5b2d-88c1-f4f4f81643a3",
+                "kind": "assign",
+                "path": [
+                  "active"
+                ],
+                "value": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              {
+                "id": "e4ba9b2b-b4de-547e-87dd-a0abac165f87",
+                "kind": "trace",
+                "code": "ui-failed"
+              }
+            ]
+          },
+          {
+            "id": "d18cc574-1911-599b-9492-46093cf29260",
+            "fromStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "eventPortId": "27277cc7-f945-5f23-9d8c-4b8cfd783c3a",
+            "guard": {
+              "op": "equals",
+              "left": {
+                "kind": "read",
+                "source": "input",
+                "path": [
+                  "requestId"
+                ]
+              },
+              "right": {
+                "kind": "read",
+                "source": "context",
+                "path": [
+                  "active"
+                ]
+              }
+            },
+            "toStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "effects": [
+              {
+                "id": "becbaa26-e795-531b-90c5-4191c8608def",
+                "kind": "assign",
+                "path": [
+                  "active"
+                ],
+                "value": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              {
+                "id": "22e10408-1925-5e4f-a968-b4755203834d",
+                "kind": "trace",
+                "code": "ui-timeout"
+              }
+            ]
+          },
+          {
+            "id": "e7911f8b-b258-5d84-aa3f-dec964940cf9",
+            "fromStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda",
+            "guard": null,
+            "toStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "effects": [
+              {
+                "id": "a9b5b37f-3601-50e5-b720-c9e9fce67bd3",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "b4880e71-93af-5681-9c5c-3923d4e6f559",
+            "fromStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "eventPortId": "27277cc7-f945-5f23-9d8c-4b8cfd783c3a",
+            "guard": null,
+            "toStateId": "50fca322-d906-5f85-abfe-3530b158deda",
+            "effects": [
+              {
+                "id": "5bfb7313-a307-5d0c-b3cb-9bc2e244ca8a",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "d87c6355-b0c7-5fbf-8a45-8aa921e8e223",
+            "fromStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda",
+            "guard": null,
+            "toStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "effects": [
+              {
+                "id": "fc7123e3-def8-53f9-b138-aac0229cbbc1",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "7520018a-e4a0-52fd-a41c-d529d864ebcb",
+            "fromStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "eventPortId": "27277cc7-f945-5f23-9d8c-4b8cfd783c3a",
+            "guard": null,
+            "toStateId": "7b779671-5ddd-5f77-bae4-982e540b5be4",
+            "effects": [
+              {
+                "id": "2194d1b8-bf39-595d-ad45-4056d118a4c7",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "f0178723-4d81-51b9-9eb6-46088dddde53",
+            "fromStateId": "a8367eec-3b2b-51da-b486-bc414309c7b2",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda",
+            "guard": null,
+            "toStateId": "a8367eec-3b2b-51da-b486-bc414309c7b2",
+            "effects": [
+              {
+                "id": "2930e65e-0231-5dc0-9f91-5ed87f6cb395",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "9a3cb77f-bee3-500f-9d78-19b70654e3c0",
+            "fromStateId": "a8367eec-3b2b-51da-b486-bc414309c7b2",
+            "eventPortId": "27277cc7-f945-5f23-9d8c-4b8cfd783c3a",
+            "guard": null,
+            "toStateId": "a8367eec-3b2b-51da-b486-bc414309c7b2",
+            "effects": [
+              {
+                "id": "97db6ec0-2612-5377-aa66-9e93bc45abb0",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "e2b993ea-4427-54e2-a46e-83a04066d133",
+            "fromStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda",
+            "guard": null,
+            "toStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "effects": [
+              {
+                "id": "6f4fd021-a3ea-55aa-a882-af7569ae0223",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "53891d8f-c0d5-5573-8423-08d91a3c294b",
+            "fromStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "eventPortId": "27277cc7-f945-5f23-9d8c-4b8cfd783c3a",
+            "guard": null,
+            "toStateId": "fef269f5-b321-59ac-8aa3-6623498af1e8",
+            "effects": [
+              {
+                "id": "d7f4d6bb-3e55-566e-8068-c4663c17b8be",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          }
+        ],
+        "responseBindings": [
+          {
+            "id": "39094a0c-fc9c-5154-802e-0a29b6279a39",
+            "callPortId": "536f3532-59fa-59ae-950f-0012086e7f38",
+            "eventPortId": "57b92e94-36e2-5674-af70-c99140365fda"
+          }
+        ]
+      }
+    },
+    {
+      "id": "faefd261-257d-5a0f-ba6e-c04edba5f030",
+      "label": "Order entry",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "a0282c20-5373-5f29-bd83-9aca0b319332",
+          "label": "request",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+        },
+        {
+          "id": "137f7096-57f0-57d0-864b-7deebba9a145",
+          "label": "validate",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "machine",
+        "version": 1,
+        "states": [
+          {
+            "id": "74fd67d1-5340-5467-83ca-3318f53a13f3",
+            "label": "idle"
+          }
+        ],
+        "initialStateId": "74fd67d1-5340-5467-83ca-3318f53a13f3",
+        "contextSchemaId": "5c15c734-060b-5974-beb9-f2b380732a37",
+        "initialContextFixtureId": "9bf36dbf-af32-5a6d-b133-649bb9827995",
+        "transitions": [
+          {
+            "id": "01688fde-0e12-5aa4-baf1-46e31f817e2c",
+            "fromStateId": "74fd67d1-5340-5467-83ca-3318f53a13f3",
+            "eventPortId": "a0282c20-5373-5f29-bd83-9aca0b319332",
+            "guard": null,
+            "toStateId": "74fd67d1-5340-5467-83ca-3318f53a13f3",
+            "effects": [
+              {
+                "id": "a8dc8406-7d84-50ba-9faf-0414666aca3a",
+                "kind": "emit",
+                "portId": "137f7096-57f0-57d0-864b-7deebba9a145",
+                "value": {
+                  "kind": "list",
+                  "items": [
+                    {
+                      "kind": "read",
+                      "source": "input",
+                      "path": []
+                    }
+                  ]
+                },
+                "correlation": {
+                  "kind": "current"
+                }
+              }
+            ]
+          }
+        ],
+        "responseBindings": []
+      }
+    },
+    {
+      "id": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+      "label": "Validate order",
+      "description": "Planning fixture",
+      "visualKind": "data-pipeline",
+      "ports": [
+        {
+          "id": "06a7d385-b33b-540e-a808-d817cde9d7f2",
+          "label": "in",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+          "responseSchemaId": null
+        },
+        {
+          "id": "81e99cf6-c8d8-5adb-a908-d87fb40bfbae",
+          "label": "valid",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+          "responseSchemaId": null
+        },
+        {
+          "id": "6f702f09-98dd-5546-8fbc-131e4bd7850b",
+          "label": "invalid",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "pipeline",
+        "version": 1,
+        "inputSchemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+        "outputSchemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+        "errorSchemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+        "inputPortId": "06a7d385-b33b-540e-a808-d817cde9d7f2",
+        "outputPortId": "81e99cf6-c8d8-5adb-a908-d87fb40bfbae",
+        "errorPortId": "6f702f09-98dd-5546-8fbc-131e4bd7850b",
+        "operations": [
+          {
+            "id": "257e77f8-d9a7-51d0-b4ed-9e58f796f570",
+            "kind": "validate",
+            "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+          }
+        ]
+      }
+    },
+    {
+      "id": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+      "label": "Payment decision",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "467e2716-1f08-5531-be89-4c9c7fae003b",
+          "label": "in",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+          "responseSchemaId": null
+        },
+        {
+          "id": "63b92977-b808-5f75-ac99-e70cd8b48a88",
+          "label": "allow",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        },
+        {
+          "id": "08f41048-beac-562d-9772-c4bea27c0ca4",
+          "label": "deny",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "decision",
+        "version": 1,
+        "inputSchemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+        "inputPortId": "467e2716-1f08-5531-be89-4c9c7fae003b",
+        "cases": [
+          {
+            "id": "7edde0e4-97a7-5046-bb0a-4abe2aec6f35",
+            "guard": {
+              "op": "equals",
+              "left": {
+                "kind": "read",
+                "source": "input",
+                "path": [
+                  0,
+                  "payment"
+                ]
+              },
+              "right": {
+                "kind": "literal",
+                "value": "allow"
+              }
+            },
+            "outputPortId": "63b92977-b808-5f75-ac99-e70cd8b48a88",
+            "value": {
+              "kind": "read",
+              "source": "input",
+              "path": [
+                0
+              ]
+            }
+          }
+        ],
+        "fallback": {
+          "outputPortId": "08f41048-beac-562d-9772-c4bea27c0ca4",
+          "value": {
+            "kind": "read",
+            "source": "input",
+            "path": [
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "39ac2685-b88e-539c-b7e2-511ca9a22990",
+      "label": "Order reply",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "ab960bb9-e140-596b-beff-3c736c8e8ea4",
+          "label": "accepted",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        },
+        {
+          "id": "9d89f21d-a612-5430-99e1-d56bee8efa9a",
+          "label": "denied",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        },
+        {
+          "id": "353d3c39-a736-5d84-96a8-76bcc79ceae2",
+          "label": "invalid",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+          "responseSchemaId": null
+        },
+        {
+          "id": "4309ad2f-e14e-531f-84ce-ca1bf80dab64",
+          "label": "fulfill",
+          "direction": "out",
+          "channel": "message",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "machine",
+        "version": 1,
+        "states": [
+          {
+            "id": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "label": "idle"
+          }
+        ],
+        "initialStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+        "contextSchemaId": "5c15c734-060b-5974-beb9-f2b380732a37",
+        "initialContextFixtureId": "9bf36dbf-af32-5a6d-b133-649bb9827995",
+        "transitions": [
+          {
+            "id": "ca265ad0-b69d-52f5-9a6d-badcfec9c758",
+            "fromStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "eventPortId": "ab960bb9-e140-596b-beff-3c736c8e8ea4",
+            "guard": null,
+            "toStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "effects": [
+              {
+                "id": "52ee2db1-5aec-5f26-bf46-68d8d90b38e8",
+                "kind": "emit",
+                "portId": "4309ad2f-e14e-531f-84ce-ca1bf80dab64",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": []
+                },
+                "correlation": {
+                  "kind": "current"
+                }
+              },
+              {
+                "id": "518fa4e3-b99b-562b-82bc-0c5d411b3732",
+                "kind": "reply",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": []
+                },
+                "outcome": "succeeded"
+              },
+              {
+                "id": "779d2b17-2fc6-5187-a4c3-3a8d4050fdc6",
+                "kind": "trace",
+                "code": "accepted-order"
+              }
+            ]
+          },
+          {
+            "id": "fafc905b-aa91-5fd8-a5b6-4735cbe154f7",
+            "fromStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "eventPortId": "9d89f21d-a612-5430-99e1-d56bee8efa9a",
+            "guard": null,
+            "toStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "effects": [
+              {
+                "id": "68f7c711-189d-5258-968f-6d39871cc595",
+                "kind": "reply",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": []
+                },
+                "outcome": "rejected"
+              }
+            ]
+          },
+          {
+            "id": "26cf9ad0-b713-5785-a7b2-a655ccf83d2d",
+            "fromStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "eventPortId": "353d3c39-a736-5d84-96a8-76bcc79ceae2",
+            "guard": null,
+            "toStateId": "8703957f-54e9-595d-aa92-ab141d20263a",
+            "effects": [
+              {
+                "id": "727b7f10-0119-580e-8964-fcdf1b709c94",
+                "kind": "reply",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": [
+                    0
+                  ]
+                },
+                "outcome": "rejected"
+              }
+            ]
+          }
+        ],
+        "responseBindings": []
+      }
+    },
+    {
+      "id": "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
+      "label": "Fulfillment queue",
+      "description": "Planning fixture",
+      "visualKind": "queue",
+      "ports": [
+        {
+          "id": "4ffe16a1-f3c4-5601-916d-fd9e2c432f3a",
+          "label": "in",
+          "direction": "in",
+          "channel": "message",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": null
+        },
+        {
+          "id": "a0d26b12-2892-53ea-a949-c46626515c81",
+          "label": "consumer",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "broker",
+          "capacity": 100,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0,
+          "delivery": "competing"
+        },
+        "entryPortId": "4ffe16a1-f3c4-5601-916d-fd9e2c432f3a"
+      }
+    },
+    {
+      "id": "7453e0ab-17a6-579d-909c-0586d9144ad3",
+      "label": "Fulfillment worker",
+      "description": "Planning fixture",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "7032193c-b741-5f40-83ec-5e24cdcd072d",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "processor",
+          "capacity": 10,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0
+        },
+        "entryPortId": "7032193c-b741-5f40-83ec-5e24cdcd072d"
+      }
+    },
+    {
+      "id": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+      "label": "API capacity",
+      "description": "Planning fixture",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "57d35485-00be-53b3-ac42-fdf2d336cb4d",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+        },
+        {
+          "id": "52d09422-82d7-57e8-a6c3-83a58df4d6aa",
+          "label": "business",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "processor",
+          "capacity": 100,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0
+        },
+        "entryPortId": "57d35485-00be-53b3-ac42-fdf2d336cb4d"
+      }
+    },
+    {
+      "id": "bec51d3f-c29c-5ad5-adde-541e559da69f",
+      "label": "API host",
+      "description": "Planning fixture",
+      "visualKind": "host",
+      "ports": [],
+      "behavior": {
+        "kind": "host",
+        "version": 1
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "475e7063-822b-51bc-a98b-e480798305c6",
+      "label": "entry to validate",
+      "kind": "data",
+      "source": {
+        "elementId": "faefd261-257d-5a0f-ba6e-c04edba5f030",
+        "portId": "137f7096-57f0-57d0-864b-7deebba9a145"
+      },
+      "target": {
+        "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+        "portId": "06a7d385-b33b-540e-a808-d817cde9d7f2"
+      },
+      "config": {}
+    },
+    {
+      "id": "bb003547-3a1a-5356-9e43-3953f03cf08a",
+      "label": "valid to payment",
+      "kind": "data",
+      "source": {
+        "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+        "portId": "81e99cf6-c8d8-5adb-a908-d87fb40bfbae"
+      },
+      "target": {
+        "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+        "portId": "467e2716-1f08-5531-be89-4c9c7fae003b"
+      },
+      "config": {}
+    },
+    {
+      "id": "7348c420-3eea-533c-9a2e-4476b8170db5",
+      "label": "allow to reply",
+      "kind": "data",
+      "source": {
+        "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+        "portId": "63b92977-b808-5f75-ac99-e70cd8b48a88"
+      },
+      "target": {
+        "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
+        "portId": "ab960bb9-e140-596b-beff-3c736c8e8ea4"
+      },
+      "config": {}
+    },
+    {
+      "id": "9cb5e22f-6074-5035-a50e-916880ab938c",
+      "label": "deny to reply",
+      "kind": "data",
+      "source": {
+        "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+        "portId": "08f41048-beac-562d-9772-c4bea27c0ca4"
+      },
+      "target": {
+        "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
+        "portId": "9d89f21d-a612-5430-99e1-d56bee8efa9a"
+      },
+      "config": {}
+    },
+    {
+      "id": "761d9f38-98c6-584d-83cf-1997494bf448",
+      "label": "invalid to reply",
+      "kind": "data",
+      "source": {
+        "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+        "portId": "6f702f09-98dd-5546-8fbc-131e4bd7850b"
+      },
+      "target": {
+        "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
+        "portId": "353d3c39-a736-5d84-96a8-76bcc79ceae2"
+      },
+      "config": {}
+    },
+    {
+      "id": "8f9c1648-016b-5d53-8cbd-efb24f5f61a6",
+      "label": "publish fulfillment",
+      "kind": "message",
+      "source": {
+        "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
+        "portId": "4309ad2f-e14e-531f-84ce-ca1bf80dab64"
+      },
+      "target": {
+        "elementId": "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
+        "portId": "4ffe16a1-f3c4-5601-916d-fd9e2c432f3a"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
+          "operation": "read",
+          "key": null,
+          "tags": [
+            "order"
+          ],
+          "deadlineDurationMs": 9000
+        },
+        "ackDelayMs": 0,
+        "messageTtlMs": 10000
+      }
+    },
+    {
+      "id": "f900d9d9-5e68-5e80-a8f2-e4bad1927080",
+      "label": "queue to worker",
+      "kind": "call",
+      "source": {
+        "elementId": "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
+        "portId": "a0d26b12-2892-53ea-a949-c46626515c81"
+      },
+      "target": {
+        "elementId": "7453e0ab-17a6-579d-909c-0586d9144ad3",
+        "portId": "7032193c-b741-5f40-83ec-5e24cdcd072d"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "returnLatencyMs": 0
+      }
+    },
+    {
+      "id": "30f21556-0ed3-50c0-9884-9ac427777ab0",
+      "label": "UI to API",
+      "kind": "call",
+      "source": {
+        "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+        "portId": "536f3532-59fa-59ae-950f-0012086e7f38"
+      },
+      "target": {
+        "elementId": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+        "portId": "57d35485-00be-53b3-ac42-fdf2d336cb4d"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
+          "operation": "read",
+          "key": null,
+          "tags": [
+            "order"
+          ],
+          "deadlineDurationMs": 9000
+        },
+        "returnLatencyMs": 0
+      }
+    },
+    {
+      "id": "9e6e6628-d50f-5998-a5bf-315da2fc46e3",
+      "label": "API to business",
+      "kind": "call",
+      "source": {
+        "elementId": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+        "portId": "52d09422-82d7-57e8-a6c3-83a58df4d6aa"
+      },
+      "target": {
+        "elementId": "faefd261-257d-5a0f-ba6e-c04edba5f030",
+        "portId": "a0282c20-5373-5f29-bd83-9aca0b319332"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "returnLatencyMs": 0
+      }
+    }
+  ],
+  "relations": [
+    {
+      "id": "21b84126-9fa6-5f7b-9432-c28be9628546",
+      "label": "Runs on",
+      "kind": "deployed-on",
+      "elementId": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+      "hostId": "bec51d3f-c29c-5ad5-adde-541e559da69f"
+    }
+  ],
+  "schemas": [
+    {
+      "id": "82d08a0e-9949-5da7-92c9-bea29d236999",
+      "label": "Order",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "requestId",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "492976af-c7f2-5e03-8616-a851441952c3"
+          },
+          {
+            "key": "payment",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "4e9918bb-af04-5e5e-9b03-8974474c5833"
+          },
+          {
+            "key": "items",
+            "optional": false,
+            "shape": {
+              "type": "list",
+              "nullable": false,
+              "items": {
+                "type": "record",
+                "nullable": false,
+                "fields": [
+                  {
+                    "key": "sku",
+                    "optional": false,
+                    "shape": {
+                      "type": "string",
+                      "nullable": false
+                    },
+                    "id": "be703546-44ef-549d-a4bd-36587f14ea19"
+                  },
+                  {
+                    "key": "quantity",
+                    "optional": false,
+                    "shape": {
+                      "type": "integer",
+                      "nullable": false
+                    },
+                    "id": "74ccacb1-3f4b-5414-bc17-5409a8630900"
+                  }
+                ]
+              },
+              "maxItems": 100
+            },
+            "id": "48d53586-0abf-5359-abd9-e817b2e90919"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
+      "label": "Orders",
+      "shape": {
+        "type": "list",
+        "nullable": false,
+        "items": {
+          "type": "record",
+          "nullable": false,
+          "fields": [
+            {
+              "key": "requestId",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "2b734c98-acf5-5c0a-84c1-ee5f94587e6a"
+            },
+            {
+              "key": "payment",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "6259a382-5053-5ea1-a24a-4c222e0b7ddd"
+            },
+            {
+              "key": "items",
+              "optional": false,
+              "shape": {
+                "type": "list",
+                "nullable": false,
+                "items": {
+                  "type": "record",
+                  "nullable": false,
+                  "fields": [
+                    {
+                      "key": "sku",
+                      "optional": false,
+                      "shape": {
+                        "type": "string",
+                        "nullable": false
+                      },
+                      "id": "4040c920-dc81-5ea8-a9c5-391897e012ec"
+                    },
+                    {
+                      "key": "quantity",
+                      "optional": false,
+                      "shape": {
+                        "type": "integer",
+                        "nullable": false
+                      },
+                      "id": "0f2cc107-4ca9-5e80-864b-875eefb775b4"
+                    }
+                  ]
+                },
+                "maxItems": 100
+              },
+              "id": "96118cc7-b66f-570b-a895-28574c67a4bb"
+            }
+          ]
+        },
+        "maxItems": 100
+      }
+    },
+    {
+      "id": "5c15c734-060b-5974-beb9-f2b380732a37",
+      "label": "Empty",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "7b030a73-285a-51a2-bdee-2e4b5dbd1820",
+      "label": "Checkout context",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "items",
+            "optional": false,
+            "shape": {
+              "type": "list",
+              "nullable": false,
+              "items": {
+                "type": "record",
+                "nullable": false,
+                "fields": [
+                  {
+                    "key": "sku",
+                    "optional": false,
+                    "shape": {
+                      "type": "string",
+                      "nullable": false
+                    },
+                    "id": "d9c175da-c3e6-56b5-a3ea-19917455d17c"
+                  },
+                  {
+                    "key": "quantity",
+                    "optional": false,
+                    "shape": {
+                      "type": "integer",
+                      "nullable": false
+                    },
+                    "id": "7b7c6c6b-57e0-54d9-acfb-9995bb2900d1"
+                  }
+                ]
+              },
+              "maxItems": 100
+            },
+            "id": "76492772-ba5c-588e-8684-a6b08b1e0cb8"
+          },
+          {
+            "key": "active",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": true
+            },
+            "id": "dbfc6f10-402c-59f1-8c37-35de4809ca71"
+          },
+          {
+            "key": "error",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": true
+            },
+            "id": "e839ee29-da1c-5d71-b34b-d18f8721e648"
+          }
+        ]
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "83fe11a8-1bbc-56ac-b46b-f5a64c550c3f",
+      "schemaId": "7b030a73-285a-51a2-bdee-2e4b5dbd1820",
+      "value": {
+        "items": [
+          {
+            "sku": "A",
+            "quantity": 1
+          }
+        ],
+        "active": null,
+        "error": null
+      }
+    },
+    {
+      "id": "1b319c86-beab-5cea-968d-4d0c4e434ca1",
+      "schemaId": "7b030a73-285a-51a2-bdee-2e4b5dbd1820",
+      "value": {
+        "items": [],
+        "active": null,
+        "error": null
+      }
+    },
+    {
+      "id": "9bf36dbf-af32-5a6d-b133-649bb9827995",
+      "schemaId": "5c15c734-060b-5974-beb9-f2b380732a37",
+      "value": {}
+    },
+    {
+      "id": "791d81ad-094d-5b7e-84ee-05c9c45a3aa7",
+      "schemaId": "5c15c734-060b-5974-beb9-f2b380732a37",
+      "value": {}
+    }
+  ],
+  "refinements": [],
+  "scenarios": [
+    {
+      "id": "8f2767d3-81a6-5996-af62-b0e3041b5fc2",
+      "label": "Accepted and fulfilled",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "b5582eea-b31f-5df1-b50c-bf73046f2726",
+        "faefd261-257d-5a0f-ba6e-c04edba5f030",
+        "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+        "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+        "39ac2685-b88e-539c-b7e2-511ca9a22990",
+        "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
+        "7453e0ab-17a6-579d-909c-0586d9144ad3",
+        "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+        "bec51d3f-c29c-5ad5-adde-541e559da69f"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+          "portId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "4e7df9ad-cafb-5a23-ac2f-4d839ce83782",
+          "entry": {
+            "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+            "portId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09"
+          },
+          "fixtureId": "791d81ad-094d-5b7e-84ee-05c9c45a3aa7",
+          "journeyId": "5aefda48-9f7c-5202-979e-8009b3df52b5",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "cb5bfaec-363b-5443-a6c3-65f0a19b86cb",
+          "label": "ui-success",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+            "code": "ui-success"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "f62d5f97-6814-542b-9ab7-c777ce40288a",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "1a567fb3-a9c0-551f-a903-d32b207e8395",
+          "label": "message/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "6f173d2b-6b69-5e18-aecd-0c4c34a15237",
+          "label": "message/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "d4bd875b-2e28-55db-981b-c84935e0925e",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    },
+    {
+      "id": "7ec14521-7cab-57b5-b7ef-467c3bbd7552",
+      "label": "Outage then explicit retry",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "b5582eea-b31f-5df1-b50c-bf73046f2726",
+        "faefd261-257d-5a0f-ba6e-c04edba5f030",
+        "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+        "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+        "39ac2685-b88e-539c-b7e2-511ca9a22990",
+        "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
+        "7453e0ab-17a6-579d-909c-0586d9144ad3",
+        "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+        "bec51d3f-c29c-5ad5-adde-541e559da69f"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+          "portId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "5552a6c2-15df-53f7-8f0d-b7e596c251f1",
+          "entry": {
+            "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+            "portId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09"
+          },
+          "fixtureId": "791d81ad-094d-5b7e-84ee-05c9c45a3aa7",
+          "journeyId": "5ff880c8-fc3c-54fa-98ee-0c40c276c93b",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": null
+        },
+        {
+          "id": "6afb05dd-0d32-5ba0-9ec6-432daaa4ad33",
+          "entry": {
+            "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+            "portId": "cbdcb8ab-25c8-5d2c-8be5-da4eb1760f09"
+          },
+          "fixtureId": "791d81ad-094d-5b7e-84ee-05c9c45a3aa7",
+          "journeyId": "5ff880c8-fc3c-54fa-98ee-0c40c276c93b",
+          "atMs": 1100,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [
+        {
+          "id": "2c197a6f-9723-5486-b8b5-3e95404ea231",
+          "hostId": "bec51d3f-c29c-5ad5-adde-541e559da69f",
+          "downAtMs": 0,
+          "upAtMs": 1000,
+          "detectionDelayMs": 0,
+          "recoveryDetectionDelayMs": 0,
+          "activePolicy": "fail",
+          "queuedPolicy": "reject",
+          "routeReset": "first-healthy"
+        }
+      ],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "be41ef57-f002-5310-96e3-3c19bdb23687",
+          "label": "ui-failed",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+            "code": "ui-failed"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "165f63bd-6bd7-5825-bc25-ae4354b03d8f",
+          "label": "root/rejected",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "c832273d-f05f-5c92-bfc8-7d4b413a2a23",
+          "label": "ui-success",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+            "code": "ui-success"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "b72c20c0-20c5-5b92-bbe3-92fbf6f0c5e5",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "d7437c37-d6e7-5285-8cfd-70eae9578404",
+          "label": "message/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "21c55b3a-90be-5700-9362-46083a53d854",
+          "label": "message/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "91326ff1-fd2f-583f-bae3-7fd47f322008",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    }
+  ],
+  "views": [
+    {
+      "id": "546949f0-b10a-5e9e-8b42-68d6df983ab8",
+      "label": "Overview",
+      "placements": [
+        {
+          "id": "db2adade-a9db-5216-a34c-051e3c164098",
+          "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
+          "x": 0,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "e058a353-beda-534f-8e13-635368404004",
+          "elementId": "faefd261-257d-5a0f-ba6e-c04edba5f030",
+          "x": 240,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "8bb6ec2e-85bb-597a-9bc1-fc99b768cb18",
+          "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
+          "x": 480,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "1a8119fe-8754-5338-ae27-ae9667a0d860",
+          "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
+          "x": 720,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "36bbfc1e-71a7-5756-b153-b737d4f04735",
+          "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
+          "x": 0,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "317ed994-6d98-59b3-a3cb-3b3b53b71887",
+          "elementId": "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
+          "x": 240,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "f83ccefe-1f7b-5774-bacd-14997c7de3e2",
+          "elementId": "7453e0ab-17a6-579d-909c-0586d9144ad3",
+          "x": 480,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "9fb7f9fb-e62a-5eeb-af74-0c368590e177",
+          "elementId": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",
+          "x": 720,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "a6e506f3-2860-550c-9d35-454da241c45b",
+          "elementId": "bec51d3f-c29c-5ad5-adde-541e559da69f",
+          "x": 0,
+          "y": 320,
+          "width": 180,
+          "expanded": false
+        }
+      ],
+      "connectionIds": [
+        "475e7063-822b-51bc-a98b-e480798305c6",
+        "bb003547-3a1a-5356-9e43-3953f03cf08a",
+        "7348c420-3eea-533c-9a2e-4476b8170db5",
+        "9cb5e22f-6074-5035-a50e-916880ab938c",
+        "761d9f38-98c6-584d-83cf-1997494bf448",
+        "8f9c1648-016b-5d53-8cbd-efb24f5f61a6",
+        "f900d9d9-5e68-5e80-a8f2-e4bad1927080",
+        "30f21556-0ed3-50c0-9884-9ac427777ab0",
+        "9e6e6628-d50f-5998-a5bf-315da2fc46e3"
+      ],
+      "relationIds": [
+        "21b84126-9fa6-5f7b-9432-c28be9628546"
+      ],
+      "groups": [],
+      "notes": []
+    }
+  ]
+}

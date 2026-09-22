@@ -10,11 +10,11 @@ IDs below are UUIDs unless content hashes; all tables except device-local prefer
 
 | Table / primary key | Record fields beyond key | Required secondary indexes |
 |---|---|---|
-| projects / id | `title,mainBranchId,initialSnapshotId,importSourceId:Id|null,createdAt,updatedAt` | updatedAt |
+| projects / id | `title,revision,mainBranchId,initialSnapshotId,importSourceId:Id|null,createdAt,updatedAt` | updatedAt |
 | branches / [projectId+id] | `label,state:'open'|'closed',headCommitId:null|Id,workingSnapshotId,workingRevision,createdAt` | projectId |
 | snapshots / [projectId+id] | `document:Document` (id is snapshot hash) | projectId |
 | commits / [projectId+id] | `snapshotId,parentIds:Id[],evidence:EvidenceRef[],actor,createdAt,message` | projectId |
-| publications / [projectId+id] | `commitId,sourceBranchId,previousMainHeadId:null|Id,ordinal,actor,createdAt` | projectId; unique [projectId+ordinal] |
+| publications / [projectId+id] | `commitId,sourceBranchId,previousMainHeadId:null|Id,ordinal,actor,createdAt,metadata:PublicationMetadata,versionKey` | projectId; unique [projectId+ordinal]; unique [projectId+versionKey] |
 | checkpoints / [projectId+id] | `snapshotId,sourceBranchId,label,actor,createdAt` | projectId |
 | runs / [projectId+id] | `snapshotId,manifest,fingerprint,status,provenance:'local'|'imported-unverified',checks,summary,traceState:'complete'|'pruned'|'not-saved',createdAt,completedAt:number` | projectId; [projectId+fingerprint] |
 | traceChunks / [projectId+runId+index] | `firstSequence,events,payloads,byteLength` | [projectId+runId] |
@@ -32,7 +32,9 @@ Import creates a fresh project ID namespace; preserves document/entity/branch/co
 
 ## Repository boundary
 
-Exportability invariant: canonical ProjectBundle bytes must stay <=64 MiB as well as total local project bytes <=128 MiB. Excluded trace chunks may use the difference; a history write that would exceed portable size rejects before mutation. Thus a project within accepted storage limits always has a complete authored/history recovery export. Deletion/pruning/export recovery never requires allocating a new operation receipt beyond the cap; deletion uses expected revision/head CAS and returns missing/already-absent on safe retries. No mutation other than deletion/pruning can bypass operation receipt retention.
+Exact publication fields, initial template snapshot semantics and portable record keys are closed in [publication metadata](publication-metadata.md); project/branch CAS and command results are closed in [command inventory](command-inventory.md). The creation snapshot may contain a template: references elsewhere to an “initial empty snapshot” mean this recorded creation snapshot, never a fabricated empty replacement. ProjectBundle includes createdAt/updatedAt as specified there. Do not implement only this overview table while omitting those normative fields.
+
+Exportability invariant: canonical complete portable envelope bytes (`{format,version,project}` including all container overhead) must stay <=64 MiB as well as total local project bytes <=128 MiB. Excluded trace chunks may use the difference; a history write that would exceed portable size rejects before mutation. Thus a project within accepted storage limits always has a complete authored/history recovery export that also fits the import file cap. Deletion/pruning/export recovery never requires allocating a new operation receipt beyond the cap; deletion uses expected revision/head CAS and returns missing/already-absent on safe retries. No mutation other than deletion/pruning can bypass operation receipt retention.
 
 UI never writes Dexie tables directly. Local adapter exposes `loadProject(projectId)`, `loadBranch(projectId,branchId)`, `execute(command)`, `savePreferences(expectedRevision,value)`, `saveRun(startToken,terminalResult,chunks)`, `importProject(validatedBundle)`, `exportProject(projectId)`, `pruneUnreferenced(projectId,selection)` and explicit `deleteProject(projectId,expectedMainHead)`. Queries return cloned/read-only records. Commands use [transactions](transactions.md); all authored writes resolve to one transaction and an idempotent operation receipt. Preferences have separate CAS. Run start token is minted by the local runner controller and bound to immutable manifest/snapshot/run ID; portable data cannot mint it.
 
@@ -47,7 +49,7 @@ These are conservative v1 **product ceilings**, not measured browser performance
 | Scope | Limit |
 |---|---|
 | Document | 2 MiB; 100 elements; 200 behavioral connections; 200 relations; 10 views |
-| Nested content | 16 ports/element; 100 schemas; schema/guard/JSON depth 8; 100 fields/schema; 1,000 nodes per guard tree; 100 transitions/machine; 100 operations/pipeline |
+| Nested content | 16 ports/element; 100 schemas; semantic shape/expression/payload depth 8; raw Document container depth 32; 100 fields/schema; 1,000 nodes per expression tree; 100 transitions/machine; 100 operations/pipeline |
 | Authored strings | labels/title 1–80 code points; descriptions/note text 0–4,000; keys 1–80; string fixture values <=16 KiB UTF-8 |
 | View | 100 placements; 50 notes; 50 groups; finite coordinates abs<=1e6; width 80–2,000 |
 | Scenarios | 20/document; 100 assertions/scenario; 1,000 explicit inputs/scenario; 100 faults; 100 boundaries; 20 workloads with 20 classes each |
@@ -57,9 +59,13 @@ These are conservative v1 **product ceilings**, not measured browser performance
 | Time | timed horizon 1–300 seconds; drain deadline >arrival horizon and <=600 seconds; logical has no modeled time limit |
 | Worker | <=1,000 events or 8ms wall time per yield, whichever first; 100ms main-thread watchdog acknowledgement target, not an assertion of current performance |
 | Local project | 100 branches; 1,000 commits; 100 checkpoints; 200 run summaries; 100 part revisions; 100,000 operation receipts; 128 MiB accounted canonical content |
-| Transfer | 64 MiB file byte cap before parse; 100,000 total records; 16 nesting depth envelope; one project per file |
+| Transfer | 64 MiB file byte cap before parse; 100,000 total object/array containers; raw container depth 40 including envelope; one project per file |
 
 Budgets exact fields in Scenario: `maxEvents,maxTraceRows,maxTraceBytes,maxScheduledEvents,maxLiveRoots`. Values positive integers <= maxima; defaults materialize into manifest. Array count/byte/depth limits are cumulative across nested refinements, not multiplied per selected view. Memory accounting is conservative canonical byte accounting plus collection ceilings, not a promise of exact JavaScript heap usage. Trace exhaustion stops as incomplete, no hidden sampling of qualification evidence. Display virtualization never changes stored trace/check results. Resource admission limits remain modeled outcomes; global infrastructure budgets mean incomplete, not simulated overload success.
+
+Depth definitions: scalar payload depth 0, each object/list adds 1; shape depth counts nested shape nodes; expression depth counts Guard/Value nodes across their shared tree (literal JSON has its own payload-depth bound). Raw depth counts every serialized object/array container, including record wrappers, with the root container at 1. These limits all apply simultaneously. The former raw transfer depth 16 failed the measured five-family recovery envelope (depth 17); document 32 / transfer 40 replaces that draft, while retaining semantic depth 8. Use an iterative bounded inventory walk after the file-byte check and parse; do not recursively walk untrusted arbitrary depth before checking it.
+
+Trace row and byte ceilings are independent upper bounds, not a promise that the maximum rows fit the maximum bytes. The synthetic 100k-row measurement exceeds 16 MiB before payload-table content; the run must stop incomplete at the first exhausted bound. Show both budgets in readiness/results diagnostics. No hidden truncation or lossy sampling may make an oversized run qualify.
 
 Accounted local project bytes are checked transactionally using per-record canonical sizes; browser quota can still reject earlier. At the local project limit, edits/runs needing more space fail with recovery; deleting unpinned artifacts or explicit project export/deletion is user-directed. No retention policy silently deletes authored snapshots, history or checks. First-run defaults are not an automatic request to browser persistent-storage permission.
 

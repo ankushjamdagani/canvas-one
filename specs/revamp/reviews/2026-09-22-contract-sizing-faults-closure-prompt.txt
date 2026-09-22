@@ -1,0 +1,181 @@
+Claude senior closure review, planning only, no tools. Check S04 B1/B3/B4 against exact revised rules below. B2 rebuttal: Counts are nonnegative and conserved, so generated6=succeeded5+rejected1+inFlight0 already forces failed=expired=0; a redundant assertion is optional, not a correctness blocker. B1 reviewer suggestion restricted rejection to queue full: lead instead rejects all admissions to actually-down hosts, as existing scenario intent requires. B3 suggestion said do not reset on recovery: lead chooses explicit first-healthy reset at BOTH detections, consistent with S04 recovery restart A. Also check serialization budget conclusions for concrete flaws. Return PASS/REVISE with <=5 findings, <=600 words. No observed runtime or performance claims.
+Fault: `{id,hostId,downAtMs,upAtMs,detectionDelayMs,recoveryDetectionDelayMs,activePolicy:'fail',queuedPolicy:'reject',routeReset:'first-healthy'}`. S04 fixes the initial route reset policy; configurable alternatives need a later behavior version. Non-overlapping intervals per host, up>down. Failure/recovery and detection events precede completions at the same time only in fault-enabled scenarios. Ordinary no-fault runner ordering must remain bit-for-bit characterized. Already settled operations never settle twice; no orphan callback may occupy capacity after outage cancellation.
+
+Admission while the actual host is down rejects immediately with unavailable outcome, regardless of queue capacity and before routing detection catches up. It never waits in a failed host's queue. activePolicy/queuedPolicy govern only work present at the outage event. At both failure detection and recovery detection, update the router's eligible pool and reset a round-robin cursor to the first healthy outgoing edge in stable edge-ID order. Weighted routing retains its seeded draw rule over the new eligible pool; conditional routing applies its explicit conditions/fallback. If no route is eligible, reject unavailable. Host state at admission is authoritative even if routing information is stale. Recovery permits new work; it never resurrects failed/settled operations.
+
+Retained service demand is one work unit per admitted attempt; each slot's local service duration is 1000/capacity milliseconds (storage writes use writeCapacity). Queue wait, edge delay, downstream waiting and retry delay are separate measured intervals. Thus capacity=1 gives 1000ms local service, and capacity=10 gives 100ms. Keep current behavior-specific router/broker handling and exact accounting; no new workUnits field or zero-time resource interpreter is inferred.
+
+`RunSummary={mode:'logical'|'timed',consumedInputs:number,rootCounts:Counts,messageCounts:Counts,elementMetrics:ElementMetric[],finalStates:[{elementId,stateId,context:Json}],outputs:[{port:Endpoint,values:Json[]}],coverage:{includedElementIds:Id[],excludedElementIds:Id[]},processedEvents:number,elapsedMs:number|null}`. Counts exact fields `generated,succeeded,rejected,failed,expired,inFlight`, nonnegative safe integers, conservation at roots and messages independently. Invalid inputs count as consumed inputs and explicit rejected roots. Transport and business status are distinguished by trace/check subjects; accepted business response never increments fulfillment root success twice.
+C5 cross-document evidence, exact transactions.md paragraph:
+The [closed command inventory](command-inventory.md) supplies exact request/result unions, including project revision and bootstrap/controller distinctions. Its named failed codes replace the older storage-failed shorthand below. Main direct commit/restore rejects; preserve main working edits by creating a branch from working content and switching before committing/restoring. Only publication advances main history. Project.title is current navigation metadata; Document.title is a branch/historical caption, so rename updates the active caption atomically without rewriting other branches or immutable snapshots.
+
+ARTIFACT fixtures/size-review.md
+# Serialization measurements and budget decision
+
+2026-09-22; Node v24.5.0. Reproduce with `node specs/revamp/fixtures/measure.mjs`. Exact SHA-256 values and script hash are in [measurements.json](measurements.json). Whitespace in the review-friendly JSON files is excluded by canonical encoding; the actual future export serializer must use that same compact encoding.
+
+| Specimen | Canonical UTF-8 bytes | Interpretation |
+|---|---:|---|
+| S01 frontend | 21,777 | Three declared machine/boundary scenarios |
+| S02 backend/service | 17,836 | Allowed and denied order scenarios |
+| S03 data flow | 5,319 | Original five-row malformed/duplicate/aggregate fixture |
+| S04 infrastructure | 16,819 | Routing, active/queued outage and same-time outage |
+| S05 fullstack | 31,483 | Causal success and unavailable host/retry |
+| Combined authored document | 92,412 | 25 elements, 19 connections, 15 schemas, 11 scenarios, 48 expected assertions; about 4.4% of 2 MiB |
+| Synthetic storable document | 2,096,128 | Exactly 1,024 bytes below 2 MiB, 100 elements and 100 schemas; intentionally unmodeled, not runnable |
+| Synthetic 100k trace rows | 47,655,521 | Exceeds 16 MiB; row and byte budgets must be enforced together, stopping incomplete at the first limit |
+| Synthetic recovery export | 148,164 | 100 branches/100 checkpoints, no fabricated commits or runs; includes full portable wrapper |
+
+The combined document has raw container depth 13; the portable recovery envelope has depth 17. The earlier transfer-depth ceiling 16 was therefore incompatible with these legitimate examples. Proposed corrected simultaneous limits: semantic shape/expression/payload depth 8, raw document depth 32, raw portable envelope depth 40. The byte invariant now budgets the complete envelope rather than just ProjectBundle, so accepted exports cannot exceed the import cap merely because of wrapper overhead.
+
+Retain the proposed 2 MiB document, 1 MiB fixture aggregate, 64 MiB portable envelope and 128 MiB local-project ceilings for implementation validation. These specimens establish room for the required examples, **not** a performance guarantee or proof every maximum can be combined. Count, byte, depth and compiler-expansion limits apply simultaneously. The synthetic near-ceiling document contains more independently identified fields than the compiler entity budget; it is storable incomplete work and is not evidence of run-readiness at that size.
+
+Unmeasured gates remain assigned to implementation acceptance: actual runtime traces/payload table size, large commit/evidence histories, browser quota behavior, database transaction cost, compiler cancellation latency, main-thread responsiveness, mobile rendering and heap usage. No result in this report is an observed simulation outcome. Fixture assertions are specifications, not passing checks. No production budget should be raised based on this serialization exercise alone.
+
+ARTIFACT fixtures/measurements.json
+{
+  "runtime": "v24.5.0",
+  "canonicalEncoding": "canonical-json-v1 (these fixtures use ASCII keys and finite ordinary integers)",
+  "scope": "Planning data inventory and serialization only; no runtime outcomes, memory or latency measured",
+  "files": [
+    {
+      "name": "s01.json",
+      "bytes": 21777,
+      "sha256": "48b5820b929e91c6a3f981bf29039cb3fcdc2b44b596169a995509f25f602f26",
+      "definitions": 105,
+      "rawDepth": 13,
+      "elements": 2,
+      "connections": 1,
+      "schemas": 4,
+      "scenarios": 3,
+      "assertions": 10,
+      "fixtureBytes": 186
+    },
+    {
+      "name": "s02.json",
+      "bytes": 17836,
+      "sha256": "2af768a972c92a396d4321cdecce72c948e1ff699c7768759fcd1aeee6e8a946",
+      "definitions": 80,
+      "rawDepth": 12,
+      "elements": 6,
+      "connections": 7,
+      "schemas": 3,
+      "scenarios": 2,
+      "assertions": 10,
+      "fixtureBytes": 165
+    },
+    {
+      "name": "s03.json",
+      "bytes": 5319,
+      "sha256": "0aea1d3ebc38e2771c9dac4197608c0646b814f928ccce3b36a8da13382bb84a",
+      "definitions": 27,
+      "rawDepth": 9,
+      "elements": 1,
+      "connections": 0,
+      "schemas": 3,
+      "scenarios": 1,
+      "assertions": 2,
+      "fixtureBytes": 248
+    },
+    {
+      "name": "s04.json",
+      "bytes": 16819,
+      "sha256": "6b61485ca1b6cbc48bebe465354cc0e31d1aff14d826e39da877f4199d4d3652",
+      "definitions": 62,
+      "rawDepth": 7,
+      "elements": 7,
+      "connections": 2,
+      "schemas": 1,
+      "scenarios": 3,
+      "assertions": 14,
+      "fixtureBytes": 11
+    },
+    {
+      "name": "s05.json",
+      "bytes": 31483,
+      "sha256": "c3d02784302a732ff7fcc63d2999b96667d5a3e59e500734233ac0cb91d2428f",
+      "definitions": 150,
+      "rawDepth": 13,
+      "elements": 9,
+      "connections": 9,
+      "schemas": 4,
+      "scenarios": 2,
+      "assertions": 12,
+      "fixtureBytes": 106
+    },
+    {
+      "name": "combined.json",
+      "bytes": 92412,
+      "sha256": "330fc68e284b02182c391e430822780b0aac337c7f611dae00ff8b74d1742ffd",
+      "definitions": 420,
+      "rawDepth": 13,
+      "elements": 25,
+      "connections": 19,
+      "schemas": 15,
+      "scenarios": 11,
+      "assertions": 48,
+      "fixtureBytes": 716
+    }
+  ],
+  "stress": {
+    "bytes": 2096128,
+    "sha256": "d980e5b1c611277b6c32e550c6ccb9ad7eec5790fb2d63ed44a9e1a85d031611",
+    "definitions": 10205,
+    "rawDepth": 7,
+    "elements": 100,
+    "connections": 0,
+    "schemas": 100,
+    "scenarios": 0,
+    "assertions": 0,
+    "fixtureBytes": 486112,
+    "remainingTo2MiB": 1024,
+    "recipe": "100 unmodeled elements, 100 schemas x 100 fields, bounded string fixtures; recreated by this script"
+  },
+  "syntheticTrace": {
+    "rows": 100000,
+    "bytes": 47655521,
+    "sha256": "9969ede208f0fb725236d86ee137a3d9acd679e53e89d97a2ea0db662358d086",
+    "byteCeiling": 16777216,
+    "withinByteCeiling": false,
+    "note": "Row count and byte cap are simultaneous bounds; reaching either stops incomplete. Payload-table bytes are additional."
+  },
+  "syntheticHistory": {
+    "bytes": 148164,
+    "sha256": "1f51541c04ce90ba213842a8cb941181983817d3142c98172ac8563f871dddaa",
+    "rawDepth": 17,
+    "containers": 1592,
+    "branches": 100,
+    "checkpoints": 100,
+    "commits": 0,
+    "runs": 0,
+    "note": "Checkpoint/history serialization only. No synthetic passing evidence or executed results."
+  },
+  "scriptSha256": "6dc2eefc6a2859298d9e564f7d0964d1bee242e3dc994b30369679c896d9e60c"
+}
+
+ARTIFACT reviews/2026-09-22-contract-fixture-s04-report.md
+## REVISE — 4 blockers
+
+---
+
+### B1 · S04a: New-arrival-to-down-host outcome undefined (critical)
+
+`activePolicy:'fail'` and `queuedPolicy:'reject'` are defined only for requests already in-flight or queued **at the moment the fault fires**. req3 arrives at service A (phase 3, t=2000) after H1 has already gone down (phase 0, same tick) but before the router detects it (t=3000). Neither policy clause covers this case. Whether req3's outcome is `rejected` (queue overflow, queueLimit=0) or `failed` (host-down) is unspecified. `S04a` asserts `rejected:1`; that assertion stands or falls on this gap. Contract must add: "A request admitted to a resource whose host is already down at admission time is rejected immediately when queueLimit=0 or when the queue is already full; `queuedPolicy` governs requests that were already in the queue when the fault fired."
+
+---
+
+### B2 · S04a: Missing `failed:0` assertion (important)
+
+S04a asserts generated=6, succeeded=5, rejected=1, inFlight=0. No `failed` assertion. If B1 resolves as "failed" rather than "rejected," `rejected:1` would fail at runtime — correctly catching the error — but only because the expected count is wrong, not because `failed` is explicitly bounded. The intended conservation equation (5+1+0+0=6) is underdocumented. Add `{outcome:'failed', expected:0}` so the assertion set is closed over all terminal outcomes and the intent is unambiguous to the runner and any future fixture author.
+
+---
+
+### B3 · routeReset at recovery detection is unspecified
+
+The contract says "S04 fixes the **initial** route reset policy; configurable alternatives need a later behavior version." The word "initial" is load-bearing but undefined. Does `routeReset:'first-healthy'` fire only when a failure is detected, or also when recovery is detected (t=5000 for S04a)? For S04a the arithmetic is unaffected either way — round-robin through two B's leaves A as the natural next route, so req6→A regardless. But the behavioral gap is real: a follow-on scenario with a three-way router or asymmetric weight state after recovery would produce different counts depending on interpretation. The contract needs a sentence: "routeReset triggers at failure detection; recovery detection restores the route to the healthy-route pool but does not reset the round-robin counter."
+
+---
+
+### B4 · S04b/c: service-time basis is implicit (important)
+
+S04b and S04c depend on req1 (capacity=1, admitted at t=0) still being active when the fault fires at t=500ms and t=1000ms respectively. This requires ~1000ms service time, consistent with capacity=1 work-unit/sec at 1 work-unit per request. But the fixture declares no `workUnits`, `serviceTimeMs`, or equivalent field; the resource config only has `capacity`. The assumed "1 work-unit per request" is nowhere in the contract. If the retained kernel uses a different duration model (e.g., fixed 0ms for timed-mode resources, or slot-based), both S04b and S04c could produce req1 completing before the fault fires — inverting succeeded/failed counts and silently failing the assertions. The contract must state explicitly how service time is derived from `capacity` for authoring purposes (e.g., "each admitted call consumes one work-unit; service time = 1/capacity seconds per concurrency slot").

@@ -1,0 +1,1001 @@
+{
+  "schema": "studio-model/1",
+  "id": "cd53f0ea-7d32-540a-8b93-488b8a46443e",
+  "title": "S02 Order processing",
+  "elements": [
+    {
+      "id": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+      "label": "Order entry",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "02848995-4504-5ae5-b0f2-9cfa8a4f2489",
+          "label": "request",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": "200e9451-f192-5712-a601-8460cfebcd4c"
+        },
+        {
+          "id": "a1ef30fa-4fdf-57be-8dd7-27463d2d010a",
+          "label": "validate",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "machine",
+        "version": 1,
+        "states": [
+          {
+            "id": "a8ee58d7-24c5-57ea-9e12-1dce5a54c6c1",
+            "label": "idle"
+          }
+        ],
+        "initialStateId": "a8ee58d7-24c5-57ea-9e12-1dce5a54c6c1",
+        "contextSchemaId": "9f68e007-1b30-5bf5-a867-009f2a95b500",
+        "initialContextFixtureId": "0057fefd-e62d-575d-9a13-aaf042207e04",
+        "transitions": [
+          {
+            "id": "e5b36a7e-0b04-5fc6-9789-1af745bd6c23",
+            "fromStateId": "a8ee58d7-24c5-57ea-9e12-1dce5a54c6c1",
+            "eventPortId": "02848995-4504-5ae5-b0f2-9cfa8a4f2489",
+            "guard": null,
+            "toStateId": "a8ee58d7-24c5-57ea-9e12-1dce5a54c6c1",
+            "effects": [
+              {
+                "id": "aa863cc5-5f8b-5278-8e63-dfe831b88ee8",
+                "kind": "emit",
+                "portId": "a1ef30fa-4fdf-57be-8dd7-27463d2d010a",
+                "value": {
+                  "kind": "list",
+                  "items": [
+                    {
+                      "kind": "read",
+                      "source": "input",
+                      "path": []
+                    }
+                  ]
+                },
+                "correlation": {
+                  "kind": "current"
+                }
+              }
+            ]
+          }
+        ],
+        "responseBindings": []
+      }
+    },
+    {
+      "id": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+      "label": "Validate order",
+      "description": "Planning fixture",
+      "visualKind": "data-pipeline",
+      "ports": [
+        {
+          "id": "21eb170d-d27f-5cde-bacb-0e11d73a708e",
+          "label": "in",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+          "responseSchemaId": null
+        },
+        {
+          "id": "dff73f26-cc2a-5170-83a9-aa792a8bd5d9",
+          "label": "valid",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+          "responseSchemaId": null
+        },
+        {
+          "id": "3be2c3ca-2140-5259-adcb-f1c52a51f396",
+          "label": "invalid",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "pipeline",
+        "version": 1,
+        "inputSchemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+        "outputSchemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+        "errorSchemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+        "inputPortId": "21eb170d-d27f-5cde-bacb-0e11d73a708e",
+        "outputPortId": "dff73f26-cc2a-5170-83a9-aa792a8bd5d9",
+        "errorPortId": "3be2c3ca-2140-5259-adcb-f1c52a51f396",
+        "operations": [
+          {
+            "id": "75b0ff78-67be-542d-b13a-875a75620397",
+            "kind": "validate",
+            "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c"
+          }
+        ]
+      }
+    },
+    {
+      "id": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+      "label": "Payment decision",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "6c85cddf-9e30-5fe8-9eda-b63048bacb1f",
+          "label": "in",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+          "responseSchemaId": null
+        },
+        {
+          "id": "d8cb2423-3d54-505e-9686-2a3c87e5cdac",
+          "label": "allow",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": null
+        },
+        {
+          "id": "88c491a6-44e5-510e-b369-8ffc45019bdf",
+          "label": "deny",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "decision",
+        "version": 1,
+        "inputSchemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+        "inputPortId": "6c85cddf-9e30-5fe8-9eda-b63048bacb1f",
+        "cases": [
+          {
+            "id": "ab14b8b2-10fd-592d-98f8-c96b46ef7e30",
+            "guard": {
+              "op": "equals",
+              "left": {
+                "kind": "read",
+                "source": "input",
+                "path": [
+                  0,
+                  "payment"
+                ]
+              },
+              "right": {
+                "kind": "literal",
+                "value": "allow"
+              }
+            },
+            "outputPortId": "d8cb2423-3d54-505e-9686-2a3c87e5cdac",
+            "value": {
+              "kind": "read",
+              "source": "input",
+              "path": [
+                0
+              ]
+            }
+          }
+        ],
+        "fallback": {
+          "outputPortId": "88c491a6-44e5-510e-b369-8ffc45019bdf",
+          "value": {
+            "kind": "read",
+            "source": "input",
+            "path": [
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+      "label": "Order reply",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "a3c93e84-7de4-5bb0-824c-b42de4f8bde6",
+          "label": "accepted",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": null
+        },
+        {
+          "id": "faab75a0-0943-55a0-9802-ee3514d1f16e",
+          "label": "denied",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": null
+        },
+        {
+          "id": "549fb98d-df0c-5585-ba22-9bce8e1d5c91",
+          "label": "invalid",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+          "responseSchemaId": null
+        },
+        {
+          "id": "abd1f12f-1dd9-5d1c-97a7-71492aa431f7",
+          "label": "fulfill",
+          "direction": "out",
+          "channel": "message",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "machine",
+        "version": 1,
+        "states": [
+          {
+            "id": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "label": "idle"
+          }
+        ],
+        "initialStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+        "contextSchemaId": "9f68e007-1b30-5bf5-a867-009f2a95b500",
+        "initialContextFixtureId": "0057fefd-e62d-575d-9a13-aaf042207e04",
+        "transitions": [
+          {
+            "id": "8f22f9f1-f8c2-5c8d-834d-4bc8012d83c5",
+            "fromStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "eventPortId": "a3c93e84-7de4-5bb0-824c-b42de4f8bde6",
+            "guard": null,
+            "toStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "effects": [
+              {
+                "id": "d0979293-d766-5134-9260-e0b0905bb0dc",
+                "kind": "emit",
+                "portId": "abd1f12f-1dd9-5d1c-97a7-71492aa431f7",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": []
+                },
+                "correlation": {
+                  "kind": "current"
+                }
+              },
+              {
+                "id": "14e899a1-1b36-587b-a278-5fd68eb39d9b",
+                "kind": "reply",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": []
+                },
+                "outcome": "succeeded"
+              },
+              {
+                "id": "c70b6c3d-dd66-5db2-88bd-3c1eeb97e224",
+                "kind": "trace",
+                "code": "accepted-order"
+              }
+            ]
+          },
+          {
+            "id": "746d0446-cbf6-5cc6-9e4c-58aa18775937",
+            "fromStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "eventPortId": "faab75a0-0943-55a0-9802-ee3514d1f16e",
+            "guard": null,
+            "toStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "effects": [
+              {
+                "id": "a892eda2-4593-572a-83d4-5cbde0f9371e",
+                "kind": "reply",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": []
+                },
+                "outcome": "rejected"
+              }
+            ]
+          },
+          {
+            "id": "e7c8ada3-a6e0-50ba-8810-1daac0535a06",
+            "fromStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "eventPortId": "549fb98d-df0c-5585-ba22-9bce8e1d5c91",
+            "guard": null,
+            "toStateId": "c0a36970-f479-5ec0-a623-f5d7ba51ab75",
+            "effects": [
+              {
+                "id": "f0cc0909-d278-59b5-a21c-69e031265796",
+                "kind": "reply",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": [
+                    0
+                  ]
+                },
+                "outcome": "rejected"
+              }
+            ]
+          }
+        ],
+        "responseBindings": []
+      }
+    },
+    {
+      "id": "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
+      "label": "Fulfillment queue",
+      "description": "Planning fixture",
+      "visualKind": "queue",
+      "ports": [
+        {
+          "id": "9a330342-2b13-565e-9645-5f043d0cb13a",
+          "label": "in",
+          "direction": "in",
+          "channel": "message",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": null
+        },
+        {
+          "id": "cb425f4f-9587-5934-a05e-d7c48eb1f53b",
+          "label": "consumer",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": "200e9451-f192-5712-a601-8460cfebcd4c"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "broker",
+          "capacity": 100,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0,
+          "delivery": "competing"
+        },
+        "entryPortId": "9a330342-2b13-565e-9645-5f043d0cb13a"
+      }
+    },
+    {
+      "id": "b870e6ff-5835-5cdc-80b9-9f9e159c8a55",
+      "label": "Fulfillment worker",
+      "description": "Planning fixture",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "7224644f-57c5-52bb-8261-030bf5e5d42f",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+          "responseSchemaId": "200e9451-f192-5712-a601-8460cfebcd4c"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "type": "processor",
+          "capacity": 10,
+          "concurrency": 1,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 0
+        },
+        "entryPortId": "7224644f-57c5-52bb-8261-030bf5e5d42f"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "cd1e0433-ba8e-5de6-89c2-408744b1bffc",
+      "label": "entry to validate",
+      "kind": "data",
+      "source": {
+        "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+        "portId": "a1ef30fa-4fdf-57be-8dd7-27463d2d010a"
+      },
+      "target": {
+        "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+        "portId": "21eb170d-d27f-5cde-bacb-0e11d73a708e"
+      },
+      "config": {}
+    },
+    {
+      "id": "d2930d72-096a-5ee5-8814-ab18b904be10",
+      "label": "valid to payment",
+      "kind": "data",
+      "source": {
+        "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+        "portId": "dff73f26-cc2a-5170-83a9-aa792a8bd5d9"
+      },
+      "target": {
+        "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+        "portId": "6c85cddf-9e30-5fe8-9eda-b63048bacb1f"
+      },
+      "config": {}
+    },
+    {
+      "id": "22cc9929-5655-58fa-a2ad-44ca80cb9172",
+      "label": "allow to reply",
+      "kind": "data",
+      "source": {
+        "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+        "portId": "d8cb2423-3d54-505e-9686-2a3c87e5cdac"
+      },
+      "target": {
+        "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+        "portId": "a3c93e84-7de4-5bb0-824c-b42de4f8bde6"
+      },
+      "config": {}
+    },
+    {
+      "id": "5602258b-bb1f-55cb-8f0d-56eaea5cbbb5",
+      "label": "deny to reply",
+      "kind": "data",
+      "source": {
+        "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+        "portId": "88c491a6-44e5-510e-b369-8ffc45019bdf"
+      },
+      "target": {
+        "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+        "portId": "faab75a0-0943-55a0-9802-ee3514d1f16e"
+      },
+      "config": {}
+    },
+    {
+      "id": "69ad37df-b5ec-5301-8624-6063b4386686",
+      "label": "invalid to reply",
+      "kind": "data",
+      "source": {
+        "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+        "portId": "3be2c3ca-2140-5259-adcb-f1c52a51f396"
+      },
+      "target": {
+        "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+        "portId": "549fb98d-df0c-5585-ba22-9bce8e1d5c91"
+      },
+      "config": {}
+    },
+    {
+      "id": "4682d3b1-50f5-5bd3-b36a-7ec0aac12a24",
+      "label": "publish fulfillment",
+      "kind": "message",
+      "source": {
+        "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+        "portId": "abd1f12f-1dd9-5d1c-97a7-71492aa431f7"
+      },
+      "target": {
+        "elementId": "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
+        "portId": "9a330342-2b13-565e-9645-5f043d0cb13a"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "7480821d-f678-5d62-8290-e986ccffa5df",
+          "operation": "read",
+          "key": null,
+          "tags": [
+            "order"
+          ],
+          "deadlineDurationMs": 9000
+        },
+        "ackDelayMs": 0,
+        "messageTtlMs": 10000
+      }
+    },
+    {
+      "id": "f32c3f55-a5d7-50d1-8e16-407f5defa777",
+      "label": "queue to worker",
+      "kind": "call",
+      "source": {
+        "elementId": "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
+        "portId": "cb425f4f-9587-5934-a05e-d7c48eb1f53b"
+      },
+      "target": {
+        "elementId": "b870e6ff-5835-5cdc-80b9-9f9e159c8a55",
+        "portId": "7224644f-57c5-52bb-8261-030bf5e5d42f"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "returnLatencyMs": 0
+      }
+    }
+  ],
+  "relations": [],
+  "schemas": [
+    {
+      "id": "200e9451-f192-5712-a601-8460cfebcd4c",
+      "label": "Order",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "requestId",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "c29d6bf2-4441-5057-bd3f-d8014f105f7c"
+          },
+          {
+            "key": "payment",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "d2c0a658-45f2-5839-b12c-c33c0da5466f"
+          },
+          {
+            "key": "items",
+            "optional": false,
+            "shape": {
+              "type": "list",
+              "nullable": false,
+              "items": {
+                "type": "record",
+                "nullable": false,
+                "fields": [
+                  {
+                    "key": "sku",
+                    "optional": false,
+                    "shape": {
+                      "type": "string",
+                      "nullable": false
+                    },
+                    "id": "07ceab95-2955-5565-83db-09f3334f55de"
+                  },
+                  {
+                    "key": "quantity",
+                    "optional": false,
+                    "shape": {
+                      "type": "integer",
+                      "nullable": false
+                    },
+                    "id": "19b80052-18b9-5585-8bb9-ef2a1c09d91f"
+                  }
+                ]
+              },
+              "maxItems": 100
+            },
+            "id": "62d78109-d545-5d60-b7d1-ced12d84ad83"
+          }
+        ]
+      }
+    },
+    {
+      "id": "4e29c2e8-0a83-5dec-8a5c-ee82f99e9ba8",
+      "label": "Orders",
+      "shape": {
+        "type": "list",
+        "nullable": false,
+        "items": {
+          "type": "record",
+          "nullable": false,
+          "fields": [
+            {
+              "key": "requestId",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "eb1cae1f-001c-5eb4-b5dc-4a973a40ff2a"
+            },
+            {
+              "key": "payment",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "43b51ae1-8c32-5af1-92f9-7f1deeaedc1c"
+            },
+            {
+              "key": "items",
+              "optional": false,
+              "shape": {
+                "type": "list",
+                "nullable": false,
+                "items": {
+                  "type": "record",
+                  "nullable": false,
+                  "fields": [
+                    {
+                      "key": "sku",
+                      "optional": false,
+                      "shape": {
+                        "type": "string",
+                        "nullable": false
+                      },
+                      "id": "39d4642a-b974-54ae-a746-a71ea19481ef"
+                    },
+                    {
+                      "key": "quantity",
+                      "optional": false,
+                      "shape": {
+                        "type": "integer",
+                        "nullable": false
+                      },
+                      "id": "27bdb0f6-0869-56f4-9849-3f98f773e04b"
+                    }
+                  ]
+                },
+                "maxItems": 100
+              },
+              "id": "3a4a31bd-dc56-5954-b469-f84c53310d87"
+            }
+          ]
+        },
+        "maxItems": 100
+      }
+    },
+    {
+      "id": "9f68e007-1b30-5bf5-a867-009f2a95b500",
+      "label": "Empty",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "0057fefd-e62d-575d-9a13-aaf042207e04",
+      "schemaId": "9f68e007-1b30-5bf5-a867-009f2a95b500",
+      "value": {}
+    },
+    {
+      "id": "48fd51d6-d903-5034-af9a-c0c20609be05",
+      "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+      "value": {
+        "requestId": "fixture-order",
+        "payment": "allow",
+        "items": [
+          {
+            "sku": "A",
+            "quantity": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "6d9d9b86-7dfd-5338-81af-01359ec58db2",
+      "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
+      "value": {
+        "requestId": "fixture-order",
+        "payment": "deny",
+        "items": [
+          {
+            "sku": "A",
+            "quantity": 1
+          }
+        ]
+      }
+    }
+  ],
+  "refinements": [],
+  "scenarios": [
+    {
+      "id": "5bf95962-e1aa-5df7-8dd2-5784bbad14c8",
+      "label": "allow",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+        "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+        "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+        "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+        "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
+        "b870e6ff-5835-5cdc-80b9-9f9e159c8a55"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+          "portId": "02848995-4504-5ae5-b0f2-9cfa8a4f2489"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "db6f8bcc-a3db-519d-857e-386209bc72f0",
+          "entry": {
+            "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+            "portId": "02848995-4504-5ae5-b0f2-9cfa8a4f2489"
+          },
+          "fixtureId": "48fd51d6-d903-5034-af9a-c0c20609be05",
+          "journeyId": "51b7c066-b692-50df-84a9-2564c931e319",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "532a82b1-ed0f-512f-9377-9a6f5307053f",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "93191d94-f07d-5981-8d93-ec1999a5e9fa",
+          "label": "root/rejected",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "ce380b1d-7198-5dc6-8959-5069ddadf940",
+          "label": "message/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "e951f4d2-f105-5b15-a2a1-e45f014bed8c",
+          "label": "message/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "60fadbb6-5016-5729-99f0-b6ff9faf8d42",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    },
+    {
+      "id": "498f913f-5159-594e-9257-823735e6d2d1",
+      "label": "deny",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+        "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+        "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+        "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+        "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
+        "b870e6ff-5835-5cdc-80b9-9f9e159c8a55"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+          "portId": "02848995-4504-5ae5-b0f2-9cfa8a4f2489"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "e267b6ac-7aee-5ec5-a30e-ae9b985b2bd1",
+          "entry": {
+            "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+            "portId": "02848995-4504-5ae5-b0f2-9cfa8a4f2489"
+          },
+          "fixtureId": "6d9d9b86-7dfd-5338-81af-01359ec58db2",
+          "journeyId": "0cb44833-9624-5a53-8e44-233cb548b0b4",
+          "atMs": 0,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "4b8ceaac-6cfa-5e9f-b7bc-1b3977d4190f",
+          "label": "root/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "b5cf5229-1c3f-5dbd-9b46-2f897b7164e3",
+          "label": "root/rejected",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "77f66205-fb34-5aa7-aea6-82cb4947655b",
+          "label": "message/generated",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "generated"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "0890bce3-2994-5867-b257-406b49e68dd7",
+          "label": "message/succeeded",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "succeeded"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "beaea947-7c62-5f44-af13-ae872d3d48f3",
+          "label": "root/inFlight",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 6000,
+        "deadlineMs": 10000
+      },
+      "assumptions": []
+    }
+  ],
+  "views": [
+    {
+      "id": "9e32f038-7e07-5282-acf5-69d5ac269cb3",
+      "label": "Overview",
+      "placements": [
+        {
+          "id": "83eb5ece-fd1c-5f34-89a2-50fa9d66dadf",
+          "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
+          "x": 0,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "235f895e-a968-5f78-84ba-43c2b806617d",
+          "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
+          "x": 240,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "839bb99a-50f4-5e7a-8fd6-1af588a243d8",
+          "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
+          "x": 480,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "ecdc6915-9237-5207-8571-6b8d560e1b04",
+          "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
+          "x": 720,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "55c4aef6-8bb4-58ef-a6d4-1df289b41cf8",
+          "elementId": "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
+          "x": 0,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "18ecabe9-d568-5349-9380-86dc800365ba",
+          "elementId": "b870e6ff-5835-5cdc-80b9-9f9e159c8a55",
+          "x": 240,
+          "y": 160,
+          "width": 180,
+          "expanded": false
+        }
+      ],
+      "connectionIds": [
+        "cd1e0433-ba8e-5de6-89c2-408744b1bffc",
+        "d2930d72-096a-5ee5-8814-ab18b904be10",
+        "22cc9929-5655-58fa-a2ad-44ca80cb9172",
+        "5602258b-bb1f-55cb-8f0d-56eaea5cbbb5",
+        "69ad37df-b5ec-5301-8624-6063b4386686",
+        "4682d3b1-50f5-5bd3-b36a-7ec0aac12a24",
+        "f32c3f55-a5d7-50d1-8e16-407f5defa777"
+      ],
+      "relationIds": [],
+      "groups": [],
+      "notes": []
+    }
+  ]
+}

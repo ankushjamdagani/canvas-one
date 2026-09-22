@@ -2,6 +2,8 @@
 
 Status: proposed contract for Claude review, 2026-09-22. Planning only. Foundation uses existing Radix/shadcn compositions; placement and draft reducers are domain-specific pure functions, not new overlay primitives.
 
+The [closed command inventory](command-inventory.md) supplies exact payloads, envelopes and result unions for every registry action, including required conflict-resolution/model-edit/floating-position plumbing. Its explicit payload definitions take precedence over shorthand in the overview table below.
+
 ## Command registry and availability
 
 Each entry is `{id,label,keywords,group,iconKey,shortcut:null|Shortcut,availability(context),execute(payload)}`. Stable IDs below, no menu-local alternative handler. Availability returns `{enabled:true}` or `{enabled:false,reason,code}`. Context is readonly selection/project/branch/revision/run/draft/storage state, no DOM inspection. Disabled commands display their reason; unsupported future features are absent, not fake enabled buttons.

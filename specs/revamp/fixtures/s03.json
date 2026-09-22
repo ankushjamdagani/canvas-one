@@ -1,0 +1,353 @@
+{
+  "schema": "studio-model/1",
+  "id": "fa28668c-18e3-5d37-95df-88cc45504fcd",
+  "title": "S03 Records pipeline",
+  "elements": [
+    {
+      "id": "cb57f38f-1332-592b-b419-27c075b8a5ea",
+      "label": "Normalize orders",
+      "description": "Planning fixture",
+      "visualKind": "data-pipeline",
+      "ports": [
+        {
+          "id": "6328f951-90ba-5cc6-831d-a6ce54bad789",
+          "label": "rows",
+          "direction": "in",
+          "channel": "data",
+          "schemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
+          "responseSchemaId": null
+        },
+        {
+          "id": "7ec363bd-a50b-5053-abc2-c235d2259b6e",
+          "label": "totals",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "8ed8a998-9d53-58cc-9e83-0dc7dab72e08",
+          "responseSchemaId": null
+        },
+        {
+          "id": "a54a537c-2e14-5991-8f23-ba21f779f571",
+          "label": "errors",
+          "direction": "out",
+          "channel": "data",
+          "schemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "pipeline",
+        "version": 1,
+        "inputSchemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
+        "outputSchemaId": "8ed8a998-9d53-58cc-9e83-0dc7dab72e08",
+        "errorSchemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
+        "inputPortId": "6328f951-90ba-5cc6-831d-a6ce54bad789",
+        "outputPortId": "7ec363bd-a50b-5053-abc2-c235d2259b6e",
+        "errorPortId": "a54a537c-2e14-5991-8f23-ba21f779f571",
+        "operations": [
+          {
+            "id": "6227a7bc-b376-5899-a2b7-5a789c0ec903",
+            "kind": "validate",
+            "schemaId": "1bd74ce9-d2b7-5971-a0ed-6a782edb8237"
+          },
+          {
+            "id": "e89f5179-72ad-538e-acca-79e04aa57870",
+            "kind": "trim",
+            "path": [
+              "region"
+            ]
+          },
+          {
+            "id": "f35966cf-fc0b-5ed3-a4d0-84ef4ff78242",
+            "kind": "deduplicate",
+            "path": [
+              "orderId"
+            ]
+          },
+          {
+            "id": "3a9709e1-7d87-593f-9771-f6481cd41fdb",
+            "kind": "group-sum",
+            "keyPath": [
+              "region"
+            ],
+            "valuePath": [
+              "amountMinor"
+            ],
+            "keyName": "region",
+            "sumName": "amountMinor"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": [],
+  "relations": [],
+  "schemas": [
+    {
+      "id": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
+      "label": "External rows",
+      "shape": {
+        "type": "list",
+        "nullable": false,
+        "items": {
+          "type": "record",
+          "nullable": false,
+          "fields": [
+            {
+              "key": "orderId",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "62a073e1-ee46-55c2-80ce-d0bcdb74bb37"
+            },
+            {
+              "key": "region",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "4bed8b09-61a8-5b1f-bd17-c8876d2b45b2"
+            },
+            {
+              "key": "amountMinor",
+              "optional": false,
+              "shape": {
+                "type": "scalar-union",
+                "nullable": false,
+                "types": [
+                  "integer",
+                  "string"
+                ]
+              },
+              "id": "c757470d-0099-50ad-b61d-c058b7cc9edc"
+            }
+          ]
+        },
+        "maxItems": 100
+      }
+    },
+    {
+      "id": "1bd74ce9-d2b7-5971-a0ed-6a782edb8237",
+      "label": "Validated row",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "orderId",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "8921a48d-e293-5b29-b8bc-9711b1a3c701"
+          },
+          {
+            "key": "region",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "2734949a-39ca-53b7-b3a1-ba8becd48a59"
+          },
+          {
+            "key": "amountMinor",
+            "optional": false,
+            "shape": {
+              "type": "integer",
+              "nullable": false
+            },
+            "id": "9dce23c1-3d24-51e5-a183-bfb70c835737"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8ed8a998-9d53-58cc-9e83-0dc7dab72e08",
+      "label": "Totals",
+      "shape": {
+        "type": "list",
+        "nullable": false,
+        "items": {
+          "type": "record",
+          "nullable": false,
+          "fields": [
+            {
+              "key": "region",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "3bb42347-3687-51b4-bb81-6b443ffa6406"
+            },
+            {
+              "key": "amountMinor",
+              "optional": false,
+              "shape": {
+                "type": "integer",
+                "nullable": false
+              },
+              "id": "e55d57ed-a78a-5bfe-b183-81b8bda13b23"
+            }
+          ]
+        },
+        "maxItems": 100
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "1bfed4ff-e129-5439-8e93-268c06557971",
+      "schemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
+      "value": [
+        {
+          "orderId": "a",
+          "region": " EU ",
+          "amountMinor": 1000
+        },
+        {
+          "orderId": "a",
+          "region": "EU",
+          "amountMinor": 1000
+        },
+        {
+          "orderId": "b",
+          "region": "US",
+          "amountMinor": 2500
+        },
+        {
+          "orderId": "c",
+          "region": "EU",
+          "amountMinor": "bad"
+        },
+        {
+          "orderId": "d",
+          "region": "EU",
+          "amountMinor": 500
+        }
+      ]
+    }
+  ],
+  "refinements": [],
+  "scenarios": [
+    {
+      "id": "bb435997-4baa-54f4-bb02-f7c72b67af19",
+      "label": "Normalize and aggregate",
+      "revision": 0,
+      "mode": "logical",
+      "scopeElementIds": [
+        "cb57f38f-1332-592b-b419-27c075b8a5ea"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "cb57f38f-1332-592b-b419-27c075b8a5ea",
+          "portId": "6328f951-90ba-5cc6-831d-a6ce54bad789"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "85adf6e7-0c16-50eb-be06-905cc2c4a71c",
+          "entry": {
+            "elementId": "cb57f38f-1332-592b-b419-27c075b8a5ea",
+            "portId": "6328f951-90ba-5cc6-831d-a6ce54bad789"
+          },
+          "fixtureId": "1bfed4ff-e129-5439-8e93-268c06557971",
+          "journeyId": "5b607aa3-c6b2-552e-ba86-7d448406fbc0",
+          "atMs": null,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "ffbaee32-84f8-5702-988d-661a74529f6b",
+          "label": "totals",
+          "subject": {
+            "kind": "output",
+            "port": {
+              "elementId": "cb57f38f-1332-592b-b419-27c075b8a5ea",
+              "portId": "7ec363bd-a50b-5053-abc2-c235d2259b6e"
+            },
+            "path": []
+          },
+          "operator": "equals",
+          "expected": [
+            [
+              {
+                "region": "EU",
+                "amountMinor": 1500
+              },
+              {
+                "region": "US",
+                "amountMinor": 2500
+              }
+            ]
+          ]
+        },
+        {
+          "id": "27889edb-5e1e-5554-8048-98c218335073",
+          "label": "errors",
+          "subject": {
+            "kind": "output",
+            "port": {
+              "elementId": "cb57f38f-1332-592b-b419-27c075b8a5ea",
+              "portId": "a54a537c-2e14-5991-8f23-ba21f779f571"
+            },
+            "path": []
+          },
+          "operator": "equals",
+          "expected": [
+            [
+              {
+                "orderId": "c",
+                "region": "EU",
+                "amountMinor": "bad"
+              }
+            ]
+          ]
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "quiescent"
+      },
+      "assumptions": []
+    }
+  ],
+  "views": [
+    {
+      "id": "9b5c7216-d238-5b30-a03e-d38e93484f8d",
+      "label": "Overview",
+      "placements": [
+        {
+          "id": "e1833d22-0346-586a-8e05-8ecda0a5ac75",
+          "elementId": "cb57f38f-1332-592b-b419-27c075b8a5ea",
+          "x": 0,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        }
+      ],
+      "connectionIds": [],
+      "relationIds": [],
+      "groups": [],
+      "notes": []
+    }
+  ]
+}

@@ -6,14 +6,14 @@ GLOBAL IMPLEMENTATION HOLD — user instruction 2026-09-22. All implementation t
 
 | ID | Status | Owner | Blocking condition / next action |
 |---|---|---|---|
-| PLAN | REVIEW | Codex | Schema/storage/UI/export/delegation findings have targeted Claude closure PASS. Consolidated schema/command inventory and concrete fixture sizing remain RV-02 gates; see contract disposition. User implementation hold remains. |
+| PLAN | REVIEW | Codex | All RV-02 contracts, command inventory, publication metadata, S01–S04 fixtures and sizing have targeted PASS. Only gate left: independent closure of the 2026-09-23 S05 contract corrections. See contract disposition. User implementation hold remains. |
 | ARCH-01 | ACCEPTED | Codex planning / Claude review | High-level architecture baseline passed P2/P4. This does not freeze detailed schemas or authorize implementation. |
 | RV-00 | ACCEPTED | Claude CLI; Codex coordinator | P1/P2/P3 reconciled; P4 passed baseline 6824bae. Remaining package-specific contracts and visual implementation checks are explicit gates. |
 | EXEC-PREFLIGHT | BLOCKED | Codex coordinator / Gemini acknowledgement / Claude evidence review | User hold; task-scoped read/ownership/permission and interruption rehearsal required before any implementation enters IN_PROGRESS. Prior headless permission denial is not clearance. |
 | RV-01 | BLOCKED | Unclaimed; Gemini intended | RV-00 accepted; freeze exact foundation files |
 | RV-01a | BLOCKED | Unclaimed; prior Gemini attempt stopped | User implementation hold. No app edits occurred; clean isolated worktree at /tmp/system-studio-foundation-a. Prior review clearance is not execution permission. |
 | RV-02 | BLOCKED | Codex planning / Claude review | RV-00 findings; execution/current-schema contracts and R15 extension seams; no AI implementation |
-| RV-02d/e/f/g planning | REVIEW | Codex authors / Claude reviews | Detailed drafts and named findings reviewed; final freeze requires schema consolidation, S01–S05 serialized fixtures and measured size headroom. No application writes authorized. |
+| RV-02d/e/f/g planning | REVIEW | Codex authors / Claude reviews | Schema consolidation, S01–S05 fixtures and size measurement done. Final freeze waits only on S05 closure (bridge call frames, transport-only payload echo). No application writes authorized. |
 | RV-03 | BLOCKED | Unclaimed | RV-01/02 accepted |
 | RV-04 | BLOCKED | Unclaimed | RV-01/02 accepted |
 | RV-05 | BLOCKED | Unclaimed | RV-01/02; atomic editor API contract |

@@ -1,0 +1,21 @@
+# RV-02e — Publication metadata and portable record closure
+
+Planning contract, 2026-09-22. Implements the existing local-publish default in decisions.md. No remote publishing, accounts or automatic version inference.
+
+`PublicationMetadata={version:{major:number,minor:number,patch:number},title:string,rationale:string,ticketUrl:string|null}`. Version components are safe integers 0–999999; title is trimmed 1–80 code points, rationale 0–4000. Ticket URL is null or an absolute http/https URL <=2048 characters, with no username/password; opening it is an explicit external-link action. Author uses Actor from the command envelope; optional display name never changes actor identity or implies authentication.
+
+First proposal defaults to 0.1.0. Subsequent proposal offers major/minor/patch bump of the latest published version, with explicit preview and manual entry. Major resets minor/patch to zero; minor resets patch; patch increments patch. Overflow disables that suggestion. User must choose/confirm the displayed version; graph shape never determines it. No prerelease/build metadata in v1. Display `vM.m.p`; canonical versionKey is `M.m.p` without leading zeros.
+
+Versions strictly increase lexicographically by numeric components compared to the latest publication ordinal. Enforce uniqueness of `[projectId+versionKey]` in the same transaction as ordinal/head updates; concurrent attempts reject stale or duplicate version, never silently bump. Import validates ascending ordinal/version order and uniqueness. A reopened source branch can publish only a new higher version. No reuse, editing or deletion of an individual published version.
+
+Duplicate version returns failed/duplicate-version; a lower nonduplicate version is invalid with issue path metadata.version. Numeric version suggestions are drafts until explicit publication succeeds.
+
+Publication row adds `metadata:PublicationMetadata,versionKey:string` to the storage table. versionKey is derived and validated against metadata, not a second editable field. Message on the merge commit is the publication title; rationale/ticket remain publication metadata. Metadata is included in authored-history export and operation request hashing, excluded from executable scenario fingerprints. Updating a draft title/rationale/version before publish does not require rerunning unchanged executable content; published metadata is immutable. Local timestamps are display data only.
+
+Project row adds `revision:Revision` for project-level CAS. Table record keys are required fields: portable branch/commit/publication/checkpoint/run/part records include id (and part revision); snapshot records include their content-hash id. ProjectBundle arrays omit repeated projectId because the enclosing project owns their namespace; import supplies projectId on insertion. ProjectBundle additionally includes `createdAt,updatedAt`; project revision/importSourceId are device-local and reset on import (revision=0, importSourceId=source bundle id). All portable run traceState values are `not-saved` because chunks are excluded; conversion never alters checks/status/summary/manifest.
+
+The initial snapshot is the project's actual creation content (blank or selected template), not necessarily an empty document. It remains immutable and pinned. Initial main/draft share it; imports preserve their declared initialSnapshotId. An unborn branch's ancestry is that creation snapshot. A fork from an existing head keeps the head even when copying its uncommitted working snapshot.
+
+Portable records preserve actor metadata, authoring timestamps and immutable history. Imports do not preserve local trust, revision counters, operation receipts or session handles. Those transformations occur only in repository fields; authored Document bytes and snapshot IDs stay unchanged. Projects always export from one consistent readonly transaction; precomputed bytes correspond to that captured revision.
+
+Acceptance: version collisions and concurrent publish; 0.1.0 initial proposal; manual numeric version ordering (0.10.0 > 0.9.9); overflow; hostile URL schemes; absent author display; metadata-only edits reuse executable evidence; import/export record-key/reference inventory; immutable publication; project create/import retry identity and project/branch CAS races.

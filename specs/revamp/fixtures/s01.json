@@ -1,0 +1,1347 @@
+{
+  "schema": "studio-model/1",
+  "id": "cf7f8bd2-4259-561e-96a7-584c02518fcd",
+  "title": "S01 Checkout",
+  "elements": [
+    {
+      "id": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+      "label": "Checkout",
+      "description": "Planning fixture",
+      "visualKind": "state-machine",
+      "ports": [
+        {
+          "id": "4e8c654e-de2c-5b20-a1f0-981f89e69656",
+          "label": "submit",
+          "direction": "in",
+          "channel": "event",
+          "schemaId": "f512c088-8004-5e1f-a92c-b365adc73111",
+          "responseSchemaId": null
+        },
+        {
+          "id": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+          "label": "response",
+          "direction": "in",
+          "channel": "event",
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responseSchemaId": null
+        },
+        {
+          "id": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07",
+          "label": "timeout",
+          "direction": "in",
+          "channel": "event",
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responseSchemaId": null
+        },
+        {
+          "id": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e",
+          "label": "create order",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responseSchemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995"
+        }
+      ],
+      "behavior": {
+        "kind": "machine",
+        "version": 1,
+        "states": [
+          {
+            "id": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "label": "editing"
+          },
+          {
+            "id": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "label": "submitting"
+          },
+          {
+            "id": "47d8e10f-7c32-5ca4-b0e3-6493394efe86",
+            "label": "succeeded"
+          },
+          {
+            "id": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "label": "failed"
+          }
+        ],
+        "initialStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+        "contextSchemaId": "da56f5bb-3c53-5175-96e4-80716a570d59",
+        "initialContextFixtureId": "373ead21-5625-5b53-a21f-d2e21789c9db",
+        "transitions": [
+          {
+            "id": "f34e9d62-98fb-5ebe-b690-fadf5c7a453a",
+            "fromStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "eventPortId": "4e8c654e-de2c-5b20-a1f0-981f89e69656",
+            "guard": {
+              "op": "all",
+              "guards": [
+                {
+                  "op": "nonEmpty",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  }
+                },
+                {
+                  "op": "every",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "itemGuard": {
+                    "op": "positiveInteger",
+                    "value": {
+                      "kind": "read",
+                      "source": "input",
+                      "path": [
+                        "quantity"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "toStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "effects": [
+              {
+                "id": "f7b24fa0-847b-537f-8f8e-966b7be7194c",
+                "kind": "request-id",
+                "path": [
+                  "active"
+                ]
+              },
+              {
+                "id": "8e4224bd-62a4-56e2-8bd1-ec4e6889ecf9",
+                "kind": "emit",
+                "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e",
+                "value": {
+                  "kind": "record",
+                  "fields": [
+                    {
+                      "key": "requestId",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "active"
+                        ]
+                      }
+                    },
+                    {
+                      "key": "payment",
+                      "value": {
+                        "kind": "literal",
+                        "value": "allow"
+                      }
+                    },
+                    {
+                      "key": "items",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "items"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "correlation": {
+                  "kind": "context-request",
+                  "path": [
+                    "active"
+                  ]
+                }
+              },
+              {
+                "id": "54881eef-22cb-531f-aa3d-baf4d4dfb900",
+                "kind": "trace",
+                "code": "order-command"
+              }
+            ]
+          },
+          {
+            "id": "4cc74793-d095-53b5-8f55-61f883ebc2ae",
+            "fromStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "eventPortId": "4e8c654e-de2c-5b20-a1f0-981f89e69656",
+            "guard": null,
+            "toStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "effects": [
+              {
+                "id": "698fb6e0-c2b0-518f-8ffe-0bbdb07decde",
+                "kind": "trace",
+                "code": "invalid-cart"
+              }
+            ]
+          },
+          {
+            "id": "bf5f3e13-4ae0-5c73-8ddc-6fe7ee444134",
+            "fromStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "eventPortId": "4e8c654e-de2c-5b20-a1f0-981f89e69656",
+            "guard": {
+              "op": "all",
+              "guards": [
+                {
+                  "op": "nonEmpty",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  }
+                },
+                {
+                  "op": "every",
+                  "value": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "items"
+                    ]
+                  },
+                  "itemGuard": {
+                    "op": "positiveInteger",
+                    "value": {
+                      "kind": "read",
+                      "source": "input",
+                      "path": [
+                        "quantity"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "toStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "effects": [
+              {
+                "id": "40a6f851-cec4-5158-b55e-b3f8c68fd0b0",
+                "kind": "request-id",
+                "path": [
+                  "active"
+                ]
+              },
+              {
+                "id": "2058e6bf-b4d0-508e-9bc0-bc7aa716463a",
+                "kind": "emit",
+                "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e",
+                "value": {
+                  "kind": "record",
+                  "fields": [
+                    {
+                      "key": "requestId",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "active"
+                        ]
+                      }
+                    },
+                    {
+                      "key": "payment",
+                      "value": {
+                        "kind": "literal",
+                        "value": "allow"
+                      }
+                    },
+                    {
+                      "key": "items",
+                      "value": {
+                        "kind": "read",
+                        "source": "context",
+                        "path": [
+                          "items"
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "correlation": {
+                  "kind": "context-request",
+                  "path": [
+                    "active"
+                  ]
+                }
+              },
+              {
+                "id": "0a3e38fb-e2e2-5db3-b56e-5a1ebcc1cbdf",
+                "kind": "trace",
+                "code": "order-command"
+              }
+            ]
+          },
+          {
+            "id": "2cde9827-37a3-57c7-b9e5-00f9d17556c1",
+            "fromStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "eventPortId": "4e8c654e-de2c-5b20-a1f0-981f89e69656",
+            "guard": null,
+            "toStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "effects": [
+              {
+                "id": "bea25b31-d580-5334-8582-3e74be9a2c82",
+                "kind": "trace",
+                "code": "invalid-cart"
+              }
+            ]
+          },
+          {
+            "id": "01bfafbb-1846-5170-8fbc-2de93c850ae5",
+            "fromStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "eventPortId": "4e8c654e-de2c-5b20-a1f0-981f89e69656",
+            "guard": null,
+            "toStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "effects": [
+              {
+                "id": "eb530c77-1ce3-51c5-915b-8328c26a0047",
+                "kind": "trace",
+                "code": "ignored-duplicate"
+              }
+            ]
+          },
+          {
+            "id": "89788184-aa8d-580f-89ea-d0d7a0f327a5",
+            "fromStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+            "guard": {
+              "op": "all",
+              "guards": [
+                {
+                  "op": "equals",
+                  "left": {
+                    "kind": "read",
+                    "source": "input",
+                    "path": [
+                      "requestId"
+                    ]
+                  },
+                  "right": {
+                    "kind": "read",
+                    "source": "context",
+                    "path": [
+                      "active"
+                    ]
+                  }
+                },
+                {
+                  "op": "equals",
+                  "left": {
+                    "kind": "outcome"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": "succeeded"
+                  }
+                }
+              ]
+            },
+            "toStateId": "47d8e10f-7c32-5ca4-b0e3-6493394efe86",
+            "effects": [
+              {
+                "id": "ed617fe7-5cbb-5ee7-babd-cc147b5cf4cc",
+                "kind": "assign",
+                "path": [
+                  "active"
+                ],
+                "value": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              {
+                "id": "f520e637-8053-578e-a29d-5dfe9877d0a6",
+                "kind": "trace",
+                "code": "ui-success"
+              }
+            ]
+          },
+          {
+            "id": "85f825e5-81c6-536b-9801-ffc5b0d1cf4c",
+            "fromStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+            "guard": {
+              "op": "equals",
+              "left": {
+                "kind": "read",
+                "source": "input",
+                "path": [
+                  "requestId"
+                ]
+              },
+              "right": {
+                "kind": "read",
+                "source": "context",
+                "path": [
+                  "active"
+                ]
+              }
+            },
+            "toStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "effects": [
+              {
+                "id": "fdae8458-b098-5fc5-9885-f8f61f67dc88",
+                "kind": "assign",
+                "path": [
+                  "active"
+                ],
+                "value": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              {
+                "id": "08fb54a1-8241-58a3-9580-4e6e121734cd",
+                "kind": "trace",
+                "code": "ui-failed"
+              }
+            ]
+          },
+          {
+            "id": "45e8cb65-ce73-5f14-95b4-f6c38dcdd829",
+            "fromStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "eventPortId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07",
+            "guard": {
+              "op": "equals",
+              "left": {
+                "kind": "read",
+                "source": "input",
+                "path": [
+                  "requestId"
+                ]
+              },
+              "right": {
+                "kind": "read",
+                "source": "context",
+                "path": [
+                  "active"
+                ]
+              }
+            },
+            "toStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "effects": [
+              {
+                "id": "1c9dad52-c31f-52e4-bff7-ed1d6a4c9dee",
+                "kind": "assign",
+                "path": [
+                  "active"
+                ],
+                "value": {
+                  "kind": "literal",
+                  "value": null
+                }
+              },
+              {
+                "id": "4edc9213-d67c-58c3-a511-4f8ed1795510",
+                "kind": "trace",
+                "code": "ui-timeout"
+              }
+            ]
+          },
+          {
+            "id": "021f2bdd-88eb-5a5e-a619-c6f8f5a6a2a0",
+            "fromStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+            "guard": null,
+            "toStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "effects": [
+              {
+                "id": "5088a82a-388f-5347-bbef-b945cb0e87be",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "5517efa2-e257-5a4c-a49c-e4470c38e65c",
+            "fromStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "eventPortId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07",
+            "guard": null,
+            "toStateId": "fbab72a9-a716-5746-a644-cb97080902e1",
+            "effects": [
+              {
+                "id": "ad5f3e71-09a8-5d12-b4bf-d016f164d7f9",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "de1a5d42-e2ab-5824-b002-ecee95dc4998",
+            "fromStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+            "guard": null,
+            "toStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "effects": [
+              {
+                "id": "f496467e-49bb-52f2-a987-937d5135d44b",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "0acd8ae9-9354-574b-a662-1167aeaac142",
+            "fromStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "eventPortId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07",
+            "guard": null,
+            "toStateId": "7f6df6da-1540-557b-b7e4-92bf62560fa3",
+            "effects": [
+              {
+                "id": "3f526b6c-9af2-5cd3-9144-eeb336cfaf95",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "9ae2e3cc-1944-5338-93be-f788e46e1d50",
+            "fromStateId": "47d8e10f-7c32-5ca4-b0e3-6493394efe86",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+            "guard": null,
+            "toStateId": "47d8e10f-7c32-5ca4-b0e3-6493394efe86",
+            "effects": [
+              {
+                "id": "26e18644-e07f-52a0-a835-c2bb04075f23",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "3bcff97e-cb45-56e3-8c59-a89438395ec6",
+            "fromStateId": "47d8e10f-7c32-5ca4-b0e3-6493394efe86",
+            "eventPortId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07",
+            "guard": null,
+            "toStateId": "47d8e10f-7c32-5ca4-b0e3-6493394efe86",
+            "effects": [
+              {
+                "id": "01ea0fe3-7421-54ab-8b47-bc8edd404415",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "1d16081c-068c-5959-9724-b304a771a4c9",
+            "fromStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0",
+            "guard": null,
+            "toStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "effects": [
+              {
+                "id": "61a57ea1-fe06-55fb-ab27-ac507876eac3",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          },
+          {
+            "id": "56b7ba94-73c6-5338-904f-f4e4fd4ef08d",
+            "fromStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "eventPortId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07",
+            "guard": null,
+            "toStateId": "e7480ec3-6fa0-5f6e-9bd4-be93a6c48bd4",
+            "effects": [
+              {
+                "id": "a075a8ed-5c38-5a9a-83a1-a9092e40c270",
+                "kind": "trace",
+                "code": "stale-response"
+              }
+            ]
+          }
+        ],
+        "responseBindings": [
+          {
+            "id": "c9899f13-8c8e-516d-825b-9e7d6ef07472",
+            "callPortId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e",
+            "eventPortId": "9432636a-9d65-5ebf-afe6-7d1aa646c1b0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "454213fb-9b2e-51e9-ad52-02cd5767dd89",
+      "label": "Order boundary",
+      "description": "Planning fixture",
+      "visualKind": "thirdparty",
+      "ports": [
+        {
+          "id": "fe53ba67-b037-52bb-a8fe-24b782013d1a",
+          "label": "request",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responseSchemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995"
+        }
+      ],
+      "behavior": {
+        "kind": "unmodeled",
+        "version": 1,
+        "reason": "Explicit boundary"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "90c258a5-6003-5d54-8f25-d63df58bca7e",
+      "label": "mock request",
+      "kind": "call",
+      "source": {
+        "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+        "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e"
+      },
+      "target": {
+        "elementId": "454213fb-9b2e-51e9-ad52-02cd5767dd89",
+        "portId": "fe53ba67-b037-52bb-a8fe-24b782013d1a"
+      },
+      "config": {
+        "latencyMs": 0,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "returnLatencyMs": 0
+      }
+    }
+  ],
+  "relations": [],
+  "schemas": [
+    {
+      "id": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+      "label": "Order",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "requestId",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "8c27e4de-a9d5-527b-8cfc-e5b29ff9599a"
+          },
+          {
+            "key": "payment",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": false
+            },
+            "id": "a3a1bad9-f57c-54fd-ad9c-08a8f6ffde21"
+          },
+          {
+            "key": "items",
+            "optional": false,
+            "shape": {
+              "type": "list",
+              "nullable": false,
+              "items": {
+                "type": "record",
+                "nullable": false,
+                "fields": [
+                  {
+                    "key": "sku",
+                    "optional": false,
+                    "shape": {
+                      "type": "string",
+                      "nullable": false
+                    },
+                    "id": "27b7d76b-819e-5bdb-87a9-08db0b94d0f5"
+                  },
+                  {
+                    "key": "quantity",
+                    "optional": false,
+                    "shape": {
+                      "type": "integer",
+                      "nullable": false
+                    },
+                    "id": "c4513b0c-5169-5939-b33a-08034e565e9d"
+                  }
+                ]
+              },
+              "maxItems": 100
+            },
+            "id": "b24cda14-6bca-553e-8192-a3777f323ddd"
+          }
+        ]
+      }
+    },
+    {
+      "id": "3a49d706-b264-57c7-9b99-0750837d0a93",
+      "label": "Orders",
+      "shape": {
+        "type": "list",
+        "nullable": false,
+        "items": {
+          "type": "record",
+          "nullable": false,
+          "fields": [
+            {
+              "key": "requestId",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "dba7557f-06b7-5b14-8a55-f11b9363e162"
+            },
+            {
+              "key": "payment",
+              "optional": false,
+              "shape": {
+                "type": "string",
+                "nullable": false
+              },
+              "id": "1ef9b9d8-0a64-51af-93dd-41308765ef8c"
+            },
+            {
+              "key": "items",
+              "optional": false,
+              "shape": {
+                "type": "list",
+                "nullable": false,
+                "items": {
+                  "type": "record",
+                  "nullable": false,
+                  "fields": [
+                    {
+                      "key": "sku",
+                      "optional": false,
+                      "shape": {
+                        "type": "string",
+                        "nullable": false
+                      },
+                      "id": "c9eef665-f724-57e0-92fc-52ad9163a0d2"
+                    },
+                    {
+                      "key": "quantity",
+                      "optional": false,
+                      "shape": {
+                        "type": "integer",
+                        "nullable": false
+                      },
+                      "id": "b6175e9e-d332-57a4-bb3f-dc37e140c3a1"
+                    }
+                  ]
+                },
+                "maxItems": 100
+              },
+              "id": "f253565d-eee9-53a8-90a5-068258fa7ca6"
+            }
+          ]
+        },
+        "maxItems": 100
+      }
+    },
+    {
+      "id": "f512c088-8004-5e1f-a92c-b365adc73111",
+      "label": "Empty",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "da56f5bb-3c53-5175-96e4-80716a570d59",
+      "label": "Checkout context",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": [
+          {
+            "key": "items",
+            "optional": false,
+            "shape": {
+              "type": "list",
+              "nullable": false,
+              "items": {
+                "type": "record",
+                "nullable": false,
+                "fields": [
+                  {
+                    "key": "sku",
+                    "optional": false,
+                    "shape": {
+                      "type": "string",
+                      "nullable": false
+                    },
+                    "id": "9d903435-d287-5656-812e-5b4b3f94eac9"
+                  },
+                  {
+                    "key": "quantity",
+                    "optional": false,
+                    "shape": {
+                      "type": "integer",
+                      "nullable": false
+                    },
+                    "id": "58c85db8-1b1c-5045-ad9a-b693ff072798"
+                  }
+                ]
+              },
+              "maxItems": 100
+            },
+            "id": "869256b9-983f-5e08-8fba-d8f8b9e04e50"
+          },
+          {
+            "key": "active",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": true
+            },
+            "id": "38678057-e995-575b-b621-5f8c41d79819"
+          },
+          {
+            "key": "error",
+            "optional": false,
+            "shape": {
+              "type": "string",
+              "nullable": true
+            },
+            "id": "7b7b552d-90e1-56b1-8ebd-e50df3f7e984"
+          }
+        ]
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "373ead21-5625-5b53-a21f-d2e21789c9db",
+      "schemaId": "da56f5bb-3c53-5175-96e4-80716a570d59",
+      "value": {
+        "items": [
+          {
+            "sku": "A",
+            "quantity": 1
+          }
+        ],
+        "active": null,
+        "error": null
+      }
+    },
+    {
+      "id": "fe2a28c7-98ac-589d-98d7-e32d6373df06",
+      "schemaId": "da56f5bb-3c53-5175-96e4-80716a570d59",
+      "value": {
+        "items": [],
+        "active": null,
+        "error": null
+      }
+    },
+    {
+      "id": "c3a12e13-bf1c-5ae6-8654-6b40afbbf353",
+      "schemaId": "f512c088-8004-5e1f-a92c-b365adc73111",
+      "value": {}
+    },
+    {
+      "id": "33096558-225c-5376-9aad-cf91fd370aab",
+      "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+      "value": {
+        "requestId": "fixture-order",
+        "payment": "allow",
+        "items": [
+          {
+            "sku": "A",
+            "quantity": 1
+          }
+        ]
+      }
+    }
+  ],
+  "refinements": [],
+  "scenarios": [
+    {
+      "id": "63096c28-fb95-589b-ac92-178597be9c0d",
+      "label": "Invalid cart",
+      "revision": 0,
+      "mode": "logical",
+      "scopeElementIds": [
+        "04f1d18c-7a82-5986-aae6-ca2fe393b135"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+          "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "c4436c06-e0bd-5aa6-95e4-8c8c58ee46aa",
+          "entry": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+          },
+          "fixtureId": "c3a12e13-bf1c-5ae6-8654-6b40afbbf353",
+          "journeyId": "0f31a2b8-2a70-5b91-964b-cf8484676e1e",
+          "atMs": null,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [
+        {
+          "id": "f7ff926a-929a-5254-a6a7-7e497a4417c9",
+          "source": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e"
+          },
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responses": [
+            {
+              "id": "0663ca20-e0b0-555a-9b7a-a0d87486a808",
+              "match": {
+                "op": "exists",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": [
+                    "requestId"
+                  ]
+                }
+              },
+              "responseFixtureId": "33096558-225c-5376-9aad-cf91fd370aab",
+              "payloadBindings": [
+                {
+                  "targetPath": [
+                    "requestId"
+                  ],
+                  "requestPath": [
+                    "requestId"
+                  ]
+                }
+              ],
+              "delayMs": null,
+              "afterInputId": null,
+              "outcome": "succeeded"
+            }
+          ]
+        }
+      ],
+      "refinementSelections": [],
+      "initialContexts": [
+        {
+          "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+          "fixtureId": "fe2a28c7-98ac-589d-98d7-e32d6373df06"
+        }
+      ],
+      "assertions": [
+        {
+          "id": "6b5d29af-a314-569a-8939-df7d4444b5c2",
+          "label": "order-command",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "order-command"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "b017797f-b1ca-5ff3-871c-fa1156e02ba5",
+          "label": "editing",
+          "subject": {
+            "kind": "final-state",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135"
+          },
+          "operator": "equals",
+          "expected": "fbab72a9-a716-5746-a644-cb97080902e1"
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "quiescent"
+      },
+      "assumptions": []
+    },
+    {
+      "id": "425ec755-23cd-56f9-ab2f-1b1ae8ab18d6",
+      "label": "Duplicate submit",
+      "revision": 0,
+      "mode": "logical",
+      "scopeElementIds": [
+        "04f1d18c-7a82-5986-aae6-ca2fe393b135"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+          "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "fb40d1cc-84b7-52f6-8042-a963ac4c51ea",
+          "entry": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+          },
+          "fixtureId": "c3a12e13-bf1c-5ae6-8654-6b40afbbf353",
+          "journeyId": "3b11a518-49e4-5f2f-bf0d-93faf293fefd",
+          "atMs": null,
+          "payloadBindings": [],
+          "resource": null
+        },
+        {
+          "id": "a3dd9f41-18f3-5117-90de-890c785629b3",
+          "entry": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+          },
+          "fixtureId": "c3a12e13-bf1c-5ae6-8654-6b40afbbf353",
+          "journeyId": "3b11a518-49e4-5f2f-bf0d-93faf293fefd",
+          "atMs": null,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [
+        {
+          "id": "edf0884f-7d46-529d-8ef1-abc3c46b88a0",
+          "source": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e"
+          },
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responses": [
+            {
+              "id": "534c5bcc-8d6a-595d-b9c8-a86c2e327a7d",
+              "match": {
+                "op": "exists",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": [
+                    "requestId"
+                  ]
+                }
+              },
+              "responseFixtureId": "33096558-225c-5376-9aad-cf91fd370aab",
+              "payloadBindings": [
+                {
+                  "targetPath": [
+                    "requestId"
+                  ],
+                  "requestPath": [
+                    "requestId"
+                  ]
+                }
+              ],
+              "delayMs": null,
+              "afterInputId": "a3dd9f41-18f3-5117-90de-890c785629b3",
+              "outcome": "succeeded"
+            }
+          ]
+        }
+      ],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "773cb896-4060-5ef1-9e66-4b0f42011169",
+          "label": "ignored-duplicate",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "ignored-duplicate"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "5d5c93ef-d6df-5d28-a3bd-fb7dac45e356",
+          "label": "order-command",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "order-command"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "10d3aee0-aa25-5a27-8335-a39fd059be24",
+          "label": "ui-success",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "ui-success"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "79acf518-b8dd-5911-9dc8-e0db6fb7d467",
+          "label": "succeeded",
+          "subject": {
+            "kind": "final-state",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135"
+          },
+          "operator": "equals",
+          "expected": "47d8e10f-7c32-5ca4-b0e3-6493394efe86"
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "quiescent"
+      },
+      "assumptions": []
+    },
+    {
+      "id": "c90abfe5-387e-556c-85cc-a246dd3aeec4",
+      "label": "Timeout retry stale response",
+      "revision": 0,
+      "mode": "logical",
+      "scopeElementIds": [
+        "04f1d18c-7a82-5986-aae6-ca2fe393b135"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+          "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+        },
+        {
+          "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+          "portId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "0b5908a9-6c01-53de-a833-d3f3090777b0",
+          "entry": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+          },
+          "fixtureId": "c3a12e13-bf1c-5ae6-8654-6b40afbbf353",
+          "journeyId": "26c01ec4-9b47-53a8-859d-6926ed0de80f",
+          "atMs": null,
+          "payloadBindings": [],
+          "resource": null
+        },
+        {
+          "id": "a816f9d5-0d13-50a9-96f7-cb7b4c838554",
+          "entry": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "1741cbd8-d7f8-5803-a8aa-4a7c76180d07"
+          },
+          "fixtureId": "33096558-225c-5376-9aad-cf91fd370aab",
+          "journeyId": "26c01ec4-9b47-53a8-859d-6926ed0de80f",
+          "atMs": null,
+          "payloadBindings": [
+            {
+              "targetPath": [
+                "requestId"
+              ],
+              "source": {
+                "port": {
+                  "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+                  "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e"
+                },
+                "journeyId": "26c01ec4-9b47-53a8-859d-6926ed0de80f",
+                "occurrence": 0,
+                "path": [
+                  "requestId"
+                ]
+              }
+            }
+          ],
+          "resource": null
+        },
+        {
+          "id": "33f5eee3-d05a-5a44-a681-083170fbbfbc",
+          "entry": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "4e8c654e-de2c-5b20-a1f0-981f89e69656"
+          },
+          "fixtureId": "c3a12e13-bf1c-5ae6-8654-6b40afbbf353",
+          "journeyId": "26c01ec4-9b47-53a8-859d-6926ed0de80f",
+          "atMs": null,
+          "payloadBindings": [],
+          "resource": null
+        }
+      ],
+      "workloads": [],
+      "faults": [],
+      "boundaries": [
+        {
+          "id": "aa57b89c-b53e-512e-8e2a-c578160f3947",
+          "source": {
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "portId": "67f4891d-7ee0-5f07-9a4d-6c267fa9de4e"
+          },
+          "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
+          "responses": [
+            {
+              "id": "e0a41784-6ea1-5369-819c-f7c05dc2c903",
+              "match": {
+                "op": "exists",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": [
+                    "requestId"
+                  ]
+                }
+              },
+              "responseFixtureId": "33096558-225c-5376-9aad-cf91fd370aab",
+              "payloadBindings": [
+                {
+                  "targetPath": [
+                    "requestId"
+                  ],
+                  "requestPath": [
+                    "requestId"
+                  ]
+                }
+              ],
+              "delayMs": null,
+              "afterInputId": "33f5eee3-d05a-5a44-a681-083170fbbfbc",
+              "outcome": "succeeded"
+            },
+            {
+              "id": "b2397b12-0710-5ce5-9e48-9b76edc2a192",
+              "match": {
+                "op": "exists",
+                "value": {
+                  "kind": "read",
+                  "source": "input",
+                  "path": [
+                    "requestId"
+                  ]
+                }
+              },
+              "responseFixtureId": "33096558-225c-5376-9aad-cf91fd370aab",
+              "payloadBindings": [
+                {
+                  "targetPath": [
+                    "requestId"
+                  ],
+                  "requestPath": [
+                    "requestId"
+                  ]
+                }
+              ],
+              "delayMs": null,
+              "afterInputId": null,
+              "outcome": "succeeded"
+            }
+          ]
+        }
+      ],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "ef8b3aa9-99d9-5ed9-980e-93dccd63f053",
+          "label": "stale-response",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "stale-response"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "a6286433-5c4e-5279-aeae-b877df9da41f",
+          "label": "order-command",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "order-command"
+          },
+          "operator": "equals",
+          "expected": 2
+        },
+        {
+          "id": "986af4a8-1a21-55ee-aef0-b9016e5c26a6",
+          "label": "ui-success",
+          "subject": {
+            "kind": "trace-count",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+            "code": "ui-success"
+          },
+          "operator": "equals",
+          "expected": 1
+        },
+        {
+          "id": "384e3688-1752-5e2e-a71b-ed296835adbf",
+          "label": "succeeded",
+          "subject": {
+            "kind": "final-state",
+            "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135"
+          },
+          "operator": "equals",
+          "expected": "47d8e10f-7c32-5ca4-b0e3-6493394efe86"
+        }
+      ],
+      "seed": 1,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "quiescent"
+      },
+      "assumptions": []
+    }
+  ],
+  "views": [
+    {
+      "id": "7f5c473c-043f-53f8-8efe-9cbadef51cf5",
+      "label": "Overview",
+      "placements": [
+        {
+          "id": "e1236a14-33dc-5c34-a4db-d4a0cdedff8a",
+          "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
+          "x": 0,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        },
+        {
+          "id": "224b0f5a-44cd-595a-97d5-cf5e5c328205",
+          "elementId": "454213fb-9b2e-51e9-ad52-02cd5767dd89",
+          "x": 240,
+          "y": 0,
+          "width": 180,
+          "expanded": false
+        }
+      ],
+      "connectionIds": [
+        "90c258a5-6003-5d54-8f25-d63df58bca7e"
+      ],
+      "relationIds": [],
+      "groups": [],
+      "notes": []
+    }
+  ]
+}

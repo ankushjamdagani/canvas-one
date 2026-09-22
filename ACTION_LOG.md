@@ -946,3 +946,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: RV-02 contracts, fixture mapping, scoped review prompts/reports/states/disposition, package ledger/rollout, technical design, tasks and HANDOFF. Consolidated schema/command inventory and S01–S05 fixture sizing remain explicit planning gates; no runtime or measured-size claims.
 - **Platform**: Codex lead using delegate workflow; Claude Sonnet 4.6 via bounded read-only CLI sessions, final focused closures at medium effort. Three prior/broad attempts timed out without verdicts; preserved evidence and narrowed prompts. All tracked reviews terminated/returned; no Gemini implementation dispatched.
 - **Verification**: Whitespace/link/reference checks and source/dependency/test diff against fb4a1ff; application files unchanged. No application suites rerun for documentation-only work. No push/deployment or data mutation.
+
+## 2026-09-23
+
+### Final RV-02 contract round — recorded and S05 reviewed (Claude)
+
+- **Outcome**: Finished Codex's unrecorded round (Codex ran out of tokens). Verified the inventory closure's C5 caveat against transactions.md. Reviewed the S05 fixture that had timed out: REVISE with two contract gaps, both lead-corrected in document-and-runner.md (bridge call-frame settlement via `settleCall`; transport-only settlement echoes the request payload, and unavailable maps to rejected). S01–S04, the command inventory, publication metadata and sizing already had PASS. Implementation hold remains.
+- **Changed**: `specs/revamp/contracts/document-and-runner.md`, `contracts/README.md`, `tasks.md`, `fixtures/README.md`, `reviews/2026-09-22-contract-disposition.md`, new `reviews/2026-09-23-contract-fixture-s05-report.md`, HANDOFF. Committed Codex's pending drafts (command inventory, publication metadata, fixtures, review evidence) unchanged.
+- **Platform**: Claude Opus 5.5 inline; no subagents. The S05 review was inline, not an independent CLI process.
+- **Verification**: `node specs/revamp/fixtures/measure.mjs` runs; `s05.json` unchanged. Checked kernel.ts to confirm the child-callback wait. `git diff --check` run. No app code changed, so no app suites run.
+- **Limitations**: The S05 corrections are self-reviewed; RV-02 cannot be frozen until a fresh session does the closure review. The planned doc cleanup/restructure has not started.
