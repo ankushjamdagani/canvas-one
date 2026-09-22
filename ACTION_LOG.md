@@ -971,3 +971,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude only; one earlier read-only review subagent (S05 closure). User chose options for reviews, future docs, process and contracts.
 - **Verification**: Link/anchor check over all revamp Markdown passes; `measure.mjs` runs; fixture JSON unchanged. Independent read-only subagent reviewed the merge against `09d2c8b`: 20 drift findings (2 high: payload-type convention, pipeline port-channel rule), all fixed and confirmed in a second pass. No app code changed; suites not run.
 - **Other**: Removed the clean stale worktree `/tmp/system-studio-foundation-a` (branch kept). Side task to harden `/delegate` is running in a separate session.
+
+### Agent workflow spec drafted (Claude)
+
+- **Outcome**: Analyzed why the revamp stalled in planning (docs-only commits since 09-19 vs. shipped features 09-06→09-17) and drafted a deferred workflow spec: thin-slice loop, stop rules, tiered agent coordination (T0 solo / T1 + reviewer / T2 parallel lanes), skill-cleanup direction, split log/handoff structure. Not adopted; `AGENTS.md` unchanged.
+- **Changed**: new `docs/superpowers/specs/2026-09-23-agent-workflow-design.md`, ACTION_LOG.
+- **Platform**: Claude Opus 5.5 inline; no subagents.
+- **Verification**: Docs only; no suites run.
+- **Limitations**: Skill keep/remove list and log split format left open for a future brainstorming session.
