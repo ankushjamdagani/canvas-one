@@ -20,7 +20,7 @@ The model reading this is the lead. It owns task planning, architecture decision
 
 ## 2. Delegation
 
-Use `/delegate` (`.agents/skills/delegate/SKILL.md`) for longer or complex tasks that benefit from parallelism or multi-model execution. All mechanics, roles, and executor options are defined in that skill.
+Use `/delegate` (`.agents/skills/delegate/SKILL.md`) for longer or complex tasks that benefit from parallelism or multi-model execution. All mechanics, roles, and executor options are defined in that skill; this repo's critic/reviewer/executor defaults are in `.agents/delegate.json`.
 
 ---
 
@@ -37,15 +37,11 @@ Use graphify for questions about code, architecture, or file relationships. Conf
 
 ---
 
-## 4. Project invariants
+## 4. Project state
 
-Read [`HANDOFF.md`](HANDOFF.md) before any work touching architecture, simulation, persistence, exports, or canvas behavior.
+Read [`HANDOFF.md`](HANDOFF.md) at the start of each task. It holds current implementation state, project invariants and resume instructions; preserve those invariants.
 
-Preserve:
-- **Simulation accounting** — strict separation between configured architecture and observed results; exact per-attempt latency, FIFO queuing, retry draws
-- **Model/view separation** — canvas metadata must not pollute executable simulation models
-- **Portable persistence** — versioned export format and read-only archive semantics per `HANDOFF.md`; do not restate format numbers here
-- **Scope discipline** — do not invent milestones beyond the requested task
+Do not invent milestones beyond the requested task.
 
 ---
 

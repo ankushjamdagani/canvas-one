@@ -1,73 +1,47 @@
-# Executor Invocation Patterns
+# CLI Invocation (executors, CLI critic, CLI reviewer)
 
-Exact Bash commands for each CLI. Use these in Phase 3 of SKILL.md.
-
-## agy (Gemini models)
+Every headless agent runs through `scripts/run-agent.sh`; never call a CLI directly:
 
 ```bash
-echo "<prompt>" | agy --model <model> --effort <effort> > <scratchpad>/exec-<id>.txt 2>&1
-echo $? > <scratchpad>/exit-<id>.txt
+scripts/run-agent.sh <prefix> <timeout_sec> <cli> <model> [effort] -- [extra args...]
 ```
 
-Valid model names (use exact strings):
-- `gemini-3.8-flash` (latest, recommended)
-- `gemini-3.7-flash`
-- `gemini-3.6-flash`
+It reads the prompt from `<prefix>.in`, writes full `<prefix>.out` / `<prefix>.err`, and writes `<prefix>.exit` last (`124` = timed out). Extra args come from the target's `args`.
 
-Valid effort values: `low`, `medium`, `high`
-Default: `gemini-3.8-flash` with `effort: low`
+## Commands the wrapper builds
 
-## codex (GPT models)
+| cli | command | default model |
+| :-- | :-- | :-- |
+| agy | `agy --print="<prompt>" --model <model> [--effort <effort>] <args>` | `gemini-3.8-flash-low` |
+| codex | `codex exec -c model="<model>" <args> - < <prefix>.in` | `gpt-5.6-terra` |
+| claude | `claude -p --model <model> <args> < <prefix>.in` | `claude-sonnet-4-6` |
 
-```bash
-codex exec "<prompt>" -c model="<model>" > <scratchpad>/exec-<id>.txt 2>&1
-echo $? > <scratchpad>/exit-<id>.txt
-```
+Models:
+- agy: the tier is part of the model ID (`agy models`): `gemini-3.8-flash-{low,medium,high}`, `gemini-3.7-flash-*`, `gemini-3.1-pro-{low,high}`. `effort` is optional.
+- codex: light `gpt-5.6-luna`, `gpt-5.5`; medium `gpt-5.6-terra`; heavy `gpt-5.6-sol`.
+- claude: light `claude-haiku-4-5-20251001`; medium `claude-sonnet-4-6`; heavy `claude-opus-4-8`.
 
-Models by cost tier:
-- Light: `gpt-5.6-luna`, `gpt-5.5`
-- Medium: `gpt-5.6-terra`
-- Heavy: `gpt-5.6-sol`
+## Permissions (`args`)
 
-## claude (Claude models)
+Headless runs cannot answer prompts, so a missing permission often yields exit 0 with a refusal. `collect` marks that `failed`; grant what the role needs up front:
 
-```bash
-claude -p "<prompt>" --model <model> > <scratchpad>/exec-<id>.txt 2>&1
-echo $? > <scratchpad>/exit-<id>.txt
-```
+| need | agy | codex | claude |
+| :-- | :-- | :-- | :-- |
+| edit files | `--mode accept-edits` | `--sandbox workspace-write` | `--permission-mode acceptEdits` |
+| run commands | no per-command flag | `--sandbox workspace-write` | `--allowedTools "Bash(npm test:*)"` |
+| extra directories | `--add-dir <dir>` | `--add-dir <dir>` | `--add-dir <dir>` |
 
-Models by cost tier:
-- Light: `claude-haiku-4-5-20251001`
-- Medium: `claude-sonnet-4-6`
-- Heavy: `claude-opus-4-8`
+Critic and reviewer targets stay read-only (no edit flags). Blanket bypass flags (`--dangerously-skip-permissions`, `--dangerously-bypass-approvals-and-sandbox`) need explicit user approval.
 
-## Embedding context for codex and claude
+## Prompt context
 
-codex and claude do not support a `--context` flag. Embed context inline:
+Executors have no conversation history. Every prompt must embed:
 
 ```
-Repository context: <one-paragraph summary of the relevant codebase area>
+Repository: <absolute repo path>. Context: <one-paragraph summary of the relevant area>
 Relevant files: <comma-separated list>
 
 Task: <subtask prompt>
 ```
 
-Keep embedded context under 2000 characters.
-
-## Timeout enforcement
-
-Wrap each executor in a background subshell with a 300-second kill:
-
-```bash
-(
-  <executor command> &
-  EXEC_PID=$!
-  (sleep 300 && kill $EXEC_PID 2>/dev/null) &
-  TIMER_PID=$!
-  wait $EXEC_PID
-  EXIT_CODE=$?
-  kill $TIMER_PID 2>/dev/null
-  [ $EXIT_CODE -eq 0 ] && echo 0 || echo $EXIT_CODE
-) > <scratchpad>/exec-<id>.txt 2>&1
-echo $? > <scratchpad>/exit-<id>.txt
-```
+Keep embedded context under 2000 characters. `dispatch` appends the `DELEGATE_STATUS` footer; do not add your own.

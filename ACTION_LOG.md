@@ -963,3 +963,17 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: `contracts/document-and-runner.md`, new `reviews/2026-09-23-contract-fixture-s05-closure-report.md`, disposition, contract register, tasks, fixture README, HANDOFF.
 - **Platform**: Claude coordinator plus one general-purpose subagent (read-only reviewer, two rounds).
 - **Verification**: Reviewer checked `kernel.ts` `selectOutgoing`/`handleChildResponse` and all fixture call-port shapes. `git diff --check` run. No app code changed.
+
+### /delegate skill hardening (Claude)
+
+- **Outcome**: Fixed five planning-review gaps in the delegate skill. Executors now run under a real timeout: `gtimeout`/`timeout` when present, else a job-control watcher. Each run gets its own process group, so a timeout kills only that group and records exit 124. Full stdout/stderr stay in per-subtask files; state stores paths plus an 800-char tail, and the reviewer must read the full files. Runs live in `.delegate/runs/<timestamp>/` (gitignored). `--resume=<state.json>` continues from the recorded `phase`, keeping finished subtasks and stopping and rerunning orphaned ones. An exit-0 run is `failed` if stdout is empty, it contains permission/tool-denial text, or it lacks the `DELEGATE_STATUS: done` footer. Critic/reviewer/executors are configurable targets; `.agents/delegate.json` sets Claude as critic and reviewer, and agy `gemini-3.8-flash-low` as executor. Also fixed agy invocation: it needs `--print`, and model IDs carry the tier. claude/codex prompts now go through stdin so variadic flags cannot swallow them.
+- **Changed**: `.agents/skills/delegate/SKILL.md`, `roles/{executor,planner,reviewer}.md`, new `scripts/run-agent.sh` and `scripts/state.py`, new `.agents/delegate.json`, `.gitignore`, one sentence in `AGENTS.md`.
+- **Platform**: Claude Opus 5.5 inline; no subagents.
+- **Verification**: Fake-CLI harness covered timeouts (including a TERM-ignoring child and grandchildren, with no orphans left), an unrelated process surviving, empty output, denial text, blocked or missing marker, non-zero exit, and interrupt-then-resume. Real smoke runs of agy (`gemini-3.8-flash-low`) and `claude -p` (haiku, with `--add-dir`) both passed. The GNU `timeout` branch was not exercised because it is not installed here. No full orchestrated run; no app code changed, so no app suites run.
+- **Limitations**: Denial detection uses regex heuristics and can flag benign text. A CLI that calls `setsid` for its own children escapes group kill. The HANDOFF implementation hold and its "no generic delegate loops for implementation dispatch" rule are unchanged.
+
+### AGENTS.md made task-agnostic (Claude)
+
+- **Outcome**: Removed implementation-specific invariants from AGENTS.md §4, which is now a generic "Project state" pointer: read HANDOFF.md at task start and keep scope discipline. The simulation accounting, model/view separation and portable persistence invariants moved verbatim into a new "Project invariants" section at the top of HANDOFF.md.
+- **Changed**: `AGENTS.md`, `HANDOFF.md`, `ACTION_LOG.md`.
+- **Platform**: Claude Opus 5.5 inline. **Verification**: diff inspected; documentation only, no suites run.

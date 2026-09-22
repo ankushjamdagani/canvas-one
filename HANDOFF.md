@@ -1,5 +1,12 @@
 # Development handoff
 
+## Project invariants
+
+Preserve in all work touching architecture, simulation, persistence, exports or canvas behavior:
+- **Simulation accounting** — strict separation between configured architecture and observed results; exact per-attempt latency, FIFO queuing, retry draws.
+- **Model/view separation** — canvas metadata must not pollute executable simulation models.
+- **Portable persistence** — versioned export format and read-only archive semantics per the persistence and compatibility policy below.
+
 ## Active initiative — System Studio design revamp (21 September 2026)
 
 2026-09-22 USER HOLD: planning and read-only reviews only. Do not implement, dispatch implementation, or treat a reviewer approval as permission to execute. Finalize requirements, implementation architecture, delivery/execution and delegation through multiple reviews first; only a later explicit user instruction lifts this hold. Gemini was stopped before edits; its isolated worktree is clean and its temporary node_modules symlink removed. Preserve planning documents.

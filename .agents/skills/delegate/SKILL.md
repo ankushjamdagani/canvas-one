@@ -6,82 +6,80 @@ config:
   reviewer: self
   critique_max_loops: 3
   review_max_loops: 2
+  timeout_sec: 300
+  runs_dir: .delegate/runs
   executor_targets:
     - cli: agy
-      model: gemini-3.8-flash
-      effort: low
+      model: gemini-3.8-flash-low
+      args: ["--mode", "accept-edits"]
   executor_concurrency: 3
+  failure_patterns: []
 ---
 
 # Delegate — Multi-Agent Task Orchestration
 
 Orchestrate a task through four phases: Plan → Critique → Execute → Review.
-You are the orchestrator. Use your Bash tool throughout.
+You are the orchestrator. Use your Bash tool throughout. `$SKILL` below is this skill's directory.
 
-## Parsing Arguments
+## Configuration
 
-Parse flags from the invocation line:
-- `--critic=<self|claude|codex>` — who runs critique
-- `--reviewer=<self|claude|codex>` — who runs review
-- `--executors="cli:model:effort,..."` — executor targets (overrides config entirely when provided)
-- Remaining text after all flags is the task string
+Precedence (later wins, top-level keys replace): frontmatter above → project file `.agents/delegate.json` (optional, same keys as JSON) → invocation flags.
 
-Flags override config defaults. Store merged result as run config.
+- **Target**: `{"cli": "agy|codex|claude", "model": "...", "effort": "...", "args": [...], "timeout_sec": N}`. Only `cli` and `model` are required. `args` are extra CLI flags (permission modes, `--add-dir`); see `roles/executor.md`.
+- `critic` / `reviewer`: `self` (you, inline) or a target. A bare CLI name (`claude`) means that CLI with its default model from `roles/executor.md`. A CLI target always runs as a separate process — use it when you want an independent critique/review.
+- `executor_targets`: list of targets, assigned round-robin.
+- `timeout_sec`: default per-process limit; a target's own `timeout_sec` overrides it.
+- `failure_patterns`: extra regexes that mark an exit-0 executor run as failed (added to the built-in denial patterns in `scripts/state.py`).
 
-## Phase 0: Startup
-
-Read all four role files before doing anything else:
-- `roles/planner.md`
-- `roles/critic.md`
-- `roles/reviewer.md`
-- `roles/executor.md`
-
-Check CLI availability:
-```bash
-which agy 2>/dev/null && echo "agy: ok" || echo "agy: MISSING"
-which codex 2>/dev/null && echo "codex: ok" || echo "codex: MISSING"
-which claude 2>/dev/null && echo "claude: ok" || echo "claude: MISSING"
-```
-
-Rules:
-- Missing executor CLI → remove that target from executor_targets and warn. If all executor targets missing → abort: `ERROR: No executor CLIs available. Install agy, codex, or claude.`
-- Missing critic/reviewer CLI (when not `self`) → fall back to `self` and warn.
-
-Create scratchpad:
-```bash
-SCRATCHPAD="${TMPDIR:-/tmp}/delegate-$(date +%s)"
-mkdir -p "$SCRATCHPAD"
-STATE="$SCRATCHPAD/state.json"
-```
-
-Write initial state to `$STATE`:
+Example `.agents/delegate.json` — Claude critiques and reviews, Gemini implements:
 ```json
 {
-  "task": "<task string>",
-  "config": {
-    "critic": "self",
-    "reviewer": "self",
-    "executor_targets": [{"cli": "agy", "model": "gemini-3.8-flash", "effort": "low"}],
-    "executor_concurrency": 3,
-    "critique_max_loops": 3,
-    "review_max_loops": 2
-  },
-  "plan": null,
-  "critique": null,
-  "executions": [],
-  "review": null
+  "critic": {"cli": "claude", "model": "claude-sonnet-4-6"},
+  "reviewer": {"cli": "claude", "model": "claude-sonnet-4-6", "timeout_sec": 600},
+  "executor_targets": [{"cli": "agy", "model": "gemini-3.8-flash-low", "args": ["--mode", "accept-edits"]}]
 }
 ```
 
-Echo: `Delegate run started. State: $STATE`
+## Parsing Arguments
+
+- `--critic=<self|cli[:model]>`, `--reviewer=<self|cli[:model]>`
+- `--executors="cli:model[:effort],..."` — replaces `executor_targets`
+- `--resume=<path/to/state.json>` — continue an interrupted run (see Resume); ignores other flags
+- Remaining text after all flags is the task string
+
+## Phase 0: Startup
+
+Read all four role files first: `roles/planner.md`, `roles/critic.md`, `roles/reviewer.md`, `roles/executor.md`.
+
+Check CLI availability:
+```bash
+for c in agy codex claude; do command -v $c >/dev/null && echo "$c: ok" || echo "$c: MISSING"; done
+```
+- Missing executor CLI → drop that target and warn. None left → abort: `ERROR: No executor CLIs available. Install agy, codex, or claude.`
+- Missing critic/reviewer CLI → fall back to `self` and warn.
+
+Create the run directory inside the repo (keep `runs_dir` gitignored) so every agent can read it and it survives temp cleanup:
+```bash
+SCRATCHPAD="$(git rev-parse --show-toplevel)/<runs_dir>/$(date +%Y%m%d-%H%M%S)"
+STATE="$SCRATCHPAD/state.json"
+python3 "$SKILL/scripts/state.py" init "$STATE" '<task>' '<merged config JSON>'
+```
+Echo: `Delegate run started. State: $STATE (resume with --resume=$STATE)`
+
+State fields: `phase` (next phase to run: `plan|critique|execute|review|done`), `plan`, `critique`, `review_loop`, `executions`, `review`. Always write state through `scripts/state.py` (atomic writes). Set `phase` as the **last** step of each phase.
+
+## Resume
+
+With `--resume=<state.json>`: run the Phase 0 role-file read and CLI check, set `STATE` to the path and `SCRATCHPAD` to its `scratchpad` field, echo `Resuming at phase <phase>`, then jump:
+- `plan` → Phase 1. `critique` → Phase 2, continuing the loop count in `critique.loop`.
+- `execute` → Phase 3. `dispatch` skips subtasks of the current round that already have a `.exit` file, and stops (process group only) and reruns any that were orphaned mid-run.
+- `review` → Phase 4, continuing the loop count in `review_loop`. `done` → echo the stored result.
+
+If the run directory is unknown, the newest run is `ls -td <runs_dir>/*/ | head -1`.
 
 ## Phase 1: Plan
 
-Adopt the Planner persona from `roles/planner.md`.
-
-Produce subtasks JSON. Assign each subtask an executor by cycling through `executor_targets` round-robin (e1 → targets[0], e2 → targets[1], e3 → targets[0], ...).
-
-Your output must be valid JSON matching this schema exactly:
+Adopt the Planner persona. Produce subtasks JSON; assign executors round-robin from `executor_targets` (copy the whole target into `assigned_executor`):
 ```json
 {
   "version": 1,
@@ -89,201 +87,69 @@ Your output must be valid JSON matching this schema exactly:
     {
       "id": "e1",
       "title": "brief title ≤60 chars",
-      "prompt": "Full executor prompt. Include: what to do, which files to touch, current state, expected outcome, how to verify. Write as if the executor has never seen this codebase.",
+      "prompt": "Full executor prompt. What to do, which files to touch, current state, expected outcome, how to verify. Written for an executor that has never seen this codebase.",
       "files": ["src/path/to/file.ts"],
-      "assigned_executor": {"cli": "agy", "model": "gemini-3.8-flash", "effort": "low"}
+      "assigned_executor": {"cli": "agy", "model": "gemini-3.8-flash-low", "args": ["--mode", "accept-edits"]}
     }
   ]
 }
 ```
+Invalid JSON → retry once with "Output ONLY valid JSON, no prose, no code fences." Still invalid → abort: `ERROR: Planner failed to produce valid JSON. State: $STATE`.
 
-If your output is not valid JSON: prepend "Output ONLY valid JSON, no prose, no code fences." and retry once. If still invalid: abort — `ERROR: Planner failed to produce valid JSON. State: $STATE`.
-
-Update state:
 ```bash
-python3 -c "
-import json, sys
-s = json.load(open('$STATE'))
-s['plan'] = json.loads(sys.argv[1])
-json.dump(s, open('$STATE', 'w'), indent=2)
-" '<your plan JSON>'
+python3 "$SKILL/scripts/state.py" set "$STATE" plan - <<'JSON'
+<plan JSON>
+JSON
+python3 "$SKILL/scripts/state.py" set "$STATE" phase '"critique"'
 ```
 
 ## Phase 2: Critique Loop
 
-Initialize loop counter to 0.
+Loop counter starts at 0 (or `critique.loop` on resume).
 
-**If `critic` is `self`:** Adopt the Critic persona from `roles/critic.md`. Produce critique JSON inline.
+**`critic: self`** → adopt the Critic persona and produce critique JSON inline.
 
-**If `critic` is `claude`:**
+**CLI critic** → write the prompt to a file and run it through the timeout wrapper:
 ```bash
-PLAN=$(python3 -c "import json; print(json.dumps(json.load(open('$STATE'))['plan']))")
-TASK=$(python3 -c "import json; print(json.load(open('$STATE'))['task'])")
-CRITIQUE=$(claude -p "$(cat roles/critic.md)
-
-Task: $TASK
-
-Plan: $PLAN" --model claude-sonnet-4-6 2>&1)
+P="$SCRATCHPAD/critic-<loop>"
+{ cat "$SKILL/roles/critic.md"; echo; echo "Task: <task>"; echo; echo "Plan:"; python3 "$SKILL/scripts/state.py" get "$STATE" plan; } > "$P.in"
+"$SKILL/scripts/run-agent.sh" "$P" <timeout_sec> <cli> <model> [effort] -- [args...]
 ```
-
-**If `critic` is `codex`:**
-```bash
-PLAN=$(python3 -c "import json; print(json.dumps(json.load(open('$STATE'))['plan']))")
-TASK=$(python3 -c "import json; print(json.load(open('$STATE'))['task'])")
-CRITIQUE=$(codex exec "$(cat roles/critic.md)
-
-Task: $TASK
-
-Plan: $PLAN" -c model="gpt-4o-mini" 2>&1)
-```
-
-If critique JSON is malformed: retry once with "Respond with ONLY valid JSON, no prose." prepended. Still malformed → treat as `{"verdict": "fail", "issues": ["<raw output>"], "revised_plan_hints": []}`.
+Read `$P.out` as the critique. Exit ≠ 0 (124 = timeout) or output not valid JSON → retry once with "Respond with ONLY valid JSON, no prose." prepended. Still bad → treat as `{"verdict": "fail", "issues": ["critic failed: <exit code / raw output>"], "revised_plan_hints": []}`.
 
 Rules:
-- `verdict: pass` → proceed to Phase 3
-- `verdict: fail` AND loop < `critique_max_loops`:
-  - Increment loop counter
-  - Adopt Planner persona, revise plan using `revised_plan_hints`
-  - Update state with new plan
-  - Run critique again
-- `verdict: fail` AND loop = `critique_max_loops`:
-  - Abort: `ERROR: Critique failed after 3 attempts. State: $STATE`
-  - Echo all collected critique feedback
+- `pass` → set `phase` to `"execute"`, go to Phase 3.
+- `fail` and loop < `critique_max_loops` → increment, revise the plan as Planner using `revised_plan_hints`, save plan, critique again.
+- `fail` at the limit → abort: `ERROR: Critique failed after <n> attempts. State: $STATE`, then echo all critique feedback.
 
-Update state after each loop:
-```bash
-python3 -c "
-import json, sys
-s = json.load(open('$STATE'))
-s['critique'] = {'loop': int(sys.argv[1]), 'passed': sys.argv[2]=='pass', 'feedback': sys.argv[3]}
-json.dump(s, open('$STATE', 'w'), indent=2)
-" '<loop_count>' '<verdict>' '<issues summary>'
-```
+After each loop: `state.py set "$STATE" critique '{"loop": <n>, "passed": <bool>, "feedback": <issues>}'`.
 
 ## Phase 3: Execute
 
-Read `roles/executor.md` for exact CLI invocation patterns.
-
-Fire each subtask using its `assigned_executor`. Respect `executor_concurrency` — run at most N processes at once.
-
+`dispatch` writes `<id>.in` (subtask prompt plus a required `DELEGATE_STATUS` footer) and a runner script for each unfinished subtask of the current round (`$SCRATCHPAD/r<review_loop>/`); `xargs -P` enforces `executor_concurrency`:
 ```bash
-CONCURRENCY=3  # from config
-PIDS=()
-IDS=()
-BATCH=0
-
-for subtask in <subtasks from state>; do
-  ID=<subtask.id>
-  CLI=<subtask.assigned_executor.cli>
-  MODEL=<subtask.assigned_executor.model>
-  EFFORT=<subtask.assigned_executor.effort>  # only for agy
-  PROMPT=<subtask.prompt>
-  OUT="$SCRATCHPAD/exec-$ID.txt"
-  EXIT_FILE="$SCRATCHPAD/exit-$ID.txt"
-
-  # Build command per roles/executor.md, background it with timeout
-  (
-    case "$CLI" in
-      agy)    echo "$PROMPT" | agy --model "$MODEL" --effort "$EFFORT" > "$OUT" 2>&1 ;;
-      codex)  codex exec "$PROMPT" -c model="$MODEL" > "$OUT" 2>&1 ;;
-      claude) claude -p "$PROMPT" --model "$MODEL" > "$OUT" 2>&1 ;;
-    esac
-    echo $? > "$EXIT_FILE"
-  ) &
-  PIDS+=($!)
-  IDS+=($ID)
-  BATCH=$((BATCH + 1))
-
-  if [ $BATCH -ge $CONCURRENCY ]; then
-    wait "${PIDS[@]}"
-    PIDS=()
-    IDS=()
-    BATCH=0
-  fi
-done
-
-# Wait for remaining
-[ ${#PIDS[@]} -gt 0 ] && wait "${PIDS[@]}"
+python3 "$SKILL/scripts/state.py" dispatch "$STATE" | xargs -P <executor_concurrency> -n 1 bash
+python3 "$SKILL/scripts/state.py" collect "$STATE"
 ```
+`run-agent.sh` runs each agent in its own process group with a hard timeout (GNU `timeout`/`gtimeout` when installed, otherwise a background watcher). On timeout it sends TERM to that group only, then KILL after 10s, and records exit `124`. Full stdout/stderr remain in `<id>.out` / `<id>.err`.
 
-Note: the 5-minute timeout is enforced by executor_targets config. For longer-running tasks, kill stalled processes manually.
+`collect` stores per subtask: `status`, `reason`, `exit_code`, `stdout_path`, `stderr_path` and a short tail `excerpt`. Status is `done` only when **all** hold: exit 0, non-empty stdout, no permission/tool-denial text, and a final `DELEGATE_STATUS: done` line. Otherwise it is `timeout` (124), `error` (non-zero exit) or `failed` (exit 0 but empty, denied, blocked or unmarked). Never upgrade a `failed` status yourself; hand it to the reviewer.
 
-After all complete, read outputs and update state:
-```bash
-python3 - <<'EOF'
-import json, os
-state_path = os.environ['STATE']
-scratchpad = os.environ['SCRATCHPAD']
-s = json.load(open(state_path))
-executions = []
-for subtask in s['plan']['subtasks']:
-    eid = subtask['id']
-    out_file = f"{scratchpad}/exec-{eid}.txt"
-    exit_file = f"{scratchpad}/exit-{eid}.txt"
-    output = open(out_file).read() if os.path.exists(out_file) else ""
-    exit_code = int(open(exit_file).read().strip()) if os.path.exists(exit_file) else -1
-    status = "done" if exit_code == 0 else ("timeout" if exit_code == -1 else "error")
-    executions.append({
-        "id": eid,
-        "status": status,
-        "output": output[:4000],  # truncate very long outputs
-        "exit_code": exit_code,
-        "executor": subtask["assigned_executor"]
-    })
-s['executions'] = executions
-json.dump(s, open(state_path, 'w'), indent=2)
-EOF
-```
+If Bash tool time limits are shorter than the run, launch the `dispatch | xargs` line in the background and poll for `.exit` files. After `collect`, set `phase` to `"review"`.
 
 ## Phase 4: Review Loop
 
-Initialize loop counter to 0.
+Loop counter is `review_loop` (starts at 0).
 
-**If `reviewer` is `self`:** Adopt the Reviewer persona from `roles/reviewer.md`. Produce review JSON inline.
+**`reviewer: self`** → adopt the Reviewer persona. Read every `stdout_path` and `stderr_path` in full and inspect `git status` / `git diff`; the excerpts in state are not enough.
 
-**If `reviewer` is `claude`:**
-```bash
-EXECUTIONS=$(python3 -c "import json; print(json.dumps(json.load(open('$STATE'))['executions']))")
-TASK=$(python3 -c "import json; print(json.load(open('$STATE'))['task'])")
-REVIEW=$(claude -p "$(cat roles/reviewer.md)
+**CLI reviewer** → same wrapper pattern as the critic, with `P="$SCRATCHPAD/review-<review_loop>"` and a prompt built from `roles/reviewer.md`, the task, and `state.py get "$STATE" executions`. The reviewer must read the full output files itself (they are inside the repo), so give it read access (see `roles/executor.md`).
 
-Task: $TASK
-
-Execution results: $EXECUTIONS" --model claude-sonnet-4-6 2>&1)
-```
-
-**If `reviewer` is `codex`:**
-```bash
-EXECUTIONS=$(python3 -c "import json; print(json.dumps(json.load(open('$STATE'))['executions']))")
-TASK=$(python3 -c "import json; print(json.load(open('$STATE'))['task'])")
-REVIEW=$(codex exec "$(cat roles/reviewer.md)
-
-Task: $TASK
-
-Execution results: $EXECUTIONS" -c model="gpt-4o-mini" 2>&1)
-```
-
-If review JSON is malformed: retry once. Still malformed → treat as `{"verdict": "fail", "failures": [{"subtask_id": "all", "reason": "<raw output>"}], "summary": ""}`.
+Malformed review or reviewer failure → retry once. Still bad → treat as `{"verdict": "fail", "failures": [{"subtask_id": "all", "reason": "reviewer failed: <exit code / raw output>"}], "summary": ""}`.
 
 Rules:
-- `verdict: pass` → echo `SUCCESS: <summary>` and `State: $STATE`. Done.
-- `verdict: fail` AND loop < `review_max_loops`:
-  - Increment loop counter
-  - Adopt Planner persona, re-plan using original task + execution outputs + reviewer feedback
-  - Update state with new plan (reset executions to [])
-  - Re-run Phase 3, then Phase 4
-- `verdict: fail` AND loop = `review_max_loops`:
-  - Echo `PARTIAL RESULT: <summary of what succeeded>`
-  - Echo `REVIEW DIAGNOSIS: <failures>`
-  - Echo `State: $STATE`
-  - Done
+- `pass` → set `review` and `phase` `"done"`; echo `SUCCESS: <summary>` and `State: $STATE`.
+- `fail` and `review_loop` < `review_max_loops` → as Planner, re-plan using the task, execution outputs and reviewer feedback; save the plan, increment `review_loop` (new round directory), set `executions` to `[]` and `phase` to `"execute"`; re-run Phase 3, then Phase 4.
+- `fail` at the limit → set `phase` `"done"`; echo `PARTIAL RESULT: <what succeeded>`, `REVIEW DIAGNOSIS: <failures>`, `State: $STATE`.
 
-Update state after each loop:
-```bash
-python3 -c "
-import json, sys
-s = json.load(open('$STATE'))
-s['review'] = {'loop': int(sys.argv[1]), 'passed': sys.argv[2]=='pass', 'feedback': sys.argv[3]}
-json.dump(s, open('$STATE', 'w'), indent=2)
-" '<loop_count>' '<verdict>' '<failures summary>'
-```
+After each loop: `state.py set "$STATE" review '{"loop": <n>, "passed": <bool>, "feedback": <failures>, "summary": "..."}'`.
