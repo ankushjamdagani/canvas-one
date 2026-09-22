@@ -36,7 +36,7 @@ Follow [ai-collaboration.md](ai-collaboration.md): domain commands and candidate
 | Panel preferences | panel ID, placement, open/collapsed state, order/stack, per-side widths, floating rect; open/close/place/collapse/resize/reset |
 | Inspector draft | target ID, base revision, editable draft, dirty/valid state, apply/cancel/conflict result |
 | Branch workspace | stable branch ID, display name, base commit, head commit, working snapshot, revision token; switch/create/archive/reopen |
-| Commit | immutable ID, parent(s), full system snapshot, message, timestamp, author provenance, non-empty required scenarios and exact-state run evidence |
+| Commit | immutable ID, parent(s), full system snapshot, message, timestamp, author provenance, complete non-empty configured-scenario inventory and exact-state passing evidence |
 | Published version | immutable ID/version, commit, previous published head, source branch, title/rationale/ticket, evidence; compare/restore |
 | Merge result | common ancestor, ours/theirs, typed changes/conflicts/resolutions, validated candidate, expected-head token |
 | Saved part | ID/version, name/description/category, copied graph subset/view metadata, provenance; save/place/update-copy |
@@ -56,7 +56,7 @@ No legacy migration or archive support is required. Lead rollout proposal uses a
 
 Define a canonical executable fingerprint using normalized behavior, scenario inputs/initial state/scope, refinement selections, active assumptions, workload/resource model, seed/budgets and runner/model versions. Exclude camera, panel placement, selection and purely visual metadata. Deployment relationships that affect a fault scenario are executable, even though they appear in a structural view. Store full authored snapshot content separately. Do not reuse the existing worker reset key without auditing inclusion rules and canonical ordering.
 
-A completed run qualifies only for the same fingerprint. Paused, aborted, stale, truncated or imported/unverified evidence cannot silently satisfy a fresh local-run gate. No diagram exception. Completion and successful assertions are distinct; a deliberately modeled failure can be a completed run. Show assertion failures prominently without inventing an additional mandatory zero-failure policy.
+A completed run qualifies only for the same fingerprint with all checks passing (D27). Every configured scenario must qualify (D28); no subset selector or disabled-scenario bypass. Paused, aborted, stale, truncated or imported/unverified evidence cannot satisfy the gate. No diagram exception. Modeled failure outcomes may satisfy checks expecting them; failed checks require system/check changes and new matching runs.
 
 Apply/merge changes invalidate eligibility when the executable fingerprint changes. A publish candidate formed by combining main and draft changes must itself have a qualifying completed run; running the old draft tip is insufficient. This often means resolve → validate → run merged candidate → review → publish, with candidate editing isolated from source branches.
 
@@ -66,9 +66,9 @@ Use a common ancestor and stable entity IDs. Non-overlapping changes can merge; 
 
 Validate candidate topology, bounds, typed ports/relationships, scenarios, behavior, subsystems and notes after resolutions. Unsupported schema/behavior versions are rejected rather than coerced. Ours/theirs/edit actions must state which branch is which; bulk resolution still validates and can be undone in the merge session.
 
-Publish transaction checks expected current main head, unique version and eligibility, writes immutable records, advances main, and optionally closes the draft. If main changed in another tab, reject the transaction and recompute merge; don't overwrite. Use local revision tokens and transactional compare-and-set. Cross-tab notifications are an enhancement; correctness cannot depend on receiving one.
+Publish transaction checks expected current main head, unique version and eligibility, writes immutable records, advances main, and closes the source branch by default (explicit keep-open opt-out only). If main changed in another tab, reject the transaction and recompute merge; don't overwrite. Use local revision tokens and transactional compare-and-set. Cross-tab notifications are an enhancement; correctness cannot depend on receiving one.
 
-“Undo publish” is a compensating operation available only while its expected head remains current, with descendants/branch closure handled explicitly. Older history is never erased. Restore makes a new working state, preserving immutable history. Claude must review these state transitions with table-driven edge cases before implementation.
+Publication cannot be undone (D26): no compensating-publish or main-rewind command. Restore makes a working draft; corrections use ordinary new passing commits/publications. Source branch closes by default atomically with successful publish and can explicitly reopen without changing main/history (D29). Failed publication never closes it. Claude reviews these transitions and strict all-scenario evidence gates before implementation.
 
 ## Parts and view state
 

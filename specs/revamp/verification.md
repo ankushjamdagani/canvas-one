@@ -43,8 +43,8 @@ Use scoped unit tests for reducers/domain operations, focused browser tests for 
 | Inspector | valid multi-field Apply; invalid draft; Cancel; one undo; dirty close/switch; removed/stale target; live vs saved data; scenario-specific behavior |
 | Parts | internal references remapped; external links excluded visibly; independent placement; limits; no inherited observed results; one undo; import validation |
 | Branches | independent autosaved work; save failure blocks switch; reload; per-branch history; dirty inspector gate; main edit creates draft |
-| Run evidence | exact scenario/scope/refinement/assumption fingerprint; input/seed/budget mismatch; visual-only changes; incomplete/imported evidence; no diagram exemption; completion distinct from assertions |
-| Merge/publish | unchanged/identical/disjoint/conflicting fields; delete/edit; invalid edge/route/attachment; changed main; merged-state rerun; atomic failure; recoverable close/undo |
+| Run evidence | exact scenario/scope/refinement/assumption fingerprint; input/seed/budget mismatch; visual-only changes; incomplete/imported evidence; no diagram exemption; every configured scenario and all checks passing; changed checks require rerun |
+| Merge/publish | unchanged/identical/disjoint/conflicting fields; delete/edit; invalid edge/route/attachment; changed main; merged-state rerun; atomic failure; default source closure and explicit reopen; no publication undo |
 | Storage cutover | fresh current namespace; old database untouched; unsupported format rejected; current round-trip/reload; bad IDs/references; quota/size limits |
 | Results | idle/running/paused/completed/saved/imported; root vs message rates; real chart samples; empty values; unmatched comparisons; reveal correct node |
 | Export | full SVG/PNG view; JSON lossless; CSV units/provenance/formula safety; Mermaid escaping/loss disclosure; errors/retry |

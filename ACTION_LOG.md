@@ -931,3 +931,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: YAML frontmatter validated; all 3 CLIs confirmed present (agy, codex, claude); agy stdin-pipe mode and `--model`+`--effort` flags verified; GPT-5 slugs verified from `~/.codex/models_cache.json`. No build/test run (no application code changed).
 - **Limitations**: Nothing committed — user approval required before commit. Spec/plan docs written but not tested end-to-end.
 - **Follow-up**: Commit skill files + AGENTS.md when user approves. End-to-end test by invoking `/delegate` from each platform CLI.
+
+### User policies reconciled — planning only (Codex)
+
+- **Outcome**: Propagated confirmed run/check, irreversible publication, default branch closure/reopening, draft, panel and merge policies. Preserved the user's confirmed single-Library decision. Implementation hold remains; detailed RV-02d/e/f/g contracts are still pending.
+- **Changed**: Revamp requirements, decisions, contracts, delivery/verification ledgers and HANDOFF; archived focused Claude prompt/report/process state and lead disposition. No app code or dependencies changed; unrelated `debby.md` untouched.
+- **Platform/delegates/tools**: Codex lead; Claude Sonnet 4.6 read-only policy review via CLI, exit 0. REVISE contained one stale D30 reference; Codex corrected it. No Gemini implementation, in-session children or new skill invocation in this continuation.
+- **Verification**: `git diff --check` passed; `git diff fb4a1ff --exit-code -- src package.json package-lock.json tests` empty; relative planning-document links checked. No app tests rerun. Review process finished; no later Claude PASS claimed.
+- **Next**: Finalize schema/runner, storage/budgets, command/panel and export contracts with review before requesting implementation release.

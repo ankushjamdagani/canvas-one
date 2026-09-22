@@ -20,6 +20,8 @@ Apply parses the complete draft, validates target existence and all cross-refere
 
 The reducer computes a candidate without mutating current state. Persistence success publishes the accepted candidate to editor state. If optimistic display is later desired it requires explicit pending/error/rollback behavior; initial implementation uses pending controls during save.
 
+Run readiness includes a clean-configuration-draft prerequisite (D25). Apply or Cancel is required before a new run; there is no last-applied-version bypass. Apply must finish validation/persistence before Run is enabled. Configuration drafts remain transient and never become execution inputs. Commit/publish review likewise cannot silently ignore a dirty draft: resolve it first, then evaluate candidate evidence.
+
 ## Local compare-and-set
 
 New database namespace and schema are frozen by the storage contract, independent of old `system-studio`. `workingRevision` and branch/main head values live in records; no index on revision is needed solely for CAS. Use one read-write Dexie transaction covering affected branch/project/commit/publication/run-evidence/operation tables. Read current records, compare expected values, reject if stale, write immutable rows and update pointers, then commit. Database abort leaves all old rows/pointers intact.
@@ -28,20 +30,20 @@ Never await hashing, network, arbitrary callbacks or worker responses inside the
 
 ## History transition table
 
-Publication undo rows/paragraphs are a conditional draft pending D26; they are not accepted implementation scope. All other operations remain independently reviewable.
+Publication undo is excluded by D26. Commit and publish require every configured scenario to complete with passing checks (D27/D28); no scenario-subset selector or failure waiver.
 
 | Action / precondition | Atomic effect | Rejection / recovery |
 |---|---|---|
 | New project | Create branch working copy with nullable head and revision 0 | No fabricated initial commit or run |
 | Checkpoint incomplete model | Save named immutable authored snapshot, no commit status | Quota failure leaves working copy; show retry |
-| Commit with completed required scenarios | Add immutable commit with parent current branch head; advance branch head; increment branch revision | Stale working revision or missing evidence rejects everything |
+| Commit with completed passing evidence for every configured scenario | Add immutable commit with parent current branch head; advance branch head; increment branch revision | Empty scenario set, stale working revision, failed checks or missing evidence reject everything |
 | Prepare publish | Resolve common ancestor and isolated merged candidate with expected source/main heads and revisions | Missing merge base blocks; do not invent common ancestry |
-| Publish candidate | Validate candidate/evidence; add merge commit/publication, advance main, record prior state and optional source closure | Any changed expected head/revision rejects; recompute candidate |
-| Undo latest publication with expected current main | Add compensating history record restoring previous published content; advance main to compensation; preserve original history | Moved main rejects; user can instead create a new restore branch |
+| Publish candidate | Validate all candidate scenarios/evidence; add merge commit/publication, advance main and close source branch by default in one transaction | Any changed expected head/revision or failing/missing evidence rejects; recompute candidate; source stays open on failure |
+| Reopen closed source branch | Set branch open through expected-revision transaction, preserve its working snapshot/history | Stale revision rejects; does not change main or any publication |
 | Restore historical snapshot | Create/update an explicit working draft with source provenance; increment revision | Does not rewind immutable history or manufacture qualifying evidence |
 | Switch branch | Finish save of source working state, resolve inspector draft, then load target | Any save/conflict failure keeps source active |
 
-Undo publication uses stored previous-content snapshot and its matching completed evidence. Published/committed snapshots and required evidence are reference-pinned: independent deletion is rejected with `referenced-artifact`. Corruption/missing content yields `missing` with artifact IDs; do not fabricate a restore from partial evidence. If snapshot exists but evidence is unavailable, offer a restore draft requiring a run instead. Source branch reopening is permitted only if its closure was performed by that publication and its recorded closure revision still matches; otherwise preserve its newer state and report that reopening was skipped. Descendant branches keep their existing immutable parent references; compensation does not erase or reparent descendants. A later main commit makes direct undo unavailable. First publication with no prior published content returns `invalid` with `no-previous-publication`; UI disables direct undo with that reason and offers a separate restore-draft action. Concurrent tabs race on expected main, so only one compensation can succeed.
+No undo-publication command, compensation record or main-rewind action exists. Corrections are ordinary new draft/commit/publication work and must satisfy the same all-scenario passing gate. Published/committed snapshots and required evidence are reference-pinned: independent deletion is rejected with `referenced-artifact`. Corruption/missing content yields `missing` with artifact IDs; never fabricate restore content from partial evidence. Restore affects only a working draft, not published history. Closing/reopening a source branch preserves its work and descendants' immutable references; reopening is not publication undo. The source revision checked during publish prevents concurrently saved work from being closed unnoticed. Optional keep-open selection, if exposed, defaults off under D29.
 
 ## Merge identity rules
 

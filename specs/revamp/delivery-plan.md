@@ -71,9 +71,9 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 
 - Owner: Codex authors specification; Claude reviews. Gemini may produce bounded read-only fixture-size/compatibility evidence.
 - Owns: new contract specification and fixture descriptions under `specs/revamp/contracts/`; actual shared TypeScript contract creation is a later Gemini task with an exact file list.
-- Dependencies: accepted RV-00; current D10/D11/D17–D25 govern contracts. D09 is superseded; conditional publication-undo scope waits for D26.
+- Dependencies: accepted RV-00; current D10/D11/D17–D29 govern contracts. D09 is superseded; D26 excludes publication undo. D30 confirms a single Library instance.
 - Deliver: concrete system/view/behavior/scenario types, typed ports and structural relationships, S01–S05 fixtures, state transition tables, numeric limits, current portable/storage versions, run fingerprints, command/panel API, parts rules, merge cases and recovery policy. No old-data migration requirement. Freeze typed contracts before RV-14/15/16 proceed.
-- Exit: no unresolved storage/interaction/execution contract before related implementation starts. Contract review is not satisfied by the high-level architecture alone. Required scenario coverage must be non-empty; incomplete work stays in autosave/checkpoints.
+- Exit: no unresolved storage/interaction/execution contract before related implementation starts. Contract review is not satisfied by the high-level architecture alone. Every configured scenario must complete with passing checks, with a non-empty scenario inventory; incomplete/failing work stays in autosave/checkpoints.
 
 ### RV-03 — Shell, command palette and panel host
 
@@ -115,8 +115,8 @@ Every path below is an ownership boundary proposal. Before READY, record exact f
 - Owner: Gemini in sequential microtasks; Claude adversarial review at each subgate; Codex verifies.
 - Owns: new `domain/versioning/`, new versioning repository files and tests. Existing `domain/model.ts`, `persistence/projects.ts`, `state/editor.ts` are integration-owned and patched only in reserved RV-12 slots.
 - Dependencies: accepted RV-02; RV-14 run identity API (fixtures may precede completed runner).
-- Sequence: immutable snapshots/run identity → branch working copies → typed diff/merge → candidate run eligibility → transactional publish/undo → current-format validation. Each subtask gets its own exact files/fixtures/checkpoint.
-- Exit: R08, deterministic three-way cases, completed-scenario gating, failure atomicity, stale-head/quota/multi-tab cases. Do not hand the junior engineer this entire track as one unbounded prompt.
+- Sequence: immutable snapshots/run identity → branch working copies → typed diff/merge → candidate run eligibility → transactional publish/default closure/reopen → current-format validation. Each subtask gets its own exact files/fixtures/checkpoint.
+- Exit: R08, deterministic three-way cases, all-configured-scenario passing gates, failure atomicity, stale-head/quota/multi-tab cases. Do not hand the junior engineer this entire track as one unbounded prompt.
 
 ### RV-09 — Saved-part domain
 

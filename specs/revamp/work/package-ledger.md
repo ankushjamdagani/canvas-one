@@ -10,7 +10,7 @@ All rows BLOCKED by the user implementation hold. These are planned subgates, no
 | RV-08b | RV-08a | Branch working copies, autosave/checkpoints, switch/save-failure handling | BLOCKED |
 | RV-08c | RV-08b | Deterministic typed three-way diff/merge and reference conflicts | BLOCKED |
 | RV-08d | RV-08c; RV-14 actual runner | Isolated candidate validation and exact-state run eligibility | BLOCKED |
-| RV-08e | RV-08d; RV-16 transactional repository | Atomic publish, compensation, closure/reopen and stale-head cases | BLOCKED |
+| RV-08e | RV-08d; RV-16 transactional repository | Atomic irreversible publication, default source closure/reopen and stale-head cases | BLOCKED |
 | RV-08f | RV-08e | Current-format history round trip, retention/reference integrity | BLOCKED |
 
 Only a named accepted subgate unblocks its consumers. RV-08a may use contract fixtures after the evidence interface is accepted; real commit/publish acceptance requires actual runner-produced evidence. Full RV-08 completion requires all rows and integrated journeys.

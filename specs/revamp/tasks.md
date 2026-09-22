@@ -6,7 +6,7 @@ GLOBAL IMPLEMENTATION HOLD — user instruction 2026-09-22. All implementation t
 
 | ID | Status | Owner | Blocking condition / next action |
 |---|---|---|---|
-| PLAN | REVIEW | Codex | P4 passed planning baseline; D26 product answer and detailed RV-02d/e/f/g contracts remain pending. User implementation hold remains. |
+| PLAN | REVIEW | Codex | P4 passed prior baseline; focused Claude policy review returned one stale D30 reference, corrected and verified by Codex. D30 is settled in the decision register; detailed RV-02d/e/f/g contracts remain pending. User implementation hold remains. |
 | ARCH-01 | ACCEPTED | Codex planning / Claude review | High-level architecture baseline passed P2/P4. This does not freeze detailed schemas or authorize implementation. |
 | RV-00 | ACCEPTED | Claude CLI; Codex coordinator | P1/P2/P3 reconciled; P4 passed baseline 6824bae. Remaining package-specific contracts and visual implementation checks are explicit gates. |
 | RV-01 | BLOCKED | Unclaimed; Gemini intended | RV-00 accepted; freeze exact foundation files |

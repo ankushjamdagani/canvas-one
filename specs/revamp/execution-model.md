@@ -100,11 +100,11 @@ Trace events carry run ID, parent/correlation IDs, logical sequence/time, elemen
 
 ## Consequence for commit/publish policy
 
-User decision D20 keeps commits and publication run-required, without a diagram exemption. Proposed contract: every current project has at least one designated baseline scenario, and commits/publications identify a non-empty required scenario set with completed exact-state evidence for each. A runnable trivial path must not silently claim coverage of the whole system: record tested scope, inactive elements and uncovered behavior explicitly.
+User decisions D20/D27/D28 require completed passing exact-state evidence for every configured scenario before commit/publication, with at least one scenario and no diagram exemption. Incomplete scenarios block eligibility; no selectable required subset. A runnable trivial path must not silently claim coverage of the whole system: record tested scope, inactive elements and uncovered behavior explicitly.
 
 Autosave/checkpoints preserve incomplete sketches and do not carry commit/publication status. A project may have a working branch with no initial commit yet; creating a project does not manufacture a qualifying run. Imported current-format snapshots likewise do not gain verification by parsing successfully.
 
-Completion and passing assertions remain distinct. Lead default: a completed modeled failure scenario can support a commit/publication with its failures prominent; do not display a passing-verification badge when assertions failed. No additional mandatory pass/fail publication gate is introduced without a separate decision, because the confirmed requirement specifies completed runs.
+Completion and passing assertions remain distinct. D27 supersedes the earlier completion-only default: failing checks block both commit and publication. Users update the system or checks and rerun the changed state. A modeled failure scenario can still pass when checks assert its expected failure behavior. Saved failed runs remain diagnostic evidence; they cannot be relabeled passing or waived.
 
 ## Before implementation
 
