@@ -4,7 +4,7 @@
 
 USER HOLD (2026-09-22): planning and read-only reviews only. Do not implement or dispatch implementation until the user explicitly lifts the hold; no reviewer verdict overrides it.
 
-State (2026-09-23): planning complete. Plan passed P1–P4 reviews; every RV-02 contract finding is closed, including the S05 bridge-frame corrections. The plan was consolidated from 127 files to 24 (same substance, no product changes); raw review evidence is in git at `09d2c8b`. No revamp application code exists; the stale Gemini worktree was removed 2026-09-23 (it had no changes); its empty branch `codex/revamp-foundation-a` (8b5e47d) remains.
+State (2026-09-23): planning complete. Plan passed P1–P4 reviews; every RV-02 contract finding is closed, including the S05 bridge-frame corrections. The plan was consolidated from 127 files to 24 (same substance, no product changes); raw review evidence is in git at `09d2c8b`. No revamp application code exists; the stale Gemini worktree and its empty branch `codex/revamp-foundation-a` were removed 2026-09-23 (no unique commits).
 
 Entry point: [`specs/revamp/README.md`](specs/revamp/README.md). Decisions D01–D30 supersede any conflicting history below — notably: model-based runs for all five families (S01–S05), real source execution later; commits/publication need passing runs for every scenario; publication is irreversible; old data formats dropped with the old Dexie DB left untouched; local-only now, hosted/self-hosted/sync and AI collaboration later. Roles: Codex lead/verifier, Claude reviewer, Gemini implementer via `/delegate` with the project rules in `specs/revamp/delivery.md`.
 
