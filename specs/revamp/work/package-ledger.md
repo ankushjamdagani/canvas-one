@@ -2,6 +2,10 @@
 
 All rows BLOCKED by the user implementation hold. These are planned subgates, not dispatched work or accepted code. Exact file lists, contract hashes, base/worktree and checks are recorded in a separate claim before any future dispatch.
 
+Global gate EXEC-PREFLIGHT is BLOCKED: Codex must record a successful task-scoped Gemini no-edit ownership/read acknowledgement, permitted writes/test commands, and interruption/timeout recovery rehearsal after the user lifts the hold. No implementation claim may enter IN_PROGRESS until EXEC-PREFLIGHT is ACCEPTED; each later claim rechecks its own scope/base/permissions. This gate authorizes no product implementation itself. Review evidence goes in work/exec-preflight.md when performed; that file does not yet exist.
+
+This is a subgate supplement to the [main task ledger](../tasks.md), not its replacement. RV-05 (inspector) is tracked there, with package scope and acceptance in [delivery plan](../delivery-plan.md); retirement requires that package's actual ACCEPTED replacement checkpoint.
+
 ## RV-08 versioning microtasks
 
 | Subgate | Dependency | Deliverable | Status |
@@ -9,11 +13,20 @@ All rows BLOCKED by the user implementation hold. These are planned subgates, no
 | RV-08a | RV-02 identity/storage contracts; RV-14a evidence interface | Immutable snapshot/run-evidence storage and eligibility predicates | BLOCKED |
 | RV-08b | RV-08a | Branch working copies, autosave/checkpoints, switch/save-failure handling | BLOCKED |
 | RV-08c | RV-08b | Deterministic typed three-way diff/merge and reference conflicts | BLOCKED |
-| RV-08d | RV-08c; RV-14 actual runner | Isolated candidate validation and exact-state run eligibility | BLOCKED |
-| RV-08e | RV-08d; RV-16 transactional repository | Atomic irreversible publication, default source closure/reopen and stale-head cases | BLOCKED |
+| RV-08d | RV-08c; RV-14a–f all ACCEPTED | Isolated candidate validation and exact-state run eligibility across all five families | BLOCKED |
+| RV-08e | RV-08d; RV-16a | Atomic irreversible publication, default source closure/reopen and stale-head cases | BLOCKED |
 | RV-08f | RV-08e | Current-format history round trip, retention/reference integrity | BLOCKED |
 
 Only a named accepted subgate unblocks its consumers. RV-08a may use contract fixtures after the evidence interface is accepted; real commit/publish acceptance requires actual runner-produced evidence. Full RV-08 completion requires all rows and integrated journeys.
+
+## RV-16 local repository microtasks
+
+| Subgate | Dependency | Deliverable | Status |
+|---|---|---|---|
+| RV-16a | Accepted RV-02 schema/storage/transaction contracts | Fresh namespace, immutable rows, CAS/receipts, preferences, quota/recovery primitives and repository port | BLOCKED |
+| RV-16b | RV-16a; RV-08 history and RV-14 saved evidence | Current-format import/export, pruning/reference integrity and integrated recovery journeys | BLOCKED |
+
+RV-08a may develop pure eligibility with repository fixtures, but durable acceptance requires RV-16a. RV-08e requires RV-16a, not completion of RV-16b. RV-16b follows versioning integration; this prevents a dependency cycle. No server, GitHub provider or remote sync implementation belongs to either subgate.
 
 ## RV-14 execution microtasks
 
@@ -26,7 +39,7 @@ Only a named accepted subgate unblocks its consumers. RV-08a may use contract fi
 | RV-14e | RV-14d | S04 deployment/fault scheduler with exact failure accounting | BLOCKED |
 | RV-14f | RV-14b/c/d/e | S05 composition/refinement and full five-family acceptance | BLOCKED |
 
-RV-14b/c may run in parallel after shared interfaces freeze. RV-14d/e are serialized if they touch the retained kernel. RV-08 consumes the versioned evidence interface frozen in RV-14a; this does not require waiting for every UI/runtime slice before pure history fixture work.
+RV-14b/c may run in parallel after shared interfaces freeze. RV-14d/e are always serialized: RV-14e starts only after RV-14d is ACCEPTED, regardless of proposed files. RV-08 consumes the versioned evidence interface frozen in RV-14a; this does not require waiting for every UI/runtime slice before pure history fixture work.
 
 ## RV-12 integration slot protocol
 

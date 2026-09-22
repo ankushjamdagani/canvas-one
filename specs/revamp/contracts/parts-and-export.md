@@ -34,9 +34,9 @@ UTF-8 BOM, comma delimiter, CRLF row endings, final CRLF. Quote every cell with 
 
 CSV has <=100,000 rows and <=16 MiB output; compute size/limits before Blob allocation. Test hostile labels including separator+quote+formula, whitespace prefixes, fullwidth forms, multiline text, leading apostrophe, emoji, negative numeric measurements and unavailable metrics. No formulas or formula hyperlinks are emitted. Download extension `.csv`, MIME `text/csv;charset=utf-8`.
 
-## Mermaid v1
-
 CSV enums are exact: `run_status=completed|invalid|failed|cancelled|incomplete`; `provenance=local|imported-unverified`. Export a stored terminal run only, not live partial batches. Partial stored runs retain their actual terminal status and unavailable metric reasons.
+
+## Mermaid v1
 
 Output plain text `flowchart LR` only; no renderer dependency is needed for download. Selected view elements sorted by stable ID map to generated `n0`, `n1`, …; groups to `g0`, `g1`, … independent of labels. Emit each node once using `n0["encoded label"]`. Wholly represented non-overlapping view groups emit `subgraph g0["encoded label"]` then member declarations and `end`; emit all edges after all node/subgraph declarations. Empty view rejects with “Add an element before exporting.”
 

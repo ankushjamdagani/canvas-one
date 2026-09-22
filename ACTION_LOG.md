@@ -939,3 +939,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/delegates/tools**: Codex lead; Claude Sonnet 4.6 read-only policy review via CLI, exit 0. REVISE contained one stale D30 reference; Codex corrected it. No Gemini implementation, in-session children or new skill invocation in this continuation.
 - **Verification**: `git diff --check` passed; `git diff fb4a1ff --exit-code -- src package.json package-lock.json tests` empty; relative planning-document links checked. No app tests rerun. Review process finished; no later Claude PASS claimed.
 - **Next**: Finalize schema/runner, storage/budgets, command/panel and export contracts with review before requesting implementation release.
+
+### Detailed revamp contracts — resumed planning and closure reviews (Codex)
+
+- **Outcome**: Resumed interrupted reviews; corrected response identity/scheduling, worker-plan transport, pipeline provenance/types, resource metadata, storage pinning/timestamps and delegation gates. Claude closure PASS covers eight schema findings, fourteen UI/export findings, two storage findings and four delegation findings. One delegation premise (missing RV-05) was incorrect; clarified its existing authoritative ledger instead. Implementation hold remains.
+- **Changed**: RV-02 contracts, fixture mapping, scoped review prompts/reports/states/disposition, package ledger/rollout, technical design, tasks and HANDOFF. Consolidated schema/command inventory and S01–S05 fixture sizing remain explicit planning gates; no runtime or measured-size claims.
+- **Platform**: Codex lead using delegate workflow; Claude Sonnet 4.6 via bounded read-only CLI sessions, final focused closures at medium effort. Three prior/broad attempts timed out without verdicts; preserved evidence and narrowed prompts. All tracked reviews terminated/returned; no Gemini implementation dispatched.
+- **Verification**: Whitespace/link/reference checks and source/dependency/test diff against fb4a1ff; application files unchanged. No application suites rerun for documentation-only work. No push/deployment or data mutation.

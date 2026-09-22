@@ -1,0 +1,142 @@
+You are Claude senior reviewer. Planning only. Review embedded delegation and dependency plan; no tools or implementation. Check for cycles, missing ownership/serialization, unsafe preflight and resume assumptions. User roles Codex plans/verifies, Claude reviews, Gemini implements after explicit hold release. Return PASS or REVISE with only concrete blocking findings. This is not approval to execute.
+
+ARTIFACT review-plan.md
+# Planning review and execution hold
+
+Updated 2026-09-22. This document implements the user's instruction to finalize the plan through multiple reviews, including delegation. No implementation is authorized. A technical clearance does not lift the user hold.
+
+## Review rounds
+
+| Review | Reviewer | Independent question | Required evidence |
+|---|---|---|---|
+| P1 Requirements | Claude, fresh read-only session | Does the plan preserve confirmed scope without invented features, omitted capabilities or contradictory outcomes? | Requirement/decision IDs, design/source anchors, genuine unresolved product questions |
+| P2 Implementation architecture | Claude, fresh read-only session | Can the bounded architecture express all five examples and future sync/AI seams without overbuilding? | Concrete contract defects, retained-kernel boundaries, storage/data-loss cases, previously raised findings disposition |
+| P3 Execution and delegation | Claude, fresh read-only session | Can agents carry out/resume independent tasks safely with this ownership graph and tooling? | Dependency cycles, exact ownership gaps, permission/timeout/result failures, handoff/recovery requirements |
+| P4 Closure review | Claude, fresh session after revisions; Codex final check | Were accepted findings fixed consistently and are unresolved items visibly gated? | Finding-by-finding pass/revise; no acceptance from prose summaries alone |
+
+Codex owns final decisions and source validation. Reviewers have Read/Glob/Grep only and no write/delegation tools. Read-only Codex scouts may validate bounded source claims; they do not replace Claude senior review. Gemini is the future implementer; do not send it implementation or code-writing prompts during this hold. A later read-only feasibility check may be separately bounded without granting write access.
+
+## Acceptance levels
+
+- **Plan accepted**: requirements/scope settled; architecture and delivery graph coherent; no unresolved high-risk architecture/data-loss finding; remaining per-package details named with owner, deliverable and gate. This does not claim every future package is implementation-ready.
+- **Contract accepted**: named interface/schema/fixture document passes its targeted peer review and lead verification. A high-level plan does not satisfy this.
+- **Task executable**: user hold lifted, plan and relevant contracts accepted, exact ownership/base/worktree/acceptance evidence recorded, delegate preflight passed.
+- **Task accepted**: actual diff and tests reviewed by Claude and verified by Codex; fixture-only UI cannot count as integrated functionality.
+
+Never mark all RV-02 complete while storage versions, numeric budgets, command APIs or scenario types remain unspecified. These may be explicit pre-dispatch deliverables in an accepted delivery plan, but remain implementation blockers.
+
+## Revised delegation contract
+
+Codex plans and verifies; Claude reviews; Gemini implements only after user authorization. Platform names in a brief are not evidence a process ran. Record model, CLI version, base commit, worktree, exact prompt, session/process identity, start/end, stdout/stderr, exit status and diff. Exit 0 with no output or a tool-permission denial is a failed assignment, as observed in the first agy headless attempt.
+
+Use automatic CLI coordination where available. The repository's older manual-only instruction is superseded for this initiative, but the implementation hold takes precedence. No `--dangerously-skip-permissions`, blanket global grants or global permission changes. Request/approve only scoped operations already authorized by the task. A headless read denial means preflight failed; use an interactive scoped permission flow or report the blocker. Do not repeatedly relaunch an unverified setup.
+
+Before future code dispatch: verify trusted workspace and read access; run a no-edit acknowledgement of task boundary; establish allowed writes and test commands; then dispatch. Do not interpret model-list availability as a successful end-to-end execution check. Shared dependencies are never writable through a symlink. Isolated worktrees need their own dependency install if package changes are allowed.
+
+The generic delegate skill is a planning aid, not an approved production dispatcher for this project. Its shell examples lack the required durable resume, preflight, reliable timeout/interrupt handling and complete evidence review. Do not run its Phase 3/4 verbatim. Project orchestration overrides its self-critic/self-review defaults: Claude is both critic and reviewer; Gemini is the implementation target. Any future automated runner must first pass a no-edit preflight and interruption/timeout test with task-scoped permissions. Until then use coordinator-managed bounded sessions with explicit state records; do not implement a new orchestration tool during this hold.
+
+Durable record before dispatch: `work/<task-id>.md` plus `work/<task-id>-state.json`, containing exact prompt/evidence paths, base/contract hashes, allowed files, model/CLI, active process/session, phase, attempt number, timeout, current owner and permission mode. Keep full stdout/stderr in referenced evidence files, not a 4000-character truncation. Reviewers inspect actual source/diff/test evidence rather than trusting exit status or summary. For read-only planning reviews, records live under `reviews/` and list actual artifacts.
+
+Before retry, inspect and preserve the actual partial diff, explain what changed in the next brief, recheck locks/base/contracts and record a new attempt. Never automatically reset a worktree or overwrite partial work. Retry only unaccepted scope. On interruption terminate the specific tracked process group/session and record exit/remaining children; retain interrupted ownership until inspected and explicitly released. An OS/process restart requires checking the recorded process identity before sending signals, avoiding reused PIDs.
+
+After every delegate return the coordinator reads the full report, checks nonempty task-relevant output and tool denials, verifies owned-file diff, records actual commands/results and updates ledger. Append ACTION_LOG and update HANDOFF only when resume guidance changes. `SUCCESS` emitted by a skill is not acceptance. Shared integration and versioning/runtime subgates follow [package-ledger.md](work/package-ledger.md).
+
+At most three active delegate processes including reviewers, and at most three implementation lanes. Keep dependencies serial: shared contracts before consumers, kernel patches exclusive, integration one writer. Review a frozen checkpoint; new commits invalidate approval of touched scope. Give each executor a one-checkpoint task, with explicit exclusion paths and stop-on-ambiguity rules. Coordinator alone writes central ledger/HANDOFF/logs.
+
+Persist orchestration state outside transient chat: task state references durable work records; prompts/results are saved under task-specific review/work evidence paths before acceptance. Temporary process IDs alone are not resumable state. Unexpected exit, timeout or user interruption marks task interrupted, retains ownership until released, captures actual diff, and never implies completion. Terminate the specific session, not every CLI process on the machine. Inspect clean state before removing any task-created worktree.
+
+Timeout is a liveness check, not permission to drop work. Read-only reviews use a bounded 5-minute attempt; implementation timeout is set per bounded assignment, followed by a clean checkpoint/retry decision. Poll for actual state at reasonable intervals and report meaningful progress; do not end the coordinator turn with a running untracked review. Multi-session resumption begins with user hold, task ledger, last accepted contracts and actual Git diff.
+
+## Current interruption evidence
+
+The RV-01a agy headless attempt returned exit 0 with a read permission denial and no implementation output. An interactive attempt reached read-only commands; it was interrupted and exited on the user's hold. Isolated worktree `codex/revamp-foundation-a` at `/tmp/system-studio-foundation-a` has no source changes. The task-created node_modules symlink was removed; original dependency files were untouched. No implementation commit exists. Main-checkout changes are planning documents only.
+
+ARTIFACT work/contract-rollout.md
+# Detailed contract rollout and delegation checks
+
+Planning only, 2026-09-22. No owner is authorized to implement. Read [review plan](../review-plan.md) before any dispatch. This refines the high-level delivery graph without adding product scope.
+
+## Contract review checkpoint
+
+Draft checkpoint `1697d42` contains RV-02d/e/f/g. Two independent Claude read-only reviews cover core/storage and UI/transfer. Reports, prompts, input hashes and process states are under `../reviews/2026-09-22-contract-*`. A draft checkpoint is not accepted merely because it exists. Codex resolves findings and records a closure disposition before any contract row can change to ACCEPTED.
+
+## Implementation dependency order after release of the hold
+
+1. **Shared schema checkpoint**: Gemini implements only accepted document/command/result schemas and validators, plus exhaustive reference/projection metadata and golden fixtures. Exact new paths/tests are assigned by Codex; no editor integration. Claude verifies closed types, discriminated unions and S01–S05 representability. Do not assign consumer code in parallel with changing these types.
+2. **Independent lanes**: foundation, pure compiler/runner contracts, and local repository base can proceed only with disjoint exact files. Three is a ceiling, not a requirement to keep three agents occupied.
+3. **RV-16a repository base**: new namespace/table keys, immutable snapshot storage, command CAS/receipts, preference CAS, import namespace and quota failures. One owner holds DB configuration. Pure versioning tests can use an accepted repository port; durable RV-08a acceptance requires the real RV-16a adapter. This removes the apparent cycle between RV-08e and the broad RV-16 package.
+4. **RV-14a manifest/evidence**: compiler and run envelope fixtures precede RV-08a eligibility consumers. They do not certify real run outcomes. RV-14b/c run independently; retained kernel RV-14d then faults RV-14e stay serialized; S05 RV-14f joins them.
+5. **UI lanes**: shell/panel reducer, canvas/dock, inspector/library/results use accepted typed fixtures with no production pretend actions. A reviewer may accept component behavior but must mark product integration pending. Commands with missing adapters stay unavailable with reasons.
+6. **Versioning lane**: RV-08a/b/c can develop after shared schema, evidence interface and repository ports; actual candidate-run gate RV-08d waits for relevant runner slices, and final acceptance requires all S01–S05. RV-08e integrates only after RV-16a transaction tests. RV-16b is recovery/import/export integration, not remote sync implementation.
+7. **Integration slots**: reserve exact shared-file subset and dependency commit hashes per RV-12 slice. Integrate accepted code only. No second writer in another worktree touches the same shared files concurrently. Schema cutover/legacy retirement wait for replacement acceptance, not merely source compilation.
+
+## Bounded brief requirements
+
+Each Gemini brief includes one concrete checkpoint, exact owned files/test paths, accepted contract hashes, fixture IDs, exclusions, commands permitted for validation, and stop conditions. For example, a machine interpreter assignment excludes kernel, persistence and App; a repository assignment excludes frontend and compiler. “Implement RV-14” is not a valid bounded brief. Codex remains the only writer to task ledger/HANDOFF/ACTION_LOG.
+
+Each Claude implementation review receives actual diff/base, full test outputs and relevant accepted contract hashes. A review is not tasked with silently implementing repairs. Codex checks claimed evidence and assigns any fix as a new bounded task to Gemini. A new semantic finding returns to Codex planning; the junior engineer does not invent missing behavior.
+
+Read-only review process preflight is proven by actual returned reports; Gemini's implementation preflight is still **not proven**. Before any future write dispatch, perform a task-scoped no-edit read/ownership acknowledgement and an interruption/timeout rehearsal, then confirm intended write permissions/test commands. Do not reuse the previous headless exit-0 permission-denial as success. No blanket global tool grants.
+
+## Remaining evidence classes
+
+Contract prose can establish types, policies and limits. Concrete fixture-size measurements are needed before accepting the storage budget gate; runtime memory/latency, mobile/browser geometry, Mermaid parser and spreadsheet-reader tests occur only after the corresponding implementation exists. Never relabel future checks as passed. Each gate records its own status, so a slow core package does not prevent planning or reviewing an independent UI slice.
+
+ARTIFACT work/package-ledger.md
+# Future package subgates and shared-file ownership
+
+All rows BLOCKED by the user implementation hold. These are planned subgates, not dispatched work or accepted code. Exact file lists, contract hashes, base/worktree and checks are recorded in a separate claim before any future dispatch.
+
+## RV-08 versioning microtasks
+
+| Subgate | Dependency | Deliverable | Status |
+|---|---|---|---|
+| RV-08a | RV-02 identity/storage contracts; RV-14a evidence interface | Immutable snapshot/run-evidence storage and eligibility predicates | BLOCKED |
+| RV-08b | RV-08a | Branch working copies, autosave/checkpoints, switch/save-failure handling | BLOCKED |
+| RV-08c | RV-08b | Deterministic typed three-way diff/merge and reference conflicts | BLOCKED |
+| RV-08d | RV-08c; RV-14 actual runner | Isolated candidate validation and exact-state run eligibility | BLOCKED |
+| RV-08e | RV-08d; RV-16 transactional repository | Atomic irreversible publication, default source closure/reopen and stale-head cases | BLOCKED |
+| RV-08f | RV-08e | Current-format history round trip, retention/reference integrity | BLOCKED |
+
+Only a named accepted subgate unblocks its consumers. RV-08a may use contract fixtures after the evidence interface is accepted; real commit/publish acceptance requires actual runner-produced evidence. Full RV-08 completion requires all rows and integrated journeys.
+
+## RV-16 local repository microtasks
+
+| Subgate | Dependency | Deliverable | Status |
+|---|---|---|---|
+| RV-16a | Accepted RV-02 schema/storage/transaction contracts | Fresh namespace, immutable rows, CAS/receipts, preferences, quota/recovery primitives and repository port | BLOCKED |
+| RV-16b | RV-16a; RV-08 history and RV-14 saved evidence | Current-format import/export, pruning/reference integrity and integrated recovery journeys | BLOCKED |
+
+RV-08a may develop pure eligibility with repository fixtures, but durable acceptance requires RV-16a. RV-08e requires RV-16a, not completion of RV-16b. RV-16b follows versioning integration; this prevents a dependency cycle. No server, GitHub provider or remote sync implementation belongs to either subgate.
+
+## RV-14 execution microtasks
+
+| Subgate | Dependency | Deliverable | Status |
+|---|---|---|---|
+| RV-14a | Accepted RV-02 types/identity/budgets | Scenario readiness, canonical manifest and durable evidence interface, trace envelope | BLOCKED |
+| RV-14b | RV-14a | S01 state/events interpreter | BLOCKED |
+| RV-14c | RV-14a | S03 data-operation interpreter | BLOCKED |
+| RV-14d | RV-14a | Retained resource characterization, finite-input/trace/completion adapter, S02 business outcomes | BLOCKED |
+| RV-14e | RV-14d | S04 deployment/fault scheduler with exact failure accounting | BLOCKED |
+| RV-14f | RV-14b/c/d/e | S05 composition/refinement and full five-family acceptance | BLOCKED |
+
+RV-14b/c may run in parallel after shared interfaces freeze. RV-14d/e are serialized if they touch the retained kernel. RV-08 consumes the versioned evidence interface frozen in RV-14a; this does not require waiting for every UI/runtime slice before pure history fixture work.
+
+## RV-12 integration slot protocol
+
+The coordinator owns a single integration lock across `src/App.tsx`, `src/state/editor.ts`, `src/domain/model.ts`, `src/persistence/projects.ts`, `src/components/StudioMenu.tsx` and any reserved shared CSS/contracts/package files. These are an exclusion list, not blanket write permission. Each slot lists the exact subset it may edit.
+
+1. A feature submits its accepted checkpoint and requested adapter/wiring changes. Coordinator verifies dependencies and drafts `work/rv-12-<slice>.md` with exact files, base and acceptance journeys.
+2. Register one ACTIVE slot below; no second slot or feature writer may hold any shared file concurrently, even in another worktree if it would create unreviewed integration divergence.
+3. Gemini performs only the slot's implementation. Claude reviews actual diff and Codex verifies tests and integration behavior.
+4. Mark slot ACCEPTED at its actual checkpoint, release locks explicitly, then assign the next slot. If it fails, retain ownership and publish its specific pending corrections; do not advance dependent slots.
+
+| Slot | Owner | Files | State | Checkpoint |
+|---|---|---|---|---|
+| None | None | None | User hold | None |
+
+Small independent feature modules can continue outside those files after their own gates. Integration ordering is dependency-driven: foundation → shell/canvas → inspector → library/results/entry → history, with current-schema/runner/retirement slices coordinated before incompatible consumers are wired.
+
+## Retirement gate
+
+RV-15 never owns `OpenInspector.tsx` by default; RV-05 retains current inspector functionality. Legacy `Inspector.tsx` and internals/control families are separate candidates. Every removal manifest names live callers and replacement acceptance evidence; orphan removal has verified no-caller evidence. Shared model/editor/worker/persistence changes go through one RV-12 slot. An active file cannot transfer to retirement while its current task is IN_PROGRESS or REVIEW. Coordinator records explicit release/transfer and new ownership only after replacement behavior is ACCEPTED. No blanket folder deletion or arbitrary worktree reset.

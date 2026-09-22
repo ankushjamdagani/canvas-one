@@ -16,6 +16,23 @@ Implementation hold remains. Initial four-contract draft checkpoint: 1697d42.
 - Added schema dependency manifest field, source/main cleanliness and revision requirements, full authored-export size invariant and recovery operations at receipt cap.
 - Added [rollout protocol](../work/contract-rollout.md): RV-16a repository base precedes durable versioning acceptance; pure independent lanes remain possible. No Gemini preflight or implementation is claimed.
 
-## Pending evidence
+## Resumed review results
 
-Focused schema/runner, storage and UI closure review; concrete S01–S05 serialized fixture sizing; remaining detailed grammar findings if raised. Runtime performance, browser panel behavior and parser/spreadsheet tests are future implementation acceptance checks. Conservative specified ceilings are not measured runtime guarantees. No contract is marked accepted solely because this disposition lists intended fixes.
+The prior schema review returned REVISE (eight findings); storage and UI closure attempts timed out at 300 seconds without output. Their state/report files are retained. A second broad schema attempt also timed out; no approval is inferred. Subsequent reviews used embedded frozen artifacts with tools disabled and bounded process groups. No delegate was permitted to edit files. All processes are now terminal.
+
+| Scope | Final evidence | Lead disposition |
+|---|---|---|
+| UI/parts, CP-1–7 and PE-1–7 | [UI r2](2026-09-22-contract-ui-r2-report.md), PASS | All 14 original findings closed. Accept this scoped review, not its broader assertion that all implementation dependencies are ready. |
+| Schema D1–D8 | [schema closure](2026-09-22-contract-schema-closure-report.md), PASS | Explicit request bindings, separate call/application identities, same-worker plan handles, response schemas, decision entry ports, row errors, completion-mode validation and metric subjects now specified. Logical afterInputId scheduling also passed. |
+| Storage D1/D2 | [gates closure](2026-09-22-contract-gates-closure-report.md), PASS | Initial snapshot explicitly pinned; terminal timestamps non-null. Added retained-run snapshot protection and explicit evidence pin definition. |
+| Delegation F1–F4 | [delegation findings](2026-09-22-contract-delegation-r2-report.md), then [closure](2026-09-22-contract-gates-closure-report.md), PASS | Exact RV-14a–f dependency for RV-08d, unconditional d/e serialization and named EXEC-PREFLIGHT gate. F2's claim RV-05 did not exist was incorrect: it already existed in tasks.md/delivery-plan.md, omitted from that focused prompt. Added explicit cross-reference rather than duplicate ownership. |
+
+Other lead corrections: initialSnapshotId is now a real project/export field; S03 permits explicit scalar-union external values and preserves typed row provenance; finite resource inputs/bridge connections declare routing and deadline metadata; CSV enum paragraph moved into its correct section. Source/dependencies/tests remain unchanged from fb4a1ff.
+
+Review transport: schema/storage/UI r2 and delegation r2 used Claude Sonnet 4.6, tools disabled, no session persistence, 300-second bound. Final gates/schema closure additionally requested medium effort. Each exact embedded prompt is saved; state files record input hashes/base/PID/timing/status. Base commit alone does not identify uncommitted reviewed drafts; use embedded prompt content and hashes. Later edits invalidate only the affected review scope.
+
+## Remaining contract freeze evidence
+
+Known findings above are closed; full RV-02 is not yet ACCEPTED. Before final freeze, author and independently inventory complete S01–S05 serialized fixtures, measure canonical byte sizes and budget headroom, and reconcile the consolidated closed schemas. The latter must include publication-form metadata from decisions.md (version/title/rationale/ticket) and the exact per-command payload/result inventory currently described by registry rows. These are existing RV-02d/e/f deliverables, not new product scope and not permission for an implementer to guess.
+
+Runtime performance, browser panel behavior and parser/spreadsheet tests are future implementation acceptance checks. Conservative specified ceilings are not measured runtime guarantees. Claude's “ready for implementation hold lift” is a reviewer's scoped conclusion, not user authorization or completion of the remaining fixture/schema gates.

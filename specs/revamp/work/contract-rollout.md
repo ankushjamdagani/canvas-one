@@ -4,7 +4,7 @@ Planning only, 2026-09-22. No owner is authorized to implement. Read [review pla
 
 ## Contract review checkpoint
 
-Draft checkpoint `1697d42` contains RV-02d/e/f/g. Two independent Claude read-only reviews cover core/storage and UI/transfer. Reports, prompts, input hashes and process states are under `../reviews/2026-09-22-contract-*`. A draft checkpoint is not accepted merely because it exists. Codex resolves findings and records a closure disposition before any contract row can change to ACCEPTED.
+Draft checkpoint `1697d42` contains RV-02d/e/f/g; subsequent corrections have targeted Claude PASS results for schema, storage, UI/transfer and delegation findings. Read [current disposition](../reviews/2026-09-22-contract-disposition.md) for exact scope and remaining schema/fixture gates. Reports, embedded prompts, input hashes and terminal process states are under `../reviews/2026-09-22-contract-*`. A draft checkpoint or scoped closure PASS does not make every package executable.
 
 ## Implementation dependency order after release of the hold
 
