@@ -1084,3 +1084,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: Sonnet subagent (resumed once after a session rate limit) added `src/domain/studio/runner/`: `prepareScenario` compile front end, trace envelope, run-update/result types and evidence interface. Review round fixed the trace recorder: payloads were stored before the cap checks (orphans past the budget), the payload table kept caller objects by reference, and unserialisable events counted as 0 bytes. Committed `3d413c4` on `claude/rv-14a-runner-start` (base `2ffa2d3`).
 - **Verification** (Claude): 389 unit tests, `tsc -b` clean; code review of trace/compile/evidence.
 - **Limitations**: No worker, plan handles or `startRun` yet (later RV-14 steps). Contract gaps recorded in the ledger (no AbortSignal in `buildManifest`, `identity-unavailable` status, single-value limits).
+
+## 2026-09-24
+
+### RV-14b + RV-14c in parallel (Claude lead, Gemini executors)
+
+- **Outcome**: Claude first committed a shared Value/Guard `Evaluator` interface (`runner/expr-api.ts`, `81f8b09`) so the lanes wouldn't duplicate it. Gemini RV-14b built the evaluator, machine interpreter, logical runner and assertion evaluation (`f9c4f47`); all three S01 scenarios pass their authored assertions and §11 trace facts. Gemini RV-14c built the six pipeline operations with row provenance (`585b6fb`); S03 reproduced exactly. Both merged onto the runner line @ `59cf20b`.
+- **Verification** (Claude): each lane and the merge: 441 / 404 / 456 unit tests, `tsc -b` clean; review found no fixture special-casing and no clock/RNG use.
+- **Limitations**: Pipelines are not yet called from the logical runner; contract gaps listed in the ledger (request ID format, trace effect kind, pipeline row-error routing, overflow accounting).
