@@ -96,6 +96,19 @@ export const evergreen = Object.freeze({
     subtitle: 15,
     ui: 13,
   }),
+
+  // Elevation shadows
+  // Source: /private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/design.k81I/tokens/shape.css
+  shadow: Object.freeze({
+    raised: '0 1px 2px rgba(22, 32, 29, 0.08)',
+    popover: '0 18px 32px -16px rgba(22, 32, 29, 0.32)',
+    floating: '0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06)',
+  }),
+  shadows: Object.freeze({
+    raised: '0 1px 2px rgba(22, 32, 29, 0.08)',
+    popover: '0 18px 32px -16px rgba(22, 32, 29, 0.32)',
+    floating: '0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06)',
+  }),
 } as const);
 
 export type Evergreen = typeof evergreen;

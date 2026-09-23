@@ -110,7 +110,7 @@ test.describe("Canvas Floating Dock (RV-04a)", () => {
 
     const buttons = dock.getByRole("button");
     const count = await buttons.count();
-    expect(count).toBeGreaterThanOrEqual(9);
+    expect(count).toBeGreaterThanOrEqual(7);
 
     for (let i = 0; i < count; i++) {
       const btn = buttons.nth(i);
@@ -120,8 +120,24 @@ test.describe("Canvas Floating Dock (RV-04a)", () => {
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
 
-
-
+    const moreBtn = dock.getByRole("button", { name: "More canvas tools" });
+    let totalCount = count;
+    if (await moreBtn.isVisible()) {
+      await moreBtn.click();
+      const popover = page.getByTestId("dock-more-popover");
+      await expect(popover).toBeVisible();
+      const popoverButtons = popover.getByRole("button");
+      const popoverCount = await popoverButtons.count();
+      for (let i = 0; i < popoverCount; i++) {
+        const btn = popoverButtons.nth(i);
+        const box = await btn.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+      totalCount += popoverCount;
+    }
+    expect(totalCount).toBeGreaterThanOrEqual(9);
 
     await context.close();
   });
@@ -136,6 +152,81 @@ test.describe("Canvas Floating Dock (RV-04a)", () => {
       return window.getComputedStyle(el).borderRadius;
     });
     expect(borderRadius).toBe("14px");
+  });
+
+  test("at 390x844 touch dock right edge <= viewport width and every action reachable; at 1512x982 no More button", async ({
+    browser,
+  }) => {
+    // 1. Mobile touch context (390x844)
+    const mobileContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const mobilePage = await mobileContext.newPage();
+    await mobilePage.goto("/");
+    const mobileDock = mobilePage.getByTestId("canvas-floating-dock");
+    await expect(mobileDock).toBeVisible();
+
+    // At 390x844 touch the dock's right edge <= viewport width
+    const dockBox = await mobileDock.boundingBox();
+    expect(dockBox).not.toBeNull();
+    expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(390);
+
+    // Every dock action is reachable (visible, or inside the More popover after opening it)
+    const allActions = [
+      "Undo",
+      "Redo",
+      "Select",
+      "Pan",
+      "Selection actions",
+      "Add canvas note",
+      "Zoom Out",
+      "Zoom In",
+      "Fit view",
+    ];
+
+    // Priority actions are visible directly in dock
+    await expect(mobileDock.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+    await expect(mobileDock.getByRole("button", { name: "Redo", exact: true })).toBeVisible();
+    await expect(mobileDock.getByRole("button", { name: "Select", exact: true })).toBeVisible();
+    await expect(mobileDock.getByRole("button", { name: "Pan", exact: true })).toBeVisible();
+
+    // More button is visible with aria-label and aria-expanded
+    const moreBtn = mobileDock.getByRole("button", { name: "More canvas tools" });
+    await expect(moreBtn).toBeVisible();
+    await expect(moreBtn).toHaveAttribute("aria-expanded", "false");
+
+    await moreBtn.click();
+    await expect(moreBtn).toHaveAttribute("aria-expanded", "true");
+
+    const popover = mobilePage.getByTestId("dock-more-popover");
+    await expect(popover).toBeVisible();
+
+    // Every dock action is reachable
+    for (const name of allActions) {
+      const btn = mobilePage.getByRole("button", { name, exact: true });
+      await expect(btn).toBeVisible();
+    }
+
+    await mobileContext.close();
+
+    // 2. Desktop context (1512x982): no More button is shown
+    const desktopPage = await browser.newPage();
+    await desktopPage.setViewportSize({ width: 1512, height: 982 });
+    await desktopPage.goto("/");
+    const desktopDock = desktopPage.getByTestId("canvas-floating-dock");
+    await expect(desktopDock).toBeVisible();
+
+    const desktopMoreBtn = desktopDock.getByRole("button", { name: "More canvas tools" });
+    await expect(desktopMoreBtn).toHaveCount(0);
+
+    for (const name of allActions) {
+      const btn = desktopDock.getByRole("button", { name, exact: true });
+      await expect(btn).toBeVisible();
+    }
+
+    await desktopPage.close();
   });
 });
 

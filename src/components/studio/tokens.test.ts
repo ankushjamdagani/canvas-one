@@ -196,4 +196,10 @@ describe("Evergreen tokens and styles.css single source check", () => {
       expect(themeVars[`--text-${key}`]).toBe(`${size}px`);
     }
   });
+
+  it("(h) asserts elevation shadow tokens in @theme equal evergreen.shadow", () => {
+    expect(themeVars["--shadow-raised"]).toBe(evergreen.shadow.raised);
+    expect(themeVars["--shadow-popover"]).toBe(evergreen.shadow.popover);
+    expect(themeVars["--shadow-floating"]).toBe(evergreen.shadow.floating);
+  });
 });
