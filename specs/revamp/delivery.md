@@ -95,8 +95,9 @@ RV-14d and RV-14e are always serialized. RV-16b follows versioning integration, 
 |---|---|---|
 | PLAN, RV-00, RV-02 | ACCEPTED (planning) | — |
 | EXEC-PREFLIGHT | ACCEPTED 2026-09-23 | agy runs headless with `--dangerously-skip-permissions` (user choice) inside per-task worktrees; timeouts need a SIGTERM/SIGKILL watchdog (`alarm`/`--print-timeout` don't stop agy) |
-| RV-01a Evergreen tokens | REVIEW PASS, uncommitted | Worktree `.claude/worktrees/rv-01a` (branch `claude/rv-01a-tokens`); commit, then RV-01b fonts / components.json / specimen |
-| RV-02a `studio-model/1` types | REVIEW PASS, uncommitted | Worktree `.claude/worktrees/rv-02a` (branch `claude/rv-02a-model-types`); commit, then validators (model-and-runner §12.1) |
+| RV-01a/b/c foundation tokens, colours, fonts, specimen | REVIEW PASS, committed | Branch `claude/rv-01a-tokens` @ `2d08ec5` (merges RV-01b `5908702`, RV-01c `c60d984`); worktree `.claude/worktrees/rv-01a` |
+| RV-01d legacy base CSS + computed-style checks | READY | Specimen defects: bare `border` renders currentColor (no base border-color); legacy global `button` rule boxes ghost/link variants and forces nowrap (long label clips); disabled uses opacity 0.4; focus uses legacy `--teal`; invalid fields show no risk border; `canvasFirst.css` still sets Inter |
+| RV-02a `studio-model/1` types | REVIEW PASS, committed | Branch `claude/rv-02a-model-types` @ `d0cbc1c`; next RV-02b validators (model-and-runner §12.1) |
 | RV-01 (rest), RV-03 … RV-16 | BLOCKED | Dependencies as ordered above |
 
 Statuses: READY → CLAIMED → IN_PROGRESS → REVIEW → ACCEPTED, or BLOCKED (with the specific dependency named). A paused task stays owned until it is released.

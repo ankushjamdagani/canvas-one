@@ -996,3 +996,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude orchestrator/critic/reviewer; Gemini 3.8 Flash executors (medium/high effort) via `/delegate`. One agy 503, retried.
 - **Verification** (rerun by Claude): RV-01a 238 unit tests, build ok, production e2e 46/51 on an isolated port (5184) with the same 5 baseline mobile failures; RV-02a 238 tests, build ok; `git diff --check` clean. A stale Sep-17 `vite preview` holds port 5174, so the default e2e config would test stale code.
 - **Limitations**: Not committed. Fonts, `components.json`, specimen and browser computed-style checks (R02) not started.
+
+### RV-01b/c — colour decisions, fonts, specimen (Claude)
+
+- **Outcome**: User decisions applied: destructive uses clay `#A15B40` (theme `--danger` is clay; `#B4674A` fails 4.5:1 with white text), and field borders use warm grey `#948D80` (≥3:1 on canvas/shell/panel). My earlier "theme border + fill" suggestion was withdrawn because the fill is only 1.04–1.09:1. RV-01b packaged IBM Plex Sans/Mono 400–600 latin and Newsreader variable locally. RV-01c added `components.json` and a dev-only `/specimen.html` with a focus/overlay smoke test. Both merged into `claude/rv-01a-tokens` (`2d08ec5`).
+- **Changed**: RV-01b `styles.css`, `tokens(.test).ts`, `package(-lock).json`; RV-01c `components.json`, `specimen.html`, `src/components/studio/specimen/*`, `tests/specimen.spec.ts`. Main repo: delivery ledger, HANDOFF, ACTION_LOG, `.claude/launch.json` (worktree preview config).
+- **Platform**: Claude orchestrator/reviewer; two parallel Gemini 3.8 Flash lanes.
+- **Verification** (Claude, merged branch): 239 unit tests; build ok; specimen spec 1/1 (dev); production e2e 46/51 on port 5184 with the same 5 baseline mobile failures, specimen skipped in production; browser check confirms Plex/Newsreader load, destructive `rgb(161,91,64)`, field border `rgb(148,141,128)`.
+- **Limitations**: Specimen exposed legacy global CSS defects (bare `border` = currentColor, boxed ghost/link buttons, clipped long labels, opacity-0.4 disabled, legacy teal focus, no invalid border, Inter still set in `canvasFirst.css`) — queued as RV-01d. Missing primitives vs design table: kbd, select, slider, toggle-group, breadcrumb, command, toast, progress, resizable, hover-card.

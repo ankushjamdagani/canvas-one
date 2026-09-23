@@ -2,7 +2,7 @@
 
 ## Active initiative — System Studio design revamp (21 September 2026)
 
-HOLD LIFTED (2026-09-23): user started revamp work via `/delegate`. EXEC-PREFLIGHT accepted; RV-01a (Evergreen tokens) and RV-02a (`studio-model/1` types) passed review in worktrees `.claude/worktrees/rv-01a` and `rv-02a`, uncommitted. Ledger: `specs/revamp/delivery.md`.
+HOLD LIFTED (2026-09-23): user started revamp work via `/delegate`. EXEC-PREFLIGHT accepted; RV-01a–c (Evergreen tokens, clay destructive #A15B40, warm field border #948D80, local Plex/Newsreader fonts, components.json, dev-only /specimen.html) are committed on `claude/rv-01a-tokens`; RV-02a types on `claude/rv-02a-model-types`. Next: RV-01d (legacy base CSS defects found on the specimen), RV-02b validators. Ledger: `specs/revamp/delivery.md`.
 
 State (2026-09-23): planning complete. Plan passed P1–P4 reviews; every RV-02 contract finding is closed, including the S05 bridge-frame corrections. The plan was consolidated from 127 files to 24 (same substance, no product changes); raw review evidence is in git at `09d2c8b`. No revamp application code exists; the stale Gemini worktree and its empty branch `codex/revamp-foundation-a` were removed 2026-09-23 (no unique commits).
 
