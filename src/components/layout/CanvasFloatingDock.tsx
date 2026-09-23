@@ -6,8 +6,8 @@ import {
   Hand,
   Boxes,
   StickyNote,
-  Plus,
   Minus,
+  Plus,
   Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,19 +51,39 @@ export function CanvasFloatingDock({
   onZoomOut,
   onFitView,
 }: CanvasFloatingDockProps) {
+  const [hasExportPanel, setHasExportPanel] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => {
+      const panel = document.querySelector(".canvas-first-export-panel");
+      setHasExportPanel(Boolean(panel));
+    };
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <TooltipProvider delayDuration={250}>
       <div
         data-testid="canvas-floating-dock"
         className={cn(
           "canvas-floating-dock",
-          "absolute bottom-2 left-2 sm:bottom-3.5 sm:left-3.5 z-10 flex max-w-[calc(100%-16px)] items-center gap-1 overflow-x-auto rounded-lg border border-border bg-background/95 backdrop-blur-md px-1.5 py-1 shadow-md select-none pointer-events-auto"
+          "absolute bottom-3 sm:bottom-6 z-dock",
+          hasExportPanel
+            ? "left-3 sm:left-4 translate-x-0"
+            : "left-1/2 -translate-x-1/2",
+          "flex max-w-[calc(100%-16px)] sm:max-w-none items-center gap-1",
+          "rounded-dock border border-border bg-panel px-1.5 py-1",
+          "shadow-[0_20px_44px_-18px_rgba(22,32,29,0.38),0_2px_6px_rgba(22,32,29,0.06)]",
+          "overflow-x-auto select-none pointer-events-auto"
         )}
         role="toolbar"
         aria-label="Canvas controls"
       >
         {/* History: Undo & Redo */}
-        <div className="canvas-dock-group flex items-center gap-0.5">
+        <div className="canvas-dock-group shrink-0 flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -71,12 +91,12 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
+                className="canvas-dock-btn shrink-0 size-8 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text pointer-coarse:size-11"
                 aria-label="Undo"
                 disabled={!canUndo}
                 onClick={onUndo}
               >
-                <Undo2 size={15} />
+                <Undo2 className="size-3.5 sm:size-4" />
                 <span className="sr-only">Undo</span>
               </Button>
             </TooltipTrigger>
@@ -90,12 +110,12 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
+                className="canvas-dock-btn shrink-0 size-8 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text pointer-coarse:size-11"
                 aria-label="Redo"
                 disabled={!canRedo}
                 onClick={onRedo}
               >
-                <Redo2 size={15} />
+                <Redo2 className="size-3.5 sm:size-4" />
                 <span className="sr-only">Redo</span>
               </Button>
             </TooltipTrigger>
@@ -103,29 +123,29 @@ export function CanvasFloatingDock({
           </Tooltip>
         </div>
 
-        <Separator orientation="vertical" className="canvas-dock-divider h-4 mx-0.5 bg-border" />
+        <Separator orientation="vertical" className="canvas-dock-divider shrink-0 h-[22px] bg-border" />
 
         {/* Tool Modes: Select & Pan */}
-        <div className="canvas-dock-group flex items-center gap-0.5">
+        <div className="canvas-dock-group shrink-0 flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 data-testid="dock-select-btn"
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant={dragMode === "select" ? "tint" : "ghost"}
+                size="icon"
                 className={cn(
-                  "canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground",
+                  "canvas-dock-btn shrink-0 size-8 pointer-coarse:size-11",
                   dragMode === "select"
-                    ? "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
-                    : "bg-transparent border-transparent"
+                    ? "active font-semibold text-primary"
+                    : "text-body hover:text-foreground"
                 )}
                 aria-label="Select"
                 aria-pressed={dragMode === "select"}
                 onClick={() => onSetDragMode("select")}
               >
-                <MousePointer size={14} />
-                <span className="canvas-dock-text ml-1">Select</span>
+                <MousePointer className="size-3.5 sm:size-4" />
+                <span className="sr-only">Select</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Select tool (box select)</TooltipContent>
@@ -136,47 +156,47 @@ export function CanvasFloatingDock({
               <Button
                 data-testid="dock-pan-btn"
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant={dragMode === "pan" ? "tint" : "ghost"}
+                size="icon"
                 className={cn(
-                  "canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground",
+                  "canvas-dock-btn shrink-0 size-8 pointer-coarse:size-11",
                   dragMode === "pan"
-                    ? "active bg-teal-500/15 text-teal-700 dark:text-teal-300 font-semibold border border-teal-500/30"
-                    : "bg-transparent border-transparent"
+                    ? "active font-semibold text-primary"
+                    : "text-body hover:text-foreground"
                 )}
                 aria-label="Pan"
                 aria-pressed={dragMode === "pan"}
                 onClick={() => onSetDragMode("pan")}
               >
-                <Hand size={14} />
-                <span className="canvas-dock-text ml-1">Pan</span>
+                <Hand className="size-3.5 sm:size-4" />
+                <span className="sr-only">Pan</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Pan tool (drag canvas)</TooltipContent>
           </Tooltip>
         </div>
 
-        <Separator orientation="vertical" className="canvas-dock-divider h-4 mx-0.5 bg-border" />
+        <Separator orientation="vertical" className="canvas-dock-divider shrink-0 h-[22px] bg-border" />
 
         {/* Group & Canvas Actions */}
-        <div className="canvas-dock-group flex items-center gap-0.5">
+        <div className="canvas-dock-group shrink-0 flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 data-testid="dock-group-btn"
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="canvas-dock-btn h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
+                size="icon"
+                className="canvas-dock-btn shrink-0 size-8 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text pointer-coarse:size-11"
                 aria-label="Selection actions"
                 disabled={!canGroup}
                 onClick={onGroupClick}
               >
-                <Boxes size={14} />
-                <span className="canvas-dock-text ml-1">Group</span>
+                <Boxes className="size-3.5 sm:size-4" />
+                <span className="sr-only">Group</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Group / selection actions</TooltipContent>
+            <TooltipContent side="top">Selection actions</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -185,42 +205,24 @@ export function CanvasFloatingDock({
                 data-testid="dock-add-note-btn"
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="canvas-dock-btn add-canvas-note h-7 w-auto min-h-0 mt-0 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 bg-transparent border-transparent"
+                size="icon"
+                className="canvas-dock-btn add-canvas-note shrink-0 size-8 min-w-8 pointer-coarse:min-w-11 pointer-coarse:size-11 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text"
                 aria-label="Add canvas note"
                 disabled={!canAddNote}
                 onClick={onAddNote}
               >
-                <StickyNote size={14} />
-                <span className="canvas-dock-text ml-1">Add canvas note</span>
+                <StickyNote className="size-3.5 sm:size-4" />
+                <span className="sr-only">Add canvas note</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Add canvas note</TooltipContent>
           </Tooltip>
         </div>
 
-        <Separator orientation="vertical" className="canvas-dock-divider h-4 mx-0.5 bg-border" />
+        <Separator orientation="vertical" className="canvas-dock-divider shrink-0 h-[22px] bg-border" />
 
-        {/* Zoom Controls */}
-        <div className="canvas-dock-group flex items-center gap-0.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-zoom-in-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground bg-transparent border-transparent"
-                aria-label="Zoom In"
-                onClick={onZoomIn}
-              >
-                <Plus size={15} />
-                <span className="sr-only">Zoom In</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Zoom in</TooltipContent>
-          </Tooltip>
-
+        {/* Zoom Controls: Zoom Out, Zoom In, Fit view */}
+        <div className="canvas-dock-group shrink-0 flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -228,11 +230,11 @@ export function CanvasFloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground bg-transparent border-transparent"
+                className="canvas-dock-btn shrink-0 size-8 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text pointer-coarse:size-11"
                 aria-label="Zoom Out"
                 onClick={onZoomOut}
               >
-                <Minus size={15} />
+                <Minus className="size-3.5 sm:size-4" />
                 <span className="sr-only">Zoom Out</span>
               </Button>
             </TooltipTrigger>
@@ -242,15 +244,33 @@ export function CanvasFloatingDock({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                data-testid="dock-zoom-in-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="canvas-dock-btn shrink-0 size-8 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text pointer-coarse:size-11"
+                aria-label="Zoom In"
+                onClick={onZoomIn}
+              >
+                <Plus className="size-3.5 sm:size-4" />
+                <span className="sr-only">Zoom In</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Zoom in</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
                 data-testid="dock-fit-view-btn"
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="canvas-dock-btn h-7 w-7 text-muted-foreground hover:text-foreground bg-transparent border-transparent"
+                className="canvas-dock-btn shrink-0 size-8 text-body hover:text-foreground disabled:bg-transparent disabled:border-transparent disabled:text-secondary-text pointer-coarse:size-11"
                 aria-label="Fit view"
                 onClick={onFitView}
               >
-                <Maximize2 size={15} />
+                <Maximize2 className="size-3.5 sm:size-4" />
                 <span className="sr-only">Fit view</span>
               </Button>
             </TooltipTrigger>

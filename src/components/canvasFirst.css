@@ -513,24 +513,7 @@ header.canvas-first-topbar * {
   color: #0f172a;
 }
 
-/* Canvas Floating Dock */
-.canvas-floating-dock .canvas-dock-btn {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}
 
-.canvas-floating-dock .canvas-dock-btn:hover:not(:disabled) {
-  background: var(--accent, #f4f4f5);
-  border-color: transparent;
-}
-
-.canvas-floating-dock .canvas-dock-btn.active,
-.canvas-floating-dock .canvas-dock-btn[aria-pressed="true"] {
-  background-color: rgba(20, 184, 166, 0.15);
-  border-color: rgba(20, 184, 166, 0.3);
-  font-weight: 600;
-}
 
 /* Empty canvas prompt */
 .canvas-first-empty-prompt {
