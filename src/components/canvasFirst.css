@@ -19,68 +19,6 @@
   z-index: 25;
 }
 
-/* Compact full-width topbar */
-header.canvas-first-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  min-height: 48px;
-  padding: 0 16px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid #dce5e1;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
-  gap: 12px;
-  flex-shrink: 0;
-  position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  z-index: 1100 !important;
-  pointer-events: auto !important;
-}
-
-header.canvas-first-topbar * {
-  pointer-events: auto;
-}
-
-.canvas-first-topbar-row {
-  display: flex;
-  align-items: center;
-}
-
-.canvas-first-topbar-row-main {
-  gap: 10px;
-}
-
-.canvas-first-topbar-row-tools {
-  gap: 8px;
-}
-
-.canvas-first-brand {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-weight: 700;
-  font-size: 14.5px;
-  line-height: 1;
-  color: #0f1715;
-  user-select: none;
-  margin: 0 !important;
-  padding: 0;
-}
-
-.canvas-first-brand svg {
-  color: #087f84;
-  display: block;
-  flex-shrink: 0;
-}
-
-.canvas-first-brand .brand-dot {
-  color: #087f84;
-}
-
 .project-switch {
   max-width: 190px;
 }
@@ -236,95 +174,6 @@ header.canvas-first-topbar * {
   width: 100%;
   position: relative;
   overflow: hidden;
-}
-
-/* Left Control Rail / Menu Bar */
-.canvas-first-left-rail {
-  width: 60px;
-  flex-shrink: 0;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-right: 1px solid #dce5e1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  z-index: 1100 !important;
-  box-shadow: 1px 0 4px rgba(15, 23, 42, 0.04);
-  box-sizing: border-box;
-}
-
-.canvas-first-rail-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.canvas-first-rail-bottom {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding-top: 10px;
-  border-top: 1px solid #eef2f0;
-}
-
-.canvas-first-rail-btn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #33443e;
-  cursor: pointer;
-  position: relative;
-  transition: all 0.15s ease;
-  box-sizing: border-box;
-}
-
-.canvas-first-rail-btn:hover:not(:disabled) {
-  background: #eef5f2;
-  color: #087f84;
-  border-color: #d1e3dd;
-}
-
-.canvas-first-rail-btn.active {
-  background: #e4f3f0;
-  color: #087f84;
-  border-color: #087f84;
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgba(8, 127, 132, 0.18);
-}
-
-.canvas-first-rail-btn:focus-visible {
-  outline: 2px solid #087f84;
-  outline-offset: 1px;
-}
-
-.canvas-first-rail-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.canvas-first-rail-label {
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 1;
-  color: inherit;
-  white-space: nowrap;
-  letter-spacing: -0.01em;
-  user-select: none;
 }
 
 /* Component catalog drawer */
@@ -883,82 +732,6 @@ header.canvas-first-topbar * {
     overflow-x: hidden;
   }
 
-  header.canvas-first-topbar {
-    height: auto !important;
-    min-height: auto;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    padding: 8px 10px;
-    z-index: 900 !important;
-  }
-
-  .canvas-first-topbar-row {
-    width: 100%;
-  }
-
-  .canvas-first-topbar-row-main {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    flex-wrap: nowrap;
-  }
-
-  .canvas-first-topbar-row-main .canvas-first-brand {
-    font-size: 13px;
-    margin-right: 0;
-    flex-shrink: 0;
-  }
-
-  .canvas-first-topbar-row-main .project-switch {
-    max-width: 110px;
-    padding: 0 6px;
-    font-size: 11px;
-    height: 28px;
-    flex-shrink: 1;
-    min-width: 0;
-  }
-
-  .canvas-first-topbar-row-main .save-status {
-    font-size: 10.5px;
-    margin-left: 0;
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
-  .canvas-first-topbar-row-tools {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    padding-bottom: 2px;
-  }
-
-  .canvas-first-topbar-row-tools::-webkit-scrollbar {
-    display: none;
-  }
-
-  .canvas-first-topbar-row-tools .canvas-first-btn {
-    height: 30px;
-    padding: 0 8px;
-    font-size: 11px;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-
-  .canvas-first-topbar-row-tools .canvas-first-btn-group {
-    flex-shrink: 0;
-  }
-
-  .canvas-first-topbar-row-tools .canvas-first-btn-group .canvas-first-icon-btn {
-    width: 28px;
-    height: 28px;
-  }
-
   .canvas-first-canvas-container .diagram-organizer {
     top: 8px;
     right: 8px;
@@ -970,47 +743,6 @@ header.canvas-first-topbar * {
     flex-direction: column;
     height: auto;
     min-height: auto;
-  }
-
-  .canvas-first-left-rail {
-    width: 100%;
-    height: auto;
-    flex-direction: row;
-    justify-content: flex-start;
-    padding: 4px 8px;
-    overflow-x: auto;
-    border-right: none;
-    border-bottom: 1px solid #dce5e1;
-    flex-shrink: 0;
-    z-index: 20 !important;
-  }
-
-  .canvas-first-rail-group {
-    flex-direction: row;
-    width: auto;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .canvas-first-rail-bottom {
-    display: flex;
-    flex-direction: row;
-    width: auto;
-    gap: 6px;
-    align-items: center;
-    padding-top: 0;
-    padding-left: 6px;
-    border-top: none;
-    border-left: 1px solid #dce5e1;
-  }
-
-  .canvas-first-rail-btn {
-    width: 36px;
-    height: 36px;
-  }
-
-  .canvas-first-rail-label {
-    display: none;
   }
 
   .canvas-first-catalog-drawer {
@@ -1064,9 +796,6 @@ header.canvas-first-topbar * {
     max-width: calc(100% - 16px);
   }
 
-  header.canvas-first-topbar {
-    z-index: 900 !important;
-  }
 
 
 
@@ -1410,20 +1139,6 @@ header.canvas-first-topbar * {
 .component-category.category-messaging .library-item svg:first-child { color: #7c3aed; }
 .component-category.category-operations .library-item svg:first-child { color: #059669; }
 
-/* Left Rail Refinement */
-.canvas-first-rail-btn {
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.canvas-first-rail-btn:active:not(:disabled) {
-  transform: scale(0.94);
-}
-.canvas-first-rail-btn.active {
-  background: #f0fdfa;
-  color: #0f766e;
-  border-color: #ccfbf1;
-  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.12);
-}
-
 /* Inspector Dock Form Inputs & Visual Craft */
 .canvas-first-inspector-dock input[type="text"],
 .canvas-first-inspector-dock input[type="number"],
@@ -1547,4 +1262,12 @@ header.canvas-first-topbar * {
 /* Tactile micro-interactions across workspace buttons */
 .canvas-first-btn:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+/* TEMPORARY compatibility (RV-03b): StudioMenu is an RV-12-reserved file that opens a
+   full-screen backdrop and is closed by clicking .project-switch again. Keep the top bar
+   above that backdrop, as the legacy rule did, until StudioMenu becomes a DropdownMenu
+   (RV-11/RV-12). This intentionally exceeds the commands.md §7 chrome layer. */
+header.canvas-first-topbar {
+  z-index: 1100;
 }
