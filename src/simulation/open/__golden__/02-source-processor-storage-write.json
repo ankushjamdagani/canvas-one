@@ -1,0 +1,118 @@
+{
+  "edges": {
+    "e-proc-store": {
+      "admitted": 9,
+      "rejected": 0,
+      "responses": 9,
+      "sent": 9
+    },
+    "e-src-proc": {
+      "admitted": 9,
+      "rejected": 0,
+      "responses": 9,
+      "sent": 10
+    }
+  },
+  "finished": true,
+  "history": [
+    {
+      "completed": 4,
+      "generated": 5,
+      "latency": 84.00000000000004,
+      "queue": 0,
+      "time": 1
+    },
+    {
+      "completed": 9,
+      "generated": 10,
+      "latency": 83.99999999999994,
+      "queue": 0,
+      "time": 2
+    }
+  ],
+  "messages": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 0,
+    "inFlight": 0,
+    "meanLatency": 0,
+    "p95Latency": 0,
+    "rejected": 0,
+    "succeeded": 0,
+    "throughput": 0
+  },
+  "nodes": {
+    "proc": {
+      "activeWorkers": 0,
+      "admitted": 9,
+      "arrived": 9,
+      "attempts": 9,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 9,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.3465,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.09000000000000007,
+      "waiting": 0
+    },
+    "src": {
+      "activeWorkers": 0,
+      "admitted": 10,
+      "arrived": 10,
+      "attempts": 0,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 9,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0,
+      "waiting": 1
+    },
+    "store": {
+      "activeWorkers": 0,
+      "admitted": 9,
+      "arrived": 9,
+      "attempts": 9,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 9,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.22500000000000014,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.22500000000000014,
+      "waiting": 0
+    }
+  },
+  "roots": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 10,
+    "inFlight": 1,
+    "meanLatency": 83.99999999999994,
+    "p95Latency": 84.00000000000007,
+    "rejected": 0,
+    "succeeded": 9,
+    "throughput": 4.5
+  },
+  "time": 2
+}

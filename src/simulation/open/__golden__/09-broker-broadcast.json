@@ -1,0 +1,147 @@
+{
+  "edges": {
+    "e-broker-sub1": {
+      "admitted": 20,
+      "rejected": 0,
+      "responses": 19,
+      "sent": 20
+    },
+    "e-broker-sub2": {
+      "admitted": 20,
+      "rejected": 0,
+      "responses": 19,
+      "sent": 20
+    },
+    "e-src-broker": {
+      "admitted": 40,
+      "rejected": 0,
+      "responses": 38,
+      "sent": 40
+    }
+  },
+  "finished": true,
+  "history": [
+    {
+      "completed": 9,
+      "generated": 10,
+      "latency": 8.000000000000007,
+      "queue": 0,
+      "time": 1
+    },
+    {
+      "completed": 19,
+      "generated": 20,
+      "latency": 8.000000000000004,
+      "queue": 0,
+      "time": 2
+    }
+  ],
+  "messages": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 40,
+    "inFlight": 2,
+    "meanLatency": 50.00000000000001,
+    "p95Latency": 50.00000000000004,
+    "rejected": 0,
+    "succeeded": 38,
+    "throughput": 19
+  },
+  "nodes": {
+    "broker": {
+      "activeWorkers": 0,
+      "admitted": 40,
+      "arrived": 40,
+      "attempts": 0,
+      "buffered": 0,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 38,
+      "delivered": 40,
+      "expired": 0,
+      "failed": 0,
+      "inFlight": 2,
+      "occupancy": 0,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0,
+      "waiting": 2
+    },
+    "src": {
+      "activeWorkers": 0,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 0,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0,
+      "waiting": 1
+    },
+    "sub1": {
+      "activeWorkers": 1,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 20,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.4750000000000003,
+      "processing": 1,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.4750000000000003,
+      "waiting": 0
+    },
+    "sub2": {
+      "activeWorkers": 1,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 20,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.4750000000000003,
+      "processing": 1,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.4750000000000003,
+      "waiting": 0
+    }
+  },
+  "roots": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 20,
+    "inFlight": 1,
+    "meanLatency": 8.000000000000004,
+    "p95Latency": 8.000000000000007,
+    "rejected": 0,
+    "succeeded": 19,
+    "throughput": 9.5
+  },
+  "time": 2
+}
