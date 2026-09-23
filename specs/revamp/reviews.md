@@ -41,3 +41,8 @@ The plan was restructured from 127 files to 24. An independent reviewer compared
 ## Still open
 
 Nothing in planning. Runtime, browser, parser, quota and performance checks happen during implementation acceptance. The implementation hold stays until the user lifts it.
+
+
+## 2026-09-23 — RV-01 foundation sign-off (Claude)
+
+First attempt FAILED on fidelity: computed styles on `/specimen.html` compared with the Design System board served locally showed Button type/radius/padding/variants, field rest fill, checkbox mixed, tab style, tooltip colour, menu states and tag variants off. RV-01h fixed them; re-measured Button values match the board (13px, 600/500, 7px, secondary border #C6C0B4, tint #EAEFEC/#A8CBC5). Deliberate deviations kept: field border #948D80, destructive #A15B40, solid 2px offset focus, explicit disabled colours, text ≥ 11.5px. Unit 240, specimen 4/4, production e2e 46/51 (baseline). **ACCEPTED** with low residuals listed in delivery.md.

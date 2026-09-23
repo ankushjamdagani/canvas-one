@@ -1028,3 +1028,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude reviewer/orchestrator; Gemini (until quota), then Sonnet subagents.
 - **Verification** (Claude): rv-02d 288 unit + build, closure dumped for all 11 fixture scenarios; rv-03a 55 tests + build; foundation 240 unit, specimen 4/4, production e2e 46/51 (same 5 baseline mobile failures).
 - **Limitations**: Manifest JSON shape and several closure/panel details need a contract clarification round before RV-02 manifest work.
+
+### RV-01h, RV-02e; foundation ACCEPTED (Claude)
+
+- **Outcome**: RV-01h (Sonnet subagent) aligned 13 primitives with the Design System board; re-measured and accepted the RV-01 foundation. RV-02e (Sonnet subagent) added `checkReadiness` slice 1 (shape compatibility, call cycles, mode/workload/completion/boundary/time rules, assertions). Found a defect missed in my RV-02b review: the storable validator rejects mode-coupled scenario rules, which can block autosave (§1) — queued for the contract round.
+- **Changed**: `3631027` (rv-01h, ff into `claude/rv-01a-tokens`), `fe11622` (rv-02e); delivery ledger, reviews.md, ACTION_LOG.
+- **Platform**: Claude reviewer; Sonnet subagents (Gemini quota).
+- **Verification** (Claude): foundation 240 unit, specimen 4/4, production e2e 46/51 (same 5 baseline), board-vs-specimen computed styles; rv-02e 313 unit + build. Browser pane was hidden, so no screenshots this round.
+- **Limitations**: RV-02f (remaining §5 readiness rejects) and a contract clarification round are open.
