@@ -13,6 +13,9 @@ config:
       model: gemini-3.8-flash-low
       args: ["--mode", "accept-edits"]
   executor_concurrency: 3
+  scarce_clis: [codex, claude]
+  scarce_max_subtasks: 1
+  fallback_executor: null
   failure_patterns: []
 ---
 
@@ -27,18 +30,26 @@ Precedence (later wins, top-level keys replace): frontmatter above → project f
 
 - **Target**: `{"cli": "agy|codex|claude", "model": "...", "effort": "...", "args": [...], "timeout_sec": N}`. Only `cli` and `model` are required. `args` are extra CLI flags (permission modes, `--add-dir`); see `roles/executor.md`.
 - `critic` / `reviewer`: `self` (you, inline) or a target. A bare CLI name (`claude`) means that CLI with its default model from `roles/executor.md`. A CLI target always runs as a separate process — use it when you want an independent critique/review.
-- `executor_targets`: list of targets, assigned round-robin.
+- `executor_targets`: list of targets. The planner prefers non-scarce ones (see Token budget).
 - `timeout_sec`: default per-process limit; a target's own `timeout_sec` overrides it.
+- `scarce_clis`, `scarce_max_subtasks`, `fallback_executor`: see Token budget.
 - `failure_patterns`: extra regexes that mark an exit-0 executor run as failed (added to the built-in denial patterns in `scripts/state.py`).
 
-Example `.agents/delegate.json` — Claude critiques and reviews, Gemini implements:
+Example `.agents/delegate.json` — Gemini critiques and implements, Claude spends quota only on the final review:
 ```json
 {
-  "critic": {"cli": "claude", "model": "claude-sonnet-4-6"},
+  "critic": {"cli": "agy", "model": "gemini-3.1-pro-high"},
   "reviewer": {"cli": "claude", "model": "claude-sonnet-4-6", "timeout_sec": 600},
   "executor_targets": [{"cli": "agy", "model": "gemini-3.8-flash-low", "args": ["--mode", "accept-edits"]}]
 }
 ```
+
+### Token budget
+
+CLIs in `scarce_clis` (default `codex`, `claude`) have tight usage quotas. Spend them sparingly:
+- Executors: the planner assigns non-scarce targets by default. A scarce target gets a subtask only when it clearly needs that model, and at most `scarce_max_subtasks` per round. Pick the lightest model tier that can do the job.
+- Critic/reviewer: prefer `self` or a non-scarce CLI; use a scarce CLI for at most one of them.
+- Quota exhaustion (usage/rate-limit text on a failed run) gives status `quota`. The next `dispatch` reruns that subtask on `fallback_executor` (default: first non-scarce executor target) and keeps the old output as `<id>.quota.*`. A quota-hit critic or reviewer falls back to `self`.
 
 ## Parsing Arguments
 
@@ -79,7 +90,7 @@ If the run directory is unknown, the newest run is `ls -td <runs_dir>/*/ | head 
 
 ## Phase 1: Plan
 
-Adopt the Planner persona. Produce subtasks JSON; assign executors round-robin from `executor_targets` (copy the whole target into `assigned_executor`):
+Adopt the Planner persona. Produce subtasks JSON; assign executors from `executor_targets` per Token budget (copy the whole target into `assigned_executor`):
 ```json
 {
   "version": 1,
@@ -115,7 +126,7 @@ P="$SCRATCHPAD/critic-<loop>"
 { cat "$SKILL/roles/critic.md"; echo; echo "Task: <task>"; echo; echo "Plan:"; python3 "$SKILL/scripts/state.py" get "$STATE" plan; } > "$P.in"
 "$SKILL/scripts/run-agent.sh" "$P" <timeout_sec> <cli> <model> [effort] -- [args...]
 ```
-Read `$P.out` as the critique. Exit ≠ 0 (124 = timeout) or output not valid JSON → retry once with "Respond with ONLY valid JSON, no prose." prepended. Still bad → treat as `{"verdict": "fail", "issues": ["critic failed: <exit code / raw output>"], "revised_plan_hints": []}`.
+If `python3 "$SKILL/scripts/state.py" quota "$STATE" "$P"` exits 0, the CLI is out of quota: warn and switch the critic to `self` for the rest of the run. Otherwise read `$P.out` as the critique. Exit ≠ 0 (124 = timeout) or output not valid JSON → retry once with "Respond with ONLY valid JSON, no prose." prepended. Still bad → treat as `{"verdict": "fail", "issues": ["critic failed: <exit code / raw output>"], "revised_plan_hints": []}`.
 
 Rules:
 - `pass` → set `phase` to `"execute"`, go to Phase 3.
@@ -133,7 +144,9 @@ python3 "$SKILL/scripts/state.py" collect "$STATE"
 ```
 `run-agent.sh` runs each agent in its own process group with a hard timeout (GNU `timeout`/`gtimeout` when installed, otherwise a background watcher). On timeout it sends TERM to that group only, then KILL after 10s, and records exit `124`. Full stdout/stderr remain in `<id>.out` / `<id>.err`.
 
-`collect` stores per subtask: `status`, `reason`, `exit_code`, `stdout_path`, `stderr_path` and a short tail `excerpt`. Status is `done` only when **all** hold: exit 0, non-empty stdout, no permission/tool-denial text, and a final `DELEGATE_STATUS: done` line. Otherwise it is `timeout` (124), `error` (non-zero exit) or `failed` (exit 0 but empty, denied, blocked or unmarked). Never upgrade a `failed` status yourself; hand it to the reviewer.
+`collect` stores per subtask: `status`, `reason`, `exit_code`, `stdout_path`, `stderr_path` and a short tail `excerpt`. Status is `done` only when **all** hold: exit 0, non-empty stdout, no permission/tool-denial text, and a final `DELEGATE_STATUS: done` line. Otherwise it is `timeout` (124), `quota` (failed run showing usage/rate-limit text), `error` (non-zero exit) or `failed` (exit 0 but empty, denied, blocked or unmarked). Never upgrade a `failed` status yourself; hand it to the reviewer.
+
+If any subtask is `quota`, run the `dispatch | xargs` and `collect` lines once more; `dispatch` moves those subtasks to the fallback target. No fallback target → leave them `quota` for the reviewer.
 
 If Bash tool time limits are shorter than the run, launch the `dispatch | xargs` line in the background and poll for `.exit` files. After `collect`, set `phase` to `"review"`.
 
@@ -145,7 +158,7 @@ Loop counter is `review_loop` (starts at 0).
 
 **CLI reviewer** → same wrapper pattern as the critic, with `P="$SCRATCHPAD/review-<review_loop>"` and a prompt built from `roles/reviewer.md`, the task, and `state.py get "$STATE" executions`. The reviewer must read the full output files itself (they are inside the repo), so give it read access (see `roles/executor.md`).
 
-Malformed review or reviewer failure → retry once. Still bad → treat as `{"verdict": "fail", "failures": [{"subtask_id": "all", "reason": "reviewer failed: <exit code / raw output>"}], "summary": ""}`.
+Quota-hit CLI reviewer (`state.py quota`) → warn and review as `self`. Malformed review or other reviewer failure → retry once. Still bad → treat as `{"verdict": "fail", "failures": [{"subtask_id": "all", "reason": "reviewer failed: <exit code / raw output>"}], "summary": ""}`.
 
 Rules:
 - `pass` → set `review` and `phase` `"done"`; echo `SUCCESS: <summary>` and `State: $STATE`.

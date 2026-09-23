@@ -977,3 +977,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: Removed implementation-specific invariants from AGENTS.md §4, which is now a generic "Project state" pointer: read HANDOFF.md at task start and keep scope discipline. The simulation accounting, model/view separation and portable persistence invariants moved verbatim into a new "Project invariants" section at the top of HANDOFF.md.
 - **Changed**: `AGENTS.md`, `HANDOFF.md`, `ACTION_LOG.md`.
 - **Platform**: Claude Opus 5.5 inline. **Verification**: diff inspected; documentation only, no suites run.
+
+### /delegate token budget (Claude)
+
+- **Outcome**: Model selection now accounts for usage quotas. New config: `scarce_clis` (default codex, claude), `scarce_max_subtasks` (default 1), `fallback_executor`. The planner prefers non-scarce executors and light tiers. A failed run that shows usage/rate-limit text is classified `quota`, and the next `dispatch` reruns it on the fallback target, keeping the old output as `<id>.quota.*`. A quota-hit CLI critic or reviewer falls back to `self` via `state.py quota`. The repo critic moved from claude to agy `gemini-3.1-pro-high`; the claude reviewer stays.
+- **Changed**: `.agents/skills/delegate/{SKILL.md,scripts/state.py,roles/planner.md,roles/executor.md}`, `.agents/delegate.json`, `ACTION_LOG.md`.
+- **Platform**: Claude Opus 5.5 inline. **Verification**: fake-CLI tests covered quota → fallback rerun, successful runs mentioning "quota" not flagged, and no-fallback staying `quota`. No real quota-exhausted CLI tested.
+- **Limitations**: Quota detection is regex-based; the exact codex and agy limit messages are unverified.

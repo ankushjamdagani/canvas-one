@@ -6,6 +6,7 @@
   state.py set     <state.json> <key> <json | ->       set a top-level value ("-" reads JSON from stdin)
   state.py dispatch <state.json>                        write prompt + runner script per unfinished subtask; print script paths
   state.py collect <state.json>                         classify current-round executor results into state
+  state.py quota   <state.json> <prefix>                exit 0 (and print the line) if a failed run at <prefix> hit a quota
 """
 import json
 import os
@@ -32,6 +33,18 @@ DENIAL_PATTERNS = [
     r"approval (?:was )?(?:required|denied|rejected)",
     r"not allowed to (?:run|execute|use|write|edit)",
 ]
+# Token/usage quota exhaustion; only checked on runs that did not finish `done`.
+QUOTA_PATTERNS = [
+    r"usage limit",
+    r"rate.?limit",
+    r"quota",
+    r"out of (?:credits|tokens)",
+    r"credit balance",
+    r"too many requests",
+    r"\b429\b",
+    r"limit (?:reached|exceeded)",
+    r"resource.?exhausted",
+]
 
 
 def load(path):
@@ -54,8 +67,38 @@ def read(path):
         return None
 
 
+def quota_hit(prefix):
+    """Return the first line showing quota exhaustion in <prefix>.err/.out, else None."""
+    for text in (read(prefix + ".err") or "", read(prefix + ".out") or ""):
+        for pat in QUOTA_PATTERNS:
+            m = re.search(pat, text, re.I)
+            if m:
+                return text[text.rfind("\n", 0, m.start()) + 1:].split("\n", 1)[0].strip()[:200]
+    return None
+
+
 def classify(prefix, patterns):
-    """Return (status, reason, exit_code). status: done|failed|timeout|error|pending."""
+    """Return (status, reason, exit_code). status: done|quota|failed|timeout|error|pending."""
+    status, reason, code = _classify(prefix, patterns)
+    if status in ("failed", "error"):
+        hit = quota_hit(prefix)
+        if hit:
+            return "quota", "quota exhausted: " + hit, code
+    return status, reason, code
+
+
+def scarce(cfg):
+    return set(cfg.get("scarce_clis", ["codex", "claude"]))
+
+
+def fallback_target(cfg):
+    """Target that replaces a quota-exhausted executor: config value, else first non-scarce executor."""
+    if cfg.get("fallback_executor"):
+        return cfg["fallback_executor"]
+    return next((t for t in cfg.get("executor_targets", []) if t["cli"] not in scarce(cfg)), None)
+
+
+def _classify(prefix, patterns):
     code = read(prefix + ".exit")
     if code is None:
         pid = read(prefix + ".pid")
@@ -114,10 +157,22 @@ def dispatch(path):
     run_dir = os.path.join(state["scratchpad"], "r%d" % state.get("review_loop", 0))
     os.makedirs(run_dir, exist_ok=True)
     runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run-agent.sh")
+    patterns = DENIAL_PATTERNS + cfg.get("failure_patterns", [])
+    fallback = fallback_target(cfg)
     for sub in state["plan"]["subtasks"]:
         prefix = os.path.join(run_dir, sub["id"])
         if os.path.exists(prefix + ".exit"):
-            continue  # finished in an earlier attempt; keep its result
+            if not (fallback and classify(prefix, patterns)[0] == "quota"
+                    and sub["assigned_executor"] != fallback):
+                continue  # finished in an earlier attempt; keep its result
+            # quota exhausted: keep the evidence, rerun on the fallback target
+            for ext in (".out", ".err", ".exit"):
+                if os.path.exists(prefix + ext):
+                    os.replace(prefix + ext, prefix + ".quota" + ext)
+            sub["fallback_from"] = sub["assigned_executor"]
+            sub["assigned_executor"] = fallback
+            print("%s: quota exhausted on %s, rerunning on %s" % (
+                sub["id"], sub["fallback_from"]["cli"], fallback["cli"]), file=sys.stderr)
         pid = read(prefix + ".pid")
         if pid:  # orphaned by an interrupted orchestrator: stop only its own process group
             try:
@@ -138,6 +193,7 @@ def dispatch(path):
         with open(prefix + ".sh", "w") as f:
             f.write(" ".join(shlex.quote(a) for a in argv) + "\n")
         print(prefix + ".sh")
+    save(path, state)
 
 
 def main(argv):
@@ -169,6 +225,13 @@ def main(argv):
         dispatch(path)
     elif cmd == "collect":
         collect(path)
+    elif cmd == "quota":  # for critic/reviewer runs: failed = non-zero exit or empty stdout
+        prefix = argv[3]
+        failed = (read(prefix + ".exit") or "").strip() != "0" or not (read(prefix + ".out") or "").strip()
+        hit = failed and quota_hit(prefix)
+        if hit:
+            print(hit)
+        sys.exit(0 if hit else 1)
     else:
         sys.exit(__doc__)
 

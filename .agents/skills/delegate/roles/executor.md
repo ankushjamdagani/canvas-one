@@ -21,6 +21,8 @@ Models:
 - codex: light `gpt-5.6-luna`, `gpt-5.5`; medium `gpt-5.6-terra`; heavy `gpt-5.6-sol`.
 - claude: light `claude-haiku-4-5-20251001`; medium `claude-sonnet-4-6`; heavy `claude-opus-4-8`.
 
+codex and claude are quota-limited (`scarce_clis`); agy is the default workhorse. See Token budget in `SKILL.md`.
+
 ## Permissions (`args`)
 
 Headless runs cannot answer prompts, so a missing permission often yields exit 0 with a refusal. `collect` marks that `failed`; grant what the role needs up front:
