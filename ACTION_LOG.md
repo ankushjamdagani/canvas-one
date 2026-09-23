@@ -1020,3 +1020,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude orchestrator/reviewer; Gemini 3.8 Flash high-effort lanes, one fix round.
 - **Verification** (Claude): RV-02c 273 unit tests, build; encoder bytes+SHA-256 equal the independent `measure.mjs` values for s01–s05 and combined; nullable still enforced once. Merged foundation: `tsc -b`, 240 unit, build (main chunk +1.7 kB), specimen 3/3, production e2e 46/51 with the same 5 baseline mobile failures; screenshots of app and new primitives.
 - **Limitations**: Gemini's RV-01f run left an orphan dev server on 5173 that made a later specimen run test the wrong worktree (killed; executor prompts now say not to leave servers). Low: indeterminate Progress is a full-width pulse; legacy `@keyframes pulse` shadows Tailwind's; `canvasFirst.css` Inter.
+
+### RV-01g, RV-02d, RV-03a; foundation sign-off FAIL (Claude)
+
+- **Outcome**: Gemini hit its individual quota mid-run (RV-01g, RV-02d partial); user chose Sonnet subagents to finish from the partial diffs. RV-03a (Gemini) pure panel reducer passed. RV-02d closure passed (subagent found no code defects, strengthened batch-cancel test). RV-01g passed (layering tokens, R02 checks). Foundation sign-off then FAILED on fidelity: computed-style comparison with the Design System board (served locally) shows Button 11.5px/500/6px vs 13px/600/7px, missing tint and loading, field rest fill, checkbox mixed, underline tabs, ink tooltip, menu states and tag variants. RV-01h dispatched with the discrepancy list; RV-02e (runnable readiness) in parallel.
+- **Changed**: commits `e9e3b58` (rv-03a), `ef16546` (rv-02d), `b8694a4` (rv-01g, ff into foundation); ledger, ACTION_LOG; `.claude/launch.json` local design-reference server (uncommitted).
+- **Platform**: Claude reviewer/orchestrator; Gemini (until quota), then Sonnet subagents.
+- **Verification** (Claude): rv-02d 288 unit + build, closure dumped for all 11 fixture scenarios; rv-03a 55 tests + build; foundation 240 unit, specimen 4/4, production e2e 46/51 (same 5 baseline mobile failures).
+- **Limitations**: Manifest JSON shape and several closure/panel details need a contract clarification round before RV-02 manifest work.
