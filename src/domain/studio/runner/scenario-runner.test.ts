@@ -41,6 +41,26 @@ describe('scenario runner: S02 reference fixture', () => {
     expect(result.summary.messageCounts.succeeded).toBe(1);
     expect(result.summary.messageCounts.inFlight).toBe(0);
 
+    // Exactly one unit-level settlement per root: per-attempt resource settlements always
+    // use the distinct 'attempt-settled:<attempt>' code, so excluding that prefix isolates
+    // the single canonical settlement for the user root (a machine 'reply') and, separately,
+    // for the message root (a resource completion) (coordinator review: this must hold
+    // outside S04 too).
+    const inputRootId = result.events.find((e) => e.kind === 'input')!.rootId;
+    const rootUnitSettlements = result.events.filter(
+      (e) => e.rootId === inputRootId && e.kind === 'settled' && !e.code.startsWith('attempt-settled:'),
+    );
+    expect(rootUnitSettlements.length).toBe(1);
+    expect(rootUnitSettlements[0].outcome).toBe('succeeded');
+
+    const messageRootId = result.events.find(
+      (e) => e.rootId !== inputRootId && e.kind === 'settled' && e.outcome === 'succeeded',
+    )!.rootId;
+    const messageUnitSettlements = result.events.filter(
+      (e) => e.rootId === messageRootId && e.kind === 'settled' && !e.code.startsWith('attempt-settled:'),
+    );
+    expect(messageUnitSettlements.length).toBe(1);
+
     // Trace ordering check:
     // "the accepted reply is traced BEFORE fulfillment completes (reply settles independently)"
     const acceptedTraceIdx = result.events.findIndex((e) => e.code === 'accepted-order');
@@ -437,12 +457,12 @@ describe('review fix 2: exact linkage, no string prefix collisions', () => {
   });
 });
 
-describe('review fix 3: broadcast broker ambiguity', () => {
+describe('D36: broadcast message roots supersede the RV-14d broadcast guard', () => {
   const s02Doc = loadFixture('s02.json');
   const allowScenarioId = '5bf95962-e1aa-5df7-8dd2-5784bbad14c8';
   const queueElementId = 'cbf95fcf-bc61-5c89-9c0c-d506c152f7f8';
 
-  it('rejects scenario with status invalid and issue code unsupported-rv14d when message edge reaches broadcast broker', async () => {
+  it('runs to completion when a message edge reaches a broadcast broker, minting one message root per delivered copy', async () => {
     const broadcastDoc: Document = {
       ...s02Doc,
       elements: s02Doc.elements.map((el) => {
@@ -466,16 +486,20 @@ describe('review fix 3: broadcast broker ambiguity', () => {
     const runId = '00000000-0000-0000-0000-000000000099';
     const result = await runScenario(broadcastDoc, allowScenarioId, runId);
 
-    expect(result.status).toBe('invalid');
-    expect(result.reason).toContain('unsupported-rv14d');
-    expect(result.reason).toMatch(/broadcast.*message root outcome/i);
+    // D36 supersedes the RV-14d 'unsupported-rv14d' guard: this now runs and completes.
+    expect(result.status).toBe('completed');
+    expect(result.reason).toBeNull();
 
-    expect(result.issues).toBeDefined();
-    expect(result.issues!.length).toBeGreaterThan(0);
-    const issue = result.issues!.find((i) => i.code === 'unsupported-rv14d');
-    expect(issue).toBeDefined();
-    expect(issue!.code).toBe('unsupported-rv14d');
-    expect(issue!.message).toMatch(/broadcast.*message root outcome/i);
+    // The queue has exactly one downstream consumer in this fixture, so broadcasting to it
+    // mints exactly one message root (linked to the emitting parent), same conservation as
+    // a competing delivery would for a single consumer.
+    expect(result.summary.messageCounts.generated).toBe(1);
+    expect(result.summary.messageCounts.succeeded).toBe(1);
+    expect(result.summary.messageCounts.failed).toBe(0);
+    expect(result.summary.messageCounts.inFlight).toBe(0);
+
+    // The user root is unaffected by the (now-supported) broadcast delivery.
+    expect(result.summary.rootCounts.succeeded).toBe(1);
   });
 });
 

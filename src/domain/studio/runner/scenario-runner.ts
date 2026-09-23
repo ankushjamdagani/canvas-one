@@ -50,7 +50,7 @@ import { deepCloneJson, setPathInContext, stepMachine } from './machine';
 import { runPipeline } from './pipeline';
 import { runDecision } from './decision';
 import { evaluateAssertions } from './assertions';
-import { ResourceAdapter } from './resource-adapter';
+import { ResourceAdapter, validateFaultsAndPlacements } from './resource-adapter';
 import { validateSchemaValue } from './schema-value';
 
 // ============================================================================
@@ -446,42 +446,21 @@ export class ScenarioRunner {
       maxTraceBytes: this.scenario.budgets.maxTraceBytes,
     });
 
-    // Check for out-of-scope features (faults -> RV-14e, bridge frames -> RV-14f, host -> RV-14e, broadcast broker -> RV-14d gap)
-    if (this.scenario.faults && this.scenario.faults.length > 0) {
+    // Validate faults and host placements (§6 & §8)
+    const validationIssues = validateFaultsAndPlacements(
+      this.scenario.faults,
+      this.document.relations,
+      this.scenario.id,
+    );
+    if (validationIssues.length > 0) {
       this.terminalStatus = 'invalid';
-      this.failureReason = 'unsupported-rv14d: faults are not supported in RV-14d';
-      this.issues = [
-        {
-          code: 'unsupported-rv14d',
-          path: ['scenarios', this.scenario.id, 'faults'],
-          entityId: this.scenario.id,
-          severity: 'error',
-          message: 'faults are not supported in RV-14d',
-        },
-      ];
+      this.failureReason = validationIssues[0].message;
+      this.issues = validationIssues;
       this.isFinished = true;
       return;
     }
 
-    for (const elId of this.scenario.scopeElementIds) {
-      const el = this.elementsMap.get(elId);
-      if (el?.behavior.kind === 'host') {
-        this.terminalStatus = 'invalid';
-        this.failureReason = `unsupported-rv14d: host behavior on element '${elId}' is not supported in RV-14d`;
-        this.issues = [
-          {
-            code: 'unsupported-rv14d',
-            path: ['elements', elId],
-            entityId: elId,
-            severity: 'error',
-            message: `host behavior on element '${elId}' is not supported in RV-14d`,
-          },
-        ];
-        this.isFinished = true;
-        return;
-      }
-    }
-
+    // Check for out-of-scope features (bridge frames -> RV-14f)
     for (const conn of document.connections) {
       if (conn.kind === 'call') {
         const srcEl = this.elementsMap.get(conn.source.elementId);
@@ -501,32 +480,6 @@ export class ScenarioRunner {
             ];
             this.isFinished = true;
             return;
-          }
-        }
-      } else if (conn.kind === 'message') {
-        const tgtEl = this.elementsMap.get(conn.target.elementId);
-        if (tgtEl && tgtEl.behavior.kind === 'resource') {
-          const config = tgtEl.behavior.config as unknown as { type?: string; delivery?: string };
-          if (config && config.type === 'broker' && config.delivery === 'broadcast') {
-            if (
-              this.scenario.scopeElementIds.length === 0 ||
-              this.scenario.scopeElementIds.includes(conn.source.elementId) ||
-              this.scenario.scopeElementIds.includes(tgtEl.id)
-            ) {
-              this.terminalStatus = 'invalid';
-              this.failureReason = `unsupported-rv14d: broadcast broker delivery on element '${tgtEl.id}' is not supported in RV-14d (message fan-out leaves studio message root outcome undefined)`;
-              this.issues = [
-                {
-                  code: 'unsupported-rv14d',
-                  path: ['connections', conn.id],
-                  entityId: conn.id,
-                  severity: 'error',
-                  message: `Broadcast broker delivery on element '${tgtEl.id}' is not supported in RV-14d (message fan-out leaves studio message root outcome undefined)`,
-                },
-              ];
-              this.isFinished = true;
-              return;
-            }
           }
         }
       }
@@ -666,30 +619,25 @@ export class ScenarioRunner {
         const res = await this.dispatchToElement(conn.target, payload, context, atMs);
         if (!res.ok) return res;
       } else if (conn.kind === 'message') {
-        // Message emission creates its own message root linked to its parent (§5)
-        const msgRootId = `msg_${++this.messageCounter}`;
-        this.messageCounts.generated++;
-        this.messageCounts.inFlight++;
-        this.activeMessageRoots.add(msgRootId);
-
         const targetEl = this.elementsMap.get(conn.target.elementId);
+        const isBroadcastBroker =
+          targetEl?.behavior.kind === 'resource' &&
+          (targetEl.behavior.config as any)?.type === 'broker' &&
+          (targetEl.behavior.config as any)?.delivery === 'broadcast';
+
+        let msgRootId: string;
+        if (!isBroadcastBroker) {
+          // Message emission creates its own message root linked to its parent (§5)
+          msgRootId = `msg_${++this.messageCounter}`;
+          this.messageCounts.generated++;
+          this.messageCounts.inFlight++;
+          this.activeMessageRoots.add(msgRootId);
+        } else {
+          // Through a broadcast broker (D36), delivered consumer copies become individual message roots
+          msgRootId = `pub_${++this.messageCounter}`;
+        }
+
         if (targetEl && targetEl.behavior.kind === 'resource') {
-          const config = targetEl.behavior.config as unknown as { type?: string; delivery?: string };
-          if (config && config.type === 'broker' && config.delivery === 'broadcast') {
-            this.terminalStatus = 'invalid';
-            this.failureReason = `unsupported-rv14d: broadcast broker delivery on element '${targetEl.id}' is not supported in RV-14d (message fan-out leaves studio message root outcome undefined)`;
-            this.issues = [
-              {
-                code: 'unsupported-rv14d',
-                path: ['connections', conn.id],
-                entityId: conn.id,
-                severity: 'error',
-                message: `Broadcast broker delivery on element '${targetEl.id}' is not supported in RV-14d (message fan-out leaves studio message root outcome undefined)`,
-              },
-            ];
-            this.isFinished = true;
-            return { ok: false, error: this.failureReason };
-          }
 
           // Message into resource entry: build ResourceInput from connection resource metadata
           const duration = conn.config.resource?.deadlineDurationMs ?? 60000;
@@ -1421,10 +1369,15 @@ export class ScenarioRunner {
           return false;
         }
 
-        // Exact linkage: record delivered unit IDs when adapter reports message creation (§8)
+        // Exact linkage: record delivered unit IDs when adapter reports message creation (§8 & D36)
         if (te.kind === 'dispatch' && te.code === 'message' && te.parentId) {
           if (this.activeMessageRoots.has(te.parentId)) {
             this.deliveredUnitToMessageRoot.set(te.rootId, te.parentId);
+          } else if (te.parentId.startsWith('pub_') || te.rootId.includes(':')) {
+            this.messageCounts.generated++;
+            this.messageCounts.inFlight++;
+            this.activeMessageRoots.add(te.rootId);
+            this.deliveredUnitToMessageRoot.set(te.rootId, te.rootId);
           }
         }
 
@@ -1522,6 +1475,74 @@ export class ScenarioRunner {
         const entryEl = this.elementsMap.get(evt.input.entry.elementId);
         const entryPort = this.portsMap.get(evt.input.entry.portId);
 
+        if (entryEl?.behavior.kind === 'resource') {
+          if (!this.adapter) {
+            this.terminalStatus = 'failed';
+            this.failureReason = 'Resource adapter not initialized for resource admission';
+            this.isFinished = true;
+            return false;
+          }
+          const resMeta = evt.input.resource;
+          const resInput: ResourceInput = {
+            rootId: inputRootId,
+            journeyId: evt.input.journeyId,
+            parentEventId: inputAppend.event?.id ?? null,
+            entryElementId: evt.input.entry.elementId,
+            requestClassId: resMeta?.requestClassId ?? 'default-class',
+            operation: resMeta?.operation ?? 'read',
+            key: resMeta?.key ?? null,
+            tags: resMeta?.tags ? [...resMeta.tags] : [],
+            payloadRef: inputAppend.event?.payloadRef ?? 'payload-input',
+            atMs: evt.atMs,
+            deadlineMs: resMeta?.deadlineMs ?? (evt.atMs + 9000),
+          };
+
+          this.activeUserRoots.set(inputRootId, { openFrameCount: 0, outcomes: [] });
+          this.rootCounts.generated++;
+          this.rootCounts.inFlight++;
+
+          const adm = this.adapter.admit(resInput);
+          for (const te of adm.events) {
+            if (te.kind === 'input' && te.code === 'admit') {
+              continue;
+            }
+            this.processedEvents++;
+            const appendRes = await this.recorder.append({
+              rootId: te.rootId,
+              journeyId: te.journeyId,
+              parentId: te.parentId,
+              elementId: te.elementId,
+              portId: te.portId,
+              kind: te.kind,
+              code: te.code,
+              payloadRef: te.payloadRef,
+              atMs: te.atMs,
+              outcome: te.outcome,
+            });
+            if (!appendRes.ok) {
+              this.terminalStatus = 'incomplete';
+              this.failureReason = 'Budget exhausted: recorder cap hit';
+              this.isFinished = true;
+              return false;
+            }
+
+            const settlementRes = handleSettlementEvent(te, {
+              activeMessageRoots: this.activeMessageRoots,
+              activeUserRoots: this.activeUserRoots,
+              deliveredUnitToMessageRoot: this.deliveredUnitToMessageRoot,
+              rootCounts: this.rootCounts,
+              messageCounts: this.messageCounts,
+            });
+            if (!settlementRes.ok) {
+              this.terminalStatus = settlementRes.status;
+              this.failureReason = settlementRes.reason;
+              this.isFinished = true;
+              return false;
+            }
+          }
+          return true;
+        }
+
         let frameId: string | null = null;
         if (entryEl?.behavior.kind === 'machine' && entryPort?.channel === 'call') {
           // Call entry creates one user root and a frame (§5 & BUILD)
@@ -1585,6 +1606,11 @@ export class ScenarioRunner {
           if (te.kind === 'dispatch' && te.code === 'message' && te.parentId) {
             if (this.activeMessageRoots.has(te.parentId)) {
               this.deliveredUnitToMessageRoot.set(te.rootId, te.parentId);
+            } else if (te.parentId.startsWith('pub_') || te.rootId.includes(':')) {
+              this.messageCounts.generated++;
+              this.messageCounts.inFlight++;
+              this.activeMessageRoots.add(te.rootId);
+              this.deliveredUnitToMessageRoot.set(te.rootId, te.rootId);
             }
           }
         }
