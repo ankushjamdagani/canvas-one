@@ -979,3 +979,16 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude Opus 5.5 inline; no subagents.
 - **Verification**: Docs only; no suites run.
 - **Limitations**: Skill keep/remove list and log split format left open for a future brainstorming session.
+
+### Session-over-session learning loop (Claude)
+
+- **Outcome**: Added a capture → distill → load loop so agents improve across sessions. New `LESSONS.md` holds curated rules (cap 50) and is loaded via `AGENTS.md`. §6 now asks for a `Lesson:` line on failures/corrections and a same-task `LESSONS.md` edit when the lesson generalizes. New `/retro` skill consolidates lessons periodically and prunes stale rules. Seeded 15 rules from a backfill over all prior entries (agy sandbox limits, macOS timeout, symlinked skills, full-suite verification, delegate/reviewer checking, incremental status).
+- **Changed**: new `LESSONS.md`, new `.agents/skills/retro/SKILL.md` (+ symlinks in `.claude/skills/`, `.codex/skills/`), `AGENTS.md` §5–6 and imports, ACTION_LOG.
+- **Platform**: Claude Opus 5.5 inline; no subagents.
+- **Schedule**: Local scheduled task `daily-retro-system-design-planner` runs `/retro` at 09:07 over the previous day, auto-applying to `LESSONS.md` uncommitted in the main checkout; skips until this branch is merged.
+- **Verification**: `git diff --check`; symlinks resolve. Docs/config only; app suites not run. Loading in a fresh session not yet confirmed.
+- **Limitations**: Capture still depends on agents following §6; a Claude `Stop` hook nudge was deferred until instruction-only proves insufficient. ACTION_LOG size (120 KB) is unchanged.
+
+### Retro (Claude)
+- **Range**: 2026-09-10 → 2026-09-23, all entries (initial backfill)
+- **Changed**: LESSONS.md +15 ~0 -0 (now 15 rules)

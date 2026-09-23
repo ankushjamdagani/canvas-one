@@ -62,6 +62,7 @@ Preserve:
   ```
 - Use `rtk` for output-heavy commands (see [`RTK.md`](RTK.md)); use `headroom` for context compression (see [`HEADROOM.md`](HEADROOM.md))
 - Never claim a check passed if it was skipped or blocked
+- Follow [`LESSONS.md`](LESSONS.md); cite the rule when it changes your approach
 
 ---
 
@@ -71,9 +72,14 @@ Append every completed task to [`ACTION_LOG.md`](ACTION_LOG.md). If blocked, rec
 
 Include: outcome, files changed, platform/subagents used, verification results, limitations.
 
+Add a `Lesson:` line when the task hit a failure, user correction, wasted retry, or surprise. If the lesson would change a future agent's behavior, also add or edit a rule in [`LESSONS.md`](LESSONS.md) in the same task. Replace a contradicted rule rather than appending.
+
 Keep entries short — no raw logs, diffs, or dumps. Append under a `YYYY-MM-DD` heading chronologically.
 
-`ACTION_LOG.md` = cumulative task history. `HANDOFF.md` = current implementation state and resume instructions. Keep them separate.
+`ACTION_LOG.md` = cumulative task history. `HANDOFF.md` = current implementation state and resume instructions. `LESSONS.md` = distilled rules for future sessions. Keep them separate.
+
+Run `/retro` (`.agents/skills/retro/SKILL.md`) periodically to consolidate `Lesson:` lines into `LESSONS.md` and prune stale rules.
 
 @RTK.md
 @HEADROOM.md
+@LESSONS.md
