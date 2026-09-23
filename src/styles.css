@@ -98,6 +98,19 @@
   --radius-card: 12px;
   --radius-dock: 14px;
 
+  /* Layering tokens (commands.md §7) */
+  --z-index-canvas: 0;
+  --z-index-dock: 10;
+  --z-index-chrome: 20;
+  --z-index-floating: 30;
+  --z-index-modal-backdrop: 50;
+  --z-index-modal: 60;
+  --z-index-popover: 70;
+  --z-index-tooltip: 80;
+
+  /* Animation tokens */
+  --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
+
   /* Typography scale: design tokens + default px equivalents */
   --text-xs: 11.5px;
   --text-xs--line-height: calc(1 / 0.75);
@@ -866,7 +879,7 @@ p {
 }
 .guide-status.running {
   background: var(--teal);
-  animation: pulse 1s ease-in-out infinite;
+  animation: legacy-pulse 1s ease-in-out infinite;
 }
 .scenario-actions {
   display: flex;
@@ -1364,9 +1377,25 @@ p {
   stroke: #c48212 !important;
   stroke-width: 3 !important;
 }
-@keyframes pulse {
+@keyframes legacy-pulse {
   50% {
     opacity: 0.35;
+  }
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    left: -30%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="progress-indicator"][data-state="indeterminate"] {
+    animation: none !important;
+    left: 35% !important;
   }
 }
 @media (min-width: 1600px) {

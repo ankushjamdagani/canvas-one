@@ -250,4 +250,149 @@ test.describe("Specimen review page", () => {
 
     await context.close();
   });
+
+  test("R02: computed-style/interaction checks for tabs, dropdown, overlays, progress, and long labels", async ({
+    page,
+  }) => {
+    await page.goto("/specimen.html");
+
+    // --- Tabs ---
+    const tabOverview = page.getByRole("tab", { name: "Overview", exact: true });
+    const tabPerformance = page.getByRole("tab", {
+      name: "Performance",
+      exact: true,
+    });
+
+    await expect(tabOverview).toHaveAttribute("aria-selected", "true");
+    await expect(tabPerformance).toHaveAttribute("aria-selected", "false");
+
+    const [selectedStyles, unselectedStyles] = await Promise.all([
+      tabOverview.evaluate((el) => {
+        const s = window.getComputedStyle(el);
+        return { bg: s.backgroundColor, color: s.color };
+      }),
+      tabPerformance.evaluate((el) => {
+        const s = window.getComputedStyle(el);
+        return { bg: s.backgroundColor, color: s.color };
+      }),
+    ]);
+    const tabsVisuallyDiffer =
+      selectedStyles.bg !== unselectedStyles.bg ||
+      selectedStyles.color !== unselectedStyles.color;
+    expect(tabsVisuallyDiffer).toBe(true);
+
+    await tabOverview.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tabPerformance).toHaveAttribute("aria-selected", "true");
+    await expect(tabPerformance).toBeFocused();
+
+    // --- DropdownMenu (keyboard open, nested submenu, escape closes all) ---
+    const dropdownTrigger = page.getByRole("button", {
+      name: "Open Menu",
+      exact: true,
+    });
+    await dropdownTrigger.focus();
+    await page.keyboard.press("Enter");
+
+    const dropdownMenu = page.getByRole("menu").first();
+    await expect(dropdownMenu).toBeVisible();
+
+    const submenuTrigger = page.getByRole("menuitem", { name: "Export Model" });
+    await expect
+      .poll(
+        async () => {
+          const isFocused = await submenuTrigger
+            .evaluate((el) => el === document.activeElement)
+            .catch(() => false);
+          if (!isFocused) {
+            await page.keyboard.press("ArrowDown");
+          }
+          return isFocused;
+        },
+        { timeout: 5000, intervals: [150] }
+      )
+      .toBe(true);
+    await expect(submenuTrigger).toBeFocused();
+
+    await page.keyboard.press("ArrowRight");
+    const submenuItems = page.getByRole("menuitem", { name: /^Export as/ });
+    await expect(submenuItems.first()).toBeVisible();
+    expect(await submenuItems.count()).toBeGreaterThanOrEqual(1);
+
+    for (let i = 0; i < 3; i += 1) {
+      const stillOpen = await dropdownMenu.isVisible().catch(() => false);
+      if (!stillOpen) break;
+      await page.keyboard.press("Escape");
+    }
+    await expect(dropdownMenu).not.toBeVisible();
+    await expect(dropdownTrigger).toBeFocused();
+
+    // --- Overlays: layering tokens computed on live elements ---
+    const dialogTrigger = page.getByRole("button", {
+      name: "Open Dialog",
+      exact: true,
+    });
+    await dialogTrigger.click();
+    const dialogContent = page.locator('[data-slot="dialog-content"]');
+    const dialogOverlay = page.locator('[data-slot="dialog-overlay"]');
+    await expect(dialogContent).toBeVisible();
+    const [dialogContentZ, dialogOverlayZ] = await Promise.all([
+      dialogContent.evaluate((el) => window.getComputedStyle(el).zIndex),
+      dialogOverlay.evaluate((el) => window.getComputedStyle(el).zIndex),
+    ]);
+    expect(dialogContentZ).toBe("60");
+    expect(dialogOverlayZ).toBe("50");
+    await page.keyboard.press("Escape");
+    await expect(dialogContent).not.toBeVisible();
+
+    const popoverTrigger = page.getByRole("button", {
+      name: "Open Popover",
+      exact: true,
+    });
+    await popoverTrigger.click();
+    const popoverContent = page.locator('[data-slot="popover-content"]');
+    await expect(popoverContent).toBeVisible();
+    const popoverZ = await popoverContent.evaluate(
+      (el) => window.getComputedStyle(el).zIndex
+    );
+    expect(popoverZ).toBe("70");
+    await page.keyboard.press("Escape");
+    await expect(popoverContent).not.toBeVisible();
+
+    const tooltipTrigger = page.getByRole("button", {
+      name: "Hover for Tooltip",
+      exact: true,
+    });
+    await tooltipTrigger.hover();
+    const tooltipContent = page.locator('[data-slot="tooltip-content"]');
+    await expect(tooltipContent).toBeVisible();
+    const tooltipZ = await tooltipContent.evaluate(
+      (el) => window.getComputedStyle(el).zIndex
+    );
+    expect(tooltipZ).toBe("80");
+    await page.keyboard.press("Escape");
+
+    // --- Progress: indeterminate indicator narrower than its track ---
+    const indeterminateIndicator = page.locator(
+      "#specimen-progress-indeterminate [data-slot='progress-indicator']"
+    );
+    const widthRatio = await indeterminateIndicator.evaluate((el) => {
+      const track = el.closest('[data-slot="progress"]') as HTMLElement;
+      const trackRect = track.getBoundingClientRect();
+      const rect = el.getBoundingClientRect();
+      return rect.width / trackRect.width;
+    });
+    expect(widthRatio).toBeLessThan(0.5);
+
+    // --- Long labels: every button-slot element fits without clipping ---
+    const buttonSlotElements = page.locator('[data-slot="button"]');
+    const buttonSlotCount = await buttonSlotElements.count();
+    for (let i = 0; i < buttonSlotCount; i += 1) {
+      const el = buttonSlotElements.nth(i);
+      const noClipping = await el.evaluate(
+        (node) => node.scrollWidth <= node.clientWidth + 1
+      );
+      expect(noClipping).toBe(true);
+    }
+  });
 });

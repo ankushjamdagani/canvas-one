@@ -19,7 +19,9 @@ const Progress = React.forwardRef<
     <ProgressPrimitive.Indicator
       data-slot="progress-indicator"
       className={cn(
-        "h-full w-full flex-1 bg-primary transition-all data-[state=indeterminate]:animate-pulse"
+        "h-full w-full flex-1 bg-primary transition-all",
+        "data-[state=indeterminate]:absolute data-[state=indeterminate]:top-0 data-[state=indeterminate]:h-full data-[state=indeterminate]:w-[30%]",
+        "data-[state=indeterminate]:animate-progress-indeterminate"
       )}
       style={
         typeof value === "number"
