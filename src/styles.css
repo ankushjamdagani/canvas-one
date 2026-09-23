@@ -166,6 +166,18 @@
   --text-subtitle--line-height: calc(1.75 / 1.125);
   --text-ui: 13px;
   --text-ui--line-height: 1.55;
+
+  /* Evergreen node-kind stripe colours (specs/revamp/design.md "Canvas objects":
+     stripe colour is the node kind, never derived from node names). Keyed by the
+     six system layers used by src/domain/componentCatalog.ts. Per decision D35,
+     a dedicated six-colour set distinct from the semantic primary/branch/risk
+     roles — see src/components/studio/tokens.ts `nodeKindColor`. */
+  --color-node-kind-clients: #4F6D8F;
+  --color-node-kind-edge: #2B7A83;
+  --color-node-kind-compute: #56773A;
+  --color-node-kind-messaging: #8A6A1F;
+  --color-node-kind-data: #8A4F6E;
+  --color-node-kind-operations: #5F646B;
 }
 
 :root {
@@ -735,23 +747,6 @@ p {
 .react-flow__controls-button:last-child {
   border: 0;
 }
-.component-node {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 215px;
-  padding: 22px 15px;
-  background: #fff;
-  border: 1px solid #d4deda;
-  border-radius: 9px;
-  color: var(--ink);
-}
-.component-node.selected {
-  border-color: #119499;
-  outline: 2px solid #e0eeeb;
-  outline-offset: 2px;
-}
 .component-node.overloaded {
   border-color: #c58320;
 }
@@ -775,15 +770,6 @@ p {
 }
 .node-copy {
   min-width: 0;
-}
-.node-copy strong {
-  font-size: 11px;
-  font-weight: 650;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 145px;
 }
 .node-copy span {
   display: block;
@@ -1838,10 +1824,6 @@ p {
   }
 }
 /* Expansion reveals the existing processing model without rearranging its path. */
-.component-node {
-  display: block;
-  padding: 0;
-}
 .node-header {
   display: flex;
   align-items: center;
@@ -1851,13 +1833,6 @@ p {
 }
 .node-header .node-copy {
   flex: 1;
-}
-.node-header .node-copy strong {
-  max-width: 112px;
-}
-.node-header .node-copy span {
-  font-size: 9px;
-  white-space: nowrap;
 }
 .node-expand {
   padding: 4px 0;
@@ -2691,18 +2666,6 @@ select:disabled {
 .subsystem-library-row span {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.subsystem-shell {
-  width: 100%;
-  height: 100%;
-  border: 1.5px dashed #6f9f96;
-  background: #edf6f080;
-  border-radius: 10px;
-  position: relative;
-}
-.subsystem-shell.collapsed {
-  background: #f3f8f5;
-  border-style: solid;
 }
 .subsystem-header {
   display: flex;

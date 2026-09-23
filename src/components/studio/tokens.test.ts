@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { evergreen, contrastRatio } from "./tokens";
+import { evergreen, contrastRatio, nodeKindColor } from "./tokens";
 
 describe("Evergreen tokens and styles.css single source check", () => {
   const cssPath = path.resolve(__dirname, "../../styles.css");
@@ -201,5 +201,49 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(themeVars["--shadow-raised"]).toBe(evergreen.shadow.raised);
     expect(themeVars["--shadow-popover"]).toBe(evergreen.shadow.popover);
     expect(themeVars["--shadow-floating"]).toBe(evergreen.shadow.floating);
+  });
+
+  it("(i) asserts nodeKindColor covers exactly the six componentCatalog layers, lowercased", () => {
+    const layers = ["clients", "edge", "compute", "data", "messaging", "operations"];
+    expect(Object.keys(nodeKindColor).sort()).toEqual([...layers].sort());
+    for (const layer of layers) {
+      expect(nodeKindColor).toHaveProperty(layer);
+      expect(typeof nodeKindColor[layer as keyof typeof nodeKindColor]).toBe("string");
+    }
+  });
+
+  it("(j) asserts nodeKindColor equals the decision D35 stripe colours exactly", () => {
+    // D35: a dedicated six-colour set, deliberately distinct from the semantic
+    // primary/branch/risk roles used elsewhere in Evergreen.
+    expect(nodeKindColor.clients).toBe("#4F6D8F");
+    expect(nodeKindColor.edge).toBe("#2B7A83");
+    expect(nodeKindColor.compute).toBe("#56773A");
+    expect(nodeKindColor.messaging).toBe("#8A6A1F");
+    expect(nodeKindColor.data).toBe("#8A4F6E");
+    expect(nodeKindColor.operations).toBe("#5F646B");
+  });
+
+  it("(k) asserts D35 stripe colours are NOT the semantic primary/branch/risk roles", () => {
+    const semanticRoles = [evergreen.primary, evergreen.branch, evergreen.risk];
+    for (const color of Object.values(nodeKindColor)) {
+      expect(semanticRoles).not.toContain(color);
+    }
+  });
+
+  it("(k2) asserts each node-kind colour reaches >=3:1 contrast against white and the panel surface", () => {
+    // Non-text, meaningful state/kind indicator bar (design.md Accessibility corrections).
+    for (const [layer, color] of Object.entries(nodeKindColor)) {
+      expect(contrastRatio(color, "#FFFFFF"), `${layer} vs #FFFFFF`).toBeGreaterThanOrEqual(3.0);
+      expect(contrastRatio(color, evergreen.panel), `${layer} vs panel`).toBeGreaterThanOrEqual(3.0);
+    }
+  });
+
+  it("(l) asserts styles.css plain @theme node-kind colour vars equal tokens.ts nodeKindColor", () => {
+    expect(themeVars["--color-node-kind-clients"]).toBe(nodeKindColor.clients);
+    expect(themeVars["--color-node-kind-edge"]).toBe(nodeKindColor.edge);
+    expect(themeVars["--color-node-kind-compute"]).toBe(nodeKindColor.compute);
+    expect(themeVars["--color-node-kind-data"]).toBe(nodeKindColor.data);
+    expect(themeVars["--color-node-kind-messaging"]).toBe(nodeKindColor.messaging);
+    expect(themeVars["--color-node-kind-operations"]).toBe(nodeKindColor.operations);
   });
 });

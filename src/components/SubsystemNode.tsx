@@ -12,7 +12,9 @@ export function SubsystemNode({ data }: NodeProps<SubsystemCanvasNode>) {
     group = data.group;
   return (
     <div
-      className={`subsystem-shell ${group.collapsed ? "collapsed" : "open"}`}
+      className={`subsystem-shell ${group.collapsed ? "collapsed" : "open"} relative w-full h-full rounded-[10px] border-selected-edge ${
+        group.collapsed ? "border border-solid bg-panel" : "border-[1.5px] border-dashed bg-accent/50"
+      }`}
     >
       {group.collapsed && (
         <Handle type="target" position={Position.Left} isConnectable={false} />
