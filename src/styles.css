@@ -422,34 +422,7 @@ p {
   padding: 23px 16px 17px;
   overflow-y: auto;
 }
-.brand {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  font-size: 17px;
-  letter-spacing: -0.65px;
-  font-weight: 650;
-  white-space: nowrap;
-  margin: 1px 1px 25px;
-}
-.brand > svg {
-  color: var(--teal);
-  flex-shrink: 0;
-}
-.brand-dot {
-  color: var(--teal);
-}
-.project-switch {
-  width: 100%;
-  justify-content: space-between;
-  font-size: 12px;
-  background: #f9fbf9;
-  padding: 11px 10px;
-}
-.project-switch > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+
 .library-section {
   margin-top: 32px;
 }
@@ -716,27 +689,7 @@ p {
   display: flex;
   flex-direction: column;
 }
-.experiment-heading {
-  position: absolute;
-  top: 34px;
-  left: 33px;
-  right: 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  z-index: 2;
-  pointer-events: none;
-}
-.experiment-heading h1 {
-  font-size: 23px;
-  letter-spacing: -0.8px;
-  font-weight: 550;
-  line-height: 1.3;
-}
-.experiment-heading p {
-  font-size: 11px;
-  margin-top: 7px;
-}
+
 .tag {
   font-size: 9px;
   line-height: 1.4;
@@ -1430,10 +1383,6 @@ p {
   .inspector-body {
     padding: 26px;
   }
-  .experiment-heading {
-    top: 45px;
-    left: 42px;
-  }
   .experiment-guide {
     margin-inline: 34px;
   }
@@ -1451,13 +1400,6 @@ p {
   .library {
     padding-inline: 12px;
   }
-  .brand {
-    font-size: 15px;
-    gap: 6px;
-  }
-  .brand svg {
-    width: 21px;
-  }
   .toolbar {
     padding-inline: 15px;
   }
@@ -1467,12 +1409,6 @@ p {
     display: none;
   }
   .toolbar-divider {
-    display: none;
-  }
-  .experiment-heading {
-    left: 24px;
-  }
-  .experiment-heading .tag {
     display: none;
   }
   .experiment-guide {
@@ -1526,13 +1462,6 @@ p {
     grid-row: 1/3;
     padding-inline: 10px;
   }
-  .brand {
-    font-size: 12px;
-    gap: 4px;
-  }
-  .brand svg {
-    width: 19px;
-  }
   .library-item {
     font-size: 11px;
     padding-inline: 8px;
@@ -1584,12 +1513,6 @@ p {
   .primary {
     padding: 10px 14px;
   }
-  .experiment-heading h1 {
-    font-size: 20px;
-  }
-  .experiment-heading p {
-    font-size: 10px;
-  }
   .metric strong {
     font-size: 16px;
   }
@@ -1623,13 +1546,6 @@ p {
     gap: 10px;
     border-bottom: 1px solid var(--line);
     overflow: visible;
-  }
-  .brand {
-    font-size: 15px;
-    margin: 0;
-  }
-  .project-switch {
-    padding: 8px;
   }
   .library-section {
     grid-column: 1/-1;
@@ -1706,13 +1622,6 @@ p {
   .reset-button {
     font-size: 10px;
     padding: 9px;
-  }
-  .experiment-heading {
-    top: 24px;
-    left: 20px;
-  }
-  .experiment-heading h1 {
-    font-size: 21px;
   }
   .canvas-shell {
     min-height: 350px;
@@ -2118,10 +2027,6 @@ p {
   }
   .canvas-shell {
     min-height: 0;
-  }
-  .experiment-heading {
-    position: static;
-    padding: 24px 20px 16px;
   }
   .canvas-area {
     flex: none;
