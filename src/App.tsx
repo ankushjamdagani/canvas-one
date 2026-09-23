@@ -676,7 +676,7 @@ export default function App() {
           if (!isInspectorOpen) return null;
 
           return (
-            <aside className="canvas-first-inspector-dock inspector w-[340px] shrink-0 h-full overflow-y-auto bg-card border-l border-border flex flex-col z-20" aria-label="Inspector dock">
+            <aside className="canvas-first-inspector-dock inspector w-[321px] shrink-0 h-full overflow-y-auto bg-card border-l border-border flex flex-col z-20" aria-label="Inspector dock">
               {selectedEdgeId ? (
                 <OpenConnectionEditor
                   edgeId={selectedEdgeId}
