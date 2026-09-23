@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import type { Document, ResourceBehavior } from '../model';
 import { runScenario, ScenarioRunner } from './scenario-runner';
 import { canonicalJson } from '../canonical';
+import { expectCleanJourneysAndRootIds } from './acceptance.test';
 
 const FIXTURES_DIR = path.join(process.cwd(), 'specs/revamp/fixtures');
 
@@ -441,6 +442,12 @@ describe('Decision D36: broadcast message roots', () => {
     expect(res.summary.messageCounts.succeeded).toBe(2);
     expect(res.summary.messageCounts.failed).toBe(0);
     expect(res.summary.messageCounts.inFlight).toBe(0);
+
+    // RV-14f review: no delivered/broadcast-copy unit is left with journeyId 'unknown',
+    // and both broadcast copies expose a clean runner-minted root id, never a raw kernel
+    // delivery-path identity.
+    const scenario = docWith2Consumers.scenarios.find((s) => s.id === allowScenarioId)!;
+    expectCleanJourneysAndRootIds(res.events, scenario);
   });
 
   it('one consumer failing on broadcast broker is counted as one failed message root', async () => {
