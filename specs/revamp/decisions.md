@@ -39,6 +39,7 @@ Only a user answer or an identified lead decision settles a row. To change one, 
 | D33 | User (2026-09-23) | Recursive refinement ownership is a storable structural error (like a `contains` cycle), rejected at save time for the whole document. |
 | D34 | User (2026-09-23) | Accepted readings: a compiler 'reference' is each resolved ID reference followed during closure expansion, counted once per referencing field; panel reducer gesture payloads, `activeOverlay` type and announce strings as implemented in RV-03a; toast layer z 80 (shared with tooltip); 'missing pipeline outputs' means an unresolvable output/error port — unconnected outputs are legal. |
 | D35 | User (2026-09-23) | Node kind stripes use six dedicated muted hues by catalog layer, distinct from the semantic primary/branch/risk colours: clients #4F6D8F, edge #2B7A83, compute #56773A, messaging #8A6A1F, data #8A4F6E, operations #5F646B (each ≥ 4.5:1 on white and panel). Extends design.md "Node kinds" beyond the board's three examples. |
+| D36 | User (2026-09-24) | A studio message delivered through a `broadcast` broker counts as one message root per delivered consumer copy, each linked to the emitting parent; each settles from its own kernel delivery facts. `competing` delivery keeps one message root per emission. |
 
 ## Lead defaults
 

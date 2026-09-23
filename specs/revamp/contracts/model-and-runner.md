@@ -124,7 +124,7 @@ All operations preserve row provenance. Filtered and duplicate rows are explicit
   - Direct finite call/resource inputs create one user root.
   - An external event/data input is a control invocation. It becomes a user root only if it emits a call; the first call promotes it, and later synchronous calls share that root. Events that emit no call (duplicate submit, timeout) add no request count.
   - Internal response events never create roots.
-  - Each message emission creates its own message root, linked to its parent; resource continuations don't duplicate it.
+  - Each message emission creates its own message root, linked to its parent; resource continuations don't duplicate it. Through a `broadcast` broker, each delivered consumer copy is its own message root linked to the same parent (D36).
   - A user root settles when all its synchronous frames settle. Outcome precedence: expired > failed > rejected > succeeded. Async message outcomes don't change the user root.
   - Malformed external input is an explicit rejected root. Control roots still get trace IDs for causality even when they're excluded from transport counters. The UI labels counts "Requests", not "User interactions".
   - Pure data runs (S03) can pass with zero transport roots.
