@@ -21,16 +21,21 @@
  * be exercised directly against a document that has not been (or no longer is) freshly
  * re-validated. This is intentional defense in depth, not a contract gap.
  *
+ * CONTRACT GAPS / INTERPRETATIONS:
+ * - "missing pipeline outputs" (specs/revamp/contracts/model-and-runner.md §5):
+ *   Interpreted as meaning the pipeline's declared outputPortId or errorPortId does not
+ *   resolve to a port on the same element (defensive check; the storable validator normally
+ *   catches it). An unconnected output port is legal (as demonstrated by reference fixture S03,
+ *   which passes with zero connections); connection/assertion coverage is not required.
+ *
  * NOT COVERED (explicitly out of scope for this task; see final report for citations):
- * - Path-dependent double settlement (runtime-only concern).
+ * - Path-dependent double settlement (runtime-only concern; model-and-runner.md §5:
+ *   "Path-dependent double settlement and budget-exhausting message cycles fail or end
+ *   incomplete at runtime").
  * - Static type inference of Value/Guard expressions beyond the trivial, statically
  *   knowable checks implemented here (port/shape compatibility). Guard/Value expression
  *   type-checking against payload shapes is not implemented.
  * - The trace envelope (model-and-runner.md §8/§9 TraceEvent, RunUpdate, etc).
- * - Full §4 "Wiring" completeness (decision/pipeline/machine port-kind wiring beyond what
- *   is exercised by the reference fixtures), machine response-binding uniqueness/coverage,
- *   "unbound call responses" and "effect lists that could reply twice" (§5) — these need a
- *   dedicated wiring/effect-flow analysis pass beyond this task's scope.
  */
 
 import type {
@@ -41,6 +46,11 @@ import type {
   Port,
   Shape,
   Json,
+  MachineBehavior,
+  PipelineBehavior,
+  DecisionBehavior,
+  ResourceBehavior,
+  Effect,
 } from './model';
 import type { Issue } from './validate';
 import { canonicalJson } from './canonical';
@@ -93,6 +103,16 @@ export const READINESS_ISSUE_CODES = [
   'compiler-analysis-limit',
   /** run-identity.md §3: compilation was cancelled before a closure could be computed. */
   'compiler-cancelled',
+  /** §4 Wiring: "maps each outbound call port to exactly one inbound event port on the same machine, with a compatible shape" / §5: "Readiness rejects: unbound call responses". */
+  'unbound-call-response',
+  /** §4 Behaviors / §5: "Readiness rejects: ... effect lists that could reply twice". */
+  'reply-twice',
+  /** §4 Wiring / §5: "Readiness rejects: ... mismatched schemas". */
+  'mismatched-schema',
+  /** §5: "Readiness rejects: ... missing pipeline outputs". */
+  'missing-pipeline-output',
+  /** §4 Behaviors: "unmodeled: reachable in a runnable scenario only behind a boundary fixture". */
+  'unmodeled-element',
 ] as const;
 
 export type ReadinessIssueCode = (typeof READINESS_ISSUE_CODES)[number];
@@ -557,6 +577,339 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
       );
     }
   });
+
+  // --------------------------------------------------------------------------
+  // §4 Behaviors: unmodeled elements reachable only behind boundary fixtures.
+  // "unmodeled: reachable in a runnable scenario only behind a boundary fixture"
+  // "so reject any unmodeled element present in the closure's includedElementIds."
+  // --------------------------------------------------------------------------
+  for (const elId of closure.includedElementIds) {
+    const el = elementsMap.get(elId);
+    if (!el) continue;
+    const elIdx = doc.elements.findIndex((e) => e.id === elId);
+    if (el.behavior.kind === 'unmodeled') {
+      issues.push(
+        issue(
+          'unmodeled-element',
+          ['elements', elIdx, 'behavior', 'kind'],
+          el.id,
+          `Element '${el.id}' has unmodeled behavior; reachable in a runnable scenario only behind a boundary fixture (specs/revamp/contracts/model-and-runner.md §4)`,
+        ),
+      );
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // §4 Wiring / §5: Machine checks
+  // 1. Unbound call responses:
+  //    §4 Wiring: "A machine response binding maps each outbound call port to exactly one
+  //    inbound event port on the same machine, with a compatible shape."
+  //    §5: "Readiness rejects: unbound call responses"
+  // 2. Effect lists that could reply twice:
+  //    §4 Behaviors: "{id,kind:'reply',value:Value,outcome:'succeeded'|'rejected'|'failed'|'expired'}
+  //    — settles the current initiating call frame exactly once"
+  //    §5: "Readiness rejects: ... effect lists that could reply twice ... Path-dependent
+  //    double settlement and budget-exhausting message cycles fail or end incomplete at runtime."
+  // 3. Machine transition eventPortId:
+  //    §4 Transitions and effects: "eventPortId may be any inbound event/call/message/data
+  //    port on the machine."
+  // --------------------------------------------------------------------------
+  for (const elId of closure.includedElementIds) {
+    const el = elementsMap.get(elId);
+    if (!el || el.behavior.kind !== 'machine') continue;
+    const mb = el.behavior as MachineBehavior;
+    const elIdx = doc.elements.findIndex((e) => e.id === elId);
+
+    // 1. Unbound call responses:
+    // Every outbound call port of an included machine that is used (emit effect portId
+    // or wired connection) must appear in exactly one responseBinding whose eventPortId
+    // is an inbound event port on the same machine with a shape compatible with the call
+    // port's responseSchemaId.
+    el.ports.forEach((p, pIdx) => {
+      if (p.direction === 'out' && p.channel === 'call') {
+        const isEmitted = mb.transitions.some((t) =>
+          t.effects.some((eff) => eff.kind === 'emit' && eff.portId === p.id),
+        );
+        const isWired = doc.connections.some(
+          (c) => c.source.elementId === el.id && c.source.portId === p.id,
+        );
+        if (isEmitted || isWired) {
+          const matchingBindings = mb.responseBindings.filter((rb) => rb.callPortId === p.id);
+          if (matchingBindings.length === 0) {
+            issues.push(
+              issue(
+                'unbound-call-response',
+                ['elements', elIdx, 'ports', pIdx],
+                p.id,
+                `Outbound call port '${p.id}' on machine '${el.id}' is used but has no response binding (specs/revamp/contracts/model-and-runner.md §4, §5)`,
+              ),
+            );
+          } else if (matchingBindings.length > 1) {
+            issues.push(
+              issue(
+                'unbound-call-response',
+                ['elements', elIdx, 'behavior', 'responseBindings'],
+                el.id,
+                `Outbound call port '${p.id}' on machine '${el.id}' has multiple response bindings; expected exactly one (specs/revamp/contracts/model-and-runner.md §4, §5)`,
+              ),
+            );
+          } else {
+            const rb = matchingBindings[0];
+            const rbIdx = mb.responseBindings.indexOf(rb);
+            const eventPort = el.ports.find((ep) => ep.id === rb.eventPortId);
+            if (!eventPort || eventPort.direction !== 'in' || eventPort.channel !== 'event') {
+              issues.push(
+                issue(
+                  'unbound-call-response',
+                  ['elements', elIdx, 'behavior', 'responseBindings', rbIdx, 'eventPortId'],
+                  rb.id,
+                  `Response binding '${rb.id}' eventPortId '${rb.eventPortId}' must be an inbound event port on machine '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+                ),
+              );
+            } else if (p.responseSchemaId) {
+              const callRespShape = schemaShapeMap.get(p.responseSchemaId);
+              const eventShape = schemaShapeMap.get(eventPort.schemaId);
+              if (callRespShape && eventShape && !shapesCompatible(callRespShape, eventShape)) {
+                issues.push(
+                  issue(
+                    'unbound-call-response',
+                    ['elements', elIdx, 'behavior', 'responseBindings', rbIdx, 'eventPortId'],
+                    rb.id,
+                    `Response binding '${rb.id}' event port '${eventPort.id}' shape is incompatible with call port '${p.id}' response schema (specs/revamp/contracts/model-and-runner.md §4)`,
+                  ),
+                );
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // 2. Effect lists that could reply twice:
+    // Within one transition's ordered effects, more than one 'reply' effect is a reject.
+    mb.transitions.forEach((t, tIdx) => {
+      const replyEffects: { eff: Effect; effIdx: number }[] = [];
+      t.effects.forEach((eff, effIdx) => {
+        if (eff.kind === 'reply') {
+          replyEffects.push({ eff, effIdx });
+        }
+      });
+      if (replyEffects.length > 1) {
+        for (let i = 1; i < replyEffects.length; i++) {
+          issues.push(
+            issue(
+              'reply-twice',
+              ['elements', elIdx, 'behavior', 'transitions', tIdx, 'effects', replyEffects[i].effIdx],
+              replyEffects[i].eff.id,
+              `Transition '${t.id}' has multiple reply effects; an effect list cannot reply twice (specs/revamp/contracts/model-and-runner.md §5)`,
+            ),
+          );
+        }
+      }
+    });
+
+    // 3. Machine transition eventPortId:
+    // Machine transition eventPortId is an inbound event/call/message/data port on the same machine.
+    mb.transitions.forEach((t, tIdx) => {
+      const evPort = el.ports.find((p) => p.id === t.eventPortId);
+      if (!evPort || evPort.direction !== 'in') {
+        issues.push(
+          issue(
+            'mismatched-schema',
+            ['elements', elIdx, 'behavior', 'transitions', tIdx, 'eventPortId'],
+            t.eventPortId,
+            `Machine transition '${t.id}' eventPortId '${t.eventPortId}' must be an inbound port on machine '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          ),
+        );
+      }
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // §4 Wiring / §5: Decision checks
+  // §4 Wiring: "A decision's inputPortId is an inbound data port matching inputSchemaId.
+  // Case/fallback ports are outbound data ports..."
+  // §5: "Readiness rejects: ... mismatched schemas"
+  // --------------------------------------------------------------------------
+  for (const elId of closure.includedElementIds) {
+    const el = elementsMap.get(elId);
+    if (!el || el.behavior.kind !== 'decision') continue;
+    const db = el.behavior as DecisionBehavior;
+    const elIdx = doc.elements.findIndex((e) => e.id === elId);
+
+    const inPort = el.ports.find((p) => p.id === db.inputPortId);
+    const inPortShape = inPort ? schemaShapeMap.get(inPort.schemaId) : null;
+    const expectedInShape = schemaShapeMap.get(db.inputSchemaId);
+    if (
+      !inPort ||
+      inPort.direction !== 'in' ||
+      inPort.channel !== 'data' ||
+      !inPortShape ||
+      !expectedInShape ||
+      !shapesCompatible(inPortShape, expectedInShape)
+    ) {
+      issues.push(
+        issue(
+          'mismatched-schema',
+          ['elements', elIdx, 'behavior', 'inputPortId'],
+          db.inputPortId,
+          `Decision inputPortId '${db.inputPortId}' must be an inbound data port whose schema matches inputSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+        ),
+      );
+    }
+
+    db.cases.forEach((c, cIdx) => {
+      const cPort = el.ports.find((p) => p.id === c.outputPortId);
+      if (!cPort || cPort.direction !== 'out' || cPort.channel !== 'data') {
+        issues.push(
+          issue(
+            'mismatched-schema',
+            ['elements', elIdx, 'behavior', 'cases', cIdx, 'outputPortId'],
+            c.outputPortId,
+            `Decision case outputPortId '${c.outputPortId}' must be an outbound data port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          ),
+        );
+      }
+    });
+
+    const fbPort = el.ports.find((p) => p.id === db.fallback.outputPortId);
+    if (!fbPort || fbPort.direction !== 'out' || fbPort.channel !== 'data') {
+      issues.push(
+        issue(
+          'mismatched-schema',
+          ['elements', elIdx, 'behavior', 'fallback', 'outputPortId'],
+          db.fallback.outputPortId,
+          `Decision fallback outputPortId '${db.fallback.outputPortId}' must be an outbound data port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+        ),
+      );
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // §4 Wiring / §5: Resource checks
+  // §4 Wiring: "A resource entryPortId is an inbound call/message port."
+  // §5: "Readiness rejects: ... mismatched schemas"
+  // --------------------------------------------------------------------------
+  for (const elId of closure.includedElementIds) {
+    const el = elementsMap.get(elId);
+    if (!el || el.behavior.kind !== 'resource') continue;
+    const rb = el.behavior as ResourceBehavior;
+    const elIdx = doc.elements.findIndex((e) => e.id === elId);
+
+    const entryPort = el.ports.find((p) => p.id === rb.entryPortId);
+    if (!entryPort || entryPort.direction !== 'in' || (entryPort.channel !== 'call' && entryPort.channel !== 'message')) {
+      issues.push(
+        issue(
+          'mismatched-schema',
+          ['elements', elIdx, 'behavior', 'entryPortId'],
+          rb.entryPortId,
+          `Resource entryPortId '${rb.entryPortId}' must be an inbound call or message port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+        ),
+      );
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // §4 Wiring / §5: Pipeline checks
+  // §4 Wiring: "A pipeline's inputPortId, outputPortId and errorPortId must be data-channel
+  // ports whose shapes match its input, output and error schemas."
+  // §5: "Readiness rejects: ... mismatched schemas; missing pipeline outputs."
+  // --------------------------------------------------------------------------
+  for (const elId of closure.includedElementIds) {
+    const el = elementsMap.get(elId);
+    if (!el || el.behavior.kind !== 'pipeline') continue;
+    const pb = el.behavior as PipelineBehavior;
+    const elIdx = doc.elements.findIndex((e) => e.id === elId);
+
+    const inPort = el.ports.find((p) => p.id === pb.inputPortId);
+    const inShape = inPort ? schemaShapeMap.get(inPort.schemaId) : null;
+    const expectedInShape = schemaShapeMap.get(pb.inputSchemaId);
+    if (
+      !inPort ||
+      inPort.direction !== 'in' ||
+      inPort.channel !== 'data' ||
+      !inShape ||
+      !expectedInShape ||
+      !shapesCompatible(inShape, expectedInShape)
+    ) {
+      issues.push(
+        issue(
+          'mismatched-schema',
+          ['elements', elIdx, 'behavior', 'inputPortId'],
+          pb.inputPortId,
+          `Pipeline inputPortId '${pb.inputPortId}' must be an inbound data port matching inputSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+        ),
+      );
+    }
+
+    const outPort = el.ports.find((p) => p.id === pb.outputPortId);
+    if (outPort) {
+      const outShape = schemaShapeMap.get(outPort.schemaId);
+      const expectedOutShape = schemaShapeMap.get(pb.outputSchemaId);
+      if (
+        outPort.direction !== 'out' ||
+        outPort.channel !== 'data' ||
+        !outShape ||
+        !expectedOutShape ||
+        !shapesCompatible(outShape, expectedOutShape)
+      ) {
+        issues.push(
+          issue(
+            'mismatched-schema',
+            ['elements', elIdx, 'behavior', 'outputPortId'],
+            pb.outputPortId,
+            `Pipeline outputPortId '${pb.outputPortId}' must be an outbound data port matching outputSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          ),
+        );
+      }
+    }
+
+    const errPort = el.ports.find((p) => p.id === pb.errorPortId);
+    if (errPort) {
+      const errShape = schemaShapeMap.get(errPort.schemaId);
+      const expectedErrShape = schemaShapeMap.get(pb.errorSchemaId);
+      if (
+        errPort.direction !== 'out' ||
+        errPort.channel !== 'data' ||
+        !errShape ||
+        !expectedErrShape ||
+        !shapesCompatible(errShape, expectedErrShape)
+      ) {
+        issues.push(
+          issue(
+            'mismatched-schema',
+            ['elements', elIdx, 'behavior', 'errorPortId'],
+            pb.errorPortId,
+            `Pipeline errorPortId '${pb.errorPortId}' must be an outbound data port matching errorSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          ),
+        );
+      }
+    }
+
+    // Check 4: Missing pipeline outputs (§5)
+    // Fires only when outputPortId or errorPortId does not resolve to a port on the same
+    // element (defensive check; the storable validator normally catches it).
+    if (!outPort) {
+      issues.push(
+        issue(
+          'missing-pipeline-output',
+          ['elements', elIdx, 'behavior', 'outputPortId'],
+          pb.outputPortId,
+          `Pipeline '${el.id}' outputPortId '${pb.outputPortId}' does not resolve to a port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §5)`,
+        ),
+      );
+    }
+    if (!errPort) {
+      issues.push(
+        issue(
+          'missing-pipeline-output',
+          ['elements', elIdx, 'behavior', 'errorPortId'],
+          pb.errorPortId,
+          `Pipeline '${el.id}' errorPortId '${pb.errorPortId}' does not resolve to a port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §5)`,
+        ),
+      );
+    }
+  }
 
   if (issues.length > 0) {
     return { ready: false, issues };

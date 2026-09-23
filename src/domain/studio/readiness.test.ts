@@ -9,6 +9,12 @@ import type {
   Scenario,
   Shape,
   CallConnectionConfig,
+  MachineBehavior,
+  PipelineBehavior,
+  DecisionBehavior,
+  ResourceBehavior,
+  Transition,
+  MachineResponseBinding,
 } from './model';
 import { checkReadiness, normalizeShape, shapesCompatible } from './readiness';
 
@@ -68,7 +74,12 @@ function port(id: string, direction: Port['direction'], channel: Port['channel']
   return { id, label: id, direction, channel, schemaId, responseSchemaId };
 }
 
-function machineElement(id: string, ports: Port[]): Element {
+function machineElement(
+  id: string,
+  ports: Port[],
+  transitions: readonly Transition[] = [],
+  responseBindings: readonly MachineResponseBinding[] = [],
+): Element {
   return {
     id,
     label: id,
@@ -82,8 +93,8 @@ function machineElement(id: string, ports: Port[]): Element {
       initialStateId: 'st1',
       contextSchemaId: S_ID,
       initialContextFixtureId: 'fx-ctx',
-      transitions: [],
-      responseBindings: [],
+      transitions,
+      responseBindings,
     },
   };
 }
@@ -558,3 +569,625 @@ describe('checkReadiness mutation tests', () => {
     }
   });
 });
+
+// ============================================================================
+// RV-02f runnable-readiness rejects
+// ============================================================================
+
+function pipelineElement(
+  id: string,
+  inPortId: string,
+  outPortId: string,
+  errPortId: string,
+  inSchemaId = S_ID,
+  outSchemaId = S_ID,
+  errSchemaId = S_ID,
+): Element {
+  return {
+    id,
+    label: id,
+    description: '',
+    visualKind: 'data-pipeline',
+    ports: [
+      port(inPortId, 'in', 'data', inSchemaId),
+      port(outPortId, 'out', 'data', outSchemaId),
+      port(errPortId, 'out', 'data', errSchemaId),
+    ],
+    behavior: {
+      kind: 'pipeline',
+      version: 1,
+      inputSchemaId: inSchemaId,
+      outputSchemaId: outSchemaId,
+      errorSchemaId: errSchemaId,
+      inputPortId: inPortId,
+      outputPortId: outPortId,
+      errorPortId: errPortId,
+      operations: [],
+    },
+  };
+}
+
+function decisionElement(
+  id: string,
+  inPortId: string,
+  outPortId: string,
+  fbPortId: string,
+  inSchemaId = S_ID,
+): Element {
+  return {
+    id,
+    label: id,
+    description: '',
+    visualKind: 'state-machine',
+    ports: [
+      port(inPortId, 'in', 'data', inSchemaId),
+      port(outPortId, 'out', 'data', inSchemaId),
+      port(fbPortId, 'out', 'data', inSchemaId),
+    ],
+    behavior: {
+      kind: 'decision',
+      version: 1,
+      inputSchemaId: inSchemaId,
+      inputPortId: inPortId,
+      cases: [
+        {
+          id: 'case-1',
+          guard: { op: 'exists', value: { kind: 'read', source: 'input', path: [] } },
+          outputPortId: outPortId,
+          value: { kind: 'read', source: 'input', path: [] },
+        },
+      ],
+      fallback: {
+        outputPortId: fbPortId,
+        value: { kind: 'read', source: 'input', path: [] },
+      },
+    },
+  };
+}
+
+function unmodeledElement(id: string, ports: Port[] = []): Element {
+  return {
+    id,
+    label: id,
+    description: '',
+    visualKind: 'service',
+    ports,
+    behavior: {
+      kind: 'unmodeled',
+      version: 1,
+      reason: 'External service',
+    },
+  };
+}
+
+describe('RV-02f runnable-readiness rejects', () => {
+  // --------------------------------------------------------------------------
+  // Check 1: Unbound call responses (§4 Wiring, §5)
+  // --------------------------------------------------------------------------
+  describe('unbound-call-response', () => {
+    it('rejects an outbound call port used by an emit effect when response binding is missing', () => {
+      const M = machineElement(
+        'm1',
+        [port('p1', 'in', 'data', S_ID), port('call-out', 'out', 'call', S_ID, S_ID)],
+        [
+          {
+            id: 't1',
+            fromStateId: 'st1',
+            eventPortId: 'p1',
+            guard: null,
+            toStateId: 'st1',
+            effects: [
+              {
+                id: 'eff1',
+                kind: 'emit',
+                portId: 'call-out',
+                value: { kind: 'literal', value: {} },
+                correlation: { kind: 'current' },
+              },
+            ],
+          },
+        ],
+      );
+
+      const scenario: Scenario = {
+        id: 'scn-m1',
+        label: 'm1',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['m1'],
+        entryPorts: [{ elementId: 'm1', portId: 'p1' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'm1', portId: 'p1' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'final', subject: { kind: 'final-state', elementId: 'm1' }, operator: 'equals', expected: 'st1' },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([M], [], scenario);
+      const result = checkReadiness(doc, 'scn-m1');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'unbound-call-response');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'ports', 1]);
+        expect(found?.entityId).toBe('call-out');
+      }
+    });
+
+    it('passes when the used outbound call port has exactly one compatible response binding', () => {
+      const M = machineElement(
+        'm1',
+        [
+          port('p1', 'in', 'data', S_ID),
+          port('call-out', 'out', 'call', S_ID, S_ID),
+          port('ev-in', 'in', 'event', S_ID),
+        ],
+        [
+          {
+            id: 't1',
+            fromStateId: 'st1',
+            eventPortId: 'p1',
+            guard: null,
+            toStateId: 'st1',
+            effects: [
+              {
+                id: 'eff1',
+                kind: 'emit',
+                portId: 'call-out',
+                value: { kind: 'literal', value: {} },
+                correlation: { kind: 'current' },
+              },
+            ],
+          },
+        ],
+        [{ id: 'rb1', callPortId: 'call-out', eventPortId: 'ev-in' }],
+      );
+
+      const scenario: Scenario = {
+        id: 'scn-m1-ok',
+        label: 'm1',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['m1'],
+        entryPorts: [{ elementId: 'm1', portId: 'p1' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'm1', portId: 'p1' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'final', subject: { kind: 'final-state', elementId: 'm1' }, operator: 'equals', expected: 'st1' },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([M], [], scenario);
+      const result = checkReadiness(doc, 'scn-m1-ok');
+      expect(result.ready).toBe(true);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Check 2: Effect lists that could reply twice (§5)
+  // --------------------------------------------------------------------------
+  describe('reply-twice', () => {
+    it('rejects a transition effect list with more than one reply effect', () => {
+      const M = machineElement(
+        'm1',
+        [port('p1', 'in', 'call', S_ID, S_ID)],
+        [
+          {
+            id: 't1',
+            fromStateId: 'st1',
+            eventPortId: 'p1',
+            guard: null,
+            toStateId: 'st1',
+            effects: [
+              { id: 'rep1', kind: 'reply', value: { kind: 'literal', value: {} }, outcome: 'succeeded' },
+              { id: 'rep2', kind: 'reply', value: { kind: 'literal', value: {} }, outcome: 'succeeded' },
+            ],
+          },
+        ],
+      );
+
+      const scenario: Scenario = {
+        id: 'scn-rep-twice',
+        label: 'rep-twice',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['m1'],
+        entryPorts: [{ elementId: 'm1', portId: 'p1' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'm1', portId: 'p1' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'final', subject: { kind: 'final-state', elementId: 'm1' }, operator: 'equals', expected: 'st1' },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([M], [], scenario);
+      const result = checkReadiness(doc, 'scn-rep-twice');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'reply-twice');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'transitions', 0, 'effects', 1]);
+        expect(found?.entityId).toBe('rep2');
+      }
+    });
+
+    it('passes when a transition contains at most one reply effect', () => {
+      const M = machineElement(
+        'm1',
+        [port('p1', 'in', 'call', S_ID, S_ID)],
+        [
+          {
+            id: 't1',
+            fromStateId: 'st1',
+            eventPortId: 'p1',
+            guard: null,
+            toStateId: 'st1',
+            effects: [
+              { id: 'rep1', kind: 'reply', value: { kind: 'literal', value: {} }, outcome: 'succeeded' },
+            ],
+          },
+        ],
+      );
+
+      const scenario: Scenario = {
+        id: 'scn-rep-once',
+        label: 'rep-once',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['m1'],
+        entryPorts: [{ elementId: 'm1', portId: 'p1' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'm1', portId: 'p1' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'final', subject: { kind: 'final-state', elementId: 'm1' }, operator: 'equals', expected: 'st1' },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([M], [], scenario);
+      const result = checkReadiness(doc, 'scn-rep-once');
+      expect(result.ready).toBe(true);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Check 3: Mismatched schemas (§4 Wiring)
+  // --------------------------------------------------------------------------
+  describe('mismatched-schema', () => {
+    it('rejects a decision whose inputPort schema does not match inputSchemaId', () => {
+      const shapeStr: Shape = { type: 'string', nullable: false };
+      const D = decisionElement('d1', 'dp-in', 'dp-out', 'dp-fb', 'schema-str');
+      // dp-in port on element currently uses S_ID (record), but inputSchemaId is schema-str (string)
+      (D.ports as any)[0] = port('dp-in', 'in', 'data', S_ID);
+
+      const scenario: Scenario = {
+        id: 'scn-dec-mismatch',
+        label: 'dec',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['d1'],
+        entryPorts: [{ elementId: 'd1', portId: 'dp-in' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'd1', portId: 'dp-in' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'count', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 0 },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([D], [], scenario, [{ id: 'schema-str', label: 'Str', shape: shapeStr }]);
+      const result = checkReadiness(doc, 'scn-dec-mismatch');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'mismatched-schema');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'inputPortId']);
+        expect(found?.entityId).toBe('dp-in');
+      }
+    });
+
+    it('rejects a resource entryPortId that is a data port instead of call or message', () => {
+      const R = resourceElement('r1', 'rp1', [port('rp1', 'in', 'data', S_ID)]);
+      const scenario: Scenario = {
+        id: 'scn-res-data-entry',
+        label: 'res',
+        revision: 0,
+        mode: 'timed',
+        scopeElementIds: ['r1'],
+        entryPorts: [{ elementId: 'r1', portId: 'rp1' }],
+        inputs: [
+          {
+            id: 'in1',
+            entry: { elementId: 'r1', portId: 'rp1' },
+            fixtureId: 'fx-input',
+            journeyId: 'j1',
+            atMs: 0,
+            payloadBindings: [],
+            resource: { requestClassId: 'rc1', operation: 'read', key: null, tags: [], deadlineMs: 5000 },
+          },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'succeeded', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 1 },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'horizon', horizonMs: 5000 },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([R], [], scenario);
+      const result = checkReadiness(doc, 'scn-res-data-entry');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'mismatched-schema');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'entryPortId']);
+        expect(found?.entityId).toBe('rp1');
+      }
+    });
+
+    it('rejects a machine transition eventPortId that is an outbound port', () => {
+      const M = machineElement(
+        'm1',
+        [port('p1', 'in', 'data', S_ID), port('p2', 'out', 'data', S_ID)],
+        [{ id: 't1', fromStateId: 'st1', eventPortId: 'p2', guard: null, toStateId: 'st1', effects: [] }],
+      );
+
+      const scenario: Scenario = {
+        id: 'scn-m-out-event',
+        label: 'm',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['m1'],
+        entryPorts: [{ elementId: 'm1', portId: 'p1' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'm1', portId: 'p1' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'final', subject: { kind: 'final-state', elementId: 'm1' }, operator: 'equals', expected: 'st1' },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([M], [], scenario);
+      const result = checkReadiness(doc, 'scn-m-out-event');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'mismatched-schema');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'transitions', 0, 'eventPortId']);
+        expect(found?.entityId).toBe('p2');
+      }
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Check 4: Missing pipeline outputs (§5)
+  // --------------------------------------------------------------------------
+  describe('missing-pipeline-output', () => {
+    it('allows a pipeline with an unconnected output (unconnected output is legal per S03)', () => {
+      const P = pipelineElement('pipe1', 'p-in', 'p-out', 'p-err');
+      const scenario: Scenario = {
+        id: 'scn-pipe-unconnected',
+        label: 'pipe',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['pipe1'],
+        entryPorts: [{ elementId: 'pipe1', portId: 'p-in' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'pipe1', portId: 'p-in' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'count', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 0 },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([P], [], scenario);
+      const result = checkReadiness(doc, 'scn-pipe-unconnected');
+      expect(result.ready).toBe(true);
+    });
+
+    it('rejects a pipeline whose outputPortId points to a port of another element', () => {
+      const M = machineElement('m1', [port('m-port', 'out', 'data', S_ID)]);
+      const P = pipelineElement('pipe1', 'p-in', 'p-out', 'p-err');
+      (P.behavior as { outputPortId: string }).outputPortId = 'm-port';
+
+      const scenario: Scenario = {
+        id: 'scn-pipe-foreign-output',
+        label: 'pipe',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['pipe1'],
+        entryPorts: [{ elementId: 'pipe1', portId: 'p-in' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'pipe1', portId: 'p-in' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'count', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 0 },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([P, M], [], scenario);
+      const result = checkReadiness(doc, 'scn-pipe-foreign-output');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'missing-pipeline-output');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'outputPortId']);
+        expect(found?.entityId).toBe('m-port');
+      }
+    });
+
+    it('rejects a pipeline whose errorPortId points to a port of another element', () => {
+      const M = machineElement('m1', [port('m-err', 'out', 'data', S_ID)]);
+      const P = pipelineElement('pipe1', 'p-in', 'p-out', 'p-err');
+      (P.behavior as { errorPortId: string }).errorPortId = 'm-err';
+
+      const scenario: Scenario = {
+        id: 'scn-pipe-foreign-error',
+        label: 'pipe',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['pipe1'],
+        entryPorts: [{ elementId: 'pipe1', portId: 'p-in' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'pipe1', portId: 'p-in' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'count', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 0 },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([P, M], [], scenario);
+      const result = checkReadiness(doc, 'scn-pipe-foreign-error');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'missing-pipeline-output');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'errorPortId']);
+        expect(found?.entityId).toBe('m-err');
+      }
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Check 5: Unmodeled element in closure (§4)
+  // --------------------------------------------------------------------------
+  describe('unmodeled-element', () => {
+    it('rejects an unmodeled element present in the scenario closure', () => {
+      const U = unmodeledElement('u1', [port('up1', 'in', 'data', S_ID)]);
+      const scenario: Scenario = {
+        id: 'scn-unmodeled',
+        label: 'unmodeled',
+        revision: 0,
+        mode: 'logical',
+        scopeElementIds: ['u1'],
+        entryPorts: [{ elementId: 'u1', portId: 'up1' }],
+        inputs: [
+          { id: 'in1', entry: { elementId: 'u1', portId: 'up1' }, fixtureId: 'fx-input', journeyId: 'j1', atMs: null, payloadBindings: [], resource: null },
+        ],
+        workloads: [],
+        faults: [],
+        boundaries: [],
+        refinementSelections: [],
+        initialContexts: [],
+        assertions: [
+          { id: 'a1', label: 'count', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 0 },
+        ],
+        seed: 1,
+        budgets: defaultBudgets,
+        completion: { kind: 'quiescent' },
+        assumptions: [],
+      };
+
+      const doc = baseDoc([U], [], scenario);
+      const result = checkReadiness(doc, 'scn-unmodeled');
+      expect(result.ready).toBe(false);
+      if (!result.ready) {
+        const found = result.issues.find((i) => i.code === 'unmodeled-element');
+        expect(found).toBeDefined();
+        expect(found?.path).toEqual(['elements', 0, 'behavior', 'kind']);
+        expect(found?.entityId).toBe('u1');
+      }
+    });
+
+    it('passes when an unmodeled element is reached only behind a boundary (s01)', () => {
+      const doc = loadFixture('s01.json');
+      const unmodeled = doc.elements.find((e) => e.behavior.kind === 'unmodeled');
+      expect(unmodeled).toBeDefined();
+      for (const scn of doc.scenarios) {
+        const result = checkReadiness(doc, scn.id);
+        expect(result.ready).toBe(true);
+      }
+    });
+  });
+});
+
