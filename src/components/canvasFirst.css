@@ -537,9 +537,12 @@
   z-index: 10;
 }
 
-/* Contextual Inspector Dock */
+/* Contextual Inspector Dock (commands.md §7: the inspector surface is fixed
+   320px on desktop; box-sizing:border-box means the 1px border-left would
+   otherwise eat into that 320px and clip the inspector to 319px, so the dock
+   is sized to 320px content + its own border). */
 .canvas-first-inspector-dock {
-  width: 340px;
+  width: calc(320px + 1px);
   flex-shrink: 0;
   height: 100%;
   overflow-y: auto;
@@ -740,15 +743,28 @@
   }
 
   .canvas-first-workspace {
-    flex: none;
+    flex: 1;
     width: 100%;
-    height: auto;
+    height: 0;
+    min-height: 0;
   }
 
   .canvas-first-canvas-container {
-    height: 420px;
-    min-height: 420px;
-    flex: none;
+    flex: 1;
+    min-height: 240px;
+    height: 0;
+  }
+
+  /* Nested percentage-height chain (container -> system-canvas -> .react-flow)
+     doesn't resolve reliably through two stacked auto/flex-grown ancestors in
+     this engine; anchor the canvas to the container's already-resolved box via
+     absolute inset instead of a further percentage height. */
+  .canvas-first-canvas-container .system-canvas {
+    position: absolute !important;
+    inset: 0 !important;
+    height: auto !important;
+    width: auto !important;
+    min-height: 0 !important;
   }
 
   .canvas-first-inspector-dock {
@@ -764,6 +780,9 @@
     align-items: flex-start;
     gap: 10px;
     padding: 10px 12px;
+    height: auto;
+    min-height: auto;
+    flex-shrink: 0;
   }
 
   .canvas-first-strip-info,
@@ -1031,12 +1050,4 @@
 /* Tactile micro-interactions across workspace buttons */
 .canvas-first-btn:active:not(:disabled) {
   transform: scale(0.97);
-}
-
-/* TEMPORARY compatibility (RV-03b): StudioMenu is an RV-12-reserved file that opens a
-   full-screen backdrop and is closed by clicking .project-switch again. Keep the top bar
-   above that backdrop, as the legacy rule did, until StudioMenu becomes a DropdownMenu
-   (RV-11/RV-12). This intentionally exceeds the commands.md §7 chrome layer. */
-header.canvas-first-topbar {
-  z-index: 1100;
 }

@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy } from "react";
+import React, { useEffect, useState, Suspense, lazy } from "react";
 import {
   FolderOpen,
   Plus,
@@ -82,11 +82,32 @@ export function StudioMenu({
   setError,
 }: StudioMenuProps) {
   const [checkpointName, setCheckpointName] = useState("");
+  // commands.md §7: the topbar owns the chrome layer and must stay visible and
+  // clickable while this menu is open (e2e tests close it via the topbar's
+  // project-switch control). Rather than escalating this menu above the
+  // topbar's stacking layer, keep the backdrop/menu below the topbar's own
+  // rendered height so it never covers it, on desktop and mobile alike.
+  const [topOffset, setTopOffset] = useState(52);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const measure = () => {
+      const topbar = document.querySelector<HTMLElement>('[data-testid="topbar"]');
+      if (topbar) setTopOffset(topbar.getBoundingClientRect().height);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="scope-menu-backdrop fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-start justify-center pt-14 p-4 animate-in fade-in-0" onClick={onClose}>
+    <div
+      className="scope-menu-backdrop fixed inset-x-0 bottom-0 z-50 bg-black/40 backdrop-blur-xs flex items-start justify-center p-4 animate-in fade-in-0"
+      style={{ top: topOffset }}
+      onClick={onClose}
+    >
       <Card
         data-testid="studio-menu"
         className="scope-menu-card studio-menu-card w-full max-w-lg bg-background border-border shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
