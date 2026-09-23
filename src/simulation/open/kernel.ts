@@ -22,7 +22,11 @@ export type SimLifecycleFactKind =
   | 'attempt_settled'
   | 'unit_settled'
   | 'message_created'
-  | 'route_selected';
+  | 'route_selected'
+  | 'host_down'
+  | 'host_up'
+  | 'failure_detected'
+  | 'recovery_detected';
 
 export interface SimLifecycleFact {
   kind: SimLifecycleFactKind;
@@ -38,10 +42,24 @@ export interface SimLifecycleFact {
 
 export type SimTraceHook = (fact: SimLifecycleFact) => void;
 
+export interface KernelFaultConfig {
+  id: string;
+  hostId: string;
+  downAtMs: number;
+  upAtMs: number;
+  detectionDelayMs: number;
+  recoveryDetectionDelayMs: number;
+  activePolicy: 'fail';
+  queuedPolicy: 'reject';
+  routeReset: 'first-healthy';
+}
+
 export interface OpenSimulationOptions {
   traceHook?: SimTraceHook;
   disabledWorkloadIds?: Iterable<string>;
   requireRunnable?: boolean;
+  hostPlacement?: Map<string, string> | Record<string, string>;
+  faults?: readonly KernelFaultConfig[];
 }
 
 export interface KernelResourceInput {
@@ -254,6 +272,7 @@ export interface Op {
   cacheAction?: 'fill' | 'invalidate';
   subscription?: string;
   publicationOnly?: boolean;
+  cancelled?: boolean;
 }
 
 export interface NodeRuntime {
@@ -351,6 +370,13 @@ export class OpenSimulation {
   }> = [];
   protected nextSampleTime = 1;
 
+  protected hostPlacement = new Map<string, string>();
+  protected hostState = new Map<string, boolean>();
+  protected routerDetectedHostState = new Map<string, boolean>();
+  protected roundRobinCursors = new Map<string, number>();
+  protected faults: KernelFaultConfig[] = [];
+  protected pendingCompletionCancels = new Map<Op, () => void>();
+
   constructor(graph: ExecutionGraph, options?: OpenSimulationOptions) {
     if (options?.traceHook) {
       this.traceHook = options.traceHook;
@@ -426,6 +452,191 @@ export class OpenSimulation {
     }
 
     this.scheduleSample(1);
+
+    if (options?.hostPlacement) {
+      if (options.hostPlacement instanceof Map) {
+        this.hostPlacement = new Map(options.hostPlacement);
+      } else {
+        this.hostPlacement = new Map(Object.entries(options.hostPlacement));
+      }
+    }
+
+    if (options?.faults && options.faults.length > 0) {
+      this.faults = [...options.faults];
+      for (const fault of this.faults) {
+        this.hostState.set(fault.hostId, true);
+        this.routerDetectedHostState.set(fault.hostId, true);
+
+        const downSec = fault.downAtMs / 1000;
+        const failDetectSec = (fault.downAtMs + fault.detectionDelayMs) / 1000;
+        const upSec = fault.upAtMs / 1000;
+        const recDetectSec = (fault.upAtMs + fault.recoveryDetectionDelayMs) / 1000;
+
+        // Phase 0: host-down event (priority -2)
+        this.scheduleEvent(downSec, -2, () => {
+          this.interruptHost(fault.hostId, downSec);
+        });
+
+        // Phase 0: failure-detection event (priority -1)
+        this.scheduleEvent(failDetectSec, -1, () => {
+          this.failureDetected(fault.hostId, failDetectSec);
+        });
+
+        // Phase 0: host-up event (priority -2)
+        this.scheduleEvent(upSec, -2, () => {
+          this.hostUp(fault.hostId, upSec);
+        });
+
+        // Phase 0: recovery-detection event (priority -1)
+        this.scheduleEvent(recDetectSec, -1, () => {
+          this.recoveryDetected(fault.hostId, recDetectSec);
+        });
+      }
+    }
+  }
+
+  public getHostState(hostId: string): boolean | undefined {
+    return this.hostState.get(hostId);
+  }
+
+  public getRouterDetectedHostState(hostId: string): boolean | undefined {
+    return this.routerDetectedHostState.get(hostId);
+  }
+
+  public interruptHost(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.hostState.set(hostId, false);
+    this.emitFact({
+      kind: 'host_down',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
+
+    for (const [nodeId, placedHostId] of this.hostPlacement.entries()) {
+      if (placedHostId !== hostId) continue;
+      const nr = this.nodesRuntime.get(nodeId);
+      if (!nr) continue;
+
+      // 1. Active work on this host fails once
+      const activeOps = Array.from(nr.active);
+      nr.active.clear();
+      for (const op of activeOps) {
+        if (op.done) continue;
+        op.cancelled = true;
+        const cancelCb = this.pendingCompletionCancels.get(op);
+        if (cancelCb) {
+          cancelCb();
+          this.pendingCompletionCancels.delete(op);
+        }
+
+        nr.counters.failed++;
+        op.phase = 'settled';
+        op.done = true;
+        this.emitFact({
+          kind: 'attempt_settled',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+          outcome: 'failed',
+        });
+        this.finishOp(op, 'failed');
+        this.releaseOp(op);
+      }
+
+      // 2. Queued work on this host is rejected once
+      const queuedOps = Array.from(nr.queue);
+      nr.queue = [];
+      for (const op of queuedOps) {
+        if (op.done) continue;
+        op.cancelled = true;
+        nr.counters.rejected++;
+        op.phase = 'settled';
+        op.done = true;
+        if (op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'rejected',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
+        this.finishOp(op, 'rejected');
+        this.releaseOp(op);
+      }
+
+      // Retrying work is left alone: activePolicy/queuedPolicy apply only to active and
+      // queued work present when the outage fires (§6 Faults). When a pending retry's timer
+      // later re-admits it, normal admission applies: rejected as unavailable if the host is
+      // still down, admitted normally if it has recovered.
+    }
+  }
+
+  public hostUp(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.hostState.set(hostId, true);
+    this.emitFact({
+      kind: 'host_up',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
+  }
+
+  public failureDetected(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.routerDetectedHostState.set(hostId, false);
+    for (const [nodeId, node] of this.plan.nodes.entries()) {
+      if (node.behavior.type === 'router' && node.behavior.strategy === 'round-robin') {
+        this.roundRobinCursors.set(nodeId, 0);
+      }
+    }
+    this.emitFact({
+      kind: 'failure_detected',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
+  }
+
+  public recoveryDetected(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.routerDetectedHostState.set(hostId, true);
+    for (const [nodeId, node] of this.plan.nodes.entries()) {
+      if (node.behavior.type === 'router' && node.behavior.strategy === 'round-robin') {
+        this.roundRobinCursors.set(nodeId, 0);
+      }
+    }
+    this.emitFact({
+      kind: 'recovery_detected',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
   }
 
   protected scheduleEvent(time: number, priority: number, run: () => void): void {
@@ -725,6 +936,29 @@ export class OpenSimulation {
     const nr = this.nodesRuntime.get(op.nodeId)!;
     const node = this.plan.nodes.get(op.nodeId)!;
 
+    const hostId = this.hostPlacement.get(op.nodeId);
+    if (hostId !== undefined && this.hostState.get(hostId) === false) {
+      // Admission to a host that is actually down is rejected immediately as unavailable,
+      // whatever the router knows and regardless of whether this is a first attempt or a
+      // retry landing during the outage (§6 Faults).
+      nr.counters.rejected++;
+      op.phase = 'settled';
+      op.done = true;
+      if (op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'rejected',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
+      this.finishOp(op, 'rejected');
+      this.releaseOp(op);
+      return false;
+    }
+
     if (!isRetry) {
       nr.counters.arrived++;
     }
@@ -927,7 +1161,15 @@ export class OpenSimulation {
     }
 
     const completeTime = this.currentTime + procTime;
+    let cancelled = false;
+    this.pendingCompletionCancels.set(op, () => {
+      cancelled = true;
+    });
     this.scheduleEvent(completeTime, 1, () => {
+      this.pendingCompletionCancels.delete(op);
+      if (cancelled || op.cancelled) {
+        return;
+      }
       this.handleProcessingCompletion(op);
     });
   }
@@ -1049,16 +1291,89 @@ export class OpenSimulation {
   protected selectOutgoing(op: Op, outgoing: ExecutionEdge[]): ExecutionEdge[] {
     const node = this.plan.nodes.get(op.nodeId)!;
     if (node.behavior.type === 'router') {
-      const draw = makeRng(
-        (this.seed ^ hashString(`${op.unit.identity}:${op.path}:route`)) >>> 0
-      );
-      const selected = this.routeSelector.select(
-        node,
-        outgoing,
-        op.unit.requestClass,
-        draw
-      );
-      return [selected];
+      if (this.faults.length === 0) {
+        const draw = makeRng(
+          (this.seed ^ hashString(`${op.unit.identity}:${op.path}:route`)) >>> 0
+        );
+        const selected = this.routeSelector.select(
+          node,
+          outgoing,
+          op.unit.requestClass,
+          draw
+        );
+        return [selected];
+      }
+
+      // Fault-enabled router logic: filter outgoing edges by routerDetectedHostState
+      const eligible = outgoing.filter((edge) => {
+        const targetHost = this.hostPlacement.get(edge.target);
+        if (targetHost === undefined) return true;
+        return this.routerDetectedHostState.get(targetHost) !== false;
+      });
+
+      if (eligible.length === 0) {
+        // Advance round robin cursor even on rejected selection per S04
+        if (node.behavior.strategy === 'round-robin') {
+          const cursor = this.roundRobinCursors.get(node.id) ?? 0;
+          this.roundRobinCursors.set(node.id, cursor + 1);
+        }
+        return [];
+      }
+
+      const strategy = node.behavior.strategy;
+      if (strategy === 'round-robin') {
+        const cursor = this.roundRobinCursors.get(node.id) ?? 0;
+        const selected = eligible[cursor % eligible.length];
+        this.roundRobinCursors.set(node.id, cursor + 1);
+        return [selected];
+      }
+
+      if (strategy === 'weighted') {
+        const draw = makeRng(
+          (this.seed ^ hashString(`${op.unit.identity}:${op.path}:route`)) >>> 0
+        );
+        let maxWeight = 0;
+        for (const edge of eligible) {
+          if (edge.weight > maxWeight) maxWeight = edge.weight;
+        }
+        const safeMax = maxWeight > 0 ? maxWeight : 1;
+        let totalNormalizedWeight = 0;
+        for (const edge of eligible) {
+          totalNormalizedWeight += edge.weight / safeMax;
+        }
+        let roll = draw() * totalNormalizedWeight;
+        for (const edge of eligible) {
+          const w = edge.weight / safeMax;
+          if (roll <= w) return [edge];
+          roll -= w;
+        }
+        return [eligible[eligible.length - 1]];
+      }
+
+      if (strategy === 'conditional') {
+        let fallbackEdge: ExecutionEdge | undefined;
+        for (const edge of eligible) {
+          if (edge.fallback) {
+            fallbackEdge = edge;
+            continue;
+          }
+          const condition = edge.condition;
+          if (!condition) continue;
+          let matched = false;
+          if (condition.field === 'class') {
+            matched = op.unit.requestClass.name === condition.value;
+          } else if (condition.field === 'operation') {
+            matched = op.unit.requestClass.operation === condition.value;
+          } else if (condition.field === 'tag') {
+            matched = op.unit.requestClass.tags.includes(condition.value);
+          }
+          if (matched) return [edge];
+        }
+        if (fallbackEdge) return [fallbackEdge];
+        return [];
+      }
+
+      return [eligible[0]];
     }
     return outgoing;
   }
@@ -1072,6 +1387,28 @@ export class OpenSimulation {
 
     const selectedOutgoing = this.selectOutgoing(op, allOutgoing);
     if (selectedOutgoing.length === 0) {
+      const node = this.plan.nodes.get(op.nodeId)!;
+      if (node.behavior.type === 'router') {
+        const nr = this.nodesRuntime.get(op.nodeId)!;
+        nr.active.delete(op);
+        this.pumpQueue(op.nodeId);
+        nr.counters.rejected++;
+        op.phase = 'settled';
+        op.done = true;
+        if (op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'rejected',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
+        this.finishOp(op, 'rejected');
+        this.releaseOp(op);
+        return;
+      }
       this.completeLocalOp(op);
       return;
     }
@@ -1305,11 +1642,19 @@ export class OpenSimulation {
           nr.active.delete(parentOp);
           this.pumpQueue(parentOp.nodeId);
         }
-        nr.counters.failed++;
-        parentOp.phase = 'settled';
-        parentOp.done = true;
-        this.finishOp(parentOp, 'failed');
-        this.releaseOp(parentOp);
+        if (node.behavior.type === 'router' && outcome === 'rejected') {
+          nr.counters.rejected++;
+          parentOp.phase = 'settled';
+          parentOp.done = true;
+          this.finishOp(parentOp, 'rejected');
+          this.releaseOp(parentOp);
+        } else {
+          nr.counters.failed++;
+          parentOp.phase = 'settled';
+          parentOp.done = true;
+          this.finishOp(parentOp, 'failed');
+          this.releaseOp(parentOp);
+        }
       }
       return;
     }

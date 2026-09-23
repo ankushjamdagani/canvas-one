@@ -22,6 +22,8 @@ import type {
   MessageConnection,
   Workload,
   RequestClass as StudioRequestClass,
+  Relation,
+  Fault,
 } from '../model';
 import type {
   ResourceInput,
@@ -37,6 +39,7 @@ import {
   OpenSimulation,
   type SimLifecycleFact,
   type KernelResourceInput,
+  type KernelFaultConfig,
 } from '../../../simulation/open/kernel';
 import type {
   ExecutionGraph,
@@ -69,10 +72,109 @@ interface UnitContext {
   entryPortId: Id | null;
 }
 
+export interface FaultPlacementValidationIssue {
+  readonly code: 'invalid';
+  readonly path: readonly (string | number)[];
+  readonly entityId: Id | null;
+  readonly severity: 'error';
+  readonly message: string;
+}
+
+export function validateFaultsAndPlacements(
+  faults: readonly Fault[] | undefined,
+  relations: readonly Relation[] | undefined,
+  scenarioId?: Id,
+): FaultPlacementValidationIssue[] {
+  const issues: FaultPlacementValidationIssue[] = [];
+
+  // 1. Fault intervals per host don't overlap, and up > down
+  if (faults && faults.length > 0) {
+    const faultsByHost = new Map<Id, Fault[]>();
+    for (let i = 0; i < faults.length; i++) {
+      const fault = faults[i];
+      if (fault.upAtMs <= fault.downAtMs) {
+        issues.push({
+          code: 'invalid',
+          path: scenarioId ? ['scenarios', scenarioId, 'faults', i] : ['faults', i],
+          entityId: fault.id,
+          severity: 'error',
+          message: `Fault '${fault.id}' has upAtMs (${fault.upAtMs}) <= downAtMs (${fault.downAtMs})`,
+        });
+      }
+      const list = faultsByHost.get(fault.hostId) ?? [];
+      list.push(fault);
+      faultsByHost.set(fault.hostId, list);
+    }
+
+    for (const [hostId, hostFaults] of faultsByHost.entries()) {
+      for (let i = 0; i < hostFaults.length; i++) {
+        for (let j = i + 1; j < hostFaults.length; j++) {
+          const f1 = hostFaults[i];
+          const f2 = hostFaults[j];
+          if (Math.max(f1.downAtMs, f2.downAtMs) < Math.min(f1.upAtMs, f2.upAtMs)) {
+            issues.push({
+              code: 'invalid',
+              path: scenarioId ? ['scenarios', scenarioId, 'faults'] : ['faults'],
+              entityId: f1.id,
+              severity: 'error',
+              message: `Overlapping fault intervals on host '${hostId}' between fault '${f1.id}' and '${f2.id}'`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Host placement non-conflicting and acyclic
+  if (relations && relations.length > 0) {
+    const placedOn = new Map<Id, Id>();
+    for (const rel of relations) {
+      if (rel.kind === 'deployed-on') {
+        const existing = placedOn.get(rel.elementId);
+        if (existing !== undefined && existing !== rel.hostId) {
+          issues.push({
+            code: 'invalid',
+            path: ['relations', rel.id],
+            entityId: rel.id,
+            severity: 'error',
+            message: `Conflicting host placement for element '${rel.elementId}': deployed on both '${existing}' and '${rel.hostId}'`,
+          });
+        } else {
+          placedOn.set(rel.elementId, rel.hostId);
+        }
+      }
+    }
+
+    // Acyclic check
+    for (const startId of placedOn.keys()) {
+      const visited = new Set<Id>();
+      let current: Id | undefined = startId;
+      while (current !== undefined && placedOn.has(current)) {
+        if (visited.has(current)) {
+          issues.push({
+            code: 'invalid',
+            path: ['relations'],
+            entityId: current,
+            severity: 'error',
+            message: `Cyclic host placement detected involving element '${current}'`,
+          });
+          break;
+        }
+        visited.add(current);
+        current = placedOn.get(current);
+      }
+    }
+  }
+
+  return issues;
+}
+
 export interface ResourceAdapterOptions {
   runId?: string;
   elements: readonly Element[];
   connections: readonly Connection[];
+  relations?: readonly Relation[];
+  faults?: readonly Fault[];
   workloads?: readonly Workload[];
   seed?: number;
   durationMs?: number;
@@ -250,6 +352,8 @@ export class ResourceAdapter {
     let workloads: readonly Workload[] | undefined;
     let seed: number | undefined;
     let durationMs: number | undefined;
+    let faults: readonly Fault[] | undefined;
+    let relations: readonly Relation[] | undefined;
     const disabledWorkloadIds = new Set<string>(init.disabledWorkloadIds ?? []);
 
     if ('document' in init) {
@@ -258,6 +362,8 @@ export class ResourceAdapter {
       connections = init.document.connections;
       workloads = scenario?.workloads;
       seed = scenario?.seed;
+      faults = scenario?.faults;
+      relations = init.document.relations;
       if (scenario?.completion.kind === 'horizon') {
         durationMs = scenario.completion.horizonMs;
       } else if (scenario?.completion.kind === 'drain') {
@@ -282,7 +388,35 @@ export class ResourceAdapter {
       workloads = init.workloads;
       seed = init.seed;
       durationMs = init.durationMs;
+      faults = init.faults;
+      relations = init.relations;
     }
+
+    const validationIssues = validateFaultsAndPlacements(faults, relations);
+    if (validationIssues.length > 0) {
+      throw new Error(`Invalid fault or placement configuration: ${validationIssues[0].message}`);
+    }
+
+    const hostPlacement = new Map<string, string>();
+    if (relations) {
+      for (const rel of relations) {
+        if (rel.kind === 'deployed-on') {
+          hostPlacement.set(rel.elementId, rel.hostId);
+        }
+      }
+    }
+
+    const kernelFaults: KernelFaultConfig[] = (faults ?? []).map((f) => ({
+      id: f.id,
+      hostId: f.hostId,
+      downAtMs: f.downAtMs,
+      upAtMs: f.upAtMs,
+      detectionDelayMs: f.detectionDelayMs,
+      recoveryDetectionDelayMs: f.recoveryDetectionDelayMs,
+      activePolicy: f.activePolicy,
+      queuedPolicy: f.queuedPolicy,
+      routeReset: f.routeReset,
+    }));
 
     const { graph, edgeMap, resourceElements } = buildExecutionGraph({
       elements,
@@ -302,6 +436,8 @@ export class ResourceAdapter {
       },
       disabledWorkloadIds,
       requireRunnable: hasActiveWorkloads,
+      hostPlacement,
+      faults: kernelFaults,
     });
   }
 
@@ -423,16 +559,46 @@ export class ResourceAdapter {
 
   /**
    * Peeks the next event in the kernel heap.
-   * Phase is always 1 for retained kernel events per §8 global scheduler rules.
+   * Phase is 0 for fault/detection events and 1 for retained kernel events per §8 global scheduler rules.
    */
-  peekNext(): { atMs: number; phase: 1; sequence: number } | null {
+  peekNext(): { atMs: number; phase: 0 | 1; sequence: number } | null {
     const nextEvt = this.sim.peekNextEvent();
     if (!nextEvt) return null;
     return {
       atMs: Math.round(nextEvt.time * 1000),
-      phase: 1,
+      phase: nextEvt.priority < 0 ? 0 : 1,
       sequence: nextEvt.seq,
     };
+  }
+
+  /**
+   * Interrupts a host at the given simulation time (§8).
+   * Host outage fails active work once and rejects queued work once on that host.
+   */
+  interruptHost(hostId: Id, atMs: number): KernelDelta {
+    this.stepFacts = [];
+    this.sim.interruptHost(hostId, atMs / 1000);
+    const events: TraceEvent[] = [];
+    for (const fact of this.stepFacts) {
+      if (fact.kind === 'unit_settled') {
+        const isMsg = fact.unitIdentity.includes(':');
+        const outcome = fact.outcome ?? 'succeeded';
+        if (isMsg) {
+          this.messageCounts.inFlight = Math.max(0, this.messageCounts.inFlight - 1);
+          if (outcome === 'succeeded' || outcome === 'rejected' || outcome === 'failed' || outcome === 'expired') {
+            this.messageCounts[outcome]++;
+          }
+        } else {
+          this.rootCounts.inFlight = Math.max(0, this.rootCounts.inFlight - 1);
+          if (outcome === 'succeeded' || outcome === 'rejected' || outcome === 'failed' || outcome === 'expired') {
+            this.rootCounts[outcome]++;
+          }
+        }
+      }
+      const te = this.mapFactToTraceEvent(fact);
+      if (te) events.push(te);
+    }
+    return { events, outputs: [] };
   }
 
   /**
@@ -512,7 +678,11 @@ export class ResourceAdapter {
           elementId: fact.nodeId,
           entryPortId: null,
         };
-        if (conn) {
+        // A route target that is itself a resource element stays inside this kernel's own
+        // subgraph: the kernel continues processing it internally (admission/queue/completion),
+        // so it must not also surface as a bridge PortEmission for external dispatch. Only a
+        // route crossing out to a non-resource element is a bridge continuation (§8).
+        if (conn && !this.resourceElements.has(conn.target.elementId)) {
           const latencyMs = conn.kind === 'call' || conn.kind === 'message' ? conn.config.latencyMs : 0;
           outputs.push({
             source: conn.source,
@@ -567,6 +737,10 @@ export class ResourceAdapter {
           outcome: null,
         };
       case 'rejected':
+        // An admission-time rejection (queue full, unavailable host, no eligible route) is an
+        // attempt that never got past admission. It must use the same attempt-level code as
+        // 'attempt_settled' so that exactly one 'unit_settled' fact per root carries the
+        // unit-level outcome code, keeping attempt-level and unit-level settlement distinguishable.
         return {
           id,
           sequence: seq,
@@ -576,7 +750,7 @@ export class ResourceAdapter {
           elementId: fact.nodeId,
           portId: unitCtx.entryPortId,
           kind: 'settled',
-          code: 'rejected',
+          code: `attempt-settled:${fact.attempt}`,
           payloadRef: unitCtx.payloadRef,
           atMs,
           outcome: 'rejected',
@@ -656,8 +830,88 @@ export class ResourceAdapter {
           atMs,
           outcome: null,
         };
-      case 'route_selected':
-        return null;
+      case 'route_selected': {
+        // Surfaces which element a router chose for this attempt. Distinct from admission:
+        // a selected target may still be rejected at its own admission gate (e.g. an
+        // unavailable host), so this is a routing decision, not an outcome.
+        if (!fact.edgeId) return null;
+        const conn = this.edgeMap.get(fact.edgeId);
+        if (!conn) return null;
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
+          parentId: unitCtx.parentEventId,
+          elementId: conn.target.elementId,
+          portId: conn.target.portId,
+          kind: 'dispatch',
+          code: 'route-selected',
+          payloadRef: unitCtx.payloadRef,
+          atMs,
+          outcome: null,
+        };
+      }
+      case 'host_down':
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId || 'fault',
+          journeyId: unitCtx.journeyId || 'system',
+          parentId: null,
+          elementId: fact.nodeId,
+          portId: null,
+          kind: 'fault',
+          code: 'host-down',
+          payloadRef: null,
+          atMs,
+          outcome: null,
+        };
+      case 'host_up':
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId || 'fault',
+          journeyId: unitCtx.journeyId || 'system',
+          parentId: null,
+          elementId: fact.nodeId,
+          portId: null,
+          kind: 'fault',
+          code: 'host-up',
+          payloadRef: null,
+          atMs,
+          outcome: null,
+        };
+      case 'failure_detected':
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId || 'fault',
+          journeyId: unitCtx.journeyId || 'system',
+          parentId: null,
+          elementId: fact.nodeId,
+          portId: null,
+          kind: 'fault',
+          code: 'failure-detected',
+          payloadRef: null,
+          atMs,
+          outcome: null,
+        };
+      case 'recovery_detected':
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId || 'fault',
+          journeyId: unitCtx.journeyId || 'system',
+          parentId: null,
+          elementId: fact.nodeId,
+          portId: null,
+          kind: 'fault',
+          code: 'recovery-detected',
+          payloadRef: null,
+          atMs,
+          outcome: null,
+        };
       default:
         return null;
     }
