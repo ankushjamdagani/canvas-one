@@ -220,7 +220,7 @@ Domain intents (add component, connect, edit settings, scenarios, notes, views, 
 | floating panels (focus order within) | 30 |
 | modal backdrop / modal | 50 / 60 |
 | modal-owned popovers | 70 |
-| tooltip | 80 |
+| tooltip / toast | 80 |
 
 - Shared tokens and portal ownership only; no screen-local z-index escalation.
 - Docked panels are labelled complementary regions, not dialogs. Modals use shadcn Dialog/Sheet (focus trap, title, description, focus return).

@@ -1050,3 +1050,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: Gemini fixed the clipped rail labels (board short labels ADD/LOADS/REVS/RUNS, full aria-labels kept, supplied 22A app-mark gradient verified against the board source) and made the dock fit narrow screens via a "More canvas tools" popover, with new design shadow tokens replacing the arbitrary dock shadow. Merged onto the foundation line @ `11b6bb0`.
 - **Verification** (Claude): 241 unit, build, production e2e 60 passed / 5 failed (same baseline mobile set) / 4 skipped; headless desktop 1440x900 and mobile 390x844 screenshots confirm both fixes.
 - **Limitations**: Blank area under the canvas on mobile pre-dates the revamp and likely needs App.tsx layout work (RV-12 slot). Empty-canvas card and its button are still legacy styling (their owning packages have not started).
+
+### Contract round D31–D34 (Claude)
+
+- **Outcome**: User accepted all four recommendations: manifest v1 = closure projection without presentation fields (shape written into run-identity §3); mode coherence moves from the storable validator to readiness; recursive refinement ownership is a storable error; minor readings (compiler 'reference', panel reducer choices, toast z 80, 'missing pipeline outputs'). Recorded as D31–D34 and in model-and-runner, run-identity, storage and commands contracts.
+- **Changed**: decisions.md, contracts/{run-identity,model-and-runner,storage,commands}.md, delivery.md, ACTION_LOG.
+- **Platform**: Claude (AskUserQuestion); RV-04c and RV-05a Gemini lanes running in parallel.
+- **Verification**: Docs only; `git diff --check`.

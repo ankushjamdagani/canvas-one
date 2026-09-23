@@ -34,6 +34,10 @@ Only a user answer or an identified lead decision settles a row. To change one, 
 | D28 | User (2026-09-22) | Every configured scenario must pass (at least one scenario). No required-subset selector. |
 | D29 | User (2026-09-22) | Close the source branch by default after publishing. It can be reopened; reopening doesn't undo anything. |
 | D30 | User (2026-09-22) | Library entry points focus/expand the single existing Library instance. |
+| D31 | User (2026-09-23) | Execution manifest v1 is a projection of the scope closure with every presentation (A) field removed; shape in [run-identity.md §3](contracts/run-identity.md#3-execution-manifest-v1). |
+| D32 | User (2026-09-23) | Mode coherence (input `atMs`, completion kind, boundary `delayMs`/`afterInputId` vs scenario mode) is a readiness rule, not a storable one; the storable validator checks only per-field types and bounds. Supersedes the storable checks in RV-02b. |
+| D33 | User (2026-09-23) | Recursive refinement ownership is a storable structural error (like a `contains` cycle), rejected at save time for the whole document. |
+| D34 | User (2026-09-23) | Accepted readings: a compiler 'reference' is each resolved ID reference followed during closure expansion, counted once per referencing field; panel reducer gesture payloads, `activeOverlay` type and announce strings as implemented in RV-03a; toast layer z 80 (shared with tooltip); 'missing pipeline outputs' means an unresolvable output/error port — unconnected outputs are legal. |
 
 ## Lead defaults
 

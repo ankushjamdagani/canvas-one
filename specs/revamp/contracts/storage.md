@@ -102,7 +102,7 @@ These are v1 product ceilings, not measured performance. Bytes are UTF-8 canonic
 | View | 100 placements; 50 notes; 50 groups; coordinates abs ≤1e6; width 80–2,000 |
 | Scenarios | 20/document; 100 assertions, 1,000 inputs, 100 faults, 100 boundaries, 20 workloads × 20 classes per scenario |
 | Fixtures | 1 MiB aggregate; 256 KiB/value; 10,000 list items |
-| Compiler | ≤2,000 expanded entities, ≤10,000 references; batches ≤100 items; cancellation checked after every batch |
+| Compiler | ≤2,000 expanded entities, ≤10,000 references (each resolved ID reference followed during closure expansion, once per referencing field — D34); batches ≤100 items; cancellation checked after every batch |
 | Run defaults / maxima | events 100k / 1M; trace rows 10k / 100k; trace+payload bytes 4 / 16 MiB; live scheduled events 100k; simultaneous roots 10k |
 | Time | timed horizon 1–300 s; drain deadline > arrival horizon and ≤600 s; logical has no time limit |
 | Worker | yield every ≤1,000 events or 8 ms; 100 ms main-thread watchdog target |

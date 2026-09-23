@@ -128,7 +128,7 @@ All operations preserve row provenance. Filtered and duplicate rows are explicit
   - A user root settles when all its synchronous frames settle. Outcome precedence: expired > failed > rejected > succeeded. Async message outcomes don't change the user root.
   - Malformed external input is an explicit rejected root. Control roots still get trace IDs for causality even when they're excluded from transport counters. The UI labels counts "Requests", not "User interactions".
   - Pure data runs (S03) can pass with zero transport roots.
-- **Readiness rejects:** unbound call responses; effect lists that could reply twice; mismatched schemas; missing pipeline outputs. Path-dependent double settlement and budget-exhausting message cycles fail or end incomplete at runtime.
+- **Readiness rejects:** unbound call responses; effect lists that could reply twice; mismatched schemas; missing pipeline outputs (an output/error port that doesn't resolve; unconnected outputs are legal, D34). Mode coherence of inputs, completion and boundaries is also a readiness rule, never a save blocker (D32). Path-dependent double settlement and budget-exhausting message cycles fail or end incomplete at runtime.
 
 ## 6. Scenarios
 
@@ -174,7 +174,7 @@ Logical completion needs all inputs consumed, the queue drained and all frames s
 
 **Refinement.**
 - `Refinement={id,ownerElementId,memberElementIds:Id[],portMappings:[{id,outer:Endpoint,inner:Endpoint}]}` and `Selection={refinementId,mode:'aggregate'|'refined'}`.
-- Same-document only in v1; the candidate snapshot pins content, with no live external fetch. Each member has at most one owner, and recursive ownership is rejected. Every crossing port has exactly one compatible mapping.
+- Same-document only in v1; the candidate snapshot pins content, with no live external fetch. Each member has at most one owner, and recursive ownership is rejected as a storable structural error (D33). Every crossing port has exactly one compatible mapping.
 - Aggregate runs the owner and excludes members; refined runs the members and excludes the owner. Nesting is allowed within expansion budgets.
 - Unselected visible elements stay uncovered. View expand/collapse never changes execution.
 

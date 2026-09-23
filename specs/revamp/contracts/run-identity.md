@@ -61,6 +61,21 @@ The compiler builds a manifest from an immutable snapshot plus one scenario ID.
 
 **Record separation.** Behavioral connections (call/message/data) and structural relations (contains/deployed-on/descriptive) are disjoint unions. Misfiled or unknown kinds are rejected; they can't drop out of identity.
 
+**Manifest shape (D31).** The manifest is the closure's records with every A field from [model-and-runner.md §7](model-and-runner.md#7-projection-inventory) removed. Entity sets are sorted by ID; ordered data keeps its order.
+
+```
+{ identityVersion: 1, modelSchemaVersion: 'studio-model/1', compilerVersion, runnerVersions: [{runnerId, version}] /*sorted by runnerId*/,
+  scenario: { id, revision, mode, scopeElementIds, entryPorts, inputs, workloads, faults, boundaries, refinementSelections,
+              initialContexts, assertions /*no label*/, seed, budgets /*materialized*/, completion, assumptions /*key, value, source*/ },
+  scope: { declaredElementIds, includedElementIds, includedConnectionIds, boundaryIds, excludedElementIds },
+  elements: [{ id, ports: [{id, direction, channel, schemaId, responseSchemaId}], behavior }],
+  schemas: [{ id, shape /*field ids kept, labels dropped*/ }],
+  connections: [{ id, kind, source, target, config }],
+  structuralConstraints: [ interpreted relations, E fields only ],
+  refinements: [{ refinementId, mode, ownerElementId, memberElementIds, portMappings }],
+  fixtures: [{ id, schemaId, value, sha256 }] }
+```
+
 **Coverage test.** Adding a synthetic executable field without classifying it must fail the contract test. Once classified, changing only that field must change the fingerprint.
 
 ## 4. Run lifecycle
