@@ -2184,6 +2184,70 @@ export function validateDocument(
     }
   }
 
+  // 7b. D33: Recursive refinement ownership is a storable structural error, like a
+  // `contains` cycle: reject a refinement whose owner is, transitively, a member of a
+  // refinement it owns (self-membership included). Checked iteratively (explicit stack,
+  // no recursion) over the ownerElementId -> memberElementIds graph.
+  if (Array.isArray(doc.refinements)) {
+    const refs = doc.refinements as unknown[];
+
+    // Union all memberElementIds authored under each ownerElementId, so the reachability
+    // walk below follows every ownership edge even if an owner appears on more than one
+    // (possibly malformed) refinement record.
+    const ownerToMembers = new Map<Id, Id[]>();
+    for (const r of refs) {
+      const rr = r as Record<string, unknown>;
+      if (!rr || typeof rr !== 'object') continue;
+      const ownerId = typeof rr.ownerElementId === 'string' ? rr.ownerElementId : null;
+      if (!ownerId) continue;
+      const members = Array.isArray(rr.memberElementIds)
+        ? (rr.memberElementIds.filter((m): m is Id => typeof m === 'string') as Id[])
+        : [];
+      const existing = ownerToMembers.get(ownerId) ?? [];
+      ownerToMembers.set(ownerId, existing.concat(members));
+    }
+
+    for (let refIdx = 0; refIdx < refs.length; refIdx++) {
+      const ref = refs[refIdx] as Record<string, unknown>;
+      if (!ref || typeof ref !== 'object') continue;
+      const refPath = ['refinements', refIdx];
+      const refId = typeof ref.id === 'string' ? ref.id : null;
+      const ownerId = typeof ref.ownerElementId === 'string' ? ref.ownerElementId : null;
+      if (!ownerId) continue;
+      const members = Array.isArray(ref.memberElementIds)
+        ? (ref.memberElementIds.filter((m): m is Id => typeof m === 'string') as Id[])
+        : [];
+
+      // Is `ownerId` reachable by walking from this refinement's own members through the
+      // ownerElementId -> memberElementIds chain (i.e. is the owner transitively a member
+      // of a refinement it owns)?
+      const visited = new Set<Id>();
+      const stack: Id[] = [...members];
+      let cyclic = false;
+      while (stack.length > 0) {
+        const cur = stack.pop()!;
+        if (cur === ownerId) {
+          cyclic = true;
+          break;
+        }
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        const next = ownerToMembers.get(cur);
+        if (next) stack.push(...next);
+      }
+
+      if (cyclic) {
+        issues.push({
+          code: 'structural-rule',
+          path: refPath,
+          entityId: refId,
+          severity: 'error',
+          message: `Recursive refinement ownership: element '${ownerId}' is transitively a member of a refinement it owns`,
+        });
+      }
+    }
+  }
+
   // 8. Refinement selections in scenarios -> refinements
   if (Array.isArray(doc.scenarios)) {
     const scenarios = doc.scenarios as unknown[];
@@ -3182,18 +3246,10 @@ function validateScenario(
         pendingFixtureRefs.push({ fixtureId: inp.fixtureId, path: [...iPath, 'fixtureId'], entityId: inpId ?? sId });
         validateId(inp.journeyId, [...iPath, 'journeyId'], inpId ?? sId, issues);
 
-        // Logical mode: atMs is null. Timed mode: atMs >= 0.
-        if (mode === 'logical') {
-          if (inp.atMs !== null) {
-            issues.push({
-              code: 'structural-rule',
-              path: [...iPath, 'atMs'],
-              entityId: inpId ?? sId,
-              severity: 'error',
-              message: `In logical mode, input atMs must be null`,
-            });
-          }
-        } else if (mode === 'timed') {
+        // D32: mode coherence (atMs null vs number by scenario mode) is a readiness rule
+        // (readiness.ts), not storable. The storable check is per-field only: atMs is
+        // either null or a finite number >= 0.
+        if (inp.atMs !== null) {
           validateNumber(inp.atMs, 0, Number.MAX_SAFE_INTEGER, [...iPath, 'atMs'], inpId ?? sId, issues, 'input atMs');
         }
 
@@ -3359,39 +3415,24 @@ function validateScenario(
                 }
               }
 
-              if (mode === 'logical') {
-                if (r.delayMs !== null) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...rPath, 'delayMs'],
-                    entityId: rId ?? bId ?? sId,
-                    severity: 'error',
-                    message: `In logical mode, boundary response delayMs must be null`,
-                  });
-                }
-                if (r.afterInputId !== null) {
-                  if (validateId(r.afterInputId, [...rPath, 'afterInputId'], rId ?? bId ?? sId, issues)) {
-                    if (!scenarioInputIds.has(r.afterInputId)) {
-                      issues.push({
-                        code: 'dangling-reference',
-                        path: [...rPath, 'afterInputId'],
-                        entityId: rId ?? bId ?? sId,
-                        severity: 'error',
-                        message: `Boundary response afterInputId '${r.afterInputId}' does not exist in this scenario`,
-                      });
-                    }
-                  }
-                }
-              } else if (mode === 'timed') {
+              // D32: mode coherence (delayMs/afterInputId vs scenario mode) is a readiness
+              // rule (readiness.ts), not storable. The storable checks are per-field only:
+              // delayMs is null or 0-600000ms; afterInputId, if present, must reference an
+              // input in this scenario.
+              if (r.delayMs !== null) {
                 validateNumber(r.delayMs, 0, 600000, [...rPath, 'delayMs'], rId ?? bId ?? sId, issues, 'delayMs');
-                if (r.afterInputId !== null) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...rPath, 'afterInputId'],
-                    entityId: rId ?? bId ?? sId,
-                    severity: 'error',
-                    message: `In timed mode, boundary response afterInputId must be null`,
-                  });
+              }
+              if (r.afterInputId !== null) {
+                if (validateId(r.afterInputId, [...rPath, 'afterInputId'], rId ?? bId ?? sId, issues)) {
+                  if (!scenarioInputIds.has(r.afterInputId)) {
+                    issues.push({
+                      code: 'dangling-reference',
+                      path: [...rPath, 'afterInputId'],
+                      entityId: rId ?? bId ?? sId,
+                      severity: 'error',
+                      message: `Boundary response afterInputId '${r.afterInputId}' does not exist in this scenario`,
+                    });
+                  }
                 }
               }
 
@@ -3477,7 +3518,7 @@ function validateScenario(
   validateScenarioBudgets(rec.budgets, [...sPath, 'budgets'], sId, issues);
 
   // Completion
-  validateCompletionPolicy(mode, rec.completion, [...sPath, 'completion'], sId, issues);
+  validateCompletionPolicy(rec.completion, [...sPath, 'completion'], sId, issues);
 
   // Assumptions
   if (validateArray(rec.assumptions, Number.MAX_SAFE_INTEGER, [...sPath, 'assumptions'], sId, issues, 'Scenario assumptions')) {
@@ -3799,7 +3840,6 @@ function validateScenarioBudgets(
 }
 
 function validateCompletionPolicy(
-  mode: unknown,
   completion: unknown,
   path: readonly (string | number)[],
   scenarioId: Id | null,
@@ -3830,27 +3870,9 @@ function validateCompletionPolicy(
     return;
   }
 
-  if (mode === 'logical') {
-    if (kind !== 'quiescent') {
-      issues.push({
-        code: 'structural-rule',
-        path: [...path, 'kind'],
-        entityId: scenarioId,
-        severity: 'error',
-        message: `Logical scenarios must use 'quiescent' completion policy`,
-      });
-    }
-  } else if (mode === 'timed') {
-    if (kind !== 'horizon' && kind !== 'drain') {
-      issues.push({
-        code: 'structural-rule',
-        path: [...path, 'kind'],
-        entityId: scenarioId,
-        severity: 'error',
-        message: `Timed scenarios must use 'horizon' or 'drain' completion policy`,
-      });
-    }
-  }
+  // D32: completion kind vs scenario mode is a readiness rule (readiness.ts), not
+  // storable. The storable check only confirms `kind` is a valid literal (above) and
+  // validates each kind's own per-field bounds (below).
 
   if (kind === 'quiescent') {
     checkRecord(rec, ['kind'], ['kind'], path, scenarioId, issues, 'quiescent completion policy');

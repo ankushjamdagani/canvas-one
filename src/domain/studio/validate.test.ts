@@ -433,6 +433,126 @@ describe('validateDocument mutation tests', () => {
     }
   });
 
+  // D32: mode coherence (input atMs, completion kind, boundary delayMs/afterInputId vs
+  // scenario mode) moved to readiness.ts; the storable validator only checks per-field
+  // types/bounds now, so these previously-rejected mode-mismatch shapes are storable-valid.
+  it('accepts a timed-mode scenario with logical-shaped fields (mode coherence is a readiness rule, not storable)', () => {
+    const doc = structuredClone(s01);
+    // Flip mode to 'timed' but leave every mode-coupled field in its logical shape:
+    // atMs null, completion 'quiescent', boundary delayMs null / afterInputId null.
+    doc.scenarios[0].mode = 'timed';
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a logical-mode scenario with a non-null input atMs (mode coherence is a readiness rule, not storable)', () => {
+    const doc = structuredClone(s01);
+    // mode stays 'logical'; atMs is a finite number >= 0, which is now a valid shape at
+    // the storable level (only readiness enforces logical => atMs null).
+    doc.scenarios[0].inputs[0].atMs = 500;
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a logical-mode scenario with a non-null boundary response delayMs and a set afterInputId (mode coherence is a readiness rule, not storable)', () => {
+    const doc = structuredClone(s01);
+    doc.scenarios[0].boundaries[0].responses[0].delayMs = 1000;
+    doc.scenarios[0].boundaries[0].responses[0].afterInputId = doc.scenarios[0].inputs[0].id;
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(true);
+  });
+
+  it('still rejects an out-of-range boundary response delayMs regardless of mode (per-field bound kept)', () => {
+    const doc = structuredClone(s01);
+    doc.scenarios[0].boundaries[0].responses[0].delayMs = 700000; // > 600000ms max
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            path: ['scenarios', 0, 'boundaries', 0, 'responses', 0, 'delayMs'],
+          }),
+        ])
+      );
+    }
+  });
+
+  it('still rejects a boundary response afterInputId that does not reference an input in this scenario (per-field reference kept)', () => {
+    const doc = structuredClone(s01);
+    doc.scenarios[0].boundaries[0].responses[0].afterInputId = '70000000-0000-4000-8000-0000000000ff';
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'dangling-reference',
+            path: ['scenarios', 0, 'boundaries', 0, 'responses', 0, 'afterInputId'],
+          }),
+        ])
+      );
+    }
+  });
+
+  // D33: recursive refinement ownership is a storable structural error.
+  it('detects self-membership refinement ownership as structural-rule', () => {
+    const doc = structuredClone(s01);
+    const idA = doc.elements[0].id;
+    doc.refinements = [
+      {
+        id: '70000000-0000-4000-8000-0000000000c1',
+        ownerElementId: idA,
+        memberElementIds: [idA],
+        portMappings: [],
+      },
+    ];
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'structural-rule',
+            path: ['refinements', 0],
+          }),
+        ])
+      );
+    }
+  });
+
+  it('detects transitive recursive refinement ownership (2-cycle) as structural-rule on both refinements', () => {
+    const doc = structuredClone(s01);
+    const idA = doc.elements[0].id;
+    const idB = doc.elements[1].id;
+    doc.refinements = [
+      {
+        id: '70000000-0000-4000-8000-0000000000c2',
+        ownerElementId: idA,
+        memberElementIds: [idB],
+        portMappings: [],
+      },
+      {
+        id: '70000000-0000-4000-8000-0000000000c3',
+        ownerElementId: idB,
+        memberElementIds: [idA],
+        portMappings: [],
+      },
+    ];
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'structural-rule', path: ['refinements', 0] }),
+          expect.objectContaining({ code: 'structural-rule', path: ['refinements', 1] }),
+        ])
+      );
+    }
+  });
+
   it('reports missing nullable on a record shape exactly once', () => {
     const doc = structuredClone(s01);
     delete (doc.schemas[0].shape as any).nullable;
