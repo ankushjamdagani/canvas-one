@@ -8,9 +8,9 @@
  *
  * TODO: runnable readiness (model-and-runner.md §1, §2, §3, §5, §6: port compatibility for execution, complete scope, completion policy fit, sync call cycle rejection, boundary/crossing rules)
  * TODO: trace envelope (model-and-runner.md §8)
- * TODO: canonical-JSON byte-size checks (storage.md §6: 2 MiB document, 1 MiB fixtures aggregate, 256 KiB/value — requires canonical encoder from run-identity.md)
  */
 
+import { canonicalJson } from './canonical';
 import type {
   Document,
   Id,
@@ -63,6 +63,8 @@ export const ISSUE_CODES = [
   'too-many',
   /** String code-point length exceeds maximum allowed limit. */
   'too-long',
+  /** Byte size of a document, fixture, or string exceeds storage limits. */
+  'too-large',
   /** Nesting depth exceeds allowed raw document or semantic depth ceiling. */
   'too-deep',
   /** Enumerated literal or discriminant does not match allowed values. */
@@ -169,6 +171,68 @@ function checkRawDepth(input: unknown, issues: Issue[], maxDepth = 32): void {
         const val = rec[k];
         if (val !== null && typeof val === 'object') {
           stack.push({ node: val, depth: depth + 1, path: [...path, k] });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Iteratively checks that string values inside fixture values do not exceed 16 KiB (UTF-8 bytes).
+ * storage.md §6: string fixture values <= 16 KiB.
+ */
+function checkFixtureStrings(
+  root: unknown,
+  basePath: readonly (string | number)[],
+  issues: Issue[],
+  maxStringBytes = 16384,
+): void {
+  if (root === null || typeof root !== 'object') {
+    if (typeof root === 'string') {
+      const bytes = new TextEncoder().encode(root).length;
+      if (bytes > maxStringBytes) {
+        issues.push({
+          code: 'too-large',
+          path: basePath,
+          entityId: null,
+          severity: 'error',
+          message: `Fixture string value byte length ${bytes} exceeds maximum limit of 16 KiB (${maxStringBytes} bytes)`,
+        });
+      }
+    }
+    return;
+  }
+
+  const stack: { val: unknown; path: readonly (string | number)[] }[] = [{ val: root, path: basePath }];
+  const seen = new Set<unknown>();
+  const encoder = new TextEncoder();
+
+  while (stack.length > 0) {
+    const { val, path } = stack.pop()!;
+    if (typeof val === 'string') {
+      const bytes = encoder.encode(val).length;
+      if (bytes > maxStringBytes) {
+        issues.push({
+          code: 'too-large',
+          path,
+          entityId: null,
+          severity: 'error',
+          message: `Fixture string value byte length ${bytes} exceeds maximum limit of 16 KiB (${maxStringBytes} bytes)`,
+        });
+      }
+    } else if (val !== null && typeof val === 'object') {
+      if (seen.has(val)) continue;
+      seen.add(val);
+
+      if (Array.isArray(val)) {
+        for (let i = val.length - 1; i >= 0; i--) {
+          stack.push({ val: val[i], path: [...path, i] });
+        }
+      } else {
+        const keys = Object.keys(val as Record<string, unknown>);
+        for (let i = keys.length - 1; i >= 0; i--) {
+          const k = keys[i];
+          stack.push({ val: (val as Record<string, unknown>)[k], path: [...path, k] });
         }
       }
     }
@@ -730,9 +794,9 @@ function validateShape(
     }
 
     if (SCALAR_TYPES.includes(type as (typeof SCALAR_TYPES)[number])) {
-      checkRecord(rec, ['type', 'nullable'], ['type', 'nullable'], path, entityId, issues, `${type} scalar shape`);
+      checkRecord(rec, ['type', 'nullable'], ['type'], path, entityId, issues, `${type} scalar shape`);
     } else if (type === 'scalar-union') {
-      if (checkRecord(rec, ['type', 'nullable', 'types'], ['type', 'nullable', 'types'], path, entityId, issues, 'scalar-union shape')) {
+      if (checkRecord(rec, ['type', 'nullable', 'types'], ['type', 'types'], path, entityId, issues, 'scalar-union shape')) {
         if (!Array.isArray(rec.types)) {
           issues.push({
             code: 'wrong-type',
@@ -789,12 +853,12 @@ function validateShape(
         }
       }
     } else if (type === 'list') {
-      if (checkRecord(rec, ['type', 'nullable', 'items', 'maxItems'], ['type', 'nullable', 'items', 'maxItems'], path, entityId, issues, 'list shape')) {
+      if (checkRecord(rec, ['type', 'nullable', 'items', 'maxItems'], ['type', 'items', 'maxItems'], path, entityId, issues, 'list shape')) {
         validateNumber(rec.maxItems, 1, Number.MAX_SAFE_INTEGER, [...path, 'maxItems'], entityId, issues, 'list maxItems', true);
         stack.push({ node: rec.items, depth: depth + 1, path: [...path, 'items'] });
       }
     } else if (type === 'record') {
-      if (checkRecord(rec, ['type', 'nullable', 'fields'], ['type', 'nullable', 'fields'], path, entityId, issues, 'record shape')) {
+      if (checkRecord(rec, ['type', 'nullable', 'fields'], ['type', 'fields'], path, entityId, issues, 'record shape')) {
         if (validateArray(rec.fields, 100, [...path, 'fields'], entityId, issues, 'record fields')) {
           const fields = rec.fields as unknown[];
           const fieldKeys = new Set<string>();
@@ -1113,12 +1177,60 @@ export function validateDocument(
     };
   }
 
-  // Step 2: Raw depth check (must be iterative, before other walks)
-  checkRawDepth(input, issues, 32);
+  // Step 2: Byte size limits (storage.md §6) before other inventory walks
+  // Whole document <= 2 MiB (2*1048576 bytes).
+  const docByteResult = canonicalJson(input, 2 * 1048576);
+  if (!docByteResult.ok) {
+    // If the document byte check fails, return immediately with that issue (no further walks).
+    return {
+      ok: false,
+      issues: docByteResult.issues,
+    };
+  }
 
   const doc = input as Record<string, unknown>;
 
-  // Step 3: Closed record check on Document root
+  // Fixtures byte limits (storage.md §6) before other inventory walks:
+  // aggregate of all fixture values <= 1 MiB; each fixture value <= 256 KiB;
+  // string values inside fixture values <= 16 KiB (UTF-8 bytes).
+  if (Array.isArray(doc.fixtures)) {
+    let aggregateFixtureBytes = 0;
+    const maxFixtureAggregateBytes = 1048576; // 1 MiB
+    const maxFixtureValueBytes = 262144; // 256 KiB
+    const maxFixtureStringBytes = 16384; // 16 KiB
+
+    for (let fIdx = 0; fIdx < doc.fixtures.length; fIdx++) {
+      const f = doc.fixtures[fIdx];
+      if (f !== null && typeof f === 'object' && !Array.isArray(f) && 'value' in f) {
+        const fVal = (f as Record<string, unknown>).value;
+        const fValPath = ['fixtures', fIdx, 'value'];
+
+        const valResult = canonicalJson(fVal, maxFixtureValueBytes, fValPath);
+        if (!valResult.ok) {
+          issues.push(...valResult.issues);
+        } else {
+          aggregateFixtureBytes += valResult.bytes;
+        }
+
+        checkFixtureStrings(fVal, fValPath, issues, maxFixtureStringBytes);
+      }
+    }
+
+    if (aggregateFixtureBytes > maxFixtureAggregateBytes) {
+      issues.push({
+        code: 'too-large',
+        path: ['fixtures'],
+        entityId: null,
+        severity: 'error',
+        message: `Aggregate fixture values size ${aggregateFixtureBytes} bytes exceeds maximum limit of 1 MiB (${maxFixtureAggregateBytes} bytes)`,
+      });
+    }
+  }
+
+  // Step 3: Raw depth check (must be iterative, after byte check)
+  checkRawDepth(input, issues, 32);
+
+  // Step 4: Closed record check on Document root
   checkRecord(doc, DOCUMENT_FIELDS, DOCUMENT_FIELDS, [], null, issues, 'Document');
 
   // Document schema literal check
@@ -2189,7 +2301,16 @@ export function validateDocument(
   }
 
   if (issues.length > 0) {
-    return { ok: false, issues };
+    const seen = new Set<string>();
+    const uniqueIssues: Issue[] = [];
+    for (const iss of issues) {
+      const key = `${iss.code}:${iss.path.join('/')}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueIssues.push(iss);
+      }
+    }
+    return { ok: false, issues: uniqueIssues };
   }
 
   return { ok: true, document: input as Document };

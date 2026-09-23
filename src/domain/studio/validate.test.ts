@@ -48,6 +48,7 @@ describe('validateDocument schema constants', () => {
     expect(ISSUE_CODES).toContain('out-of-range');
     expect(ISSUE_CODES).toContain('too-many');
     expect(ISSUE_CODES).toContain('too-long');
+    expect(ISSUE_CODES).toContain('too-large');
     expect(ISSUE_CODES).toContain('too-deep');
     expect(ISSUE_CODES).toContain('invalid-literal');
     expect(ISSUE_CODES).toContain('duplicate-key');
@@ -327,6 +328,124 @@ describe('validateDocument mutation tests', () => {
           }),
         ])
       );
+    }
+  });
+
+  it('rejects document just over 2 MiB with too-large at path [] returned early', () => {
+    const doc = structuredClone(s01);
+    // Add many fixtures each under 16 KiB/256 KiB until > 2 MiB
+    // 2 MiB = 2,097,152 bytes. 145 fixtures * 15,000 bytes = 2,175,000 bytes > 2 MiB.
+    doc.fixtures = Array.from({ length: 145 }, (_, i) => ({
+      id: `80000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      schemaId: s01.schemas[0].id,
+      value: 'a'.repeat(15000),
+    }));
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual([
+        expect.objectContaining({
+          code: 'too-large',
+          path: [],
+        }),
+      ]);
+    }
+  });
+
+  it('rejects a fixture value > 256 KiB with too-large', () => {
+    const doc = structuredClone(s01);
+    // 20 strings of 14,000 chars: each string < 16 KiB, total fixture value ~280 KiB > 256 KiB
+    doc.fixtures[0].value = Array.from({ length: 20 }, () => 'a'.repeat(14000));
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'too-large',
+            path: ['fixtures', 0, 'value'],
+          }),
+        ])
+      );
+    }
+  });
+
+  it('rejects a fixture string > 16 KiB with too-large', () => {
+    const doc = structuredClone(s01);
+    // Root fixture string value > 16 KiB (16 * 1024 + 1 bytes)
+    doc.fixtures[0].value = 'a'.repeat(16 * 1024 + 1);
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'too-large',
+            path: ['fixtures', 0, 'value'],
+          }),
+        ])
+      );
+    }
+  });
+
+  it('rejects a nested fixture string > 16 KiB with too-large', () => {
+    const doc = structuredClone(s01);
+    // Nested string value inside fixture value > 16 KiB
+    doc.fixtures[0].value = { payload: 'b'.repeat(16 * 1024 + 1) };
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'too-large',
+            path: ['fixtures', 0, 'value', 'payload'],
+          }),
+        ])
+      );
+    }
+  });
+
+  it('rejects aggregate fixture values > 1 MiB with too-large', () => {
+    const doc = structuredClone(s01);
+    // 6 fixtures of ~196 KiB each: each string < 16 KiB, each fixture < 256 KiB, total aggregate ~1.17 MiB > 1 MiB
+    doc.fixtures = Array.from({ length: 6 }, (_, i) => ({
+      id: `80000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      schemaId: s01.schemas[0].id,
+      value: Array.from({ length: 14 }, () => 'c'.repeat(14000)),
+    }));
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'too-large',
+            path: ['fixtures'],
+          }),
+        ])
+      );
+    }
+  });
+
+  it('reports missing nullable on a record shape exactly once', () => {
+    const doc = structuredClone(s01);
+    delete (doc.schemas[0].shape as any).nullable;
+
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const nullableIssues = result.issues.filter(
+        (iss) =>
+          iss.code === 'missing-property' &&
+          iss.path.join('.') === 'schemas.0.shape.nullable'
+      );
+      expect(nullableIssues).toHaveLength(1);
     }
   });
 });
