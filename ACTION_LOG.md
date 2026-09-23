@@ -1113,3 +1113,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review rounds** (Claude): tightened the S05 journey check to read the trace, which exposed `journeyId:'unknown'` and kernel identities on delivered message events (a bug since RV-14d); then removed every invented default (success from a missing outcome, `{}` payloads, `'unknown'` contexts, ID-shape message detection). Claude made part of the round-3 edits directly in resource-adapter.ts. Subagent interrupted once by a session limit and resumed.
 - **Verification** (Claude): 591 unit tests, characterization goldens unchanged, `tsc -b` clean; default sweep of runner/ clean. Summaries for S01/S04/S02-deny byte-identical to `01cac16`; S02 allow's message 'generated' metric corrected 0 → 1.
 - **Limitations**: Router + bridge not implemented; runtime refinement maps one level of ports.
+
+### RV-14 accepted; RV-16a local repository base (Claude lead, Gemini executor)
+
+- **Outcome**: User accepted RV-14 and approved adding `fake-indexeddb` (dev-only; Claude added it in `bd9bbe2`). Gemini built `src/persistence/studio/`: the new Dexie `system-studio-local-v1` schema, immutable rows, compare-and-set, operation receipts, the §5 error set, byte/count limits, and the repository port with project.create / project.rename / branch.create, preferences and delete. Merged onto the runner line @ `590fe19`.
+- **Review round** (Claude): removed repository-generated branch IDs and a rename fallback to main — the contract requires explicit bootstrap IDs and a branch envelope.
+- **Verification** (Claude): 620 unit tests (Dexie adapter on fake-indexeddb), `tsc -b` clean; hashing confirmed outside transactions.
+- **Limitations**: Not wired into the app (RV-12 slot); import/export/pruning (RV-16b) and commits/publish/saveRun (RV-08) return typed unsupported.
