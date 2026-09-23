@@ -57,6 +57,28 @@ export const evergreen = Object.freeze({
     card: 12,
     dock: 14,
   }),
+
+  // Typography (sizes in px)
+  type: Object.freeze({
+    xs: 11.5,
+    sm: 12.5,
+    base: 13,
+    lg: 15,
+    xl: 18,
+    '2xl': 28,
+    '3xl': 30,
+    '4xl': 36,
+    '5xl': 48,
+    '6xl': 60,
+    '7xl': 72,
+    '8xl': 96,
+    '9xl': 128,
+    display: 46,
+    heading: 28,
+    title: 18,
+    subtitle: 15,
+    ui: 13,
+  }),
 } as const);
 
 export type Evergreen = typeof evergreen;

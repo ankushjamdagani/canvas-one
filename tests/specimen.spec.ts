@@ -199,6 +199,33 @@ test.describe("Specimen review page", () => {
       (el) => window.getComputedStyle(el).borderTopColor
     );
     expect(borderColour).toBe("rgb(231, 227, 219)");
+
+    // 8. element with class text-xs (and Badge) has font-size '11.5px'
+    const textXsElement = page.locator(".text-xs").first();
+    const textXsFontSize = await textXsElement.evaluate(
+      (el) => window.getComputedStyle(el).fontSize
+    );
+    expect(textXsFontSize).toBe("11.5px");
+
+    const badgeElement = page.locator("[data-slot='badge']").first();
+    const badgeFontSize = await badgeElement.evaluate(
+      (el) => window.getComputedStyle(el).fontSize
+    );
+    expect(badgeFontSize).toBe("11.5px");
+
+    // 9. a 'p-4' element measures 16px padding and a 'gap-2' element measures 8px gap
+    const p4Element = page.locator(".p-4").first();
+    const p4Padding = await p4Element.evaluate(
+      (el) => window.getComputedStyle(el).paddingTop
+    );
+    expect(p4Padding).toBe("16px");
+
+    const gap2Element = page.locator(".gap-2").first();
+    const gap2Gap = await gap2Element.evaluate((el) => {
+      const s = window.getComputedStyle(el);
+      return s.gap || s.rowGap || s.columnGap;
+    });
+    expect(gap2Gap).toBe("8px");
   });
 
   test("at viewport 390x844 with hasTouch/isMobile, default Button height >= 44", async ({

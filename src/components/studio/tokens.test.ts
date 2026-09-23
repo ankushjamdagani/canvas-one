@@ -180,6 +180,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(evergreen).toHaveProperty("primaryHover");
     expect(evergreen).toHaveProperty("primaryPressed");
     expect(evergreen).toHaveProperty("radii");
+    expect(evergreen).toHaveProperty("type");
     expect(evergreen).toHaveProperty("controlBorderStrong");
     expect(evergreen).toHaveProperty("destructive");
     expect(evergreen).toHaveProperty("destructiveHover");
@@ -188,5 +189,11 @@ describe("Evergreen tokens and styles.css single source check", () => {
   it("(f) asserts styles.css contains no Google Fonts CDN and no Spline Sans", () => {
     expect(cssContent).not.toContain("fonts.googleapis");
     expect(cssContent).not.toContain("Spline");
+  });
+
+  it("(g) asserts typography type tokens in @theme equal evergreen.type", () => {
+    for (const [key, size] of Object.entries(evergreen.type)) {
+      expect(themeVars[`--text-${key}`]).toBe(`${size}px`);
+    }
   });
 });
