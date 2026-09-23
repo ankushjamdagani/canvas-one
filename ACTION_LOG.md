@@ -1036,3 +1036,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude reviewer; Sonnet subagents (Gemini quota).
 - **Verification** (Claude): foundation 240 unit, specimen 4/4, production e2e 46/51 (same 5 baseline), board-vs-specimen computed styles; rv-02e 313 unit + build. Browser pane was hidden, so no screenshots this round.
 - **Limitations**: RV-02f (remaining §5 readiness rejects) and a contract clarification round are open.
+
+### RV-04a, RV-03b, RV-02f (Claude)
+
+- **Outcome**: Gemini lanes (quota reset). RV-04a dock restyle accepted. RV-02f accepted after a review fix removing invented semantics (output assertions "covering" unconnected pipeline outputs). RV-03b timed out mid-e2e; my full run found 2 regressions from deleting the legacy top-bar stacking rule (StudioMenu backdrop intercepting `.project-switch`) — I added a documented temporary z-index rule — and a mobile revisions overlap, which Gemini fixed. Merged dock + shell onto the foundation line.
+- **Changed**: `c7a4020`, `fe2bda7`, merge `2262d55` (foundation line), `e75fc15` (rv-02f); ledger, ACTION_LOG.
+- **Platform**: Claude reviewer; Gemini 3.8 Flash high-effort lanes plus two fix rounds.
+- **Verification** (Claude): merged line 240 unit, build, production e2e 57 passed / 5 failed (same baseline mobile set) / 4 skipped; rv-02f 325 unit + build; headless screenshots desktop/mobile vs pre-shell commit.
+- **Limitations**: Rail labels clip on desktop (new, RV-03c). Mobile dock overflow and blank area under the canvas pre-date this work (RV-04b / shell layout). Board screenshot capture for 16A came out blank, so dock fidelity was checked by computed styles only.
