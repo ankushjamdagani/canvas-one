@@ -114,6 +114,36 @@ export const evergreen = Object.freeze({
 export type Evergreen = typeof evergreen;
 
 /**
+ * Node-kind stripe colours.
+ *
+ * Source: specs/revamp/design.md "Canvas objects" ("A 176px card with a 3px type
+ * stripe. The stripe colour is the node kind; the border carries state").
+ *
+ * Keyed by the six system layers used by src/domain/componentCatalog.ts
+ * (Clients, Edge, Compute, Data, Messaging, Operations), lowercased to match
+ * ArchitectureCanvas's `category-${categorySlug}` class/slug convention — never by
+ * node name (design.md "Design vs decisions": "Kind stripes use an explicit
+ * node-kind color map, never colors chosen by node name").
+ *
+ * Per user decision D35, these are a dedicated set of six stripe colours, distinct
+ * from (and deliberately not derived from) the semantic primary/branch/risk roles —
+ * replacing the earlier board-inferred mapping onto those roles. Each is verified
+ * (tokens.test.ts) to reach >=3:1 contrast against both white and the panel surface,
+ * matching the "meaningful control boundaries and state indicators" bar from
+ * design.md's Accessibility corrections.
+ */
+export const nodeKindColor = Object.freeze({
+  clients: '#4F6D8F',
+  edge: '#2B7A83',
+  compute: '#56773A',
+  messaging: '#8A6A1F',
+  data: '#8A4F6E',
+  operations: '#5F646B',
+} as const);
+
+export type NodeKindLayer = keyof typeof nodeKindColor;
+
+/**
  * Calculates the relative luminance of an sRGB color according to WCAG 2.2 specifications.
  * @see https://www.w3.org/TR/WCAG22/#dfn-relative-luminance
  */

@@ -96,12 +96,48 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
   const nodeCounters = execMetrics?.nodes?.[n.id];
   const category = componentDefinition(n.kind)?.category ?? "Compute";
   const categorySlug = category.toLowerCase();
+  // Tailwind's scanner only picks up literal class names, never ones built by string
+  // interpolation, so the six `bg-node-kind-*` / `text-node-kind-*` utilities (defined in
+  // the plain @theme block in styles.css, mirroring tokens.ts `nodeKindColor`) must each
+  // appear literally here.
+  const stripeClass = {
+    clients: "bg-node-kind-clients",
+    edge: "bg-node-kind-edge",
+    compute: "bg-node-kind-compute",
+    data: "bg-node-kind-data",
+    messaging: "bg-node-kind-messaging",
+    operations: "bg-node-kind-operations",
+  }[categorySlug as "clients" | "edge" | "compute" | "data" | "messaging" | "operations"] ?? "bg-node-kind-compute";
+  const pillTintClass = {
+    clients: "bg-node-kind-clients/10",
+    edge: "bg-node-kind-edge/10",
+    compute: "bg-node-kind-compute/10",
+    data: "bg-node-kind-data/10",
+    messaging: "bg-node-kind-messaging/10",
+    operations: "bg-node-kind-operations/10",
+  }[categorySlug as "clients" | "edge" | "compute" | "data" | "messaging" | "operations"] ?? "bg-node-kind-compute/10";
+  const pillTextClass = {
+    clients: "text-node-kind-clients",
+    edge: "text-node-kind-edge",
+    compute: "text-node-kind-compute",
+    data: "text-node-kind-data",
+    messaging: "text-node-kind-messaging",
+    operations: "text-node-kind-operations",
+  }[categorySlug as "clients" | "edge" | "compute" | "data" | "messaging" | "operations"] ?? "text-node-kind-compute";
 
   return (
     <div
-      className={`component-node category-${categorySlug} ${diagram ? "diagram-node" : ""} ${expanded ? "expanded-node" : ""} ${selected ? "selected" : ""} ${overloaded ? "overloaded" : ""}`}
+      className={`component-node category-${categorySlug} relative block w-44 rounded-node border transition-colors ${
+        selected
+          ? "selected border-2 border-primary ring-2 ring-selected-edge ring-offset-1 shadow-none"
+          : "border-control-border hover:border-hover-border"
+      } ${diagram ? "diagram-node" : ""} ${expanded ? "expanded-node" : ""} ${overloaded ? "overloaded" : ""}`}
     >
-      <div className={`node-category-strip category-${categorySlug}`} aria-hidden="true" />
+      <div
+        className={`node-category-strip category-${categorySlug} absolute inset-x-0 top-0 h-[3px] w-auto rounded-t-node rounded-bl-none ${stripeClass}`}
+        aria-hidden="true"
+        data-node-kind={categorySlug}
+      />
       {(diagram || isOpen || n.kind !== "traffic") && (
         <Handle type="target" position={Position.Left} />
       )}
@@ -110,8 +146,8 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
           <Icon size={22} strokeWidth={1.7} />
         </div>
         <div className="node-copy">
-          <strong>{n.name}</strong>
-          <span>
+          <strong className="block whitespace-normal overflow-visible text-clip max-w-none break-words [overflow-wrap:anywhere]">{n.name}</strong>
+          <span className="block whitespace-normal break-words [overflow-wrap:anywhere]">
             {diagram
               ? (n.kind === "custom" ? n.customType : n.description) || "Architecture component"
               : isOpen
@@ -185,7 +221,11 @@ function ComponentNode({ data, selected }: NodeProps<ArchitectureNode>) {
       <div className={`node-footnote ${overloaded ? "warning-text" : ""}`}>
         {diagram ? (
           <div className="node-footnote-diagram">
-            <span className={`node-cat-pill category-${categorySlug}`}>{category}</span>
+            <span
+              className={`node-cat-pill category-${categorySlug} rounded-tag ${pillTintClass} px-1.5 py-0.5 ${pillTextClass} font-medium`}
+            >
+              {category}
+            </span>
             <span className="node-footnote-text">Architecture node</span>
           </div>
         ) : isOpen ? (

@@ -34,6 +34,8 @@ export const TrafficEdge = memo(function TrafficEdge({
     targetPosition,
   });
   const moving = !!data?.running && (data?.rate ?? 0) > 0;
+  const isAsync = data?.communication === "async";
+  const isData = data?.communication === "data";
   return (
     <>
       <BaseEdge
@@ -41,9 +43,13 @@ export const TrafficEdge = memo(function TrafficEdge({
         path={path}
         markerEnd={markerEnd}
         style={{
-          stroke: selected ? "#c48212" : "#72b4b2",
+          // Design System board "Canvas objects" connectors: idle = neutral hover-border,
+          // selected path = primary (solid, thicker), async/queued = branch/async purple
+          // (dashed). "data" classification keeps the existing dotted pattern; the board's
+          // legend doesn't show a data-specific colour, so it stays neutral like idle.
+          stroke: selected ? "var(--primary)" : isAsync ? "var(--branch)" : "var(--hover-border)",
           strokeWidth: selected ? 2 : 1.4,
-          strokeDasharray: data?.communication === "async" ? "7 5" : data?.communication === "data" ? "2 4" : undefined,
+          strokeDasharray: isAsync ? "7 5" : isData ? "2 4" : undefined,
         }}
       />
       <path
