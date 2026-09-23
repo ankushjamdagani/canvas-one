@@ -56,11 +56,14 @@ describe("Evergreen tokens and styles.css single source check", () => {
 
     // Borders & dividers
     expect(rootVars["--border"]).toBe(evergreen.divider);
-    expect(rootVars["--input"]).toBe(evergreen.inputBorder);
+    expect(rootVars["--input"]).toBe(evergreen.controlBorderStrong);
+    expect(rootVars["--control-border-strong"]).toBe(evergreen.controlBorderStrong);
     expect(rootVars["--ring"]).toBe(evergreen.primary);
 
-    // Destructive role (contrast >= 4.5:1 against white)
-    expect(contrastRatio(rootVars["--destructive"], "#FFFFFF")).toBeGreaterThanOrEqual(4.5);
+    // Destructive role (--destructive equals evergreen.destructive and destructive-foreground on --destructive >= 4.5)
+    expect(rootVars["--destructive"]).toBe(evergreen.destructive);
+    expect(rootVars["--destructive-foreground"]).toBe("#FFFFFF");
+    expect(contrastRatio(rootVars["--destructive-foreground"], rootVars["--destructive"])).toBeGreaterThanOrEqual(4.5);
 
     // Evergreen specific role variables
     expect(rootVars["--shell"]).toBe(evergreen.shell);
@@ -111,6 +114,10 @@ describe("Evergreen tokens and styles.css single source check", () => {
     const primaryForeground = rootVars["--primary-foreground"];
     expect(contrastRatio(primaryForeground, evergreen.primary)).toBeGreaterThanOrEqual(4.5);
 
+    // Destructive-foreground on --destructive (and evergreen.destructive)
+    expect(contrastRatio(rootVars["--destructive-foreground"], rootVars["--destructive"])).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("#FFFFFF", evergreen.destructive)).toBeGreaterThanOrEqual(4.5);
+
     // Risk text on risk tint
     expect(contrastRatio(evergreen.riskText, evergreen.riskTint)).toBeGreaterThanOrEqual(4.5);
 
@@ -124,11 +131,22 @@ describe("Evergreen tokens and styles.css single source check", () => {
     }
   });
 
-  it("(c) asserts --input/control-border vs white >= 3", () => {
-    // The accessible input field boundary must achieve >= 3:1 against white canvas
+  it("(c) asserts controlBorderStrong contrast >= 3 against canvas, shell, and panel", () => {
+    // The accessible input field boundary must achieve >= 3:1 against canvas, shell, and panel
     const inputBorderValue = rootVars["--input"];
+    const controlBorderStrongValue = rootVars["--control-border-strong"];
+
     expect(contrastRatio(inputBorderValue, evergreen.canvas)).toBeGreaterThanOrEqual(3.0);
-    expect(contrastRatio(evergreen.inputBorder, evergreen.canvas)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(inputBorderValue, evergreen.shell)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(inputBorderValue, evergreen.panel)).toBeGreaterThanOrEqual(3.0);
+
+    expect(contrastRatio(controlBorderStrongValue, evergreen.canvas)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(controlBorderStrongValue, evergreen.shell)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(controlBorderStrongValue, evergreen.panel)).toBeGreaterThanOrEqual(3.0);
+
+    expect(contrastRatio(evergreen.controlBorderStrong, evergreen.canvas)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(evergreen.controlBorderStrong, evergreen.shell)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(evergreen.controlBorderStrong, evergreen.panel)).toBeGreaterThanOrEqual(3.0);
   });
 
   it("(d) asserts meta #8A938F is NOT exported as a text token", () => {
@@ -156,8 +174,16 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(evergreenKeys).not.toContain("popover");
     expect(evergreenKeys).not.toContain("card");
     expect(evergreenKeys).not.toContain("dock");
+    expect(evergreenKeys).not.toContain("inputBorder");
     expect(evergreen).toHaveProperty("primaryHover");
     expect(evergreen).toHaveProperty("primaryPressed");
     expect(evergreen).toHaveProperty("radii");
+    expect(evergreen).toHaveProperty("controlBorderStrong");
+    expect(evergreen).toHaveProperty("destructive");
+  });
+
+  it("(f) asserts styles.css contains no Google Fonts CDN and no Spline Sans", () => {
+    expect(cssContent).not.toContain("fonts.googleapis");
+    expect(cssContent).not.toContain("Spline");
   });
 });

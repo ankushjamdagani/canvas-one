@@ -1,6 +1,17 @@
 @import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-500.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource-variable/newsreader/opsz.css";
 
 @theme inline {
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-display: "Newsreader Variable", Georgia, serif;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -36,6 +47,7 @@
   --color-risk-text: var(--risk-text);
   --color-risk-tint: var(--risk-tint);
   --color-control-border: var(--control-border);
+  --color-control-border-strong: var(--control-border-strong);
   --color-hover-border: var(--hover-border);
   --color-note: var(--note);
   --color-note-edge: var(--note-edge);
@@ -70,11 +82,12 @@
   --shadcn-muted-foreground: #626D68;
   --accent: #EAEFEC;
   --accent-foreground: #16201D;
-  --destructive: #dc2626;
+  --destructive: #A15B40;
   --destructive-foreground: #FFFFFF;
   --border: #E7E3DB;
-  /* Strong control border: #8A938F is the lightest neutral from the palette reaching >=3:1 (3.16:1) against white for accessible field boundaries */
-  --input: #8A938F;
+  /* Strong control border: #948D80 is the darker step of the theme's warm border family reaching >=3:1 against white for accessible field boundaries */
+  --input: #948D80;
+  --control-border-strong: #948D80;
   --ring: #0B5C54;
   --radius: 0.5rem;
 
@@ -98,7 +111,7 @@
   --note-edge: #E6DAB8;
 
 
-  font-family: "Inter Variable", sans-serif;
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   color: #243b41;
   background: #f9faf8;
   font-synthesis: none;

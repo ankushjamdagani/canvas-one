@@ -35,12 +35,13 @@ export const evergreen = Object.freeze({
   risk: '#B4674A', // Decorative clay
   riskText: '#A15B40', // Corrected clay for text contrast on riskTint (4.62:1 >= 4.5:1)
   riskTint: '#FBF1EA',
+  destructive: '#A15B40',
 
   // Lines & borders
   divider: '#E7E3DB',
   controlBorder: '#DCD7CD',
   hoverBorder: '#C6C0B4',
-  inputBorder: '#8A938F', // Stronger control border reaching >=3:1 (3.16:1) against white for field boundaries
+  controlBorderStrong: '#948D80', // Darker step of the theme's warm border family; >=3:1 on canvas 3.29, shell 3.15, panel 3.02
 
   // Notes
   note: '#FBF6E8',
