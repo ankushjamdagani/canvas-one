@@ -438,96 +438,6 @@
   background: #f0f4f2;
 }
 
-/* Compact Results & Readiness Strip */
-.canvas-first-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 16px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid #dce5e1;
-  font-size: 12px;
-  min-height: 40px;
-  gap: 12px;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 20;
-}
-
-.canvas-first-strip-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.canvas-first-strip-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.canvas-first-strip-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.canvas-first-strip-stat strong {
-  font-weight: 600;
-  color: #111b17;
-}
-
-.canvas-first-strip-stat.danger {
-  color: #b91c1c;
-  font-weight: 600;
-  margin: 0 !important;
-  margin-top: 0 !important;
-  display: inline-flex;
-  align-items: center;
-}
-
-.canvas-first-strip-stat.incomplete {
-  color: #b45309;
-  font-weight: 600;
-}
-
-.canvas-first-strip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #94a3b8;
-  flex-shrink: 0;
-}
-
-.canvas-first-strip-dot.ready {
-  background: #10b981;
-}
-
-.canvas-first-strip-dot.idle {
-  background: #94a3b8;
-}
-
-.canvas-first-strip-dot.running {
-  background: #087f84;
-  box-shadow: 0 0 0 3px rgba(8, 127, 132, 0.2);
-  animation: pulse-dot 1.5s infinite;
-}
-
-.canvas-first-strip-dot.finished {
-  background: #16a34a;
-}
-
-.canvas-first-strip-dot.stopped {
-  background: #b91c1c;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-}
-
 .canvas-first-details-panel {
   max-height: 280px;
   overflow-y: auto;
@@ -775,22 +685,6 @@
     flex-shrink: 0;
   }
 
-  .canvas-first-strip {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
-    height: auto;
-    min-height: auto;
-    flex-shrink: 0;
-  }
-
-  .canvas-first-strip-info,
-  .canvas-first-strip-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
   .canvas-first-export-panel {
     bottom: 56px;
     right: 8px;
@@ -1027,24 +921,6 @@
 
 .result-table tbody tr:hover td {
   background: #f8fafc;
-}
-
-/* Simulation running glowing pulse */
-@keyframes pulse-emerald-glow {
-  0% {
-    box-shadow: 0 0 0 0 rgba(8, 127, 132, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(8, 127, 132, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(8, 127, 132, 0);
-  }
-}
-
-.canvas-first-strip-dot.running {
-  background: #087f84;
-  animation: pulse-emerald-glow 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Tactile micro-interactions across workspace buttons */

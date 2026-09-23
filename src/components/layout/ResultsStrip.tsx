@@ -1,6 +1,8 @@
 import * as React from "react";
 import { BookmarkPlus, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 export interface ResultsStripProps {
@@ -27,6 +29,20 @@ export interface ResultsStripProps {
   onOpenExport: () => void;
 }
 
+/** Text label + badge tone for the current run state. Color is always paired with this text. */
+function runStateLabel(
+  simulationError: string | null | undefined,
+  incomplete: boolean | string | undefined,
+  simulationRunning: boolean,
+  simulationFinished: boolean | undefined,
+): { text: string; variant: "risk" | "success" | "neutral" | "accent" } {
+  if (simulationError) return { text: "Simulation stopped", variant: "risk" };
+  if (incomplete) return { text: "Resource boundary", variant: "risk" };
+  if (simulationRunning) return { text: "Running", variant: "accent" };
+  if (simulationFinished) return { text: "Completed", variant: "success" };
+  return { text: "Paused", variant: "neutral" };
+}
+
 export function ResultsStrip({
   simulationTime,
   simulationRunning,
@@ -50,108 +66,102 @@ export function ResultsStrip({
   onSaveResultClick,
   onOpenExport,
 }: ResultsStripProps) {
+  const state = runStateLabel(simulationError, incomplete, simulationRunning, simulationFinished);
+
   return (
     <div
       data-testid="results-strip"
-      className="canvas-first-strip flex items-center justify-between h-9 min-h-[36px] px-4 bg-background/95 backdrop-blur-md border-t border-border text-xs gap-3 shrink-0 shadow-xs z-20 select-none"
+      className="flex flex-col md:flex-row md:items-center md:justify-between min-h-9 px-4 py-1.5 md:py-1 bg-background/95 backdrop-blur-md border-t border-border text-xs gap-2 md:gap-3 shrink-0 shadow-xs z-20 select-none"
       role="region"
       aria-label="Simulation status and results"
     >
-      <div className="canvas-first-strip-info flex items-center gap-4 overflow-x-auto whitespace-nowrap flex-1">
+      <div className="w-full md:w-auto flex items-center gap-3 overflow-x-auto whitespace-nowrap md:flex-1 scrollbar-none">
         {simulationTime > 0 ? (
           <>
-            <span className="canvas-first-strip-stat inline-flex items-center gap-1.5 text-xs text-foreground">
+            <Badge
+              variant={state.variant}
+              className="gap-1.5 normal-case tracking-normal font-sans text-xs"
+            >
               <span
+                aria-hidden="true"
                 className={cn(
-                  "canvas-first-strip-dot w-2 h-2 rounded-full inline-block shrink-0",
+                  "w-1.5 h-1.5 rounded-full inline-block shrink-0",
                   simulationRunning
-                    ? "running bg-teal-500 animate-pulse"
-                    : simulationFinished
-                      ? "finished bg-teal-600 dark:text-teal-400"
-                      : "stopped bg-amber-500"
+                    ? "bg-primary animate-pulse motion-reduce:animate-none"
+                    : simulationFinished && !simulationError && !incomplete
+                      ? "bg-primary"
+                      : simulationError || incomplete
+                        ? "bg-risk-text"
+                        : "bg-secondary-text",
                 )}
               />
-              <strong>
-                {simulationError
-                  ? "Simulation stopped"
-                  : incomplete
-                    ? "Resource boundary"
-                    : simulationRunning
-                      ? "Running"
-                      : simulationFinished
-                        ? "Completed"
-                        : "Paused"}
-              </strong>
+              {state.text}
+            </Badge>
+            <Separator orientation="vertical" className="h-4" />
+            <span className="inline-flex items-baseline gap-1.5 text-secondary-text">
+              <span>Elapsed</span>
+              <strong className="font-mono text-foreground tabular-nums">{simulationTime.toFixed(1)}</strong>
+              <span className="text-secondary-text/80">s / {duration}s</span>
             </span>
-            <span className="canvas-first-strip-stat inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>Time:</span>
-              <strong className="text-foreground tabular-nums">{simulationTime.toFixed(1)}s</strong>
-              <span className="text-muted-foreground/70">/ {duration}s</span>
-            </span>
-            <span className="canvas-first-strip-stat inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>Throughput:</span>
-              <strong data-testid="throughput" className="text-foreground tabular-nums">
-                {throughput !== undefined ? `${throughput.toFixed(1)} req/s` : "0 req/s"}
+            <span className="inline-flex items-baseline gap-1.5 text-secondary-text">
+              <span>Throughput</span>
+              <strong data-testid="throughput" className="font-mono text-foreground tabular-nums">
+                {throughput !== undefined ? throughput.toFixed(1) : "0"}
               </strong>
+              <span className="text-secondary-text/80">req/s</span>
             </span>
-            <span className="canvas-first-strip-stat inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>p95:</span>
-              <strong data-testid="p95" className="text-foreground tabular-nums">
-                {p95Latency !== undefined && p95Latency !== null
-                  ? `${p95Latency.toFixed(1)}ms`
-                  : "—"}
+            <span className="inline-flex items-baseline gap-1.5 text-secondary-text">
+              <span>p95</span>
+              <strong data-testid="p95" className="font-mono text-foreground tabular-nums">
+                {p95Latency !== undefined && p95Latency !== null ? p95Latency.toFixed(1) : "—"}
               </strong>
+              {p95Latency !== undefined && p95Latency !== null && (
+                <span className="text-secondary-text/80">ms</span>
+              )}
             </span>
             <span
               className={cn(
-                "canvas-first-strip-stat inline-flex items-center gap-1.5 text-xs text-muted-foreground",
-                failures > 0 ? "danger text-destructive" : ""
+                "inline-flex items-baseline gap-1.5",
+                failures > 0 ? "text-risk-text" : "text-secondary-text",
               )}
             >
-              <span>Failures:</span>
-              <strong data-testid="failures" className={cn("tabular-nums", failures > 0 ? "text-destructive font-bold" : "text-foreground")}>
+              <span>Failures</span>
+              <strong
+                data-testid="failures"
+                className={cn("font-mono tabular-nums", failures > 0 ? "text-risk-text font-bold" : "text-foreground")}
+              >
                 {failures}
               </strong>
             </span>
-            {incomplete && (
-              <span className="canvas-first-strip-stat incomplete inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                <strong>Incomplete run</strong>
-              </span>
-            )}
           </>
         ) : (
-          <div className="canvas-first-readiness flex items-center">
+          <div className="flex items-center">
             {nodeCount === 0 ? (
-              <span className="canvas-first-strip-stat muted inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="canvas-first-strip-dot idle w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
-                <span>
-                  Empty canvas · Add components or load an example to begin
-                </span>
+              <span className="inline-flex items-center gap-1.5 text-secondary-text">
+                <span className="w-1.5 h-1.5 rounded-full bg-secondary-text/50 shrink-0" />
+                <span>Empty canvas · Add components or load an example to begin</span>
               </span>
             ) : errors.length > 0 ? (
               <span
-                className="canvas-first-strip-stat danger inline-flex items-center gap-1.5 text-xs text-destructive font-medium cursor-help"
+                className="inline-flex items-center gap-1.5 text-risk-text font-medium cursor-help"
                 title={errors.join("\n")}
               >
                 <TriangleAlert size={14} className="shrink-0" />
                 <strong>
                   {errors.length} draft error{errors.length > 1 ? "s" : ""}
                 </strong>
-                <span className="text-[11px] ml-1 opacity-80">
-                  ({errors[0]})
-                </span>
+                <span className="text-xs ml-1 opacity-80">({errors[0]})</span>
               </span>
             ) : (
-              <span className="canvas-first-strip-stat muted inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 text-secondary-text">
                 <span
                   className={cn(
-                    "canvas-first-strip-dot w-2 h-2 rounded-full shrink-0",
-                    ready ? "ready bg-teal-600" : "idle bg-muted-foreground/40"
+                    "w-1.5 h-1.5 rounded-full shrink-0",
+                    ready ? "bg-primary" : "bg-secondary-text/50",
                   )}
                 />
                 <span>
-                  Ready to simulate · {nodeCount} components, {workloadCount}{" "}
-                  workloads
+                  Ready to simulate · {nodeCount} components, {workloadCount} workloads
                 </span>
               </span>
             )}
@@ -159,17 +169,15 @@ export function ResultsStrip({
         )}
       </div>
 
-      <div className="canvas-first-strip-actions flex items-center gap-1.5 shrink-0">
+      <div className="w-full md:w-auto flex items-center flex-wrap md:flex-nowrap gap-1.5 shrink-0">
         {simulationTime > 0 && (
           <>
             <Button
               data-testid="details-btn"
-              variant={showDetails ? "secondary" : "ghost"}
+              variant={showDetails ? "tint" : "ghost"}
               size="sm"
-              className={cn(
-                "canvas-first-btn subtle h-7 px-2.5 text-xs",
-                showDetails && "active bg-accent font-semibold"
-              )}
+              className="text-xs"
+              aria-expanded={showDetails}
               onClick={onToggleDetails}
             >
               {showDetails ? "Hide details" : "Details"}
@@ -178,7 +186,7 @@ export function ResultsStrip({
               data-testid="compare-btn"
               variant="ghost"
               size="sm"
-              className="canvas-first-btn subtle h-7 px-2.5 text-xs"
+              className="text-xs"
               onClick={onOpenSavedRuns}
             >
               Compare ({savedRunsCount})
@@ -188,7 +196,7 @@ export function ResultsStrip({
                 data-testid="save-result-btn"
                 variant="outline"
                 size="sm"
-                className="canvas-first-btn h-7 px-2.5 text-xs gap-1.5"
+                className="text-xs gap-1.5"
                 disabled={resultSaved}
                 onClick={onSaveResultClick}
               >
@@ -202,7 +210,7 @@ export function ResultsStrip({
           data-testid="export-canvas-btn"
           variant="ghost"
           size="sm"
-          className="canvas-first-btn subtle h-7 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+          className="text-xs text-secondary-text hover:text-foreground"
           onClick={onOpenExport}
         >
           Export canvas
