@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implementation hold (user, 2026-09-22).** Planning and read-only reviews only. No implementation is dispatched until the user explicitly lifts the hold; no reviewer verdict overrides it.
+**Hold lifted (user, 2026-09-23, `/delegate start revamp work`).** EXEC-PREFLIGHT passed; first lanes RV-01a and RV-02a are in review. The hold was set 2026-09-22.
 
 Planning is complete: the plan passed four review rounds and every RV-02 contract finding is closed ([reviews.md](reviews.md)). The only remaining step is the user reviewing the plan and lifting the hold.
 
@@ -93,8 +93,10 @@ RV-14d and RV-14e are always serialized. RV-16b follows versioning integration, 
 
 | ID | Status | Next |
 |---|---|---|
-| PLAN, RV-00, RV-02 | ACCEPTED (planning) | User review of the plan |
-| EXEC-PREFLIGHT | BLOCKED | Hold; then Gemini's no-edit boundary and interrupt rehearsal |
-| RV-01 … RV-16 | BLOCKED | Hold; then as ordered above |
+| PLAN, RV-00, RV-02 | ACCEPTED (planning) | — |
+| EXEC-PREFLIGHT | ACCEPTED 2026-09-23 | agy runs headless with `--dangerously-skip-permissions` (user choice) inside per-task worktrees; timeouts need a SIGTERM/SIGKILL watchdog (`alarm`/`--print-timeout` don't stop agy) |
+| RV-01a Evergreen tokens | REVIEW PASS, uncommitted | Worktree `.claude/worktrees/rv-01a` (branch `claude/rv-01a-tokens`); commit, then RV-01b fonts / components.json / specimen |
+| RV-02a `studio-model/1` types | REVIEW PASS, uncommitted | Worktree `.claude/worktrees/rv-02a` (branch `claude/rv-02a-model-types`); commit, then validators (model-and-runner §12.1) |
+| RV-01 (rest), RV-03 … RV-16 | BLOCKED | Dependencies as ordered above |
 
 Statuses: READY → CLAIMED → IN_PROGRESS → REVIEW → ACCEPTED, or BLOCKED (with the specific dependency named). A paused task stays owned until it is released.

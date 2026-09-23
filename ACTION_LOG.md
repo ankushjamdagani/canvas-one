@@ -979,3 +979,20 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude Opus 5.5 inline; no subagents.
 - **Verification**: Docs only; no suites run.
 - **Limitations**: Skill keep/remove list and log split format left open for a future brainstorming session.
+
+### Revamp start — EXEC-PREFLIGHT blocked (Claude)
+
+- **Outcome**: User invoked `/delegate start revamp work` (treated as lifting the hold). Ran EXEC-PREFLIGHT first as `delivery.md` requires. BLOCKED: headless `agy` (gemini-3.8-flash, `--mode plan`) exits 0 with no output after auto-denying `read_file` and `command` permissions, so Gemini can't even read the repo. `--print-timeout 25s` was not honored (run took 79s). macOS has no `timeout`; `/delegate` executor wrapper needs a portable alternative (`perl -e 'alarm N; exec @ARGV'` works).
+- **Changed**: ACTION_LOG only. No edits by Gemini (`git status` clean after both runs).
+- **Platform**: Claude orchestrator via `/delegate`; two agy no-edit runs.
+- **Next**: User approves scoped allow-rules in `~/.gemini/antigravity-cli/settings.json` (no blanket bypass), then rerun preflight, then RV-01 / RV-02 shared types / RV-16a lanes.
+
+### Revamp first lanes — RV-01a and RV-02a pass review (Claude)
+
+- **Outcome**: User chose `--dangerously-skip-permissions` for headless agy. EXEC-PREFLIGHT then passed: Gemini's no-edit boundary ack matched delivery.md; interrupt rehearsal needs a SIGTERM/SIGKILL watchdog (`perl alarm` and `--print-timeout` did not stop agy; watchdog exits 124, no stray processes). Two Gemini lanes in isolated worktrees with own `npm ci`:
+  - **RV-01a** Evergreen tokens: shadcn roles remapped, new Evergreen role/radius variables, `studio/tokens.ts` + contrast/single-source tests. Review loop 1 fixed a self-referential `--radius-*` cycle in `@theme inline` and duplicate token keys. `--input` uses `#8A938F` (3.16:1) as the stronger field border; `--destructive` `#dc2626` is not from the Evergreen palette (review later with RV-01b).
+  - **RV-02a** `src/domain/studio/model.ts` types for model-and-runner §1–§4, §6, checked field-by-field against the contract; fixture key/kind tests.
+- **Changed**: worktree files only (uncommitted); `delivery.md` status/ledger, HANDOFF hold line, ACTION_LOG.
+- **Platform**: Claude orchestrator/critic/reviewer; Gemini 3.8 Flash executors (medium/high effort) via `/delegate`. One agy 503, retried.
+- **Verification** (rerun by Claude): RV-01a 238 unit tests, build ok, production e2e 46/51 on an isolated port (5184) with the same 5 baseline mobile failures; RV-02a 238 tests, build ok; `git diff --check` clean. A stale Sep-17 `vite preview` holds port 5174, so the default e2e config would test stale code.
+- **Limitations**: Not committed. Fonts, `components.json`, specimen and browser computed-style checks (R02) not started.
