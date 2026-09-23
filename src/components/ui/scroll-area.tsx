@@ -8,6 +8,7 @@ const ScrollArea = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
+    data-slot="scroll-area"
     className={cn("relative overflow-hidden", className)}
     {...props}
   >
@@ -26,6 +27,7 @@ const ScrollBar = React.forwardRef<
 >(({ className, orientation = "vertical", ...props }, ref) => (
   <ScrollAreaPrimitive.ScrollAreaScrollbar
     ref={ref}
+    data-slot="scroll-area-scrollbar"
     orientation={orientation}
     className={cn(
       "flex touch-none select-none transition-colors",

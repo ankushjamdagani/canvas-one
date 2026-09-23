@@ -28,6 +28,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -84,6 +85,7 @@
   --accent-foreground: #16201D;
   --destructive: #A15B40;
   --destructive-foreground: #FFFFFF;
+  --destructive-hover: #8E5038;
   --border: #E7E3DB;
   /* Strong control border: #948D80 is the darker step of the theme's warm border family reaching >=3:1 against white for accessible field boundaries */
   --input: #948D80;
@@ -184,12 +186,17 @@ body {
 }
 
 @layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
   button,
   input,
   textarea {
     font: inherit;
   }
-  button {
+  button:not([data-slot]) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -206,26 +213,26 @@ body {
       background 0.15s,
       border-color 0.15s;
   }
-  button:hover:not(:disabled):not([role="switch"]):not([data-state]) {
+  button:not([data-slot]):hover:not(:disabled):not([role="switch"]):not([data-state]) {
     background: #f0f5f2;
     border-color: #bdceca;
   }
-  button:disabled {
+  button:not([data-slot]):disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
-  button:focus-visible,
-  input:focus-visible {
-    outline: 2px solid var(--teal);
+  button:not([data-slot]):focus-visible,
+  input:not([data-slot]):focus-visible {
+    outline: 2px solid var(--ring);
     outline-offset: 3px;
   }
-  button[role="switch"] {
+  button:not([data-slot])[role="switch"] {
     display: inline-flex;
     padding: 0;
     border: 2px solid transparent;
     background: transparent;
   }
-  input {
+  input:not([data-slot]) {
     width: 100%;
     min-width: 0;
     border: 1px solid #dbe3df;
@@ -235,7 +242,7 @@ body {
     color: var(--ink);
     caret-color: var(--teal);
   }
-  textarea {
+  textarea:not([data-slot]) {
     width: 100%;
     resize: vertical;
     border: 1px solid #dbe3df;
@@ -246,11 +253,11 @@ body {
     line-height: 1.55;
     caret-color: var(--teal);
   }
-  textarea:focus-visible {
-    outline: 2px solid var(--teal);
+  textarea:not([data-slot]):focus-visible {
+    outline: 2px solid var(--ring);
     outline-offset: 3px;
   }
-  input[type="number"] {
+  input:not([data-slot])[type="number"] {
     font-variant-numeric: tabular-nums;
   }
 }

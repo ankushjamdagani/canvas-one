@@ -36,6 +36,7 @@ export const evergreen = Object.freeze({
   riskText: '#A15B40', // Corrected clay for text contrast on riskTint (4.62:1 >= 4.5:1)
   riskTint: '#FBF1EA',
   destructive: '#A15B40',
+  destructiveHover: '#8E5038',
 
   // Lines & borders
   divider: '#E7E3DB',

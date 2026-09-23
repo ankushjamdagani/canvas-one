@@ -64,6 +64,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(rootVars["--destructive"]).toBe(evergreen.destructive);
     expect(rootVars["--destructive-foreground"]).toBe("#FFFFFF");
     expect(contrastRatio(rootVars["--destructive-foreground"], rootVars["--destructive"])).toBeGreaterThanOrEqual(4.5);
+    expect(rootVars["--destructive-hover"]).toBe(evergreen.destructiveHover);
 
     // Evergreen specific role variables
     expect(rootVars["--shell"]).toBe(evergreen.shell);
@@ -117,6 +118,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
     // Destructive-foreground on --destructive (and evergreen.destructive)
     expect(contrastRatio(rootVars["--destructive-foreground"], rootVars["--destructive"])).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio("#FFFFFF", evergreen.destructive)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("#FFFFFF", evergreen.destructiveHover)).toBeGreaterThanOrEqual(4.5);
 
     // Risk text on risk tint
     expect(contrastRatio(evergreen.riskText, evergreen.riskTint)).toBeGreaterThanOrEqual(4.5);
@@ -180,6 +182,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(evergreen).toHaveProperty("radii");
     expect(evergreen).toHaveProperty("controlBorderStrong");
     expect(evergreen).toHaveProperty("destructive");
+    expect(evergreen).toHaveProperty("destructiveHover");
   });
 
   it("(f) asserts styles.css contains no Google Fonts CDN and no Spline Sans", () => {
