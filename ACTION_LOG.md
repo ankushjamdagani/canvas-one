@@ -1044,3 +1044,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude reviewer; Gemini 3.8 Flash high-effort lanes plus two fix rounds.
 - **Verification** (Claude): merged line 240 unit, build, production e2e 57 passed / 5 failed (same baseline mobile set) / 4 skipped; rv-02f 325 unit + build; headless screenshots desktop/mobile vs pre-shell commit.
 - **Limitations**: Rail labels clip on desktop (new, RV-03c). Mobile dock overflow and blank area under the canvas pre-date this work (RV-04b / shell layout). Board screenshot capture for 16A came out blank, so dock fidelity was checked by computed styles only.
+
+### RV-03c, RV-04b (Claude)
+
+- **Outcome**: Gemini fixed the clipped rail labels (board short labels ADD/LOADS/REVS/RUNS, full aria-labels kept, supplied 22A app-mark gradient verified against the board source) and made the dock fit narrow screens via a "More canvas tools" popover, with new design shadow tokens replacing the arbitrary dock shadow. Merged onto the foundation line @ `11b6bb0`.
+- **Verification** (Claude): 241 unit, build, production e2e 60 passed / 5 failed (same baseline mobile set) / 4 skipped; headless desktop 1440x900 and mobile 390x844 screenshots confirm both fixes.
+- **Limitations**: Blank area under the canvas on mobile pre-dates the revamp and likely needs App.tsx layout work (RV-12 slot). Empty-canvas card and its button are still legacy styling (their owning packages have not started).
