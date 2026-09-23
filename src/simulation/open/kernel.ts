@@ -14,6 +14,47 @@ import { randomGenerator } from '../primitives';
 
 export type Outcome = 'succeeded' | 'rejected' | 'failed' | 'expired';
 
+export type SimLifecycleFactKind =
+  | 'admitted'
+  | 'rejected'
+  | 'queued'
+  | 'started'
+  | 'attempt_settled'
+  | 'unit_settled'
+  | 'message_created'
+  | 'route_selected';
+
+export interface SimLifecycleFact {
+  kind: SimLifecycleFactKind;
+  time: number;
+  nodeId: string;
+  unitIdentity: string;
+  attempt: number;
+  path: string;
+  outcome?: Outcome;
+  parentIdentity?: string;
+  edgeId?: string;
+}
+
+export type SimTraceHook = (fact: SimLifecycleFact) => void;
+
+export interface OpenSimulationOptions {
+  traceHook?: SimTraceHook;
+  disabledWorkloadIds?: Iterable<string>;
+  requireRunnable?: boolean;
+}
+
+export interface KernelResourceInput {
+  entryNodeId: string;
+  identity: string;
+  time: number;
+  deadline: number;
+  requestClass: RequestClass;
+  key?: string | null;
+  workloadId?: string;
+  ordinal?: number;
+}
+
 export interface FlowCounts {
   generated: number;
   succeeded: number;
@@ -188,7 +229,7 @@ export interface Unit {
   born: number;
   deadline: number;
   requestClass: RequestClass;
-  key: string;
+  key?: string | null;
   done: boolean;
   rootOp?: Op;
   ops: Set<Op>;
@@ -298,6 +339,9 @@ export class OpenSimulation {
   protected workloadRngs = new Map<string, () => number>();
   protected workloadNextOrdinal = new Map<string, number>();
 
+  protected traceHook?: SimTraceHook;
+  protected disabledWorkloads = new Set<string>();
+
   protected history: Array<{
     time: number;
     generated: number;
@@ -307,8 +351,17 @@ export class OpenSimulation {
   }> = [];
   protected nextSampleTime = 1;
 
-  constructor(graph: ExecutionGraph) {
-    const compiled = compileExecution(graph, true);
+  constructor(graph: ExecutionGraph, options?: OpenSimulationOptions) {
+    if (options?.traceHook) {
+      this.traceHook = options.traceHook;
+    }
+    if (options?.disabledWorkloadIds) {
+      for (const id of options.disabledWorkloadIds) {
+        this.disabledWorkloads.add(id);
+      }
+    }
+    const requireRunnable = options?.requireRunnable ?? true;
+    const compiled = compileExecution(graph, requireRunnable);
     if (!compiled.plan) {
       const errMsgs = compiled.issues
         .filter(i => i.severity === 'error')
@@ -365,7 +418,7 @@ export class OpenSimulation {
     }
 
     for (const wl of this.plan.graph.workloads) {
-      if (!wl.enabled) continue;
+      if (!wl.enabled || this.disabledWorkloads.has(wl.id)) continue;
       const wlSeed = (this.seed ^ hashString(wl.id)) >>> 0;
       this.workloadRngs.set(wl.id, makeRng(wlSeed));
       this.workloadNextOrdinal.set(wl.id, 0);
@@ -454,7 +507,12 @@ export class OpenSimulation {
     return { reqClass: chosen, key: `k-${keyIdx}` };
   }
 
+  protected emitFact(fact: SimLifecycleFact): void {
+    this.traceHook?.(fact);
+  }
+
   protected scheduleNextArrival(wl: WorkloadDefinition, afterTime: number): void {
+    if (this.disabledWorkloads.has(wl.id)) return;
     const ordinal = this.workloadNextOrdinal.get(wl.id)!;
     this.workloadNextOrdinal.set(wl.id, ordinal + 1);
 
@@ -480,6 +538,7 @@ export class OpenSimulation {
     if (!Number.isFinite(arrTime) || arrTime > this.duration) return;
 
     this.scheduleEvent(arrTime, 2, () => {
+      if (this.disabledWorkloads.has(wl.id)) return;
       this.handleArrival(wl, ordinal, arrTime);
       this.scheduleNextArrival(wl, arrTime);
     });
@@ -625,6 +684,15 @@ export class OpenSimulation {
   protected finishUnit(unit: Unit, outcome: Outcome): void {
     if (unit.done) return;
     unit.done = true;
+    this.emitFact({
+      kind: 'unit_settled',
+      time: this.currentTime,
+      nodeId: unit.rootOp?.nodeId ?? '',
+      unitIdentity: unit.identity,
+      attempt: unit.rootOp?.attempt ?? 0,
+      path: unit.rootOp?.path ?? '',
+      outcome,
+    });
     const elapsedMs = (this.currentTime - unit.born) * 1000;
     if (unit.category === 'root') {
       this.rootsInFlight--;
@@ -663,6 +731,16 @@ export class OpenSimulation {
 
     if (node.behavior.type === 'source') {
       nr.counters.admitted++;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'admitted',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.startSourceProcessing(op);
       return true;
     }
@@ -682,6 +760,16 @@ export class OpenSimulation {
       const candidates = this.getReadyBrokerConsumers(op.nodeId, sub);
       if (matchingQueueCount === 0 && candidates.length > 0) {
         nr.counters.admitted++;
+        if (!isRetry && op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'admitted',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
         const chosenEdge = candidates[0];
         this.reserveBrokerConsumer(op, chosenEdge);
         return true;
@@ -689,14 +777,42 @@ export class OpenSimulation {
 
       if (matchingQueueCount < qLimit) {
         nr.counters.admitted++;
+        if (!isRetry && op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'admitted',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
         op.phase = 'queued';
         nr.queue.push(op);
+        this.emitFact({
+          kind: 'queued',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
         return true;
       }
 
       nr.counters.rejected++;
       op.phase = 'settled';
       op.done = true;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'rejected',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
       return false;
@@ -704,14 +820,42 @@ export class OpenSimulation {
 
     if (nr.active.size < node.behavior.concurrency) {
       if (!isRetry) nr.counters.admitted++;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'admitted',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.startProcessing(op);
       return true;
     }
 
     if (nr.queue.length < node.behavior.queueLimit) {
       if (!isRetry) nr.counters.admitted++;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'admitted',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       op.phase = 'queued';
       nr.queue.push(op);
+      this.emitFact({
+        kind: 'queued',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: op.attempt,
+        path: op.path,
+      });
       return true;
     }
 
@@ -719,6 +863,16 @@ export class OpenSimulation {
       nr.counters.rejected++;
       op.phase = 'settled';
       op.done = true;
+      if (op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'rejected',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
     } else {
@@ -734,6 +888,14 @@ export class OpenSimulation {
   protected startSourceProcessing(op: Op): void {
     const nr = this.nodesRuntime.get(op.nodeId)!;
     nr.waitingSources.add(op);
+    this.emitFact({
+      kind: 'started',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+    });
     this.dispatchDownstream(op);
   }
 
@@ -745,6 +907,15 @@ export class OpenSimulation {
     op.phase = 'processing';
     op.attempt++;
     nr.counters.attempts++;
+
+    this.emitFact({
+      kind: 'started',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+    });
 
     let procTime: number;
     if (node.behavior.type === 'storage') {
@@ -783,6 +954,15 @@ export class OpenSimulation {
     const failed = failRng() * 100 < node.behavior.failureRate;
 
     if (failed) {
+      this.emitFact({
+        kind: 'attempt_settled',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: op.attempt,
+        path: op.path,
+        outcome: 'failed',
+      });
       nr.active.delete(op);
       this.pumpQueue(op.nodeId);
 
@@ -815,7 +995,9 @@ export class OpenSimulation {
       const isWrite = op.unit.requestClass.operation === 'write';
       if (isWrite) {
         cs.writes++;
-        op.cacheAction = 'invalidate';
+        if (node.behavior.mode !== 'lru' || op.unit.key != null) {
+          op.cacheAction = 'invalidate';
+        }
       } else {
         let hit = false;
         if (node.behavior.mode === 'fixed') {
@@ -823,20 +1005,43 @@ export class OpenSimulation {
             (this.seed ^ hashString(`${op.unit.identity}:${op.path}:cache`)) >>> 0
           );
           hit = draw() * 100 < node.behavior.hitRate;
-        } else {
+        } else if (op.unit.key != null) {
           hit = cs.runtime!.get(op.unit.key, this.currentTime);
+        } else {
+          hit = false;
         }
 
         if (hit) {
           cs.hits++;
+          this.emitFact({
+            kind: 'attempt_settled',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            attempt: op.attempt,
+            path: op.path,
+            outcome: 'succeeded',
+          });
           this.completeLocalOp(op);
           return;
         }
 
         cs.misses++;
-        op.cacheAction = 'fill';
+        if (node.behavior.mode !== 'lru' || op.unit.key != null) {
+          op.cacheAction = 'fill';
+        }
       }
     }
+
+    this.emitFact({
+      kind: 'attempt_settled',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+      outcome: 'succeeded',
+    });
 
     this.dispatchDownstream(op);
   }
@@ -876,6 +1081,16 @@ export class OpenSimulation {
     op.failedChild = false;
 
     for (const edge of selectedOutgoing) {
+      this.emitFact({
+        kind: 'route_selected',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: op.attempt,
+        path: op.path,
+        edgeId: edge.id,
+      });
+
       if (edge.transport === 'message') {
         this.publishMessage(op, edge);
         continue;
@@ -955,6 +1170,17 @@ export class OpenSimulation {
     const deadline = Math.min(edgeDeadline, parentUnit.lineageDeadline);
     const lineageDeadline = deadline;
     const identity = `${parentUnit.identity}:${parentOp.path}:${edge.id}:${subscription ?? ''}`;
+
+    this.emitFact({
+      kind: 'message_created',
+      time: this.currentTime,
+      nodeId: edge.target,
+      unitIdentity: identity,
+      attempt: 0,
+      path: `${parentOp.path}>${edge.id}`,
+      parentIdentity: parentUnit.identity,
+      edgeId: edge.id,
+    });
 
     const messageUnit: Unit = {
       category: 'message',
@@ -1103,7 +1329,7 @@ export class OpenSimulation {
     const node = this.plan.nodes.get(op.nodeId)!;
 
     if (node.behavior.type === 'cache' && nr.cacheState && op.cacheAction) {
-      if (nr.cacheState.runtime) {
+      if (nr.cacheState.runtime && op.unit.key != null) {
         if (op.cacheAction === 'fill') {
           nr.cacheState.runtime.put(op.unit.key, this.currentTime);
         } else if (op.cacheAction === 'invalidate') {
@@ -1536,5 +1762,183 @@ export class OpenSimulation {
       edges: edgeMetricsCopy,
       history: structuredClone(this.history),
     };
+  }
+
+  public peekNextEvent(): { time: number; priority: number; seq: number } | null {
+    if (this.events.size === 0) return null;
+    const evt = this.events.peek()!;
+    return { time: evt.time, priority: evt.priority, seq: evt.seq };
+  }
+
+  public stepEvent(): boolean {
+    if (this.events.size === 0) return false;
+    if (this.totalEventsProcessed >= 1000000 || this.liveOpsCount >= 100000) {
+      this.incompleteReason = 'resource limit';
+      this.finished = false;
+      return false;
+    }
+    const nextEvt = this.events.pop()!;
+    this.updateIntegrals(nextEvt.time);
+    this.currentTime = nextEvt.time;
+    this.totalEventsProcessed++;
+    nextEvt.run();
+
+    if (this.currentTime >= this.duration) {
+      this.finished = true;
+    }
+    return true;
+  }
+
+  public get currentTimeSeconds(): number {
+    return this.currentTime;
+  }
+
+  public get pendingEventsCount(): number {
+    return this.events.size;
+  }
+
+  public get planRef(): CompiledPlan {
+    return this.plan;
+  }
+
+  public get liveRootsCount(): number {
+    return this.rootsInFlight;
+  }
+
+  public setTraceHook(hook?: SimTraceHook): void {
+    this.traceHook = hook;
+  }
+
+  public disableWorkload(workloadId: string): void {
+    this.disabledWorkloads.add(workloadId);
+  }
+
+  public isWorkloadDisabled(workloadId: string): boolean {
+    return this.disabledWorkloads.has(workloadId);
+  }
+
+  public injectInput(input: KernelResourceInput): boolean {
+    if (input.time < this.currentTime - 1e-9) {
+      throw new Error(
+        `Cannot inject input at time ${input.time}s: earlier than current simulation time ${this.currentTime}s`
+      );
+    }
+
+    const nextEvt = this.peekNextEvent();
+    if (nextEvt && nextEvt.time <= input.time + 1e-9) {
+      throw new Error(
+        `Cannot inject input at time ${input.time}s: pending kernel event exists at time ${nextEvt.time}s (outer scheduler must step pending events first)`
+      );
+    }
+
+    if (input.time > this.currentTime) {
+      this.updateIntegrals(input.time);
+      this.currentTime = input.time;
+    }
+
+    const entryNode = this.plan.nodes.get(input.entryNodeId);
+    if (!entryNode) {
+      throw new Error(`Entry node not found: ${input.entryNodeId}`);
+    }
+
+    this.rootsGenerated++;
+    this.rootsInFlight++;
+
+    const unit: Unit = {
+      category: 'root',
+      hops: 0,
+      lineageDeadline: Infinity,
+      identity: input.identity,
+      workloadId: input.workloadId ?? input.entryNodeId,
+      ordinal: input.ordinal ?? this.rootsGenerated,
+      born: input.time,
+      deadline: input.deadline,
+      requestClass: input.requestClass,
+      key: input.key ?? null,
+      done: false,
+      ops: new Set(),
+    };
+
+    this.scheduleEvent(input.deadline, 0, () => {
+      if (!unit.done) {
+        this.expireUnit(unit);
+      }
+    });
+
+    if (entryNode.behavior.type === 'broker') {
+      const rootOp: Op = {
+        unit,
+        nodeId: input.entryNodeId,
+        path: input.entryNodeId,
+        phase: 'waiting',
+        publicationOnly: true,
+        done: false,
+        attempt: 0,
+        children: new Set(),
+        arrived: input.time,
+        pendingChildren: 1,
+        onDone: (outcome) => {
+          this.finishUnit(unit, outcome);
+          const affectedNodes = new Set<string>();
+          for (const op of unit.ops) {
+            if (op !== rootOp && !op.done) {
+              this.cancelOp(op, affectedNodes);
+            }
+          }
+          for (const nid of affectedNodes) {
+            this.pumpQueue(nid);
+          }
+        },
+      };
+
+      unit.rootOp = rootOp;
+      unit.ops.add(rootOp);
+      this.liveOpsCount++;
+
+      const syntheticEdge: ExecutionEdge = {
+        id: `__entry:${input.entryNodeId}`,
+        source: input.entryNodeId,
+        target: input.entryNodeId,
+        transport: 'message',
+        latencyMs: 0,
+        returnLatencyMs: 0,
+        ackDelayMs: 8,
+        messageTtlMs: Math.max(1, (input.deadline - input.time) * 1000),
+        weight: 1,
+      };
+
+      this.publishMessage(rootOp, syntheticEdge);
+      return true;
+    }
+
+    const rootOp: Op = {
+      unit,
+      nodeId: input.entryNodeId,
+      path: input.entryNodeId,
+      phase: 'transit',
+      done: false,
+      attempt: 0,
+      children: new Set(),
+      arrived: input.time,
+      onDone: (outcome) => {
+        this.finishUnit(unit, outcome);
+        const affectedNodes = new Set<string>();
+        for (const op of unit.ops) {
+          if (op !== rootOp && !op.done) {
+            this.cancelOp(op, affectedNodes);
+          }
+        }
+        for (const nid of affectedNodes) {
+          this.pumpQueue(nid);
+        }
+      },
+    };
+
+    unit.rootOp = rootOp;
+    unit.ops.add(rootOp);
+    this.liveOpsCount++;
+
+    const accepted = this.admitOp(rootOp, false);
+    return accepted;
   }
 }
