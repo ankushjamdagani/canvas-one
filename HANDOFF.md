@@ -2,7 +2,7 @@
 
 ## Active initiative — System Studio design revamp (21 September 2026)
 
-HOLD LIFTED (2026-09-23): user started revamp work via `/delegate`. EXEC-PREFLIGHT accepted; RV-01a–c (Evergreen tokens, clay destructive #A15B40, warm field border #948D80, local Plex/Newsreader fonts, components.json, dev-only /specimen.html) are committed on `claude/rv-01a-tokens`; RV-02a types on `claude/rv-02a-model-types`. RV-01d (legacy base CSS fixes) merged at `3edcc4a`; RV-02b storable validator on `claude/rv-02b-validators` @ `5eb079c`. Open decision: root `font-size:13px` shrinks all rem-based Tailwind sizes. Ledger: `specs/revamp/delivery.md`.
+HOLD LIFTED (2026-09-23): user started revamp work via `/delegate`. EXEC-PREFLIGHT accepted; RV-01a–c (Evergreen tokens, clay destructive #A15B40, warm field border #948D80, local Plex/Newsreader fonts, components.json, dev-only /specimen.html) are committed on `claude/rv-01a-tokens`; RV-02a types on `claude/rv-02a-model-types`. Foundation RV-01a–f is on `claude/rv-01a-tokens` @ `fd35518` (pixel theme scale per user decision; root stays 13px until legacy retires). Model work RV-02a–c is on `claude/rv-02c-canonical` @ `b79df1b`. Ledger has next steps. Ledger: `specs/revamp/delivery.md`.
 
 State (2026-09-23): planning complete. Plan passed P1–P4 reviews; every RV-02 contract finding is closed, including the S05 bridge-frame corrections. The plan was consolidated from 127 files to 24 (same substance, no product changes); raw review evidence is in git at `09d2c8b`. No revamp application code exists; the stale Gemini worktree and its empty branch `codex/revamp-foundation-a` were removed 2026-09-23 (no unique commits).
 
