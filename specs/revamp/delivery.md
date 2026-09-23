@@ -95,9 +95,8 @@ RV-14d and RV-14e are always serialized. RV-16b follows versioning integration, 
 |---|---|---|
 | PLAN, RV-00, RV-02 | ACCEPTED (planning) | — |
 | EXEC-PREFLIGHT | ACCEPTED 2026-09-23 | agy runs headless with `--dangerously-skip-permissions` (user choice) inside per-task worktrees; timeouts need a SIGTERM/SIGKILL watchdog (`alarm`/`--print-timeout` don't stop agy) |
-| RV-01a/b/c foundation tokens, colours, fonts, specimen | REVIEW PASS, committed | Branch `claude/rv-01a-tokens` @ `2d08ec5` (merges RV-01b `5908702`, RV-01c `c60d984`); worktree `.claude/worktrees/rv-01a` |
-| RV-01d legacy base CSS + computed-style checks | READY | Specimen defects: bare `border` renders currentColor (no base border-color); legacy global `button` rule boxes ghost/link variants and forces nowrap (long label clips); disabled uses opacity 0.4; focus uses legacy `--teal`; invalid fields show no risk border; `canvasFirst.css` still sets Inter |
-| RV-02a `studio-model/1` types | REVIEW PASS, committed | Branch `claude/rv-02a-model-types` @ `d0cbc1c`; next RV-02b validators (model-and-runner §12.1) |
+| RV-01a–d foundation | REVIEW PASS, committed | Branch `claude/rv-01a-tokens` @ `3edcc4a` (RV-01d `3edcc4a`: data-slot scoping of legacy base CSS, px control heights, explicit disabled/focus/invalid states, computed-style specimen checks). Open: root `font-size:13px` makes rem utilities 13/16 size (`text-xs` = 9.75px) — needs a decision before screens restyle; Dialog overlay uses `backdrop-blur` (design: no frosted surfaces); `canvasFirst.css` still sets Inter; 10 primitives missing (kbd, select, slider, toggle-group, breadcrumb, command, toast, progress, resizable, hover-card) |
+| RV-02a/b `studio-model/1` types + storable validator | REVIEW PASS, committed | Branch `claude/rv-02b-validators` @ `5eb079c` (on RV-02a `d0cbc1c`). Low: missing `nullable` reported twice. Next: canonical encoding/byte limits (run-identity.md), runnable readiness |
 | RV-01 (rest), RV-03 … RV-16 | BLOCKED | Dependencies as ordered above |
 
 Statuses: READY → CLAIMED → IN_PROGRESS → REVIEW → ACCEPTED, or BLOCKED (with the specific dependency named). A paused task stays owned until it is released.
