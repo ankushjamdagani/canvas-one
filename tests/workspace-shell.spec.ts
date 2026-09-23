@@ -168,4 +168,90 @@ test.describe("Workspace Shell (TopBar & ActivityRail)", () => {
 
     await context.close();
   });
+
+  test("every rail item label element has scrollWidth <= clientWidth + 1 and is not horizontally clipped by rail at 1440x900", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+
+    const rail = page.getByTestId("activity-rail");
+    await expect(rail).toBeVisible();
+    const railBox = await rail.boundingBox();
+    expect(railBox).not.toBeNull();
+
+    const labels = rail.locator(".canvas-first-rail-label:visible");
+    const count = await labels.count();
+    expect(count).toBeGreaterThanOrEqual(5);
+
+    for (let i = 0; i < count; i++) {
+      const label = labels.nth(i);
+      const metrics = await label.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        text: el.textContent?.trim(),
+      }));
+      expect(
+        metrics.scrollWidth,
+        `Label "${metrics.text}" has scrollWidth (${metrics.scrollWidth}) > clientWidth (${metrics.clientWidth}) + 1`
+      ).toBeLessThanOrEqual(metrics.clientWidth + 1);
+
+      const labelBox = await label.boundingBox();
+      expect(labelBox).not.toBeNull();
+      expect(
+        labelBox!.x,
+        `Label "${metrics.text}" left edge (${labelBox!.x}) is outside rail left (${railBox!.x})`
+      ).toBeGreaterThanOrEqual(railBox!.x - 0.5);
+      expect(
+        labelBox!.x + labelBox!.width,
+        `Label "${metrics.text}" right edge (${labelBox!.x + labelBox!.width}) is outside rail right (${railBox!.x + railBox!.width})`
+      ).toBeLessThanOrEqual(railBox!.x + railBox!.width + 0.5);
+    }
+  });
+
+  test("every rail item label element has scrollWidth <= clientWidth + 1 and is not horizontally clipped by rail at 390x844 touch", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+    });
+    const page = await context.newPage();
+    await page.goto("/");
+
+    const rail = page.getByTestId("activity-rail");
+    await expect(rail).toBeVisible();
+    const railBox = await rail.boundingBox();
+    expect(railBox).not.toBeNull();
+
+    const labels = rail.locator(".canvas-first-rail-label:visible");
+    const count = await labels.count();
+    expect(count).toBeGreaterThanOrEqual(5);
+
+    for (let i = 0; i < count; i++) {
+      const label = labels.nth(i);
+      const metrics = await label.evaluate((el) => ({
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        text: el.textContent?.trim(),
+      }));
+      expect(
+        metrics.scrollWidth,
+        `Label "${metrics.text}" has scrollWidth (${metrics.scrollWidth}) > clientWidth (${metrics.clientWidth}) + 1`
+      ).toBeLessThanOrEqual(metrics.clientWidth + 1);
+
+      const labelBox = await label.boundingBox();
+      expect(labelBox).not.toBeNull();
+      expect(
+        labelBox!.x,
+        `Label "${metrics.text}" left edge (${labelBox!.x}) is outside rail left (${railBox!.x})`
+      ).toBeGreaterThanOrEqual(railBox!.x - 0.5);
+      expect(
+        labelBox!.x + labelBox!.width,
+        `Label "${metrics.text}" right edge (${labelBox!.x + labelBox!.width}) is outside rail right (${railBox!.x + railBox!.width})`
+      ).toBeLessThanOrEqual(railBox!.x + railBox!.width + 0.5);
+    }
+
+    await context.close();
+  });
 });

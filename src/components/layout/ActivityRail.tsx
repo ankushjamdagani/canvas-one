@@ -144,7 +144,7 @@ export function ActivityRail({
             data-testid="rail-workloads-btn"
             aria-label="Workloads"
             glyph={<SlidersHorizontal size={16} />}
-            label="Workloads"
+            label="Loads"
             active={inspectorMode === "workloads"}
             onClick={onToggleWorkloads}
             tooltip="Workloads configuration"
@@ -154,7 +154,7 @@ export function ActivityRail({
             data-testid="rail-revisions-btn"
             aria-label="Architecture Revisions"
             glyph={<GitBranch size={16} />}
-            label="Revisions"
+            label="Revs"
             active={leftDrawerMode === "revisions"}
             onClick={onToggleRevisions}
             tooltip="Revisions & Checkpoints"

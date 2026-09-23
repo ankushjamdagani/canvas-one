@@ -71,11 +71,21 @@ export function TopBar({
             data-testid="brand"
             className="canvas-first-brand brand flex items-center gap-2 font-semibold text-[14.5px] tracking-[-0.01em] text-foreground shrink-0 select-none"
           >
-            <div
-              className="size-5 rounded-[5px] shrink-0"
-              style={{ background: "linear-gradient(140deg, #0B5C54, #2E7D6B)" }}
+            <svg
+              className="size-5 shrink-0"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
               aria-hidden="true"
-            />
+            >
+              <defs>
+                <linearGradient id="brand-mark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#0B5C54" />
+                  <stop offset="100%" stopColor="#2E7D6B" />
+                </linearGradient>
+              </defs>
+              <rect width="20" height="20" rx="5" fill="url(#brand-mark-gradient)" />
+            </svg>
             <span className="flex items-center">
               System studio<span className="brand-dot text-primary hidden">.</span>
             </span>
