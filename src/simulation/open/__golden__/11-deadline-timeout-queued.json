@@ -1,0 +1,92 @@
+{
+  "edges": {
+    "e-src-svc": {
+      "admitted": 40,
+      "rejected": 0,
+      "responses": 0,
+      "sent": 40
+    }
+  },
+  "finished": true,
+  "history": [
+    {
+      "completed": 0,
+      "generated": 20,
+      "latency": 0,
+      "queue": 5,
+      "time": 1
+    },
+    {
+      "completed": 0,
+      "generated": 40,
+      "latency": 0,
+      "queue": 5,
+      "time": 2
+    }
+  ],
+  "messages": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 0,
+    "inFlight": 0,
+    "meanLatency": 0,
+    "p95Latency": 0,
+    "rejected": 0,
+    "succeeded": 0,
+    "throughput": 0
+  },
+  "nodes": {
+    "src": {
+      "activeWorkers": 0,
+      "admitted": 40,
+      "arrived": 40,
+      "attempts": 0,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 0,
+      "expired": 35,
+      "failed": 0,
+      "occupancy": 0,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0,
+      "waiting": 5
+    },
+    "svc": {
+      "activeWorkers": 1,
+      "admitted": 40,
+      "arrived": 40,
+      "attempts": 4,
+      "cancelled": 0,
+      "cleanupProcessing": 1,
+      "completed": 0,
+      "expired": 35,
+      "failed": 0,
+      "occupancy": 0.975,
+      "processing": 1,
+      "queued": 5,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.975,
+      "waiting": 0
+    }
+  },
+  "roots": {
+    "expired": 35,
+    "failed": 0,
+    "generated": 40,
+    "inFlight": 5,
+    "meanLatency": 0,
+    "p95Latency": 0,
+    "rejected": 0,
+    "succeeded": 0,
+    "throughput": 0
+  },
+  "time": 2
+}

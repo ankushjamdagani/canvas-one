@@ -1,0 +1,126 @@
+{
+  "edges": {
+    "e-cache-origin": {
+      "admitted": 6,
+      "rejected": 0,
+      "responses": 6,
+      "sent": 6
+    },
+    "e-src-cache": {
+      "admitted": 20,
+      "rejected": 0,
+      "responses": 19,
+      "sent": 20
+    }
+  },
+  "finished": true,
+  "history": [
+    {
+      "completed": 9,
+      "generated": 10,
+      "latency": 1.4444444444444455,
+      "queue": 0,
+      "time": 1
+    },
+    {
+      "completed": 19,
+      "generated": 20,
+      "latency": 1.6315789473683644,
+      "queue": 0,
+      "time": 2
+    }
+  ],
+  "messages": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 0,
+    "inFlight": 0,
+    "meanLatency": 0,
+    "p95Latency": 0,
+    "rejected": 0,
+    "succeeded": 0,
+    "throughput": 0
+  },
+  "nodes": {
+    "cache": {
+      "activeWorkers": 1,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 20,
+      "cache": {
+        "entries": 0,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 13,
+        "misses": 6,
+        "writes": 0
+      },
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.015499999999999459,
+      "processing": 1,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.009499999999999453,
+      "waiting": 0
+    },
+    "origin": {
+      "activeWorkers": 0,
+      "admitted": 6,
+      "arrived": 6,
+      "attempts": 6,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 6,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.006000000000000005,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.006000000000000005,
+      "waiting": 0
+    },
+    "src": {
+      "activeWorkers": 0,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 0,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0,
+      "waiting": 1
+    }
+  },
+  "roots": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 20,
+    "inFlight": 1,
+    "meanLatency": 1.6315789473683644,
+    "p95Latency": 3.0000000000000027,
+    "rejected": 0,
+    "succeeded": 19,
+    "throughput": 9.5
+  },
+  "time": 2
+}
