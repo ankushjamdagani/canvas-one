@@ -1078,3 +1078,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: `ResultsStrip.tsx`, `OpenMetricsPanel.tsx`, `canvasFirst.css` (legacy strip rules deleted), new `tests/results-look.spec.ts` (`66885b1`); ledger, HANDOFF.
 - **Verification** (Claude): 246 unit, build, production e2e 78 passed / 1 known failure / 4 skipped; headless desktop and 390x844 screenshots after a completed run.
 - **Limitations**: `ResultsPanel` (saved-run comparison) not restyled. The same example gives different numbers run to run — pre-existing; flag for RV-14 seeding / R09.
+
+### RV-14a runner start (Claude)
+
+- **Outcome**: Sonnet subagent (resumed once after a session rate limit) added `src/domain/studio/runner/`: `prepareScenario` compile front end, trace envelope, run-update/result types and evidence interface. Review round fixed the trace recorder: payloads were stored before the cap checks (orphans past the budget), the payload table kept caller objects by reference, and unserialisable events counted as 0 bytes. Committed `3d413c4` on `claude/rv-14a-runner-start` (base `2ffa2d3`).
+- **Verification** (Claude): 389 unit tests, `tsc -b` clean; code review of trace/compile/evidence.
+- **Limitations**: No worker, plan handles or `startRun` yet (later RV-14 steps). Contract gaps recorded in the ledger (no AbortSignal in `buildManifest`, `identity-unavailable` status, single-value limits).
