@@ -9,11 +9,35 @@ import { NoteInspector } from './CanvasNotes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import './openInspector.css';
 
 import { X, AlertCircle } from 'lucide-react';
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Label asChild>
+      <span className="open-inspector-field-label">{children}</span>
+    </Label>
+  );
+}
+
+function SectionHeading({ title, badge }: { title: string; badge?: string }) {
+  return (
+    <div className="open-inspector-section-heading">
+      <span className="open-inspector-section-title">{title}</span>
+      {badge && (
+        <Badge variant="outline" className="open-inspector-section-badge">
+          {badge}
+        </Badge>
+      )}
+    </div>
+  );
+}
 
 export interface OpenInspectorProps {
   metrics: Metrics | null;
@@ -39,7 +63,7 @@ export function OpenInspector({
 
   const renderGlobalWorkloads = (title: string) => (
     <aside className="inspector open-inspector-container" aria-label="System configuration inspector">
-      <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="inspector-heading open-inspector-heading-row">
         <strong>{title}</strong>
         {onClose && (
           <Button
@@ -47,7 +71,7 @@ export function OpenInspector({
             variant="ghost"
             size="icon"
             aria-label="Close inspector"
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0 pointer-coarse:h-11 pointer-coarse:w-11"
             onClick={onClose}
           >
             <X size={15} />
@@ -57,7 +81,7 @@ export function OpenInspector({
       <fieldset disabled={readOnly} className="open-inspector-fieldset">
         <div className="inspector-body">
           <div className="open-inspector-section">
-            <span className="open-inspector-section-title">Execution Settings</span>
+            <SectionHeading title="Execution Settings" badge="Configured" />
             <NumberField
               label="Simulation Duration"
               unit="s"
@@ -105,7 +129,7 @@ export function OpenInspector({
   if (subsystem) {
     return (
       <aside className="inspector open-inspector-container" aria-label="Subsystem inspector">
-        <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="inspector-heading open-inspector-heading-row">
           <strong>Subsystem: {subsystem.name}</strong>
           {onClose && (
             <Button
@@ -113,7 +137,7 @@ export function OpenInspector({
               variant="ghost"
               size="icon"
               aria-label="Close inspector"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0 pointer-coarse:h-11 pointer-coarse:w-11"
               onClick={onClose}
             >
               <X size={15} />
@@ -122,14 +146,14 @@ export function OpenInspector({
         </div>
         <div className="inspector-body">
           <div className="open-inspector-section">
-            <span className="open-inspector-section-title">Members</span>
+            <SectionHeading title="Members" />
             <p className="open-inspector-help-text">
               Contains {subsystem.nodeIds.length} member component{subsystem.nodeIds.length === 1 ? '' : 's'}.
             </p>
             <p className="open-inspector-help-text">
               Right-click the subsystem shell on the canvas to expand, collapse, or dissolve this group.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+            <div className="flex flex-col gap-2 mt-3">
               <Button
                 type="button"
                 variant="outline"
@@ -163,7 +187,7 @@ export function OpenInspector({
   if (selectedNodeIds.length > 1) {
     return (
       <aside className="inspector open-inspector-container" aria-label="Multiple selection inspector">
-        <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="inspector-heading open-inspector-heading-row">
           <strong>{selectedNodeIds.length} Components Selected</strong>
           {onClose && (
             <Button
@@ -171,7 +195,7 @@ export function OpenInspector({
               variant="ghost"
               size="icon"
               aria-label="Close inspector"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0 pointer-coarse:h-11 pointer-coarse:w-11"
               onClick={onClose}
             >
               <X size={15} />
@@ -277,9 +301,9 @@ export function OpenInspector({
 
     return (
       <aside className="inspector open-inspector-container" aria-label="Component inspector">
-        <div className="inspector-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
-            <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedNode.name}</strong>
+        <div className="inspector-heading open-inspector-heading-row">
+          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+            <strong className="overflow-hidden text-ellipsis whitespace-nowrap">{selectedNode.name}</strong>
             <Badge variant="secondary" className="open-inspector-behavior-badge uppercase font-mono text-[10px] tracking-wider">
               {behavior.type}
             </Badge>
@@ -290,7 +314,7 @@ export function OpenInspector({
               variant="ghost"
               size="icon"
               aria-label="Close inspector"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0 pointer-coarse:h-11 pointer-coarse:w-11"
               onClick={onClose}
             >
               <X size={15} />
@@ -302,20 +326,20 @@ export function OpenInspector({
           <div className="inspector-body">
             {/* Identity section */}
             <div className="open-inspector-section">
-              <span className="open-inspector-section-title">Identity & Metadata</span>
-              <label className="field">
-                <span>Name</span>
+              <SectionHeading title="Identity & Metadata" badge="Configured" />
+              <label className="field open-inspector-field">
+                <FieldLabel>Name</FieldLabel>
                 <Input
                   type="text"
                   maxLength={80}
                   value={selectedNode.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  className="h-8"
+                  className="h-8 pointer-coarse:h-11"
                 />
               </label>
 
-              <label className="field">
-                <span>Description / Notes</span>
+              <label className="field open-inspector-field">
+                <FieldLabel>Description / Notes</FieldLabel>
                 <Textarea
                   rows={2}
                   maxLength={240}
@@ -326,35 +350,35 @@ export function OpenInspector({
                 />
               </label>
 
-              <label className="field">
-                <span>Custom Type Label</span>
+              <label className="field open-inspector-field">
+                <FieldLabel>Custom Type Label</FieldLabel>
                 <Input
                   type="text"
                   maxLength={60}
                   value={selectedNode.customType ?? ''}
                   onChange={(e) => handleCustomTypeChange(e.target.value)}
                   placeholder="e.g., Auth Service, Payment DB"
-                  className="h-8"
+                  className="h-8 pointer-coarse:h-11"
                 />
               </label>
             </div>
 
             {/* Behavior Switching */}
-            <div className="open-inspector-section">
-              <span className="open-inspector-section-title">Behavior Model</span>
-              <label className="field">
-                <span>Execution Behavior</span>
-                <select
+            <div className="open-inspector-section" data-inspector-group="configured" aria-label="Configured behavior model">
+              <SectionHeading title="Behavior Model" badge="Configured" />
+              <label className="field open-inspector-field">
+                <FieldLabel>Execution Behavior</FieldLabel>
+                <NativeSelect
                   value={behavior.type}
                   onChange={(e) => handleBehaviorTypeChange(e.target.value as BehaviorConfig['type'])}
                 >
-                  <option value="source">Source (Logical Traffic Entry)</option>
-                  <option value="processor">Processor (Service / Worker)</option>
-                  <option value="storage">Storage (Database / Objectstore)</option>
-                  <option value="router">Router (Gateway / Balancer)</option>
-                  <option value="cache">Cache (Fixed / LRU)</option>
-                  <option value="broker">Broker (Queue / Stream / PubSub)</option>
-                </select>
+                  <NativeSelectOption value="source">Source (Logical Traffic Entry)</NativeSelectOption>
+                  <NativeSelectOption value="processor">Processor (Service / Worker)</NativeSelectOption>
+                  <NativeSelectOption value="storage">Storage (Database / Objectstore)</NativeSelectOption>
+                  <NativeSelectOption value="router">Router (Gateway / Balancer)</NativeSelectOption>
+                  <NativeSelectOption value="cache">Cache (Fixed / LRU)</NativeSelectOption>
+                  <NativeSelectOption value="broker">Broker (Queue / Stream / PubSub)</NativeSelectOption>
+                </NativeSelect>
               </label>
               <p className="open-inspector-help-text">
                 Note: Switching behavior resets parameters to type defaults. Connected routes remain intact;
@@ -371,8 +395,8 @@ export function OpenInspector({
             </div>
 
             {/* Applicable Behavior Parameters */}
-            <div className="open-inspector-section">
-              <span className="open-inspector-section-title">Behavior Parameters</span>
+            <div className="open-inspector-section" data-inspector-group="configured" aria-label="Configured behavior parameters">
+              <SectionHeading title="Behavior Parameters" badge="Configured" />
 
               {behavior.type === 'source' && (
                 <p className="open-inspector-help-text">
@@ -382,15 +406,15 @@ export function OpenInspector({
 
               {behavior.type === 'broker' && (
                 <>
-                  <label className="field">
-                    <span>Delivery Mode</span>
-                    <select
+                  <label className="field open-inspector-field">
+                    <FieldLabel>Delivery Mode</FieldLabel>
+                    <NativeSelect
                       value={behavior.delivery}
                       onChange={(e) => patchBehavior({ delivery: e.target.value as 'competing' | 'broadcast' })}
                     >
-                      <option value="competing">Competing Consumers (Queue: one recipient per msg)</option>
-                      <option value="broadcast">Broadcast / Fan-out (PubSub: all subscribers receive msg)</option>
-                    </select>
+                      <NativeSelectOption value="competing">Competing Consumers (Queue: one recipient per msg)</NativeSelectOption>
+                      <NativeSelectOption value="broadcast">Broadcast / Fan-out (PubSub: all subscribers receive msg)</NativeSelectOption>
+                    </NativeSelect>
                   </label>
                   <NumberField
                     label="Queue Limit"
@@ -476,32 +500,32 @@ export function OpenInspector({
               )}
 
               {behavior.type === 'router' && (
-                <label className="field">
-                  <span>Routing Strategy</span>
-                  <select
+                <label className="field open-inspector-field">
+                  <FieldLabel>Routing Strategy</FieldLabel>
+                  <NativeSelect
                     value={behavior.strategy}
                     onChange={(e) =>
                       patchBehavior({ strategy: e.target.value as 'round-robin' | 'weighted' | 'conditional' })
                     }
                   >
-                    <option value="round-robin">Round Robin (Even distribution)</option>
-                    <option value="weighted">Weighted (Ratio per route)</option>
-                    <option value="conditional">Conditional (Match request class/op/tag)</option>
-                  </select>
+                    <NativeSelectOption value="round-robin">Round Robin (Even distribution)</NativeSelectOption>
+                    <NativeSelectOption value="weighted">Weighted (Ratio per route)</NativeSelectOption>
+                    <NativeSelectOption value="conditional">Conditional (Match request class/op/tag)</NativeSelectOption>
+                  </NativeSelect>
                 </label>
               )}
 
               {behavior.type === 'cache' && (
                 <>
-                  <label className="field">
-                    <span>Cache Eviction Mode</span>
-                    <select
+                  <label className="field open-inspector-field">
+                    <FieldLabel>Cache Eviction Mode</FieldLabel>
+                    <NativeSelect
                       value={behavior.mode}
                       onChange={(e) => patchBehavior({ mode: e.target.value as 'fixed' | 'lru' })}
                     >
-                      <option value="fixed">Fixed Hit Rate</option>
-                      <option value="lru">Finite Capacity LRU</option>
-                    </select>
+                      <NativeSelectOption value="fixed">Fixed Hit Rate</NativeSelectOption>
+                      <NativeSelectOption value="lru">Finite Capacity LRU</NativeSelectOption>
+                    </NativeSelect>
                   </label>
 
                   {behavior.mode === 'fixed' && <NumberField
@@ -536,8 +560,8 @@ export function OpenInspector({
 
             {/* Observed Runtime Metrics */}
             {nodeMetrics && (
-              <div className="open-inspector-section">
-                <span className="open-inspector-section-title">Observed Resource Metrics</span>
+              <div className="open-inspector-section" data-inspector-group="measured" aria-label="Measured resource metrics">
+                <SectionHeading title="Observed Resource Metrics" badge="Measured" />
                 <div className="open-metrics-grid grid grid-cols-2 gap-2 bg-muted/40 p-2.5 rounded-lg border border-border mb-2">
                   <div className="open-metric-item flex flex-col gap-0.5">
                     <span className="open-metric-label text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Utilization</span>

@@ -6,11 +6,28 @@
   box-sizing: border-box;
 }
 
+/* commands.md §7: the inspector is a fixed-right contextual region, 320px on
+   desktop. The outer dock wrapper (App.tsx, out of scope for this
+   visual-only slice) sizes itself around this element; the two-class
+   selector matches the specificity of the wrapper's own `.inspector` width
+   rule (`.canvas-first-inspector-dock .inspector`) so this fixed width wins
+   without needing to touch App.tsx. */
+.inspector.open-inspector-container {
+  width: 320px;
+  max-width: 100%;
+}
+
 .open-inspector-fieldset {
   border: none;
   margin: 0;
   padding: 0;
   min-width: 0;
+}
+
+.open-inspector-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .open-inspector-section {
@@ -20,32 +37,62 @@
   margin-bottom: 16px;
 }
 
+.open-inspector-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .open-inspector-section-title {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #677773;
-  margin-top: 4px;
+  color: var(--secondary-text);
+}
+
+.open-inspector-section-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  letter-spacing: 0.04em;
+}
+
+/* Configured (architecture) vs measured (observed) separation: a hairline
+   accent keeps the two kinds of value visually distinct without changing
+   any markup semantics beyond the data-inspector-group attribute. */
+.open-inspector-section[data-inspector-group="configured"] {
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+
+.open-inspector-section[data-inspector-group="measured"] {
+  border-left: 2px solid var(--selected-edge, var(--border));
+  padding-left: 10px;
+}
+
+.open-inspector-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.open-inspector-field-label {
+  display: block;
+}
+
+.open-inspector-field-unit {
+  font-variant-numeric: tabular-nums;
 }
 
 .open-inspector-behavior-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #fafbf9;
-  color: #243b41;
   margin-left: 6px;
-  text-transform: uppercase;
-  font-weight: 600;
 }
 
 .open-inspector-help-text {
   font-size: 12px;
-  color: #677773;
+  color: var(--secondary-text);
   line-height: 1.4;
   margin: 0 0 6px 0;
 }
@@ -66,16 +113,16 @@
   font-size: 12px;
   font-weight: 500;
   border-radius: 4px;
-  border: 1px solid #e1e7e3;
-  background: #ffffff;
-  color: #243b41;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .open-inspector-btn:hover:not(:disabled) {
-  background: #fafbf9;
-  border-color: #677773;
+  background: var(--sunken);
+  border-color: var(--secondary-text);
 }
 
 .open-inspector-btn:disabled {
@@ -84,24 +131,24 @@
 }
 
 .open-inspector-btn.danger {
-  color: #dc2626;
-  border-color: #fecaca;
-  background: #fff5f5;
+  color: var(--risk-text);
+  border-color: var(--risk-edge);
+  background: var(--risk-tint);
 }
 
 .open-inspector-btn.danger:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #f87171;
+  background: var(--risk-tint);
+  border-color: var(--risk);
 }
 
 .open-inspector-btn.primary {
-  background: #087f84;
-  color: #ffffff;
-  border-color: #086b70;
+  background: var(--primary);
+  color: var(--primary-foreground, #ffffff);
+  border-color: var(--primary);
 }
 
 .open-inspector-btn.primary:hover:not(:disabled) {
-  background: #086b70;
+  background: var(--primary-hover, var(--primary));
 }
 
 .open-workload-card {
