@@ -1064,3 +1064,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: `2ffa2d3` (rv-02g), `a97836b` (rv-05a), `76e4a37` + merge `8e869e5` (rv-04c on foundation line); decisions D35, ledger, ACTION_LOG.
 - **Verification** (Claude): rv-02g 355 unit + build + my fingerprint probes on S04; merged foundation line 246 unit, build, production e2e 68 passed / 5 failed (same baseline mobile set) / 4 skipped; headless screenshots of inspector and canvas.
 - **Limitations**: Inspector wrapper sliver and Apply/Cancel wait for RV-12; entryPorts ordering vs set is an open contract question; node drop-preview/dimmed states not wired.
+
+### RV-12a layout slot (Claude)
+
+- **Outcome**: Sonnet subagent fixed the three App.tsx-slot items: inspector dock now 320px content (+1px border), StudioMenu backdrop/menu start below the measured top bar so the temporary `z-index:1100` top-bar rule is gone, and the mobile canvas fills the remaining height (the collapse was also behind four of the five known mobile e2e failures). Merged onto the foundation line @ `b4e73ca`; slot released.
+- **Changed**: `src/App.tsx`, `src/components/StudioMenu.tsx`, `src/components/canvasFirst.css` (`5a93acf`); ledger, HANDOFF.
+- **Verification** (Claude): 246 unit, build, production e2e 72 passed / 1 failed (known 40px Load-example target) / 4 skipped, stable over two reruns (one earlier run showed a second, unidentified failure — treated as flake); headless desktop menu and 390x844 mobile screenshots.
+- **Limitations**: Mobile `.system-canvas` anchor needs `!important` to override legacy `openWorkspace.css`.
