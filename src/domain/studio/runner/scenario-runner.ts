@@ -18,6 +18,7 @@
 import { canonicalJson, sha256Hex } from '../canonical';
 import type {
   BoundaryResponse,
+  Connection,
   Document,
   Element,
   Endpoint,
@@ -27,6 +28,7 @@ import type {
   MachineBehavior,
   PayloadSchema,
   Port,
+  Refinement,
   Scenario,
   Shape,
   TransportOutcome,
@@ -76,6 +78,10 @@ export type ScenarioRunResult = {
 
 export type ScenarioRunnerOptions = {
   readonly stepSize?: number;
+  /** Checked at every scheduler batch boundary (each `step()` call, §12 "cancellation at
+   * compiler and runner batch boundaries"). An aborted signal ends the run 'cancelled'
+   * with no terminal success, mirroring `prepareScenario`'s compile-time cancellation. */
+  readonly signal?: AbortSignal;
 };
 
 type InvocationContext = {
@@ -183,6 +189,13 @@ type GlobalSchedulerEvent =
     }
   | {
       readonly kind: 'admit-message';
+      readonly atMs: number;
+      readonly phase: 2;
+      readonly sequence: number;
+      readonly resourceInput: ResourceInput;
+    }
+  | {
+      readonly kind: 'admit-resource-call';
       readonly atMs: number;
       readonly phase: 2;
       readonly sequence: number;
@@ -368,8 +381,33 @@ export class ScenarioRunner {
   private readonly activeMessageRoots = new Set<string>();
   // Exact mapping of delivered unit ID -> studio message root ID (§8)
   private readonly deliveredUnitToMessageRoot = new Map<string, string>();
+  // Bridge call frames (§8): a call-frame id handed to an external (non-resource)
+  // business flow via a resource's bridge continuation. Its eventual reply settles the
+  // resource's own waiting op (ResourceAdapter.settleCall) instead of root accounting.
+  private readonly kernelBridgeFrames = new Set<string>();
+  // A machine call routed directly into a resource entry, keyed by the resource
+  // ResourceInput.rootId (the SAME id as the promoted user root, §5 "the bridge call and
+  // everything synchronous under it share that root"): carries what's needed to deliver
+  // the eventual settlement back to the calling machine's response port, mirroring a
+  // HeldBoundaryResponse.
+  private readonly resourceCallPending = new Map<
+    string,
+    {
+      callPortId: Id;
+      correlationRequestId: string;
+      initiatingFrameId: string;
+      machineElementId: Id;
+      rootId: string;
+      journeyId: Id;
+    }
+  >();
   // Issues collected during runner initialization / runtime
   private issues: ScenarioIssue[] = [];
+
+  // Refinement selection (§6): elements excluded by the scenario's aggregate/refined
+  // choices, and the connection list with crossings routed through port mappings.
+  private refinementExcludedElementIds: Set<Id> = new Set();
+  private effectiveConnections: readonly Connection[] = [];
 
   // Logical mode causal queue and held responses
   private readonly logicalCausalQueue: HeldBoundaryResponse[] = [];
@@ -393,10 +431,12 @@ export class ScenarioRunner {
   private isFinished = false;
   private terminalStatus: TerminalStatus = 'incomplete';
   private failureReason: string | null = null;
+  private readonly signal?: AbortSignal;
 
-  constructor(document: Document, scenarioId: Id, runId: string) {
+  constructor(document: Document, scenarioId: Id, runId: string, options: ScenarioRunnerOptions = {}) {
     this.document = document;
     this.runId = runId;
+    this.signal = options.signal;
 
     const foundScenario = document.scenarios.find((s) => s.id === scenarioId);
     if (!foundScenario) {
@@ -460,30 +500,31 @@ export class ScenarioRunner {
       return;
     }
 
-    // Check for out-of-scope features (bridge frames -> RV-14f)
-    for (const conn of document.connections) {
-      if (conn.kind === 'call') {
-        const srcEl = this.elementsMap.get(conn.source.elementId);
-        const tgtEl = this.elementsMap.get(conn.target.elementId);
-        if (srcEl?.behavior.kind === 'resource' && tgtEl && tgtEl.behavior.kind !== 'resource') {
-          if (this.scenario.scopeElementIds.includes(srcEl.id) || this.scenario.scopeElementIds.includes(tgtEl.id)) {
-            this.terminalStatus = 'invalid';
-            this.failureReason = `unsupported-rv14d: bridge call frames (resource '${srcEl.id}' -> non-resource '${tgtEl.id}') are not supported in RV-14d`;
-            this.issues = [
-              {
-                code: 'unsupported-rv14d',
-                path: ['connections', conn.id],
-                entityId: conn.id,
-                severity: 'error',
-                message: `bridge call frames (resource '${srcEl.id}' -> non-resource '${tgtEl.id}') are not supported in RV-14d`,
-              },
-            ];
-            this.isFinished = true;
-            return;
-          }
-        }
-      }
+    // Bridge call frames (resource -> non-resource call continuation) are supported as of
+    // RV-14f (§8 "Bridge call frames"); the former RV-14d 'unsupported-rv14d' guard for
+    // this case is removed.
+
+    // Refinement selection (§6): aggregate runs the owner and excludes members; refined
+    // runs the members and excludes the owner, with crossing connections routed through
+    // port mappings.
+    const refinementResult = this.resolveRefinements();
+    if (!refinementResult.ok) {
+      this.terminalStatus = 'invalid';
+      this.failureReason = refinementResult.message;
+      this.issues = [
+        {
+          code: 'invalid-refinement-selection',
+          path: ['scenarios', this.scenario.id, 'refinementSelections'],
+          entityId: null,
+          severity: 'error',
+          message: refinementResult.message,
+        },
+      ];
+      this.isFinished = true;
+      return;
     }
+    this.refinementExcludedElementIds = refinementResult.excludedElementIds;
+    this.effectiveConnections = refinementResult.connections;
 
     // Initialize machine states & contexts
     for (const elId of this.scenario.scopeElementIds) {
@@ -510,13 +551,40 @@ export class ScenarioRunner {
     // Initialize mode-specific resources
     if (this.scenario.mode === 'timed') {
       const hasResourceElements = document.elements.some(
-        (e) => e.behavior.kind === 'resource' && this.scenario.scopeElementIds.includes(e.id),
+        (e) =>
+          e.behavior.kind === 'resource' &&
+          this.scenario.scopeElementIds.includes(e.id) &&
+          !this.refinementExcludedElementIds.has(e.id),
       );
       if (hasResourceElements) {
+        // Built from the refinement-resolved elements/connections (not {document,
+        // scenarioId}) so an aggregate/refined selection changes which resource
+        // configuration actually runs (§11 S05 "Aggregate and refined service
+        // configurations are exclusive per scenario").
+        const effectiveElements = this.refinementExcludedElementIds.size
+          ? this.document.elements.filter((e) => !this.refinementExcludedElementIds.has(e.id))
+          : this.document.elements;
+
+        const disabledWorkloadIds = new Set<string>(
+          this.scenario.workloads
+            .filter((wl) => this.scenario.inputs.some((inp) => inp.entry.elementId === wl.entry.elementId))
+            .map((wl) => wl.id),
+        );
+
+        let durationMs: number | undefined;
+        if (this.scenario.completion.kind === 'horizon') durationMs = this.scenario.completion.horizonMs;
+        else if (this.scenario.completion.kind === 'drain') durationMs = this.scenario.completion.deadlineMs;
+
         this.adapter = new ResourceAdapter({
-          document: this.document,
-          scenarioId: this.scenario.id,
+          elements: effectiveElements,
+          connections: this.effectiveConnections,
+          relations: this.document.relations,
+          faults: this.scenario.faults,
+          workloads: this.scenario.workloads,
+          seed: this.scenario.seed,
+          durationMs,
           runId: this.runId,
+          disabledWorkloadIds,
         });
       }
 
@@ -542,6 +610,110 @@ export class ScenarioRunner {
         this.isFinished = true;
       }
     }
+  }
+
+  /**
+   * Refinement selection (§6): "aggregate runs the owner and excludes members; refined
+   * runs the members and excludes the owner (port mappings route crossings)." A
+   * refinement absent from `scenario.refinementSelections` is left alone (neither
+   * aggregate nor refined applies — its owner/members are ordinary elements). Returns
+   * `ok:false` when the SAME refinement has more than one selection ("running both
+   * paths ... is invalid") or a refined selection's owner has a crossing connection with
+   * no compatible port mapping ("mismatched mappings ... is invalid").
+   *
+   * CONTRACT GAP (narrowed reading): crossing validation here only checks connections
+   * with an endpoint literally on the owner element, mirroring the common authoring
+   * pattern where all pre-refinement wiring uses the owner's ports. A connection authored
+   * directly at a member's inner port that should also fire an outer-declared connection
+   * is not mirrored back out; full closure-equivalent reachability validation belongs to
+   * `computeClosure` at compile time (not reproduced here since closure.ts is off limits
+   * for this task and the S05 fixture carries no refinements to exercise it against).
+   */
+  private resolveRefinements():
+    | { ok: true; excludedElementIds: Set<Id>; connections: Connection[] }
+    | { ok: false; message: string } {
+    const selections = this.scenario.refinementSelections;
+    if (selections.length === 0) {
+      return { ok: true, excludedElementIds: new Set(), connections: [...this.document.connections] };
+    }
+
+    const refinementMap = new Map<Id, Refinement>();
+    for (const r of this.document.refinements) refinementMap.set(r.id, r);
+
+    const seenRefinementIds = new Set<Id>();
+    const excludedElementIds = new Set<Id>();
+    const outerToInner = new Map<string, Endpoint>();
+
+    for (const sel of selections) {
+      if (seenRefinementIds.has(sel.refinementId)) {
+        return {
+          ok: false,
+          message: `Refinement '${sel.refinementId}' has more than one selection in this scenario (running both paths is invalid)`,
+        };
+      }
+      seenRefinementIds.add(sel.refinementId);
+
+      const ref = refinementMap.get(sel.refinementId);
+      if (!ref) {
+        return { ok: false, message: `Refinement selection references unknown refinement '${sel.refinementId}'` };
+      }
+
+      if (sel.mode === 'aggregate') {
+        for (const mId of ref.memberElementIds) excludedElementIds.add(mId);
+      } else {
+        excludedElementIds.add(ref.ownerElementId);
+        for (const mapping of ref.portMappings) {
+          outerToInner.set(`${mapping.outer.elementId}:${mapping.outer.portId}`, mapping.inner);
+        }
+
+        for (const conn of this.document.connections) {
+          if (conn.source.elementId === ref.ownerElementId) {
+            if (!outerToInner.has(`${conn.source.elementId}:${conn.source.portId}`)) {
+              return {
+                ok: false,
+                message: `Refinement '${ref.id}': owner port '${conn.source.portId}' has a crossing connection with no compatible port mapping`,
+              };
+            }
+          }
+          if (conn.target.elementId === ref.ownerElementId) {
+            if (!outerToInner.has(`${conn.target.elementId}:${conn.target.portId}`)) {
+              return {
+                ok: false,
+                message: `Refinement '${ref.id}': owner port '${conn.target.portId}' has a crossing connection with no compatible port mapping`,
+              };
+            }
+          }
+        }
+      }
+    }
+
+    if (outerToInner.size === 0 && excludedElementIds.size === 0) {
+      return { ok: true, excludedElementIds, connections: [...this.document.connections] };
+    }
+
+    const remapped: Connection[] = [];
+    for (const conn of this.document.connections) {
+      let source = conn.source;
+      let target = conn.target;
+      let changed = false;
+
+      if (excludedElementIds.has(source.elementId)) {
+        const inner = outerToInner.get(`${source.elementId}:${source.portId}`);
+        if (!inner) continue; // both endpoints excluded with no mapping: unreachable, drop
+        source = inner;
+        changed = true;
+      }
+      if (excludedElementIds.has(target.elementId)) {
+        const inner = outerToInner.get(`${target.elementId}:${target.portId}`);
+        if (!inner) continue;
+        target = inner;
+        changed = true;
+      }
+
+      remapped.push(changed ? ({ ...conn, source, target } as Connection) : conn);
+    }
+
+    return { ok: true, excludedElementIds, connections: remapped };
   }
 
   private sortTimedQueue(): void {
@@ -570,7 +742,24 @@ export class ScenarioRunner {
     journeyList.push(deepCloneJson(payload));
   }
 
-  private settleCallFrame(frameId: string, outcome: TransportOutcome): boolean {
+  private async settleCallFrame(frameId: string, outcome: TransportOutcome, payloadRef?: string): Promise<boolean> {
+    // Bridge call frames (§8): this frame was handed to an external (non-resource)
+    // business flow by the resource adapter; settling it here resolves the resource's own
+    // waiting op via ResourceAdapter.settleCall, rather than touching root accounting
+    // directly (the resource's own eventual unit_settled — via routeSettlement — is what
+    // ultimately settles the OUTER frame that shares the promoted user root).
+    if (this.kernelBridgeFrames.has(frameId)) {
+      this.kernelBridgeFrames.delete(frameId);
+      if (!this.adapter) return false;
+      this.adapter.settleCall({
+        frameId,
+        outcome,
+        payloadRef: payloadRef ?? 'payload-bridge-reply',
+        atMs: this.currentTimeMs,
+      });
+      return true;
+    }
+
     const frameInfo = this.openFrames.get(frameId);
     if (!frameInfo || frameInfo.settled) {
       return false; // Double reply or unknown frame
@@ -598,6 +787,101 @@ export class ScenarioRunner {
   }
 
   /**
+   * Routes a settled TraceEvent to the right accounting path (§5, §8): a resource unit
+   * settling on behalf of a machine's direct call (resourceCallPending, keyed by the
+   * SAME rootId as the promoted user root) is delivered back to the calling machine's
+   * response port exactly like a boundary response, instead of being counted as a bare
+   * root settlement by handleSettlementEvent. Every other settled event (workload/finite
+   * resource traffic, message delivery) keeps the existing handleSettlementEvent path.
+   */
+  private routeSettlement(te: Pick<TraceEvent, 'id' | 'kind' | 'code' | 'rootId' | 'outcome' | 'atMs' | 'payloadRef'>): SettlementResult {
+    if (
+      te.kind === 'settled' &&
+      (te.code === 'succeeded' || te.code === 'failed' || te.code === 'rejected' || te.code === 'expired')
+    ) {
+      const pending = this.resourceCallPending.get(te.rootId);
+      if (pending) {
+        this.resourceCallPending.delete(te.rootId);
+        // §8 "No success is inferred": a settlement with no explicit outcome, or one whose
+        // payload reference can't be resolved, fails the run — never a fabricated
+        // 'succeeded' outcome or an empty payload standing in for the real one.
+        if (!te.outcome) {
+          return {
+            ok: false,
+            status: 'failed',
+            reason: `Resource call settlement for root '${te.rootId}' carried no outcome`,
+          };
+        }
+        if (!te.payloadRef) {
+          return {
+            ok: false,
+            status: 'failed',
+            reason: `Resource call settlement for root '${te.rootId}' carried no payload reference`,
+          };
+        }
+        const payloadJson = this.recorder.payloadTable.get(te.payloadRef);
+        if (payloadJson === undefined) {
+          return {
+            ok: false,
+            status: 'failed',
+            reason: `Resource call settlement for root '${te.rootId}' referenced an unresolvable payload '${te.payloadRef}'`,
+          };
+        }
+        const held: HeldBoundaryResponse = {
+          response: {
+            id: `resource-call:${te.rootId}`,
+            match: { op: 'exists', value: { kind: 'literal', value: true } },
+            responseFixtureId: '',
+            payloadBindings: [],
+            delayMs: 0,
+            afterInputId: null,
+            outcome: te.outcome,
+          },
+          payload: payloadJson as Json,
+          callPortId: pending.callPortId,
+          correlationRequestId: pending.correlationRequestId,
+          initiatingFrameId: pending.initiatingFrameId,
+          machineElementId: pending.machineElementId,
+          rootId: pending.rootId,
+          journeyId: pending.journeyId,
+        };
+        this.timedQueue.push({
+          kind: 'boundary-response',
+          atMs: te.atMs ?? this.currentTimeMs,
+          phase: 2,
+          sequence: ++this.globalSequence,
+          held,
+        });
+        this.sortTimedQueue();
+        return { ok: true, matched: true };
+      }
+    }
+    return handleSettlementEvent(te, {
+      activeMessageRoots: this.activeMessageRoots,
+      activeUserRoots: this.activeUserRoots,
+      deliveredUnitToMessageRoot: this.deliveredUnitToMessageRoot,
+      rootCounts: this.rootCounts,
+      messageCounts: this.messageCounts,
+    });
+  }
+
+  /**
+   * Checks the adapter for a pending journey/parent resolution failure (§5/§8: every
+   * TraceEvent carries its journey, and a message root links to its parent) after every
+   * admit()/stepNext() call. Ends the run 'failed' with a sanitized diagnostic instead of
+   * ever letting an unresolved journey surface as 'unknown'. Returns true when the run was
+   * just ended so the caller can return immediately.
+   */
+  private failOnUnresolvedJourney(): boolean {
+    const failure = this.adapter?.takeJourneyFailure() ?? null;
+    if (!failure) return false;
+    this.terminalStatus = 'failed';
+    this.failureReason = failure;
+    this.isFinished = true;
+    return true;
+  }
+
+  /**
    * Forwards an emission from an element's port to all connected downstream ports.
    * - Data edges: forward invocation context unchanged in zero modeled time.
    * - Message edges into resource entries: create linked message root and admit ResourceInput.
@@ -609,7 +893,7 @@ export class ScenarioRunner {
     context: InvocationContext,
     atMs: number | null,
   ): Promise<{ ok: boolean; error?: string }> {
-    const outgoing = this.document.connections.filter(
+    const outgoing = this.effectiveConnections.filter(
       (c) => c.source.elementId === sourceEndpoint.elementId && c.source.portId === sourceEndpoint.portId,
     );
 
@@ -921,7 +1205,7 @@ export class ScenarioRunner {
         const boundary = this.scenario.boundaries.find(
           (b) =>
             (b.source.elementId === machineElementId && b.source.portId === emission.portId) ||
-            this.document.connections.some(
+            this.effectiveConnections.some(
               (c) =>
                 c.kind === 'call' &&
                 c.source.elementId === machineElementId &&
@@ -1005,6 +1289,65 @@ export class ScenarioRunner {
           }
           continue;
         }
+
+        // Direct call into a resource entry (§5 root accounting, §8 bridge call frames):
+        // no boundary mocks this call, so if its connection targets a resource element,
+        // admit it into the retained kernel using the SAME rootId as the promoted user
+        // root ("the bridge call and everything synchronous under it share that root").
+        // The frame created above is settled once the resource's own unit_settled fires
+        // (directly, or via an internal bridge continuation resolved by settleCall) —
+        // see routeSettlement()/resourceCallPending.
+        const targetConn = this.effectiveConnections.find(
+          (c) => c.kind === 'call' && c.source.elementId === machineElementId && c.source.portId === emission.portId,
+        );
+        const targetEl = targetConn ? this.elementsMap.get(targetConn.target.elementId) : undefined;
+        if (targetConn && targetEl && targetEl.behavior.kind === 'resource') {
+          if (this.scenario.mode !== 'timed') {
+            return { ok: false, error: 'Logical scenario cannot reach resource elements (§6)' };
+          }
+          if (!this.adapter) {
+            return { ok: false, error: 'Resource adapter not initialized for resource admission' };
+          }
+          const resMeta = targetConn.kind === 'call' ? targetConn.config.resource : null;
+          const latencyMs = targetConn.kind === 'call' ? targetConn.config.latencyMs : 0;
+          const arrivalMs = (atMs ?? 0) + latencyMs;
+          const deadlineMs = arrivalMs + (resMeta?.deadlineDurationMs ?? 60000);
+          const canon = canonicalJson(emission.value);
+          const payloadRef = canon.ok ? `sha256:${await sha256Hex(canon.text)}` : 'payload-call';
+
+          const resInput: ResourceInput = {
+            rootId: context.rootId,
+            journeyId: context.journeyId,
+            parentEventId: appendRes.event?.id ?? context.parentEventId,
+            entryElementId: targetEl.id,
+            requestClassId: resMeta?.requestClassId ?? 'default-class',
+            operation: resMeta?.operation ?? 'read',
+            key: resMeta?.key ?? null,
+            tags: resMeta?.tags ? [...resMeta.tags] : [],
+            payloadRef,
+            atMs: arrivalMs,
+            deadlineMs,
+          };
+
+          this.resourceCallPending.set(context.rootId, {
+            callPortId: emission.portId,
+            correlationRequestId: emission.correlationRequestId,
+            initiatingFrameId: frameId,
+            machineElementId,
+            rootId: context.rootId,
+            journeyId: context.journeyId,
+          });
+
+          this.timedQueue.push({
+            kind: 'admit-resource-call',
+            atMs: arrivalMs,
+            phase: 2,
+            sequence: ++this.globalSequence,
+            resourceInput: resInput,
+          });
+          this.sortTimedQueue();
+          continue;
+        }
       }
 
       // Forward emission to downstream connections
@@ -1017,7 +1360,9 @@ export class ScenarioRunner {
       if (!context.frameId) {
         return { ok: false, error: 'Reply without active frame fails the run (§4 & §5)' };
       }
-      const settledOk = this.settleCallFrame(context.frameId, reply.outcome);
+      const replyCanon = canonicalJson(reply.value);
+      const replyPayloadRef = replyCanon.ok ? `sha256:${await sha256Hex(replyCanon.text)}` : undefined;
+      const settledOk = await this.settleCallFrame(context.frameId, reply.outcome, replyPayloadRef);
       if (!settledOk) {
         return { ok: false, error: `Double reply on frame '${context.frameId}' fails the run (§4 & §5)` };
       }
@@ -1097,6 +1442,15 @@ export class ScenarioRunner {
   async step(): Promise<boolean> {
     if (this.isFinished) return false;
 
+    // Cancellation at a scheduler batch boundary (§12): ends the run 'cancelled' with no
+    // terminal success, never mid-mutation (checked only between steps).
+    if (this.signal?.aborted) {
+      this.terminalStatus = 'cancelled';
+      this.failureReason = null;
+      this.isFinished = true;
+      return false;
+    }
+
     // Check budget limits
     if (this.recorder.stopped) {
       this.terminalStatus = 'incomplete';
@@ -1157,7 +1511,7 @@ export class ScenarioRunner {
           return false;
         }
 
-        this.settleCallFrame(held.initiatingFrameId, held.response.outcome);
+        await this.settleCallFrame(held.initiatingFrameId, held.response.outcome);
 
         const invContext: InvocationContext = {
           frameId: null,
@@ -1280,9 +1634,23 @@ export class ScenarioRunner {
 
     // Check completion condition
     if (this.scenario.completion.kind === 'drain') {
+      const drainDeadlineMs = this.scenario.completion.deadlineMs;
+      // A pending kernel event at or before the scenario's own drain deadline might still
+      // be, or lead to, real causal work (a queued/retrying attempt, a periodic sample
+      // that happens to coincide with the deadline as its very last tick — the existing,
+      // exact mechanism S02/S04 rely on for their own drain completion). A pending event
+      // strictly AFTER the deadline can't matter to this run's outcome either way (the
+      // scenario itself never observes past its own deadline), so it never blocks
+      // detecting drainage from the studio-level counts alone. This is what keeps an
+      // already-settled unit's own deadline-expiry timer (scheduled unconditionally,
+      // becoming a harmless no-op once its unit is done) from blocking completion when it
+      // merely happens to fall a little past the deadline — narrower than requiring the
+      // raw kernel event heap to be empty (peekNext() === null) outright.
+      const kernelPeek = this.adapter?.peekNext() ?? null;
+      const kernelMayStillMatter = !!kernelPeek && kernelPeek.atMs <= drainDeadlineMs;
       const isDrained =
         this.timedQueue.length === 0 &&
-        (!this.adapter || !this.adapter.peekNext()) &&
+        !kernelMayStillMatter &&
         this.rootCounts.inFlight === 0 &&
         this.messageCounts.inFlight === 0 &&
         this.openFrames.size === 0;
@@ -1347,6 +1715,7 @@ export class ScenarioRunner {
     if (stepKernel && kernelNext) {
       this.currentTimeMs = kernelNext.atMs;
       const delta = this.adapter!.stepNext();
+      if (this.failOnUnresolvedJourney()) return false;
 
       for (const te of delta.events) {
         this.processedEvents++;
@@ -1373,7 +1742,12 @@ export class ScenarioRunner {
         if (te.kind === 'dispatch' && te.code === 'message' && te.parentId) {
           if (this.activeMessageRoots.has(te.parentId)) {
             this.deliveredUnitToMessageRoot.set(te.rootId, te.parentId);
-          } else if (te.parentId.startsWith('pub_') || te.rootId.includes(':')) {
+          } else {
+            // A message dispatch whose parent isn't already a known message root (D36
+            // broadcast: the runner doesn't pre-register a root for a broadcast publish,
+            // only for the ordinary single-delivery case) mints one now. The adapter's
+            // clean, deterministic rootId (never a parsed/matched identity string) is
+            // used directly as this delivered copy's own conserved message root.
             this.messageCounts.generated++;
             this.messageCounts.inFlight++;
             this.activeMessageRoots.add(te.rootId);
@@ -1382,13 +1756,7 @@ export class ScenarioRunner {
         }
 
         // Handle unit settlement (no inferred success, exact linkage)
-        const settlementRes = handleSettlementEvent(te, {
-          activeMessageRoots: this.activeMessageRoots,
-          activeUserRoots: this.activeUserRoots,
-          deliveredUnitToMessageRoot: this.deliveredUnitToMessageRoot,
-          rootCounts: this.rootCounts,
-          messageCounts: this.messageCounts,
-        });
+        const settlementRes = this.routeSettlement(te);
         if (!settlementRes.ok) {
           this.terminalStatus = settlementRes.status;
           this.failureReason = settlementRes.reason;
@@ -1397,11 +1765,28 @@ export class ScenarioRunner {
         }
       }
 
-      // Process adapter outputs
+      // Process adapter outputs. A non-null frameId (§8 bridge call frames) marks this as
+      // a bridge dispatch: the resource's call continuation reaches an external
+      // (non-resource) target, carrying the real admitted payload (resolved from the
+      // recorder's payload table, never the placeholder `{}`) and no transport outcome
+      // yet (the call has only just been dispatched, not settled) — the eventual reply
+      // resolves via settleCallFrame()/kernelBridgeFrames once it reaches a reply effect.
       for (const out of delta.outputs) {
-        const outConnections = this.document.connections.filter(
+        const outConnections = this.effectiveConnections.filter(
           (c) => c.source.elementId === out.source.elementId && c.source.portId === out.source.portId,
         );
+        const payload = this.recorder.payloadTable.get(out.payloadRef);
+        if (payload === undefined) {
+          // §8 "No success is inferred": never substitute a fabricated `{}` payload for
+          // one that can't be resolved.
+          this.terminalStatus = 'failed';
+          this.failureReason = `Bridge dispatch from '${out.source.elementId}' referenced an unresolvable payload '${out.payloadRef}'`;
+          this.isFinished = true;
+          return false;
+        }
+        if (out.frameId) {
+          this.kernelBridgeFrames.add(out.frameId);
+        }
         for (const conn of outConnections) {
           const atMs = out.atMs ?? this.currentTimeMs;
           this.timedQueue.push({
@@ -1410,14 +1795,21 @@ export class ScenarioRunner {
             phase: 2,
             sequence: ++this.globalSequence,
             target: conn.target,
-            payload: {},
+            payload,
             context: {
               frameId: out.frameId,
               rootId: out.rootId,
               journeyId: out.journeyId,
               parentEventId: out.parentEventId,
-              requestId: null,
-              outcome: out.outcome,
+              // A bridge dispatch (§8) carries the application request ID embedded in the
+              // forwarded payload (e.g. checkout's own `requestId` field), so a
+              // `correlation:{kind:'current'}` emission on the far side of the bridge can
+              // still reuse it (there is no authored reverse edge to derive it from).
+              requestId:
+                payload && typeof payload === 'object' && !Array.isArray(payload) && typeof (payload as Record<string, Json>).requestId === 'string'
+                  ? ((payload as Record<string, Json>).requestId as string)
+                  : null,
+              outcome: out.frameId ? null : out.outcome,
             },
           });
         }
@@ -1502,6 +1894,7 @@ export class ScenarioRunner {
           this.rootCounts.inFlight++;
 
           const adm = this.adapter.admit(resInput);
+          if (this.failOnUnresolvedJourney()) return false;
           for (const te of adm.events) {
             if (te.kind === 'input' && te.code === 'admit') {
               continue;
@@ -1526,13 +1919,7 @@ export class ScenarioRunner {
               return false;
             }
 
-            const settlementRes = handleSettlementEvent(te, {
-              activeMessageRoots: this.activeMessageRoots,
-              activeUserRoots: this.activeUserRoots,
-              deliveredUnitToMessageRoot: this.deliveredUnitToMessageRoot,
-              rootCounts: this.rootCounts,
-              messageCounts: this.messageCounts,
-            });
+            const settlementRes = this.routeSettlement(te);
             if (!settlementRes.ok) {
               this.terminalStatus = settlementRes.status;
               this.failureReason = settlementRes.reason;
@@ -1582,6 +1969,7 @@ export class ScenarioRunner {
         }
 
         const adm = this.adapter.admit(evt.resourceInput);
+        if (this.failOnUnresolvedJourney()) return false;
         for (const te of adm.events) {
           this.processedEvents++;
           const appendRes = await this.recorder.append({
@@ -1606,7 +1994,10 @@ export class ScenarioRunner {
           if (te.kind === 'dispatch' && te.code === 'message' && te.parentId) {
             if (this.activeMessageRoots.has(te.parentId)) {
               this.deliveredUnitToMessageRoot.set(te.rootId, te.parentId);
-            } else if (te.parentId.startsWith('pub_') || te.rootId.includes(':')) {
+            } else {
+              // D36 broadcast: no pre-registered root for a broadcast publish. Mint one
+              // now, using the adapter's clean, deterministic rootId directly — never a
+              // parsed/matched identity string.
               this.messageCounts.generated++;
               this.messageCounts.inFlight++;
               this.activeMessageRoots.add(te.rootId);
@@ -1624,6 +2015,54 @@ export class ScenarioRunner {
           }
           this.messageCounts.inFlight = Math.max(0, this.messageCounts.inFlight - 1);
           this.messageCounts.rejected++;
+        }
+        return true;
+      }
+
+      case 'admit-resource-call': {
+        // A machine's call routed directly into a resource entry (§5, §8): admission is
+        // recorded via resourceCallPending (registered when the call was emitted), so
+        // every settlement — including an immediate admission rejection, which the
+        // kernel surfaces synchronously in adm.events — routes back to the calling
+        // machine's response port via routeSettlement() instead of bare root counting.
+        if (!this.adapter) {
+          this.terminalStatus = 'failed';
+          this.failureReason = 'Resource adapter not initialized for resource call admission';
+          this.isFinished = true;
+          return false;
+        }
+
+        const adm = this.adapter.admit(evt.resourceInput);
+        if (this.failOnUnresolvedJourney()) return false;
+        for (const te of adm.events) {
+          if (te.kind === 'input' && te.code === 'admit') continue;
+          this.processedEvents++;
+          const appendRes = await this.recorder.append({
+            rootId: te.rootId,
+            journeyId: te.journeyId,
+            parentId: te.parentId,
+            elementId: te.elementId,
+            portId: te.portId,
+            kind: te.kind,
+            code: te.code,
+            payloadRef: te.payloadRef,
+            atMs: te.atMs,
+            outcome: te.outcome,
+          });
+          if (!appendRes.ok) {
+            this.terminalStatus = 'incomplete';
+            this.failureReason = 'Budget exhausted: recorder cap hit';
+            this.isFinished = true;
+            return false;
+          }
+
+          const settlementRes = this.routeSettlement(te);
+          if (!settlementRes.ok) {
+            this.terminalStatus = settlementRes.status;
+            this.failureReason = settlementRes.reason;
+            this.isFinished = true;
+            return false;
+          }
         }
         return true;
       }
@@ -1682,7 +2121,7 @@ export class ScenarioRunner {
           return false;
         }
 
-        this.settleCallFrame(held.initiatingFrameId, held.response.outcome);
+        await this.settleCallFrame(held.initiatingFrameId, held.response.outcome);
 
         const invContext: InvocationContext = {
           frameId: null,
@@ -1761,8 +2200,14 @@ export class ScenarioRunner {
         values: o.values,
       })),
       coverage: {
-        includedElementIds: this.scenario.scopeElementIds,
-        excludedElementIds: [],
+        includedElementIds: this.scenario.scopeElementIds.filter(
+          (id) => !this.refinementExcludedElementIds.has(id),
+        ),
+        // Refinement selection (§6): unselected elements (the excluded owner in refined
+        // mode, or the excluded members in aggregate mode) stay uncovered here.
+        excludedElementIds: this.scenario.scopeElementIds.filter((id) =>
+          this.refinementExcludedElementIds.has(id),
+        ),
       },
       processedEvents: this.processedEvents,
       elapsedMs,
@@ -1791,7 +2236,7 @@ export async function runScenario(
   runId: string,
   options: ScenarioRunnerOptions = {},
 ): Promise<ScenarioRunResult> {
-  const runner = new ScenarioRunner(document, scenarioId, runId);
+  const runner = new ScenarioRunner(document, scenarioId, runId, options);
   if (options.stepSize !== undefined && options.stepSize > 0) {
     while (await runner.step()) {
       // Step chunked

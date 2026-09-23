@@ -40,6 +40,8 @@ import {
   type SimLifecycleFact,
   type KernelResourceInput,
   type KernelFaultConfig,
+  type KernelBridgeConfig,
+  type Outcome as KernelOutcome,
 } from '../../../simulation/open/kernel';
 import type {
   ExecutionGraph,
@@ -52,6 +54,10 @@ import type {
 } from '../../execution';
 import { VALID_KINDS } from '../../execution';
 import { traceEventId } from './trace';
+
+/** Root and journey used only by host fault/detection trace events, which belong to no request. */
+export const SYSTEM_FAULT_ROOT_ID = 'fault';
+export const SYSTEM_FAULT_JOURNEY_ID = 'system';
 import type { ResourceMetrics } from '../../../simulation/open/kernel';
 
 type MutableCounts = {
@@ -202,9 +208,16 @@ function buildExecutionGraph(opts: {
   workloads?: readonly Workload[];
   seed?: number;
   durationMs?: number;
-}): { graph: ExecutionGraph; edgeMap: Map<string, Connection>; resourceElements: Map<Id, Element> } {
+}): {
+  graph: ExecutionGraph;
+  edgeMap: Map<string, Connection>;
+  resourceElements: Map<Id, Element>;
+  bridgeConnByNode: Map<Id, Connection>;
+} {
   const resourceElements = new Map<Id, Element>();
   const nodes: ExecutionNode[] = [];
+  const allElementsById = new Map<Id, Element>();
+  for (const el of opts.elements) allElementsById.set(el.id, el);
 
   for (const el of opts.elements) {
     if (el.behavior.kind !== 'resource') continue;
@@ -226,8 +239,26 @@ function buildExecutionGraph(opts: {
 
   const edges: ExecutionEdge[] = [];
   const edgeMap = new Map<string, Connection>();
+  const bridgeConnByNode = new Map<Id, Connection>();
 
   for (const conn of opts.connections) {
+    // Bridge call frames (§8): a call from a resource's continuation to a non-resource
+    // target. Deliberately excluded from the compiled ExecutionGraph (its target isn't a
+    // kernel node), and tracked separately so the kernel can be told, via
+    // KernelBridgeConfig, which resource nodes have one (dispatchDownstream then waits on
+    // an external settleCall() instead of completing locally when it finds no other
+    // outgoing edge). Readiness guarantees at most one bridge continuation per
+    // non-router resource, so `set` here never silently drops a second one in practice.
+    if (
+      conn.kind === 'call' &&
+      resourceElements.has(conn.source.elementId) &&
+      !resourceElements.has(conn.target.elementId) &&
+      allElementsById.has(conn.target.elementId)
+    ) {
+      bridgeConnByNode.set(conn.source.elementId, conn);
+      continue;
+    }
+
     // Only connect between known resource elements
     if (!resourceElements.has(conn.source.elementId) || !resourceElements.has(conn.target.elementId)) {
       continue;
@@ -311,7 +342,7 @@ function buildExecutionGraph(opts: {
     },
   };
 
-  return { graph, edgeMap, resourceElements };
+  return { graph, edgeMap, resourceElements, bridgeConnByNode };
 }
 
 /**
@@ -322,9 +353,21 @@ export class ResourceAdapter {
   private readonly sim: OpenSimulation;
   private readonly edgeMap: Map<string, Connection>;
   private readonly resourceElements: Map<Id, Element>;
+  private readonly bridgeConnByNode: Map<Id, Connection>;
   private readonly unitContexts = new Map<string, UnitContext>();
   private traceSequence = 0;
   private stepFacts: SimLifecycleFact[] = [];
+
+  // Delivered-copy ordinal, keyed by the delivering (kernel) parent unit identity, so
+  // every message delivery (single or D36 broadcast fan-out) gets a stable, deterministic
+  // runner-level root id (`${parentRootId}:${ordinal}`) instead of exposing the kernel's
+  // own internal delivery-path identity (e.g. `msg_1:<path>:__entry:<id>:`) in TraceEvents.
+  private readonly deliveryOrdinalByParent = new Map<string, number>();
+  // Set when a kernel fact's journey/parent linkage can't be resolved (§5/§8: every
+  // TraceEvent carries its journey; a message root links to its parent). Checked by the
+  // caller after every admit()/stepNext()/interruptHost() call so the run fails with a
+  // sanitized diagnostic instead of ever emitting an 'unknown' journeyId.
+  private journeyFailure: string | null = null;
 
   private readonly rootCounts: MutableCounts = {
     generated: 0,
@@ -418,7 +461,7 @@ export class ResourceAdapter {
       routeReset: f.routeReset,
     }));
 
-    const { graph, edgeMap, resourceElements } = buildExecutionGraph({
+    const { graph, edgeMap, resourceElements, bridgeConnByNode } = buildExecutionGraph({
       elements,
       connections,
       workloads,
@@ -428,6 +471,13 @@ export class ResourceAdapter {
 
     this.edgeMap = edgeMap;
     this.resourceElements = resourceElements;
+    this.bridgeConnByNode = bridgeConnByNode;
+
+    const kernelBridges: KernelBridgeConfig[] = [];
+    for (const [nodeId, conn] of bridgeConnByNode.entries()) {
+      const returnLatencyMs = conn.kind === 'call' ? (conn as CallConnection).config.returnLatencyMs : 0;
+      kernelBridges.push({ nodeId, returnLatencyMs });
+    }
 
     const hasActiveWorkloads = graph.workloads.some((w) => w.enabled && !disabledWorkloadIds.has(w.id));
     this.sim = new OpenSimulation(graph, {
@@ -438,6 +488,7 @@ export class ResourceAdapter {
       requireRunnable: hasActiveWorkloads,
       hostPlacement,
       faults: kernelFaults,
+      bridges: kernelBridges,
     });
   }
 
@@ -447,6 +498,121 @@ export class ResourceAdapter {
       return el.behavior.entryPortId;
     }
     return null;
+  }
+
+  /**
+   * Returns and clears a pending journey/parent resolution failure (§5/§8). Callers check
+   * this after every admit()/stepNext()/interruptHost() call and turn a non-null result
+   * into a controlled run failure — never a silent 'unknown' journeyId.
+   */
+  takeJourneyFailure(): string | null {
+    const failure = this.journeyFailure;
+    this.journeyFailure = null;
+    return failure;
+  }
+
+  /**
+   * Per-fact bookkeeping shared by admit(), stepNext() and interruptHost() (§5, §8): root
+   * and message Counts, and unitContexts registration for every kernel-derived unit
+   * (delivered message copies, D36 broadcast fan-out copies) so journeyId, parent
+   * linkage, and payloadRef always propagate from the admitted parent — regardless of
+   * which entry point produced the fact (a broker's synchronous delivery inside admit()
+   * previously skipped this, which is exactly what left journeyId 'unknown' on delivered
+   * units admitted via a message; see RV-14f review).
+   *
+   * Every delivered copy is exposed under a deterministic `${parentRootId}:${ordinal}`
+   * root id, never the kernel's own internal delivery-path identity.
+   */
+  private consumeFact(fact: SimLifecycleFact): void {
+    if (fact.kind === 'message_created') {
+      this.registerMessageCreated(fact);
+      return;
+    }
+
+    // §8 "No success is inferred": root-vs-message is likewise never inferred from the
+    // shape of unitIdentity — the kernel now carries the unit's actual category on every
+    // 'admitted'/'rejected'/'unit_settled' fact (RV-14f review). A fact of one of these
+    // kinds with no category is an adapter/kernel bookkeeping failure, not a silent
+    // "assume root" default.
+    if (fact.kind === 'admitted' || fact.kind === 'rejected' || fact.kind === 'unit_settled') {
+      if (!fact.category) {
+        this.journeyFailure ??= `${fact.kind} fact for unit '${fact.unitIdentity}' carried no category`;
+        return;
+      }
+    }
+
+    if (fact.kind === 'admitted' && fact.category === 'root' && !this.unitContexts.has(fact.unitIdentity)) {
+      this.rootCounts.generated++;
+      this.rootCounts.inFlight++;
+      this.unitContexts.set(fact.unitIdentity, {
+        rootId: fact.unitIdentity,
+        journeyId: fact.unitIdentity,
+        parentEventId: null,
+        payloadRef: 'payload-workload',
+        elementId: fact.nodeId,
+        entryPortId: this.getEntryPortId(fact.nodeId),
+      });
+    } else if (fact.kind === 'rejected' && fact.category === 'root' && !this.unitContexts.has(fact.unitIdentity)) {
+      this.rootCounts.generated++;
+      this.rootCounts.rejected++;
+      this.unitContexts.set(fact.unitIdentity, {
+        rootId: fact.unitIdentity,
+        journeyId: fact.unitIdentity,
+        parentEventId: null,
+        payloadRef: 'payload-workload',
+        elementId: fact.nodeId,
+        entryPortId: this.getEntryPortId(fact.nodeId),
+      });
+    } else if (fact.kind === 'unit_settled') {
+      if (!fact.outcome) {
+        // §8 "No success is inferred": a unit_settled fact without an explicit outcome
+        // must fail the run, never default to 'succeeded'.
+        this.journeyFailure ??= `unit_settled fact for unit '${fact.unitIdentity}' carried no outcome`;
+        return;
+      }
+      const outcome = fact.outcome;
+      if (fact.category === 'message') {
+        this.messageCounts.inFlight = Math.max(0, this.messageCounts.inFlight - 1);
+        this.messageCounts[outcome]++;
+      } else {
+        this.rootCounts.inFlight = Math.max(0, this.rootCounts.inFlight - 1);
+        this.rootCounts[outcome]++;
+      }
+    }
+  }
+
+  /**
+   * Registers a delivered message unit's context (§5, §8), inheriting journeyId,
+   * payloadRef and a clean, deterministic root id from its parent. Split out from
+   * consumeFact and called unconditionally (including from admit(), where a broker's
+   * synchronous delivery can fire this fact before any per-fact root/message counting
+   * applies) since admit()'s own accepted/rejected branches already do that counting for
+   * the admitted unit itself — calling the rest of consumeFact there would double-count.
+   */
+  private registerMessageCreated(fact: SimLifecycleFact): void {
+    this.messageCounts.generated++;
+    this.messageCounts.inFlight++;
+
+    const parentCtx = fact.parentIdentity ? this.unitContexts.get(fact.parentIdentity) : undefined;
+    if (!parentCtx) {
+      // §5/§8: every message root links to its parent, and every TraceEvent carries its
+      // journey — a delivered unit whose parent can't be resolved must fail the run
+      // rather than fabricate a placeholder journey.
+      this.journeyFailure = `Cannot resolve journey for delivered message unit '${fact.unitIdentity}': parent unit '${fact.parentIdentity ?? '(none)'}' has no registered context`;
+      return;
+    }
+
+    const ordinal = this.deliveryOrdinalByParent.get(fact.parentIdentity!) ?? 0;
+    this.deliveryOrdinalByParent.set(fact.parentIdentity!, ordinal + 1);
+
+    this.unitContexts.set(fact.unitIdentity, {
+      rootId: `${parentCtx.rootId}:${ordinal}`,
+      journeyId: parentCtx.journeyId,
+      parentEventId: parentCtx.rootId,
+      payloadRef: parentCtx.payloadRef,
+      elementId: fact.nodeId,
+      entryPortId: this.getEntryPortId(fact.nodeId),
+    });
   }
 
   /**
@@ -528,6 +694,7 @@ export class ResourceAdapter {
       this.rootCounts.inFlight++;
 
       for (const fact of this.stepFacts) {
+        if (fact.kind === 'message_created') this.registerMessageCreated(fact);
         const te = this.mapFactToTraceEvent(fact);
         if (te) events.push(te);
       }
@@ -542,6 +709,7 @@ export class ResourceAdapter {
       this.rootCounts.rejected++;
 
       for (const fact of this.stepFacts) {
+        if (fact.kind === 'message_created') this.registerMessageCreated(fact);
         const te = this.mapFactToTraceEvent(fact);
         if (te) events.push(te);
       }
@@ -580,21 +748,7 @@ export class ResourceAdapter {
     this.sim.interruptHost(hostId, atMs / 1000);
     const events: TraceEvent[] = [];
     for (const fact of this.stepFacts) {
-      if (fact.kind === 'unit_settled') {
-        const isMsg = fact.unitIdentity.includes(':');
-        const outcome = fact.outcome ?? 'succeeded';
-        if (isMsg) {
-          this.messageCounts.inFlight = Math.max(0, this.messageCounts.inFlight - 1);
-          if (outcome === 'succeeded' || outcome === 'rejected' || outcome === 'failed' || outcome === 'expired') {
-            this.messageCounts[outcome]++;
-          }
-        } else {
-          this.rootCounts.inFlight = Math.max(0, this.rootCounts.inFlight - 1);
-          if (outcome === 'succeeded' || outcome === 'rejected' || outcome === 'failed' || outcome === 'expired') {
-            this.rootCounts[outcome]++;
-          }
-        }
-      }
+      this.consumeFact(fact);
       const te = this.mapFactToTraceEvent(fact);
       if (te) events.push(te);
     }
@@ -617,67 +771,17 @@ export class ResourceAdapter {
     const outputs: PortEmission[] = [];
 
     for (const fact of this.stepFacts) {
-      if (fact.kind === 'admitted' && !fact.unitIdentity.includes(':') && !this.unitContexts.has(fact.unitIdentity)) {
-        this.rootCounts.generated++;
-        this.rootCounts.inFlight++;
-        this.unitContexts.set(fact.unitIdentity, {
-          rootId: fact.unitIdentity,
-          journeyId: fact.unitIdentity,
-          parentEventId: null,
-          payloadRef: 'payload-workload',
-          elementId: fact.nodeId,
-          entryPortId: this.getEntryPortId(fact.nodeId),
-        });
-      } else if (fact.kind === 'rejected' && !fact.unitIdentity.includes(':') && !this.unitContexts.has(fact.unitIdentity)) {
-        this.rootCounts.generated++;
-        this.rootCounts.rejected++;
-        this.unitContexts.set(fact.unitIdentity, {
-          rootId: fact.unitIdentity,
-          journeyId: fact.unitIdentity,
-          parentEventId: null,
-          payloadRef: 'payload-workload',
-          elementId: fact.nodeId,
-          entryPortId: this.getEntryPortId(fact.nodeId),
-        });
-      } else if (fact.kind === 'unit_settled') {
-        const isMsg = fact.unitIdentity.includes(':');
-        const outcome = fact.outcome ?? 'succeeded';
-        if (isMsg) {
-          this.messageCounts.inFlight = Math.max(0, this.messageCounts.inFlight - 1);
-          if (outcome === 'succeeded' || outcome === 'rejected' || outcome === 'failed' || outcome === 'expired') {
-            this.messageCounts[outcome]++;
-          }
-        } else {
-          this.rootCounts.inFlight = Math.max(0, this.rootCounts.inFlight - 1);
-          if (outcome === 'succeeded' || outcome === 'rejected' || outcome === 'failed' || outcome === 'expired') {
-            this.rootCounts[outcome]++;
-          }
-        }
-      } else if (fact.kind === 'message_created') {
-        this.messageCounts.generated++;
-        this.messageCounts.inFlight++;
+      this.consumeFact(fact);
 
-        const parentCtx = this.unitContexts.get(fact.parentIdentity ?? '');
-        if (parentCtx) {
-          this.unitContexts.set(fact.unitIdentity, {
-            rootId: fact.unitIdentity,
-            journeyId: parentCtx.journeyId,
-            parentEventId: parentCtx.rootId,
-            payloadRef: parentCtx.payloadRef,
-            elementId: fact.nodeId,
-            entryPortId: this.getEntryPortId(fact.nodeId),
-          });
-        }
-      } else if (fact.kind === 'route_selected' && fact.edgeId) {
+      if (fact.kind === 'route_selected' && fact.edgeId) {
         const conn = this.edgeMap.get(fact.edgeId);
-        const unitCtx = this.unitContexts.get(fact.unitIdentity) ?? {
-          rootId: fact.unitIdentity,
-          journeyId: 'unknown',
-          parentEventId: null,
-          payloadRef: 'unknown',
-          elementId: fact.nodeId,
-          entryPortId: null,
-        };
+        const unitCtx = this.unitContexts.get(fact.unitIdentity);
+        if (!unitCtx) {
+          // Never emit a continuation with an invented journey/payload: an unregistered unit
+          // is an adapter bookkeeping failure and ends the run (see takeJourneyFailure).
+          this.journeyFailure ??= `Cannot resolve context for route selection of unit '${fact.unitIdentity}' at node '${fact.nodeId}'`;
+          continue;
+        }
         // A route target that is itself a resource element stays inside this kernel's own
         // subgraph: the kernel continues processing it internally (admission/queue/completion),
         // so it must not also surface as a bridge PortEmission for external dispatch. Only a
@@ -695,6 +799,31 @@ export class ResourceAdapter {
             frameId: null,
           });
         }
+      } else if (fact.kind === 'bridge_dispatch' && fact.frameId) {
+        // Bridge call frames (§8): the resource has no further in-kernel route and
+        // dispatches its call continuation externally, carrying the system frameId the
+        // caller must eventually resolve via settleCall(). §8 phase 2 "bridge dispatch".
+        const conn = this.bridgeConnByNode.get(fact.nodeId);
+        const unitCtx = this.unitContexts.get(fact.unitIdentity);
+        if (!unitCtx) {
+          // Never emit a continuation with an invented journey/payload: an unregistered unit
+          // is an adapter bookkeeping failure and ends the run (see takeJourneyFailure).
+          this.journeyFailure ??= `Cannot resolve context for bridge dispatch of unit '${fact.unitIdentity}' at node '${fact.nodeId}'`;
+          continue;
+        }
+        if (conn) {
+          const latencyMs = conn.kind === 'call' ? conn.config.latencyMs : 0;
+          outputs.push({
+            source: conn.source,
+            rootId: unitCtx.rootId,
+            journeyId: unitCtx.journeyId,
+            parentEventId: unitCtx.parentEventId,
+            payloadRef: unitCtx.payloadRef,
+            outcome: 'succeeded',
+            atMs: Math.round(fact.time * 1000) + latencyMs,
+            frameId: fact.frameId,
+          });
+        }
       }
 
       const te = this.mapFactToTraceEvent(fact);
@@ -706,10 +835,50 @@ export class ResourceAdapter {
     return { events, outputs };
   }
 
+  /**
+   * Bridge call frames (RV-14f, §8): settles a frame dispatched externally via a
+   * 'bridge_dispatch' PortEmission. A second settlement of the same frame fails the run
+   * (the kernel throws); if the parent was already settled by an outage or deadline
+   * expiry while the frame was open, this is a no-op that still frees the frame (§8: "the
+   * later settleCall is ignored ... but still counts toward root settlement and drain").
+   * The resulting completion (with the adopted outcome/payload) surfaces later, at
+   * `atMs + returnLatencyMs`, through the normal `peekNext()`/`stepNext()` scheduler loop
+   * — matching how a retained child's response delay already surfaces (§8 "the kernel
+   * applies returnLatencyMs and its existing child-response handling").
+   */
+  settleCall(input: { frameId: string; outcome: TraceEvent['outcome']; payloadRef: string; atMs: number }): KernelDelta {
+    if (input.outcome === null) {
+      // §8: no success is inferred. A bridge settlement must carry an explicit outcome.
+      this.journeyFailure ??= `settleCall for frame '${input.frameId}' carried no outcome`;
+      return { events: [], outputs: [] };
+    }
+    this.sim.settleCall({
+      frameId: input.frameId,
+      outcome: input.outcome as KernelOutcome,
+      payloadRef: input.payloadRef,
+      atMs: input.atMs,
+    });
+    return { events: [], outputs: [] };
+  }
+
   private mapFactToTraceEvent(fact: SimLifecycleFact): TraceEvent | null {
-    const unitCtx = this.unitContexts.get(fact.unitIdentity) ?? {
-      rootId: fact.unitIdentity,
-      journeyId: 'unknown',
+    // Host fault/detection facts belong to no request: they use the fixed system root and
+    // journey below. Every other fact must resolve to a registered unit context; an
+    // unregistered unit is an adapter bookkeeping failure that ends the run
+    // (takeJourneyFailure), never a trace event with an invented journey.
+    const isSystemFact =
+      fact.kind === 'host_down' ||
+      fact.kind === 'host_up' ||
+      fact.kind === 'failure_detected' ||
+      fact.kind === 'recovery_detected';
+    const registered = this.unitContexts.get(fact.unitIdentity);
+    if (!registered && !isSystemFact) {
+      this.journeyFailure ??= `Cannot resolve context for '${fact.kind}' fact of unit '${fact.unitIdentity}' at node '${fact.nodeId}'`;
+      return null;
+    }
+    const unitCtx = registered ?? {
+      rootId: SYSTEM_FAULT_ROOT_ID,
+      journeyId: SYSTEM_FAULT_JOURNEY_ID,
       parentEventId: null,
       payloadRef: null,
       elementId: fact.nodeId,
@@ -800,7 +969,12 @@ export class ResourceAdapter {
           atMs,
           outcome: fact.outcome ?? null,
         };
-      case 'unit_settled':
+      case 'unit_settled': {
+        if (!fact.outcome) {
+          // §8 "No success is inferred": never default a bare settlement to 'succeeded'.
+          this.journeyFailure ??= `unit_settled fact for unit '${fact.unitIdentity}' carried no outcome`;
+          return null;
+        }
         return {
           id,
           sequence: seq,
@@ -810,10 +984,29 @@ export class ResourceAdapter {
           elementId: fact.nodeId,
           portId: unitCtx.entryPortId,
           kind: 'settled',
-          code: fact.outcome ?? 'succeeded',
+          code: fact.outcome,
+          // Bridge call frames (§8): a bridge-adopted settlement carries the child's own
+          // payload ref (fact.payloadRef); every other settlement keeps the original
+          // admitted payload (transport-only settlement, §8).
+          payloadRef: fact.payloadRef ?? unitCtx.payloadRef,
+          atMs,
+          outcome: fact.outcome,
+        };
+      }
+      case 'bridge_dispatch':
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
+          parentId: unitCtx.parentEventId,
+          elementId: fact.nodeId,
+          portId: unitCtx.entryPortId,
+          kind: 'dispatch',
+          code: 'bridge-dispatch',
           payloadRef: unitCtx.payloadRef,
           atMs,
-          outcome: fact.outcome ?? 'succeeded',
+          outcome: null,
         };
       case 'message_created':
         return {
@@ -856,8 +1049,8 @@ export class ResourceAdapter {
         return {
           id,
           sequence: seq,
-          rootId: unitCtx.rootId || 'fault',
-          journeyId: unitCtx.journeyId || 'system',
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
           parentId: null,
           elementId: fact.nodeId,
           portId: null,
@@ -871,8 +1064,8 @@ export class ResourceAdapter {
         return {
           id,
           sequence: seq,
-          rootId: unitCtx.rootId || 'fault',
-          journeyId: unitCtx.journeyId || 'system',
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
           parentId: null,
           elementId: fact.nodeId,
           portId: null,
@@ -886,8 +1079,8 @@ export class ResourceAdapter {
         return {
           id,
           sequence: seq,
-          rootId: unitCtx.rootId || 'fault',
-          journeyId: unitCtx.journeyId || 'system',
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
           parentId: null,
           elementId: fact.nodeId,
           portId: null,
@@ -901,8 +1094,8 @@ export class ResourceAdapter {
         return {
           id,
           sequence: seq,
-          rootId: unitCtx.rootId || 'fault',
-          journeyId: unitCtx.journeyId || 'system',
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
           parentId: null,
           elementId: fact.nodeId,
           portId: null,

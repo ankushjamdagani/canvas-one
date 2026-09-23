@@ -26,7 +26,8 @@ export type SimLifecycleFactKind =
   | 'host_down'
   | 'host_up'
   | 'failure_detected'
-  | 'recovery_detected';
+  | 'recovery_detected'
+  | 'bridge_dispatch';
 
 export interface SimLifecycleFact {
   kind: SimLifecycleFactKind;
@@ -38,6 +39,19 @@ export interface SimLifecycleFact {
   outcome?: Outcome;
   parentIdentity?: string;
   edgeId?: string;
+  /** Bridge call frames (RV-14f, model-and-runner.md §8): the system frame ID a
+   * 'bridge_dispatch' fact carries, correlating it to the eventual settleCall(). */
+  frameId?: string;
+  /** Set only when a 'unit_settled' fact resolves through a bridge child's adopted
+   * outcome/payload (§8 "the parent adopts the child's outcome and returns the child's
+   * payload"). Absent for ordinary (non-bridge) settlement, where the original admitted
+   * payload still applies. */
+  payloadRef?: string;
+  /** The emitting unit's actual category (RV-14f review, §8: "No success is inferred" —
+   * extended to "no root/message distinction is inferred either"). Set on 'admitted',
+   * 'rejected' and 'unit_settled' facts so a consumer never has to guess root-vs-message
+   * from the shape of `unitIdentity`. */
+  category?: 'root' | 'message';
 }
 
 export type SimTraceHook = (fact: SimLifecycleFact) => void;
@@ -54,12 +68,26 @@ export interface KernelFaultConfig {
   routeReset: 'first-healthy';
 }
 
+/**
+ * Bridge call frames (RV-14f, model-and-runner.md §8): declares that `nodeId` (a
+ * resource with no other selectable call continuation, per readiness) dispatches its
+ * call continuation to an external, non-resource target. The kernel keeps the parent op
+ * waiting (as in a retained call chain) instead of completing it locally, and applies
+ * `returnLatencyMs` when the external caller eventually resolves the frame via
+ * `settleCall`.
+ */
+export interface KernelBridgeConfig {
+  nodeId: string;
+  returnLatencyMs: number;
+}
+
 export interface OpenSimulationOptions {
   traceHook?: SimTraceHook;
   disabledWorkloadIds?: Iterable<string>;
   requireRunnable?: boolean;
   hostPlacement?: Map<string, string> | Record<string, string>;
   faults?: readonly KernelFaultConfig[];
+  bridges?: readonly KernelBridgeConfig[];
 }
 
 export interface KernelResourceInput {
@@ -265,7 +293,7 @@ export interface Op {
   released?: boolean;
   attempt: number;
   children: Set<Op>;
-  onDone?: (outcome: Outcome) => void;
+  onDone?: (outcome: Outcome, payloadRef?: string) => void;
   arrived: number;
   pendingChildren?: number;
   failedChild?: boolean;
@@ -273,6 +301,8 @@ export interface Op {
   subscription?: string;
   publicationOnly?: boolean;
   cancelled?: boolean;
+  /** Bridge call frames (RV-14f): set while this op waits on an external settleCall. */
+  bridgeFrameId?: string;
 }
 
 export interface NodeRuntime {
@@ -376,6 +406,12 @@ export class OpenSimulation {
   protected roundRobinCursors = new Map<string, number>();
   protected faults: KernelFaultConfig[] = [];
   protected pendingCompletionCancels = new Map<Op, () => void>();
+
+  // Bridge call frames (RV-14f, §8): nodes with an external (non-resource) call
+  // continuation, and the ops currently waiting on an external settleCall.
+  protected bridgeByNode = new Map<string, KernelBridgeConfig>();
+  protected bridgePendingOps = new Map<string, Op>();
+  protected bridgeFrameCounter = 0;
 
   constructor(graph: ExecutionGraph, options?: OpenSimulationOptions) {
     if (options?.traceHook) {
@@ -493,6 +529,12 @@ export class OpenSimulation {
         });
       }
     }
+
+    if (options?.bridges) {
+      for (const bridge of options.bridges) {
+        this.bridgeByNode.set(bridge.nodeId, bridge);
+      }
+    }
   }
 
   public getHostState(hostId: string): boolean | undefined {
@@ -566,6 +608,7 @@ export class OpenSimulation {
             time: this.currentTime,
             nodeId: op.nodeId,
             unitIdentity: op.unit.identity,
+            category: op.unit.category,
             attempt: op.attempt,
             path: op.path,
           });
@@ -826,8 +869,8 @@ export class OpenSimulation {
       attempt: 0,
       children: new Set(),
       arrived: arrTime,
-      onDone: (outcome) => {
-        this.finishUnit(unit, outcome);
+      onDone: (outcome, payloadRef) => {
+        this.finishUnit(unit, outcome, payloadRef);
         const affectedNodes = new Set<string>();
         for (const op of unit.ops) {
           if (op !== rootOp && !op.done) {
@@ -859,8 +902,8 @@ export class OpenSimulation {
       children: new Set(),
       arrived: arrTime,
       pendingChildren: 1,
-      onDone: (outcome) => {
-        this.finishUnit(unit, outcome);
+      onDone: (outcome, payloadRef) => {
+        this.finishUnit(unit, outcome, payloadRef);
         const affectedNodes = new Set<string>();
         for (const op of unit.ops) {
           if (op !== rootOp && !op.done) {
@@ -892,7 +935,7 @@ export class OpenSimulation {
     this.publishMessage(rootOp, syntheticEdge);
   }
 
-  protected finishUnit(unit: Unit, outcome: Outcome): void {
+  protected finishUnit(unit: Unit, outcome: Outcome, payloadRef?: string): void {
     if (unit.done) return;
     unit.done = true;
     this.emitFact({
@@ -900,9 +943,11 @@ export class OpenSimulation {
       time: this.currentTime,
       nodeId: unit.rootOp?.nodeId ?? '',
       unitIdentity: unit.identity,
+      category: unit.category,
       attempt: unit.rootOp?.attempt ?? 0,
       path: unit.rootOp?.path ?? '',
       outcome,
+      ...(payloadRef !== undefined ? { payloadRef } : {}),
     });
     const elapsedMs = (this.currentTime - unit.born) * 1000;
     if (unit.category === 'root') {
@@ -950,6 +995,7 @@ export class OpenSimulation {
           time: this.currentTime,
           nodeId: op.nodeId,
           unitIdentity: op.unit.identity,
+          category: op.unit.category,
           attempt: op.attempt,
           path: op.path,
         });
@@ -971,6 +1017,7 @@ export class OpenSimulation {
           time: this.currentTime,
           nodeId: op.nodeId,
           unitIdentity: op.unit.identity,
+          category: op.unit.category,
           attempt: op.attempt,
           path: op.path,
         });
@@ -1000,6 +1047,7 @@ export class OpenSimulation {
             time: this.currentTime,
             nodeId: op.nodeId,
             unitIdentity: op.unit.identity,
+            category: op.unit.category,
             attempt: op.attempt,
             path: op.path,
           });
@@ -1017,6 +1065,7 @@ export class OpenSimulation {
             time: this.currentTime,
             nodeId: op.nodeId,
             unitIdentity: op.unit.identity,
+            category: op.unit.category,
             attempt: op.attempt,
             path: op.path,
           });
@@ -1043,6 +1092,7 @@ export class OpenSimulation {
           time: this.currentTime,
           nodeId: op.nodeId,
           unitIdentity: op.unit.identity,
+          category: op.unit.category,
           attempt: op.attempt,
           path: op.path,
         });
@@ -1060,6 +1110,7 @@ export class OpenSimulation {
           time: this.currentTime,
           nodeId: op.nodeId,
           unitIdentity: op.unit.identity,
+          category: op.unit.category,
           attempt: op.attempt,
           path: op.path,
         });
@@ -1076,6 +1127,7 @@ export class OpenSimulation {
           time: this.currentTime,
           nodeId: op.nodeId,
           unitIdentity: op.unit.identity,
+          category: op.unit.category,
           attempt: op.attempt,
           path: op.path,
         });
@@ -1103,6 +1155,7 @@ export class OpenSimulation {
           time: this.currentTime,
           nodeId: op.nodeId,
           unitIdentity: op.unit.identity,
+          category: op.unit.category,
           attempt: op.attempt,
           path: op.path,
         });
@@ -1381,6 +1434,32 @@ export class OpenSimulation {
   protected dispatchDownstream(op: Op): void {
     const allOutgoing = this.plan.outgoing.get(op.nodeId) || [];
     if (allOutgoing.length === 0) {
+      // Bridge call frames (RV-14f, §8): a non-router resource with no in-kernel
+      // outgoing edge but a declared bridge continuation waits, exactly like a retained
+      // call chain, for an external settleCall() instead of completing locally. Routers
+      // always select exactly one route themselves (never reach this branch with zero
+      // real edges when a bridge is configured), so bridging is narrowed here to
+      // non-router resources per the readiness note in §8.
+      const node = this.plan.nodes.get(op.nodeId)!;
+      const bridge = node.behavior.type !== 'router' ? this.bridgeByNode.get(op.nodeId) : undefined;
+      if (bridge) {
+        op.phase = 'waiting';
+        op.pendingChildren = 1;
+        op.failedChild = false;
+        const frameId = `bridge:${op.unit.identity}:${++this.bridgeFrameCounter}`;
+        op.bridgeFrameId = frameId;
+        this.bridgePendingOps.set(frameId, op);
+        this.emitFact({
+          kind: 'bridge_dispatch',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+          frameId,
+        });
+        return;
+      }
       this.completeLocalOp(op);
       return;
     }
@@ -1401,6 +1480,7 @@ export class OpenSimulation {
             time: this.currentTime,
             nodeId: op.nodeId,
             unitIdentity: op.unit.identity,
+            category: op.unit.category,
             attempt: op.attempt,
             path: op.path,
           });
@@ -1706,12 +1786,83 @@ export class OpenSimulation {
     this.releaseOp(op);
   }
 
-  protected finishOp(op: Op, outcome: Outcome): void {
+  /**
+   * Bridge call frames (RV-14f, §8): completes the resource op that was waiting on an
+   * external settleCall(), adopting the bridge child's exact outcome (not collapsed to
+   * 'failed' the way a retained in-kernel child's non-succeeded outcome is) and its
+   * payload. This is deliberately a separate path from handleChildResponse: §8 requires
+   * "the parent adopts the child's outcome and returns the child's payload" for bridge
+   * frames specifically, whereas handleChildResponse's generic non-router rule collapses
+   * every non-succeeded child outcome to 'failed'. Resource -> resource -> bridge chains
+   * are unaffected: the outer resource's own childOp still resolves via the retained
+   * handleChildResponse path (per §8 "the outer resource keeps retained handling").
+   */
+  protected completeBridgeChild(op: Op, outcome: Outcome, payloadRef?: string): void {
+    if (op.done || op.unit.done) return;
+    const nr = this.nodesRuntime.get(op.nodeId)!;
+    nr.active.delete(op);
+    this.pumpQueue(op.nodeId);
+    if (outcome === 'succeeded') {
+      nr.counters.completed++;
+    } else {
+      nr.counters.failed++;
+    }
+    op.phase = 'settled';
+    op.done = true;
+    this.finishOp(op, outcome, payloadRef);
+    this.releaseOp(op);
+  }
+
+  /**
+   * Bridge call frames (RV-14f, §8): settles a still-open bridge frame from outside the
+   * kernel. `returnLatencyMs` (declared for this node via `OpenSimulationOptions.bridges`)
+   * is applied before the parent op resolves, matching a retained child's response delay.
+   *
+   * - A second settlement of a frame (already resolved by an earlier settleCall) fails
+   *   the run — the caller receives a thrown error, matching "fails the run" for the
+   *   deliberate double-settlement case (frameId no longer tracked in bridgePendingOps).
+   * - If the parent op was already force-settled by an outage or deadline expiry while
+   *   the frame was open, the frame is simply cleared here: "the later settleCall is
+   *   ignored (not a second settlement) but still counts toward root settlement and
+   *   drain" — the op was already released (and the unit already finished) by that
+   *   earlier path, so there is nothing further to apply.
+   */
+  public settleCall(input: { frameId: string; outcome: Outcome; payloadRef?: string; atMs?: number }): void {
+    const op = this.bridgePendingOps.get(input.frameId);
+    if (!op) {
+      throw new Error(`settleCall: unknown or already-settled bridge frame '${input.frameId}'`);
+    }
+    this.bridgePendingOps.delete(input.frameId);
+
+    if (input.atMs !== undefined) {
+      const atSec = input.atMs / 1000;
+      if (atSec > this.currentTime) {
+        this.updateIntegrals(atSec);
+        this.currentTime = atSec;
+      }
+    }
+
+    if (op.done) {
+      // Parent already settled elsewhere (outage/expiry) while the frame was open.
+      return;
+    }
+
+    const bridge = this.bridgeByNode.get(op.nodeId);
+    const returnLatencySec = (bridge?.returnLatencyMs ?? 0) / 1000;
+    const respArrivalTime = this.currentTime + returnLatencySec;
+    const { outcome, payloadRef } = input;
+    this.scheduleEvent(respArrivalTime, 1, () => {
+      if (op.done || op.unit.done) return;
+      this.completeBridgeChild(op, outcome, payloadRef);
+    });
+  }
+
+  protected finishOp(op: Op, outcome: Outcome, payloadRef?: string): void {
     op.done = true;
     if (op.notified) return;
     op.notified = true;
     if (op.onDone) {
-      op.onDone(outcome);
+      op.onDone(outcome, payloadRef);
     }
   }
 
@@ -2265,8 +2416,8 @@ export class OpenSimulation {
       attempt: 0,
       children: new Set(),
       arrived: input.time,
-      onDone: (outcome) => {
-        this.finishUnit(unit, outcome);
+      onDone: (outcome, payloadRef) => {
+        this.finishUnit(unit, outcome, payloadRef);
         const affectedNodes = new Set<string>();
         for (const op of unit.ops) {
           if (op !== rootOp && !op.done) {
