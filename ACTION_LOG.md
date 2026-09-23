@@ -1071,3 +1071,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: `src/App.tsx`, `src/components/StudioMenu.tsx`, `src/components/canvasFirst.css` (`5a93acf`); ledger, HANDOFF.
 - **Verification** (Claude): 246 unit, build, production e2e 72 passed / 1 failed (known 40px Load-example target) / 4 skipped, stable over two reruns (one earlier run showed a second, unidentified failure — treated as flake); headless desktop menu and 390x844 mobile screenshots.
 - **Limitations**: Mobile `.system-canvas` anchor needs `!important` to override legacy `openWorkspace.css`.
+
+### RV-07a results restyle (Claude)
+
+- **Outcome**: Sonnet subagent restyled the results strip and metrics detail with foundation primitives (text run-state badge, tabular numbers, units, General/Components sections). Three review rounds: the tabs were fake (both panels always shown) and became plain labelled sections; units showed next to "—"; arbitrary sizes; the phone strip hid every stat; "Failed 0" in the risk colour. Merged onto the foundation line @ `aa281c1`.
+- **Changed**: `ResultsStrip.tsx`, `OpenMetricsPanel.tsx`, `canvasFirst.css` (legacy strip rules deleted), new `tests/results-look.spec.ts` (`66885b1`); ledger, HANDOFF.
+- **Verification** (Claude): 246 unit, build, production e2e 78 passed / 1 known failure / 4 skipped; headless desktop and 390x844 screenshots after a completed run.
+- **Limitations**: `ResultsPanel` (saved-run comparison) not restyled. The same example gives different numbers run to run — pre-existing; flag for RV-14 seeding / R09.
