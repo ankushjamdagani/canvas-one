@@ -21,33 +21,82 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* Evergreen color roles */
+  --color-shell: var(--shell);
+  --color-panel: var(--panel);
+  --color-sunken: var(--sunken);
+  --color-body: var(--body);
+  --color-secondary-text: var(--secondary-text);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-selected-edge: var(--selected-edge);
+  --color-branch: var(--branch);
+  --color-branch-tint: var(--branch-tint);
+  --color-risk: var(--risk);
+  --color-risk-text: var(--risk-text);
+  --color-risk-tint: var(--risk-tint);
+  --color-control-border: var(--control-border);
+  --color-hover-border: var(--hover-border);
+  --color-note: var(--note);
+  --color-note-edge: var(--note-edge);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+@theme {
+  --radius-tag: 4px;
+  --radius-control: 7px;
+  --radius-node: 9px;
+  --radius-popover: 11px;
+  --radius-card: 12px;
+  --radius-dock: 14px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #09090b;
-  --card: #ffffff;
-  --card-foreground: #09090b;
-  --popover: #ffffff;
-  --popover-foreground: #09090b;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --shadcn-muted: #f4f4f5;
-  --shadcn-muted-foreground: #71717a;
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
-  --destructive: #ef4444;
-  --destructive-foreground: #fafafa;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #18181b;
+  --background: #FFFFFF;
+  --foreground: #16201D;
+  --card: #F7F5F1;
+  --card-foreground: #16201D;
+  --popover: #FFFFFF;
+  --popover-foreground: #16201D;
+  --primary: #0B5C54;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2EFE9;
+  --secondary-foreground: #16201D;
+  --shadcn-muted: #F2EFE9;
+  --shadcn-muted-foreground: #626D68;
+  --accent: #EAEFEC;
+  --accent-foreground: #16201D;
+  --destructive: #dc2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E7E3DB;
+  /* Strong control border: #8A938F is the lightest neutral from the palette reaching >=3:1 (3.16:1) against white for accessible field boundaries */
+  --input: #8A938F;
+  --ring: #0B5C54;
   --radius: 0.5rem;
+
+  /* Evergreen role variables */
+  --shell: #FBFAF7;
+  --panel: #F7F5F1;
+  --sunken: #F2EFE9;
+  --body: #4A544F;
+  --secondary-text: #626D68;
+  --primary-hover: #0A4E47;
+  --primary-pressed: #083F3A;
+  --selected-edge: #A8CBC5;
+  --branch: #7C5FC0;
+  --branch-tint: #F7F4FC;
+  --risk: #B4674A;
+  --risk-text: #A15B40;
+  --risk-tint: #FBF1EA;
+  --control-border: #DCD7CD;
+  --hover-border: #C6C0B4;
+  --note: #FBF6E8;
+  --note-edge: #E6DAB8;
+
 
   font-family: "Inter Variable", sans-serif;
   color: #243b41;
