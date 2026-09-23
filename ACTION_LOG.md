@@ -1099,3 +1099,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review rounds** (Claude): 14d-2 — clock jump on input injection, implicit mid-run workload disabling, invented `'k-0'` key for keyless requests; 14d-3 — success defaulted from a missing outcome, prefix-matched message linkage, undefined broadcast fan-out (now rejected).
 - **Verification** (Claude): 544 unit tests, characterization goldens unchanged through every step, `tsc -b` clean; golden mutation check fails as expected.
 - **Limitations**: Faults (14e), bridge frames (14f) and broadcast message roots unsupported; open contract question on broadcast outcome.
+
+### RV-14e S04 faults + D36 (Claude lead; Gemini partial, Sonnet completion)
+
+- **Outcome**: User accepted RV-14d and chose broadcast option (b), recorded as D36. Gemini hit its quota mid-task; a Sonnet subagent reviewed and finished the partial work. Kernel host outages, detection and router pool updates (inert without faults), adapter fault validation and `interruptHost`, runner fault scheduling and D36 broadcast message roots. All three S04 scenarios pass with §11 per-arrival route/outcome facts. Merged onto the runner line @ `01cac16`.
+- **Review rounds** (Claude): partial §11 assertions, duplicate unit-level settled events for rejected roots, invented failing of waiting retries at outage. Sonnet also fixed a real crash left by Gemini (router → in-kernel resource routes dispatched to the runner).
+- **Verification** (Claude): 559 unit tests, characterization goldens unchanged, `tsc -b` clean; fault-free S01/S02 canonical output byte-identical to `422187f` (subagent-verified via a temp worktree).
+- **Limitations**: Adapter `interruptHost` is only exercised by unit tests (the runner schedules faults through the kernel heap). Bridge frames remain RV-14f.
