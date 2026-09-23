@@ -1106,3 +1106,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review rounds** (Claude): partial §11 assertions, duplicate unit-level settled events for rejected roots, invented failing of waiting retries at outage. Sonnet also fixed a real crash left by Gemini (router → in-kernel resource routes dispatched to the runner).
 - **Verification** (Claude): 559 unit tests, characterization goldens unchanged, `tsc -b` clean; fault-free S01/S02 canonical output byte-identical to `422187f` (subagent-verified via a temp worktree).
 - **Limitations**: Adapter `interruptHost` is only exercised by unit tests (the runner schedules faults through the kernel heap). Bridge frames remain RV-14f.
+
+### RV-14f S05 composition — RV-14 code complete (Claude lead, Sonnet executor)
+
+- **Outcome**: Bridge call frames, root sharing across the bridge, refinement selection, cancellation and the §12 five-family acceptance suite. S01–S05 pass together through `runScenario`. Merged onto the runner line @ `3fbf6ae`.
+- **Review rounds** (Claude): tightened the S05 journey check to read the trace, which exposed `journeyId:'unknown'` and kernel identities on delivered message events (a bug since RV-14d); then removed every invented default (success from a missing outcome, `{}` payloads, `'unknown'` contexts, ID-shape message detection). Claude made part of the round-3 edits directly in resource-adapter.ts. Subagent interrupted once by a session limit and resumed.
+- **Verification** (Claude): 591 unit tests, characterization goldens unchanged, `tsc -b` clean; default sweep of runner/ clean. Summaries for S01/S04/S02-deny byte-identical to `01cac16`; S02 allow's message 'generated' metric corrected 0 → 1.
+- **Limitations**: Router + bridge not implemented; runtime refinement maps one level of ports.
