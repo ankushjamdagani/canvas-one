@@ -1057,3 +1057,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Changed**: decisions.md, contracts/{run-identity,model-and-runner,storage,commands}.md, delivery.md, ACTION_LOG.
 - **Platform**: Claude (AskUserQuestion); RV-04c and RV-05a Gemini lanes running in parallel.
 - **Verification**: Docs only; `git diff --check`.
+
+### RV-02g, RV-05a, RV-04c + D35 (Claude)
+
+- **Outcome**: Gemini quota hit again; all three ran on Sonnet subagents (user's earlier fallback choice). One subagent first launched in the wrong worktree (inherited orchestrator cwd) and correctly stopped; re-pointed with explicit paths, no stray edits (verified). RV-02g: D32/D33 applied + `buildManifest`/`ss-run-v1` fingerprint. RV-05a: visual inspector restyle with explicit Configured/Measured groups. RV-04c: review round fixed `!important` overrides (my scoping miss — legacy node CSS lived in canvasFirst.css), 120px nodes with truncated text, and node colours; user chose six new hues (D35, approved from a swatch preview).
+- **Changed**: `2ffa2d3` (rv-02g), `a97836b` (rv-05a), `76e4a37` + merge `8e869e5` (rv-04c on foundation line); decisions D35, ledger, ACTION_LOG.
+- **Verification** (Claude): rv-02g 355 unit + build + my fingerprint probes on S04; merged foundation line 246 unit, build, production e2e 68 passed / 5 failed (same baseline mobile set) / 4 skipped; headless screenshots of inspector and canvas.
+- **Limitations**: Inspector wrapper sliver and Apply/Cancel wait for RV-12; entryPorts ordering vs set is an open contract question; node drop-preview/dimmed states not wired.
