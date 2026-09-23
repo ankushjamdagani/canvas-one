@@ -49,6 +49,58 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Slider } from "@/components/ui/slider";
+import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandShortcut,
+} from "@/components/ui/command";
+import {
+  ToastProvider,
+  ToastViewport,
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  ToastAction,
+  ToastClose,
+} from "@/components/ui/toast";
+import { Progress } from "@/components/ui/progress";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
 
 const buttonVariantsList = [
   "default",
@@ -633,6 +685,287 @@ export function Specimen() {
             </CardContent>
           </Card>
         </div>
+      </section>
+
+      <Separator />
+
+      {/* Kbd */}
+      <section aria-labelledby="heading-kbd" className="space-y-4">
+        <h2 id="heading-kbd" className="text-xl font-semibold tracking-tight">
+          Keyboard Shortcuts (Kbd)
+        </h2>
+        <div className="flex flex-wrap items-center gap-6 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-secondary-text">Command palette:</span>
+            <KbdGroup>
+              <Kbd>⌘</Kbd>
+              <Kbd>K</Kbd>
+            </KbdGroup>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-secondary-text">Copy node:</span>
+            <KbdGroup>
+              <Kbd>Ctrl</Kbd>
+              <Kbd>C</Kbd>
+            </KbdGroup>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-secondary-text">Dismiss overlay:</span>
+            <Kbd>Esc</Kbd>
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Select */}
+      <section aria-labelledby="heading-select" className="space-y-4">
+        <h2 id="heading-select" className="text-xl font-semibold tracking-tight">
+          Select (Radix)
+        </h2>
+        <div className="max-w-xs space-y-2">
+          <Label htmlFor="specimen-select-trigger">Database Engine</Label>
+          <Select defaultValue="postgres">
+            <SelectTrigger id="specimen-select-trigger" aria-label="Database Engine">
+              <SelectValue placeholder="Select an engine" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="postgres">PostgreSQL (Relational)</SelectItem>
+              <SelectItem value="redis">Redis (In-Memory Cache)</SelectItem>
+              <SelectItem value="kafka">Apache Kafka (Event Stream)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Native Select */}
+      <section aria-labelledby="heading-native-select" className="space-y-4">
+        <h2 id="heading-native-select" className="text-xl font-semibold tracking-tight">
+          Native Select
+        </h2>
+        <div className="max-w-xs space-y-2">
+          <Label htmlFor="specimen-native-select">Runtime Target</Label>
+          <NativeSelect id="specimen-native-select" defaultValue="node20" aria-label="Runtime Target">
+            <NativeSelectOption value="node20">Node.js 20 LTS</NativeSelectOption>
+            <NativeSelectOption value="python312">Python 3.12</NativeSelectOption>
+            <NativeSelectOption value="go122">Go 1.22</NativeSelectOption>
+          </NativeSelect>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Slider */}
+      <section aria-labelledby="heading-slider" className="space-y-4">
+        <h2 id="heading-slider" className="text-xl font-semibold tracking-tight">
+          Slider
+        </h2>
+        <div className="max-w-xs space-y-2">
+          <div className="flex justify-between text-xs">
+            <Label htmlFor="specimen-slider">Traffic Capacity</Label>
+            <span className="font-mono text-secondary-text">65%</span>
+          </div>
+          <Slider
+            id="specimen-slider"
+            aria-label="Traffic Capacity"
+            defaultValue={[65]}
+            max={100}
+            step={1}
+          />
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Toggle & Toggle Group */}
+      <section aria-labelledby="heading-toggle-group" className="space-y-4">
+        <h2 id="heading-toggle-group" className="text-xl font-semibold tracking-tight">
+          Toggle &amp; Toggle Group
+        </h2>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Diagram Alignment (Single)</Label>
+            <ToggleGroup type="single" defaultValue="center" aria-label="Diagram Alignment">
+              <ToggleGroupItem value="left" aria-label="Align left">
+                Left
+              </ToggleGroupItem>
+              <ToggleGroupItem value="center" aria-label="Align center">
+                Center
+              </ToggleGroupItem>
+              <ToggleGroupItem value="right" aria-label="Align right">
+                Right
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          <div className="space-y-2">
+            <Label>Standalone Toggle</Label>
+            <div>
+              <Toggle aria-label="Toggle pin state" defaultPressed>
+                Pin Panel
+              </Toggle>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Breadcrumb */}
+      <section aria-labelledby="heading-breadcrumb" className="space-y-4">
+        <h2 id="heading-breadcrumb" className="text-xl font-semibold tracking-tight">
+          Breadcrumb
+        </h2>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#projects">Projects</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#system-studio">System Studio</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Checkout Architecture</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </section>
+
+      <Separator />
+
+      {/* Command */}
+      <section aria-labelledby="heading-command" className="space-y-4">
+        <h2 id="heading-command" className="text-xl font-semibold tracking-tight">
+          Command
+        </h2>
+        <div className="max-w-md">
+          <Command value="" className="rounded-lg border border-border shadow-xs">
+            <CommandInput placeholder="Search services..." />
+            <CommandList>
+              <CommandEmpty>No services found.</CommandEmpty>
+              <CommandGroup heading="Services">
+                <CommandItem>
+                  <span>Ingestion Worker</span>
+                  <CommandShortcut>⌘1</CommandShortcut>
+                </CommandItem>
+                <CommandItem>
+                  <span>Event Broker</span>
+                  <CommandShortcut>⌘2</CommandShortcut>
+                </CommandItem>
+                <CommandItem>
+                  <span>Storage Engine</span>
+                  <CommandShortcut>⌘3</CommandShortcut>
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Progress */}
+      <section aria-labelledby="heading-progress" className="space-y-4">
+        <h2 id="heading-progress" className="text-xl font-semibold tracking-tight">
+          Progress
+        </h2>
+        <div className="max-w-md space-y-4">
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs">
+              <Label htmlFor="specimen-progress-determinate">Determinate (40%)</Label>
+              <span className="font-mono text-secondary-text">40%</span>
+            </div>
+            <Progress
+              id="specimen-progress-determinate"
+              value={40}
+              aria-label="Determinate progress 40%"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="specimen-progress-indeterminate">Indeterminate</Label>
+            <Progress
+              id="specimen-progress-indeterminate"
+              aria-label="Indeterminate progress"
+            />
+          </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Resizable */}
+      <section aria-labelledby="heading-resizable" className="space-y-4">
+        <h2 id="heading-resizable" className="text-xl font-semibold tracking-tight">
+          Resizable Panels
+        </h2>
+        <div className="max-w-md h-32 rounded-md border border-border overflow-hidden">
+          <ResizablePanelGroup orientation="horizontal">
+            <ResizablePanel defaultSize={50} minSize={20}>
+              <div className="flex h-full items-center justify-center p-4 text-xs text-secondary-text bg-card">
+                Service Topology
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50} minSize={20}>
+              <div className="flex h-full items-center justify-center p-4 text-xs text-secondary-text bg-card">
+                Telemetry Stream
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* HoverCard */}
+      <section aria-labelledby="heading-hover-card" className="space-y-4">
+        <h2 id="heading-hover-card" className="text-xl font-semibold tracking-tight">
+          Hover Card
+        </h2>
+        <div>
+          <HoverCard>
+            <HoverCardTrigger asChild>
+              <Button type="button" variant="link" className="p-0 h-auto text-xs">
+                @architecture-team
+              </Button>
+            </HoverCardTrigger>
+            <HoverCardContent>
+              <div className="space-y-1">
+                <h4 className="text-xs font-semibold">Core Architecture Team</h4>
+                <p className="text-xs text-secondary-text">
+                  Owners of cluster topology and resilience checkpoints.
+                </p>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Toast */}
+      <section aria-labelledby="heading-toast" className="space-y-4">
+        <h2 id="heading-toast" className="text-xl font-semibold tracking-tight">
+          Toast
+        </h2>
+        <ToastProvider>
+          <div className="max-w-md">
+            <Toast open={true}>
+              <div className="grid gap-1">
+                <ToastTitle>Simulation Completed</ToastTitle>
+                <ToastDescription>
+                  10,000 requests processed with 0 errors.
+                </ToastDescription>
+              </div>
+              <ToastAction altText="View details">Details</ToastAction>
+              <ToastClose />
+            </Toast>
+          </div>
+          <ToastViewport className="static relative z-auto flex max-w-md flex-col p-0 top-auto sm:static sm:bottom-auto sm:right-auto sm:top-auto" />
+        </ToastProvider>
       </section>
     </div>
   );
