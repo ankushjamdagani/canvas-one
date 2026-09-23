@@ -8,19 +8,19 @@ const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants>
 >({
   size: "default",
-  variant: "default",
+  variant: "segmented",
 });
 
 const ToggleGroup = React.forwardRef<
   React.ElementRef<typeof ToggleGroupPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> &
     VariantProps<typeof toggleVariants>
->(({ className, variant = "default", size = "default", children, ...props }, ref) => (
+>(({ className, variant = "segmented", size = "default", children, ...props }, ref) => (
   <ToggleGroupPrimitive.Root
     ref={ref}
     data-slot="toggle-group"
     className={cn(
-      "inline-flex items-center justify-center gap-1 rounded-md",
+      "inline-flex items-center justify-center gap-0.5 rounded-control bg-sunken p-0.5",
       className
     )}
     {...props}

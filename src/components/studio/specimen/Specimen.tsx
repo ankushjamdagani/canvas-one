@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuShortcut,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -107,6 +108,7 @@ const buttonVariantsList = [
   "destructive",
   "outline",
   "secondary",
+  "tint",
   "ghost",
   "link",
 ] as const;
@@ -114,11 +116,17 @@ const buttonVariantsList = [
 const buttonSizesList = ["default", "sm", "lg", "icon"] as const;
 
 const badgeVariantsList = [
+  "neutral",
+  "success",
+  "accent",
+  "branch",
+  "risk",
+  "solid",
+  "count",
   "default",
   "secondary",
   "destructive",
   "outline",
-  "success",
   "amber",
 ] as const;
 
@@ -306,6 +314,21 @@ export function Specimen() {
           </div>
 
           <div className="space-y-3 pt-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Loading States</h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="default" loading>
+                Running
+              </Button>
+              <Button type="button" variant="secondary" loading>
+                Working
+              </Button>
+              <Button type="button" variant="tint" loading>
+                Working
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
             <h3 className="text-sm font-medium text-muted-foreground">Long-Label Case</h3>
             <div className="max-w-md">
               <Button type="button" variant="default" className="w-full">
@@ -446,6 +469,10 @@ export function Specimen() {
               <div className="flex items-center gap-2">
                 <Checkbox id="checkbox-disabled-on" defaultChecked disabled />
                 <Label htmlFor="checkbox-disabled-on">Kernel persistence (Disabled On)</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="checkbox-mixed" checked="indeterminate" />
+                <Label htmlFor="checkbox-mixed">Retry policy (Mixed)</Label>
               </div>
             </div>
           </div>
@@ -595,7 +622,10 @@ export function Specimen() {
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
-              <DropdownMenuItem>New Subsystem</DropdownMenuItem>
+              <DropdownMenuItem>
+                New Subsystem
+                <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
+              </DropdownMenuItem>
               <DropdownMenuItem>Duplicate Node</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuSub>
@@ -607,7 +637,7 @@ export function Specimen() {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Delete Scenario</DropdownMenuItem>
+              <DropdownMenuItem variant="destructive">Delete Scenario</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

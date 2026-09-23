@@ -35,6 +35,7 @@ export const evergreen = Object.freeze({
   risk: '#B4674A', // Decorative clay
   riskText: '#A15B40', // Corrected clay for text contrast on riskTint (4.62:1 >= 4.5:1)
   riskTint: '#FBF1EA',
+  riskEdge: '#E0C9B6',
   destructive: '#A15B40',
   destructiveHover: '#8E5038',
 
@@ -43,6 +44,22 @@ export const evergreen = Object.freeze({
   controlBorder: '#DCD7CD',
   hoverBorder: '#C6C0B4',
   controlBorderStrong: '#948D80', // Darker step of the theme's warm border family; >=3:1 on canvas 3.29, shell 3.15, panel 3.02
+  borderPressed: '#B8B1A3',
+
+  // Surfaces (button/ghost pressed step)
+  desk: '#E9E7E2',
+
+  // Button secondary interaction steps (sunken fill family)
+  secondaryHover: '#EAE6DE',
+  secondaryPressed: '#E2DED6',
+
+  // Button/badge tint interaction steps (selected tint family)
+  tintHover: '#DFE8E4',
+  tintHoverEdge: '#8FBCB4',
+  tintPressed: '#D3E0DB',
+
+  // Branch/async tag edge
+  branchEdge: '#C9B9E4',
 
   // Notes
   note: '#FBF6E8',

@@ -50,8 +50,19 @@
   --color-control-border: var(--control-border);
   --color-control-border-strong: var(--control-border-strong);
   --color-hover-border: var(--hover-border);
+  --color-border-pressed: var(--border-pressed);
   --color-note: var(--note);
   --color-note-edge: var(--note-edge);
+
+  /* Evergreen interaction-step roles (button/badge fidelity) */
+  --color-desk: var(--desk);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-pressed: var(--secondary-pressed);
+  --color-tint-hover: var(--tint-hover);
+  --color-tint-hover-edge: var(--tint-hover-edge);
+  --color-tint-pressed: var(--tint-pressed);
+  --color-risk-edge: var(--risk-edge);
+  --color-branch-edge: var(--branch-edge);
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -193,8 +204,19 @@
   --risk-tint: #FBF1EA;
   --control-border: #DCD7CD;
   --hover-border: #C6C0B4;
+  --border-pressed: #B8B1A3;
   --note: #FBF6E8;
   --note-edge: #E6DAB8;
+
+  /* Evergreen interaction-step roles (button/badge fidelity) */
+  --desk: #E9E7E2;
+  --secondary-hover: #EAE6DE;
+  --secondary-pressed: #E2DED6;
+  --tint-hover: #DFE8E4;
+  --tint-hover-edge: #8FBCB4;
+  --tint-pressed: #D3E0DB;
+  --risk-edge: #E0C9B6;
+  --branch-edge: #C9B9E4;
 
 
   font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;

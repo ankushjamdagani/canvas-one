@@ -29,7 +29,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     data-slot="select-trigger"
     className={cn(
-      "flex h-8 pointer-coarse:h-11 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-risk-text focus-visible:aria-invalid:outline-risk-text disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text disabled:border-control-border cursor-pointer select-none [&>span]:line-clamp-1",
+      "flex h-8 pointer-coarse:h-11 w-full items-center justify-between gap-2 rounded-control border border-input bg-shell px-3 py-1 text-base shadow-sm transition-colors hover:bg-background data-[state=open]:bg-background data-[state=open]:border-primary focus-visible:bg-background focus-visible:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-risk-text focus-visible:aria-invalid:outline-risk-text disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text disabled:border-control-border cursor-pointer select-none [&>span]:line-clamp-1",
       className
     )}
     {...props}
@@ -123,7 +123,10 @@ const SelectLabel = React.forwardRef<
   <SelectPrimitive.Label
     ref={ref}
     data-slot="select-label"
-    className={cn("px-2 py-1.5 text-xs font-semibold text-muted-foreground", className)}
+    className={cn(
+      "px-2 py-1.5 font-mono text-xs uppercase tracking-wide font-semibold text-secondary-text",
+      className
+    )}
     {...props}
   />
 ));
@@ -137,20 +140,20 @@ const SelectItem = React.forwardRef<
     ref={ref}
     data-slot="select-item"
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-xs outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:bg-sunken data-[disabled]:text-secondary-text",
+      "relative flex w-full cursor-default select-none items-center justify-between gap-2 rounded-sm py-1.5 pl-2 pr-2 text-base outline-none transition-colors data-[highlighted]:bg-sunken data-[highlighted]:text-foreground data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[state=checked]:font-semibold data-[disabled]:pointer-events-none data-[disabled]:bg-sunken data-[disabled]:text-secondary-text",
       className
     )}
     {...props}
   >
+    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     <span
       data-slot="select-item-indicator"
-      className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center"
+      className="ml-auto flex h-3.5 w-3.5 items-center justify-center"
     >
       <SelectPrimitive.ItemIndicator>
         <Check className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;

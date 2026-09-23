@@ -84,6 +84,39 @@ test.describe("Specimen review page", () => {
     expect(defaultButtonHeight).toBeGreaterThanOrEqual(32);
     expect(defaultButtonHeight).toBeLessThanOrEqual(34);
 
+    // Board fidelity: default button text 13px / weight 600, radius 7px
+    const defaultButtonType = await defaultButton.evaluate((el) => {
+      const s = window.getComputedStyle(el);
+      return {
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        borderRadius: s.borderTopLeftRadius,
+      };
+    });
+    expect(defaultButtonType.fontSize).toBe("13px");
+    expect(["600", "bold"]).toContain(defaultButtonType.fontWeight);
+    expect(defaultButtonType.borderRadius).toBe("7px");
+
+    // Secondary button: sunken fill + hover-border colour rgb(198, 192, 180)
+    const secondaryButton = page.getByRole("button", {
+      name: "secondary (default)",
+      exact: true,
+    });
+    const secondaryBorder = await secondaryButton.evaluate(
+      (el) => window.getComputedStyle(el).borderTopColor
+    );
+    expect(secondaryBorder).toBe("rgb(198, 192, 180)");
+
+    // Tint button: selected-tint fill rgb(234, 239, 236)
+    const tintButton = page.getByRole("button", {
+      name: "tint (default)",
+      exact: true,
+    });
+    const tintBg = await tintButton.evaluate(
+      (el) => window.getComputedStyle(el).backgroundColor
+    );
+    expect(tintBg).toBe("rgb(234, 239, 236)");
+
     // Keyboard focus: Tab to the first button (which is default (default))
     await page.keyboard.press("Tab");
     await expect(defaultButton).toBeFocused();
@@ -163,6 +196,12 @@ test.describe("Specimen review page", () => {
       (el) => window.getComputedStyle(el).borderTopColor
     );
     expect(restInputBorder).toBe("rgb(148, 141, 128)");
+
+    // Field rest fill is shell rgb(251, 250, 247)
+    const restInputBg = await restInput.evaluate(
+      (el) => window.getComputedStyle(el).backgroundColor
+    );
+    expect(restInputBg).toBe("rgb(251, 250, 247)");
 
     const invalidInput = page.getByLabel("Input (Invalid)");
     const invalidInputBorder = await invalidInput.evaluate(
@@ -286,6 +325,16 @@ test.describe("Specimen review page", () => {
     await expect(tabPerformance).toHaveAttribute("aria-selected", "true");
     await expect(tabPerformance).toBeFocused();
 
+    // Active tab shows a primary-coloured underline rgb(11, 92, 84) (allow the
+    // border-color transition to settle before reading the computed style)
+    await expect
+      .poll(() =>
+        tabPerformance.evaluate(
+          (el) => window.getComputedStyle(el).borderBottomColor
+        )
+      )
+      .toBe("rgb(11, 92, 84)");
+
     // --- DropdownMenu (keyboard open, nested submenu, escape closes all) ---
     const dropdownTrigger = page.getByRole("button", {
       name: "Open Menu",
@@ -370,6 +419,13 @@ test.describe("Specimen review page", () => {
       (el) => window.getComputedStyle(el).zIndex
     );
     expect(tooltipZ).toBe("80");
+
+    // Tooltip surface is ink rgb(22, 32, 29), not the primary green
+    const tooltipBg = await tooltipContent.evaluate(
+      (el) => window.getComputedStyle(el).backgroundColor
+    );
+    expect(tooltipBg).toBe("rgb(22, 32, 29)");
+
     await page.keyboard.press("Escape");
 
     // --- Progress: indeterminate indicator narrower than its track ---
