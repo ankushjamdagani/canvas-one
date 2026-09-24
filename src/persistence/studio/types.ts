@@ -364,6 +364,11 @@ export type DeleteProjectResult =
   | StaleResult
   | FailedResult;
 
+export type SaveRunResult =
+  | { readonly status: 'applied'; readonly runId: Id; readonly run: RunRecord }
+  | InvalidResult
+  | FailedResult;
+
 // ============================================================================
 // commands.md §2 & §3: Supported Authored Commands (RV-16a scope)
 // ============================================================================
@@ -451,8 +456,26 @@ export interface StudioRepository {
   /** CAS deletion by expected main branch head commit ID. Missing/already-absent on retry. */
   deleteProject(projectId: Id, expectedMainHead: ExpectedHead): Promise<DeleteProjectResult>;
 
-  /** Not implemented in RV-16a; owned by RV-08a/RV-16b. */
-  saveRun(startToken: unknown, terminalResult: unknown, chunks: unknown): Promise<UnsupportedResult>;
+  /**
+   * Commits the terminal summary, manifest, checks and retained chunks atomically (RV-08a).
+   * Verified by unforgeable RunStartToken; snapshot insert-if-absent from document;
+   * provenance 'local' set ONLY by repository; traceState 'complete' when chunks saved.
+   */
+  saveRun(
+    startToken: unknown,
+    terminalResult: unknown,
+    chunks?: unknown,
+    options?: { projectId?: Id; document?: Document } | Id,
+  ): Promise<SaveRunResult>;
+
+  /** Loads a run by [projectId, runId]. Returns cloned, read-only record or null if not found. */
+  loadRun(projectId: Id, runId: Id): Promise<Readonly<RunRecord> | null>;
+
+  /** Lists all runs for a project. Returns cloned, read-only records. */
+  listRuns(projectId: Id): Promise<readonly Readonly<RunRecord>[]>;
+
+  /** Finds runs for a project matching an execution fingerprint using [projectId+fingerprint] index. */
+  runsByFingerprint(projectId: Id, fingerprint: string): Promise<readonly Readonly<RunRecord>[]>;
 
   /** Not implemented in RV-16a; owned by RV-16b. */
   importProject(validatedBundle: unknown): Promise<UnsupportedResult>;
@@ -463,3 +486,6 @@ export interface StudioRepository {
   /** Not implemented in RV-16a; owned by RV-16b. */
   pruneUnreferenced(projectId: Id, selection: unknown): Promise<UnsupportedResult>;
 }
+
+export type { MintRunStartTokenParams, RunStartToken } from './token';
+

@@ -606,11 +606,6 @@ describe('LocalRepository', () => {
     it('returns typed unsupported result naming owning tasks', async () => {
       const db = createStudioDatabase(`test-unsupported-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
-
-      const runRes = await repo.saveRun(null, null, null);
-      expect(runRes.status).toBe('unsupported');
-      expect(runRes.task).toBe('RV-08a/RV-16b');
-
       const importRes = await repo.importProject(null);
       expect(importRes.status).toBe('unsupported');
       expect(importRes.task).toBe('RV-16b');

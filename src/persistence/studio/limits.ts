@@ -314,3 +314,79 @@ export async function enforceProjectLimits(
 
   return null;
 }
+
+/**
+ * Enforces run retention limits and run summary caps per storage.md §6 & §7:
+ * - 200 run summaries cap per project
+ * - 20 latest unpinned runs retention rule ("Before storing a 21st, offer an explicit prune")
+ * Returns a FailedResult with code 'limit' if any limit would be exceeded, or null if all pass.
+ */
+export async function enforceRunRetentionLimits(
+  db: StudioDatabase,
+  projectId: string,
+  newRunId: string,
+): Promise<FailedResult | null> {
+  // If run already exists, re-saving it does not add an unpinned run
+  const existing = await db.runs.get([projectId, newRunId]);
+  if (existing) {
+    return null;
+  }
+
+  // 1. Enforce 200 run-summaries cap (storage.md §6)
+  const totalRuns = await db.runs.where('projectId').equals(projectId).count();
+  if (totalRuns >= STORAGE_LIMITS.maxRunSummariesPerProject) {
+    return {
+      status: 'failed',
+      code: 'limit',
+      issues: [
+        createIssue(
+          'too-many',
+          `Project run summaries count would exceed maximum limit of ${STORAGE_LIMITS.maxRunSummariesPerProject} (current: ${totalRuns}, adding: 1)`,
+          ['runs'],
+          projectId,
+        ),
+      ],
+    };
+  }
+
+  // 2. Enforce 20 unpinned runs retention rule (storage.md §7:
+  // "Keep the 20 latest unpinned runs by (completedAt,id). Before storing a 21st, offer an explicit prune")
+  // A run is pinned when a retained commit references it.
+  const commits = await db.commits.where('projectId').equals(projectId).toArray();
+  const pinnedRunIds = new Set<string>();
+  for (const commit of commits) {
+    if (Array.isArray(commit.evidence)) {
+      for (const ev of commit.evidence) {
+        if (ev && typeof ev.runId === 'string') {
+          pinnedRunIds.add(ev.runId);
+        }
+      }
+    }
+  }
+
+  const allRuns = await db.runs.where('projectId').equals(projectId).toArray();
+  let unpinnedCount = 0;
+  for (const run of allRuns) {
+    if (!pinnedRunIds.has(run.id)) {
+      unpinnedCount++;
+    }
+  }
+
+  if (unpinnedCount >= 20) {
+    return {
+      status: 'failed',
+      code: 'limit',
+      issues: [
+        createIssue(
+          'too-many',
+          'Unpinned runs limit reached (20 unpinned runs). Explicit prune is required before storing additional runs.',
+          ['runs'],
+          projectId,
+        ),
+      ],
+    };
+  }
+
+  return null;
+}
+
