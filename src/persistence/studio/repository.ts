@@ -30,6 +30,12 @@ import {
 } from './primitives';
 import { applyRecordChanges } from './apply-records';
 import { validateRunStartToken } from './token';
+import { validatePublishTicket } from './publish-ticket';
+import {
+  validatePublicationMetadata,
+  deriveVersionKey,
+  compareSemanticVersions,
+} from '../../domain/versioning/publication';
 import { buildManifest, type BuildManifestVersions } from '../../domain/studio/manifest';
 import {
   buildEvidenceManifest,
@@ -53,12 +59,14 @@ import {
   type ExpectedHead,
   type HistoryCheckpointCommand,
   type HistoryCommitCommand,
+  type HistoryPublishCommand,
   type HistoryRestoreCommand,
   type ModelApplyRecordsCommand,
   type PreferenceRecord,
   type ProjectCreateCommand,
   type ProjectRecord,
   type ProjectRenameCommand,
+  type PublicationRecord,
   type RunRecord,
   type SavePreferencesResult,
   type SaveRunResult,
@@ -323,8 +331,19 @@ export class LocalRepository implements StudioRepository {
         return this.handleBranchReopen(command as BranchReopenCommand);
       case 'history.commit':
         return this.handleHistoryCommit(command as HistoryCommitCommand);
-      case 'history.prepare-publish':
       case 'history.publish':
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              'history.publish cannot be executed directly; candidates can only be published through CandidateController.publish or repo.publish with a registered ticket',
+              ['commandId'],
+            ),
+          ],
+        };
+      case 'history.prepare-publish':
       case 'history.resolve-conflict':
         return {
           status: 'unsupported',
@@ -2543,6 +2562,883 @@ export class LocalRepository implements StudioRepository {
       );
     } catch (err) {
       return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * Publishes an eligible candidate to main atomically (RV-08e).
+   *
+   * storage.md §2 & §3, commands.md (history.publish), transactions.md §4:
+   * - Validated by unforgeable PublishTicket from CandidateController
+   * - OUTSIDE: metadata validation, manifest build with current build versions, evidence qualification
+   * - INSIDE: receipt check, project CAS, source & main CAS, main clean, recheck runs,
+   *   version strictly greater, ordinal max + 1, limits, writes, source closed unless keepSourceOpen
+   */
+  async publish(
+    ticket: unknown,
+    command: HistoryPublishCommand,
+  ): Promise<AuthoredResult> {
+    // 1. Verify publish ticket against unforgeable WeakMap registry
+    const ticketBinding = validatePublishTicket(ticket);
+    if (!ticketBinding) {
+      return {
+        status: 'failed',
+        code: 'ineligible',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Publish ticket is missing, invalid, or forged; candidate tickets can only be minted by CandidateController',
+            ['ticket'],
+          ),
+        ],
+      };
+    }
+
+    // 2. Actor validation
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    // 3. Validate envelope IDs and revisions
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+
+    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projIssue) {
+      return { status: 'invalid', issues: [projIssue] };
+    }
+
+    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIssue) {
+      return { status: 'invalid', issues: [branchIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'command.payload is required', ['payload'])],
+      };
+    }
+
+    const expProjRevIssue = validateRevision(
+      command.payload.expectedProjectRevision,
+      ['payload', 'expectedProjectRevision'],
+      'expectedProjectRevision',
+    );
+    if (expProjRevIssue) {
+      return { status: 'invalid', issues: [expProjRevIssue] };
+    }
+
+    const candIdIssue = validateUuid(
+      command.payload.candidateId,
+      ['payload', 'candidateId'],
+      'candidateId',
+    );
+    if (candIdIssue) {
+      return { status: 'invalid', issues: [candIdIssue] };
+    }
+
+    const pubIdIssue = validateUuid(
+      command.payload.publicationId,
+      ['payload', 'publicationId'],
+      'publicationId',
+    );
+    if (pubIdIssue) {
+      return { status: 'invalid', issues: [pubIdIssue] };
+    }
+
+    const mergeCommitIdIssue = validateUuid(
+      command.payload.mergeCommitId,
+      ['payload', 'mergeCommitId'],
+      'mergeCommitId',
+    );
+    if (mergeCommitIdIssue) {
+      return { status: 'invalid', issues: [mergeCommitIdIssue] };
+    }
+
+    // 4. Ticket binding consistency checks
+    if (ticketBinding.candidateId !== command.payload.candidateId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Publish ticket candidateId '${ticketBinding.candidateId}' does not match command payload candidateId '${command.payload.candidateId}'`,
+            ['payload', 'candidateId'],
+            command.payload.candidateId,
+          ),
+        ],
+      };
+    }
+
+    if (ticketBinding.projectId !== command.projectId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Publish ticket projectId '${ticketBinding.projectId}' does not match command projectId '${command.projectId}'`,
+            ['projectId'],
+            command.projectId,
+          ),
+        ],
+      };
+    }
+
+    if (ticketBinding.sourceBranchId !== command.branchId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Publish ticket sourceBranchId '${ticketBinding.sourceBranchId}' does not match command branchId '${command.branchId}'`,
+            ['branchId'],
+            command.branchId,
+          ),
+        ],
+      };
+    }
+
+    if (ticketBinding.expectedSourceRevision !== command.expectedWorkingRevision) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Publish ticket expectedSourceRevision '${ticketBinding.expectedSourceRevision}' does not match command expectedWorkingRevision '${command.expectedWorkingRevision}'`,
+            ['expectedWorkingRevision'],
+          ),
+        ],
+      };
+    }
+
+    if (ticketBinding.operationId !== command.operationId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Publish ticket operationId '${ticketBinding.operationId}' does not match command operationId '${command.operationId}'`,
+            ['operationId'],
+            command.operationId,
+          ),
+        ],
+      };
+    }
+
+    // 5. Validate metadata per storage.md §3
+    const metadataIssues = validatePublicationMetadata(command.payload.metadata);
+    if (metadataIssues.length > 0) {
+      return { status: 'invalid', issues: metadataIssues };
+    }
+    const versionKey = deriveVersionKey(command.payload.metadata.version);
+
+    // 6. Validate keepSourceOpen (defaults false when omitted)
+    const keepSourceOpen = command.payload.keepSourceOpen ?? false;
+    if (typeof keepSourceOpen !== 'boolean') {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('wrong-type', 'payload.keepSourceOpen must be a boolean', [
+            'payload',
+            'keepSourceOpen',
+          ]),
+        ],
+      };
+    }
+
+    // 7. Validate evidence array
+    if (!Array.isArray(command.payload.evidence)) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('wrong-type', 'payload.evidence must be an array', ['payload', 'evidence']),
+        ],
+      };
+    }
+
+    const evidenceShapeIssues: Issue[] = [];
+    for (let i = 0; i < command.payload.evidence.length; i++) {
+      const ref = command.payload.evidence[i] as any;
+      if (
+        !ref ||
+        typeof ref !== 'object' ||
+        Array.isArray(ref) ||
+        !isValidUuid(ref.scenarioId) ||
+        typeof ref.fingerprint !== 'string' ||
+        ref.fingerprint.trim().length === 0 ||
+        !isValidUuid(ref.runId)
+      ) {
+        evidenceShapeIssues.push(
+          createIssue(
+            'wrong-type',
+            `Invalid evidence ref at index ${i}: expected {scenarioId: UUID, fingerprint: string, runId: UUID}`,
+            ['payload', 'evidence', i],
+          ),
+        );
+      }
+    }
+    if (evidenceShapeIssues.length > 0) {
+      return { status: 'invalid', issues: evidenceShapeIssues };
+    }
+
+    // 8. Candidate document validation against evidence
+    const doc = ticketBinding.document;
+    if (!doc.scenarios || doc.scenarios.length === 0) {
+      return {
+        status: 'failed',
+        code: 'ineligible',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Candidate document has zero scenarios; at least one qualified scenario is required to publish',
+            ['scenarios'],
+          ),
+        ],
+      };
+    }
+
+    const seenScenarioIds = new Set<Id>();
+    const docScenarioMap = new Map<Id, Scenario>(doc.scenarios.map((s) => [s.id, s]));
+    const refValidationIssues: Issue[] = [];
+
+    for (let i = 0; i < command.payload.evidence.length; i++) {
+      const ref = command.payload.evidence[i];
+      if (seenScenarioIds.has(ref.scenarioId)) {
+        refValidationIssues.push(
+          createIssue(
+            'duplicate-id',
+            `Duplicate evidence ref for scenario '${ref.scenarioId}'`,
+            ['payload', 'evidence', i],
+            ref.scenarioId,
+          ),
+        );
+      } else {
+        seenScenarioIds.add(ref.scenarioId);
+      }
+
+      if (!docScenarioMap.has(ref.scenarioId)) {
+        refValidationIssues.push(
+          createIssue(
+            'dangling-reference',
+            `Evidence ref cites scenario '${ref.scenarioId}' which does not exist in candidate document`,
+            ['payload', 'evidence', i],
+            ref.scenarioId,
+          ),
+        );
+      }
+    }
+    if (refValidationIssues.length > 0) {
+      return { status: 'invalid', issues: refValidationIssues };
+    }
+
+    const refByScenarioId = new Map<Id, EvidenceRef>();
+    for (const ref of command.payload.evidence) {
+      refByScenarioId.set(ref.scenarioId, ref);
+    }
+
+    for (const scenario of doc.scenarios) {
+      if (!refByScenarioId.has(scenario.id)) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Scenario '${scenario.id}' has no qualifying evidence run`,
+              ['evidence', scenario.id],
+              scenario.id,
+            ),
+          ],
+        };
+      }
+    }
+
+    // 9. OUTSIDE the transaction: validate cited runs exist in DB and qualify
+    for (const ref of command.payload.evidence) {
+      const runRec = await this.db.runs.get([command.projectId, ref.runId]);
+      if (!runRec) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' missing from database`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+
+      const runScenarioId: unknown = (runRec.manifest as { scenario?: { id?: unknown } } | null)
+        ?.scenario?.id;
+      if (typeof runScenarioId !== 'string' || runScenarioId !== ref.scenarioId) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' scenarioId '${runScenarioId}' does not match ref scenarioId '${ref.scenarioId}'`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+
+      if (runRec.fingerprint !== ref.fingerprint) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' fingerprint '${runRec.fingerprint}' does not match ref fingerprint '${ref.fingerprint}'`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+    }
+
+    // Build every scenario's manifest from the candidate document with the repository's current build versions
+    const candidateScenarios: CandidateScenario[] = [];
+    const citedRuns: RunRecord[] = [];
+
+    for (const scenario of doc.scenarios) {
+      const manifestRes = await buildManifest(doc, scenario.id, this.buildVersions);
+      if (manifestRes.status !== 'ok') {
+        const issues =
+          manifestRes.status === 'not-ready'
+            ? manifestRes.issues.map((i) =>
+                createIssue(
+                  i.code as any,
+                  i.message,
+                  ['scenarios', scenario.id, ...i.path],
+                  scenario.id,
+                ),
+              )
+            : [
+                createIssue(
+                  'structural-rule',
+                  `Scenario '${scenario.id}' buildManifest failed with status '${manifestRes.status}'`,
+                  ['scenarios', scenario.id],
+                  scenario.id,
+                ),
+              ];
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues,
+        };
+      }
+
+      const ref = refByScenarioId.get(scenario.id)!;
+      const runRec = (await this.db.runs.get([command.projectId, ref.runId]))!;
+
+      const qualResult = runQualifies(runRec, {
+        scenarioId: scenario.id,
+        fingerprint: manifestRes.fingerprint,
+        compiledScopeElementIds: manifestRes.manifest.scope.includedElementIds,
+      });
+
+      if (!qualResult.qualifies) {
+        const message =
+          runRec.status === 'incomplete'
+            ? `Scenario '${scenario.id}' evidence run is incomplete`
+            : `Scenario '${scenario.id}' evidence run is not qualifying: ${qualResult.reasons.join(', ')}`;
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              message,
+              ['evidence', scenario.id],
+              scenario.id,
+            ),
+          ],
+        };
+      }
+
+      candidateScenarios.push({
+        scenarioId: scenario.id,
+        fingerprint: manifestRes.fingerprint,
+        scope: manifestRes.manifest.scope,
+      });
+      citedRuns.push(runRec);
+    }
+
+    const evidenceManifest = buildEvidenceManifest(candidateScenarios, citedRuns);
+
+    // 10. Compute request hash BEFORE transaction and check early receipt
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    const earlyReceipt = await checkOperationReceipt(
+      this.db,
+      command.projectId,
+      command.operationId,
+      requestHash,
+    );
+    if ('status' in earlyReceipt) {
+      return earlyReceipt;
+    }
+    if (earlyReceipt.isRetry) {
+      return earlyReceipt.result;
+    }
+
+    // 11. Atomic transaction
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          // Check receipt FIRST before stale checks
+          const receiptCheck = await checkOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+          );
+          if ('status' in receiptCheck) {
+            return receiptCheck;
+          }
+          if (receiptCheck.isRetry) {
+            return receiptCheck.result;
+          }
+
+          // Project check
+          const curProject = await this.db.projects.get(command.projectId);
+          if (!curProject) {
+            return { status: 'missing', ids: [command.projectId] };
+          }
+
+          if (curProject.revision !== command.payload.expectedProjectRevision) {
+            return {
+              status: 'stale',
+              scope: 'project',
+              expected: command.payload.expectedProjectRevision,
+              actual: curProject.revision,
+            };
+          }
+
+          // Source branch check
+          const curSource = await this.db.branches.get([
+            command.projectId,
+            ticketBinding.sourceBranchId,
+          ]);
+          if (!curSource) {
+            return { status: 'missing', ids: [ticketBinding.sourceBranchId] };
+          }
+
+          if (curSource.state === 'closed') {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'Source branch is closed; cannot publish from a closed branch',
+                  ['branchId'],
+                  ticketBinding.sourceBranchId,
+                ),
+              ],
+            };
+          }
+
+          if (curSource.workingRevision !== ticketBinding.expectedSourceRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: ticketBinding.expectedSourceRevision,
+              actual: curSource.workingRevision,
+            };
+          }
+
+          if (curSource.headCommitId !== ticketBinding.expectedSourceHeadId) {
+            return {
+              status: 'failed',
+              code: 'conflict',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'HEAD_MOVED: Source branch head commit changed since candidate was prepared',
+                  ['payload', 'candidateId'],
+                  ticketBinding.expectedSourceHeadId,
+                ),
+              ],
+            };
+          }
+
+          // Main branch check
+          const curMain = await this.db.branches.get([
+            command.projectId,
+            ticketBinding.mainBranchId,
+          ]);
+          if (!curMain) {
+            return { status: 'missing', ids: [ticketBinding.mainBranchId] };
+          }
+
+          if (curMain.workingRevision !== ticketBinding.expectedMainRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: ticketBinding.expectedMainRevision,
+              actual: curMain.workingRevision,
+            };
+          }
+
+          if (curMain.headCommitId !== ticketBinding.expectedMainHeadId) {
+            return {
+              status: 'failed',
+              code: 'conflict',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'HEAD_MOVED: Main branch head commit changed since candidate was prepared',
+                  ['payload', 'candidateId'],
+                  ticketBinding.expectedMainHeadId,
+                ),
+              ],
+            };
+          }
+
+          // Main working snapshot == main head snapshot (or creation snapshot while unborn)
+          if (curMain.headCommitId === null) {
+            if (curMain.workingSnapshotId !== curProject.initialSnapshotId) {
+              return {
+                status: 'invalid',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    'Main branch has uncommitted working changes (working snapshot differs from creation snapshot while unborn)',
+                    ['mainBranchId'],
+                    curMain.id,
+                  ),
+                ],
+              };
+            }
+          } else {
+            const mainHeadCommit = await this.db.commits.get([
+              command.projectId,
+              curMain.headCommitId,
+            ]);
+            if (!mainHeadCommit) {
+              return { status: 'missing', ids: [curMain.headCommitId] };
+            }
+            if (curMain.workingSnapshotId !== mainHeadCommit.snapshotId) {
+              return {
+                status: 'invalid',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    'Main branch has uncommitted working changes (working snapshot differs from head commit snapshot)',
+                    ['mainBranchId'],
+                    curMain.id,
+                  ),
+                ],
+              };
+            }
+          }
+
+          // Recheck each cited run inside the transaction
+          for (const ref of command.payload.evidence) {
+            const cachedRun = citedRuns.find((r) => r.id === ref.runId);
+            const curRun = await this.db.runs.get([command.projectId, ref.runId]);
+            if (!curRun || !cachedRun) {
+              return {
+                status: 'failed',
+                code: 'ineligible',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    `Cited evidence run '${ref.runId}' missing from database`,
+                    ['evidence', ref.scenarioId],
+                    ref.runId,
+                  ),
+                ],
+              };
+            }
+
+            const curChecksCanon = canonicalJson(curRun.checks as any);
+            const cachedChecksCanon = canonicalJson(cachedRun.checks as any);
+            if (
+              curRun.fingerprint !== cachedRun.fingerprint ||
+              curRun.status !== cachedRun.status ||
+              curRun.provenance !== cachedRun.provenance ||
+              !curChecksCanon.ok ||
+              !cachedChecksCanon.ok ||
+              curChecksCanon.text !== cachedChecksCanon.text
+            ) {
+              return {
+                status: 'failed',
+                code: 'ineligible',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    `Cited evidence run '${ref.runId}' changed between evaluation and transaction`,
+                    ['evidence', ref.scenarioId],
+                    ref.runId,
+                  ),
+                ],
+              };
+            }
+          }
+
+          // Check existing publications and version ordering
+          const existingPublications = await this.db.publications
+            .where('projectId')
+            .equals(command.projectId)
+            .toArray();
+
+          const duplicateKeyPub = existingPublications.find(
+            (p) => p.versionKey === versionKey,
+          );
+          if (duplicateKeyPub) {
+            return {
+              status: 'failed',
+              code: 'duplicate-version',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  `Publication version '${versionKey}' already exists in project`,
+                  ['metadata', 'version'],
+                ),
+              ],
+            };
+          }
+
+          if (existingPublications.length > 0) {
+            existingPublications.sort((a, b) => a.ordinal - b.ordinal);
+            const latestPub = existingPublications[existingPublications.length - 1];
+            const cmp = compareSemanticVersions(
+              command.payload.metadata.version,
+              latestPub.metadata.version,
+            );
+            if (cmp === 0) {
+              return {
+                status: 'failed',
+                code: 'duplicate-version',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    `Publication version '${versionKey}' already exists in project`,
+                    ['metadata', 'version'],
+                  ),
+                ],
+              };
+            }
+            if (cmp < 0) {
+              return {
+                status: 'invalid',
+                issues: [
+                  createIssue(
+                    'out-of-range',
+                    `Publication version '${versionKey}' must be strictly greater than latest publication version '${latestPub.versionKey}'`,
+                    ['metadata', 'version'],
+                  ),
+                ],
+              };
+            }
+          }
+
+          const previousMaxOrdinal = existingPublications.reduce(
+            (max, p) => Math.max(max, p.ordinal),
+            0,
+          );
+          const ordinal = previousMaxOrdinal + 1;
+
+          // Merge commit parent IDs: [main head, source head] deduplicated (just [source head] when main is unborn)
+          const parentIds: readonly Id[] =
+            curMain.headCommitId === null
+              ? [curSource.headCommitId!]
+              : curMain.headCommitId === curSource.headCommitId
+                ? [curMain.headCommitId]
+                : [curMain.headCommitId, curSource.headCommitId!];
+
+          const now = Date.now();
+          const commitRow: CommitRecord = {
+            projectId: command.projectId,
+            id: command.payload.mergeCommitId,
+            snapshotId: ticketBinding.snapshotId,
+            parentIds,
+            evidence: command.payload.evidence,
+            evidenceManifest,
+            actor: command.actor,
+            createdAt: now,
+            message: command.payload.metadata.title,
+          };
+
+          const publicationRow: PublicationRecord = {
+            projectId: command.projectId,
+            id: command.payload.publicationId,
+            commitId: command.payload.mergeCommitId,
+            sourceBranchId: ticketBinding.sourceBranchId,
+            previousMainHeadId: curMain.headCommitId,
+            ordinal,
+            actor: command.actor,
+            createdAt: now,
+            metadata: command.payload.metadata,
+            versionKey,
+          };
+
+          const snapshotRow: SnapshotRecord = {
+            projectId: command.projectId,
+            id: ticketBinding.snapshotId,
+            document: ticketBinding.document,
+          };
+
+          // Project limits check
+          const existingSnapshot = await this.db.snapshots.get([
+            command.projectId,
+            ticketBinding.snapshotId,
+          ]);
+          let additionalBytes =
+            calculateRecordBytes(commitRow) + calculateRecordBytes(publicationRow);
+          if (!existingSnapshot) {
+            additionalBytes += calculateRecordBytes(snapshotRow);
+          }
+
+          const limitError = await enforceProjectLimits(this.db, {
+            projectId: command.projectId,
+            additionalCommits: 1,
+            additionalReceipts: 1,
+            additionalLocalBytes: additionalBytes,
+            additionalExportBytes: additionalBytes,
+          });
+          if (limitError) return limitError;
+
+          // Write snapshot (insert-if-absent)
+          if (!existingSnapshot) {
+            await insertImmutable(this.db.snapshots, snapshotRow, [
+              command.projectId,
+              ticketBinding.snapshotId,
+            ]);
+          }
+
+          // Write merge commit
+          await insertImmutable(this.db.commits, commitRow, [
+            command.projectId,
+            command.payload.mergeCommitId,
+          ]);
+
+          // Write publication
+          await insertImmutable(this.db.publications, publicationRow, [
+            command.projectId,
+            command.payload.publicationId,
+          ]);
+
+          // Advance main head AND working snapshot to the merge commit/snapshot together
+          const nextMainRev = curMain.workingRevision + 1;
+          await this.db.branches.update([command.projectId, curMain.id], {
+            headCommitId: command.payload.mergeCommitId,
+            workingSnapshotId: ticketBinding.snapshotId,
+            workingRevision: nextMainRev,
+          });
+
+          // Source branch: keeps its head and snapshot and is closed unless keepSourceOpen
+          const nextSourceRev = curSource.workingRevision + 1;
+          await this.db.branches.update([command.projectId, curSource.id], {
+            state: keepSourceOpen ? 'open' : 'closed',
+            workingRevision: nextSourceRev,
+          });
+
+          // Advance project revision
+          const nextProjectRev = curProject.revision + 1;
+          await this.db.projects.update(command.projectId, {
+            revision: nextProjectRev,
+            updatedAt: now,
+          });
+
+          const appliedResult: AppliedResult = {
+            status: 'applied',
+            operationId: command.operationId,
+            projectRevision: nextProjectRev,
+            branchRevision: nextSourceRev,
+            changedIds: [command.payload.publicationId, command.payload.mergeCommitId],
+            undo: null,
+            value: {
+              kind: 'artifact',
+              artifactType: 'publication',
+              id: command.payload.publicationId,
+              revision: null,
+            },
+          };
+
+          await recordOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+            appliedResult,
+          );
+
+          return appliedResult;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * Loads a publication by [projectId, publicationId]. Returns cloned, read-only record or null.
+   */
+  async loadPublication(
+    projectId: Id,
+    publicationId: Id,
+  ): Promise<Readonly<PublicationRecord> | null> {
+    try {
+      const record = await this.db.publications.get([projectId, publicationId]);
+      if (!record) return null;
+      return Object.freeze(structuredClone(record));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to load publication from database',
+        issues: [createIssue('structural-rule', String(err), [], publicationId)],
+      });
+    }
+  }
+
+  /**
+   * Lists all publications for a project. Returns cloned, read-only records.
+   */
+  async listPublications(projectId: Id): Promise<readonly Readonly<PublicationRecord>[]> {
+    try {
+      const records = await this.db.publications
+        .where('projectId')
+        .equals(projectId)
+        .sortBy('ordinal');
+      return Object.freeze(records.map((r) => Object.freeze(structuredClone(r))));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to list publications from database',
+        issues: [createIssue('structural-rule', String(err), [], projectId)],
+      });
     }
   }
 

@@ -528,6 +528,26 @@ export type HistoryCommitCommand = {
   };
 };
 
+export type HistoryPublishPayload = {
+  readonly candidateId: Id;
+  readonly publicationId: Id;
+  readonly mergeCommitId: Id;
+  readonly metadata: PublicationMetadata;
+  readonly evidence: readonly EvidenceRef[];
+  readonly keepSourceOpen?: boolean;
+  readonly expectedProjectRevision: number;
+};
+
+export type HistoryPublishCommand = {
+  readonly commandId: 'history.publish';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly expectedWorkingRevision: number;
+  readonly actor: Actor;
+  readonly payload: HistoryPublishPayload;
+};
+
 export type GenericCommand = {
   readonly commandId: string;
   readonly operationId?: Id;
@@ -548,6 +568,7 @@ export type AuthoredCommand =
   | HistoryRestoreCommand
   | HistoryCommitCommand
   | BranchReopenCommand
+  | HistoryPublishCommand
   | GenericCommand;
 
 // ============================================================================
@@ -661,6 +682,22 @@ export interface StudioRepository {
   /** Finds runs for a project matching an execution fingerprint using [projectId+fingerprint] index. */
   runsByFingerprint(projectId: Id, fingerprint: string): Promise<readonly Readonly<RunRecord>[]>;
 
+  /**
+   * Publishes a candidate to main atomically (RV-08e).
+   * Verified by unforgeable PublishTicket from CandidateController;
+   * source and main CAS, runs rechecked, version strictly greater, source closed by default.
+   */
+  publish(
+    ticket: unknown,
+    command: HistoryPublishCommand,
+  ): Promise<AuthoredResult>;
+
+  /** Loads a publication by [projectId, publicationId]. Returns cloned, read-only record or null. */
+  loadPublication(projectId: Id, publicationId: Id): Promise<Readonly<PublicationRecord> | null>;
+
+  /** Lists all publications for a project. Returns cloned, read-only records. */
+  listPublications(projectId: Id): Promise<readonly Readonly<PublicationRecord>[]>;
+
   /** Not implemented in RV-16a; owned by RV-16b. */
   importProject(validatedBundle: unknown): Promise<UnsupportedResult>;
 
@@ -672,4 +709,5 @@ export interface StudioRepository {
 }
 
 export type { MintRunStartTokenParams, RunStartToken } from './token';
+export type { MintPublishTicketParams, PublishTicket, PublishTicketBinding } from './publish-ticket';
 
