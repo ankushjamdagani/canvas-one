@@ -679,4 +679,85 @@ describe('LocalRepository', () => {
       }
     });
   });
+
+  describe('listProjects', () => {
+    it('returns empty array when no projects exist', async () => {
+      const db = createStudioDatabase(`test-list-empty-${crypto.randomUUID()}`);
+      const repo = new LocalRepository(db, { mintId: () => crypto.randomUUID() });
+      const projects = await repo.listProjects();
+      expect(projects).toEqual([]);
+      expect(Object.isFrozen(projects)).toBe(true);
+      db.close();
+    });
+
+    it('returns cloned, read-only projects sorted by title then id', async () => {
+      const db = createStudioDatabase(`test-list-sort-${crypto.randomUUID()}`);
+      const repo = new LocalRepository(db, { mintId: () => crypto.randomUUID() });
+
+      const idB = '22222222-2222-4222-8222-222222222222';
+      const idA2 = '11111111-1111-4111-8111-111111111112';
+      const idA1 = '11111111-1111-4111-8111-111111111111';
+
+      // Insert Project "Beta"
+      await repo.execute({
+        commandId: 'project.create',
+        operationId: crypto.randomUUID(),
+        actor: testActor,
+        payload: {
+          newProjectId: idB,
+          title: 'Beta Project',
+          initialDocument: s01Doc,
+          mainBranchId: crypto.randomUUID(),
+          draftBranchId: crypto.randomUUID(),
+        },
+      });
+
+      // Insert Project "Alpha" with idA2
+      await repo.execute({
+        commandId: 'project.create',
+        operationId: crypto.randomUUID(),
+        actor: testActor,
+        payload: {
+          newProjectId: idA2,
+          title: 'Alpha Project',
+          initialDocument: s01Doc,
+          mainBranchId: crypto.randomUUID(),
+          draftBranchId: crypto.randomUUID(),
+        },
+      });
+
+      // Insert Project "Alpha" with idA1
+      await repo.execute({
+        commandId: 'project.create',
+        operationId: crypto.randomUUID(),
+        actor: testActor,
+        payload: {
+          newProjectId: idA1,
+          title: 'Alpha Project',
+          initialDocument: s01Doc,
+          mainBranchId: crypto.randomUUID(),
+          draftBranchId: crypto.randomUUID(),
+        },
+      });
+
+      const list = await repo.listProjects();
+      expect(list.length).toBe(3);
+      // Sorted by title then id:
+      // 1. Alpha Project (idA1)
+      // 2. Alpha Project (idA2)
+      // 3. Beta Project (idB)
+      expect(list[0].id).toBe(idA1);
+      expect(list[0].title).toBe('Alpha Project');
+      expect(list[1].id).toBe(idA2);
+      expect(list[1].title).toBe('Alpha Project');
+      expect(list[2].id).toBe(idB);
+      expect(list[2].title).toBe('Beta Project');
+
+      // Verify read-only / frozen
+      expect(Object.isFrozen(list)).toBe(true);
+      expect(Object.isFrozen(list[0])).toBe(true);
+
+      db.close();
+    });
+  });
 });

@@ -80,6 +80,9 @@ export class SessionController {
     this.repository = options.repository;
     this.mintId = options.mintId;
     this.actor = options.actor;
+
+    this.getState = this.getState.bind(this);
+    this.subscribe = this.subscribe.bind(this);
   }
 
   /**

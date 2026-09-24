@@ -253,6 +253,10 @@
   --shadow: 0 12px 35px #203d3521;
 }
 
+.text-muted {
+  color: var(--secondary-text);
+}
+
 .dark {
   --background: #09090b;
   --foreground: #fafafa;
@@ -1342,6 +1346,28 @@ p {
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: #c48212 !important;
   stroke-width: 3 !important;
+}
+
+.react-flow__edges,
+.react-flow__edge,
+.react-flow__edge-textwrapper {
+  overflow: visible !important;
+}
+
+.react-flow__edge-textbg {
+  fill: var(--panel) !important;
+  stroke: var(--control-border) !important;
+  stroke-width: 1px !important;
+  rx: 4px !important;
+  ry: 4px !important;
+}
+
+.react-flow__edge-text {
+  fill: var(--body) !important;
+  font-size: 10px !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  user-select: none !important;
 }
 @keyframes legacy-pulse {
   50% {

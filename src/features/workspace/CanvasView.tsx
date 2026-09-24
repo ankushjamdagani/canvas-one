@@ -1,0 +1,267 @@
+import * as React from 'react';
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  type Node,
+  type Edge,
+  type OnNodeDrag,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import type { Document, Id } from '../../domain/studio/model';
+import { NodeCard } from './NodeCard';
+import { GroupNode } from './GroupNode';
+import { NoteNode } from './NoteNode';
+import { FloatingDock } from './FloatingDock';
+import {
+  projectDocumentToCanvas,
+} from './projection';
+import { NativeSelect } from '@/components/ui/native-select';
+
+const nodeTypes = {
+  elementNode: NodeCard,
+  groupNode: GroupNode,
+  noteNode: NoteNode,
+};
+
+export interface CanvasViewProps {
+  document: Document | null;
+  activeViewId: Id | null;
+  onSelectView: (viewId: Id) => void;
+  isSaving: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onMoveNodes: (
+    movedNodes: Array<{ id: string; position: { x: number; y: number } }>,
+  ) => Promise<boolean>;
+}
+
+function CanvasFlowInner({
+  document,
+  activeViewId,
+  onSelectView,
+  isSaving,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  onMoveNodes,
+}: CanvasViewProps) {
+  const [dragMode, setDragMode] = React.useState<'select' | 'pan'>('select');
+  const reactFlow = useReactFlow();
+
+  const projection = React.useMemo(() => {
+    return projectDocumentToCanvas(document, activeViewId);
+  }, [document, activeViewId]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
+    projection.nodes as unknown as Node[],
+  );
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(
+    projection.edges as unknown as Edge[],
+  );
+
+  // Sync projected nodes and edges when document or activeViewId changes
+  React.useEffect(() => {
+    setNodes(projection.nodes as unknown as Node[]);
+    setEdges(projection.edges as unknown as Edge[]);
+  }, [projection, setNodes, setEdges]);
+
+  // Node drag end handler:
+  // Identify nodes by node.type (not string prefixes on IDs)
+  // Moved list built by placement.id (ReactFlow node id)
+  const handleNodeDragStop: OnNodeDrag = React.useCallback(
+    async (_event, node, draggedNodes) => {
+      if (!projection.activeView || isSaving) return;
+
+      const nodesToProcess =
+        draggedNodes && draggedNodes.length > 0 ? draggedNodes : [node];
+
+      // Filter only element nodes by node.type (groups/notes are presentation)
+      const elementNodes = nodesToProcess.filter(
+        (n) => n.type === 'elementNode',
+      );
+      if (elementNodes.length === 0) return;
+
+      const movedList = elementNodes.map((n) => ({
+        id: n.id, // placement.id
+        position: { x: n.position.x, y: n.position.y },
+      }));
+
+      const success = await onMoveNodes(movedList);
+      if (!success) {
+        // Snap back to document positions on failure
+        setNodes(projection.nodes as unknown as Node[]);
+      }
+    },
+    [projection, isSaving, onMoveNodes, setNodes],
+  );
+
+  // Zoom controls per specs/revamp/contracts/commands.md §4:
+  // factor 1.2, clamped 0.1–2, fit padding exactly 32 px
+  const handleZoomIn = React.useCallback(() => {
+    const current = reactFlow.getZoom();
+    const next = Math.min(2.0, current * 1.2);
+    reactFlow.zoomTo(next, { duration: 150 });
+  }, [reactFlow]);
+
+  const handleZoomOut = React.useCallback(() => {
+    const current = reactFlow.getZoom();
+    const next = Math.max(0.1, current / 1.2);
+    reactFlow.zoomTo(next, { duration: 150 });
+  }, [reactFlow]);
+
+  const handleFitView = React.useCallback(() => {
+    reactFlow.fitView({
+      padding: '32px',
+      minZoom: 0.1,
+      maxZoom: 2.0,
+      duration: 150,
+    });
+  }, [reactFlow]);
+
+  // Camera fitting per requirement 3:
+  // Fit the view (32 px padding, zoom clamp 0.1–2) when a document/view is first shown
+  // and when switching views; never re-fit after a drag or undo/redo.
+  const lastFittedKeyRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const docId = document?.id;
+    const viewId = projection.activeView?.id;
+    if (!docId || !viewId) return;
+
+    const key = `${docId}:${viewId}`;
+    if (lastFittedKeyRef.current !== key) {
+      lastFittedKeyRef.current = key;
+      const timer = setTimeout(() => {
+        reactFlow.fitView({
+          padding: '32px',
+          minZoom: 0.1,
+          maxZoom: 2.0,
+          duration: 0,
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [document?.id, projection.activeView?.id, reactFlow]);
+
+  if (projection.empty) {
+    return (
+      <div
+        data-testid="empty-views-state"
+        className="flex-1 h-full w-full flex flex-col items-center justify-center p-8 text-center bg-canvas select-none"
+      >
+        <div className="max-w-md p-6 rounded-card border border-control-border bg-panel shadow-raised">
+          <p className="text-sm font-semibold text-ink">
+            This project has no views yet
+          </p>
+          <p className="text-xs text-secondary-text mt-1">
+            This project has no views configured in its document.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid="canvas-container"
+      className="relative flex-1 w-full h-full overflow-hidden bg-canvas"
+    >
+      {/* View selector when the document has more than one view */}
+      {projection.hasMultipleViews && (
+        <div
+          data-testid="view-selector-container"
+          className="absolute top-3 left-3 z-10 flex items-center gap-2 px-2.5 py-1.5 rounded-control bg-panel border border-control-border shadow-raised"
+        >
+          <span className="text-xs font-medium text-secondary-text">View:</span>
+          <NativeSelect
+            data-testid="view-selector"
+            value={projection.activeView?.id ?? ''}
+            onChange={(e) => onSelectView(e.target.value)}
+            className="h-6 text-xs bg-canvas px-2 rounded-tag border-control-border"
+          >
+            {projection.views.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      )}
+
+      {/* Non-blocking projection issues notice */}
+      {projection.issues.length > 0 && (
+        <div
+          data-testid="canvas-issues-notice"
+          className="absolute bottom-3 left-3 z-10 max-w-sm pointer-events-auto p-2.5 rounded-card border border-riskEdge bg-riskTint text-destructive text-xs shadow-raised"
+          role="status"
+        >
+          <div className="font-semibold mb-1">
+            Notice ({projection.issues.length}):
+          </div>
+          <ul className="list-disc list-inside space-y-0.5">
+            {projection.issues.map((issue, idx) => (
+              <li key={idx} className="truncate" title={issue.message}>
+                {issue.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeDragStop={handleNodeDragStop}
+        nodesDraggable={!isSaving}
+        nodesConnectable={false}
+        panOnDrag={dragMode === 'pan'}
+        selectionOnDrag={dragMode === 'select'}
+        panOnScroll
+        minZoom={0.1}
+        maxZoom={2.0}
+        fitView
+        fitViewOptions={{
+          padding: '32px',
+          minZoom: 0.1,
+          maxZoom: 2.0,
+        }}
+        proOptions={{ hideAttribution: true }}
+        className="system-canvas bg-canvas"
+      >
+        {/* Dotted canvas background from design token CSS variable */}
+        <Background color="var(--control-border)" gap={16} size={1} />
+      </ReactFlow>
+
+      {/* 16A Canvas Dock */}
+      <FloatingDock
+        dragMode={dragMode}
+        onSetDragMode={setDragMode}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={onUndo}
+        onRedo={onRedo}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onFitView={handleFitView}
+      />
+    </div>
+  );
+}
+
+export function CanvasView(props: CanvasViewProps) {
+  return (
+    <ReactFlowProvider>
+      <CanvasFlowInner {...props} />
+    </ReactFlowProvider>
+  );
+}

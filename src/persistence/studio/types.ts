@@ -701,6 +701,9 @@ export interface StudioRepository {
   /** Queries return cloned, read-only project record or null if not found. */
   loadProject(projectId: Id): Promise<Readonly<ProjectRecord> | null>;
 
+  /** Lists all projects sorted by title then id. Returns cloned, read-only records. */
+  listProjects(): Promise<readonly ProjectRecord[]>;
+
   /** Queries return cloned, read-only branch record or null if not found. */
   loadBranch(projectId: Id, branchId: Id): Promise<Readonly<BranchRecord> | null>;
 
