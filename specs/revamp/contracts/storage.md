@@ -22,7 +22,7 @@ All tables except preferences use project-scoped composite keys. Immutable rows 
 | projects / id | `title, revision, mainBranchId, initialSnapshotId, importSourceId:Id\|null, createdAt, updatedAt` | updatedAt |
 | branches / [projectId+id] | `label, state:'open'\|'closed', headCommitId:Id\|null, workingSnapshotId, workingRevision, createdAt` | projectId |
 | snapshots / [projectId+id] | `document` (id = content hash) | projectId |
-| commits / [projectId+id] | `snapshotId, parentIds, evidence:EvidenceRef[], actor, createdAt, message` | projectId |
+| commits / [projectId+id] | `snapshotId, parentIds, evidence:EvidenceRef[], evidenceManifest:EvidenceManifest, actor, createdAt, message` | projectId |
 | publications / [projectId+id] | `commitId, sourceBranchId, previousMainHeadId\|null, ordinal, actor, createdAt, metadata:PublicationMetadata, versionKey` | projectId; unique [projectId+ordinal]; unique [projectId+versionKey] |
 | checkpoints / [projectId+id] | `snapshotId, sourceBranchId, label, actor, createdAt` | projectId |
 | runs / [projectId+id] | `snapshotId, manifest, fingerprint, status, provenance:'local'\|'imported-unverified', checks, summary, traceState:'complete'\|'pruned'\|'not-saved', createdAt, completedAt` | projectId; [projectId+fingerprint] |
@@ -32,6 +32,7 @@ All tables except preferences use project-scoped composite keys. Immutable rows 
 | preferences / key | `schema, revision, value` | — |
 
 - `EvidenceRef={scenarioId, fingerprint, runId}`. Summaries and checks live in the pinned run rows; the publish transaction reads them there.
+- `EvidenceManifest={scenarioIds:Id[], entries:[{scenarioId, fingerprint, runId, completion, checks, scope:{includedElementIds, excludedElementIds}}]}` is the evidence manifest run-identity.md §5 requires at commit/publish preparation: the full scenario inventory plus each cited run's completion, check outcomes and tested scope, copied when the commit (or publish merge commit) is written. It is immutable, exported and imported with the commit, and never trusted on import (imported runs stay `imported-unverified`).
 - Run `status` is one of `completed|invalid|failed|cancelled|incomplete`. All are terminal, and `completedAt` is the finite termination time.
 - Timestamps are finite epoch ms, for display only.
 - An imported actor is descriptive metadata, never a permission grant.

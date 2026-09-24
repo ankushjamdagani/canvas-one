@@ -1172,3 +1172,8 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round** (Claude): removed an invented download-ID default, made the evidence scenario check strict, allowed trace pruning of pinned runs (rows still protected), added byte limits to import.
 - **Verification** (Claude): 868 unit tests, `tsc -b` clean.
 - **Limitations**: `evidenceManifest` on commits extends storage.md's commit row (needs a contract note); no UI/download wiring (RV-10/RV-12).
+
+### RV-16b accepted; storage.md commit row
+
+- **Outcome**: User accepted RV-16b. `specs/revamp/contracts/storage.md` §2 commit row now lists `evidenceManifest:EvidenceManifest`, with its shape defined next to `EvidenceRef` (run-identity.md §5 evidence manifest; exported/imported, never trusted on import).
+- **Limitations**: `CommitRecord.evidenceManifest` is still optional in the TypeScript type; commit and publish always write it.
