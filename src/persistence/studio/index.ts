@@ -8,3 +8,4 @@ export * from './db';
 export * from './limits';
 export * from './primitives';
 export * from './repository';
+export * from './token';

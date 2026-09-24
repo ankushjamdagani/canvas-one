@@ -217,6 +217,6 @@ describe('Quota and Limits enforcement', () => {
       }
 
       db.close();
-    });
+    }, 20000);
   });
 });

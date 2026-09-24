@@ -6,24 +6,29 @@
  * and specs/revamp/contracts/commands.md (§2 Envelopes & Results, §3 Commands).
  */
 
+import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
 import { validateDocument } from '../../domain/studio/validate';
 import type { Document, Id } from '../../domain/studio/model';
+import { TERMINAL_STATUSES, type TraceEvent } from '../../domain/studio/runner/types';
 import { createStudioDatabase, StudioDatabase } from './db';
 import { createIssue, mapErrorToFailedResult, RepositoryError } from './errors';
 import {
   calculateRecordBytes,
   enforceProjectLimits,
+  enforceRunRetentionLimits,
 } from './limits';
 import {
   checkOperationReceipt,
   computeRequestHash,
   computeSnapshotId,
   insertImmutable,
+  isValidUuid,
   recordOperationReceipt,
   validateActor,
   validateRevision,
   validateUuid,
 } from './primitives';
+import { validateRunStartToken } from './token';
 import {
   PREFERENCES_SCHEMA,
   type AppliedResult,
@@ -37,9 +42,12 @@ import {
   type ProjectCreateCommand,
   type ProjectRecord,
   type ProjectRenameCommand,
+  type RunRecord,
   type SavePreferencesResult,
+  type SaveRunResult,
   type SnapshotRecord,
   type StudioRepository,
+  type TraceChunkRecord,
   type UnsupportedResult,
 } from './types';
 
@@ -980,19 +988,406 @@ export class LocalRepository implements StudioRepository {
   }
 
   // ==========================================================================
-  // storage.md §5: Unsupported port methods (owned by later tasks)
+  // storage.md §5: Run persistence and reads (RV-08a)
   // ==========================================================================
 
   async saveRun(
-    _startToken: unknown,
-    _terminalResult: unknown,
-    _chunks: unknown,
-  ): Promise<UnsupportedResult> {
-    return {
-      status: 'unsupported',
-      task: 'RV-08a/RV-16b',
-      message: 'saveRun is not yet implemented (owned by RV-08a/RV-16b)',
+    startToken: unknown,
+    terminalResult: unknown,
+    chunks?: unknown,
+    options?: { projectId?: Id; document?: Document } | Id,
+  ): Promise<SaveRunResult> {
+    // 1. Verify start token against unforgeable registry
+    const tokenBinding = validateRunStartToken(startToken);
+    if (!tokenBinding) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Start token is invalid, forged, or not registered in the runner registry',
+            ['startToken'],
+          ),
+        ],
+      };
+    }
+
+    // 2. Validate token object against registry binding
+    if (
+      typeof startToken === 'object' &&
+      startToken !== null &&
+      ((startToken as any).runId !== tokenBinding.runId ||
+        (startToken as any).snapshotId !== tokenBinding.snapshotId ||
+        (startToken as any).fingerprint !== tokenBinding.fingerprint ||
+        (startToken as any).projectId !== tokenBinding.projectId)
+    ) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Start token object properties do not match registered binding',
+            ['startToken'],
+          ),
+        ],
+      };
+    }
+
+    // 3. Resolve project ID ONLY from the start token registry binding
+    const projectId: Id = tokenBinding.projectId;
+    if (!projectId || !isValidUuid(projectId)) {
+      return {
+        status: 'invalid',
+        issues: [createIssue('invalid-id', 'Valid projectId is required in start token binding', ['projectId'])],
+      };
+    }
+
+    // If caller-supplied projectId (options or terminalResult) disagrees with the binding -> invalid
+    const callerProjectId = typeof options === 'string' ? options : options?.projectId;
+    if (callerProjectId !== undefined && callerProjectId !== projectId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Caller-supplied projectId (${callerProjectId}) does not match start token binding (${projectId})`,
+            ['projectId'],
+          ),
+        ],
+      };
+    }
+
+    const termProjectId = (terminalResult as any)?.projectId;
+    if (termProjectId !== undefined && termProjectId !== projectId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Terminal result projectId (${termProjectId}) does not match start token binding (${projectId})`,
+            ['projectId'],
+          ),
+        ],
+      };
+    }
+
+    // 4. Verify terminal result
+    if (!terminalResult || typeof terminalResult !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('wrong-type', 'Terminal result must be an object', ['terminalResult'])],
+      };
+    }
+    const term = terminalResult as any;
+
+    // Requirement 3: terminalResult.runId must equal the binding's runId
+    if (term.runId !== tokenBinding.runId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Run ID in terminal result (${String(term.runId)}) does not match start token binding (${tokenBinding.runId})`,
+            ['runId'],
+          ),
+        ],
+      };
+    }
+
+    // Requirement 3: terminal manifest fingerprint must equal the binding's fingerprint
+    let termFingerprint =
+      term.fingerprint ?? term.manifestFingerprint ?? (term.manifest as any)?.fingerprint;
+    if (termFingerprint === undefined && term.manifest && typeof term.manifest === 'object') {
+      try {
+        const canon = canonicalJson(term.manifest);
+        if (canon.ok) {
+          termFingerprint = `ss-run-v1:${await sha256Hex(canon.text)}`;
+        }
+      } catch {
+        // ignore error and let check fail below
+      }
+    }
+
+    if (termFingerprint !== tokenBinding.fingerprint) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Manifest fingerprint in terminal result (${String(termFingerprint)}) does not match start token binding (${tokenBinding.fingerprint})`,
+            ['fingerprint'],
+          ),
+        ],
+      };
+    }
+
+    // Verify snapshotId match (if present on terminal result)
+    if (term.snapshotId !== undefined && term.snapshotId !== tokenBinding.snapshotId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Snapshot ID in terminal result (${term.snapshotId}) does not match start token binding (${tokenBinding.snapshotId})`,
+            ['snapshotId'],
+          ),
+        ],
+      };
+    }
+
+    // Verify terminal status: only terminal statuses persist
+    const status = term.status;
+    if (!TERMINAL_STATUSES.includes(status)) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'invalid-literal',
+            `Only terminal statuses persist; received non-terminal or unknown status '${String(status)}'`,
+            ['status'],
+          ),
+        ],
+      };
+    }
+
+    // Verify summary
+    const summary = term.summary;
+    if (!summary || typeof summary !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'Run summary is required to save run', ['summary'])],
+      };
+    }
+    const checks = Array.isArray(term.checks) ? term.checks : [];
+
+    // 5. Verify snapshot row exists or insert-if-absent from supplied document
+    const snapshotKey: [string, string] = [projectId, tokenBinding.snapshotId];
+    const existingSnapshot = await this.db.snapshots.get(snapshotKey);
+    const documentToInsert: Document | undefined =
+      typeof options === 'object' && options?.document
+        ? options.document
+        : tokenBinding.document ?? term.document;
+
+    if (!existingSnapshot) {
+      if (documentToInsert) {
+        try {
+          const computedSnapId = await computeSnapshotId(documentToInsert);
+          if (computedSnapId !== tokenBinding.snapshotId) {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  `Provided document snapshot ID (${computedSnapId}) does not match token snapshot ID (${tokenBinding.snapshotId})`,
+                  ['snapshotId'],
+                ),
+              ],
+            };
+          }
+        } catch (err) {
+          if (err instanceof RepositoryError && err.code === 'invalid') {
+            return {
+              status: 'invalid',
+              issues: err.issues ?? [createIssue('structural-rule', err.message, ['document'])],
+            };
+          }
+          throw err;
+        }
+      } else {
+        return {
+          status: 'invalid',
+          issues: [
+            createIssue(
+              'dangling-reference',
+              `Snapshot '${tokenBinding.snapshotId}' does not exist for project '${projectId}' and no document was supplied`,
+              ['snapshotId'],
+            ),
+          ],
+        };
+      }
+    }
+
+    // 5. Check retention & limits before mutation
+    const retentionLimitResult = await enforceRunRetentionLimits(this.db, projectId, tokenBinding.runId);
+    if (retentionLimitResult) {
+      return retentionLimitResult;
+    }
+
+    // Normalize chunks
+    const chunkRecords: TraceChunkRecord[] = [];
+    let chunksAreSaved = false;
+
+    if (chunks !== null && chunks !== undefined) {
+      chunksAreSaved = true;
+      if (Array.isArray(chunks)) {
+        if (chunks.length > 0) {
+          if ('events' in chunks[0] && Array.isArray((chunks[0] as any).events)) {
+            for (let i = 0; i < chunks.length; i++) {
+              const c = chunks[i] as any;
+              const events = c.events;
+              const firstSeq = c.firstSequence ?? (events.length > 0 ? events[0].sequence : 0);
+              const payloads = c.payloads ?? null;
+              const bLength = c.byteLength ?? calculateRecordBytes(events);
+              chunkRecords.push({
+                projectId,
+                runId: tokenBinding.runId,
+                index: c.index ?? i,
+                firstSequence: firstSeq,
+                events,
+                payloads,
+                byteLength: bLength,
+              });
+            }
+          } else if ('kind' in chunks[0] && 'sequence' in chunks[0]) {
+            const events = chunks as readonly TraceEvent[];
+            chunkRecords.push({
+              projectId,
+              runId: tokenBinding.runId,
+              index: 0,
+              firstSequence: events[0].sequence,
+              events,
+              payloads: null,
+              byteLength: calculateRecordBytes(events),
+            });
+          }
+        }
+      }
+    }
+
+    const now = Date.now();
+    const runRecord: RunRecord = {
+      projectId,
+      id: tokenBinding.runId,
+      snapshotId: tokenBinding.snapshotId,
+      manifest: tokenBinding.manifest,
+      fingerprint: tokenBinding.fingerprint,
+      status,
+      provenance: 'local', // set ONLY by the repository!
+      checks,
+      summary,
+      traceState: chunksAreSaved ? 'complete' : 'not-saved',
+      createdAt: tokenBinding.createdAt ?? now,
+      completedAt: term.completedAt ?? now,
     };
+
+    // Calculate added bytes for project limits
+    let addLocalBytes = calculateRecordBytes(runRecord);
+    let addExportBytes = calculateRecordBytes({ ...runRecord, traceState: 'not-saved' });
+    for (const chunk of chunkRecords) {
+      addLocalBytes += calculateRecordBytes(chunk);
+    }
+    if (!existingSnapshot && documentToInsert) {
+      const snapRecord = { projectId, id: tokenBinding.snapshotId, document: documentToInsert };
+      const snapBytes = calculateRecordBytes(snapRecord);
+      addLocalBytes += snapBytes;
+      addExportBytes += snapBytes;
+    }
+
+    const byteLimitResult = await enforceProjectLimits(this.db, {
+      projectId,
+      additionalLocalBytes: addLocalBytes,
+      additionalExportBytes: addExportBytes,
+      additionalRuns: (await this.db.runs.get([projectId, tokenBinding.runId])) ? 0 : 1,
+    });
+    if (byteLimitResult) {
+      return byteLimitResult;
+    }
+
+    // 6. Commit atomically in one transaction
+    try {
+      return await this.db.transaction(
+        'rw',
+        [this.db.runs, this.db.traceChunks, this.db.snapshots],
+        async () => {
+          if (!existingSnapshot && documentToInsert) {
+            await insertImmutable(
+              this.db.snapshots,
+              {
+                projectId,
+                id: tokenBinding.snapshotId,
+                document: documentToInsert,
+              },
+              [projectId, tokenBinding.snapshotId],
+            );
+          }
+
+          // insertImmutable guarantees immutability (insert-if-absent, conflicting content fails with invalid)
+          await insertImmutable(
+            this.db.runs,
+            runRecord,
+            [projectId, tokenBinding.runId],
+          );
+
+          for (const chunk of chunkRecords) {
+            await insertImmutable(
+              this.db.traceChunks,
+              chunk,
+              [projectId, tokenBinding.runId, chunk.index],
+            );
+          }
+
+          return {
+            status: 'applied',
+            runId: tokenBinding.runId,
+            run: Object.freeze(structuredClone(runRecord)),
+          };
+        },
+      );
+    } catch (err: unknown) {
+      if (err instanceof RepositoryError && err.code === 'invalid') {
+        return {
+          status: 'invalid',
+          issues: err.issues ?? [createIssue('structural-rule', err.message)],
+        };
+      }
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  async loadRun(projectId: Id, runId: Id): Promise<Readonly<RunRecord> | null> {
+    try {
+      const record = await this.db.runs.get([projectId, runId]);
+      if (!record) return null;
+      return Object.freeze(structuredClone(record));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to load run from database',
+        issues: [createIssue('structural-rule', String(err), [], runId)],
+      });
+    }
+  }
+
+  async listRuns(projectId: Id): Promise<readonly Readonly<RunRecord>[]> {
+    try {
+      const records = await this.db.runs.where('projectId').equals(projectId).toArray();
+      return Object.freeze(records.map((r) => Object.freeze(structuredClone(r))));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to list runs from database',
+        issues: [createIssue('structural-rule', String(err), [], projectId)],
+      });
+    }
+  }
+
+  async runsByFingerprint(projectId: Id, fingerprint: string): Promise<readonly Readonly<RunRecord>[]> {
+    try {
+      const records = await this.db.runs
+        .where('[projectId+fingerprint]')
+        .equals([projectId, fingerprint])
+        .toArray();
+      return Object.freeze(records.map((r) => Object.freeze(structuredClone(r))));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to query runs by fingerprint from database',
+        issues: [createIssue('structural-rule', String(err), [], projectId)],
+      });
+    }
   }
 
   async importProject(_validatedBundle: unknown): Promise<UnsupportedResult> {
