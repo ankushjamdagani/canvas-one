@@ -1161,3 +1161,7 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review** (Claude, fixed directly): snapshots of unpinned retained runs weren't pinned; commit evidence was optional and malformed refs were skipped. Added a test.
 - **Verification** (Claude): 840 unit tests, `tsc -b` clean.
 - **Limitations**: Prune and import/export are RV-16b; per-branch history order is breadth-first from the head (contract only says "never timestamp").
+
+### RV-08 accepted; worktree clean-up
+
+- **Outcome**: User accepted RV-08 (a–f). Removed 18 merged, clean task worktrees (branches kept). Kept the UI line (`rv-01a`), runner line (`rv-14a`) and `nifty-bardeen-7e9c50` (unmerged delegation-workflow commits from another session).
