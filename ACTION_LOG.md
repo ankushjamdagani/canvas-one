@@ -1177,3 +1177,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 
 - **Outcome**: User accepted RV-16b. `specs/revamp/contracts/storage.md` §2 commit row now lists `evidenceManifest:EvidenceManifest`, with its shape defined next to `EvidenceRef` (run-identity.md §5 evidence manifest; exported/imported, never trusted on import).
 - **Limitations**: `CommitRecord.evidenceManifest` is still optional in the TypeScript type; commit and publish always write it.
+
+### RV-12b runner-line merge into the UI line
+
+- **Outcome**: Merged the runner line (`claude/rv-14a-runner-start` @ `7ef2e39`: RV-14, RV-16a/b, RV-08) into the UI line `claude/rv-01a-tokens` as `e7dd0f9`. Only `package.json`/`package-lock.json` overlapped and auto-merged (`fake-indexeddb` dev dependency). No application wiring.
+- **Platform**: Claude (lead), no executor.
+- **Verification**: `npm ci` clean; 881 unit (89 files); `npx tsc -b` clean; `npm run build` passes (large-chunk warning); production e2e 76 passed / 1 known failure (diagram.spec.ts:260) / 4 skipped. The suite has 81 tests, so the earlier "78 passed" baseline was a miscount.
+- **Limitations**: The editor, canvas and saves still run on the legacy `Graph` and the old `system-studio` DB. Wiring the runner and repository needs a Document-native editor API (a new RV-12 slot) before RV-05 typed forms, RV-10 entry and RV-11 history can run on real state.
