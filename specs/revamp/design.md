@@ -36,6 +36,10 @@ What the supplied design is, how it maps to screens and code, and the component 
 
 **Rendered and inspected in planning:** 23A, 22A history ladder, 21D, 2A workspace, 22D and 22F. The other rows were identified from source only.
 
+**Rendered screens (2026-09-25):** every target artboard is rendered at 1× in [`screens/`](screens/) (file = `data-screen-label`, e.g. `2A_workspace.png`, `22A_nav_live.png`; alternative palettes excluded, `18C_Evergreen_scheme.png` kept). Rendered from the archive's Directions canvas in headless Chromium by shifting `.sc-host` so the off-screen artboards are in view. Executors building UI must open the matching PNGs; they are the layout and interaction reference under the authority order above (decisions still override, e.g. no prompt box on 2A new system, no Stop run, no p99, no "vs run" comparisons until contracted).
+
+**Observed shell structure** (from the PNGs): no permanent activity rail — the left rail exists only for collapsed panels (23F/23G); the top bar (22A nav live) is app mark · `Project / branch [DRAFT] ▾` breadcrumb chip · Quick options ⌘K · History · (Library) · … menu · primary Run Simulation; the canvas dock (16A) is undo/redo · Select · pan · Component · Connect · Note · More · zoom % · fit, labelled, and holds no run controls; node cards (2A workspace) are compact with a kind icon, title, mono `kind · key config` caption and, after a run, a utilization bar and measured values; results (21B/21D) are a bottom region with a progress rule, a summary row and an expandable General/Components + event log area; the inspector (2A workspace) is a right dock with Configuration, Measured · last run and Apply/Cancel.
+
 **Not targets:** the other palette explorations (ochre/indigo, fluorescent, cyanotype, tonal sage, nocturne, oxblood, flat triad, cool slate, terracotta) and the board annotation typography.
 
 **Look and feel:** white dotted canvas, warm panels, compact hairline controls, green actions, purple branch/async, clay risk. No hero cards, frosted surfaces, gradients (except the supplied small app mark) or entrance animations.
