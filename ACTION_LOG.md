@@ -1184,3 +1184,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude (lead), no executor.
 - **Verification**: `npm ci` clean; 881 unit (89 files); `npx tsc -b` clean; `npm run build` passes (large-chunk warning); production e2e 76 passed / 1 known failure (diagram.spec.ts:260) / 4 skipped. The suite has 81 tests, so the earlier "78 passed" baseline was a miscount.
 - **Limitations**: The editor, canvas and saves still run on the legacy `Graph` and the old `system-studio` DB. Wiring the runner and repository needs a Document-native editor API (a new RV-12 slot) before RV-05 typed forms, RV-10 entry and RV-11 history can run on real state.
+
+### D37 and RV-12c1 headless session layer
+
+- **Outcome**: User decided the old UI is disposable (D37); RV-12c replanned as a clean cutover (c1 session, c2 shell/canvas + legacy deletion, c3 new project/import/export, c4 runner in worker). RV-12c1 `ebd769d` merged on the UI line @ `7849215`: `src/features/session/` boot + `SessionController` (create/open/rename, apply-records, busy/no optimistic display, paired document/revision reload, needsReload, undo/redo ≤100 as new CAS commands).
+- **Platform**: Gemini (agy) implementer, one review round; Claude reviewer (removed an unused option).
+- **Verification**: 909 unit (90 files), `npx tsc -b` clean.
+- **Limitations**: Headless only; nothing in the app uses it until c2.
