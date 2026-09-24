@@ -27,8 +27,16 @@ export type SessionState = {
   readonly status: SessionStatus;
   readonly projectId: Id | null;
   readonly branchId: Id | null;
+  /** The project's main branch id, so callers (D40) can tell "on main" apart from a draft. */
+  readonly mainBranchId: Id | null;
   readonly projectRevision: number | null;
   readonly workingRevision: number | null;
+  /**
+   * The active branch's working snapshot hash, read from the same reloaded
+   * branch row as `document` (paired, never a stale mix) so the runs lane can
+   * pin a run target to the exact working content.
+   */
+  readonly workingSnapshotId: string | null;
   readonly document: Document | null;
   readonly canUndo: boolean;
   readonly canRedo: boolean;

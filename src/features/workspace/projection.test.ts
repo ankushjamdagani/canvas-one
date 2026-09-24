@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Document, Element, View, Connection } from '../../domain/studio/model';
 import {
   buildMoveChange,
+  CATALOG_LAYER_COLORS,
   getCatalogLayer,
   projectDocumentToCanvas,
 } from './projection';
@@ -285,7 +286,7 @@ describe('projectDocumentToCanvas', () => {
     expect(res.issues.some((i) => i.code === 'missing-connection' && i.entityId === 'c_missing_404')).toBe(true);
   });
 
-  it('maps visualKind to correct catalog layers per D35 and leaves state-machine, data-pipeline, host neutral (null)', () => {
+  it('maps visualKind to correct catalog layers per D35, and per D42: state-machine/data-pipeline/host get their own stripe groups, thirdparty -> edge, custom -> no stripe', () => {
     // 29 catalog kinds have layers
     expect(getCatalogLayer('traffic')).toBe('clients');
     expect(getCatalogLayer('client')).toBe('clients');
@@ -295,10 +296,20 @@ describe('projectDocumentToCanvas', () => {
     expect(getCatalogLayer('queue')).toBe('messaging');
     expect(getCatalogLayer('monitoring')).toBe('operations');
 
-    // CONTRACT GAP per item 7: state-machine, data-pipeline, host are unassigned in D35
-    expect(getCatalogLayer('state-machine')).toBeNull();
-    expect(getCatalogLayer('data-pipeline')).toBeNull();
-    expect(getCatalogLayer('host')).toBeNull();
+    // D42 item 1: three new dedicated stripe groups
+    expect(getCatalogLayer('state-machine')).toBe('state-machine');
+    expect(getCatalogLayer('data-pipeline')).toBe('data-pipeline');
+    expect(getCatalogLayer('host')).toBe('host');
+
+    // D42 item 2: thirdparty -> Edge; custom -> no stripe at all
+    expect(getCatalogLayer('thirdparty')).toBe('edge');
+    expect(getCatalogLayer('custom')).toBeNull();
+  });
+
+  it('D42: new stripe colors for state-machine (indigo), data-pipeline (umber), host (charcoal)', () => {
+    expect(CATALOG_LAYER_COLORS['state-machine']).toBe('#5A5B8C');
+    expect(CATALOG_LAYER_COLORS['data-pipeline']).toBe('#7A5C3E');
+    expect(CATALOG_LAYER_COLORS.host).toBe('#3A3F3C');
   });
 });
 

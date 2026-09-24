@@ -7,9 +7,6 @@ import {
   Minus,
   Plus,
   Maximize2,
-  Play,
-  Pause,
-  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -31,8 +28,22 @@ export interface FloatingDockProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
+  /** Live zoom factor (1 = 100%), from useViewport(). */
+  zoom: number;
 }
 
+/**
+ * 16A "Resting dock" (D38).
+ *
+ * D38 dock inventory is: undo, redo, Select, Pan, Component, Connect, Note,
+ * More, zoom out, zoom %, zoom in, fit. Component/Connect/Note are left out
+ * here — D39's standard catalog contract (per-entry visualKind/behavior/ports/
+ * defaults, plus connection defaults) hasn't landed yet, so there is nothing
+ * real for them to do. A "More" overflow popover (16B) is likewise omitted:
+ * with only 8 live commands the dock fits at 390px without one, and there are
+ * no extra real commands to put in it yet (absent, not fake). Run/History/the
+ * "…" menu live only in the top bar (22A) per D38, not in this dock.
+ */
 export function FloatingDock({
   dragMode,
   onSetDragMode,
@@ -43,7 +54,10 @@ export function FloatingDock({
   onZoomIn,
   onZoomOut,
   onFitView,
+  zoom,
 }: FloatingDockProps) {
+  const zoomPercent = Math.round(zoom * 100);
+
   return (
     <TooltipProvider delayDuration={250}>
       <div
@@ -59,60 +73,7 @@ export function FloatingDock({
         role="toolbar"
         aria-label="Canvas controls"
       >
-        {/* Tool Modes: Select & Pan */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-select-btn"
-                type="button"
-                variant={dragMode === 'select' ? 'tint' : 'ghost'}
-                size="icon"
-                className={cn(
-                  'size-8',
-                  dragMode === 'select'
-                    ? 'active font-semibold text-primary'
-                    : 'text-body hover:text-foreground',
-                )}
-                aria-label="Select mode"
-                aria-pressed={dragMode === 'select'}
-                onClick={() => onSetDragMode('select')}
-              >
-                <MousePointer className="size-4 stroke-current" />
-                <span className="sr-only">Select</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Select tool</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-pan-btn"
-                type="button"
-                variant={dragMode === 'pan' ? 'tint' : 'ghost'}
-                size="icon"
-                className={cn(
-                  'size-8',
-                  dragMode === 'pan'
-                    ? 'active font-semibold text-primary'
-                    : 'text-body hover:text-foreground',
-                )}
-                aria-label="Pan mode"
-                aria-pressed={dragMode === 'pan'}
-                onClick={() => onSetDragMode('pan')}
-              >
-                <Hand className="size-4 stroke-current" />
-                <span className="sr-only">Pan</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Pan tool</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
-
-        {/* History: Undo & Redo */}
+        {/* Undo / Redo */}
         <div className="flex items-center gap-0.5 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -121,7 +82,7 @@ export function FloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-body hover:text-foreground disabled:text-secondary-text"
+                className="size-11 sm:size-8 text-body hover:text-foreground disabled:text-secondary-text"
                 aria-label="Undo"
                 disabled={!canUndo}
                 onClick={onUndo}
@@ -140,7 +101,7 @@ export function FloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-body hover:text-foreground disabled:text-secondary-text"
+                className="size-11 sm:size-8 text-body hover:text-foreground disabled:text-secondary-text"
                 aria-label="Redo"
                 disabled={!canRedo}
                 onClick={onRedo}
@@ -155,7 +116,60 @@ export function FloatingDock({
 
         <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
 
-        {/* Zoom Controls */}
+        {/* Select / Pan tool modes, labelled per 16A */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-select-btn"
+                type="button"
+                variant={dragMode === 'select' ? 'tint' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
+                  dragMode === 'select'
+                    ? 'text-primary'
+                    : 'text-body hover:text-foreground',
+                )}
+                aria-label="Select tool"
+                aria-pressed={dragMode === 'select'}
+                onClick={() => onSetDragMode('select')}
+              >
+                <MousePointer className="size-4 stroke-current" />
+                <span className="hidden sm:inline">Select</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Select tool</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-pan-btn"
+                type="button"
+                variant={dragMode === 'pan' ? 'tint' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
+                  dragMode === 'pan'
+                    ? 'text-primary'
+                    : 'text-body hover:text-foreground',
+                )}
+                aria-label="Pan tool"
+                aria-pressed={dragMode === 'pan'}
+                onClick={() => onSetDragMode('pan')}
+              >
+                <Hand className="size-4 stroke-current" />
+                <span className="hidden sm:inline">Pan</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Pan tool</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
+
+        {/* Zoom controls: out, live %, in, fit */}
         <div className="flex items-center gap-0.5 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -164,16 +178,24 @@ export function FloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-body hover:text-foreground"
-                aria-label="Zoom Out"
+                className="size-11 sm:size-8 text-body hover:text-foreground"
+                aria-label="Zoom out"
                 onClick={onZoomOut}
               >
                 <Minus className="size-4" />
-                <span className="sr-only">Zoom Out</span>
+                <span className="sr-only">Zoom out</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Zoom out (1.2x)</TooltipContent>
           </Tooltip>
+
+          <span
+            data-testid="dock-zoom-value"
+            className="text-xs font-mono text-secondary-text w-11 text-center select-none tabular-nums"
+            aria-live="polite"
+          >
+            {zoomPercent}%
+          </span>
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -182,12 +204,12 @@ export function FloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-body hover:text-foreground"
-                aria-label="Zoom In"
+                className="size-11 sm:size-8 text-body hover:text-foreground"
+                aria-label="Zoom in"
                 onClick={onZoomIn}
               >
                 <Plus className="size-4" />
-                <span className="sr-only">Zoom In</span>
+                <span className="sr-only">Zoom in</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Zoom in (1.2x)</TooltipContent>
@@ -200,8 +222,8 @@ export function FloatingDock({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-body hover:text-foreground"
-                aria-label="Fit View"
+                className="size-11 sm:size-8 text-body hover:text-foreground"
+                aria-label="Fit view"
                 onClick={onFitView}
               >
                 <Maximize2 className="size-4" />
@@ -209,65 +231,6 @@ export function FloatingDock({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Fit view (padding 32px)</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5 hidden sm:block" />
-
-        {/* Run Controls: Rendered disabled per requirement 6 */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-run-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-body opacity-40 cursor-not-allowed"
-                aria-label="Run"
-                disabled
-              >
-                <Play className="size-4" />
-                <span className="sr-only">Run</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Runs arrive in the next step</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-pause-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-body opacity-40 cursor-not-allowed"
-                aria-label="Pause"
-                disabled
-              >
-                <Pause className="size-4" />
-                <span className="sr-only">Pause</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Runs arrive in the next step</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-reset-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-body opacity-40 cursor-not-allowed"
-                aria-label="Reset"
-                disabled
-              >
-                <RotateCcw className="size-4" />
-                <span className="sr-only">Reset</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Runs arrive in the next step</TooltipContent>
           </Tooltip>
         </div>
       </div>

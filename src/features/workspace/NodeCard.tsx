@@ -2,12 +2,17 @@ import * as React from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
+import { getNodeCaption, getNodeIcon } from './nodeVisuals';
 
 export function NodeCard({ data, selected }: NodeProps) {
   const nodeData = data as ProjectedNodeData;
   if (nodeData.kind !== 'element') return null;
 
   const { element, layer, stripeColor, placement } = nodeData;
+  // placement.width stays authoritative (2A workspace: ~184px nominal card,
+  // wider placements render as authored rather than truncating fields).
+  const Icon = getNodeIcon(element.visualKind);
+  const caption = getNodeCaption(element);
 
   return (
     <div
@@ -25,9 +30,9 @@ export function NodeCard({ data, selected }: NodeProps) {
         width: placement.width,
       }}
     >
-      {/* RV-04c D35 node kind stripe by catalog layer */}
-      {/* CONTRACT GAP: 'state-machine', 'data-pipeline', and 'host' are not assigned a layer in D35;
-          they render with no kind stripe (neutral). */}
+      {/* Node kind stripe by catalog layer (D35, extended by D42: state-machine,
+          data-pipeline and host each get their own stripe group; custom gets
+          none — getCatalogLayer/CATALOG_LAYER_COLORS in projection.ts). */}
       {stripeColor ? (
         <div
           className="node-category-strip absolute inset-x-0 top-0 h-[3px] rounded-t-node"
@@ -45,7 +50,12 @@ export function NodeCard({ data, selected }: NodeProps) {
       />
 
       <div className="p-2.5 pt-3 flex flex-col gap-1">
-        <div className="flex items-center justify-between gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Icon
+            size={13}
+            className="shrink-0 text-secondary-text"
+            aria-hidden="true"
+          />
           <strong
             className="text-xs font-semibold text-ink truncate leading-tight"
             title={element.label}
@@ -55,11 +65,14 @@ export function NodeCard({ data, selected }: NodeProps) {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* No truncate: D42's caption values ("processor · 2 000 /s cap")
+              can run longer than the old bare visualKind text, so this wraps
+              rather than clipping (the card has no fixed height). */}
           <span
-            className="text-[11px] font-mono text-secondary-text truncate"
+            className="text-[11px] font-mono text-secondary-text leading-snug break-words"
             data-testid={`node-caption-${element.id}`}
           >
-            {element.visualKind}
+            {caption}
           </span>
         </div>
       </div>

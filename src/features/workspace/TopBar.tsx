@@ -1,228 +1,208 @@
 import * as React from 'react';
-import {
-  FolderOpen,
-  Check,
-  Undo2,
-  Redo2,
-} from 'lucide-react';
+import { ChevronDown, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
+import { ProjectMenu } from './ProjectMenu';
+import { BranchPopover } from './BranchPopover';
 
 export interface TopBarProps {
-  projectTitle: string;
+  project: ProjectRecord;
+  branches: readonly BranchRecord[];
+  branchId: string;
   onRenameProject: (title: string) => Promise<unknown>;
-  onBackToProjects: () => void;
+  onSwitchBranch: (branchId: string) => void;
+  onAllProjects: () => void;
   saveStatusText: string;
   isSaving: boolean;
   hasError: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
+  /**
+   * D38: Run and the scenario switcher live in the top bar, but that UI
+   * belongs to the runs lane (RV-04/RV-07), not this shell package. This slot
+   * is where it mounts; empty until that lane wires it in.
+   */
+  runControl?: React.ReactNode;
 }
 
+/**
+ * 22A "nav live" top bar.
+ *
+ * Per D38/brief: Quick options (no command registry yet), History (no history
+ * panel yet) and the "…" menu (nothing real to put in it) are absent, not
+ * fake. Undo/redo moved to the canvas dock (16A).
+ */
 export function TopBar({
-  projectTitle,
+  project,
+  branches,
+  branchId,
   onRenameProject,
-  onBackToProjects,
+  onSwitchBranch,
+  onAllProjects,
   saveStatusText,
   isSaving,
   hasError,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
+  runControl,
 }: TopBarProps) {
-  const [titleDraft, setTitleDraft] = React.useState(projectTitle);
-  const [isEditing, setIsEditing] = React.useState(false);
+  const [isRenaming, setIsRenaming] = React.useState(false);
+  const [titleDraft, setTitleDraft] = React.useState(project.title);
 
   React.useEffect(() => {
-    setTitleDraft(projectTitle);
-  }, [projectTitle]);
+    if (!isRenaming) setTitleDraft(project.title);
+  }, [project.title, isRenaming]);
 
-  const handleCommitRename = async () => {
+  const currentBranch = branches.find((b) => b.id === branchId) ?? null;
+  const isMainBranch = branchId === project.mainBranchId;
+  const branchLabel = currentBranch
+    ? isMainBranch
+      ? 'main'
+      : currentBranch.label
+    : '';
+
+  const commitRename = async () => {
     const trimmed = titleDraft.trim();
-    if (trimmed.length > 0 && trimmed.length <= 80 && trimmed !== projectTitle) {
+    if (trimmed.length > 0 && trimmed.length <= 80 && trimmed !== project.title) {
       await onRenameProject(trimmed);
     } else {
-      setTitleDraft(projectTitle);
+      setTitleDraft(project.title);
     }
-    setIsEditing(false);
+    setIsRenaming(false);
   };
 
   return (
-    <TooltipProvider delayDuration={250}>
-      <header
-        data-testid="workspace-topbar"
-        className={cn(
-          'relative shrink-0 flex items-center justify-between px-3 sm:px-4 h-[52px] min-h-[52px]',
-          'border-b border-border bg-shell select-none z-chrome w-full max-w-full overflow-hidden',
-        )}
-        role="banner"
-      >
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
-          {/* Brand mark */}
-          <div
-            data-testid="brand"
-            className="flex items-center gap-2 font-semibold text-[14px] sm:text-[14.5px] tracking-[-0.01em] text-foreground shrink-0 select-none"
+    <header
+      data-testid="workspace-topbar"
+      className={cn(
+        'relative shrink-0 flex items-center justify-between px-3 sm:px-4 h-[52px] min-h-[52px]',
+        'border-b border-border bg-shell select-none z-chrome w-full max-w-full overflow-hidden gap-2',
+      )}
+      role="banner"
+    >
+      <div className="flex items-center gap-2.5 min-w-0 shrink">
+        {/* Brand mark */}
+        <div
+          data-testid="brand"
+          className="flex items-center gap-2 font-semibold text-[14px] tracking-[-0.01em] text-foreground shrink-0 select-none"
+        >
+          <svg
+            className="size-5 shrink-0"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
           >
-            <svg
-              className="size-5 shrink-0"
-              viewBox="0 0 20 20"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="brand-mark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#0B5C54" />
-                  <stop offset="100%" stopColor="#2E7D6B" />
-                </linearGradient>
-              </defs>
-              <rect width="20" height="20" rx="5" fill="url(#brand-mark-gradient)" />
-            </svg>
-            <span className="hidden sm:inline">System Studio</span>
-          </div>
+            <defs>
+              <linearGradient id="brand-mark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#0B5C54" />
+                <stop offset="100%" stopColor="#2E7D6B" />
+              </linearGradient>
+            </defs>
+            <rect width="20" height="20" rx="5" fill="url(#brand-mark-gradient)" />
+          </svg>
+          <span className="hidden sm:inline">System studio</span>
+        </div>
 
-          <Separator orientation="vertical" className="h-5 bg-border shrink-0" />
-
-          {/* Projects navigation button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="projects-back-btn"
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs font-medium text-foreground hover:bg-accent flex items-center gap-1.5 shrink-0 rounded-control"
-                onClick={onBackToProjects}
-                aria-label="Back to projects"
-              >
-                <FolderOpen size={14} className="text-secondary-text shrink-0" />
-                <span>Projects</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Switch or open other projects</TooltipContent>
-          </Tooltip>
-
-          <Separator orientation="vertical" className="h-5 bg-border shrink-0" />
-
-          {/* Inline Project Title Rename */}
-          <div className="flex items-center gap-1 min-w-0">
+        {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] */}
+        <div
+          data-testid="breadcrumb-chip"
+          className="flex items-center gap-1.5 min-w-0 rounded-control border border-control-border bg-panel pl-2 pr-1.5 h-7"
+        >
+          {isRenaming ? (
             <Input
+              autoFocus
               data-testid="project-title-input"
               aria-label="Project title"
-              className={cn(
-                'h-7 px-2 text-xs w-24 sm:w-44 md:w-56 border-transparent hover:border-control-border focus:border-ring',
-                'bg-transparent hover:bg-canvas focus:bg-canvas transition-colors truncate',
-              )}
+              className="h-6 px-1.5 text-xs w-28 sm:w-40 bg-canvas border-control-border"
               value={titleDraft}
-              onChange={(e) => {
-                setTitleDraft(e.target.value);
-                setIsEditing(true);
-              }}
+              maxLength={80}
+              onChange={(e) => setTitleDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.currentTarget.blur();
-                  void handleCommitRename();
+                  void commitRename();
                 } else if (e.key === 'Escape') {
-                  setTitleDraft(projectTitle);
-                  setIsEditing(false);
+                  setTitleDraft(project.title);
+                  setIsRenaming(false);
                   e.currentTarget.blur();
                 }
               }}
-              onBlur={() => {
-                void handleCommitRename();
-              }}
-              maxLength={80}
-              placeholder="Project title"
-              title="Click to rename project"
+              onBlur={() => void commitRename()}
             />
-            {isEditing && titleDraft.trim() !== projectTitle && titleDraft.trim().length > 0 && (
-              <Button
-                data-testid="project-save-btn"
+          ) : (
+            <ProjectMenu
+              projectTitle={project.title}
+              branchCount={branches.length}
+              onRenameProject={() => setIsRenaming(true)}
+              onAllProjects={onAllProjects}
+            >
+              <button
                 type="button"
-                variant="default"
-                size="sm"
-                className="h-7 px-2 text-xs flex items-center gap-1 shrink-0"
-                onClick={() => {
-                  void handleCommitRename();
-                }}
-                aria-label="Save project title"
+                data-testid="breadcrumb-project-btn"
+                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate max-w-[120px] sm:max-w-[220px]"
+                title={project.title}
               >
-                <Check size={12} />
-                <span className="hidden sm:inline">Save</span>
-              </Button>
-            )}
-          </div>
+                {project.title}
+              </button>
+            </ProjectMenu>
+          )}
 
-          {/* Save Status text */}
-          <span
-            data-testid="save-status"
-            className="text-xs text-secondary-text flex items-center gap-1.5 ml-1 shrink-0 whitespace-nowrap"
-            role="status"
-            aria-label={saveStatusText}
-            title={saveStatusText}
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                'inline-block size-2 rounded-full shrink-0',
-                isSaving ? 'bg-primary animate-pulse' : hasError ? 'bg-risk' : 'bg-primary',
-              )}
-            />
-            <span className="hidden sm:inline truncate max-w-[120px] sm:max-w-[200px]">{saveStatusText}</span>
-            <span className="sr-only sm:hidden">{saveStatusText}</span>
+          <span className="text-secondary-text text-xs select-none" aria-hidden="true">
+            /
           </span>
+
+          <BranchPopover
+            project={project}
+            branches={branches}
+            currentBranchId={branchId}
+            onSwitchBranch={onSwitchBranch}
+          >
+            <button
+              type="button"
+              data-testid="breadcrumb-branch-btn"
+              className="flex items-center gap-1 min-w-0"
+            >
+              <GitBranch size={12} className="text-branch shrink-0" />
+              <span className="text-xs font-semibold text-branch truncate max-w-[110px] sm:max-w-[180px]">
+                {branchLabel}
+              </span>
+            </button>
+          </BranchPopover>
+
+          <Badge
+            data-testid="breadcrumb-branch-state"
+            variant="risk"
+            className="text-[9px] px-1 py-0 h-4 shrink-0 normal-case"
+          >
+            {isMainBranch ? 'MAIN' : 'DRAFT'}
+          </Badge>
+
+          <ChevronDown size={12} className="text-secondary-text shrink-0" aria-hidden="true" />
         </div>
 
-        {/* Undo / Redo controls in topbar */}
-        <div className="flex items-center gap-1 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="topbar-undo-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-body hover:text-foreground disabled:text-secondary-text"
-                disabled={!canUndo}
-                onClick={onUndo}
-                aria-label="Undo"
-              >
-                <Undo2 size={15} className="stroke-current" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Undo (Mod+Z)</TooltipContent>
-          </Tooltip>
+        {/* Save Status */}
+        <span
+          data-testid="save-status"
+          className="text-xs text-secondary-text hidden md:flex items-center gap-1.5 ml-1 shrink-0 whitespace-nowrap"
+          role="status"
+          aria-label={saveStatusText}
+          title={saveStatusText}
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              'inline-block size-1.5 rounded-full shrink-0',
+              isSaving ? 'bg-primary animate-pulse' : hasError ? 'bg-risk' : 'bg-primary',
+            )}
+          />
+          <span className="truncate max-w-[160px]">{saveStatusText}</span>
+        </span>
+      </div>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="topbar-redo-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 text-body hover:text-foreground disabled:text-secondary-text"
-                disabled={!canRedo}
-                onClick={onRedo}
-                aria-label="Redo"
-              >
-                <Redo2 size={15} className="stroke-current" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Redo (Mod+Shift+Z)</TooltipContent>
-          </Tooltip>
-        </div>
-      </header>
-    </TooltipProvider>
+      {/* D38: Run + scenario switcher slot, owned by the runs lane */}
+      <div data-slot="run-control" className="flex items-center gap-2 shrink-0">
+        {runControl ?? null}
+      </div>
+    </header>
   );
 }

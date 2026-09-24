@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Plus, ArrowRight, FolderOpen } from 'lucide-react';
+import { Plus, ArrowRight, FolderOpen, LayoutTemplate } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
@@ -34,6 +34,13 @@ export type ProjectRowItem = {
   readonly errorMessage?: string;
 };
 
+/**
+ * 2A "new system" entry screen: two columns.
+ *
+ * D12/design-revalidation.md §2: no prompt box ("Describe the system…"), no
+ * question chips, no team/shared items. "Bring in what exists" (transfer) is
+ * left out entirely rather than shown disabled — RV-10 owns that later.
+ */
 export function EntryScreen({ session, repository, mintId, onOpenSuccess }: EntryScreenProps) {
   const [projectRows, setProjectRows] = React.useState<readonly ProjectRowItem[]>([]);
   const [loadingProjects, setLoadingProjects] = React.useState(true);
@@ -98,7 +105,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess }: Entr
   const trimmedBlankName = blankProjectName.trim();
   const isBlankNameValid = trimmedBlankName.length >= 1 && trimmedBlankName.length <= 80;
 
-  // Blank project creator
+  // Blank project creator ("Open an empty canvas")
   const handleCreateBlankProject = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!isBlankNameValid || isSubmitting) return;
@@ -138,7 +145,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess }: Entr
     }
   };
 
-  // Example creator
+  // Template creator
   const handleCreateExample = async (fixture: Document) => {
     if (isSubmitting) return;
 
@@ -208,206 +215,200 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess }: Entr
             </defs>
             <rect width="20" height="20" rx="5" fill="url(#entry-brand-gradient)" />
           </svg>
-          <span className="font-semibold text-sm tracking-[-0.01em]">System Studio</span>
+          <span className="font-semibold text-sm tracking-[-0.01em]">System studio</span>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="w-full max-w-4xl px-4 py-8 sm:py-12 flex flex-col gap-10">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-            New system
-          </h1>
-          <p className="text-sm text-secondary-text mt-1.5">
-            Create a blank system design, open an existing project, or start from reference examples.
-          </p>
-        </div>
-
+      {/* Two-column main content, per 2A new system */}
+      <main className="w-full max-w-6xl px-4 py-8 sm:py-12 flex flex-col gap-6">
         {errorMessage && (
           <div
             data-testid="entry-error-banner"
-            className="p-3 rounded-card border border-riskEdge bg-riskTint text-destructive text-xs"
+            className="p-3 rounded-card border border-risk-edge bg-risk-tint text-destructive text-xs"
             role="alert"
           >
             {errorMessage}
           </div>
         )}
 
-        {/* Section 1: Blank Project */}
-        <section aria-labelledby="blank-project-heading">
-          <h2 id="blank-project-heading" className="text-base font-semibold text-ink mb-3">
-            Blank project
-          </h2>
-          <Card className="border border-control-border bg-panel shadow-raised">
-            <CardHeader className="p-4 sm:p-5 pb-2">
-              <CardTitle className="text-sm font-semibold">Start from an empty canvas</CardTitle>
-              <CardDescription className="text-xs text-secondary-text">
-                Creates a fresh project with no initial views or components.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-5 pt-2">
-              <form onSubmit={handleCreateBlankProject} className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
-                <Input
-                  data-testid="blank-project-name-input"
-                  aria-label="Blank project name"
-                  type="text"
-                  placeholder="Enter project name (1–80 chars)"
-                  value={blankProjectName}
-                  onChange={(e) => setBlankProjectName(e.target.value)}
-                  maxLength={80}
-                  className="h-9 px-3 text-xs bg-canvas border-control-border flex-1"
-                  disabled={isSubmitting}
-                />
-                <Button
-                  data-testid="create-blank-project-btn"
-                  type="submit"
-                  variant="default"
-                  size="sm"
-                  className="h-9 px-4 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0"
-                  disabled={!isBlankNameValid || isSubmitting}
-                >
-                  <Plus size={14} />
-                  <span>Create blank project</span>
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </section>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left column: Your projects + Open an empty canvas */}
+          <div className="flex flex-col gap-8">
+            <section aria-labelledby="existing-projects-heading">
+              <div className="flex items-center justify-between mb-3">
+                <h2 id="existing-projects-heading" className="text-base font-semibold text-ink">
+                  Your projects
+                </h2>
+                <span className="text-xs text-secondary-text">
+                  {pluralize(projectRows.length, 'saved project')}
+                </span>
+              </div>
 
-        {/* Section 2: Reference Examples S01–S05 */}
-        <section aria-labelledby="examples-heading">
-          <div className="flex items-center justify-between mb-3">
-            <h2 id="examples-heading" className="text-base font-semibold text-ink">
-              Reference examples
-            </h2>
-            <span className="text-xs text-secondary-text">S01–S05 system models</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {REFERENCE_EXAMPLES.map((example) => (
-              <Card
-                key={example.id}
-                data-testid={`example-card-${example.id}`}
-                className="border border-control-border bg-panel hover:border-hover-border transition-colors flex flex-col justify-between shadow-raised"
-              >
-                <CardHeader className="p-4 pb-2">
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0">
-                      {example.key}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-sm font-semibold text-ink">
-                    {example.title}
-                  </CardTitle>
-                  <CardDescription className="text-xs text-secondary-text">
-                    {pluralize(example.fixture.elements.length, 'component')} · {pluralize(example.fixture.connections.length, 'connection')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                  <Button
-                    data-testid={`create-example-${example.id}`}
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="w-full h-8 text-xs font-medium flex items-center justify-center gap-1.5"
-                    disabled={isSubmitting}
-                    onClick={() => handleCreateExample(example.fixture)}
-                  >
-                    <span>Create</span>
-                    <ArrowRight size={13} />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* Section 3: Existing Projects */}
-        <section aria-labelledby="existing-projects-heading">
-          <div className="flex items-center justify-between mb-3">
-            <h2 id="existing-projects-heading" className="text-base font-semibold text-ink">
-              Existing projects
-            </h2>
-            <span className="text-xs text-secondary-text">
-              {pluralize(projectRows.length, 'saved project')}
-            </span>
-          </div>
-
-          {loadingProjects ? (
-            <div className="p-6 text-center text-xs text-secondary-text bg-panel rounded-card border border-control-border">
-              Loading projects…
-            </div>
-          ) : projectRows.length === 0 ? (
-            <div
-              data-testid="no-projects-notice"
-              className="p-8 text-center text-xs text-secondary-text bg-panel rounded-card border border-control-border shadow-raised"
-            >
-              <FolderOpen size={24} className="mx-auto text-secondary-text/70 mb-2" />
-              <p className="font-medium text-ink">No saved projects yet</p>
-              <p className="mt-0.5">Create a blank project or start from an example above.</p>
-            </div>
-          ) : (
-            <div data-testid="existing-projects-list" className="flex flex-col gap-2">
-              {projectRows.map((row) => (
+              {loadingProjects ? (
+                <div className="p-6 text-center text-xs text-secondary-text bg-panel rounded-card border border-control-border">
+                  Loading projects…
+                </div>
+              ) : projectRows.length === 0 ? (
                 <div
-                  key={row.project.id}
-                  data-testid={`project-item-${row.project.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-card border border-control-border bg-panel hover:border-hover-border transition-colors shadow-raised gap-3"
+                  data-testid="no-projects-notice"
+                  className="p-8 text-center text-xs text-secondary-text bg-panel rounded-card border border-control-border shadow-raised"
                 >
-                  <div className="min-w-0 pr-3">
-                    <h3 className="text-sm font-semibold text-ink truncate">
-                      {row.project.title}
-                    </h3>
-                    <p className="text-[11px] text-secondary-text mt-0.5 font-mono">
-                      ID: {row.project.id.slice(0, 8)}… · Rev {row.project.revision}
-                    </p>
-                  </div>
+                  <FolderOpen size={24} className="mx-auto text-secondary-text/70 mb-2" />
+                  <p className="font-medium text-ink">No saved projects yet</p>
+                  <p className="mt-0.5">Start from a template, or open an empty canvas.</p>
+                </div>
+              ) : (
+                <div data-testid="existing-projects-list" className="flex flex-col gap-2">
+                  {projectRows.map((row) => (
+                    <div
+                      key={row.project.id}
+                      data-testid={`project-item-${row.project.id}`}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-card border border-control-border bg-panel hover:border-hover-border transition-colors shadow-raised gap-3"
+                    >
+                      <div className="min-w-0 pr-3">
+                        <h3 className="text-sm font-semibold text-ink truncate">
+                          {row.project.title}
+                        </h3>
+                        <p className="text-[11px] text-secondary-text mt-0.5 font-mono">
+                          ID: {row.project.id.slice(0, 8)}… · Rev {row.project.revision}
+                        </p>
+                      </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {row.status === 'loading' && (
-                      <span className="text-xs text-secondary-text">Loading branches…</span>
-                    )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {row.status === 'loading' && (
+                          <span className="text-xs text-secondary-text">Loading branches…</span>
+                        )}
 
-                    {row.status === 'error' && (
-                      <span
-                        data-testid={`project-error-${row.project.id}`}
-                        className="text-xs text-destructive font-medium"
-                        role="alert"
-                      >
-                        {row.errorMessage}
-                      </span>
-                    )}
+                        {row.status === 'error' && (
+                          <span
+                            data-testid={`project-error-${row.project.id}`}
+                            className="text-xs text-destructive font-medium"
+                            role="alert"
+                          >
+                            {row.errorMessage}
+                          </span>
+                        )}
 
-                    {row.status === 'ready' && row.branches && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {row.branches.length === 0 ? (
-                          <span className="text-xs text-secondary-text">No open branches</span>
-                        ) : (
-                          row.branches.map((branch) => (
-                            <Button
-                              key={branch.id}
-                              data-testid={`open-branch-${row.project.id}-${branch.isMain ? 'main' : branch.label}`}
-                              data-branch-id={branch.id}
-                              data-branch-label={branch.label}
-                              type="button"
-                              variant={branch.isMain ? 'outline' : 'default'}
-                              size="sm"
-                              className="h-8 px-3 text-xs font-semibold shrink-0"
-                              disabled={isSubmitting}
-                              onClick={() => handleOpenProject(row.project.id, branch.id)}
-                            >
-                              Open {branch.label}
-                            </Button>
-                          ))
+                        {row.status === 'ready' && row.branches && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {row.branches.length === 0 ? (
+                              <span className="text-xs text-secondary-text">No open branches</span>
+                            ) : (
+                              row.branches.map((branch) => (
+                                <Button
+                                  key={branch.id}
+                                  data-testid={`open-branch-${row.project.id}-${branch.isMain ? 'main' : branch.label}`}
+                                  data-branch-id={branch.id}
+                                  data-branch-label={branch.label}
+                                  type="button"
+                                  variant={branch.isMain ? 'outline' : 'default'}
+                                  size="sm"
+                                  className="h-8 px-3 text-xs font-semibold shrink-0"
+                                  disabled={isSubmitting}
+                                  onClick={() => handleOpenProject(row.project.id, branch.id)}
+                                >
+                                  Open {branch.label}
+                                </Button>
+                              ))
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              )}
+            </section>
+
+            <section aria-labelledby="blank-canvas-heading">
+              <h2 id="blank-canvas-heading" className="text-base font-semibold text-ink mb-3">
+                Open an empty canvas
+              </h2>
+              <Card className="border border-control-border bg-panel shadow-raised">
+                <CardContent className="p-4 sm:p-5">
+                  <form onSubmit={handleCreateBlankProject} className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+                    <Input
+                      data-testid="blank-project-name-input"
+                      aria-label="Blank project name"
+                      type="text"
+                      placeholder="Project name"
+                      value={blankProjectName}
+                      onChange={(e) => setBlankProjectName(e.target.value)}
+                      maxLength={80}
+                      className="h-9 px-3 text-xs bg-canvas border-control-border flex-1"
+                      disabled={isSubmitting}
+                    />
+                    <Button
+                      data-testid="create-blank-project-btn"
+                      type="submit"
+                      variant="default"
+                      size="sm"
+                      className="h-9 px-4 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0"
+                      disabled={!isBlankNameValid || isSubmitting}
+                    >
+                      <Plus size={14} />
+                      <span>Create</span>
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </section>
+          </div>
+
+          {/* Right column: Start from a template */}
+          <div className="flex flex-col gap-8">
+            <section aria-labelledby="templates-heading">
+              <h2 id="templates-heading" className="text-base font-semibold text-ink mb-3">
+                Start from a template
+              </h2>
+              <div data-testid="templates-list" className="flex flex-col gap-2">
+                {REFERENCE_EXAMPLES.map((example) => (
+                  <div
+                    key={example.id}
+                    data-testid={`template-row-${example.id}`}
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-card border border-control-border bg-panel hover:border-hover-border transition-colors shadow-raised"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/*
+                        CONTRACT GAP: templates don't have a single visualKind
+                        (each combines several component kinds), so they all
+                        share one generic template icon rather than inventing
+                        a per-template kind mapping.
+                      */}
+                      <LayoutTemplate size={16} className="text-secondary-text shrink-0" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0">
+                            {example.key}
+                          </Badge>
+                          <span className="text-sm font-semibold text-ink truncate">
+                            {example.title}
+                          </span>
+                        </div>
+                        <p className="text-xs text-secondary-text mt-0.5">
+                          {pluralize(example.fixture.elements.length, 'component')} ·{' '}
+                          {pluralize(example.fixture.scenarios.length, 'scenario')}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      data-testid={`create-example-${example.id}`}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 px-3 text-xs font-medium flex items-center justify-center gap-1.5 shrink-0"
+                      disabled={isSubmitting}
+                      onClick={() => handleCreateExample(example.fixture)}
+                    >
+                      <span>Create</span>
+                      <ArrowRight size={13} />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
       </main>
     </div>
   );

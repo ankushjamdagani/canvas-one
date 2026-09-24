@@ -13,6 +13,7 @@ import {
   createIssue,
   mapErrorToFailedResult,
   type Actor,
+  type BranchCreateCommand,
   type BranchRecord,
   type MissingResult,
   type ModelApplyRecordsCommand,
@@ -40,8 +41,10 @@ const INITIAL_SESSION_STATE: SessionState = Object.freeze({
   status: 'empty',
   projectId: null,
   branchId: null,
+  mainBranchId: null,
   projectRevision: null,
   workingRevision: null,
+  workingSnapshotId: null,
   document: null,
   canUndo: false,
   canRedo: false,
@@ -199,8 +202,10 @@ export class SessionController {
           status: 'ready',
           projectId: newProjectId,
           branchId: draftBranchId,
+          mainBranchId,
           projectRevision: res.projectRevision,
           workingRevision: reloaded.branch.workingRevision,
+          workingSnapshotId: reloaded.branch.workingSnapshotId,
           document: reloaded.snapshot.document,
           canUndo: false,
           canRedo: false,
@@ -282,8 +287,10 @@ export class SessionController {
         status: 'ready',
         projectId: project.id,
         branchId: branch.id,
+        mainBranchId: project.mainBranchId,
         projectRevision: project.revision,
         workingRevision: branch.workingRevision,
+        workingSnapshotId: branch.workingSnapshotId,
         document: snapshot.document,
         canUndo: false,
         canRedo: false,
@@ -390,6 +397,7 @@ export class SessionController {
           status: 'ready',
           projectRevision: res.projectRevision,
           workingRevision: reloaded.branch.workingRevision,
+          workingSnapshotId: reloaded.branch.workingSnapshotId,
           document: reloaded.snapshot.document,
           lastError: null,
           needsReload: false,
@@ -419,9 +427,120 @@ export class SessionController {
   }
 
   /**
+   * D40: the first authored edit on main creates a draft branch from main's
+   * working content (branch.create, source:'working') and switches the
+   * session to it, before the edit itself is applied. Branch creation is not
+   * undoable (like other branch history) — only the edit gets an undo entry.
+   *
+   * CONTRACT GAP: decisions.md D40 names the label "Draft from main" but is
+   * silent on collisions with an existing branch label. Narrowest reading:
+   * append " 2", " 3", … (first free suffix), checked against every branch
+   * on the project (open and closed) via loadHistory.
+   */
+  private async autoDraftFromMainIfNeeded(): Promise<
+    { readonly ok: true } | { readonly ok: false; readonly error: SessionApplyResult }
+  > {
+    if (
+      !this.state.projectId ||
+      !this.state.branchId ||
+      this.state.mainBranchId === null ||
+      this.state.branchId !== this.state.mainBranchId ||
+      this.state.workingRevision === null
+    ) {
+      return { ok: true };
+    }
+
+    const projectId = this.state.projectId;
+    const mainBranchId = this.state.branchId;
+
+    let history;
+    try {
+      history = await this.repository.loadHistory(projectId);
+    } catch (err) {
+      const failed = mapErrorToFailedResult(err);
+      return { ok: false, error: failed };
+    }
+
+    const mainBranch = history.branches.find((b) => b.id === mainBranchId);
+    if (!mainBranch) {
+      return { ok: false, error: { status: 'missing', ids: [mainBranchId] } };
+    }
+
+    const existingLabels = new Set(history.branches.map((b) => b.label));
+    let label = 'Draft from main';
+    let suffix = 2;
+    while (existingLabels.has(label)) {
+      label = `Draft from main ${suffix}`;
+      suffix += 1;
+    }
+
+    const newBranchId = this.mintId();
+    const command: BranchCreateCommand = {
+      commandId: 'branch.create',
+      operationId: this.mintId(),
+      projectId,
+      branchId: mainBranchId,
+      expectedWorkingRevision: this.state.workingRevision,
+      actor: this.actor,
+      payload: {
+        newBranchId,
+        label,
+        source: 'working',
+        expectedHeadId: mainBranch.headCommitId,
+      },
+    };
+
+    let res;
+    try {
+      res = await this.repository.execute(command);
+    } catch (err) {
+      const failed = mapErrorToFailedResult(err);
+      return { ok: false, error: failed };
+    }
+
+    if (res.status !== 'applied') {
+      return { ok: false, error: res };
+    }
+
+    const reloaded = await this.reloadBranchAndSnapshot(projectId, newBranchId);
+    if (!reloaded.ok) {
+      this.updateState({
+        status: 'ready',
+        lastError: reloaded.missing,
+        needsReload: true,
+      });
+      return { ok: false, error: reloaded.missing };
+    }
+
+    // Branch creation itself isn't undoable; the stacks stay empty so the
+    // edit that follows becomes the first (and only) undo entry.
+    this.undoStackInternal.length = 0;
+    this.redoStackInternal.length = 0;
+
+    this.updateState({
+      status: 'ready',
+      branchId: newBranchId,
+      projectRevision: res.projectRevision,
+      workingRevision: reloaded.branch.workingRevision,
+      workingSnapshotId: reloaded.branch.workingSnapshotId,
+      document: reloaded.snapshot.document,
+      canUndo: false,
+      canRedo: false,
+      lastError: null,
+      needsReload: false,
+    });
+
+    return { ok: true };
+  }
+
+  /**
    * Applies authored RecordChanges via model.apply-records.
    * On applied: adopts returned revision and new Document, pushes one undo entry, clears redo.
    * On invalid/stale/failed: state unchanged, typed result returned.
+   *
+   * D40: if the active branch is main, this first creates and switches to a
+   * draft branch (see `autoDraftFromMainIfNeeded`) before applying the edit,
+   * so main never ends up holding unpublished edits.
    */
   async apply(changes: readonly RecordChange[], label: string): Promise<SessionApplyResult> {
     if (this.isInFlight) {
@@ -448,33 +567,56 @@ export class SessionController {
       };
     }
 
-    // Compute inverse changes from pre-apply Document before mutation
-    const inverseRes = computeInverseChanges(this.state.document, changes);
-    if (!inverseRes.ok) {
-      return {
-        status: 'invalid',
-        issues: inverseRes.issues,
-      };
-    }
-    const inverseChanges = inverseRes.changes;
-    const forwardChanges = [...changes];
-
-    const command: ModelApplyRecordsCommand = {
-      commandId: 'model.apply-records',
-      operationId: this.mintId(),
-      projectId: this.state.projectId,
-      branchId: this.state.branchId,
-      expectedWorkingRevision: this.state.workingRevision,
-      actor: this.actor,
-      payload: {
-        changes,
-      },
-    };
-
     this.isInFlight = true;
     this.updateState({ status: 'saving' });
 
     try {
+      if (this.state.branchId === this.state.mainBranchId) {
+        const drafted = await this.autoDraftFromMainIfNeeded();
+        if (!drafted.ok) {
+          this.updateState({ status: 'ready', lastError: drafted.error });
+          return drafted.error;
+        }
+      }
+
+      // Re-read state: autoDraftFromMainIfNeeded may have switched branchId,
+      // workingRevision and document to the new draft.
+      if (
+        !this.state.projectId ||
+        !this.state.branchId ||
+        this.state.workingRevision === null ||
+        !this.state.document
+      ) {
+        return {
+          status: 'invalid',
+          issues: [createIssue('structural-rule', 'Cannot apply changes: no project is open', [])],
+        };
+      }
+
+      // Compute inverse changes from pre-apply Document before mutation
+      const inverseRes = computeInverseChanges(this.state.document, changes);
+      if (!inverseRes.ok) {
+        this.updateState({ status: 'ready' });
+        return {
+          status: 'invalid',
+          issues: inverseRes.issues,
+        };
+      }
+      const inverseChanges = inverseRes.changes;
+      const forwardChanges = [...changes];
+
+      const command: ModelApplyRecordsCommand = {
+        commandId: 'model.apply-records',
+        operationId: this.mintId(),
+        projectId: this.state.projectId,
+        branchId: this.state.branchId,
+        expectedWorkingRevision: this.state.workingRevision,
+        actor: this.actor,
+        payload: {
+          changes,
+        },
+      };
+
       const res = await this.repository.execute(command);
       if (res.status === 'applied') {
         if (res.branchRevision === null) {
@@ -510,6 +652,7 @@ export class SessionController {
           status: 'ready',
           projectRevision: res.projectRevision,
           workingRevision: reloaded.branch.workingRevision,
+          workingSnapshotId: reloaded.branch.workingSnapshotId,
           document: reloaded.snapshot.document,
           canUndo: this.undoStackInternal.length > 0,
           canRedo: false,
@@ -622,6 +765,7 @@ export class SessionController {
           status: 'ready',
           projectRevision: res.projectRevision,
           workingRevision: reloaded.branch.workingRevision,
+          workingSnapshotId: reloaded.branch.workingSnapshotId,
           document: reloaded.snapshot.document,
           canUndo: this.undoStackInternal.length > 0,
           canRedo: this.redoStackInternal.length > 0,
@@ -733,6 +877,7 @@ export class SessionController {
           status: 'ready',
           projectRevision: res.projectRevision,
           workingRevision: reloaded.branch.workingRevision,
+          workingSnapshotId: reloaded.branch.workingSnapshotId,
           document: reloaded.snapshot.document,
           canUndo: this.undoStackInternal.length > 0,
           canRedo: this.redoStackInternal.length > 0,

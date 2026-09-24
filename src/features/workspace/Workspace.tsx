@@ -2,21 +2,58 @@ import * as React from 'react';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
 import { TopBar } from './TopBar';
-import { ActivityRail } from './ActivityRail';
 import { CanvasView } from './CanvasView';
 import { buildMoveChange } from './projection';
+import type {
+  BranchRecord,
+  ProjectRecord,
+  StudioRepository,
+} from '../../persistence/studio/types';
 
 export interface WorkspaceProps {
   session: SessionController;
+  repository: StudioRepository;
   onBackToProjects: () => void;
+  /** D38 run-control slot; owned by the runs lane, empty until wired in. */
+  runControl?: React.ReactNode;
 }
 
-export function Workspace({ session, onBackToProjects }: WorkspaceProps) {
+export function Workspace({ session, repository, onBackToProjects, runControl }: WorkspaceProps) {
   // Read session state via useSyncExternalStore
   const sessionState = React.useSyncExternalStore(
     session.subscribe,
     session.getState,
   );
+
+  // Project record + branch list for the 22A breadcrumb / 13A project menu /
+  // 13B branch popover. Project.title and the branch list are navigation
+  // metadata (transactions.md §4), separate from the per-branch Document, so
+  // they're loaded from the repository rather than read off the session's
+  // Document.
+  const [projectRecord, setProjectRecord] = React.useState<ProjectRecord | null>(null);
+  const [branches, setBranches] = React.useState<readonly BranchRecord[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!sessionState.projectId) {
+      setProjectRecord(null);
+      setBranches([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const history = await repository.loadHistory(sessionState.projectId as string);
+        if (cancelled) return;
+        setProjectRecord(history.project);
+        setBranches(history.branches);
+      } catch (err) {
+        console.error('Failed to load project/branch info for top bar:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [repository, sessionState.projectId, sessionState.projectRevision, sessionState.branchId]);
 
   const document = sessionState.document;
   const [activeViewId, setActiveViewId] = React.useState<string | null>(() => {
@@ -126,29 +163,44 @@ export function Workspace({ session, onBackToProjects }: WorkspaceProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [session, sessionState.canUndo, sessionState.canRedo, sessionState.status]);
 
+  const handleSwitchBranch = React.useCallback(
+    (branchId: string) => {
+      if (!sessionState.projectId || isSaving) return;
+      void session.openProject(sessionState.projectId, branchId);
+    },
+    [session, sessionState.projectId, isSaving],
+  );
+
   return (
     <div
       data-testid="workspace-root"
       className="flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none"
     >
-      {/* Top Bar */}
-      <TopBar
-        projectTitle={document?.title ?? 'Untitled Project'}
-        onRenameProject={handleRenameProject}
-        onBackToProjects={onBackToProjects}
-        saveStatusText={saveStatusText}
-        isSaving={isSaving}
-        hasError={hasError}
-        canUndo={sessionState.canUndo && sessionState.status === 'ready'}
-        canRedo={sessionState.canRedo && sessionState.status === 'ready'}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-      />
+      {/* Top Bar (22A nav live) */}
+      {projectRecord ? (
+        <TopBar
+          project={projectRecord}
+          branches={branches}
+          branchId={sessionState.branchId ?? projectRecord.mainBranchId}
+          onRenameProject={handleRenameProject}
+          onSwitchBranch={handleSwitchBranch}
+          onAllProjects={onBackToProjects}
+          saveStatusText={saveStatusText}
+          isSaving={isSaving}
+          hasError={hasError}
+          runControl={runControl}
+        />
+      ) : (
+        <header
+          data-testid="workspace-topbar-loading"
+          className="shrink-0 h-[52px] min-h-[52px] border-b border-border bg-shell"
+        />
+      )}
 
-      {/* Main Workspace Area: Left Rail + Canvas */}
+      {/* Canvas fills the workspace; the permanent left activity rail is
+          removed per D-observed shell structure — a rail only exists for
+          collapsed panels (23F/23G), not built here. */}
       <div className="flex flex-1 w-full max-w-full min-h-0 overflow-hidden relative">
-        <ActivityRail />
-
         <main className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
           <CanvasView
             document={document}

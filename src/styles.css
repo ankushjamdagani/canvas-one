@@ -1871,6 +1871,18 @@ p {
 .component-node .react-flow__handle {
   top: 39px;
 }
+
+/*
+ * RV-03s review round 1: keep edge label chips (TrafficEdge's EdgeLabelRenderer
+ * portal) above the node card layer. xyflow ships this container with
+ * z-index:auto, so with no override it paints behind `.react-flow__node`
+ * (which gets an explicit numeric zIndex per node in projection.ts), and
+ * labels near a node were clipped behind it. 5 sits above every zIndex this
+ * canvas assigns nodes (0-2) without competing with chrome/dock/popover tokens.
+ */
+.react-flow__edgelabel-renderer {
+  z-index: 5;
+}
 .component-internals {
   border-top: 1px solid var(--line);
   padding: 14px 12px 10px;
