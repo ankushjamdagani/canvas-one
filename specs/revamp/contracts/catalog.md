@@ -1,8 +1,23 @@
 # Standard component catalog contract — draft for approval (D39)
 
-Status: DRAFT. Every value not lifted verbatim from `execution.ts` / `behaviorDefaults.ts` / `model-and-runner.md` / a reference fixture is marked **PROPOSED**. Nothing here is wired to code yet.
+Status: APPROVED by the user 2026-09-25 with the resolutions below (D42). Where §1–§6 differ from a resolution, the resolution wins. Every value not lifted verbatim from `execution.ts` / `behaviorDefaults.ts` / `model-and-runner.md` / a reference fixture is marked **PROPOSED**. Nothing here is wired to code yet.
 
 Sources read: decisions.md (D21,D35,D37,D38,D39,D41, Lead defaults), requirements.md (R01,R05,R07), model-and-runner.md §1–§5,§10, parts-and-export.md, commands.md §4, screens 12A/12B/12C/16E/2A/16A, `execution.ts`, `behaviorDefaults.ts`, `studio/model.ts`, `studio/validate.ts`, `studio/readiness.ts`, fixtures `s01–s05.json`.
+
+## Approved resolutions (D42, 2026-09-25)
+
+1. **Stripes (D35 extension):** state-machine indigo `#5A5B8C`, data-pipeline umber `#7A5C3E`, host charcoal `#3A3F3C` — three new groups of their own (each ≥ 5.6:1 on white and panel).
+2. **thirdparty → Edge** (teal stripe). **custom → no stripe**, library group "Other".
+3. **Schemas:** every placement gets its own fresh copy of the generic request/response schemas.
+4. **Placement width:** 184 px, `expanded:false`.
+5. **Message connection defaults:** `ackDelayMs 0`, `messageTtlMs 10000` (S02 values; assumptions, editable). Call defaults as §4.
+6. **Library captions:** 1–3 hand-written tags per entry (`tags: string[]` on `CatalogEntry`), reviewed so they name only modeled behavior (e.g. no "autoscale").
+7. **email, monitoring, analytics, secrets:** placeable as `unmodeled`, labelled "Not simulated" on the node and in the library.
+8. **Connecting into a resource element:** drawing the edge opens a compact form for request class, read/write and deadline; the edge is stored only on confirm (one undo); Esc cancels it. No default deadline.
+9. **Saved-part summary line:** the first three component kinds in saved order, then "+ n more".
+10. **Node card second line:** before any run, `kind · key setting` (a configured value, never shown as a measurement); after a run of the selected scenario, measured values from that run only.
+11. **Routes:** a router/broker is placed with one out port; dragging another connection from it adds a new out port for that route in the same command (one undo). The new port's channel is the one its target accepts (call or message), as in S02 — lead reading.
+12. **traffic, client, mobile, device, scheduler:** diagram labels only — `unmodeled`, "Not simulated", no resource config. Scenario traffic enters at the next real component's entry port. The §2 rows for these five are superseded.
 
 ## 1. Catalog entry shape
 

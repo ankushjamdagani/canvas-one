@@ -1212,3 +1212,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: Lead-drafted scenario UX canvas (7 artboards, https://claude.ai/artifact/2c6vMhn9u47Yq4KbsozVvu) approved by the user. Rendered to `specs/revamp/screens/scenario_*.png`; D41 added; commands.md gains `run.start-all` and a Scenarios section (select/new/duplicate/delete/edit, empty drafts invent nothing, editor sections, switcher, derived status, commit panel); dock inventory rewritten per D38; design-revalidation gaps 2–3 closed; RV-12c4 READY.
 - **Platform**: Claude (lead); no executor.
 - **Limitations**: Lead readings inside D41 for review: an empty draft's scope = every element at draft time; the selected scenario is a per-browser preference; a random seed is drawn when a draft opens.
+
+### D42 standard catalog approved
+
+- **Outcome**: Catalog contract drafted by a Sonnet subagent (one review round: resource entry ports, per-route ports, worker inbound channel), then the user resolved all 12 open questions one by one (swatches shown for the three new stripe colours). Resolutions recorded at the top of `specs/revamp/contracts/catalog.md` and as D42.
+- **Platform**: Sonnet subagent (draft), Claude (review, question round).
+- **Limitations**: The §2 table rows for traffic/client/mobile/device/scheduler are superseded by resolution 12 rather than rewritten; a later edit can fold resolutions into the table.
