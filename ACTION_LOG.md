@@ -1147,3 +1147,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round** (Claude): build versions came from the cited run; evidence refs weren't validated and another run could stand in; hidden default controller and random ID default; unhandled prepare statuses; acceptance tests merged an unchanged source. Claude tightened the run-scenario check (a run without a manifest scenario can't back a ref).
 - **Verification** (Claude): 771 unit tests, `tsc -b` clean.
 - **Limitations**: Publish is RV-08e (tests seed main heads directly). Commit message length (1–4,000) and the stored evidence manifest field extend storage.md's commit row; closed branches are rejected for commit/prepare.
+
+### RV-08e atomic publish (Claude lead, Gemini executor, Sonnet finish)
+
+- **Outcome**: Publication metadata/version helpers, `history.publish` through `CandidateController.publish` with operation-bound unforgeable tickets, one atomic transaction (merge commit, publication, main head + working snapshot, revisions, default source closure). Merged onto the runner line @ `f89ed42`.
+- **Review round** (Claude): removed envelope fallbacks to candidate values and a direct-DB retry hack; publish no longer reachable via `execute()` or a reused ticket. Gemini hit its quota mid-fix; a Sonnet subagent finished it.
+- **Verification** (Claude): 819 unit tests, `tsc -b` clean.
+- **Limitations**: History export/import round trip and retention are RV-08f/RV-16b.
