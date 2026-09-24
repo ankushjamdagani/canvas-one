@@ -603,25 +603,50 @@ describe('LocalRepository', () => {
   });
 
   describe('Unsupported methods and commands', () => {
-    it('returns typed unsupported result naming owning tasks', async () => {
+    it('returns typed missing/stale results for transfer methods called with unknown data (RV-16b)', async () => {
       const db = createStudioDatabase(`test-unsupported-${crypto.randomUUID()}`);
-      const repo = new LocalRepository(db);
-      const importRes = await repo.importProject(null);
-      expect(importRes.status).toBe('unsupported');
-      expect(importRes.task).toBe('RV-16b');
+      // A repository constructed WITH an injected mintId, so exportProject's 'missing'
+      // path (unknown project) is exercised independently of item 1's mintId gate below.
+      const repo = new LocalRepository(db, { mintId: () => crypto.randomUUID() });
 
-      const exportRes = await repo.exportProject('p1');
-      expect(exportRes.status).toBe('unsupported');
-      expect(exportRes.task).toBe('RV-16b');
+      // importProject: an unresolvable fileToken (never registered) is 'missing'.
+      const importRes = await repo.importProject({
+        commandId: 'project.import',
+        operationId: crypto.randomUUID(),
+        actor: { actorId: 'u1', kind: 'local-human', displayName: 'U' },
+        payload: { fileToken: {}, newProjectId: crypto.randomUUID() },
+      });
+      expect(importRes.status).toBe('missing');
 
-      const pruneRes = await repo.pruneUnreferenced('p1', null);
-      expect(pruneRes.status).toBe('unsupported');
-      expect(pruneRes.task).toBe('RV-16b');
+      // exportProject: an unknown project is 'missing'.
+      const exportRes = await repo.exportProject({ projectId: 'p1', expectedProjectRevision: 0 });
+      expect(exportRes.status).toBe('missing');
+
+      // pruneUnreferenced: an unknown project is 'missing'.
+      const pruneRes = await repo.pruneUnreferenced({
+        projectId: 'p1',
+        expectedProjectRevision: 0,
+        selection: { runIds: [], traceRunIds: [], snapshotIds: [] },
+      });
+      expect(pruneRes.status).toBe('missing');
 
       const prepPublishCmd = await repo.execute({ commandId: 'history.prepare-publish' } as any);
       expect(prepPublishCmd.status).toBe('unsupported');
       expect((prepPublishCmd as any).task).toBe('RV-08');
 
+      db.close();
+    });
+
+    it('exportProject fails invalid naming mintId when constructed without one (review round 1, item 1)', async () => {
+      const db = createStudioDatabase(`test-no-mintid-${crypto.randomUUID()}`);
+      // No mintId injected -- there must be NO fallback of any kind (not even a
+      // deterministic one): exportProject must refuse rather than invent a downloadId.
+      const repo = new LocalRepository(db);
+      const res = await repo.exportProject({ projectId: 'p1', expectedProjectRevision: 0 });
+      expect(res.status).toBe('invalid');
+      if (res.status === 'invalid') {
+        expect(res.issues.some((i) => i.path.includes('mintId'))).toBe(true);
+      }
       db.close();
     });
   });

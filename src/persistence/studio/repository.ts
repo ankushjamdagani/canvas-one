@@ -31,6 +31,9 @@ import {
 import { applyRecordChanges } from './apply-records';
 import { validateRunStartToken } from './token';
 import { validatePublishTicket } from './publish-ticket';
+import { FileTokenRegistry } from './file-tokens';
+import { validatePortableBundle } from './bundle-validate';
+import { computePinClosure } from '../../domain/versioning/pin-closure';
 import {
   validatePublicationMetadata,
   deriveVersionKey,
@@ -57,16 +60,24 @@ import {
   type CommitRecord,
   type DeleteProjectResult,
   type ExpectedHead,
+  type ExportProjectParams,
+  type ExportProjectResult,
   type HistoryCheckpointCommand,
   type HistoryCommitCommand,
   type HistoryLoadResult,
   type HistoryPublishCommand,
   type HistoryRestoreCommand,
   type ModelApplyRecordsCommand,
+  type PartRecord,
   type PreferenceRecord,
+  type ProjectBundle,
   type ProjectCreateCommand,
+  type ProjectImportCommand,
   type ProjectRecord,
   type ProjectRenameCommand,
+  type PruneSelection,
+  type PruneUnreferencedParams,
+  type PruneUnreferencedResult,
   type PublicationRecord,
   type ReferenceIntegrityIssue,
   type ReferenceIntegrityResult,
@@ -77,6 +88,9 @@ import {
   type StudioRepository,
   type TraceChunkRecord,
   type UnsupportedResult,
+  PORTABLE_FORMAT,
+  PORTABLE_VERSION,
+  STORAGE_LIMITS,
 } from './types';
 
 /**
@@ -125,11 +139,24 @@ function getProjectTables(db: StudioDatabase) {
 
 export type LocalRepositoryOptions = {
   readonly buildVersions?: BuildManifestVersions;
+  /** Injected downloadId/newProjectId-adjacent ID minting for transfer (RV-16b). */
+  readonly mintId?: () => Id;
+  /** Injected FileToken registry; defaults to a private instance owned by this repository. */
+  readonly fileTokens?: FileTokenRegistry;
 };
 
 export class LocalRepository implements StudioRepository {
   private readonly db: StudioDatabase;
   private readonly buildVersions: BuildManifestVersions;
+  /**
+   * Injected downloadId minting (RV-16b review round 1, item 1). storage.md §5:
+   * "downloadId comes from an injected mintId, never randomUUID by default" -- there is
+   * no fallback generator of any kind (not even a deterministic one): a repository built
+   * without one simply cannot mint a downloadId, and `exportProject` reports that as a
+   * typed `invalid` naming `mintId` rather than inventing an ID.
+   */
+  private readonly mintId: (() => Id) | undefined;
+  readonly fileTokens: FileTokenRegistry;
 
   constructor(
     db?: StudioDatabase,
@@ -138,10 +165,17 @@ export class LocalRepository implements StudioRepository {
     this.db = db ?? createStudioDatabase();
     if (options && 'compilerVersion' in options) {
       this.buildVersions = options;
+      this.mintId = undefined;
+      this.fileTokens = new FileTokenRegistry();
     } else if (options && 'buildVersions' in options && options.buildVersions) {
       this.buildVersions = options.buildVersions;
+      this.mintId = (options as LocalRepositoryOptions).mintId;
+      this.fileTokens = (options as LocalRepositoryOptions).fileTokens ?? new FileTokenRegistry();
     } else {
       this.buildVersions = DEFAULT_BUILD_VERSIONS;
+      this.mintId = (options as LocalRepositoryOptions | undefined)?.mintId;
+      this.fileTokens =
+        (options as LocalRepositoryOptions | undefined)?.fileTokens ?? new FileTokenRegistry();
     }
   }
 
@@ -4119,30 +4153,559 @@ export class LocalRepository implements StudioRepository {
     return { ok: false, missing };
   }
 
-  async importProject(_validatedBundle: unknown): Promise<UnsupportedResult> {
+  /**
+   * project.export-json (RV-16b, storage.md §4 & §5). One consistent read-only
+   * transaction; the canonical-json-v1 envelope is built and hashed OUTSIDE the
+   * transaction (async Web Crypto is never awaited inside a Dexie transaction --
+   * transactions.md §2). Excluded per storage.md §4: operation receipts, preferences,
+   * trace chunks, device-local actors/credentials, project revision, importSourceId.
+   * Every exported run gets `traceState:'not-saved'`; checks/status/summary/manifest are
+   * unchanged.
+   */
+  async exportProject(params: ExportProjectParams): Promise<ExportProjectResult> {
+    const { projectId, expectedProjectRevision } = params;
+
+    // No `mintId` was injected at construction -- fail fast, before doing any work, rather
+    // than inventing a downloadId (review round 1, item 1).
+    if (!this.mintId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'missing-property',
+            'exportProject requires a LocalRepository constructed with an injected mintId; none was provided',
+            ['mintId'],
+          ),
+        ],
+      };
+    }
+    const mintId = this.mintId;
+
+    let read: {
+      project: ProjectRecord;
+      branches: BranchRecord[];
+      snapshots: SnapshotRecord[];
+      commits: CommitRecord[];
+      publications: PublicationRecord[];
+      checkpoints: CheckpointRecord[];
+      runs: RunRecord[];
+      parts: PartRecord[];
+    };
+    try {
+      const outcome = await this.db.transaction(
+        'r',
+        [
+          this.db.projects,
+          this.db.branches,
+          this.db.snapshots,
+          this.db.commits,
+          this.db.publications,
+          this.db.checkpoints,
+          this.db.runs,
+          this.db.parts,
+        ],
+        async () => {
+          const project = await this.db.projects.get(projectId);
+          if (!project) {
+            return { status: 'missing' as const, ids: [projectId] };
+          }
+          if (project.revision !== expectedProjectRevision) {
+            return {
+              status: 'stale' as const,
+              scope: 'project' as const,
+              expected: expectedProjectRevision,
+              actual: project.revision,
+            };
+          }
+          const [branches, snapshots, commits, publications, checkpoints, runs, parts] =
+            await Promise.all([
+              this.db.branches.where('projectId').equals(projectId).toArray(),
+              this.db.snapshots.where('projectId').equals(projectId).toArray(),
+              this.db.commits.where('projectId').equals(projectId).toArray(),
+              this.db.publications.where('projectId').equals(projectId).toArray(),
+              this.db.checkpoints.where('projectId').equals(projectId).toArray(),
+              this.db.runs.where('projectId').equals(projectId).toArray(),
+              this.db.parts.where('projectId').equals(projectId).toArray(),
+            ]);
+          return {
+            status: 'read' as const,
+            data: { project, branches, snapshots, commits, publications, checkpoints, runs, parts },
+          };
+        },
+      );
+      if (outcome.status === 'missing' || outcome.status === 'stale') {
+        return outcome;
+      }
+      read = outcome.data;
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    const stripProjectId = <T extends { projectId: Id }>(row: T): Omit<T, 'projectId'> => {
+      const { projectId: _drop, ...rest } = row;
+      return rest;
+    };
+
+    const bundle: ProjectBundle = {
+      id: read.project.id,
+      title: read.project.title,
+      createdAt: read.project.createdAt,
+      updatedAt: read.project.updatedAt,
+      mainBranchId: read.project.mainBranchId,
+      initialSnapshotId: read.project.initialSnapshotId,
+      branches: read.branches.map(stripProjectId).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+      snapshots: read.snapshots
+        .map(stripProjectId)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+      commits: read.commits.map(stripProjectId).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+      publications: read.publications
+        .map(stripProjectId)
+        .sort((a, b) => a.ordinal - b.ordinal),
+      checkpoints: read.checkpoints
+        .map(stripProjectId)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+      runs: read.runs
+        .map((r) => ({ ...stripProjectId(r), traceState: 'not-saved' as const }))
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+      parts: read.parts
+        .map(stripProjectId)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : a.revision - b.revision)),
+    };
+
+    const envelope = { format: PORTABLE_FORMAT, version: PORTABLE_VERSION, project: bundle };
+    const canon = canonicalJson(envelope);
+    if (!canon.ok) {
+      return {
+        status: 'failed',
+        code: 'limit',
+        issues: canon.issues,
+      };
+    }
+    if (canon.bytes > STORAGE_LIMITS.maxExportEnvelopeBytes) {
+      return {
+        status: 'failed',
+        code: 'limit',
+        issues: [
+          createIssue(
+            'too-large',
+            `Export envelope is ${canon.bytes} bytes, exceeding the ${STORAGE_LIMITS.maxExportEnvelopeBytes}-byte (64 MiB) cap; nothing was written`,
+            [],
+            projectId,
+          ),
+        ],
+      };
+    }
+
+    let sha256: string;
+    try {
+      sha256 = await sha256Hex(canon.text);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+    const bytes = new TextEncoder().encode(canon.text);
+    const downloadId = mintId();
+
     return {
-      status: 'unsupported',
-      task: 'RV-16b',
-      message: 'importProject is not yet implemented (owned by RV-16b)',
+      status: 'done',
+      value: { kind: 'download', downloadId },
+      bytes,
+      sha256,
     };
   }
 
-  async exportProject(_projectId: Id): Promise<UnsupportedResult> {
-    return {
-      status: 'unsupported',
-      task: 'RV-16b',
-      message: 'exportProject is not yet implemented (owned by RV-16b)',
+  /**
+   * project.import (RV-16b, commands.md §2/§3, storage.md §4). Validates the bundle bound
+   * to `fileToken` OUTSIDE any transaction (bundle-validate.ts is pure), then creates a
+   * fresh project namespace in one transaction: receipt first, then the newProjectId
+   * collision check, then the write. Every imported run becomes `imported-unverified`
+   * with `traceState:'not-saved'` regardless of its exported traceState (storage.md §4:
+   * "the bundle is lossless for authored content, history and check summaries, not for
+   * traces" -- an imported project never carries trusted-local trace evidence in from
+   * outside).
+   */
+  async importProject(command: ProjectImportCommand): Promise<AuthoredResult> {
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'command.payload is required', ['payload'])],
+      };
+    }
+    const newProjectIdIssue = validateUuid(
+      command.payload.newProjectId,
+      ['payload', 'newProjectId'],
+      'newProjectId',
+    );
+    if (newProjectIdIssue) {
+      return { status: 'invalid', issues: [newProjectIdIssue] };
+    }
+    const newProjectId = command.payload.newProjectId;
+
+    // FileToken resolution and bundle validation happen entirely OUTSIDE any transaction.
+    const binding = this.fileTokens.resolveFile(command.payload.fileToken);
+    if (!binding) {
+      return { status: 'missing', ids: [] };
+    }
+
+    const validation = await validatePortableBundle(binding.bytes);
+    if (!validation.ok) {
+      if (validation.kind === 'unsupported-version') {
+        return { status: 'failed', code: 'unsupported-version', issues: validation.issues };
+      }
+      return { status: 'invalid', issues: validation.issues };
+    }
+    const bundle = validation.bundle;
+
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    const now = Date.now();
+    const projectRow: ProjectRecord = {
+      id: newProjectId,
+      title: bundle.title,
+      revision: 0,
+      mainBranchId: bundle.mainBranchId,
+      initialSnapshotId: bundle.initialSnapshotId,
+      importSourceId: bundle.id,
+      createdAt: bundle.createdAt,
+      updatedAt: bundle.updatedAt,
     };
+    const branchRows: BranchRecord[] = bundle.branches.map((b) => ({ ...b, projectId: newProjectId }));
+    const snapshotRows: SnapshotRecord[] = bundle.snapshots.map((s) => ({ ...s, projectId: newProjectId }));
+    const commitRows: CommitRecord[] = bundle.commits.map((c) => ({ ...c, projectId: newProjectId }));
+    const publicationRows: PublicationRecord[] = bundle.publications.map((p) => ({
+      ...p,
+      projectId: newProjectId,
+    }));
+    const checkpointRows: CheckpointRecord[] = bundle.checkpoints.map((cp) => ({
+      ...cp,
+      projectId: newProjectId,
+    }));
+    // storage.md §5: "Only the local repository sets provenance; portable input can't
+    // claim trusted-local" (run-identity.md §5/§6). Every imported run is
+    // 'imported-unverified' with traceState 'not-saved', regardless of the exported value.
+    const runRows: RunRecord[] = bundle.runs.map((r) => ({
+      ...r,
+      projectId: newProjectId,
+      provenance: 'imported-unverified' as const,
+      traceState: 'not-saved' as const,
+    }));
+    const partRows: PartRecord[] = bundle.parts.map((p) => ({ ...p, projectId: newProjectId }));
+
+    const changedIds: Id[] = [
+      newProjectId,
+      ...branchRows.map((b) => b.id),
+      ...commitRows.map((c) => c.id),
+      ...publicationRows.map((p) => p.id),
+    ];
+
+    const appliedResult: AppliedResult = {
+      status: 'applied',
+      operationId: command.operationId,
+      projectRevision: 0,
+      branchRevision: null,
+      changedIds,
+      undo: null,
+      value: { kind: 'project', projectId: newProjectId, branchId: bundle.mainBranchId },
+    };
+
+    // Review round 1, item 4: import must also enforce §6 byte limits, per-record
+    // canonical sizes exactly as every other authored write does (see handleProjectCreate).
+    // localBytes accounts every row this import will write, INCLUDING the operation
+    // receipt (operations are local-only, per limits.ts's getProjectAccountedBytes);
+    // exportBytes mirrors what exportProject would later re-derive (no receipts/trace
+    // chunks -- runs already carry traceState:'not-saved' above).
+    const receiptRow = { projectId: newProjectId, id: command.operationId, requestHash, result: appliedResult, createdAt: now };
+    const sumBytes = (rows: readonly unknown[]): number =>
+      rows.reduce((total: number, row) => total + calculateRecordBytes(row), 0);
+    const localBytes =
+      calculateRecordBytes(projectRow) +
+      sumBytes(branchRows) +
+      sumBytes(snapshotRows) +
+      sumBytes(commitRows) +
+      sumBytes(publicationRows) +
+      sumBytes(checkpointRows) +
+      sumBytes(runRows) +
+      sumBytes(partRows) +
+      calculateRecordBytes(receiptRow);
+    const exportBytes =
+      calculateRecordBytes(projectRow) +
+      sumBytes(branchRows) +
+      sumBytes(snapshotRows) +
+      sumBytes(commitRows) +
+      sumBytes(publicationRows) +
+      sumBytes(checkpointRows) +
+      sumBytes(runRows) +
+      sumBytes(partRows);
+
+    try {
+      return await this.db.transaction('rw', getProjectTables(this.db), async () => {
+        // 1. Receipt first, in the new namespace.
+        const receiptCheck = await checkOperationReceipt(
+          this.db,
+          newProjectId,
+          command.operationId,
+          requestHash,
+        );
+        if ('status' in receiptCheck) {
+          return receiptCheck;
+        }
+        if (receiptCheck.isRetry) {
+          return receiptCheck.result;
+        }
+
+        // 2. newProjectId already used by a different import -> rejected.
+        const existingProject = await this.db.projects.get(newProjectId);
+        if (existingProject) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'duplicate-id',
+                `Project ${newProjectId} already exists`,
+                ['payload', 'newProjectId'],
+                newProjectId,
+              ),
+            ],
+          } as const;
+        }
+
+        // 3. Project limits on the new namespace (§6, before writing anything): counts
+        // AND accounted bytes (128 MiB local / 64 MiB export), exactly as every other
+        // authored write enforces them.
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: newProjectId,
+          additionalBranches: branchRows.length,
+          additionalCommits: commitRows.length,
+          additionalCheckpoints: checkpointRows.length,
+          additionalRuns: runRows.length,
+          additionalParts: partRows.length,
+          additionalReceipts: 1,
+          additionalLocalBytes: localBytes,
+          additionalExportBytes: exportBytes,
+        });
+        if (limitError) return limitError;
+
+        // 4. Write everything. Nothing becomes visible unless this whole transaction commits.
+        await this.db.projects.add(projectRow);
+        for (const row of branchRows) await this.db.branches.add(row);
+        for (const row of snapshotRows) await insertImmutable(this.db.snapshots, row, [row.projectId, row.id]);
+        for (const row of commitRows) await insertImmutable(this.db.commits, row, [row.projectId, row.id]);
+        for (const row of publicationRows) {
+          await insertImmutable(this.db.publications, row, [row.projectId, row.id]);
+        }
+        for (const row of checkpointRows) {
+          await insertImmutable(this.db.checkpoints, row, [row.projectId, row.id]);
+        }
+        for (const row of runRows) await insertImmutable(this.db.runs, row, [row.projectId, row.id]);
+        for (const row of partRows) {
+          await insertImmutable(this.db.parts, row, [row.projectId, row.id, row.revision]);
+        }
+
+        await recordOperationReceipt(this.db, newProjectId, command.operationId, requestHash, appliedResult);
+
+        return appliedResult;
+      });
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
   }
 
-  async pruneUnreferenced(
-    _projectId: Id,
-    _selection: unknown,
-  ): Promise<UnsupportedResult> {
-    return {
-      status: 'unsupported',
-      task: 'RV-16b',
-      message: 'pruneUnreferenced is not yet implemented (owned by RV-16b)',
-    };
+  /**
+   * pruneUnreferenced (RV-16b, storage.md §7). Explicit only; recomputes the pin closure
+   * from CURRENT rows inside the transaction (never a stale, pre-computed closure). A
+   * selected pinned run in `runIds` (full row deletion) or a selected pinned snapshot
+   * fails the whole call with `referenced-artifact` and deletes nothing. `traceRunIds`
+   * MAY include pinned runs: it only ever deletes trace chunks and sets `traceState` to
+   * `'pruned'`, leaving the run row (and its checks/status/summary) untouched, so it can
+   * never break evidence pinning. Already-absent IDs on retry are reported, not treated as
+   * an error.
+   */
+  async pruneUnreferenced(params: PruneUnreferencedParams): Promise<PruneUnreferencedResult> {
+    const { projectId, expectedProjectRevision, selection } = params;
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          const project = await this.db.projects.get(projectId);
+          if (!project) {
+            return { status: 'missing', ids: [projectId] } as const;
+          }
+          if (project.revision !== expectedProjectRevision) {
+            return {
+              status: 'stale',
+              scope: 'project',
+              expected: expectedProjectRevision,
+              actual: project.revision,
+            } as const;
+          }
+
+          const [branches, commits, publications, checkpoints, runs] = await Promise.all([
+            this.db.branches.where('projectId').equals(projectId).toArray(),
+            this.db.commits.where('projectId').equals(projectId).toArray(),
+            this.db.publications.where('projectId').equals(projectId).toArray(),
+            this.db.checkpoints.where('projectId').equals(projectId).toArray(),
+            this.db.runs.where('projectId').equals(projectId).toArray(),
+          ]);
+
+          const closure = computePinClosure({
+            project: { initialSnapshotId: project.initialSnapshotId, mainBranchId: project.mainBranchId },
+            branches: branches.map((b) => ({
+              id: b.id,
+              state: b.state,
+              headCommitId: b.headCommitId,
+              workingSnapshotId: b.workingSnapshotId,
+            })),
+            commits: commits.map((c) => ({
+              id: c.id,
+              snapshotId: c.snapshotId,
+              parentIds: c.parentIds,
+              evidence: c.evidence,
+            })),
+            publications: publications.map((p) => ({ id: p.id, commitId: p.commitId })),
+            checkpoints: checkpoints.map((cp) => ({ id: cp.id, snapshotId: cp.snapshotId })),
+            runs: runs.map((r) => ({ id: r.id, snapshotId: r.snapshotId })),
+          });
+          const pinnedRunIds = new Set(closure.pinnedRunIds);
+          const runById = new Map(runs.map((r) => [r.id, r]));
+
+          // Pin closure treats every stored run as pinning its own snapshot "pinned or
+          // not" (pin-closure.ts: "every stored run is retained until an explicit prune
+          // removes it"). For deciding whether a SELECTED snapshot may be released by
+          // THIS prune call, storage.md §7's "any retained run" therefore means any run
+          // that will still exist after this call -- so the gate and the later deletion
+          // both use a closure computed with `selection.runIds` (full deletions, not
+          // trace-only prunes) already removed, never the raw pre-mutation closure. This
+          // is why selecting a run together with the snapshot it alone referenced can
+          // succeed in one call ("a snapshot referenced only by a pruned run gets
+          // released"), while a snapshot still reachable via a branch, commit, checkpoint,
+          // or a run NOT in `selection.runIds` stays pinned and rejected.
+          const runsExcludingDeletions = runs.filter((r) => !selection.runIds.includes(r.id));
+          const closureExcludingDeletions = computePinClosure({
+            project: { initialSnapshotId: project.initialSnapshotId, mainBranchId: project.mainBranchId },
+            branches: branches.map((b) => ({
+              id: b.id,
+              state: b.state,
+              headCommitId: b.headCommitId,
+              workingSnapshotId: b.workingSnapshotId,
+            })),
+            commits: commits.map((c) => ({
+              id: c.id,
+              snapshotId: c.snapshotId,
+              parentIds: c.parentIds,
+              evidence: c.evidence,
+            })),
+            publications: publications.map((p) => ({ id: p.id, commitId: p.commitId })),
+            checkpoints: checkpoints.map((cp) => ({ id: cp.id, snapshotId: cp.snapshotId })),
+            runs: runsExcludingDeletions.map((r) => ({ id: r.id, snapshotId: r.snapshotId })),
+          });
+          const releasableSnapshotPins = new Set(closureExcludingDeletions.pinnedSnapshotIds);
+
+          // Any selected pinned run (full row deletion) or pinned snapshot -> referenced-
+          // artifact; nothing deleted. A pinned run in `traceRunIds` is NOT rejected here
+          // (review round 1, item 3): storage.md §7 says "Pruning trace chunks changes
+          // only traceState, never checks or status," and pinning protects the evidence
+          // run ROW (its fingerprint, checks, status, summary), not its trace bytes.
+          // Trace-only pruning never removes the row a commit's evidence points at, so it
+          // cannot break `referenced-artifact` integrity even when the run is pinned.
+          const referencedIssues: Issue[] = [];
+          for (const runId of selection.runIds) {
+            if (pinnedRunIds.has(runId)) {
+              referencedIssues.push(
+                createIssue('structural-rule', `run '${runId}' is pinned (referenced as commit evidence)`, ['selection', 'runIds'], runId),
+              );
+            }
+          }
+          for (const snapshotId of selection.snapshotIds) {
+            if (releasableSnapshotPins.has(snapshotId)) {
+              referencedIssues.push(
+                createIssue('structural-rule', `snapshot '${snapshotId}' is pinned`, ['selection', 'snapshotIds'], snapshotId),
+              );
+            }
+          }
+          if (referencedIssues.length > 0) {
+            return { status: 'failed', code: 'referenced-artifact', issues: referencedIssues } as const;
+          }
+
+          const alreadyAbsentIds: Id[] = [];
+          const deletedRunIds: Id[] = [];
+          const tracePrunedRunIds: Id[] = [];
+
+          // traceRunIds: delete trace chunks and set traceState 'pruned' only.
+          for (const runId of selection.traceRunIds) {
+            const run = runById.get(runId);
+            if (!run) {
+              alreadyAbsentIds.push(runId);
+              continue;
+            }
+            await this.db.traceChunks
+              .where('[projectId+runId]')
+              .equals([projectId, runId])
+              .delete();
+            if (run.traceState !== 'pruned') {
+              await this.db.runs.put({ ...run, traceState: 'pruned' });
+            }
+            tracePrunedRunIds.push(runId);
+          }
+
+          // Selected unpinned runs: delete the run row and its chunks entirely.
+          for (const runId of selection.runIds) {
+            const run = runById.get(runId);
+            if (!run) {
+              alreadyAbsentIds.push(runId);
+              continue;
+            }
+            await this.db.traceChunks
+              .where('[projectId+runId]')
+              .equals([projectId, runId])
+              .delete();
+            await this.db.runs.delete([projectId, runId]);
+            deletedRunIds.push(runId);
+          }
+
+          // A snapshot is deleted only if unpinned in `closureExcludingDeletions`, computed
+          // above BEFORE any mutation (the same closure already used for the
+          // referenced-artifact gate, so every requested snapshotId here is guaranteed
+          // either absent or already known-unpinned).
+          const deletedSnapshotIds: Id[] = [];
+          for (const snapshotId of selection.snapshotIds) {
+            const existing = await this.db.snapshots.get([projectId, snapshotId]);
+            if (!existing) {
+              alreadyAbsentIds.push(snapshotId);
+              continue;
+            }
+            await this.db.snapshots.delete([projectId, snapshotId]);
+            deletedSnapshotIds.push(snapshotId);
+          }
+
+          const nextRevision = project.revision + 1;
+          await this.db.projects.put({ ...project, revision: nextRevision, updatedAt: Date.now() });
+
+          return {
+            status: 'applied',
+            projectRevision: nextRevision,
+            deletedRunIds,
+            tracePrunedRunIds,
+            deletedSnapshotIds,
+            alreadyAbsentIds,
+          } as const;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
   }
 }
