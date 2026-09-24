@@ -7,8 +7,8 @@
  */
 
 import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
-import { validateDocument } from '../../domain/studio/validate';
-import type { Document, Id } from '../../domain/studio/model';
+import { validateDocument, type Issue } from '../../domain/studio/validate';
+import type { Document, Id, Scenario } from '../../domain/studio/model';
 import { TERMINAL_STATUSES, type TraceEvent } from '../../domain/studio/runner/types';
 import { createStudioDatabase, StudioDatabase } from './db';
 import { createIssue, mapErrorToFailedResult, RepositoryError } from './errors';
@@ -30,7 +30,16 @@ import {
 } from './primitives';
 import { applyRecordChanges } from './apply-records';
 import { validateRunStartToken } from './token';
+import { buildManifest, type BuildManifestVersions } from '../../domain/studio/manifest';
 import {
+  buildEvidenceManifest,
+  evaluateCandidate,
+  runQualifies,
+  type CandidateScenario,
+} from '../../domain/versioning';
+import type { EvidenceRef } from '../../domain/studio/runner/evidence';
+import {
+  DEFAULT_BUILD_VERSIONS,
   PREFERENCES_SCHEMA,
   type AppliedResult,
   type AuthoredCommand,
@@ -39,9 +48,11 @@ import {
   type BranchRecord,
   type BranchReopenCommand,
   type CheckpointRecord,
+  type CommitRecord,
   type DeleteProjectResult,
   type ExpectedHead,
   type HistoryCheckpointCommand,
+  type HistoryCommitCommand,
   type HistoryRestoreCommand,
   type ModelApplyRecordsCommand,
   type PreferenceRecord,
@@ -72,11 +83,26 @@ function getProjectTables(db: StudioDatabase) {
   ];
 }
 
+export type LocalRepositoryOptions = {
+  readonly buildVersions?: BuildManifestVersions;
+};
+
 export class LocalRepository implements StudioRepository {
   private readonly db: StudioDatabase;
+  private readonly buildVersions: BuildManifestVersions;
 
-  constructor(db?: StudioDatabase) {
+  constructor(
+    db?: StudioDatabase,
+    options?: LocalRepositoryOptions | BuildManifestVersions,
+  ) {
     this.db = db ?? createStudioDatabase();
+    if (options && 'compilerVersion' in options) {
+      this.buildVersions = options;
+    } else if (options && 'buildVersions' in options && options.buildVersions) {
+      this.buildVersions = options.buildVersions;
+    } else {
+      this.buildVersions = DEFAULT_BUILD_VERSIONS;
+    }
   }
 
   /**
@@ -111,6 +137,42 @@ export class LocalRepository implements StudioRepository {
         code: 'unavailable',
         message: 'Failed to load branch from database',
         issues: [createIssue('structural-rule', String(err), [], branchId)],
+      });
+    }
+  }
+
+  /**
+   * Loads a commit by [projectId, commitId]. Returns a cloned, read-only record or null if not found.
+   */
+  async loadCommit(projectId: Id, commitId: Id): Promise<Readonly<CommitRecord> | null> {
+    try {
+      const record = await this.db.commits.get([projectId, commitId]);
+      if (!record) return null;
+      return Object.freeze(structuredClone(record));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to load commit from database',
+        issues: [createIssue('structural-rule', String(err), [], commitId)],
+      });
+    }
+  }
+
+  /**
+   * Loads a snapshot by [projectId, snapshotId]. Returns a cloned, read-only record or null if not found.
+   */
+  async loadSnapshot(projectId: Id, snapshotId: string): Promise<Readonly<SnapshotRecord> | null> {
+    try {
+      const record = await this.db.snapshots.get([projectId, snapshotId]);
+      if (!record) return null;
+      return Object.freeze(structuredClone(record));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to load snapshot from database',
+        issues: [createIssue('structural-rule', String(err), [], snapshotId)],
       });
     }
   }
@@ -260,6 +322,7 @@ export class LocalRepository implements StudioRepository {
       case 'branch.reopen':
         return this.handleBranchReopen(command as BranchReopenCommand);
       case 'history.commit':
+        return this.handleHistoryCommit(command as HistoryCommitCommand);
       case 'history.prepare-publish':
       case 'history.publish':
       case 'history.resolve-conflict':
@@ -1857,6 +1920,614 @@ export class LocalRepository implements StudioRepository {
             changedIds: [command.branchId],
             undo: null,
             value: { kind: 'branch', branchId: command.branchId },
+          };
+
+          await recordOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+            appliedResult,
+          );
+
+          return appliedResult;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * history.commit:
+   * Non-main branch; passing evidence for every scenario (run-identity.md §5).
+   * Commit with parent = branch head (or [] when unborn); advance head; revision++.
+   * 1,000-commit limit. Retried commitId with same request returns original result.
+   */
+  private async handleHistoryCommit(
+    command: HistoryCommitCommand,
+  ): Promise<AuthoredResult> {
+    // 1. Actor validation
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    // 2. Validate envelope IDs and revisions
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+
+    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projIssue) {
+      return { status: 'invalid', issues: [projIssue] };
+    }
+
+    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIssue) {
+      return { status: 'invalid', issues: [branchIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    // 3. Validate payload
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'command.payload is required', ['payload'])],
+      };
+    }
+
+    const commitIdIssue = validateUuid(
+      command.payload.commitId,
+      ['payload', 'commitId'],
+      'commitId',
+    );
+    if (commitIdIssue) {
+      return { status: 'invalid', issues: [commitIdIssue] };
+    }
+
+    if (command.payload.expectedHeadId !== null) {
+      const headIssue = validateUuid(
+        command.payload.expectedHeadId,
+        ['payload', 'expectedHeadId'],
+        'expectedHeadId',
+      );
+      if (headIssue) {
+        return { status: 'invalid', issues: [headIssue] };
+      }
+    }
+
+    const message = command.payload.message?.trim() ?? '';
+    if (message.length < 1 || message.length > 4000) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'too-long',
+            'Commit message must be between 1 and 4,000 code points',
+            ['payload', 'message'],
+          ),
+        ],
+      };
+    }
+
+    if (!Array.isArray(command.payload.evidence)) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('wrong-type', 'payload.evidence must be an array', ['payload', 'evidence']),
+        ],
+      };
+    }
+
+    // Validate shape of each ref: {scenarioId: UUID, fingerprint: string, runId: UUID}
+    const evidenceShapeIssues: Issue[] = [];
+    for (let i = 0; i < command.payload.evidence.length; i++) {
+      const ref = command.payload.evidence[i] as any;
+      if (
+        !ref ||
+        typeof ref !== 'object' ||
+        Array.isArray(ref) ||
+        !isValidUuid(ref.scenarioId) ||
+        typeof ref.fingerprint !== 'string' ||
+        ref.fingerprint.trim().length === 0 ||
+        !isValidUuid(ref.runId)
+      ) {
+        evidenceShapeIssues.push(
+          createIssue(
+            'wrong-type',
+            `Invalid evidence ref at index ${i}: expected {scenarioId: UUID, fingerprint: string, runId: UUID}`,
+            ['payload', 'evidence', i],
+          ),
+        );
+      }
+    }
+    if (evidenceShapeIssues.length > 0) {
+      return { status: 'invalid', issues: evidenceShapeIssues };
+    }
+
+    // 4. Compute request hash BEFORE transaction and check receipt first
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    const earlyReceipt = await checkOperationReceipt(
+      this.db,
+      command.projectId,
+      command.operationId,
+      requestHash,
+    );
+    if ('status' in earlyReceipt) {
+      return earlyReceipt;
+    }
+    if (earlyReceipt.isRetry) {
+      return earlyReceipt.result;
+    }
+
+    // 5. Pre-read project & branch state outside transaction
+    const project = await this.db.projects.get(command.projectId);
+    if (!project) {
+      return { status: 'missing', ids: [command.projectId] };
+    }
+
+    // Not on main (invalid)
+    if (command.branchId === project.mainBranchId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Direct commit on main branch is rejected; main is changed only by publication',
+            ['branchId'],
+            command.branchId,
+          ),
+        ],
+      };
+    }
+
+    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+    if (!branch) {
+      return { status: 'missing', ids: [command.branchId] };
+    }
+
+    // Closed branch cannot be committed to (invalid).
+    // Narrowest reading of closed branch semantics; closed branches are read-only until reopened.
+    if (branch.state === 'closed') {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Cannot commit to a closed branch',
+            ['branchId'],
+            command.branchId,
+          ),
+        ],
+      };
+    }
+
+    // Working revision compare
+    if (branch.workingRevision !== command.expectedWorkingRevision) {
+      return {
+        status: 'stale',
+        scope: 'branch',
+        expected: command.expectedWorkingRevision,
+        actual: branch.workingRevision,
+      };
+    }
+
+    // Head compare (HEAD_MOVED)
+    if (branch.headCommitId !== command.payload.expectedHeadId) {
+      return {
+        status: 'failed',
+        code: 'conflict',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'HEAD_MOVED: Branch head commit does not match expectedHeadId',
+            ['payload', 'expectedHeadId'],
+            command.payload.expectedHeadId,
+          ),
+        ],
+      };
+    }
+
+    // Load branch's working snapshot
+    const workingSnapshot = await this.db.snapshots.get([
+      command.projectId,
+      branch.workingSnapshotId,
+    ]);
+    if (!workingSnapshot) {
+      return { status: 'missing', ids: [branch.workingSnapshotId] };
+    }
+
+    const doc = workingSnapshot.document;
+    if (!doc.scenarios || doc.scenarios.length === 0) {
+      return {
+        status: 'failed',
+        code: 'ineligible',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Branch working document has zero scenarios; at least one qualified scenario is required to commit',
+            ['scenarios'],
+          ),
+        ],
+      };
+    }
+
+    // Evidence ref validation against working document:
+    // at most one ref per scenarioId; a ref for a scenario that isn't in the working document -> invalid
+    const seenScenarioIds = new Set<Id>();
+    const docScenarioMap = new Map<Id, Scenario>(doc.scenarios.map((s) => [s.id, s]));
+    const refValidationIssues: Issue[] = [];
+
+    for (let i = 0; i < command.payload.evidence.length; i++) {
+      const ref = command.payload.evidence[i];
+      if (seenScenarioIds.has(ref.scenarioId)) {
+        refValidationIssues.push(
+          createIssue(
+            'duplicate-id',
+            `Duplicate evidence ref for scenario '${ref.scenarioId}'`,
+            ['payload', 'evidence', i],
+            ref.scenarioId,
+          ),
+        );
+      } else {
+        seenScenarioIds.add(ref.scenarioId);
+      }
+
+      if (!docScenarioMap.has(ref.scenarioId)) {
+        refValidationIssues.push(
+          createIssue(
+            'dangling-reference',
+            `Evidence ref cites scenario '${ref.scenarioId}' which does not exist in working document`,
+            ['payload', 'evidence', i],
+            ref.scenarioId,
+          ),
+        );
+      }
+    }
+
+    if (refValidationIssues.length > 0) {
+      return { status: 'invalid', issues: refValidationIssues };
+    }
+
+    // Every scenario in the document must have a ref
+    const refByScenarioId = new Map<Id, EvidenceRef>();
+    for (const ref of command.payload.evidence) {
+      refByScenarioId.set(ref.scenarioId, ref);
+    }
+
+    for (const scenario of doc.scenarios) {
+      if (!refByScenarioId.has(scenario.id)) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Scenario '${scenario.id}' has no qualifying evidence run`,
+              ['evidence', scenario.id],
+              scenario.id,
+            ),
+          ],
+        };
+      }
+    }
+
+    // A ref whose run is missing -> failed/ineligible naming the run;
+    // run.scenarioId !== ref.scenarioId or run.fingerprint !== ref.fingerprint -> failed/ineligible
+    for (const ref of command.payload.evidence) {
+      const runRec = await this.db.runs.get([command.projectId, ref.runId]);
+      if (!runRec) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' missing from database`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+
+      // The run's scenario comes from its stored manifest; a run without one can't back a ref.
+      const runScenarioId: unknown = (runRec.manifest as { scenario?: { id?: unknown } } | null)?.scenario?.id;
+      if (typeof runScenarioId !== 'string' || runScenarioId !== ref.scenarioId) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' scenarioId '${runScenarioId}' does not match ref scenarioId '${ref.scenarioId}'`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+
+      if (runRec.fingerprint !== ref.fingerprint) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' fingerprint '${runRec.fingerprint}' does not match ref fingerprint '${ref.fingerprint}'`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+    }
+
+    // 5. Eligibility computed OUTSIDE the transaction from the working snapshot:
+    // Build manifest and fingerprint for each scenario using the repository's current build versions (never from evidence)
+    // and verify that THAT ref's run qualifies (no other cited run stands in).
+    const candidateScenarios: CandidateScenario[] = [];
+    const citedRuns: RunRecord[] = [];
+
+    for (const scenario of doc.scenarios) {
+      const manifestRes = await buildManifest(doc, scenario.id, this.buildVersions);
+      if (manifestRes.status !== 'ok') {
+        const issues =
+          manifestRes.status === 'not-ready'
+            ? manifestRes.issues.map((i) =>
+                createIssue(
+                  i.code as any,
+                  i.message,
+                  ['scenarios', scenario.id, ...i.path],
+                  scenario.id,
+                ),
+              )
+            : [
+                createIssue(
+                  'structural-rule',
+                  `Scenario '${scenario.id}' buildManifest failed with status '${manifestRes.status}'`,
+                  ['scenarios', scenario.id],
+                  scenario.id,
+                ),
+              ];
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues,
+        };
+      }
+
+      const ref = refByScenarioId.get(scenario.id)!;
+      const runRec = (await this.db.runs.get([command.projectId, ref.runId]))!;
+
+      const qualResult = runQualifies(runRec, {
+        scenarioId: scenario.id,
+        fingerprint: manifestRes.fingerprint,
+        compiledScopeElementIds: manifestRes.manifest.scope.includedElementIds,
+      });
+
+      if (!qualResult.qualifies) {
+        const message =
+          runRec.status === 'incomplete'
+            ? `Scenario '${scenario.id}' evidence run is incomplete`
+            : `Scenario '${scenario.id}' evidence run is not qualifying: ${qualResult.reasons.join(', ')}`;
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              message,
+              ['evidence', scenario.id],
+              scenario.id,
+            ),
+          ],
+        };
+      }
+
+      candidateScenarios.push({
+        scenarioId: scenario.id,
+        fingerprint: manifestRes.fingerprint,
+        scope: manifestRes.manifest.scope,
+      });
+      citedRuns.push(runRec);
+    }
+
+    const evidenceManifest = buildEvidenceManifest(candidateScenarios, citedRuns);
+
+    const now = Date.now();
+    const parentIds: readonly Id[] = branch.headCommitId !== null ? [branch.headCommitId] : [];
+    const commitRow: CommitRecord = {
+      projectId: command.projectId,
+      id: command.payload.commitId,
+      snapshotId: branch.workingSnapshotId,
+      parentIds,
+      evidence: command.payload.evidence,
+      evidenceManifest,
+      actor: command.actor,
+      createdAt: now,
+      message,
+    };
+
+    const commitBytes = calculateRecordBytes(commitRow);
+
+    // 7. Atomic transaction
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          // Check receipt FIRST before stale checks
+          const receiptCheck = await checkOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+          );
+          if ('status' in receiptCheck) {
+            return receiptCheck;
+          }
+          if (receiptCheck.isRetry) {
+            return receiptCheck.result;
+          }
+
+          // Recheck branch
+          const curBranch = await this.db.branches.get([
+            command.projectId,
+            command.branchId,
+          ]);
+          if (!curBranch) {
+            return { status: 'missing', ids: [command.branchId] };
+          }
+
+          if (curBranch.state === 'closed') {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'Cannot commit to a closed branch',
+                  ['branchId'],
+                  command.branchId,
+                ),
+              ],
+            };
+          }
+
+          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: command.expectedWorkingRevision,
+              actual: curBranch.workingRevision,
+            };
+          }
+
+          if (curBranch.headCommitId !== command.payload.expectedHeadId) {
+            return {
+              status: 'failed',
+              code: 'conflict',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'HEAD_MOVED: Branch head commit does not match expectedHeadId',
+                  ['payload', 'expectedHeadId'],
+                  command.payload.expectedHeadId,
+                ),
+              ],
+            };
+          }
+
+          // Recheck project
+          const curProject = await this.db.projects.get(command.projectId);
+          if (!curProject) {
+            return { status: 'missing', ids: [command.projectId] };
+          }
+
+          // INSIDE the transaction recheck that each cited run still exists with the same fingerprint, status, checks and provenance
+          for (const ref of command.payload.evidence) {
+            const cachedRun = citedRuns.find((r) => r.id === ref.runId);
+            const curRun = await this.db.runs.get([command.projectId, ref.runId]);
+            if (!curRun || !cachedRun) {
+              return {
+                status: 'failed',
+                code: 'ineligible',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    `Cited evidence run '${ref.runId}' missing from database`,
+                    ['evidence', ref.scenarioId],
+                    ref.runId,
+                  ),
+                ],
+              };
+            }
+
+            const curChecksCanon = canonicalJson(curRun.checks as any);
+            const cachedChecksCanon = canonicalJson(cachedRun.checks as any);
+            if (
+              curRun.fingerprint !== cachedRun.fingerprint ||
+              curRun.status !== cachedRun.status ||
+              curRun.provenance !== cachedRun.provenance ||
+              !curChecksCanon.ok ||
+              !cachedChecksCanon.ok ||
+              curChecksCanon.text !== cachedChecksCanon.text
+            ) {
+              return {
+                status: 'failed',
+                code: 'ineligible',
+                issues: [
+                  createIssue(
+                    'structural-rule',
+                    `Cited evidence run '${ref.runId}' changed between evaluation and transaction`,
+                    ['evidence', ref.scenarioId],
+                    ref.runId,
+                  ),
+                ],
+              };
+            }
+          }
+
+          // Enforce 1,000-commit limit and storage limits
+          const limitError = await enforceProjectLimits(this.db, {
+            projectId: command.projectId,
+            additionalCommits: 1,
+            additionalReceipts: 1,
+            additionalLocalBytes: commitBytes,
+            additionalExportBytes: commitBytes,
+          });
+          if (limitError) return limitError;
+
+          // Insert immutable commit
+          await insertImmutable(this.db.commits, commitRow, [
+            command.projectId,
+            command.payload.commitId,
+          ]);
+
+          // Advance branch head and increment workingRevision
+          const nextBranchRev = curBranch.workingRevision + 1;
+          await this.db.branches.update([command.projectId, command.branchId], {
+            headCommitId: command.payload.commitId,
+            workingRevision: nextBranchRev,
+          });
+
+          // Advance project revision
+          const nextProjectRev = curProject.revision + 1;
+          await this.db.projects.update(command.projectId, {
+            revision: nextProjectRev,
+            updatedAt: now,
+          });
+
+          const appliedResult: AppliedResult = {
+            status: 'applied',
+            operationId: command.operationId,
+            projectRevision: nextProjectRev,
+            branchRevision: nextBranchRev,
+            changedIds: [command.payload.commitId],
+            undo: null,
+            value: {
+              kind: 'artifact',
+              artifactType: 'commit',
+              id: command.payload.commitId,
+              revision: null,
+            },
           };
 
           await recordOperationReceipt(
