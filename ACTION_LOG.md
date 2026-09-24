@@ -1120,3 +1120,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round** (Claude): removed repository-generated branch IDs and a rename fallback to main — the contract requires explicit bootstrap IDs and a branch envelope.
 - **Verification** (Claude): 620 unit tests (Dexie adapter on fake-indexeddb), `tsc -b` clean; hashing confirmed outside transactions.
 - **Limitations**: Not wired into the app (RV-12 slot); import/export/pruning (RV-16b) and commits/publish/saveRun (RV-08) return typed unsupported.
+
+### RV-08a evidence storage + eligibility (Claude lead, Gemini executor)
+
+- **Outcome**: Unforgeable run start tokens, atomic `saveRun` with local provenance and retention limits, run reads, and pure eligibility (`runQualifies`, `evaluateCandidate`, `buildEvidenceManifest`). S01 becomes eligible end to end only after all three scenarios are saved. Merged onto the runner line @ `d7efb19`.
+- **Review round** (Claude): the token didn't bind the project (saveRun resolved it from three sources); validation read the token object instead of the registry binding; added run ID / fingerprint / snapshot-hash matching.
+- **Verification** (Claude): 655 unit tests, `tsc -b` clean. One full-suite run hit 5s timeouts in unrelated simulation tests while the machine load average was ~25 (other apps); isolated and repeated runs passed.
+- **Limitations**: Pinned-run detection walks all commit rows (fine at v1 limits). Commits/publish use these predicates in RV-08d/e.
