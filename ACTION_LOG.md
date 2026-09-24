@@ -1140,3 +1140,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round** (Claude): removed invented fallbacks (default record kind/ID, JSON fallback, revision 0), enforced closed keys during merge, stopped merging scenario `revision` as a scalar, rebuilt reference conflicts by ID from the original inputs, and made unresolvable resolutions throw.
 - **Verification** (Claude): 742 unit tests, `tsc -b` clean.
 - **Limitations**: Born heads with no shared commit use the creation snapshot as the base (interpretation of storage.md). Candidate storage, prepare-publish and candidate runs are RV-08d.
+
+### RV-08d commits and candidates (Claude lead, Gemini executor)
+
+- **Outcome**: `history.commit` with all-scenario eligibility, the in-memory `CandidateController` (prepare, resolve, evaluate) and candidate runs in `src/persistence/studio/`. S01–S05 acceptance across all five families. Merged onto the runner line @ `f9050f1`.
+- **Review round** (Claude): build versions came from the cited run; evidence refs weren't validated and another run could stand in; hidden default controller and random ID default; unhandled prepare statuses; acceptance tests merged an unchanged source. Claude tightened the run-scenario check (a run without a manifest scenario can't back a ref).
+- **Verification** (Claude): 771 unit tests, `tsc -b` clean.
+- **Limitations**: Publish is RV-08e (tests seed main heads directly). Commit message length (1–4,000) and the stored evidence manifest field extend storage.md's commit row; closed branches are rejected for commit/prepare.
