@@ -1154,3 +1154,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round** (Claude): removed envelope fallbacks to candidate values and a direct-DB retry hack; publish no longer reachable via `execute()` or a reused ticket. Gemini hit its quota mid-fix; a Sonnet subagent finished it.
 - **Verification** (Claude): 819 unit tests, `tsc -b` clean.
 - **Limitations**: History export/import round trip and retention are RV-08f/RV-16b.
+
+### RV-08f history round trip (Claude lead, Sonnet executor)
+
+- **Outcome**: Pure pin closure, `loadHistory`, `verifyReferenceIntegrity`, retention sharing the pin helper, and a full history reload round trip. Merged onto the runner line @ `0417f12`. RV-08 code complete.
+- **Review** (Claude, fixed directly): snapshots of unpinned retained runs weren't pinned; commit evidence was optional and malformed refs were skipped. Added a test.
+- **Verification** (Claude): 840 unit tests, `tsc -b` clean.
+- **Limitations**: Prune and import/export are RV-16b; per-branch history order is breadth-first from the head (contract only says "never timestamp").
