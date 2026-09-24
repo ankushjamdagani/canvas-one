@@ -22,8 +22,9 @@ import type {
   View,
 } from '../../domain/studio/model';
 import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../domain/studio/runner/types';
-import type { EvidenceRef } from '../../domain/studio/runner/evidence';
+import type { EvidenceRef, EvidenceManifest } from '../../domain/studio/runner/evidence';
 import type { Issue } from '../../domain/studio/validate';
+import type { BuildManifestVersions } from '../../domain/studio/manifest';
 
 // ============================================================================
 // storage.md §1: Versions
@@ -32,6 +33,11 @@ import type { Issue } from '../../domain/studio/validate';
 export const DB_NAME = 'system-studio-local-v1';
 export const DB_VERSION = 1;
 export const PREFERENCES_SCHEMA = 'studio-preferences/1';
+
+export const DEFAULT_BUILD_VERSIONS: BuildManifestVersions = Object.freeze({
+  compilerVersion: 'studio-compiler/1',
+  runnerVersions: Object.freeze([{ runnerId: 'studio-runner', version: 'studio-runner/1' }]),
+});
 
 // ============================================================================
 // storage.md §6: Ceilings and Limits
@@ -146,6 +152,7 @@ export type CommitRecord = {
   readonly snapshotId: string; // Hash
   readonly parentIds: readonly Id[];
   readonly evidence: readonly EvidenceRef[];
+  readonly evidenceManifest?: EvidenceManifest;
   readonly actor: Actor;
   readonly createdAt: number;
   readonly message: string;
@@ -506,6 +513,21 @@ export type BranchReopenCommand = {
   };
 };
 
+export type HistoryCommitCommand = {
+  readonly commandId: 'history.commit';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly expectedWorkingRevision: number;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly commitId: Id;
+    readonly expectedHeadId: ExpectedHead;
+    readonly message: string;
+    readonly evidence: readonly EvidenceRef[];
+  };
+};
+
 export type GenericCommand = {
   readonly commandId: string;
   readonly operationId?: Id;
@@ -524,6 +546,7 @@ export type AuthoredCommand =
   | ModelApplyRecordsCommand
   | HistoryCheckpointCommand
   | HistoryRestoreCommand
+  | HistoryCommitCommand
   | BranchReopenCommand
   | GenericCommand;
 
@@ -601,6 +624,12 @@ export interface StudioRepository {
 
   /** Queries return cloned, read-only branch record or null if not found. */
   loadBranch(projectId: Id, branchId: Id): Promise<Readonly<BranchRecord> | null>;
+
+  /** Queries return cloned, read-only commit record or null if not found. */
+  loadCommit(projectId: Id, commitId: Id): Promise<Readonly<CommitRecord> | null>;
+
+  /** Queries return cloned, read-only snapshot record or null if not found. */
+  loadSnapshot(projectId: Id, snapshotId: string): Promise<Readonly<SnapshotRecord> | null>;
 
   /** Authored commands resolve to one transaction plus an operation receipt. */
   execute(command: AuthoredCommand): Promise<AuthoredResult | UnsupportedResult>;

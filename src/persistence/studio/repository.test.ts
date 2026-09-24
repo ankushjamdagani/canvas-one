@@ -618,9 +618,9 @@ describe('LocalRepository', () => {
       expect(pruneRes.status).toBe('unsupported');
       expect(pruneRes.task).toBe('RV-16b');
 
-      const commitCmd = await repo.execute({ commandId: 'history.commit' } as any);
-      expect(commitCmd.status).toBe('unsupported');
-      expect((commitCmd as any).task).toBe('RV-08');
+      const publishCmd = await repo.execute({ commandId: 'history.publish' } as any);
+      expect(publishCmd.status).toBe('unsupported');
+      expect((publishCmd as any).task).toBe('RV-08');
 
       db.close();
     });

@@ -12,4 +12,5 @@ export * from './token';
 export * from './apply-records';
 export * from './recovery';
 export * from './switch-branch';
+export * from './candidates';
 
