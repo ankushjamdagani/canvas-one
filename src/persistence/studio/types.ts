@@ -389,6 +389,64 @@ export type SaveRunResult =
   | FailedResult;
 
 // ============================================================================
+// storage.md §7 / §9: History reads and reference integrity (RV-08f)
+// ============================================================================
+
+/**
+ * One branch's history per storage.md §9 "round-trip reload": the commits reachable
+ * from that branch's head, newest first by DAG order from the head (never by timestamp).
+ */
+export type BranchHistoryEntry = {
+  readonly branchId: Id;
+  readonly commits: readonly Readonly<CommitRecord>[];
+};
+
+/**
+ * `loadHistory(projectId)` result: project, branches, commits, publications (by ordinal)
+ * and checkpoints, plus per-branch history, all read in one consistent read-only
+ * transaction (storage.md §5).
+ */
+export type HistoryLoadResult = {
+  readonly project: Readonly<ProjectRecord>;
+  readonly branches: readonly Readonly<BranchRecord>[];
+  readonly commits: readonly Readonly<CommitRecord>[];
+  readonly publications: readonly Readonly<PublicationRecord>[];
+  readonly checkpoints: readonly Readonly<CheckpointRecord>[];
+  readonly branchHistories: readonly BranchHistoryEntry[];
+};
+
+/**
+ * A single broken or corrupt reference found by `verifyReferenceIntegrity`. Never
+ * repaired or fabricated -- transactions.md §4: "Missing or corrupt content returns
+ * `missing` with IDs; restore content is never fabricated."
+ */
+export type ReferenceIntegrityIssue = {
+  readonly kind:
+    | 'project-initial-snapshot'
+    | 'branch-head-commit'
+    | 'branch-working-snapshot'
+    | 'commit-snapshot'
+    | 'commit-parent'
+    | 'evidence-run'
+    | 'publication-commit'
+    | 'checkpoint-snapshot'
+    | 'run-snapshot'
+    | 'corrupt-snapshot';
+  readonly id: string;
+  readonly referencedBy: { readonly kind: string; readonly id: string };
+  readonly detail?: string;
+};
+
+/**
+ * `verifyReferenceIntegrity(projectId)` result per storage.md §5/§9: {ok:true} when every
+ * reference resolves and every snapshot re-hashes to its own ID; otherwise {ok:false,
+ * missing:[{kind,id,referencedBy}]}.
+ */
+export type ReferenceIntegrityResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly missing: readonly ReferenceIntegrityIssue[] };
+
+// ============================================================================
 // commands.md §2 & §3: Supported Authored Commands (RV-16a scope)
 // ============================================================================
 
@@ -706,6 +764,21 @@ export interface StudioRepository {
 
   /** Not implemented in RV-16a; owned by RV-16b. */
   pruneUnreferenced(projectId: Id, selection: unknown): Promise<UnsupportedResult>;
+
+  /**
+   * Loads project, branches, commits, publications (by ordinal), checkpoints and
+   * per-branch history in one consistent read-only transaction (RV-08f, storage.md §9
+   * "round-trip reload"). Throws a `RepositoryError` (code `not-found`) if the project
+   * does not exist.
+   */
+  loadHistory(projectId: Id): Promise<HistoryLoadResult>;
+
+  /**
+   * Verifies every stored reference resolves and every snapshot re-hashes to its own ID
+   * (RV-08f, storage.md §5/§9, transactions.md §4). Never repairs or fabricates content.
+   * Throws a `RepositoryError` (code `not-found`) if the project does not exist.
+   */
+  verifyReferenceIntegrity(projectId: Id): Promise<ReferenceIntegrityResult>;
 }
 
 export type { MintRunStartTokenParams, RunStartToken } from './token';

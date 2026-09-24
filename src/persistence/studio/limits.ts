@@ -19,6 +19,7 @@
 import { canonicalJson } from '../../domain/studio/canonical';
 import type { StudioDatabase } from './db';
 import { createIssue, RepositoryError } from './errors';
+import { computeProjectPinClosure } from './pin-state';
 import { STORAGE_LIMITS, type FailedResult } from './types';
 
 /**
@@ -350,19 +351,12 @@ export async function enforceRunRetentionLimits(
   }
 
   // 2. Enforce 20 unpinned runs retention rule (storage.md §7:
-  // "Keep the 20 latest unpinned runs by (completedAt,id). Before storing a 21st, offer an explicit prune")
-  // A run is pinned when a retained commit references it.
-  const commits = await db.commits.where('projectId').equals(projectId).toArray();
-  const pinnedRunIds = new Set<string>();
-  for (const commit of commits) {
-    if (Array.isArray(commit.evidence)) {
-      for (const ev of commit.evidence) {
-        if (ev && typeof ev.runId === 'string') {
-          pinnedRunIds.add(ev.runId);
-        }
-      }
-    }
-  }
+  // "Keep the 20 latest unpinned runs by (completedAt,id). Before storing a 21st, offer an
+  // explicit prune") using the single shared pin closure (pin-state.ts / domain/versioning/
+  // pin-closure.ts) so this agrees exactly with verifyReferenceIntegrity and loadHistory's
+  // notion of "pinned" -- never a second, independently-maintained definition.
+  const closure = await computeProjectPinClosure(db, projectId);
+  const pinnedRunIds = new Set<string>(closure?.pinnedRunIds ?? []);
 
   const allRuns = await db.runs.where('projectId').equals(projectId).toArray();
   let unpinnedCount = 0;

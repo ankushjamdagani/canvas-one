@@ -6,3 +6,4 @@ export * from './merge';
 export * from './resolve';
 export * from './merge-base';
 export * from './publication';
+export * from './pin-closure';
