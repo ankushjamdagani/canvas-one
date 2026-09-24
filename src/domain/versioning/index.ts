@@ -1,2 +1,7 @@
 export * from './types';
 export * from './eligibility';
+export * from './merge-descriptor';
+export * from './diff';
+export * from './merge';
+export * from './resolve';
+export * from './merge-base';
