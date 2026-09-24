@@ -59,6 +59,7 @@ import {
   type ExpectedHead,
   type HistoryCheckpointCommand,
   type HistoryCommitCommand,
+  type HistoryLoadResult,
   type HistoryPublishCommand,
   type HistoryRestoreCommand,
   type ModelApplyRecordsCommand,
@@ -67,6 +68,8 @@ import {
   type ProjectRecord,
   type ProjectRenameCommand,
   type PublicationRecord,
+  type ReferenceIntegrityIssue,
+  type ReferenceIntegrityResult,
   type RunRecord,
   type SavePreferencesResult,
   type SaveRunResult,
@@ -75,6 +78,35 @@ import {
   type TraceChunkRecord,
   type UnsupportedResult,
 } from './types';
+
+/**
+ * Orders a branch's commit ancestry newest-first by DAG order from the head (never by
+ * timestamp): breadth-first from the head following `parentIds` in array order,
+ * deduplicating merge ancestors shared between parents on first visit. A dangling parent
+ * (absent from `commitById`) is skipped, never fabricated -- `verifyReferenceIntegrity`
+ * is the authority that reports it.
+ */
+function computeBranchHistoryOrder(
+  headCommitId: Id | null,
+  commitById: Map<Id, CommitRecord>,
+): CommitRecord[] {
+  if (headCommitId === null) return [];
+  const visited = new Set<Id>();
+  const result: CommitRecord[] = [];
+  const queue: Id[] = [headCommitId];
+  while (queue.length > 0) {
+    const commitId = queue.shift()!;
+    if (visited.has(commitId)) continue;
+    const commit = commitById.get(commitId);
+    if (!commit) continue;
+    visited.add(commitId);
+    result.push(commit);
+    for (const parentId of commit.parentIds) {
+      queue.push(parentId);
+    }
+  }
+  return result;
+}
 
 function getProjectTables(db: StudioDatabase) {
   return [
@@ -3843,6 +3875,248 @@ export class LocalRepository implements StudioRepository {
         issues: [createIssue('structural-rule', String(err), [], projectId)],
       });
     }
+  }
+
+  /**
+   * Loads project, branches, commits, publications (by ordinal), checkpoints and
+   * per-branch history in one consistent read-only transaction (RV-08f).
+   *
+   * Per-branch history is the commits reachable from that branch's head, newest first by
+   * DAG order from the head, never by timestamp (storage.md §9 "round-trip reload").
+   * CONTRACT GAP: the contract specifies "newest first by DAG order," not an exact
+   * algorithm; narrowest reading chosen is breadth-first from the head following
+   * `parentIds` in array order (head first, then its parents, then their parents, ...),
+   * deduplicating shared merge ancestors on first visit. A dangling parent is skipped
+   * here (never fabricated) -- `verifyReferenceIntegrity` is the authority that reports it.
+   */
+  async loadHistory(projectId: Id): Promise<HistoryLoadResult> {
+    try {
+      return await this.db.transaction(
+        'r',
+        [this.db.projects, this.db.branches, this.db.commits, this.db.publications, this.db.checkpoints],
+        async () => {
+          const project = await this.db.projects.get(projectId);
+          if (!project) {
+            throw new RepositoryError({
+              code: 'not-found',
+              message: `Project '${projectId}' not found`,
+              id: projectId,
+            });
+          }
+          const [branches, commits, publications, checkpoints] = await Promise.all([
+            this.db.branches.where('projectId').equals(projectId).toArray(),
+            this.db.commits.where('projectId').equals(projectId).toArray(),
+            this.db.publications.where('projectId').equals(projectId).toArray(),
+            this.db.checkpoints.where('projectId').equals(projectId).toArray(),
+          ]);
+
+          const commitById = new Map<Id, CommitRecord>(commits.map((c) => [c.id, c]));
+          const sortedPublications = [...publications].sort((a, b) => a.ordinal - b.ordinal);
+
+          const branchHistories = branches.map((branch) => ({
+            branchId: branch.id,
+            commits: computeBranchHistoryOrder(branch.headCommitId, commitById),
+          }));
+
+          return Object.freeze({
+            project: Object.freeze(structuredClone(project)),
+            branches: Object.freeze(branches.map((b) => Object.freeze(structuredClone(b)))),
+            commits: Object.freeze(commits.map((c) => Object.freeze(structuredClone(c)))),
+            publications: Object.freeze(
+              sortedPublications.map((p) => Object.freeze(structuredClone(p))),
+            ),
+            checkpoints: Object.freeze(
+              checkpoints.map((cp) => Object.freeze(structuredClone(cp))),
+            ),
+            branchHistories: Object.freeze(
+              branchHistories.map((bh) =>
+                Object.freeze({
+                  branchId: bh.branchId,
+                  commits: Object.freeze(bh.commits.map((c) => Object.freeze(structuredClone(c)))),
+                }),
+              ),
+            ),
+          });
+        },
+      );
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to load history from database',
+        issues: [createIssue('structural-rule', String(err), [], projectId)],
+      });
+    }
+  }
+
+  /**
+   * Verifies every stored reference resolves and every snapshot re-hashes to its own ID
+   * (RV-08f). Checks: commit parents and snapshots, branch head/working snapshots,
+   * publication commits, checkpoint snapshots, evidence runs, and run snapshots. Never
+   * repairs or fabricates content (transactions.md §4).
+   */
+  async verifyReferenceIntegrity(projectId: Id): Promise<ReferenceIntegrityResult> {
+    let readResult: { missing: ReferenceIntegrityIssue[]; snapshots: readonly SnapshotRecord[] };
+    try {
+      // All reads and the (synchronous) reference-resolution checks happen inside one
+      // consistent read-only transaction. Re-hashing (below, outside the transaction) is
+      // pure computation over the snapshot documents this transaction already captured,
+      // so it needs no further DB consistency guarantee; it is kept out of the
+      // transaction because Dexie's transaction zone does not track awaits on
+      // non-IndexedDB async work (e.g. Web Crypto), which would otherwise commit the
+      // transaction prematurely ("PrematureCommitError").
+      readResult = await this.db.transaction(
+        'r',
+        [
+          this.db.projects,
+          this.db.branches,
+          this.db.commits,
+          this.db.publications,
+          this.db.checkpoints,
+          this.db.runs,
+          this.db.snapshots,
+        ],
+        async () => {
+          const project = await this.db.projects.get(projectId);
+          if (!project) {
+            throw new RepositoryError({
+              code: 'not-found',
+              message: `Project '${projectId}' not found`,
+              id: projectId,
+            });
+          }
+
+          const [branches, commits, publications, checkpoints, runs, snapshots] = await Promise.all([
+            this.db.branches.where('projectId').equals(projectId).toArray(),
+            this.db.commits.where('projectId').equals(projectId).toArray(),
+            this.db.publications.where('projectId').equals(projectId).toArray(),
+            this.db.checkpoints.where('projectId').equals(projectId).toArray(),
+            this.db.runs.where('projectId').equals(projectId).toArray(),
+            this.db.snapshots.where('projectId').equals(projectId).toArray(),
+          ]);
+
+          const commitById = new Map(commits.map((c) => [c.id, c]));
+          const runById = new Map(runs.map((r) => [r.id, r]));
+          const snapshotById = new Map(snapshots.map((s) => [s.id, s]));
+          const missing: ReferenceIntegrityIssue[] = [];
+
+          const checkSnapshot = (
+            snapshotId: string,
+            kind: Extract<
+              ReferenceIntegrityIssue['kind'],
+              'project-initial-snapshot' | 'branch-working-snapshot' | 'commit-snapshot' | 'checkpoint-snapshot' | 'run-snapshot'
+            >,
+            referencedBy: { kind: string; id: string },
+          ) => {
+            if (!snapshotById.has(snapshotId)) {
+              missing.push({ kind, id: snapshotId, referencedBy });
+            }
+          };
+
+          checkSnapshot(project.initialSnapshotId, 'project-initial-snapshot', {
+            kind: 'project',
+            id: project.id,
+          });
+
+          for (const branch of branches) {
+            checkSnapshot(branch.workingSnapshotId, 'branch-working-snapshot', {
+              kind: 'branch',
+              id: branch.id,
+            });
+            if (branch.headCommitId !== null && !commitById.has(branch.headCommitId)) {
+              missing.push({
+                kind: 'branch-head-commit',
+                id: branch.headCommitId,
+                referencedBy: { kind: 'branch', id: branch.id },
+              });
+            }
+          }
+
+          for (const commit of commits) {
+            checkSnapshot(commit.snapshotId, 'commit-snapshot', { kind: 'commit', id: commit.id });
+            for (const parentId of commit.parentIds) {
+              if (!commitById.has(parentId)) {
+                missing.push({
+                  kind: 'commit-parent',
+                  id: parentId,
+                  referencedBy: { kind: 'commit', id: commit.id },
+                });
+              }
+            }
+            for (const ref of commit.evidence ?? []) {
+              if (!runById.has(ref.runId)) {
+                missing.push({
+                  kind: 'evidence-run',
+                  id: ref.runId,
+                  referencedBy: { kind: 'commit', id: commit.id },
+                });
+              }
+            }
+          }
+
+          for (const publication of publications) {
+            if (!commitById.has(publication.commitId)) {
+              missing.push({
+                kind: 'publication-commit',
+                id: publication.commitId,
+                referencedBy: { kind: 'publication', id: publication.id },
+              });
+            }
+          }
+
+          for (const checkpoint of checkpoints) {
+            checkSnapshot(checkpoint.snapshotId, 'checkpoint-snapshot', {
+              kind: 'checkpoint',
+              id: checkpoint.id,
+            });
+          }
+
+          for (const run of runs) {
+            checkSnapshot(run.snapshotId, 'run-snapshot', { kind: 'run', id: run.id });
+          }
+
+          return { missing, snapshots };
+        },
+      );
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to verify reference integrity',
+        issues: [createIssue('structural-rule', String(err), [], projectId)],
+      });
+    }
+
+    // Re-hash every snapshot row captured by the transaction above: an ID that no longer
+    // equals its content hash is reported as corrupt, never repaired.
+    const missing = [...readResult.missing];
+    for (const snapshot of readResult.snapshots) {
+      let recomputed: string;
+      try {
+        recomputed = await computeSnapshotId(snapshot.document);
+      } catch (err) {
+        missing.push({
+          kind: 'corrupt-snapshot',
+          id: snapshot.id,
+          referencedBy: { kind: 'snapshot', id: snapshot.id },
+          detail: `snapshot document failed to canonicalize: ${String(err)}`,
+        });
+        continue;
+      }
+      if (recomputed !== snapshot.id) {
+        missing.push({
+          kind: 'corrupt-snapshot',
+          id: snapshot.id,
+          referencedBy: { kind: 'snapshot', id: snapshot.id },
+          detail: `content hash '${recomputed}' does not match snapshot ID`,
+        });
+      }
+    }
+
+    if (missing.length === 0) {
+      return { ok: true };
+    }
+    return { ok: false, missing };
   }
 
   async importProject(_validatedBundle: unknown): Promise<UnsupportedResult> {
