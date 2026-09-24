@@ -1165,3 +1165,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 ### RV-08 accepted; worktree clean-up
 
 - **Outcome**: User accepted RV-08 (a–f). Removed 18 merged, clean task worktrees (branches kept). Kept the UI line (`rv-01a`), runner line (`rv-14a`) and `nifty-bardeen-7e9c50` (unmerged delegation-workflow commits from another session).
+
+### RV-16b import/export and pruning (Claude lead, Sonnet executor)
+
+- **Outcome**: Portable v9 export/import with full pre-transaction bundle validation, FileToken registry, explicit pruning with in-transaction pin recheck, and recovery journeys in `src/persistence/studio/`. Merged onto the runner line @ `7ef2e39`; worktree removed.
+- **Review round** (Claude): removed an invented download-ID default, made the evidence scenario check strict, allowed trace pruning of pinned runs (rows still protected), added byte limits to import.
+- **Verification** (Claude): 868 unit tests, `tsc -b` clean.
+- **Limitations**: `evidenceManifest` on commits extends storage.md's commit row (needs a contract note); no UI/download wiring (RV-10/RV-12).
