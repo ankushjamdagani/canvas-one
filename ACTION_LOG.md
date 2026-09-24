@@ -1191,3 +1191,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Gemini (agy) implementer, one review round; Claude reviewer (removed an unused option).
 - **Verification**: 909 unit (90 files), `npx tsc -b` clean.
 - **Limitations**: Headless only; nothing in the app uses it until c2.
+
+## 2026-09-25
+
+### RV-12c2 new app shell; legacy app deleted
+
+- **Outcome**: `c7a5a12` merged on the UI line @ `5d1836b`. The app now boots only on the studio model and `system-studio-local-v1`: entry screen (projects with per-branch open, blank, S01–S05 examples), workspace (top bar, disabled rail items, view canvas with drag = one undo, dock, runs disabled). Repository `listProjects()` added (storage.md §5 updated). Legacy UI, editor, persistence, workers and their tests deleted (136 files, −19.7k lines); open kernel and goldens kept.
+- **Platform**: Gemini (agy) implementer, two review rounds (code, then visual from screenshots); Claude reviewer (tokenized note colours, removed a width fallback; confirmed three deleted domain tests depended on the deleted engine/editor).
+- **Verification**: 767 unit, `npx tsc -b`, `npm run build`, production e2e 2 passed / 4 skipped (specimen dev-only); desktop and 390×844 screenshots.
+- **Limitations**: No add/delete/connect (constructors not contracted); D35 stripe for state-machine/data-pipeline/host undecided; edge-label overlap on tight layouts, 3-row phone dock, legacy CSS still in `styles.css`, 888 kB bundle.

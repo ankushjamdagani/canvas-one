@@ -80,7 +80,7 @@ All tables except preferences use project-scoped composite keys. Immutable rows 
 
 The UI never writes tables directly. The local adapter exposes:
 
-`loadProject(projectId)`, `loadBranch(projectId,branchId)`, `execute(command)`, `savePreferences(expectedRevision,value)`, `saveRun(startToken,terminalResult,chunks)`, `importProject(validatedBundle)`, `exportProject(projectId)`, `pruneUnreferenced(projectId,selection)`, `deleteProject(projectId,expectedMainHead)`.
+`listProjects()` (all project rows, cloned, sorted by title then id; added 2026-09-25 for the entry screen), `loadProject(projectId)`, `loadBranch(projectId,branchId)`, `execute(command)`, `savePreferences(expectedRevision,value)`, `saveRun(startToken,terminalResult,chunks)`, `importProject(validatedBundle)`, `exportProject(projectId)`, `pruneUnreferenced(projectId,selection)`, `deleteProject(projectId,expectedMainHead)`.
 
 - Queries return cloned, read-only records.
 - Authored commands resolve to one transaction plus an operation receipt. Preferences have their own compare-and-set.
