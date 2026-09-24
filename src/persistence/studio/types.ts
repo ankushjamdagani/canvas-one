@@ -8,7 +8,19 @@
  * - specs/revamp/contracts/commands.md (Envelopes, results, project.create, project.rename, branch.create)
  */
 
-import type { Document, Id, Json } from '../../domain/studio/model';
+import type {
+  Connection,
+  Document,
+  Element,
+  Fixture,
+  Id,
+  Json,
+  PayloadSchema,
+  Refinement,
+  Relation,
+  Scenario,
+  View,
+} from '../../domain/studio/model';
 import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../domain/studio/runner/types';
 import type { EvidenceRef } from '../../domain/studio/runner/evidence';
 import type { Issue } from '../../domain/studio/validate';
@@ -415,6 +427,85 @@ export type BranchCreateCommand = {
   };
 };
 
+export const RECORD_KINDS = [
+  'element',
+  'connection',
+  'relation',
+  'schema',
+  'fixture',
+  'refinement',
+  'scenario',
+  'view',
+] as const;
+
+export type RecordKind = (typeof RECORD_KINDS)[number];
+
+export type EditableRecord =
+  | { readonly recordKind: 'element'; readonly record: Element }
+  | { readonly recordKind: 'connection'; readonly record: Connection }
+  | { readonly recordKind: 'relation'; readonly record: Relation }
+  | { readonly recordKind: 'schema'; readonly record: PayloadSchema }
+  | { readonly recordKind: 'fixture'; readonly record: Fixture }
+  | { readonly recordKind: 'refinement'; readonly record: Refinement }
+  | { readonly recordKind: 'scenario'; readonly record: Scenario }
+  | { readonly recordKind: 'view'; readonly record: View };
+
+export type RecordChange =
+  | { readonly kind: 'insert'; readonly value: EditableRecord }
+  | { readonly kind: 'replace'; readonly value: EditableRecord }
+  | { readonly kind: 'remove'; readonly recordKind: RecordKind; readonly id: Id };
+
+export type ModelApplyRecordsCommand = {
+  readonly commandId: 'model.apply-records';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly expectedWorkingRevision: number;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly changes: readonly RecordChange[];
+  };
+};
+
+export type HistoryCheckpointCommand = {
+  readonly commandId: 'history.checkpoint';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly expectedWorkingRevision: number;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly checkpointId: Id;
+    readonly label: string;
+  };
+};
+
+export type HistoryRestoreCommand = {
+  readonly commandId: 'history.restore';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly expectedWorkingRevision: number;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly snapshotId: string;
+    readonly checkpointId: Id;
+    readonly label: string;
+  };
+};
+
+export type BranchReopenCommand = {
+  readonly commandId: 'branch.reopen';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly expectedWorkingRevision: number;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly expectedHeadId: ExpectedHead;
+  };
+};
+
 export type GenericCommand = {
   readonly commandId: string;
   readonly operationId?: Id;
@@ -430,7 +521,71 @@ export type AuthoredCommand =
   | ProjectCreateCommand
   | ProjectRenameCommand
   | BranchCreateCommand
+  | ModelApplyRecordsCommand
+  | HistoryCheckpointCommand
+  | HistoryRestoreCommand
+  | BranchReopenCommand
   | GenericCommand;
+
+// ============================================================================
+// Controller commands & Branch Switch (RV-08b)
+// ============================================================================
+
+export type DraftResolution = 'clean' | 'applied' | 'discarded' | 'stay';
+
+export type SwitchBranchFailedStep =
+  | 'flush-pending-save'
+  | 'resolve-draft'
+  | 'load-target-branch';
+
+export type SwitchBranchSuccess = {
+  readonly status: 'done';
+  readonly activeBranchId: Id;
+  readonly branch: Readonly<BranchRecord>;
+  readonly value: { readonly kind: 'branch'; readonly branchId: Id };
+};
+
+export type SwitchBranchFailure = {
+  readonly status: 'failed';
+  readonly step: SwitchBranchFailedStep;
+  readonly activeBranchId: Id | null;
+  readonly reason: string;
+  readonly error?: unknown;
+};
+
+export type SwitchBranchResult = SwitchBranchSuccess | SwitchBranchFailure;
+
+export type SwitchBranchContext =
+  | {
+      readonly repo: StudioRepository;
+      readonly currentBranchId?: Id | null;
+    }
+  | StudioRepository;
+
+export type SwitchBranchOptions = {
+  readonly flushPendingSave?: () => Promise<unknown>;
+  readonly resolveDraft?: () => Promise<DraftResolution>;
+};
+
+// ============================================================================
+// Save Failure & Recovery (RV-08b)
+// ============================================================================
+
+export type SaveFailureRecoveryAction = 'retry' | 'reload' | 'export';
+
+export type SaveFailureRecoveryOption = {
+  readonly action: SaveFailureRecoveryAction;
+  readonly label: string;
+  readonly description: string;
+  readonly recommended?: boolean;
+};
+
+export type SaveFailureRecoveryInfo = {
+  readonly reason: 'stale' | 'quota' | 'limit' | 'unavailable' | 'other';
+  readonly message: string;
+  readonly keepInMemoryCopy: true;
+  readonly options: readonly SaveFailureRecoveryOption[];
+};
 
 // ============================================================================
 // storage.md §5: Repository API

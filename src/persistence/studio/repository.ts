@@ -28,6 +28,7 @@ import {
   validateRevision,
   validateUuid,
 } from './primitives';
+import { applyRecordChanges } from './apply-records';
 import { validateRunStartToken } from './token';
 import {
   PREFERENCES_SCHEMA,
@@ -36,8 +37,13 @@ import {
   type AuthoredResult,
   type BranchCreateCommand,
   type BranchRecord,
+  type BranchReopenCommand,
+  type CheckpointRecord,
   type DeleteProjectResult,
   type ExpectedHead,
+  type HistoryCheckpointCommand,
+  type HistoryRestoreCommand,
+  type ModelApplyRecordsCommand,
   type PreferenceRecord,
   type ProjectCreateCommand,
   type ProjectRecord,
@@ -245,6 +251,14 @@ export class LocalRepository implements StudioRepository {
         return this.handleProjectRename(command as ProjectRenameCommand);
       case 'branch.create':
         return this.handleBranchCreate(command as BranchCreateCommand);
+      case 'model.apply-records':
+        return this.handleModelApplyRecords(command as ModelApplyRecordsCommand);
+      case 'history.checkpoint':
+        return this.handleHistoryCheckpoint(command as HistoryCheckpointCommand);
+      case 'history.restore':
+        return this.handleHistoryRestore(command as HistoryRestoreCommand);
+      case 'branch.reopen':
+        return this.handleBranchReopen(command as BranchReopenCommand);
       case 'history.commit':
       case 'history.prepare-publish':
       case 'history.publish':
@@ -969,6 +983,880 @@ export class LocalRepository implements StudioRepository {
             changedIds: [newBranchId],
             undo: null,
             value: { kind: 'branch', branchId: newBranchId },
+          };
+
+          await recordOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+            appliedResult,
+          );
+
+          return appliedResult;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * model.apply-records:
+   * Applies insert/replace/remove changes of EditableRecord to the branch working document.
+   * Allowed on main. Computes snapshot hash before transaction.
+   */
+  private async handleModelApplyRecords(
+    command: ModelApplyRecordsCommand,
+  ): Promise<AuthoredResult> {
+    // 1. Actor validation
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    // 2. Validate envelope IDs and revisions
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+
+    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projIssue) {
+      return { status: 'invalid', issues: [projIssue] };
+    }
+
+    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIssue) {
+      return { status: 'invalid', issues: [branchIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    // 3. Validate payload
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'command.payload is required', ['payload'])],
+      };
+    }
+
+    const changes = command.payload.changes;
+    if (!Array.isArray(changes)) {
+      return {
+        status: 'invalid',
+        issues: [createIssue('wrong-type', 'payload.changes must be an array', ['payload', 'changes'])],
+      };
+    }
+
+    if (changes.length > 1000) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'too-many',
+            `payload.changes exceeds maximum limit of 1,000 changes (got ${changes.length})`,
+            ['payload', 'changes'],
+          ),
+        ],
+      };
+    }
+
+    // 4. Pre-read current branch & snapshot to compute updated document BEFORE transaction
+    const project = await this.db.projects.get(command.projectId);
+    if (!project) {
+      return { status: 'missing', ids: [command.projectId] };
+    }
+
+    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+    if (!branch) {
+      return { status: 'missing', ids: [command.branchId] };
+    }
+
+    const currentSnapshot = await this.db.snapshots.get([
+      command.projectId,
+      branch.workingSnapshotId,
+    ]);
+    if (!currentSnapshot) {
+      return { status: 'missing', ids: [branch.workingSnapshotId] };
+    }
+
+    // Apply changes using pure applyRecordChanges domain helper
+    const applied = applyRecordChanges(currentSnapshot.document, changes);
+    if (!applied.ok) {
+      return { status: 'invalid', issues: applied.issues };
+    }
+
+    const updatedDocument = applied.document;
+
+    // 5. Compute snapshot hash and request hash BEFORE beginning transaction
+    let newSnapshotId: string;
+    try {
+      newSnapshotId = await computeSnapshotId(updatedDocument);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    const newSnapshotRow: SnapshotRecord = {
+      projectId: command.projectId,
+      id: newSnapshotId,
+      document: updatedDocument,
+    };
+
+    // 6. Execute atomic transaction
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          // Check receipt FIRST before stale checks
+          const receiptCheck = await checkOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+          );
+          if ('status' in receiptCheck) {
+            return receiptCheck;
+          }
+          if (receiptCheck.isRetry) {
+            return receiptCheck.result;
+          }
+
+          // Compare-and-set check on branch workingRevision
+          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
+          if (!curBranch) {
+            return { status: 'missing', ids: [command.branchId] };
+          }
+
+          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: command.expectedWorkingRevision,
+              actual: curBranch.workingRevision,
+            };
+          }
+
+          const curProject = await this.db.projects.get(command.projectId);
+          if (!curProject) {
+            return { status: 'missing', ids: [command.projectId] };
+          }
+
+          // Enforce limits before mutation
+          const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
+          const limitError = await enforceProjectLimits(this.db, {
+            projectId: command.projectId,
+            additionalReceipts: 1,
+            additionalLocalBytes: addedLocalBytes,
+            additionalExportBytes: addedLocalBytes,
+          });
+          if (limitError) return limitError;
+
+          // Write snapshot (insert-if-absent)
+          await insertImmutable(this.db.snapshots, newSnapshotRow, [
+            command.projectId,
+            newSnapshotId,
+          ]);
+
+          const now = Date.now();
+          const nextBranchRev = curBranch.workingRevision + 1;
+          const nextProjectRev = curProject.revision + 1;
+
+          await this.db.branches.update([command.projectId, command.branchId], {
+            workingSnapshotId: newSnapshotId,
+            workingRevision: nextBranchRev,
+          });
+
+          await this.db.projects.update(command.projectId, {
+            revision: nextProjectRev,
+            updatedAt: now,
+          });
+
+          const appliedResult: AppliedResult = {
+            status: 'applied',
+            operationId: command.operationId,
+            projectRevision: nextProjectRev,
+            branchRevision: nextBranchRev,
+            changedIds: applied.changedIds,
+            undo: null,
+            value: { kind: 'none' },
+          };
+
+          await recordOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+            appliedResult,
+          );
+
+          return appliedResult;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * history.checkpoint:
+   * Immutable named checkpoint of the current working snapshot, no commit status, 100-per-project limit.
+   */
+  private async handleHistoryCheckpoint(
+    command: HistoryCheckpointCommand,
+  ): Promise<AuthoredResult> {
+    // 1. Actor validation
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    // 2. Validate envelope IDs and revisions
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+
+    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projIssue) {
+      return { status: 'invalid', issues: [projIssue] };
+    }
+
+    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIssue) {
+      return { status: 'invalid', issues: [branchIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    // 3. Validate payload
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'command.payload is required', ['payload'])],
+      };
+    }
+
+    const cpIssue = validateUuid(
+      command.payload.checkpointId,
+      ['payload', 'checkpointId'],
+      'checkpointId',
+    );
+    if (cpIssue) {
+      return { status: 'invalid', issues: [cpIssue] };
+    }
+
+    const label = command.payload.label?.trim() ?? '';
+    if (label.length < 1 || label.length > 80) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'too-long',
+            'Checkpoint label must be between 1 and 80 code points',
+            ['payload', 'label'],
+          ),
+        ],
+      };
+    }
+
+    // 4. Compute request hash BEFORE transaction
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    // 5. Pre-read state to compute checkpoint record bytes
+    const project = await this.db.projects.get(command.projectId);
+    if (!project) {
+      return { status: 'missing', ids: [command.projectId] };
+    }
+
+    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+    if (!branch) {
+      return { status: 'missing', ids: [command.branchId] };
+    }
+
+    const now = Date.now();
+    const checkpointRow: CheckpointRecord = {
+      projectId: command.projectId,
+      id: command.payload.checkpointId,
+      snapshotId: branch.workingSnapshotId,
+      sourceBranchId: command.branchId,
+      label,
+      actor: command.actor,
+      createdAt: now,
+    };
+
+    const checkpointBytes = calculateRecordBytes(checkpointRow);
+
+    // 6. Execute atomic transaction
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          // Check receipt FIRST before stale checks
+          const receiptCheck = await checkOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+          );
+          if ('status' in receiptCheck) {
+            return receiptCheck;
+          }
+          if (receiptCheck.isRetry) {
+            return receiptCheck.result;
+          }
+
+          // Compare-and-set check on branch workingRevision
+          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
+          if (!curBranch) {
+            return { status: 'missing', ids: [command.branchId] };
+          }
+
+          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: command.expectedWorkingRevision,
+              actual: curBranch.workingRevision,
+            };
+          }
+
+          const curProject = await this.db.projects.get(command.projectId);
+          if (!curProject) {
+            return { status: 'missing', ids: [command.projectId] };
+          }
+
+          // Enforce 100-per-project checkpoint limit and limits
+          const limitError = await enforceProjectLimits(this.db, {
+            projectId: command.projectId,
+            additionalCheckpoints: 1,
+            additionalReceipts: 1,
+            additionalLocalBytes: checkpointBytes,
+            additionalExportBytes: checkpointBytes,
+          });
+          if (limitError) return limitError;
+
+          // Insert immutable checkpoint
+          await insertImmutable(this.db.checkpoints, checkpointRow, [
+            command.projectId,
+            command.payload.checkpointId,
+          ]);
+
+          // Working copy intact; project revision++
+          const nextProjectRev = curProject.revision + 1;
+          await this.db.projects.update(command.projectId, {
+            revision: nextProjectRev,
+            updatedAt: now,
+          });
+
+          const appliedResult: AppliedResult = {
+            status: 'applied',
+            operationId: command.operationId,
+            projectRevision: nextProjectRev,
+            branchRevision: curBranch.workingRevision,
+            changedIds: [command.payload.checkpointId],
+            undo: null,
+            value: {
+              kind: 'artifact',
+              artifactType: 'checkpoint',
+              id: command.payload.checkpointId,
+              revision: null,
+            },
+          };
+
+          await recordOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+            appliedResult,
+          );
+
+          return appliedResult;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * history.restore:
+   * Non-main only. In ONE transaction: checkpoint current working state under checkpointId/label,
+   * then replace working content with target snapshot. Heads unchanged, no evidence.
+   */
+  private async handleHistoryRestore(
+    command: HistoryRestoreCommand,
+  ): Promise<AuthoredResult> {
+    // 1. Actor validation
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    // 2. Validate envelope IDs and revisions
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+
+    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projIssue) {
+      return { status: 'invalid', issues: [projIssue] };
+    }
+
+    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIssue) {
+      return { status: 'invalid', issues: [branchIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    // 3. Validate payload
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'command.payload is required', ['payload'])],
+      };
+    }
+
+    const cpIssue = validateUuid(
+      command.payload.checkpointId,
+      ['payload', 'checkpointId'],
+      'checkpointId',
+    );
+    if (cpIssue) {
+      return { status: 'invalid', issues: [cpIssue] };
+    }
+
+    const label = command.payload.label?.trim() ?? '';
+    if (label.length < 1 || label.length > 80) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'too-long',
+            'Checkpoint label must be between 1 and 80 code points',
+            ['payload', 'label'],
+          ),
+        ],
+      };
+    }
+
+    const snapshotId = command.payload.snapshotId;
+    if (typeof snapshotId !== 'string' || snapshotId.trim().length === 0) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('missing-property', 'payload.snapshotId is required', ['payload', 'snapshotId']),
+        ],
+      };
+    }
+
+    // 4. Pre-read project & branch; verify non-main only
+    const project = await this.db.projects.get(command.projectId);
+    if (!project) {
+      return { status: 'missing', ids: [command.projectId] };
+    }
+
+    if (command.branchId === project.mainBranchId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Direct restore on main branch is rejected; main is changed only by publication',
+            ['branchId'],
+            command.branchId,
+          ),
+        ],
+      };
+    }
+
+    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+    if (!branch) {
+      return { status: 'missing', ids: [command.branchId] };
+    }
+
+    // 5. Pre-read and verify target snapshot exists and is storable
+    const targetSnapshot = await this.db.snapshots.get([command.projectId, snapshotId]);
+    if (!targetSnapshot) {
+      return { status: 'missing', ids: [snapshotId] };
+    }
+
+    // Check if target snapshot document is corrupt
+    const docCheck = validateDocument(targetSnapshot.document);
+    if (!docCheck.ok) {
+      return { status: 'missing', ids: [snapshotId] };
+    }
+
+    // 6. Compute request hash BEFORE transaction
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    const now = Date.now();
+    const checkpointRow: CheckpointRecord = {
+      projectId: command.projectId,
+      id: command.payload.checkpointId,
+      snapshotId: branch.workingSnapshotId,
+      sourceBranchId: command.branchId,
+      label,
+      actor: command.actor,
+      createdAt: now,
+    };
+
+    const checkpointBytes = calculateRecordBytes(checkpointRow);
+
+    // 7. Execute atomic transaction: checkpoint first, then replace working content
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          // Check receipt FIRST before stale checks
+          const receiptCheck = await checkOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+          );
+          if ('status' in receiptCheck) {
+            return receiptCheck;
+          }
+          if (receiptCheck.isRetry) {
+            return receiptCheck.result;
+          }
+
+          // Verify project and non-main
+          const curProject = await this.db.projects.get(command.projectId);
+          if (!curProject) {
+            return { status: 'missing', ids: [command.projectId] };
+          }
+          if (command.branchId === curProject.mainBranchId) {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'Direct restore on main branch is rejected; main is changed only by publication',
+                  ['branchId'],
+                  command.branchId,
+                ),
+              ],
+            };
+          }
+
+          // Compare-and-set check on branch workingRevision
+          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
+          if (!curBranch) {
+            return { status: 'missing', ids: [command.branchId] };
+          }
+
+          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: command.expectedWorkingRevision,
+              actual: curBranch.workingRevision,
+            };
+          }
+
+          // Re-verify target snapshot in transaction
+          const curTarget = await this.db.snapshots.get([command.projectId, snapshotId]);
+          if (!curTarget) {
+            return { status: 'missing', ids: [snapshotId] };
+          }
+
+          // Enforce checkpoint count limit (100) and storage limits
+          const limitError = await enforceProjectLimits(this.db, {
+            projectId: command.projectId,
+            additionalCheckpoints: 1,
+            additionalReceipts: 1,
+            additionalLocalBytes: checkpointBytes,
+            additionalExportBytes: checkpointBytes,
+          });
+          if (limitError) return limitError;
+
+          // 1. Checkpoint current working state
+          await insertImmutable(this.db.checkpoints, checkpointRow, [
+            command.projectId,
+            command.payload.checkpointId,
+          ]);
+
+          // 2. Replace working content with target snapshot (workingRevision++)
+          const nextBranchRev = curBranch.workingRevision + 1;
+          await this.db.branches.update([command.projectId, command.branchId], {
+            workingSnapshotId: snapshotId,
+            workingRevision: nextBranchRev,
+          });
+
+          // 3. Project revision++
+          const nextProjectRev = curProject.revision + 1;
+          await this.db.projects.update(command.projectId, {
+            revision: nextProjectRev,
+            updatedAt: now,
+          });
+
+          const appliedResult: AppliedResult = {
+            status: 'applied',
+            operationId: command.operationId,
+            projectRevision: nextProjectRev,
+            branchRevision: nextBranchRev,
+            changedIds: [command.branchId, command.payload.checkpointId],
+            undo: null,
+            value: {
+              kind: 'artifact',
+              artifactType: 'checkpoint',
+              id: command.payload.checkpointId,
+              revision: null,
+            },
+          };
+
+          await recordOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+            appliedResult,
+          );
+
+          return appliedResult;
+        },
+      );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * branch.reopen:
+   * Closed non-main branches only; set open via revision check; branch revision++; history and main unchanged.
+   */
+  private async handleBranchReopen(
+    command: BranchReopenCommand,
+  ): Promise<AuthoredResult> {
+    // 1. Actor validation
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    // 2. Validate envelope IDs and revisions
+    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIssue) {
+      return { status: 'invalid', issues: [opIssue] };
+    }
+
+    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projIssue) {
+      return { status: 'invalid', issues: [projIssue] };
+    }
+
+    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIssue) {
+      return { status: 'invalid', issues: [branchIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    // 3. Pre-read project & branch
+    const project = await this.db.projects.get(command.projectId);
+    if (!project) {
+      return { status: 'missing', ids: [command.projectId] };
+    }
+
+    // Closed non-main branches only!
+    if (command.branchId === project.mainBranchId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('structural-rule', 'Cannot reopen main branch', ['branchId'], command.branchId),
+        ],
+      };
+    }
+
+    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+    if (!branch) {
+      return { status: 'missing', ids: [command.branchId] };
+    }
+
+    if (branch.state !== 'closed') {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            'Branch is already open; only closed branches can be reopened',
+            ['branchId'],
+            command.branchId,
+          ),
+        ],
+      };
+    }
+
+    // 4. Compute request hash BEFORE transaction
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    // 5. Execute atomic transaction
+    try {
+      return await this.db.transaction(
+        'rw',
+        getProjectTables(this.db),
+        async () => {
+          // Check receipt FIRST before stale checks
+          const receiptCheck = await checkOperationReceipt(
+            this.db,
+            command.projectId,
+            command.operationId,
+            requestHash,
+          );
+          if ('status' in receiptCheck) {
+            return receiptCheck;
+          }
+          if (receiptCheck.isRetry) {
+            return receiptCheck.result;
+          }
+
+          const curProject = await this.db.projects.get(command.projectId);
+          if (!curProject) {
+            return { status: 'missing', ids: [command.projectId] };
+          }
+
+          if (command.branchId === curProject.mainBranchId) {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue('structural-rule', 'Cannot reopen main branch', ['branchId'], command.branchId),
+              ],
+            };
+          }
+
+          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
+          if (!curBranch) {
+            return { status: 'missing', ids: [command.branchId] };
+          }
+
+          if (curBranch.state !== 'closed') {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'Branch is already open; only closed branches can be reopened',
+                  ['branchId'],
+                  command.branchId,
+                ),
+              ],
+            };
+          }
+
+          // Check head mismatch
+          if (curBranch.headCommitId !== command.payload.expectedHeadId) {
+            return {
+              status: 'failed',
+              code: 'conflict',
+              issues: [
+                createIssue(
+                  'structural-rule',
+                  'HEAD_MOVED: Branch head commit does not match expectedHeadId',
+                  ['payload', 'expectedHeadId'],
+                  command.payload.expectedHeadId,
+                ),
+              ],
+            };
+          }
+
+          // Compare-and-set check on branch workingRevision
+          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+            return {
+              status: 'stale',
+              scope: 'branch',
+              expected: command.expectedWorkingRevision,
+              actual: curBranch.workingRevision,
+            };
+          }
+
+          // Enforce limits
+          const limitError = await enforceProjectLimits(this.db, {
+            projectId: command.projectId,
+            additionalReceipts: 1,
+          });
+          if (limitError) return limitError;
+
+          // Set open via revision check; branch revision++; history and main unchanged
+          const now = Date.now();
+          const nextBranchRev = curBranch.workingRevision + 1;
+          const nextProjectRev = curProject.revision + 1;
+
+          await this.db.branches.update([command.projectId, command.branchId], {
+            state: 'open',
+            workingRevision: nextBranchRev,
+          });
+
+          await this.db.projects.update(command.projectId, {
+            revision: nextProjectRev,
+            updatedAt: now,
+          });
+
+          const appliedResult: AppliedResult = {
+            status: 'applied',
+            operationId: command.operationId,
+            projectRevision: nextProjectRev,
+            branchRevision: nextBranchRev,
+            changedIds: [command.branchId],
+            undo: null,
+            value: { kind: 'branch', branchId: command.branchId },
           };
 
           await recordOperationReceipt(
