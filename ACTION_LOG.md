@@ -1127,3 +1127,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round** (Claude): the token didn't bind the project (saveRun resolved it from three sources); validation read the token object instead of the registry binding; added run ID / fingerprint / snapshot-hash matching.
 - **Verification** (Claude): 655 unit tests, `tsc -b` clean. One full-suite run hit 5s timeouts in unrelated simulation tests while the machine load average was ~25 (other apps); isolated and repeated runs passed.
 - **Limitations**: Pinned-run detection walks all commit rows (fine at v1 limits). Commits/publish use these predicates in RV-08d/e.
+
+### RV-08b working copies (Claude lead, Gemini executor)
+
+- **Outcome**: `model.apply-records`, `history.checkpoint`, `history.restore`, `branch.reopen`, the `switchBranch` controller and save-failure recovery data in `src/persistence/studio/`. Merged onto the runner line @ `07bdaff`.
+- **Verification** (Claude): 680 unit tests (fake-indexeddb), `tsc -b` clean; review confirmed no repository ID generation, restore bumps the working revision, unknown fields/references rejected via the storable validator. No fix round needed.
+- **Limitations**: Callers (editor, RV-12) supply IDs for new records; session undo not in scope.
