@@ -1133,3 +1133,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: `model.apply-records`, `history.checkpoint`, `history.restore`, `branch.reopen`, the `switchBranch` controller and save-failure recovery data in `src/persistence/studio/`. Merged onto the runner line @ `07bdaff`.
 - **Verification** (Claude): 680 unit tests (fake-indexeddb), `tsc -b` clean; review confirmed no repository ID generation, restore bumps the working revision, unknown fields/references rejected via the storable validator. No fix round needed.
 - **Limitations**: Callers (editor, RV-12) supply IDs for new records; session undo not in scope.
+
+### RV-08c typed diff/merge (Claude lead, Gemini executor)
+
+- **Outcome**: Pure three-way merge by ID and schema field with a closed field descriptor, record diff, conflict resolution and DAG merge base in `src/domain/versioning/`. Merged onto the runner line @ `0b94b67`.
+- **Review round** (Claude): removed invented fallbacks (default record kind/ID, JSON fallback, revision 0), enforced closed keys during merge, stopped merging scenario `revision` as a scalar, rebuilt reference conflicts by ID from the original inputs, and made unresolvable resolutions throw.
+- **Verification** (Claude): 742 unit tests, `tsc -b` clean.
+- **Limitations**: Born heads with no shared commit use the creation snapshot as the base (interpretation of storage.md). Candidate storage, prepare-publish and candidate runs are RV-08d.
