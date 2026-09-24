@@ -1206,3 +1206,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: Rendered all 46 Directions artboards (37 target screens committed in `specs/revamp/screens/`); c4 dispatch stopped before any write (user asked to revalidate first). Wrote `specs/revamp/design-revalidation.md`: screen→package coverage, 11 design elements overridden by decisions, 12 contract gaps needing user decisions (dock inventory, scenario selection for Run, scenario editing surface, standard catalog/constructors, editing main, project switching, tabs vs stacks, project actions, results extras, commit message suggestion, stripe gap, per-behavior layouts), proposed plan changes.
 - **Platform**: Claude (lead/reviewer); no executor.
 - **Limitations**: Nothing applied to contracts or code until the user decides the gaps.
+
+### Scenario UX approved (D41); D38 applied to the dock inventory
+
+- **Outcome**: Lead-drafted scenario UX canvas (7 artboards, https://claude.ai/artifact/2c6vMhn9u47Yq4KbsozVvu) approved by the user. Rendered to `specs/revamp/screens/scenario_*.png`; D41 added; commands.md gains `run.start-all` and a Scenarios section (select/new/duplicate/delete/edit, empty drafts invent nothing, editor sections, switcher, derived status, commit panel); dock inventory rewritten per D38; design-revalidation gaps 2–3 closed; RV-12c4 READY.
+- **Platform**: Claude (lead); no executor.
+- **Limitations**: Lead readings inside D41 for review: an empty draft's scope = every element at draft time; the selected scenario is a per-browser preference; a random seed is drawn when a draft opens.

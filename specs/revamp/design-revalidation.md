@@ -45,7 +45,7 @@ The plan was checked against every target artboard in [`screens/`](screens/), re
 
 ## 3. Contract gaps the screens expose (need user decisions)
 
-Recommendations are the lead's; nothing below is applied until the user decides. **Decided 2026-09-25:** gap 1 → D38 (dock follows 16A), gap 4 → D39 (catalog contract first), gap 5 → D40 (auto-draft on first main edit). Gap 2 (and 3) is open: the user questioned whether a project should have scenarios at all; discussion pending.
+Recommendations are the lead's; nothing below is applied until the user decides. **Decided 2026-09-25:** gap 1 → D38 (dock follows 16A), gap 4 → D39 (catalog contract first), gap 5 → D40 (auto-draft on first main edit). Gaps 2 and 3 → D41 (scenario UX approved; screens `scenario_*.png`).
 
 1. **Dock inventory.** 16A dock = undo, redo, Select, Pan, Component, Connect, Note, More, zoom out, zoom %, zoom in, fit. Run, History and results live in the top bar. commands.md's `DockCommandId` also contains `history.open`, `results.open` and `run.*` and has no Connect. *Recommend:* adopt the screen and remove the three from the dock inventory.
 2. **Scenario selection for Run.** One "Run Simulation" button, but a document holds several scenarios and commit/publish need all of them passing. No screen shows a scenario picker. *Recommend:* a split button (run the current scenario / pick a scenario / "Run all scenarios"), with the results header naming the scenario.
@@ -62,7 +62,7 @@ Recommendations are the lead's; nothing below is applied until the user decides.
 
 ## 4. Plan changes (proposed)
 
-- **Hold c4** until gaps 1 and 2 are decided; then re-brief it with Run in the top bar and results per 7A/21B/21D minus §2.
+- **c4** (runs) can resume: gaps 1 and 2 are decided (D38, D41). Re-brief it with the scenario switcher + Run in the top bar, Run all, derived scenario status, and results per 7A/21B/21D minus §2.
 - **Replace c5 with feature packages on the new app**, each briefed with its PNGs and §2 as an explicit exclusion list:
   1. RV-03 shell — 22A top bar, 13A/13B menus, 18A/18B, command registry + quick options (14A), panels 23A–G (merge the RV-03a reducer), rail only for collapsed panels.
   2. RV-04 canvas/dock — 16A–D, 2A node cards and edges; add/connect after gap 4.

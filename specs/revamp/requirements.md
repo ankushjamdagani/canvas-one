@@ -59,7 +59,7 @@ The inspector follows `2A workspace` and keeps every behavior-specific setting, 
 - A dirty draft on selection/project/branch change or close asks Apply/Discard/Stay.
 - External changes to the same target are detected before Apply.
 - **Run is blocked while a draft is dirty (D25)**, from the toolbar, shortcut and command alike. It runs only after Apply or Cancel, on an immutable applied snapshot.
-- **Workloads** keep enablement, entry, rate/interval/profile, timeout, request classes, weights, operations, tags and key distribution, and survive reload and one-step undo without silent defaults. Pure logical scenarios expose typed input events, not traffic-rate fields.
+- **Workloads** keep enablement, entry, rate/interval/profile, timeout, request classes, weights, operations, tags and key distribution, and survive reload and one-step undo without silent defaults. Pure logical scenarios expose typed input events, not traffic-rate fields. Scenario create/duplicate/delete/select and per-scenario status follow D41.
 
 ## R07 — Library and parts
 
