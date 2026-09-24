@@ -35,3 +35,4 @@ Before any work also read the repository `AGENTS.md` and `HANDOFF.md`.
   - Configuration edits use Apply/Cancel.
   - Old data formats are dropped; the old database is left untouched.
 - **Out (for now):** real source execution; AI features; accounts, sync and hosting; live coediting; dark theme; team/share features.
+- [design-revalidation.md](design-revalidation.md) — plan checked against the rendered screens (2026-09-25): coverage, overridden design elements, open gaps, proposed plan changes.

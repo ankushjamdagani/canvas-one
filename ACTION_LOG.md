@@ -1200,3 +1200,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Gemini (agy) implementer, two review rounds (code, then visual from screenshots); Claude reviewer (tokenized note colours, removed a width fallback; confirmed three deleted domain tests depended on the deleted engine/editor).
 - **Verification**: 767 unit, `npx tsc -b`, `npm run build`, production e2e 2 passed / 4 skipped (specimen dev-only); desktop and 390×844 screenshots.
 - **Limitations**: No add/delete/connect (constructors not contracted); D35 stripe for state-machine/data-pipeline/host undecided; edge-label overlap on tight layouts, 3-row phone dock, legacy CSS still in `styles.css`, 888 kB bundle.
+
+### Plan revalidation against the rendered screens
+
+- **Outcome**: Rendered all 46 Directions artboards (37 target screens committed in `specs/revamp/screens/`); c4 dispatch stopped before any write (user asked to revalidate first). Wrote `specs/revamp/design-revalidation.md`: screen→package coverage, 11 design elements overridden by decisions, 12 contract gaps needing user decisions (dock inventory, scenario selection for Run, scenario editing surface, standard catalog/constructors, editing main, project switching, tabs vs stacks, project actions, results extras, commit message suggestion, stripe gap, per-behavior layouts), proposed plan changes.
+- **Platform**: Claude (lead/reviewer); no executor.
+- **Limitations**: Nothing applied to contracts or code until the user decides the gaps.
