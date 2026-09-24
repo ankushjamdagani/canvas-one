@@ -198,6 +198,30 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
+   * Lists all projects sorted by title then id. Returns cloned, read-only records.
+   */
+  async listProjects(): Promise<readonly ProjectRecord[]> {
+    try {
+      const records = await this.db.projects.toArray();
+      records.sort((a, b) => {
+        if (a.title < b.title) return -1;
+        if (a.title > b.title) return 1;
+        if (a.id < b.id) return -1;
+        if (a.id > b.id) return 1;
+        return 0;
+      });
+      return Object.freeze(records.map((r) => Object.freeze(structuredClone(r))));
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to list projects from database',
+        issues: [createIssue('structural-rule', String(err), [])],
+      });
+    }
+  }
+
+  /**
    * Loads a branch by [projectId, branchId]. Returns a cloned, read-only record or null if not found.
    */
   async loadBranch(projectId: Id, branchId: Id): Promise<Readonly<BranchRecord> | null> {

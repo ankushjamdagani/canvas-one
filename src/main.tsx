@@ -1,15 +1,12 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import "@fontsource-variable/inter";
-import "@xyflow/react/dist/style.css";
-import "./styles.css";
-import App from "./App";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import '@fontsource-variable/inter';
+import '@xyflow/react/dist/style.css';
+import './styles.css';
+import App from './App';
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+    <App />
   </React.StrictMode>,
 );
