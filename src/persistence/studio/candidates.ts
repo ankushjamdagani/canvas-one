@@ -11,7 +11,12 @@
  */
 
 import type { Document, Id } from '../../domain/studio/model';
-import { computeSnapshotId } from './primitives';
+import {
+  computeSnapshotId,
+  validateUuid,
+  validateRevision,
+  validateActor,
+} from './primitives';
 import { createIssue } from './errors';
 import {
   findMergeBase,
@@ -43,10 +48,13 @@ import {
   type ScenarioRunResult,
 } from '../../domain/studio/runner/scenario-runner';
 import { mintRunStartToken } from './token';
+import { mintPublishTicket } from './publish-ticket';
 import {
   DEFAULT_BUILD_VERSIONS,
+  type AuthoredResult,
   type ExpectedHead,
   type FailedResult,
+  type HistoryPublishCommand,
   type InvalidResult,
   type MissingResult,
   type SaveRunResult,
@@ -788,6 +796,262 @@ export class CandidateController {
       },
       ...(wasSuperseded ? { superseded: true } : {}),
     };
+  }
+
+  /**
+   * Publishes an eligible candidate to main (RV-08e).
+   *
+   * Candidates are controller-owned and can't come from portable input, so publish
+   * goes through CandidateController.publish(ctx, command): it looks up the candidate
+   * (unknown -> missing, superseded -> failed/ineligible, conflicts/issues -> failed/conflict / invalid),
+   * then hands the repository a publish ticket minted in a module-private WeakMap registry
+   * bound to the candidate's IDs, tokens, snapshotId and merged document.
+   * The repository rejects any ticket not found in the registry.
+   */
+  async publish(
+    ctx: CandidateContext,
+    command: HistoryPublishCommand,
+  ): Promise<AuthoredResult> {
+    if (!command || typeof command !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('wrong-type', 'command must be an object', [])],
+      };
+    }
+
+    // Envelope field validation. No fallbacks: every field must be present and valid.
+    const opIdIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
+    if (opIdIssue) {
+      return { status: 'invalid', issues: [opIdIssue] };
+    }
+
+    const projectIdIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
+    if (projectIdIssue) {
+      return { status: 'invalid', issues: [projectIdIssue] };
+    }
+
+    const branchIdIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
+    if (branchIdIssue) {
+      return { status: 'invalid', issues: [branchIdIssue] };
+    }
+
+    const workingRevIssue = validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+    if (workingRevIssue) {
+      return { status: 'invalid', issues: [workingRevIssue] };
+    }
+
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) {
+      return { status: 'invalid', issues: actorIssues };
+    }
+
+    if (!command.payload || typeof command.payload !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [createIssue('missing-property', 'payload is required', ['payload'])],
+      };
+    }
+
+    const payload = command.payload;
+
+    const candidateIdIssue = validateUuid(
+      payload.candidateId,
+      ['payload', 'candidateId'],
+      'candidateId',
+    );
+    if (candidateIdIssue) {
+      return { status: 'invalid', issues: [candidateIdIssue] };
+    }
+
+    const publicationIdIssue = validateUuid(
+      payload.publicationId,
+      ['payload', 'publicationId'],
+      'publicationId',
+    );
+    if (publicationIdIssue) {
+      return { status: 'invalid', issues: [publicationIdIssue] };
+    }
+
+    const mergeCommitIdIssue = validateUuid(
+      payload.mergeCommitId,
+      ['payload', 'mergeCommitId'],
+      'mergeCommitId',
+    );
+    if (mergeCommitIdIssue) {
+      return { status: 'invalid', issues: [mergeCommitIdIssue] };
+    }
+
+    if (!payload.metadata || typeof payload.metadata !== 'object') {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('missing-property', 'payload.metadata is required', ['payload', 'metadata']),
+        ],
+      };
+    }
+
+    if (!Array.isArray(payload.evidence)) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'missing-property',
+            'payload.evidence is required and must be an array',
+            ['payload', 'evidence'],
+          ),
+        ],
+      };
+    }
+
+    // keepSourceOpen is the only defaulted field (omitted -> false).
+    let keepSourceOpen: boolean;
+    if (payload.keepSourceOpen === undefined) {
+      keepSourceOpen = false;
+    } else if (typeof payload.keepSourceOpen !== 'boolean') {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue('wrong-type', 'payload.keepSourceOpen must be a boolean', [
+            'payload',
+            'keepSourceOpen',
+          ]),
+        ],
+      };
+    } else {
+      keepSourceOpen = payload.keepSourceOpen;
+    }
+
+    const expectedProjectRevIssue = validateRevision(
+      payload.expectedProjectRevision,
+      ['payload', 'expectedProjectRevision'],
+      'expectedProjectRevision',
+    );
+    if (expectedProjectRevIssue) {
+      return { status: 'invalid', issues: [expectedProjectRevIssue] };
+    }
+
+    const candidateId = payload.candidateId;
+    const cand = this.candidates.get(candidateId);
+    if (!cand) {
+      return { status: 'missing', ids: [candidateId] };
+    }
+
+    if (cand.superseded) {
+      return {
+        status: 'failed',
+        code: 'ineligible',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Candidate '${candidateId}' is superseded`,
+            ['candidateId'],
+            candidateId,
+          ),
+        ],
+      };
+    }
+
+    if (cand.mergeState.conflicts.length > 0) {
+      return {
+        status: 'failed',
+        code: 'conflict',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Candidate '${candidateId}' has ${cand.mergeState.conflicts.length} unresolved conflicts`,
+            ['conflicts'],
+          ),
+        ],
+      };
+    }
+
+    if (cand.mergeState.issues.length > 0) {
+      return {
+        status: 'invalid',
+        issues: cand.mergeState.issues,
+      };
+    }
+
+    // Context mismatch is rejected outright; it is never a fallback to the candidate's values.
+    if (command.projectId !== cand.projectId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Command projectId '${command.projectId}' does not match candidate projectId '${cand.projectId}'`,
+            ['projectId'],
+            command.projectId,
+          ),
+        ],
+      };
+    }
+
+    if (command.branchId !== cand.sourceBranchId) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Command branchId '${command.branchId}' does not match candidate sourceBranchId '${cand.sourceBranchId}'`,
+            ['branchId'],
+            command.branchId,
+          ),
+        ],
+      };
+    }
+
+    if (command.expectedWorkingRevision !== cand.expectedSourceRevision) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'structural-rule',
+            `Command expectedWorkingRevision '${command.expectedWorkingRevision}' does not match candidate expectedSourceRevision '${cand.expectedSourceRevision}'`,
+            ['expectedWorkingRevision'],
+          ),
+        ],
+      };
+    }
+
+    const ticket = mintPublishTicket({
+      candidateId: cand.candidateId,
+      projectId: cand.projectId,
+      sourceBranchId: cand.sourceBranchId,
+      mainBranchId: cand.mainBranchId,
+      expectedSourceRevision: cand.expectedSourceRevision,
+      expectedSourceHeadId: cand.expectedSourceHeadId,
+      expectedMainRevision: cand.expectedMainRevision,
+      expectedMainHeadId: cand.expectedMainHeadId,
+      snapshotId: cand.snapshotId,
+      document: cand.mergeState.document,
+      operationId: command.operationId,
+    });
+
+    const fullCommand: HistoryPublishCommand = {
+      commandId: 'history.publish',
+      operationId: command.operationId,
+      projectId: command.projectId,
+      branchId: command.branchId,
+      expectedWorkingRevision: command.expectedWorkingRevision,
+      actor: command.actor,
+      payload: {
+        candidateId: payload.candidateId,
+        publicationId: payload.publicationId,
+        mergeCommitId: payload.mergeCommitId,
+        metadata: payload.metadata,
+        evidence: payload.evidence,
+        keepSourceOpen,
+        expectedProjectRevision: payload.expectedProjectRevision,
+      },
+    };
+
+    const repo = 'repo' in ctx ? ctx.repo : ctx;
+    return repo.publish(ticket, fullCommand);
   }
 }
 
