@@ -756,14 +756,25 @@ export interface StudioRepository {
   /** Lists all publications for a project. Returns cloned, read-only records. */
   listPublications(projectId: Id): Promise<readonly Readonly<PublicationRecord>[]>;
 
-  /** Not implemented in RV-16a; owned by RV-16b. */
-  importProject(validatedBundle: unknown): Promise<UnsupportedResult>;
+  /**
+   * project.import (RV-16b): validates the bundle bound to `fileToken` outside any
+   * transaction, then creates a fresh project namespace in one transaction. Unknown or
+   * expired token -> missing; invalid bundle -> invalid; reused newProjectId -> failed/conflict.
+   */
+  importProject(command: ProjectImportCommand): Promise<AuthoredResult>;
 
-  /** Not implemented in RV-16a; owned by RV-16b. */
-  exportProject(projectId: Id): Promise<UnsupportedResult>;
+  /**
+   * project.export-json (RV-16b): one consistent read-only transaction; canonical-json-v1
+   * envelope bytes of `{format:'system-studio',version:9,project:ProjectBundle}`, capped
+   * at 64 MiB (storage.md §5 "Export always fits").
+   */
+  exportProject(params: ExportProjectParams): Promise<ExportProjectResult>;
 
-  /** Not implemented in RV-16a; owned by RV-16b. */
-  pruneUnreferenced(projectId: Id, selection: unknown): Promise<UnsupportedResult>;
+  /**
+   * pruneUnreferenced (RV-16b): explicit-only trace/run/snapshot pruning in one
+   * transaction, recomputing the pin closure from current rows (storage.md §7).
+   */
+  pruneUnreferenced(params: PruneUnreferencedParams): Promise<PruneUnreferencedResult>;
 
   /**
    * Loads project, branches, commits, publications (by ordinal), checkpoints and
@@ -783,4 +794,115 @@ export interface StudioRepository {
 
 export type { MintRunStartTokenParams, RunStartToken } from './token';
 export type { MintPublishTicketParams, PublishTicket, PublishTicketBinding } from './publish-ticket';
+export type { FileToken, FileTokenBinding } from './file-tokens';
+
+// ============================================================================
+// storage.md §1 & §4: Portable bundle (RV-16b)
+// ============================================================================
+
+/** storage.md §1: the portable file's fixed format discriminator and version. */
+export const PORTABLE_FORMAT = 'system-studio' as const;
+export const PORTABLE_VERSION = 9 as const;
+
+/** Bundle rows are the table rows with `projectId` omitted (storage.md §4). */
+export type BundleBranchRecord = Omit<BranchRecord, 'projectId'>;
+export type BundleSnapshotRecord = Omit<SnapshotRecord, 'projectId'>;
+export type BundleCommitRecord = Omit<CommitRecord, 'projectId'>;
+export type BundlePublicationRecord = Omit<PublicationRecord, 'projectId'>;
+export type BundleCheckpointRecord = Omit<CheckpointRecord, 'projectId'>;
+export type BundleRunRecord = Omit<RunRecord, 'projectId'>;
+export type BundlePartRecord = Omit<PartRecord, 'projectId'>;
+
+/**
+ * storage.md §4 "Portable bundle" fields exactly:
+ * `ProjectBundle={id,title,createdAt,updatedAt,mainBranchId,initialSnapshotId,branches,
+ * snapshots,commits,publications,checkpoints,runs,parts}`. Arrays omit `projectId`.
+ * Excludes operation receipts, preferences, trace chunks, device-local actors/credentials,
+ * project revision and `importSourceId`.
+ */
+export type ProjectBundle = {
+  readonly id: Id;
+  readonly title: string;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly mainBranchId: Id;
+  readonly initialSnapshotId: string;
+  readonly branches: readonly BundleBranchRecord[];
+  readonly snapshots: readonly BundleSnapshotRecord[];
+  readonly commits: readonly BundleCommitRecord[];
+  readonly publications: readonly BundlePublicationRecord[];
+  readonly checkpoints: readonly BundleCheckpointRecord[];
+  readonly runs: readonly BundleRunRecord[];
+  readonly parts: readonly BundlePartRecord[];
+};
+
+/** storage.md §1: `{format:'system-studio',version:9,project:ProjectBundle}`. */
+export type PortableFile = {
+  readonly format: typeof PORTABLE_FORMAT;
+  readonly version: typeof PORTABLE_VERSION;
+  readonly project: ProjectBundle;
+};
+
+// ============================================================================
+// commands.md §3 / storage.md §4-§6: Transfer, import, export, prune (RV-16b)
+// ============================================================================
+
+/** commands.md "File tokens": `{fileToken, newProjectId, operationId}` (Bootstrap envelope). */
+export type ProjectImportCommand = {
+  readonly commandId: 'project.import';
+  readonly operationId: Id;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly fileToken: unknown;
+    readonly newProjectId: Id;
+  };
+};
+
+/** Controller command `project.export-json {projectId, expectedProjectRevision}`. */
+export type ExportProjectParams = {
+  readonly projectId: Id;
+  readonly expectedProjectRevision: number;
+};
+
+export type ExportProjectResult =
+  | {
+      readonly status: 'done';
+      readonly value: { readonly kind: 'download'; readonly downloadId: Id };
+      readonly bytes: Uint8Array;
+      readonly sha256: string;
+    }
+  | InvalidResult
+  | StaleResult
+  | MissingResult
+  | FailedResult;
+
+/**
+ * `pruneUnreferenced({projectId, expectedProjectRevision, selection})`. Explicit only
+ * (storage.md §7: "No auto-pruning anywhere").
+ */
+export type PruneSelection = {
+  readonly runIds: readonly Id[];
+  readonly traceRunIds: readonly Id[];
+  readonly snapshotIds: readonly string[];
+};
+
+export type PruneUnreferencedParams = {
+  readonly projectId: Id;
+  readonly expectedProjectRevision: number;
+  readonly selection: PruneSelection;
+};
+
+export type PruneUnreferencedResult =
+  | {
+      readonly status: 'applied';
+      readonly projectRevision: number;
+      readonly deletedRunIds: readonly Id[];
+      readonly tracePrunedRunIds: readonly Id[];
+      readonly deletedSnapshotIds: readonly Id[];
+      readonly alreadyAbsentIds: readonly Id[];
+    }
+  | StaleResult
+  | MissingResult
+  | { readonly status: 'failed'; readonly code: 'referenced-artifact'; readonly issues: readonly Issue[] }
+  | FailedResult;
 
