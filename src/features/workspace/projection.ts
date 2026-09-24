@@ -23,16 +23,19 @@ export type CatalogLayer =
   | 'compute'
   | 'messaging'
   | 'data'
-  | 'operations';
+  | 'operations'
+  | 'state-machine'
+  | 'data-pipeline'
+  | 'host';
 
 /**
- * Maps a visualKind to its system catalog layer per D35.
+ * Maps a visualKind to its system catalog layer.
  *
- * CONTRACT GAP:
- * D35 defines stripe hues only for the 29 catalog kinds across six layers
- * (clients, edge, compute, data, messaging, operations).
- * 'state-machine', 'data-pipeline', and 'host' are not assigned a layer in D35.
- * They return null and render with no kind stripe (neutral) instead of inventing layers.
+ * D35 covers the original six layers; D42 (catalog.md "Approved resolutions"
+ * 1-2) extends it: state-machine, data-pipeline and host each get their own
+ * dedicated stripe group; thirdparty moves to Edge; custom gets no stripe at
+ * all (falls through to null, catalog.md "custom has no stripe, library group
+ * 'Other'").
  */
 export function getCatalogLayer(visualKind: string): CatalogLayer | null {
   switch (visualKind) {
@@ -46,6 +49,7 @@ export function getCatalogLayer(visualKind: string): CatalogLayer | null {
     case 'firewall':
     case 'gateway':
     case 'balancer':
+    case 'thirdparty': // D42 item 2: thirdparty -> Edge
       return 'edge';
     case 'service':
     case 'function':
@@ -68,12 +72,14 @@ export function getCatalogLayer(visualKind: string): CatalogLayer | null {
     case 'monitoring':
     case 'analytics':
     case 'secrets':
-    case 'thirdparty':
-    case 'custom':
       return 'operations';
-    case 'state-machine':
-    case 'data-pipeline':
-    case 'host':
+    case 'state-machine': // D42 item 1: own indigo stripe group
+      return 'state-machine';
+    case 'data-pipeline': // D42 item 1: own umber stripe group
+      return 'data-pipeline';
+    case 'host': // D42 item 1: own charcoal stripe group
+      return 'host';
+    case 'custom': // D42 item 2: no stripe
     default:
       return null;
   }
@@ -86,6 +92,9 @@ export const CATALOG_LAYER_COLORS: Record<CatalogLayer, string> = {
   messaging: '#8A6A1F',
   data: '#8A4F6E',
   operations: '#5F646B',
+  'state-machine': '#5A5B8C',
+  'data-pipeline': '#7A5C3E',
+  host: '#3A3F3C',
 };
 
 export type ProjectedNodeData =
@@ -340,6 +349,9 @@ export function projectDocumentToCanvas(
       id: conn.id,
       source: sourcePlacement.id,
       target: targetPlacement.id,
+      // Custom edge (TrafficEdge): smoothstep routing + an HTML label chip
+      // rendered above the node layer, instead of the default bezier/SVG label.
+      type: 'traffic',
       label: conn.label || undefined,
       labelShowBg: true,
       labelBgStyle: {

@@ -143,8 +143,10 @@ describe('Session Layer (RV-12c1)', () => {
       status: 'empty',
       projectId: null,
       branchId: null,
+      mainBranchId: null,
       projectRevision: null,
       workingRevision: null,
+      workingSnapshotId: null,
       document: null,
       canUndo: false,
       canRedo: false,
@@ -1208,6 +1210,178 @@ describe('Session Layer (RV-12c1)', () => {
       await expect(openStudioRepository({})).rejects.toThrow(TypeError);
       // @ts-expect-error testing non-function mintId
       await expect(openStudioRepository({ mintId: 'not-a-fn' })).rejects.toThrow(TypeError);
+    });
+  });
+
+  describe('RV-03s: D40 auto-draft from main + workingSnapshotId pairing', () => {
+    it('first edit on main creates "Draft from main", switches to it, applies the edit there; main is unchanged; one undo entry reverts only the edit', async () => {
+      const dbName = `test-d40-${Date.now()}-${idCounter++}`;
+      const mintId = createMintId();
+      const bootResult = await openStudioRepository({ dbName, mintId });
+      if (!bootResult.ok) throw new Error('Boot failed');
+
+      const controller = new SessionController({
+        repository: bootResult.repository,
+        mintId,
+        actor: testActor,
+      });
+
+      await controller.createProject({
+        title: 'D40 Project',
+        initialDocument: createTestDocument(mintId(), 'D40 Project'),
+      });
+      const { projectId, mainBranchId } = controller.getState();
+      expect(projectId).toBeDefined();
+      expect(mainBranchId).toBeDefined();
+
+      // Move onto main explicitly (createProject opens the starter draft, not main)
+      const openMainRes = await controller.openProject(projectId!, mainBranchId!);
+      expect(openMainRes.status).toBe('ready');
+      expect(controller.getState().branchId).toBe(mainBranchId);
+
+      const el1 = makeElement(mintId(), 'First edit on main');
+      const applyRes = await controller.apply(
+        [{ kind: 'insert', value: { recordKind: 'element', record: el1 } }],
+        'Insert element',
+      );
+      expect(applyRes.status).toBe('applied');
+
+      const state = controller.getState();
+      // Session switched off main onto a new draft branch
+      expect(state.branchId).not.toBe(mainBranchId);
+      expect(state.document?.elements).toHaveLength(1);
+      expect(state.document?.elements[0].id).toBe(el1.id);
+
+      const newBranch = await bootResult.repository.loadBranch(projectId!, state.branchId!);
+      expect(newBranch?.label).toBe('Draft from main');
+
+      // Main is untouched: still revision 0, no elements
+      const mainBranch = await bootResult.repository.loadBranch(projectId!, mainBranchId!);
+      expect(mainBranch?.workingRevision).toBe(0);
+      const mainSnapshot = await bootResult.repository.loadSnapshot(
+        projectId!,
+        mainBranch!.workingSnapshotId,
+      );
+      expect(mainSnapshot?.document.elements).toHaveLength(0);
+
+      // Branch creation isn't undoable; only the edit is on the undo stack
+      expect(controller.undoStack).toHaveLength(1);
+      expect(controller.undoStack[0].label).toBe('Insert element');
+
+      // Undo reverts only the edit, staying on the same (draft) branch
+      const undoRes = await controller.undo();
+      expect(undoRes.status).toBe('applied');
+      const afterUndo = controller.getState();
+      expect(afterUndo.branchId).toBe(newBranch!.id);
+      expect(afterUndo.document?.elements).toHaveLength(0);
+    });
+
+    it('label collision on an existing "Draft from main" branch appends " 2"', async () => {
+      const dbName = `test-d40-collision-${Date.now()}-${idCounter++}`;
+      const mintId = createMintId();
+      const bootResult = await openStudioRepository({ dbName, mintId });
+      if (!bootResult.ok) throw new Error('Boot failed');
+
+      const controller = new SessionController({
+        repository: bootResult.repository,
+        mintId,
+        actor: testActor,
+      });
+
+      await controller.createProject({
+        title: 'D40 Collision Project',
+        initialDocument: createTestDocument(mintId(), 'D40 Collision Project'),
+      });
+      const { projectId, mainBranchId } = controller.getState();
+
+      // Pre-seed a branch already labeled "Draft from main" straight off main
+      const mainBranch = await bootResult.repository.loadBranch(projectId!, mainBranchId!);
+      const preseedCommand: BranchCreateCommand = {
+        commandId: 'branch.create',
+        operationId: mintId(),
+        projectId: projectId!,
+        branchId: mainBranchId!,
+        expectedWorkingRevision: mainBranch!.workingRevision,
+        actor: testActor,
+        payload: {
+          newBranchId: mintId(),
+          label: 'Draft from main',
+          source: 'working',
+          expectedHeadId: mainBranch!.headCommitId,
+        },
+      };
+      const preseedRes = await bootResult.repository.execute(preseedCommand);
+      expect(preseedRes.status).toBe('applied');
+
+      await controller.openProject(projectId!, mainBranchId!);
+      const el1 = makeElement(mintId(), 'Second draft from main');
+      const applyRes = await controller.apply(
+        [{ kind: 'insert', value: { recordKind: 'element', record: el1 } }],
+        'Insert element',
+      );
+      expect(applyRes.status).toBe('applied');
+
+      const newBranch = await bootResult.repository.loadBranch(
+        projectId!,
+        controller.getState().branchId!,
+      );
+      expect(newBranch?.label).toBe('Draft from main 2');
+    });
+
+    it('workingSnapshotId is read from the same reloaded branch row as document, across open/apply/undo/redo', async () => {
+      const dbName = `test-working-snapshot-id-${Date.now()}-${idCounter++}`;
+      const mintId = createMintId();
+      const bootResult = await openStudioRepository({ dbName, mintId });
+      if (!bootResult.ok) throw new Error('Boot failed');
+
+      const controller = new SessionController({
+        repository: bootResult.repository,
+        mintId,
+        actor: testActor,
+      });
+
+      await controller.createProject({
+        title: 'Snapshot Pairing Project',
+        initialDocument: createTestDocument(mintId(), 'Snapshot Pairing Project'),
+      });
+      const { projectId, branchId } = controller.getState();
+
+      const assertPaired = async () => {
+        const state = controller.getState();
+        const branch = await bootResult.repository.loadBranch(projectId!, state.branchId!);
+        expect(state.workingSnapshotId).toBe(branch?.workingSnapshotId);
+        const snapshot = await bootResult.repository.loadSnapshot(
+          projectId!,
+          state.workingSnapshotId!,
+        );
+        expect(snapshot?.document).toEqual(state.document);
+      };
+
+      await assertPaired();
+
+      const el1 = makeElement(mintId(), 'Paired element');
+      await controller.apply(
+        [{ kind: 'insert', value: { recordKind: 'element', record: el1 } }],
+        'Insert',
+      );
+      await assertPaired();
+
+      await controller.undo();
+      await assertPaired();
+
+      await controller.redo();
+      await assertPaired();
+
+      // Re-opening the branch also pairs document with workingSnapshotId
+      const controller2 = new SessionController({
+        repository: bootResult.repository,
+        mintId,
+        actor: testActor,
+      });
+      await controller2.openProject(projectId!, branchId!);
+      const state2 = controller2.getState();
+      const branch2 = await bootResult.repository.loadBranch(projectId!, branchId!);
+      expect(state2.workingSnapshotId).toBe(branch2?.workingSnapshotId);
     });
   });
 });

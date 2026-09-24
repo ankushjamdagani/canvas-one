@@ -160,6 +160,7 @@ function StudioShell({
     return (
       <Workspace
         session={session}
+        repository={repository}
         onBackToProjects={() => setActiveScreen('entry')}
       />
     );

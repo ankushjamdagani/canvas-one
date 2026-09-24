@@ -1,199 +1,173 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Studio Shell E2E', () => {
-  test('full user journey: boot, S01 example, drag node, undo/redo, branch resolution reload, blank project, rename, reload persistence, responsive', async ({
+test.describe('Studio Shell E2E (RV-03s)', () => {
+  test('entry two columns, create S05, breadcrumb, project menu rename persists, branch popover switches, drag on main auto-drafts, dock zoom, no rail, mobile no scroll', async ({
     page,
   }) => {
-    // 1. Boot -> entry lists nothing
+    // 1. Boot -> entry has two columns: "Your projects" + "Open an empty canvas" (left),
+    // "Start from a template" (right). No prompt box, no "Bring in what exists".
     await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await expect(page.getByTestId('no-projects-notice')).toBeVisible();
-    await expect(page.getByTestId('no-projects-notice')).toContainText('No saved projects yet');
+    await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Open an empty canvas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Start from a template' })).toBeVisible();
+    await expect(page.getByTestId('templates-list')).toBeVisible();
+    await expect(page.getByText('Describe the system')).toHaveCount(0);
+    await expect(page.getByText('Bring in what exists')).toHaveCount(0);
 
-    // 2. Create S01 example -> workspace shows its placed nodes and edges
-    const s01CreateBtn = page.getByTestId('create-example-s01');
-    await expect(s01CreateBtn).toBeVisible();
-    await s01CreateBtn.click();
+    // 2. Create S05 example -> workspace with the new top bar breadcrumb
+    const s05CreateBtn = page.getByTestId('create-example-s05');
+    await expect(s05CreateBtn).toBeVisible();
+    await s05CreateBtn.click();
 
-    // Verify lands in workspace
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('project-title-input')).toHaveValue('S01 Checkout');
+    await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('S05 Fullstack');
+    // Newly created projects open their starter draft branch, not main
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
-    // Placed nodes in S01: Checkout (state-machine) and Order boundary (thirdparty)
-    const checkoutNode = page.locator('.component-node', { hasText: 'Checkout' });
-    const orderBoundaryNode = page.locator('.component-node', { hasText: 'Order boundary' });
-    await expect(checkoutNode).toBeVisible();
-    await expect(orderBoundaryNode).toBeVisible();
-    await expect(checkoutNode).toContainText('state-machine');
-    await expect(orderBoundaryNode).toContainText('thirdparty');
+    // No permanent left activity rail
+    await expect(page.getByTestId('workspace-activity-rail')).toHaveCount(0);
 
-    // RV-04c / D35: state-machine has no assigned layer -> neutral (no kind stripe)
-    await expect(checkoutNode.locator('.node-category-strip')).toHaveCount(0);
-    // thirdparty is operations layer -> has kind stripe
-    await expect(orderBoundaryNode.locator('.node-category-strip')).toHaveCount(1);
+    // 3. Project menu: rename persists after reload
+    await page.getByTestId('breadcrumb-project-btn').click();
+    await expect(page.getByTestId('project-menu-popover')).toBeVisible();
+    await expect(page.getByTestId('project-menu-popover')).toContainText('branches');
+    await page.getByTestId('project-menu-rename').click();
 
-    // Edge must be visible
-    await expect(page.locator('.react-flow__edge').first()).toBeVisible();
+    const titleInput = page.getByTestId('project-title-input');
+    await expect(titleInput).toBeVisible();
+    await titleInput.fill('Renamed Fullstack System');
+    await titleInput.press('Enter');
 
-    // 3. Drag a node -> Saved, undo -> back, redo
-    const initialBox = await checkoutNode.boundingBox();
-    expect(initialBox).not.toBeNull();
-    const initialX = initialBox!.x;
-    const initialY = initialBox!.y;
-
-    // Drag node by +120px X and +60px Y
-    await page.mouse.move(initialX + 30, initialY + 30);
-    await page.mouse.down();
-    await page.mouse.move(initialX + 150, initialY + 90, { steps: 10 });
-    await page.mouse.up();
-
-    await page.waitForTimeout(300);
-
-    const movedBox = await checkoutNode.boundingBox();
-    expect(movedBox).not.toBeNull();
-    expect(movedBox!.x).toBeGreaterThan(initialX + 50);
-
-    // Verify save status shows Saved
+    await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('Renamed Fullstack System');
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
-    // Undo -> back to original position
-    const undoBtn = page.getByTestId('topbar-undo-btn');
-    await expect(undoBtn).toBeEnabled();
-    await undoBtn.click();
-    await expect(page.getByTestId('save-status')).toContainText('Saved');
-
-    const undoneBox = await checkoutNode.boundingBox();
-    expect(undoneBox).not.toBeNull();
-    expect(Math.abs(undoneBox!.x - initialX)).toBeLessThan(15);
-
-    // Redo -> forward to moved position
-    const redoBtn = page.getByTestId('topbar-redo-btn');
-    await expect(redoBtn).toBeEnabled();
-    await redoBtn.click();
-    await expect(page.getByTestId('save-status')).toContainText('Saved');
-
-    const redoneBox = await checkoutNode.boundingBox();
-    expect(redoneBox).not.toBeNull();
-    expect(redoneBox!.x).toBeGreaterThan(initialX + 50);
-
-    // 4. Reload -> each listed project shows its open branches (main and draft)
+    // Reload returns to the entry screen (session state is in-memory only);
+    // the rename is durable there.
     await page.reload();
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+    const renamedItem = page
+      .getByTestId('existing-projects-list')
+      .locator('[data-testid^="project-item-"]', { hasText: 'Renamed Fullstack System' });
+    await expect(renamedItem).toBeVisible();
+    await renamedItem.getByRole('button', { name: 'Open draft' }).click();
 
-    // S01 Checkout project is listed under existing projects
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('Renamed Fullstack System');
+    // Let the mount-time camera fit (fitView prop + the 50ms fit effect,
+    // both clamped to maxZoom 1) settle before reading node positions below.
+    await page.waitForTimeout(400);
+
+    // 4. Branch popover lists main + draft, and switching works
+    await page.getByTestId('breadcrumb-branch-btn').click();
+    await expect(page.getByTestId('branch-popover')).toBeVisible();
+    await expect(page.getByTestId('branch-current-row')).toBeVisible();
+    const switchList = page.getByTestId('branch-switch-list');
+    await expect(switchList).toBeVisible();
+    await expect(switchList.getByText('main')).toBeVisible();
+
+    const mainSwitchBtn = switchList.locator('[data-testid^="branch-switch-"]', { hasText: 'main' });
+    await mainSwitchBtn.click();
+
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+
+    // 5. Drag a node while on main -> D40 auto-drafts a new branch; main unchanged
+    const node = page.locator('.component-node').first();
+    await expect(node).toBeVisible();
+    const initialBox = await node.boundingBox();
+    expect(initialBox).not.toBeNull();
+
+    await page.mouse.move(initialBox!.x + 30, initialBox!.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(initialBox!.x + 140, initialBox!.y + 90, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+    await expect(page.getByTestId('breadcrumb-branch-btn')).toContainText('Draft from main');
+    await expect(page.getByTestId('save-status')).toContainText('Saved');
+
+    // Back to projects (via project menu "All projects"), reopen main -> unchanged position
+    await page.getByTestId('breadcrumb-project-btn').click();
+    await page.getByTestId('project-menu-all-projects').click();
+    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+
     const projectList = page.getByTestId('existing-projects-list');
-    await expect(projectList).toBeVisible();
-    await expect(projectList.getByText('S01 Checkout')).toBeVisible();
-
-    const s01Item = projectList.locator('[data-testid^="project-item-"]', { hasText: 'S01 Checkout' });
-
-    // Item 1: Open main explicitly and see the original position
-    const openMainBtn = s01Item.getByRole('button', { name: 'Open main' });
+    const item = projectList.locator('[data-testid^="project-item-"]', {
+      hasText: 'Renamed Fullstack System',
+    });
+    const openMainBtn = item.getByRole('button', { name: 'Open main' });
     await expect(openMainBtn).toBeVisible();
     await openMainBtn.click();
 
-    // Workspace opens with original unedited position on main branch
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('project-title-input')).toHaveValue('S01 Checkout');
-
-    const mainCheckoutNode = page.locator('.component-node', { hasText: 'Checkout' });
-    await expect(mainCheckoutNode).toBeVisible();
-    const mainBox = await mainCheckoutNode.boundingBox();
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    // Fresh mount here (Workspace/CanvasView were unmounted while on the entry
+    // screen) -> let the camera fit settle before reading positions.
+    await page.waitForTimeout(400);
+    const mainNode = page.locator('.component-node').first();
+    const mainBox = await mainNode.boundingBox();
     expect(mainBox).not.toBeNull();
-    expect(Math.abs(mainBox!.x - initialX)).toBeLessThan(15);
+    expect(Math.abs(mainBox!.x - initialBox!.x)).toBeLessThan(15);
 
-    // Back to projects
-    await page.getByTestId('projects-back-btn').click();
-    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+    // 6. Dock: undo/redo moved off the top bar, zoom % is live, no run controls
+    await expect(page.getByTestId('topbar-undo-btn')).toHaveCount(0);
+    await expect(page.getByTestId('dock-run-btn')).toHaveCount(0);
+    const zoomValue = page.getByTestId('dock-zoom-value');
+    await expect(zoomValue).toBeVisible();
+    const initialZoomText = await zoomValue.textContent();
 
-    // Item 1: Open the draft branch explicitly and see the moved position
-    const s01ItemReloaded = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]', { hasText: 'S01 Checkout' });
-    const openDraftBtn = s01ItemReloaded.getByRole('button', { name: 'Open draft' });
-    await expect(openDraftBtn).toBeVisible();
-    await openDraftBtn.click();
+    await page.getByTestId('dock-zoom-in-btn').click();
+    await page.waitForTimeout(250);
+    const zoomedInText = await zoomValue.textContent();
+    expect(zoomedInText).not.toBe(initialZoomText);
 
-    // Workspace opens with persisted moved position on draft branch
-    await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('project-title-input')).toHaveValue('S01 Checkout');
+    await page.getByTestId('dock-zoom-out-btn').click();
+    await page.waitForTimeout(250);
 
-    const draftCheckoutNode = page.locator('.component-node', { hasText: 'Checkout' });
-    await expect(draftCheckoutNode).toBeVisible();
-    const draftBox = await draftCheckoutNode.boundingBox();
-    expect(draftBox).not.toBeNull();
-    expect(draftBox!.x).toBeGreaterThan(initialX + 50);
-
-    // 5. Create blank project -> empty-view state
-    await page.getByTestId('projects-back-btn').click();
+    // 7. Create blank project via "Open an empty canvas" -> empty-view state
+    await page.getByTestId('breadcrumb-project-btn').click();
+    await page.getByTestId('project-menu-all-projects').click();
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
 
     const blankInput = page.getByTestId('blank-project-name-input');
     await blankInput.fill('My Blank Architecture');
     await page.getByTestId('create-blank-project-btn').click();
 
-    // Lands in workspace with empty-view state
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('project-title-input')).toHaveValue('My Blank Architecture');
-    const emptyState = page.getByTestId('empty-views-state');
-    await expect(emptyState).toBeVisible();
-    await expect(emptyState).toContainText('This project has no views yet');
+    await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('My Blank Architecture');
+    await expect(page.getByTestId('empty-views-state')).toBeVisible();
 
-    // 6. Rename project
-    const titleInput = page.getByTestId('project-title-input');
-    await titleInput.click();
-    await titleInput.fill('Renamed System Architecture');
-    await titleInput.press('Enter');
-
-    await expect(page.getByTestId('save-status')).toContainText('Saved');
-    await expect(titleInput).toHaveValue('Renamed System Architecture');
-
-    // Item 8: Reload -> assert renamed title persisted in entry list and workspace
-    await page.reload();
-    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
-
-    const renamedProjectList = page.getByTestId('existing-projects-list');
-    await expect(renamedProjectList).toBeVisible();
-    await expect(renamedProjectList.getByText('Renamed System Architecture')).toBeVisible();
-
-    // Open the renamed project's draft branch explicitly
-    const renamedItem = renamedProjectList.locator('[data-testid^="project-item-"]', { hasText: 'Renamed System Architecture' });
-    const openRenamedDraftBtn = renamedItem.getByRole('button', { name: 'Open draft' });
-    await expect(openRenamedDraftBtn).toBeVisible();
-    await openRenamedDraftBtn.click();
-
-    await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('project-title-input')).toHaveValue('Renamed System Architecture');
-
-    // 7. Mobile 390x844 no horizontal scroll
+    // 8. Mobile 390x844: no horizontal scroll, dock fully visible
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
 
-    const hasHorizontalScroll = await page.evaluate(() => {
-      return (
+    const hasHorizontalScrollWorkspace = await page.evaluate(
+      () =>
         document.documentElement.scrollWidth > document.documentElement.clientWidth ||
-        document.body.scrollWidth > window.innerWidth
-      );
-    });
-    expect(hasHorizontalScroll).toBe(false);
+        document.body.scrollWidth > window.innerWidth,
+    );
+    expect(hasHorizontalScrollWorkspace).toBe(false);
 
-    // Also verify Entry screen on mobile has no horizontal scroll
-    await page.getByTestId('projects-back-btn').click();
+    await page.getByTestId('breadcrumb-project-btn').click();
+    await page.getByTestId('project-menu-all-projects').click();
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await page.waitForTimeout(300);
 
-    const entryHorizontalScroll = await page.evaluate(() => {
-      return (
+    const hasHorizontalScrollEntry = await page.evaluate(
+      () =>
         document.documentElement.scrollWidth > document.documentElement.clientWidth ||
-        document.body.scrollWidth > window.innerWidth
-      );
-    });
-    expect(entryHorizontalScroll).toBe(false);
+        document.body.scrollWidth > window.innerWidth,
+    );
+    expect(hasHorizontalScrollEntry).toBe(false);
   });
 
-  test('the S05 workspace at 1512x982 has every placed node fully inside the canvas viewport after open, and at 390x844 every dock button is within the viewport', async ({
+  test('the S05 workspace at 1512x982 has every placed node inside the canvas, and at 390x844 the whole dock is visible with 44px touch targets', async ({
     page,
   }) => {
-    // 1. Desktop 1512x982: every placed node is fully inside the canvas viewport after open
     await page.setViewportSize({ width: 1512, height: 982 });
     await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
@@ -203,7 +177,6 @@ test.describe('Studio Shell E2E', () => {
     await s05CreateBtn.click();
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('project-title-input')).toHaveValue('S05 Fullstack');
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
     const canvasContainer = page.getByTestId('canvas-container');
@@ -211,11 +184,8 @@ test.describe('Studio Shell E2E', () => {
     const canvasBox = await canvasContainer.boundingBox();
     expect(canvasBox).not.toBeNull();
 
-    // S05 has 9 placed nodes
     const nodes = page.locator('.component-node');
     await expect(nodes).toHaveCount(9);
-
-    // Wait briefly for ReactFlow fitView to settle
     await page.waitForTimeout(400);
 
     for (let i = 0; i < 9; i++) {
@@ -223,40 +193,46 @@ test.describe('Studio Shell E2E', () => {
       await expect(node).toBeVisible();
       const nodeBox = await node.boundingBox();
       expect(nodeBox).not.toBeNull();
-      // Fully inside canvas viewport
       expect(nodeBox!.x).toBeGreaterThanOrEqual(canvasBox!.x);
       expect(nodeBox!.y).toBeGreaterThanOrEqual(canvasBox!.y);
       expect(nodeBox!.x + nodeBox!.width).toBeLessThanOrEqual(canvasBox!.x + canvasBox!.width);
       expect(nodeBox!.y + nodeBox!.height).toBeLessThanOrEqual(canvasBox!.y + canvasBox!.height);
     }
 
-    // 2. Mobile 390x844: every dock button is within the viewport
+    // Node card shows a kind icon + real-config caption (never p99/pressure)
+    const firstCaption = page.locator('[data-testid^="node-caption-"]').first();
+    await expect(firstCaption).toBeVisible();
+    const captionText = (await firstCaption.textContent()) ?? '';
+    expect(captionText).not.toMatch(/p99|p95|pressure|headroom/i);
+
+    // 16A dock: D38 inventory only (no Component/Connect/Note/More/run controls)
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
 
     const dockBtnTestIds = [
-      'dock-select-btn',
-      'dock-pan-btn',
       'dock-undo-btn',
       'dock-redo-btn',
+      'dock-select-btn',
+      'dock-pan-btn',
       'dock-zoom-out-btn',
       'dock-zoom-in-btn',
       'dock-fit-view-btn',
-      'dock-run-btn',
-      'dock-pause-btn',
-      'dock-reset-btn',
     ];
 
     for (const testId of dockBtnTestIds) {
       const btn = page.getByTestId(testId);
       await expect(btn).toBeVisible();
-      const btnBox = await btn.boundingBox();
-      expect(btnBox).not.toBeNull();
-      // Bounding box within viewport 390x844
-      expect(btnBox!.x).toBeGreaterThanOrEqual(0);
-      expect(btnBox!.y).toBeGreaterThanOrEqual(0);
-      expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(390);
-      expect(btnBox!.y + btnBox!.height).toBeLessThanOrEqual(844);
+      const box = await btn.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+      expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+      // 44px touch targets on mobile
+      expect(box!.height).toBeGreaterThanOrEqual(43);
     }
+
+    await expect(page.getByTestId('dock-zoom-value')).toBeVisible();
+    await expect(page.getByTestId('canvas-floating-dock')).toBeVisible();
   });
 });

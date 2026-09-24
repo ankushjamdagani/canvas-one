@@ -6,6 +6,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useViewport,
   type Node,
   type Edge,
   type OnNodeDrag,
@@ -15,6 +16,7 @@ import type { Document, Id } from '../../domain/studio/model';
 import { NodeCard } from './NodeCard';
 import { GroupNode } from './GroupNode';
 import { NoteNode } from './NoteNode';
+import { TrafficEdge } from './TrafficEdge';
 import { FloatingDock } from './FloatingDock';
 import {
   projectDocumentToCanvas,
@@ -25,6 +27,10 @@ const nodeTypes = {
   elementNode: NodeCard,
   groupNode: GroupNode,
   noteNode: NoteNode,
+};
+
+const edgeTypes = {
+  traffic: TrafficEdge,
 };
 
 export interface CanvasViewProps {
@@ -54,6 +60,7 @@ function CanvasFlowInner({
 }: CanvasViewProps) {
   const [dragMode, setDragMode] = React.useState<'select' | 'pan'>('select');
   const reactFlow = useReactFlow();
+  const { zoom } = useViewport();
 
   const projection = React.useMemo(() => {
     return projectDocumentToCanvas(document, activeViewId);
@@ -128,6 +135,14 @@ function CanvasFlowInner({
   // Camera fitting per requirement 3:
   // Fit the view (32 px padding, zoom clamp 0.1–2) when a document/view is first shown
   // and when switching views; never re-fit after a drag or undo/redo.
+  //
+  // Review round 1: the automatic open/view-switch fit must never zoom IN past
+  // 100% for a small diagram (screens show 100%, not 161%) — so this one caps
+  // at maxZoom 1, a narrower clamp than the contract's general 0.1–2 (lead
+  // reading: the contract clamp bounds what a user-driven zoom gesture may
+  // reach, not what the camera should assume on a passive open). The Fit
+  // *button* (handleFitView above) is a deliberate user gesture and keeps the
+  // full 0.1–2 contract clamp.
   const lastFittedKeyRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
@@ -142,7 +157,7 @@ function CanvasFlowInner({
         reactFlow.fitView({
           padding: '32px',
           minZoom: 0.1,
-          maxZoom: 2.0,
+          maxZoom: 1,
           duration: 0,
         });
       }, 50);
@@ -219,6 +234,7 @@ function CanvasFlowInner({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={handleNodeDragStop}
@@ -233,7 +249,12 @@ function CanvasFlowInner({
         fitViewOptions={{
           padding: '32px',
           minZoom: 0.1,
-          maxZoom: 2.0,
+          // Mount-time auto-fit is passive, not a user zoom gesture: cap at
+          // 100% so a small diagram never opens zoomed in past 1x (matches
+          // the maxZoom:1 effect below; the viewport's own maxZoom={2.0}
+          // above still bounds user-driven zoom/pan gestures per the 0.1–2
+          // contract clamp).
+          maxZoom: 1,
         }}
         proOptions={{ hideAttribution: true }}
         className="system-canvas bg-canvas"
@@ -253,6 +274,7 @@ function CanvasFlowInner({
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onFitView={handleFitView}
+        zoom={zoom}
       />
     </div>
   );
