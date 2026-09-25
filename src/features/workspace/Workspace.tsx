@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
 import { TopBar } from './TopBar';
-import { CanvasView } from './CanvasView';
+import { CanvasView, type CanvasSelectionRequest } from './CanvasView';
 import { buildMoveChange } from './projection';
 import type {
   BranchRecord,
@@ -25,6 +25,35 @@ import {
   resolveSelectedScenarioId,
   writeScenarioSelection,
 } from './runWiring';
+import {
+  applyDraft,
+  cancelDraft,
+  changeField as changeDraftField,
+  decideNavigation,
+  InspectorPanel,
+  NavigationGuardDialog,
+  openDraft,
+  RUN_DISABLED_DIRTY_DRAFT_REASON,
+  selectMeasuredSection,
+  type DraftHandle,
+  type DraftSession,
+  type DraftTarget,
+} from '../inspector';
+
+const MOBILE_BREAKPOINT_PX = 768;
+
+function useViewportWidth(): number {
+  const [width, setWidth] = React.useState<number>(() =>
+    typeof window === 'undefined' ? 1280 : window.innerWidth,
+  );
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
+}
 
 export interface WorkspaceProps {
   session: SessionController;
@@ -92,6 +121,172 @@ export function Workspace({
       setActiveViewId(document.views[0].id);
     }
   }, [document, activeViewId]);
+
+  // ==========================================================================
+  // RV-05b: inspector (2A workspace) draft + navigation guard
+  // ==========================================================================
+
+  const viewportWidth = useViewportWidth();
+  const isMobileInspector = viewportWidth < MOBILE_BREAKPOINT_PX;
+
+  const [draft, setDraft] = React.useState<DraftHandle | null>(null);
+  const [focusFieldId, setFocusFieldId] = React.useState<string | null>(null);
+  const [guardOpen, setGuardOpen] = React.useState(false);
+  const [guardApplying, setGuardApplying] = React.useState(false);
+  const pendingActionRef = React.useRef<(() => void) | null>(null);
+
+  const draftSession: DraftSession = React.useMemo(
+    () => ({
+      getState: () => {
+        const s = session.getState();
+        return { workingRevision: s.workingRevision, document: s.document };
+      },
+      apply: async (changes, label) => {
+        const result = await session.apply(changes, label);
+        if (result.status === 'busy' || result.status === 'unsupported') {
+          return { status: 'failed', code: 'unavailable', issues: [] };
+        }
+        return result;
+      },
+    }),
+    [session],
+  );
+
+  /**
+   * commands.md §6 "Navigation guard": clean -> proceed; dirty -> Apply / Discard /
+   * Stay. Every selection change, empty-canvas click, branch/project switch and
+   * inspector close routes through this before touching anything.
+   */
+  const runGuarded = React.useCallback(
+    (action: () => void) => {
+      if (decideNavigation(draft) === 'proceed') {
+        action();
+        return;
+      }
+      pendingActionRef.current = action;
+      setGuardOpen(true);
+    },
+    [draft],
+  );
+
+  const openInspectorFor = React.useCallback(
+    (target: DraftTarget) => {
+      if (!document || sessionState.workingRevision === null) return;
+      const handle = openDraft(mintId(), target, sessionState.workingRevision, document);
+      setDraft(handle);
+      setFocusFieldId(null);
+    },
+    [document, sessionState.workingRevision, mintId],
+  );
+
+  const closeInspector = React.useCallback(() => {
+    setDraft(null);
+    setFocusFieldId(null);
+  }, []);
+
+  const handleRequestSelection = React.useCallback(
+    (request: CanvasSelectionRequest) => {
+      const nextTarget: DraftTarget =
+        request.additive && draft && draft.target.kind === request.kind
+          ? {
+              kind: request.kind,
+              ids: draft.target.ids.includes(request.id)
+                ? draft.target.ids.filter((id) => id !== request.id)
+                : [...draft.target.ids, request.id],
+            }
+          : { kind: request.kind, ids: [request.id] };
+
+      if (
+        !request.additive &&
+        draft &&
+        draft.target.kind === nextTarget.kind &&
+        draft.target.ids.length === 1 &&
+        draft.target.ids[0] === nextTarget.ids[0]
+      ) {
+        return; // already the open target -- keep editing, don't reopen
+      }
+
+      if (nextTarget.ids.length === 0) {
+        runGuarded(closeInspector);
+        return;
+      }
+
+      runGuarded(() => openInspectorFor(nextTarget));
+    },
+    [draft, runGuarded, openInspectorFor, closeInspector],
+  );
+
+  const handleRequestClearSelection = React.useCallback(() => {
+    if (!draft) return;
+    runGuarded(closeInspector);
+  }, [draft, runGuarded, closeInspector]);
+
+  const handleChangeField = React.useCallback((fieldId: string, raw: string) => {
+    setDraft((prev) => (prev ? changeDraftField(prev, fieldId, raw) : prev));
+  }, []);
+
+  const handleApplyDraft = React.useCallback(async () => {
+    if (!draft) return;
+    const result = await applyDraft(draft, draftSession);
+    setDraft(result.handle);
+    setFocusFieldId(result.firstInvalidFieldId);
+  }, [draft, draftSession]);
+
+  const handleCancelDraft = React.useCallback(() => {
+    setDraft((prev) => (prev ? cancelDraft(prev) : prev));
+    setFocusFieldId(null);
+  }, []);
+
+  const handleCloseInspector = React.useCallback(() => {
+    runGuarded(closeInspector);
+  }, [runGuarded, closeInspector]);
+
+  const handleGuardStay = React.useCallback(() => {
+    pendingActionRef.current = null;
+    setGuardOpen(false);
+  }, []);
+
+  const handleGuardDiscard = React.useCallback(() => {
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    setGuardOpen(false);
+    setDraft(null);
+    setFocusFieldId(null);
+    action?.();
+  }, []);
+
+  const handleGuardApply = React.useCallback(async () => {
+    if (!draft) {
+      setGuardOpen(false);
+      return;
+    }
+    setGuardApplying(true);
+    const result = await applyDraft(draft, draftSession);
+    setGuardApplying(false);
+    if (result.handle.status === 'clean') {
+      const action = pendingActionRef.current;
+      pendingActionRef.current = null;
+      setGuardOpen(false);
+      setDraft(null);
+      setFocusFieldId(null);
+      action?.();
+    } else {
+      // Apply failed: stay on the inspector with the error surfaced, per
+      // commands.md §6 ("Apply proceeds only on success").
+      setGuardOpen(false);
+      setDraft(result.handle);
+      setFocusFieldId(result.firstInvalidFieldId);
+    }
+  }, [draft, draftSession]);
+
+  const selectedElementIds = React.useMemo(
+    () => new Set(draft && draft.target.kind === 'element' ? draft.target.ids : []),
+    [draft],
+  );
+  const selectedConnectionIds = React.useMemo(
+    () => new Set(draft && draft.target.kind === 'connection' ? draft.target.ids : []),
+    [draft],
+  );
 
   // ==========================================================================
   // RV-12d: run lane wiring
@@ -264,10 +459,12 @@ export function Workspace({
     [scenariosWithStatus],
   );
 
-  const sessionRunDisabledReason = computeSessionRunDisabledReason(
-    sessionState.status,
-    sessionState.needsReload,
-  );
+  // D25 / commands.md §6: Run is disabled while a configuration draft is dirty,
+  // with this exact reason -- checked ahead of the session's own busy reasons.
+  const sessionRunDisabledReason =
+    draft?.dirty
+      ? RUN_DISABLED_DIRTY_DRAFT_REASON
+      : computeSessionRunDisabledReason(sessionState.status, sessionState.needsReload);
 
   const runControlSlot = (
     <ScenarioRunControl
@@ -304,6 +501,17 @@ export function Workspace({
     const targetId = runningId ?? selectedScenarioId;
     return scenariosWithStatus.find((s) => s.scenario.id === targetId)?.scenario ?? null;
   }, [runControllerState, selectedScenarioId, scenariosWithStatus]);
+
+  // RV-05b MEASURED · LAST RUN: only for an element target, from the latest saved
+  // run of the currently selected scenario (already exposed by loadScenarioStatuses
+  // as ScenarioWithStatus.latestRun -- no separate runs-lane lookup needed).
+  const measuredSection = React.useMemo(() => {
+    if (!draft || draft.multi || draft.missing || draft.target.kind !== 'element') return null;
+    const elementId = draft.target.ids[0];
+    const selected = scenariosWithStatus.find((s) => s.scenario.id === selectedScenarioId) ?? null;
+    if (!selected) return selectMeasuredSection(elementId, null, 'this scenario', 'timed');
+    return selectMeasuredSection(elementId, selected.latestRun, selected.scenario.label, selected.scenario.mode);
+  }, [draft, scenariosWithStatus, selectedScenarioId]);
 
   // RV-12d review round 1: every check's assertion label, looked up from the
   // scenario that ran (never the raw assertionId) so ResultsRegion can show
@@ -425,10 +633,33 @@ export function Workspace({
   const handleSwitchBranch = React.useCallback(
     (branchId: string) => {
       if (!sessionState.projectId || isSaving) return;
-      void session.openProject(sessionState.projectId, branchId);
+      runGuarded(() => {
+        void session.openProject(sessionState.projectId as string, branchId);
+      });
     },
-    [session, sessionState.projectId, isSaving],
+    [session, sessionState.projectId, isSaving, runGuarded],
   );
+
+  const handleBackToProjects = React.useCallback(() => {
+    runGuarded(onBackToProjects);
+  }, [runGuarded, onBackToProjects]);
+
+  // Escape closes an overlay first, never a dirty draft directly (commands.md §6).
+  // The guard dialog is itself a shadcn Dialog and handles its own Escape (-> Stay).
+  // With no overlay open, Escape on a clean inspector closes it; a dirty draft is
+  // left untouched (Apply/Discard/Stay only).
+  React.useEffect(() => {
+    if (!draft) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || guardOpen) return;
+      if (!draft.dirty) {
+        e.preventDefault();
+        closeInspector();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [draft, guardOpen, closeInspector]);
 
   return (
     <div
@@ -443,7 +674,7 @@ export function Workspace({
           branchId={sessionState.branchId ?? projectRecord.mainBranchId}
           onRenameProject={handleRenameProject}
           onSwitchBranch={handleSwitchBranch}
-          onAllProjects={onBackToProjects}
+          onAllProjects={handleBackToProjects}
           saveStatusText={saveStatusText}
           isSaving={isSaving}
           hasError={hasError}
@@ -473,6 +704,10 @@ export function Workspace({
               onUndo={handleUndo}
               onRedo={handleRedo}
               onMoveNodes={handleMoveNodes}
+              selectedElementIds={selectedElementIds}
+              selectedConnectionIds={selectedConnectionIds}
+              onRequestSelection={handleRequestSelection}
+              onRequestClearSelection={handleRequestClearSelection}
             />
           </div>
 
@@ -495,7 +730,56 @@ export function Workspace({
             />
           )}
         </main>
+
+        {/* RV-05b inspector: 320px right dock >= 768px (commands.md §7); a full-width
+            bottom sheet below 768px, same content and guard. */}
+        {draft && !isMobileInspector ? (
+          <InspectorPanel
+            draft={draft}
+            measured={measuredSection}
+            onChangeField={handleChangeField}
+            onApply={() => void handleApplyDraft()}
+            onCancel={handleCancelDraft}
+            onClose={handleCloseInspector}
+            saving={draft.status === 'saving'}
+            focusFieldId={focusFieldId}
+            variant="dock"
+          />
+        ) : null}
       </div>
+
+      {draft && isMobileInspector ? (
+        <div
+          data-testid="inspector-sheet-overlay"
+          // RV-05b review round 1: an explicit h-[70vh] (not just max-h) gives the
+          // flex column below a definite height to resolve its own h-full against,
+          // and overflow-hidden makes sure the sheet itself never grows past that --
+          // the canvas stays visible above it, and InspectorPanel's own scroll
+          // region (not this wrapper) is what scrolls, leaving the Apply/Cancel
+          // footer permanently in view outside that scroll area.
+          className="fixed inset-x-0 bottom-0 z-modal h-[70vh] max-h-[70vh] overflow-hidden shadow-md rounded-t-lg border-t border-control-border"
+        >
+          <InspectorPanel
+            draft={draft}
+            measured={measuredSection}
+            onChangeField={handleChangeField}
+            onApply={() => void handleApplyDraft()}
+            onCancel={handleCancelDraft}
+            onClose={handleCloseInspector}
+            saving={draft.status === 'saving'}
+            focusFieldId={focusFieldId}
+            variant="sheet"
+          />
+        </div>
+      ) : null}
+
+      <NavigationGuardDialog
+        open={guardOpen}
+        onApply={() => void handleGuardApply()}
+        onDiscard={handleGuardDiscard}
+        onStay={handleGuardStay}
+        applying={guardApplying}
+      />
     </div>
   );
 }
