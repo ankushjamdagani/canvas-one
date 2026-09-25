@@ -9,7 +9,11 @@ import {
   useViewport,
   type Node,
   type Edge,
+  type NodeMouseHandler,
+  type EdgeMouseHandler,
   type OnNodeDrag,
+  type NodeChange,
+  type EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Document, Id } from '../../domain/studio/model';
@@ -20,8 +24,16 @@ import { TrafficEdge } from './TrafficEdge';
 import { FloatingDock } from './FloatingDock';
 import {
   projectDocumentToCanvas,
+  type ProjectedNodeData,
 } from './projection';
 import { NativeSelect } from '@/components/ui/native-select';
+import type { InspectorTargetKind } from '../inspector';
+
+export type CanvasSelectionRequest = {
+  readonly kind: InspectorTargetKind;
+  readonly id: Id;
+  readonly additive: boolean;
+};
 
 const nodeTypes = {
   elementNode: NodeCard,
@@ -45,6 +57,14 @@ export interface CanvasViewProps {
   onMoveNodes: (
     movedNodes: Array<{ id: string; position: { x: number; y: number } }>,
   ) => Promise<boolean>;
+  /** Currently selected element ids (inspector target), for visual highlight only. */
+  selectedElementIds?: ReadonlySet<Id>;
+  /** Currently selected connection ids (inspector target), for visual highlight only. */
+  selectedConnectionIds?: ReadonlySet<Id>;
+  /** A node/edge was clicked -- the caller (Workspace) runs the navigation guard. */
+  onRequestSelection?: (request: CanvasSelectionRequest) => void;
+  /** Empty canvas was clicked -- clears selection through the guard. */
+  onRequestClearSelection?: () => void;
 }
 
 function CanvasFlowInner({
@@ -57,6 +77,10 @@ function CanvasFlowInner({
   onUndo,
   onRedo,
   onMoveNodes,
+  selectedElementIds,
+  selectedConnectionIds,
+  onRequestSelection,
+  onRequestClearSelection,
 }: CanvasViewProps) {
   const [dragMode, setDragMode] = React.useState<'select' | 'pan'>('select');
   const reactFlow = useReactFlow();
@@ -66,11 +90,29 @@ function CanvasFlowInner({
     return projectDocumentToCanvas(document, activeViewId);
   }, [document, activeViewId]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node>(
     projection.nodes as unknown as Node[],
   );
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>(
     projection.edges as unknown as Edge[],
+  );
+
+  // Selection is owned by the inspector's navigation guard (Workspace), not by
+  // ReactFlow's own click-selection: 'select' changes are dropped here and the
+  // `selected` flag is instead derived below from selectedElementIds /
+  // selectedConnectionIds, which only change once the guard has approved the
+  // navigation (commands.md §6: "the guard runs before any change").
+  const onNodesChange = React.useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChangeRaw(changes.filter((c) => c.type !== 'select'));
+    },
+    [onNodesChangeRaw],
+  );
+  const onEdgesChange = React.useCallback(
+    (changes: EdgeChange[]) => {
+      onEdgesChangeRaw(changes.filter((c) => c.type !== 'select'));
+    },
+    [onEdgesChangeRaw],
   );
 
   // Sync projected nodes and edges when document or activeViewId changes
@@ -78,6 +120,49 @@ function CanvasFlowInner({
     setNodes(projection.nodes as unknown as Node[]);
     setEdges(projection.edges as unknown as Edge[]);
   }, [projection, setNodes, setEdges]);
+
+  const displayNodes = React.useMemo(
+    () =>
+      nodes.map((n) => {
+        const data = n.data as unknown as ProjectedNodeData;
+        const selected = data.kind === 'element' ? Boolean(selectedElementIds?.has(data.element.id)) : false;
+        return selected === n.selected ? n : { ...n, selected };
+      }),
+    [nodes, selectedElementIds],
+  );
+
+  const displayEdges = React.useMemo(
+    () =>
+      edges.map((e) => {
+        const data = e.data as { connection?: { id: string } } | undefined;
+        const connId = data?.connection?.id;
+        const selected = connId ? Boolean(selectedConnectionIds?.has(connId)) : false;
+        return selected === e.selected ? e : { ...e, selected };
+      }),
+    [edges, selectedConnectionIds],
+  );
+
+  const handleNodeClick: NodeMouseHandler = React.useCallback(
+    (event, node) => {
+      const data = node.data as unknown as ProjectedNodeData;
+      if (data.kind !== 'element') return;
+      onRequestSelection?.({ kind: 'element', id: data.element.id, additive: event.shiftKey });
+    },
+    [onRequestSelection],
+  );
+
+  const handleEdgeClick: EdgeMouseHandler = React.useCallback(
+    (event, edge) => {
+      const data = edge.data as { connection?: { id: string } } | undefined;
+      if (!data?.connection?.id) return;
+      onRequestSelection?.({ kind: 'connection', id: data.connection.id, additive: event.shiftKey });
+    },
+    [onRequestSelection],
+  );
+
+  const handlePaneClick = React.useCallback(() => {
+    onRequestClearSelection?.();
+  }, [onRequestClearSelection]);
 
   // Node drag end handler:
   // Identify nodes by node.type (not string prefixes on IDs)
@@ -231,13 +316,16 @@ function CanvasFlowInner({
       )}
 
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={displayNodes}
+        edges={displayEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={handleNodeDragStop}
+        onNodeClick={handleNodeClick}
+        onEdgeClick={handleEdgeClick}
+        onPaneClick={handlePaneClick}
         nodesDraggable={!isSaving}
         nodesConnectable={false}
         panOnDrag={dragMode === 'pan'}

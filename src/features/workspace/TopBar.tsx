@@ -106,7 +106,7 @@ export function TopBar({
         {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] */}
         <div
           data-testid="breadcrumb-chip"
-          className="flex items-center gap-1.5 min-w-0 rounded-control border border-control-border bg-panel pl-2 pr-1.5 h-7"
+          className="flex items-center gap-1 sm:gap-1.5 min-w-0 rounded-control border border-control-border bg-panel pl-2 pr-1.5 h-7 overflow-hidden"
         >
           {isRenaming ? (
             <Input
@@ -139,7 +139,12 @@ export function TopBar({
               <button
                 type="button"
                 data-testid="breadcrumb-project-btn"
-                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate max-w-[120px] sm:max-w-[220px]"
+                // RV-05b review round 1: min-w-[6ch] keeps at least ~6 characters of
+                // the project name visible (ellipsis included) on narrow widths --
+                // without it, this flex child could shrink past its truncate ellipsis
+                // down to a single character as the branch chip and badge (both
+                // shrink-0) claimed the rest of the breadcrumb's width.
+                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate min-w-[6ch] max-w-[120px] sm:max-w-[220px] shrink"
                 title={project.title}
               >
                 {project.title}
@@ -147,7 +152,10 @@ export function TopBar({
             </ProjectMenu>
           )}
 
-          <span className="text-secondary-text text-xs select-none" aria-hidden="true">
+          {/* RV-05b review round 1: dropped below sm along with the chevron so a
+              390px top bar has room for the project name, the branch icon and the
+              MAIN/DRAFT badge without any of them getting clipped. */}
+          <span className="hidden sm:inline text-secondary-text text-xs select-none shrink-0" aria-hidden="true">
             /
           </span>
 
@@ -160,10 +168,14 @@ export function TopBar({
             <button
               type="button"
               data-testid="breadcrumb-branch-btn"
-              className="flex items-center gap-1 min-w-0"
+              className="flex items-center gap-1 min-w-0 shrink-0"
+              title={branchLabel}
             >
               <GitBranch size={12} className="text-branch shrink-0" />
-              <span className="text-xs font-semibold text-branch truncate max-w-[110px] sm:max-w-[180px]">
+              {/* RV-05b review round 1: the branch label text drops below sm so the
+                  project name keeps its room on a narrow top bar; the icon plus the
+                  MAIN/DRAFT badge still identify the branch. */}
+              <span className="hidden sm:inline text-xs font-semibold text-branch truncate max-w-[110px] sm:max-w-[180px]">
                 {branchLabel}
               </span>
             </button>
@@ -172,12 +184,12 @@ export function TopBar({
           <Badge
             data-testid="breadcrumb-branch-state"
             variant="risk"
-            className="text-[9px] px-1 py-0 h-4 shrink-0 normal-case"
+            className="text-[9px] px-1 sm:px-1 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
           >
             {isMainBranch ? 'MAIN' : 'DRAFT'}
           </Badge>
 
-          <ChevronDown size={12} className="text-secondary-text shrink-0" aria-hidden="true" />
+          <ChevronDown size={12} className="hidden sm:block text-secondary-text shrink-0" aria-hidden="true" />
         </div>
 
         {/* Save Status */}
