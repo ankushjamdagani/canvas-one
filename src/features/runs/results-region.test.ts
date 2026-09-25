@@ -23,6 +23,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
         terminal: unmeasuredTerminal,
         isExpanded: true,
         elementLabels: {},
+        assertionLabels: {},
       }),
     );
 
@@ -46,6 +47,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
         terminal: null,
         isExpanded: true,
         elementLabels: {},
+        assertionLabels: {},
       }),
     );
 
@@ -103,6 +105,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
         runPhase: 'done',
         terminal: measuredTerminal,
         elementLabels: elementLabels,
+        assertionLabels: {},
         isExpanded: true,
       }),
     );
@@ -114,5 +117,124 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     // Now test Components tab rendering
     // Components table should show Payment Service instead of raw elem-service-1, and NEVER fake 'Global'
     expect(generalHtml).not.toContain('Global');
+  });
+
+  it('RV-12d review round 1: checks list shows the assertion label, never the raw assertionId', () => {
+    const measuredTerminal: TerminalResult = {
+      status: 'completed',
+      checks: [
+        { assertionId: 'a1', status: 'passed', actual: true, reason: null },
+        { assertionId: 'a2', status: 'failed', actual: false, reason: 'mismatch' },
+      ],
+      summary: createEmptySummary('logical'),
+      reason: null,
+      measured: true,
+    };
+
+    const html = renderToStaticMarkup(
+      React.createElement(ResultsRegion, {
+        scenarioName: 'Order Flow',
+        scenarioMode: 'logical',
+        runPhase: 'done',
+        terminal: measuredTerminal,
+        elementLabels: {},
+        assertionLabels: { a1: 'Cart total matches' },
+        isExpanded: true,
+      }),
+    );
+
+    expect(html).toContain('Cart total matches');
+    expect(html).not.toContain('Assertion a1');
+    expect(html).not.toContain('Assertion a2');
+    // a2 has no entry in assertionLabels -> "Unlabelled check", never the raw id.
+    expect(html).toContain('Unlabelled check');
+  });
+
+  it('RV-12d review round 1: event log shows modeled time or step number, element label, kind and outcome — never a raw element id', () => {
+    const measuredTerminal: TerminalResult = {
+      status: 'completed',
+      checks: [],
+      summary: createEmptySummary('timed'),
+      reason: null,
+      measured: true,
+    };
+
+    const html = renderToStaticMarkup(
+      React.createElement(ResultsRegion, {
+        scenarioName: 'Order Flow',
+        scenarioMode: 'timed',
+        runPhase: 'done',
+        terminal: measuredTerminal,
+        elementLabels: { 'elem-1': 'Payment Service' },
+        assertionLabels: {},
+        isExpanded: true,
+        events: [
+          {
+            id: 'evt-1',
+            sequence: 1,
+            rootId: 'root-1',
+            journeyId: 'journey-1',
+            parentId: null,
+            elementId: 'elem-1',
+            portId: null,
+            kind: 'dispatch',
+            code: 'request.sent',
+            payloadRef: null,
+            atMs: 1500,
+            outcome: 'succeeded',
+          },
+        ],
+      }),
+    );
+
+    expect(html).toContain('1.5 s');
+    expect(html).toContain('Payment Service');
+    expect(html).toContain('request.sent');
+    expect(html).toContain('dispatch');
+    expect(html).toContain('succeeded');
+    expect(html).not.toContain('elem-1');
+    expect(html).not.toContain('0 events recorded');
+    expect(html).toContain('1 events recorded');
+  });
+
+  it('RV-12d review round 1: logical-run events (no atMs) show a step number instead of a fabricated time', () => {
+    const measuredTerminal: TerminalResult = {
+      status: 'completed',
+      checks: [],
+      summary: createEmptySummary('logical'),
+      reason: null,
+      measured: true,
+    };
+
+    const html = renderToStaticMarkup(
+      React.createElement(ResultsRegion, {
+        scenarioName: 'Order Flow',
+        scenarioMode: 'logical',
+        runPhase: 'done',
+        terminal: measuredTerminal,
+        elementLabels: {},
+        assertionLabels: {},
+        isExpanded: true,
+        events: [
+          {
+            id: 'evt-1',
+            sequence: 3,
+            rootId: 'root-1',
+            journeyId: 'journey-1',
+            parentId: null,
+            elementId: 'elem-unlabeled',
+            portId: null,
+            kind: 'state',
+            code: 'step.advanced',
+            payloadRef: null,
+            atMs: null,
+            outcome: null,
+          },
+        ],
+      }),
+    );
+
+    expect(html).toContain('#3');
+    expect(html).not.toContain('null s');
   });
 });

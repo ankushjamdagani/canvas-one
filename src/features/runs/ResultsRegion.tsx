@@ -61,7 +61,23 @@ export interface ResultsRegionProps {
   readonly onToggleExpanded?: () => void;
   /** Required: every element referenced by a metric or event must resolve to a label. Raw ids are never shown. */
   readonly elementLabels: Record<Id, string>;
+  /**
+   * RV-12d review round 1: every check's assertion label, looked up by the
+   * caller from the scenario that ran (assertionId -> Assertion.label).
+   * Required alongside elementLabels for the same reason: a check's raw
+   * assertionId is never shown, only "Unlabelled check" when a label is
+   * missing (e.g. the assertion was deleted after the run that references it).
+   */
+  readonly assertionLabels: Record<Id, string>;
   readonly measured?: boolean;
+  /**
+   * RV-12d: true when the session's working snapshot has moved on since this run
+   * started (e.g. a canvas layout edit after the run completed). Shown as "Ran on
+   * an earlier version" next to the status; the caller decides staleness (view
+   * layout edits are presentation-only per run-identity.md and don't change the
+   * scenario fingerprint, but the run was still against an earlier snapshot).
+   */
+  readonly staleRun?: boolean;
 }
 
 // ============================================================================
@@ -82,7 +98,9 @@ export function ResultsRegion({
   isExpanded: controlledExpanded,
   onToggleExpanded,
   elementLabels,
+  assertionLabels,
   measured: controlledMeasured,
+  staleRun = false,
 }: ResultsRegionProps) {
   const [internalExpanded, setInternalExpanded] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<'general' | 'components'>('general');
@@ -133,6 +151,7 @@ export function ResultsRegion({
 
   return (
     <footer
+      data-testid="results-region"
       className="relative flex flex-col border-t border-divider bg-shell w-full text-foreground select-none"
       role="region"
       aria-label="Simulation results and telemetry"
@@ -159,6 +178,7 @@ export function ResultsRegion({
         {/* Left Side: Status Dot + Run Badge */}
         <div className="flex items-center gap-3 shrink-0">
           <div
+            data-testid="results-status-badge"
             className="flex items-center gap-2"
             aria-live="polite"
             aria-atomic="true"
@@ -173,6 +193,14 @@ export function ResultsRegion({
             {terminal && !isMeasured && terminal.reason && (
               <span className="text-secondary-text text-xs font-mono">
                 — {terminal.reason}
+              </span>
+            )}
+            {terminal && staleRun && (
+              <span
+                data-testid="results-stale-notice"
+                className="text-secondary-text text-xs font-mono"
+              >
+                · Ran on an earlier version
               </span>
             )}
           </div>
@@ -260,6 +288,7 @@ export function ResultsRegion({
           {/* Details Button */}
           <button
             type="button"
+            data-testid="results-details-toggle"
             onClick={toggleExpanded}
             className="inline-flex items-center gap-1 px-3 py-1 rounded-control border border-control-border bg-background hover:bg-sunken text-xs font-medium cursor-pointer transition-colors"
             aria-expanded={isExpanded}
@@ -378,7 +407,7 @@ export function ResultsRegion({
                           {isMeasured && messageCounts && (
                             <>
                               <div>
-                                <span className="text-secondary-text">Messages succ: </span>
+                                <span className="text-secondary-text">Messages succeeded: </span>
                                 <span className="font-mono font-medium">
                                   {messageCounts.succeeded}
                                 </span>
@@ -439,7 +468,7 @@ export function ResultsRegion({
                                 )}
                                 <div className="min-w-0">
                                   <div className="font-medium text-foreground truncate">
-                                    Assertion {check.assertionId} · {check.status}
+                                    {assertionLabels[check.assertionId] ?? 'Unlabelled check'} · {check.status}
                                   </div>
                                   {check.actual !== null && (
                                     <div className="text-[11px] font-mono text-secondary-text">
@@ -482,6 +511,9 @@ export function ResultsRegion({
                             >
                               <div className="flex items-center gap-2 truncate">
                                 <span className="text-secondary-text shrink-0">{timeStr}</span>
+                                <span className="text-secondary-text text-[10px] uppercase shrink-0">
+                                  {evt.kind}
+                                </span>
                                 <span className="font-medium text-foreground">{evt.code}</span>
                                 {evt.elementId && (
                                   <span className="text-secondary-text text-[10px]">

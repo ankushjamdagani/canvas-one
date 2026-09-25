@@ -8,7 +8,9 @@ import { EntryScreen } from './features/entry';
 import { Workspace } from './features/workspace';
 import { Button } from '@/components/ui/button';
 
-const MINT_ID = () => crypto.randomUUID();
+// Exported so the workspace can mint the same kind of id for its RunController
+// (RV-12d: "the app's mintId") instead of defining its own.
+export const MINT_ID = () => crypto.randomUUID();
 
 function getOrCreateActorId(): string {
   try {
@@ -162,6 +164,7 @@ function StudioShell({
         session={session}
         repository={repository}
         onBackToProjects={() => setActiveScreen('entry')}
+        mintId={MINT_ID}
       />
     );
   }

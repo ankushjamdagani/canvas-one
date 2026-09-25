@@ -25,7 +25,7 @@ import {
   sortQualifyingRuns,
 } from '../../domain/versioning/eligibility';
 import type { RunCandidate } from '../../domain/versioning/types';
-import type { LocalRepository } from '../../persistence/studio/repository';
+import type { StudioRepository } from '../../persistence/studio/types';
 import {
   DEFAULT_BUILD_VERSIONS,
   type RunRecord,
@@ -155,7 +155,7 @@ export function deriveScenarioStatus(
  * Asynchronously loads and computes scenario statuses for all scenarios of a document.
  */
 export async function loadScenarioStatuses(
-  repository: LocalRepository,
+  repository: StudioRepository,
   projectId: Id,
   document: Document,
   versions: BuildManifestVersions = DEFAULT_BUILD_VERSIONS,

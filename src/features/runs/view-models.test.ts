@@ -142,7 +142,7 @@ describe('View-Model Formatters and Helpers', () => {
       expired: 0,
       inFlight: 0,
     });
-    expect(summary.rootsLabel).toBe('10 roots');
+    expect(summary.rootsLabel).toBe('10');
     expect(summary.failuresCount).toBe(2);
 
     const empty = formatRootCountsSummary(null);
