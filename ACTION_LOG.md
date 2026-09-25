@@ -1218,3 +1218,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: Catalog contract drafted by a Sonnet subagent (one review round: resource entry ports, per-route ports, worker inbound channel), then the user resolved all 12 open questions one by one (swatches shown for the three new stripe colours). Resolutions recorded at the top of `specs/revamp/contracts/catalog.md` and as D42.
 - **Platform**: Sonnet subagent (draft), Claude (review, question round).
 - **Limitations**: The §2 table rows for traffic/client/mobile/device/scheduler are superseded by resolution 12 rather than rewritten; a later edit can fold resolutions into the table.
+
+### Parallel lanes: RV-03s shell, RV-12c4 runs, RV-12d wiring
+
+- **Outcome**: Shell rebuilt to the design screens (RV-03s `cd96b8a`), run worker/controller/status/UI components (RV-12c4 `579cb4e`), and runs wired into the shell (RV-12d `70d4bd7`); UI line @ `c94f694`. The app now creates projects, edits layout, runs scenarios (one or all) in a worker, saves runs and shows derived per-scenario status and results.
+- **Platform**: Gemini (RV-12c4 build; quota hit mid-review), Sonnet subagents (RV-03s, RV-12c4 fixes, RV-12d; one Sonnet rate-limit interruption resumed); Claude review with screenshots each round.
+- **Verification**: 848 unit, `npx tsc -b`, build, production e2e 6 passed / 4 skipped (specimen dev-only).
+- **Limitations**: Scenario editing waits for the inspector (RV-05); no add/connect yet (RV-06a catalog module in progress); canvas doesn't refit when results details expand.
