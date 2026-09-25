@@ -20,7 +20,7 @@
  */
 
 import type { Document, Id } from '../../domain/studio/model';
-import type { LocalRepository } from '../../persistence/studio/repository';
+import type { StudioRepository } from '../../persistence/studio/types';
 import { mapErrorToFailedResult } from '../../persistence/studio/errors';
 import {
   mintRunStartToken,
@@ -79,6 +79,14 @@ export type RunControllerState = {
   readonly queue: readonly Id[];
   readonly current: CurrentRunState | null;
   readonly issues: readonly PrepareIssue[];
+  /**
+   * RV-12d review round 1: the bounded trace-event buffer the controller
+   * already keeps internally (buffered within trace caps, per storage.md §6),
+   * now surfaced read-only for the results UI's event log. Cleared when a new
+   * run starts and on reset(); never mutated in place (each update replaces
+   * the array so consumers can rely on reference identity for change checks).
+   */
+  readonly events: readonly TraceEvent[];
 };
 
 export type RunParams = {
@@ -98,7 +106,7 @@ export type RunAllParams = {
 };
 
 export interface RunControllerOptions {
-  readonly repository: LocalRepository;
+  readonly repository: StudioRepository;
   readonly transport: RunTransport;
   readonly mintId: () => string;
 }
@@ -108,7 +116,7 @@ export interface RunControllerOptions {
 // ============================================================================
 
 export class RunController {
-  private readonly repository: LocalRepository;
+  private readonly repository: StudioRepository;
   private readonly transport: RunTransport;
   private readonly mintId: () => string;
 
@@ -117,6 +125,7 @@ export class RunController {
     queue: [],
     current: null,
     issues: [],
+    events: [],
   };
 
   private readonly listeners = new Set<(state: RunControllerState) => void>();
@@ -300,6 +309,7 @@ export class RunController {
       queue: [],
       current: null,
       issues: [],
+      events: [],
     });
   }
 
@@ -358,6 +368,7 @@ export class RunController {
         measured: false,
       },
       issues: [],
+      events: [],
     });
 
     // 1. Request compilation in worker
@@ -485,6 +496,9 @@ export class RunController {
         if (availableSpace > 0) {
           const eventsToAdd = update.events.slice(0, availableSpace);
           this.bufferedEvents.push(...eventsToAdd);
+          // Surface a fresh array reference so subscribers relying on
+          // identity (e.g. React) see the update.
+          this.setState({ events: [...this.bufferedEvents] });
         }
         break;
       }

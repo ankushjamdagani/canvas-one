@@ -84,6 +84,14 @@ export interface ScenarioRunControlProps {
   readonly onDelete: (scenarioId: Id) => void;
 }
 
+/**
+ * D41 lists scenario.new / scenario.duplicate / scenario.edit / rename / delete as real
+ * commands, but the scenario editor (inspector dock) isn't built yet -- a stated
+ * temporary state (see RV-12d NOTES), not a missing feature. Rendered disabled with
+ * this reason rather than omitted, since the commands themselves are contracted.
+ */
+const EDITOR_NOT_BUILT_REASON = 'Scenario editing arrives with the inspector';
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -145,6 +153,7 @@ export function ScenarioRunControl({
 
   return (
     <div
+      data-testid="scenario-run-control"
       className="inline-flex items-center h-8 rounded-control border border-control-border bg-background shadow-xs overflow-hidden select-none"
       role="group"
       aria-label="Scenario and simulation run controls"
@@ -156,6 +165,7 @@ export function ScenarioRunControl({
         <PopoverTrigger asChild>
           <button
             type="button"
+            data-testid="scenario-switcher-trigger"
             className={cn(
               'h-full px-2.5 flex items-center gap-1.5 text-xs font-medium transition-colors hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring focus-visible:z-10 cursor-pointer',
               !selectedScenario && 'text-secondary-text',
@@ -198,6 +208,7 @@ export function ScenarioRunControl({
         {/* Popover Content (scenario_switcher.png)                          */}
         {/* ================================================================ */}
         <PopoverContent
+          data-testid="scenario-switcher-popover"
           className="w-80 md:w-96 p-0 bg-panel border border-control-border rounded-popover shadow-md overflow-hidden text-xs"
           align="end"
           sideOffset={4}
@@ -210,6 +221,7 @@ export function ScenarioRunControl({
             {totalScenarios > 0 && (
               <button
                 type="button"
+                data-testid="scenario-run-all-btn"
                 onClick={() => {
                   setPopoverOpen(false);
                   onRunAll();
@@ -234,6 +246,7 @@ export function ScenarioRunControl({
               return (
                 <div
                   key={s.id}
+                  data-testid={`scenario-row-${s.id}`}
                   className={cn(
                     'group flex items-start justify-between rounded-control p-2 transition-colors cursor-pointer border',
                     isSelected
@@ -280,7 +293,10 @@ export function ScenarioRunControl({
                       </div>
 
                       {/* Status subtitle */}
-                      <div className="text-[11px] text-secondary-text mt-0.5">
+                      <div
+                        data-testid={`scenario-status-${s.id}`}
+                        className="text-[11px] text-secondary-text mt-0.5"
+                      >
                         {statusToken.label}
                       </div>
                     </div>
@@ -306,21 +322,27 @@ export function ScenarioRunControl({
                       <DropdownMenuContent align="end" className="w-36 text-xs bg-panel border-control-border">
                         <DropdownMenuItem
                           onClick={() => onRename(s.id)}
-                          className="cursor-pointer gap-2"
+                          disabled
+                          title={EDITOR_NOT_BUILT_REASON}
+                          className="cursor-not-allowed gap-2"
                         >
                           <Pencil className="size-3 text-secondary-text" />
                           Rename
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => onDuplicate(s.id)}
-                          className="cursor-pointer gap-2"
+                          disabled
+                          title={EDITOR_NOT_BUILT_REASON}
+                          className="cursor-not-allowed gap-2"
                         >
                           <Copy className="size-3 text-secondary-text" />
                           Duplicate
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => onDelete(s.id)}
-                          className="cursor-pointer gap-2 text-risk-text hover:text-risk-text"
+                          disabled
+                          title={EDITOR_NOT_BUILT_REASON}
+                          className="cursor-not-allowed gap-2 text-risk-text hover:text-risk-text"
                         >
                           <Trash2 className="size-3 text-risk-text" />
                           Delete…
@@ -342,6 +364,7 @@ export function ScenarioRunControl({
           {/* Commit Requirement Banner */}
           {totalScenarios > 0 && (
             <div
+              data-testid="scenario-commit-line"
               className={cn(
                 'mx-2.5 my-1.5 p-2 rounded-md border text-[11px] flex items-center gap-2',
                 allPassing
@@ -363,7 +386,9 @@ export function ScenarioRunControl({
                 setPopoverOpen(false);
                 onNew();
               }}
-              className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors"
+              disabled
+              title={EDITOR_NOT_BUILT_REASON}
+              className="inline-flex items-center gap-1 text-secondary-text cursor-not-allowed transition-colors disabled:opacity-60"
             >
               <Plus className="size-3.5" aria-hidden="true" />
               New scenario
@@ -376,7 +401,9 @@ export function ScenarioRunControl({
                   setPopoverOpen(false);
                   onDuplicate(selectedScenario.id);
                 }}
-                className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors"
+                disabled
+                title={EDITOR_NOT_BUILT_REASON}
+                className="inline-flex items-center gap-1 text-secondary-text cursor-not-allowed transition-colors disabled:opacity-60"
               >
                 <Copy className="size-3.5" aria-hidden="true" />
                 Duplicate
@@ -390,7 +417,9 @@ export function ScenarioRunControl({
                   setPopoverOpen(false);
                   onEdit(selectedScenario.id);
                 }}
-                className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer transition-colors"
+                disabled
+                title={EDITOR_NOT_BUILT_REASON}
+                className="inline-flex items-center gap-1 text-secondary-text cursor-not-allowed transition-colors disabled:opacity-60"
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
                 Edit {selectedScenario.label}
@@ -412,6 +441,7 @@ export function ScenarioRunControl({
           {isRunning ? (
             <button
               type="button"
+              data-testid="scenario-pause-btn"
               onClick={onPause}
               className="h-full px-2.5 flex items-center gap-1 text-xs font-semibold bg-[#8A6A1F] text-white hover:opacity-90 active:opacity-100 transition-colors cursor-pointer"
               aria-label="Pause execution"
@@ -422,6 +452,7 @@ export function ScenarioRunControl({
           ) : (
             <button
               type="button"
+              data-testid="scenario-resume-btn"
               onClick={onResume}
               className="h-full px-2.5 flex items-center gap-1 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed transition-colors cursor-pointer"
               aria-label="Resume execution"
@@ -436,6 +467,7 @@ export function ScenarioRunControl({
           {/* Reset Button (strictly no Stop button per lead defaults) */}
           <button
             type="button"
+            data-testid="scenario-reset-btn"
             onClick={onReset}
             className="h-full px-2 flex items-center gap-1 text-xs font-medium text-body hover:bg-sunken hover:text-foreground transition-colors cursor-pointer"
             aria-label="Reset simulation"
@@ -453,6 +485,7 @@ export function ScenarioRunControl({
               <span className="inline-flex h-full">
                 <button
                   type="button"
+                  data-testid="scenario-run-btn"
                   disabled={isRunDisabled}
                   onClick={() => {
                     if (selectedScenario) {

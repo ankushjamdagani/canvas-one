@@ -232,6 +232,10 @@ export function calculateProgressPercent(
 /**
  * Formats root counts summary string without invented metrics.
  * Missing counts return '—' for both rootsLabel and failuresCount.
+ *
+ * RV-12d review round 1: `rootsLabel` is the bare count, not "n roots" -- the
+ * caller (ResultsRegion's "ROOTS" column) already carries the unit as its
+ * heading, so appending it again read as "ROOTS 2 roots".
  */
 export function formatRootCountsSummary(rootCounts?: Counts | null): {
   readonly rootsLabel: string;
@@ -243,7 +247,7 @@ export function formatRootCountsSummary(rootCounts?: Counts | null): {
   const totalRoots = rootCounts.generated;
   const failures = rootCounts.failed + rootCounts.rejected;
   return {
-    rootsLabel: `${totalRoots} roots`,
+    rootsLabel: `${totalRoots}`,
     failuresCount: failures,
   };
 }

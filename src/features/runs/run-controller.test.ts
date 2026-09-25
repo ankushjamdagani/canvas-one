@@ -96,6 +96,49 @@ describe('RunController (main thread)', () => {
     db.close();
   });
 
+  it('RV-12d review round 1: exposes the buffered trace events on state, clearing them on the next run and on reset', async () => {
+    const db = createStudioDatabase(`test-run-events-${crypto.randomUUID()}`);
+    const repo = new LocalRepository(db);
+    const { projectId, branchId, snapshotId } = await setupTestProject(repo);
+
+    const transport = new InProcessTransport();
+    const controller = new RunController({ repository: repo, transport, mintId: () => crypto.randomUUID() });
+
+    // Before any run, the buffer is empty (not undefined).
+    expect(controller.getState().events).toEqual([]);
+
+    await controller.run({
+      projectId,
+      branchId,
+      snapshotId,
+      document: s01Doc,
+      scenarioId: s01Doc.scenarios[0].id,
+    });
+
+    // A completed run's trace produced at least one buffered event, surfaced read-only.
+    expect(controller.getState().events.length).toBeGreaterThan(0);
+    const eventsAfterFirstRun = controller.getState().events;
+
+    // Reset clears the buffer.
+    controller.reset();
+    expect(controller.getState().events).toEqual([]);
+
+    // Starting a second run doesn't inherit the first run's events.
+    await controller.run({
+      projectId,
+      branchId,
+      snapshotId,
+      document: s01Doc,
+      scenarioId: s01Doc.scenarios[1].id,
+    });
+    const eventsAfterSecondRun = controller.getState().events;
+    expect(eventsAfterSecondRun).not.toBe(eventsAfterFirstRun);
+    expect(eventsAfterSecondRun.length).toBeGreaterThan(0);
+
+    controller.destroy();
+    db.close();
+  });
+
   it('runAll saves one run per scenario and continues after a failure', async () => {
     const db = createStudioDatabase(`test-run-all-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);

@@ -235,4 +235,42 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await expect(page.getByTestId('dock-zoom-value')).toBeVisible();
     await expect(page.getByTestId('canvas-floating-dock')).toBeVisible();
   });
+
+  test('RV-12d review round 1: edge labels that would cover a node caption are hidden by default and reveal on hover', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const s05CreateBtn = page.getByTestId('create-example-s05');
+    await expect(s05CreateBtn).toBeVisible();
+    await s05CreateBtn.click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await page.waitForTimeout(400);
+
+    const edgeGroups = page.locator('[data-testid^="edge-"]:not([data-testid^="edge-label-"])');
+    const edgeCount = await edgeGroups.count();
+    expect(edgeCount).toBeGreaterThan(0);
+
+    // At least one edge on S05's tightly spaced layout has a label suppressed
+    // by default (it would overlap a node rectangle) and reveals it on hover.
+    let revealedOnHover = false;
+    for (let i = 0; i < edgeCount; i++) {
+      const group = edgeGroups.nth(i);
+      const path = group.locator('.react-flow__edge-interaction, .react-flow__edge-path').first();
+      const box = await path.boundingBox().catch(() => null);
+      if (!box) continue;
+
+      const labelsBefore = await page.locator('[data-testid^="edge-label-"]').count();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(150);
+      const labelsAfterHover = await page.locator('[data-testid^="edge-label-"]').count();
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(100);
+
+      if (labelsAfterHover > labelsBefore) {
+        revealedOnHover = true;
+        break;
+      }
+    }
+    expect(revealedOnHover).toBe(true);
+  });
 });
