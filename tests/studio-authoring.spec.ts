@@ -3,22 +3,31 @@ import { test, expect, type Page } from '@playwright/test';
 const SCREENSHOT_DIR = new URL('../artifacts/rv-12e/', import.meta.url).pathname;
 
 /**
- * CONTRACT GAP (RV-12e, out of this task's scope): a brand-new blank project
- * (EntryScreen "Open an empty canvas") is created with `views: []`, and
- * nothing in the shipped app can add a first view -- CanvasView's "This
- * project has no views yet" state has no dock, so Component/Connect/Delete
- * are unreachable on a truly blank project today. There is no
- * `view.create`-style command in commands.md's dock/selection inventories to
- * wire up here, and inventing one is out of scope for the catalog/library/
- * workspace authoring task this spec covers. This uses the S05 example
- * project instead (it ships with a real view), matching the existing
- * tests/studio-shell.spec.ts pattern, so the rest of the authoring flow
- * (place/connect/delete against a real view) can be exercised end to end.
+ * Opens the S05 example project (ships with a real view), matching the
+ * existing tests/studio-shell.spec.ts pattern, so the bulk of the authoring
+ * flow (place/connect/delete against a populated view) can be exercised end
+ * to end without every step re-placing from scratch.
  */
 async function openS05Project(page: Page) {
   await page.goto('/');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('create-example-s05').click();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await page.waitForTimeout(400);
+}
+
+/**
+ * Creates a brand-new blank project (EntryScreen "Open an empty canvas").
+ * D43(a): SessionController.createProject seeds one empty view labelled
+ * "Main" when the caller's initialDocument has none, so the dock and
+ * Component/Connect/Delete are reachable immediately -- no separate
+ * `view.create` command is needed.
+ */
+async function openBlankProject(page: Page, name: string) {
+  await page.goto('/');
+  await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+  await page.getByTestId('blank-project-name-input').fill(name);
+  await page.getByTestId('create-blank-project-btn').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await page.waitForTimeout(400);
 }
@@ -200,14 +209,26 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.getByTestId('connect-resource-form')).toBeVisible();
     await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-metadata-form.png` });
 
+    // Neither operation nor deadline has a contracted default (catalog.md
+    // resolution 8): Connect stays disabled until request class, an
+    // operation, and a valid deadline are all filled in.
+    await expect(page.getByTestId('connect-form-confirm')).toBeDisabled();
     await page.getByTestId('connect-form-request-class').fill('read-profile');
+    await expect(page.getByTestId('connect-form-confirm')).toBeDisabled();
+    await page.getByTestId('connect-form-op-read').check();
+    await expect(page.getByTestId('connect-form-confirm')).toBeDisabled();
     await page.getByTestId('connect-form-deadline').fill('0');
-    await page.getByTestId('connect-form-confirm').click();
+    await expect(page.getByTestId('connect-form-confirm')).toBeDisabled();
+    // The Connect button is disabled for this invalid state (deadline must be
+    // > 0), so drive the same validation path the Enter shortcut uses instead
+    // of clicking a disabled control.
+    await page.getByTestId('connect-form-deadline').press('Enter');
     await expect(page.getByTestId('connect-form-error')).toBeVisible();
     await expect(page.getByTestId('connect-resource-form')).toBeVisible();
 
     const edgesBeforeDb = await page.locator('.react-flow__edge').count();
     await page.getByTestId('connect-form-deadline').fill('500');
+    await expect(page.getByTestId('connect-form-confirm')).toBeEnabled();
     await page.getByTestId('connect-form-confirm').click();
     await expect(page.getByTestId('connect-resource-form')).toHaveCount(0);
     await page.waitForFunction((n) => document.querySelectorAll('.react-flow__edge').length > n, edgesBeforeDb);
@@ -246,6 +267,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await dragConnect(page, gatewayId, serviceAId);
     await expect(page.getByTestId('connect-resource-form')).toBeVisible();
     await page.getByTestId('connect-form-request-class').fill('route-a');
+    await page.getByTestId('connect-form-op-read').check();
     await page.getByTestId('connect-form-deadline').fill('250');
     const edgesBeforeRouteA = await page.locator('.react-flow__edge').count();
     await page.getByTestId('connect-form-confirm').click();
@@ -254,6 +276,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await dragConnect(page, gatewayId, serviceBId);
     await expect(page.getByTestId('connect-resource-form')).toBeVisible();
     await page.getByTestId('connect-form-request-class').fill('route-b');
+    await page.getByTestId('connect-form-op-write').check();
     await page.getByTestId('connect-form-deadline').fill('250');
     const edgesBeforeRouteB = await page.locator('.react-flow__edge').count();
     await page.getByTestId('connect-form-confirm').click();
@@ -330,5 +353,19 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await serviceCard.click();
     await expect(page.getByTestId('library-picker')).toHaveCount(0);
     await page.waitForFunction((n) => document.querySelectorAll('.component-node').length > n, before);
+  });
+
+  test('D43(a): a brand-new blank project seeds a "Main" view -- Component is reachable immediately', async ({
+    page,
+  }) => {
+    await openBlankProject(page, 'RV-12e Blank Project');
+
+    // No "no views yet" state; the dock and Component picker work right away.
+    await expect(page.getByTestId('dock-component-btn')).toBeVisible();
+    const before = await page.locator('.component-node').count();
+    expect(before).toBe(0);
+
+    const elementId = await placeAndGetElementId(page, 'service');
+    await expect(page.locator(`[data-element-id="${elementId}"]`)).toBeVisible();
   });
 });

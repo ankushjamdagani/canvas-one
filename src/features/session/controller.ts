@@ -8,7 +8,7 @@
  * - specs/revamp/contracts/storage.md §5 & session undo bullet
  */
 
-import type { Document, Id } from '../../domain/studio/model';
+import type { Document, Id, View } from '../../domain/studio/model';
 import {
   createIssue,
   mapErrorToFailedResult,
@@ -160,6 +160,29 @@ export class SessionController {
     const draftBranchId = this.mintId();
     const operationId = this.mintId();
 
+    // D43(a): a blank project (no views yet) is created with one empty view
+    // labelled "Main" so components can be placed immediately -- a caller
+    // that starts from a template (S01-S05) already supplies its own views
+    // and is left untouched. The id comes from this session's own mintId,
+    // never a client-invented default.
+    const initialDocument: Document =
+      params.initialDocument.views.length === 0
+        ? {
+            ...params.initialDocument,
+            views: [
+              {
+                id: this.mintId(),
+                label: 'Main',
+                placements: [],
+                connectionIds: [],
+                relationIds: [],
+                groups: [],
+                notes: [],
+              } satisfies View,
+            ],
+          }
+        : params.initialDocument;
+
     const command: ProjectCreateCommand = {
       commandId: 'project.create',
       operationId,
@@ -167,7 +190,7 @@ export class SessionController {
       payload: {
         newProjectId,
         title: params.title,
-        initialDocument: params.initialDocument,
+        initialDocument,
         mainBranchId,
         draftBranchId,
       },

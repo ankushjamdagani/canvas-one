@@ -70,7 +70,9 @@ type ResourceFormState = {
   readonly x: number;
   readonly y: number;
   readonly requestClass: string;
-  readonly operation: 'read' | 'write';
+  // No contracted default (catalog.md resolution 8: "No default deadline" --
+  // the same applies to operation, which the form must not preselect).
+  readonly operation: 'read' | 'write' | null;
   readonly deadlineMs: string;
   readonly error: string | null;
 };
@@ -131,8 +133,8 @@ function CanvasFlowInner({
     return projectDocumentToCanvas(document, activeViewId);
   }, [document, activeViewId]);
 
-  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node>(
-    projection.nodes as unknown as Node[],
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node<ProjectedNodeData>>(
+    projection.nodes as Node<ProjectedNodeData>[],
   );
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>(
     projection.edges as unknown as Edge[],
@@ -144,7 +146,7 @@ function CanvasFlowInner({
   // selectedConnectionIds, which only change once the guard has approved the
   // navigation (commands.md §6: "the guard runs before any change").
   const onNodesChange = React.useCallback(
-    (changes: NodeChange[]) => {
+    (changes: NodeChange<Node<ProjectedNodeData>>[]) => {
       onNodesChangeRaw(changes.filter((c) => c.type !== 'select'));
     },
     [onNodesChangeRaw],
@@ -158,7 +160,7 @@ function CanvasFlowInner({
 
   // Sync projected nodes and edges when document or activeViewId changes
   React.useEffect(() => {
-    setNodes(projection.nodes as unknown as Node[]);
+    setNodes(projection.nodes as Node<ProjectedNodeData>[]);
     setEdges(projection.edges as unknown as Edge[]);
   }, [projection, setNodes, setEdges]);
 
@@ -170,7 +172,7 @@ function CanvasFlowInner({
   const displayNodes = React.useMemo(
     () =>
       nodes.map((n) => {
-        const data = n.data as unknown as ProjectedNodeData;
+        const data = n.data;
         if (data.kind !== 'element') return n;
         const selected = Boolean(selectedElementIds?.has(data.element.id));
         const connectable = dragMode !== 'pan';
@@ -191,9 +193,9 @@ function CanvasFlowInner({
     [edges, selectedConnectionIds],
   );
 
-  const handleNodeClick: NodeMouseHandler = React.useCallback(
+  const handleNodeClick: NodeMouseHandler<Node<ProjectedNodeData>> = React.useCallback(
     (event, node) => {
-      const data = node.data as unknown as ProjectedNodeData;
+      const data = node.data;
       if (data.kind !== 'element') return;
       onRequestSelection?.({ kind: 'element', id: data.element.id, additive: event.shiftKey });
     },
@@ -216,7 +218,7 @@ function CanvasFlowInner({
   // Node drag end handler:
   // Identify nodes by node.type (not string prefixes on IDs)
   // Moved list built by placement.id (ReactFlow node id)
-  const handleNodeDragStop: OnNodeDrag = React.useCallback(
+  const handleNodeDragStop: OnNodeDrag<Node<ProjectedNodeData>> = React.useCallback(
     async (_event, node, draggedNodes) => {
       if (!projection.activeView || isSaving) return;
 
@@ -237,7 +239,7 @@ function CanvasFlowInner({
       const success = await onMoveNodes(movedList);
       if (!success) {
         // Snap back to document positions on failure
-        setNodes(projection.nodes as unknown as Node[]);
+        setNodes(projection.nodes as Node<ProjectedNodeData>[]);
       }
     },
     [projection, isSaving, onMoveNodes, setNodes],
@@ -407,15 +409,16 @@ function CanvasFlowInner({
       const sourceNodeId = startedFromSource ? fromNodeId : toNodeId;
       const targetNodeId = startedFromSource ? toNodeId : fromNodeId;
 
-      const clientPoint =
-        'changedTouches' in event && event.changedTouches.length > 0
-          ? { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY }
-          : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
+      const clientPoint = (() => {
+        if ('clientX' in event) return { x: event.clientX, y: event.clientY };
+        const touch = event.changedTouches[0];
+        return touch ? { x: touch.clientX, y: touch.clientY } : { x: 0, y: 0 };
+      })();
 
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
       const targetNode = nodes.find((n) => n.id === targetNodeId);
-      const sourceData = sourceNode?.data as unknown as ProjectedNodeData | undefined;
-      const targetData = targetNode?.data as unknown as ProjectedNodeData | undefined;
+      const sourceData = sourceNode?.data;
+      const targetData = targetNode?.data;
       if (!sourceData || sourceData.kind !== 'element' || !targetData || targetData.kind !== 'element') {
         return;
       }
@@ -437,10 +440,10 @@ function CanvasFlowInner({
       });
 
       if (result.kind === 'rejected') {
-        setRejectMessage({
-          text: result.issues[0]?.message ?? 'This connection is not allowed.',
-          ...clientPoint,
-        });
+        if (result.issues.length === 0) {
+          throw new Error('planConnection: rejected result with no issues (contract violation)');
+        }
+        setRejectMessage({ text: result.issues[0].message, ...clientPoint });
         return;
       }
       if (result.kind === 'needs-resource-metadata') {
@@ -448,7 +451,7 @@ function CanvasFlowInner({
           draft: result.draft,
           ...clientPoint,
           requestClass: '',
-          operation: 'read',
+          operation: null,
           deadlineMs: '',
           error: null,
         });
@@ -461,40 +464,61 @@ function CanvasFlowInner({
 
   const cancelResourceForm = React.useCallback(() => setResourceForm(null), []);
 
+  // catalog.md resolution 8: request class (text), read/write and deadline
+  // have no contracted default -- neither operation nor deadline is
+  // preselected, and Connect stays disabled until every field is filled in.
+  const resourceFormValid = React.useMemo(() => {
+    if (!resourceForm) return false;
+    const deadline = Number(resourceForm.deadlineMs);
+    return (
+      resourceForm.requestClass.trim().length > 0 &&
+      resourceForm.operation !== null &&
+      resourceForm.deadlineMs.trim().length > 0 &&
+      Number.isFinite(deadline) &&
+      deadline > 0
+    );
+  }, [resourceForm]);
+
   const confirmResourceForm = React.useCallback(async () => {
     if (!resourceForm) return;
-    const deadline = Number(resourceForm.deadlineMs);
     if (resourceForm.requestClass.trim().length === 0) {
       setResourceForm({ ...resourceForm, error: 'Request class is required.' });
       return;
     }
-    if (!Number.isFinite(deadline) || deadline <= 0) {
+    if (resourceForm.operation === null) {
+      setResourceForm({ ...resourceForm, error: 'Choose read or write.' });
+      return;
+    }
+    const deadline = Number(resourceForm.deadlineMs);
+    if (resourceForm.deadlineMs.trim().length === 0 || !Number.isFinite(deadline) || deadline <= 0) {
       setResourceForm({ ...resourceForm, error: 'Deadline must be a positive number of ms.' });
       return;
     }
-    // catalog.md resolution 8: the form asks for request class (text),
-    // read/write and deadline; requestClassId stays a UUID-shaped
-    // classification token, never resolved against a RequestClass record
-    // (model-and-runner.md §6). A fresh id is minted per confirm to satisfy
-    // that shape.
+    // requestClassId stays a UUID-shaped classification token, never resolved
+    // against a RequestClass record (model-and-runner.md §6). A fresh id is
+    // minted per confirm to satisfy that shape.
     //
-    // KNOWN GAP (out of this task's scope): decisions.md D43(b) later adds a
-    // presentation-only `ResourceCallMetadata.requestClassLabel` so the typed
-    // text can be persisted and reused by label instead of re-minting an id
-    // per connection. Wiring that needs a shared-model change (model.ts /
-    // validate.ts) plus matching support in the catalog compiler
-    // (src/features/catalog/connect.ts's ResourceMetadataInput/
-    // completeConnection) -- neither file is in this task's allowed-write
-    // set, and connect.ts's own tests assume the current (label-less) shape.
-    // Until that lands, the typed text here is validation-only (the field
-    // must be filled in) and is not persisted; only the minted id is stored.
+    // KNOWN GAP: decisions.md D43(b) adds a presentation-only
+    // `ResourceCallMetadata.requestClassLabel` so this typed text can be
+    // persisted and reused by label instead of re-minting an id every time.
+    // Checked this round: specs/revamp/fixtures/{s02,s04,s05,combined}.json
+    // (the app's own example projects, loaded verbatim as `Document`s) carry
+    // ResourceCallMetadata without a label; making the field required, as
+    // D43(b) specifies, fails validateDocument on load for those read-only
+    // fixtures (12 tests across validate.test.ts, merge.test.ts,
+    // s01-s05-candidates.test.ts, compile.test.ts and refinement.test.ts).
+    // Reported to the lead rather than edited; the typed text here remains
+    // validation-only (the field must be filled in) until that's resolved.
     const result = completeConnection(resourceForm.draft, {
       requestClassId: mintId(),
       operation: resourceForm.operation,
       deadlineDurationMs: deadline,
     });
     if (!result.ok) {
-      setResourceForm({ ...resourceForm, error: result.issues[0]?.message ?? 'Invalid metadata.' });
+      if (result.issues.length === 0) {
+        throw new Error('completeConnection: rejected result with no issues (contract violation)');
+      }
+      setResourceForm({ ...resourceForm, error: result.issues[0].message });
       return;
     }
     setResourceForm(null);
@@ -782,6 +806,7 @@ function CanvasFlowInner({
               type="button"
               variant="tint"
               size="sm"
+              disabled={!resourceFormValid}
               onClick={() => void confirmResourceForm()}
             >
               Connect
