@@ -1,0 +1,228 @@
+/**
+ * Pure renderToStaticMarkup fidelity tests for HistoryLadder and CommitPanel (RV-11a).
+ *
+ * Implements specs/revamp/design-revalidation.md §2 (excluded texts) and §3 item 10,
+ * and specs/revamp/screens/22A_history_ladder.png, scenario_commit_gate.png.
+ */
+import { describe, expect, it, vi } from 'vitest';
+import * as React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { HistoryLadder } from './HistoryLadder';
+import { CommitPanel } from './CommitPanel';
+import type { CheckpointRecord, CommitRecord, PublicationRecord } from '../../persistence/studio';
+import type { ScenarioWithStatus } from '../runs/scenarioStatus';
+import type { RecordChangeItem } from './types';
+
+// design-revalidation.md §2 / lead defaults: text that must never appear as visible
+// content in these panels. Excludes "overflow", which only ever appears here as a
+// Tailwind utility class (overflow-y-auto / overflow-hidden), not visible copy.
+const EXCLUDED_TEXTS = ['no run', 'suggested from your edits', 'p95', 'p99', 'burst', 'bottleneck'];
+
+const testActor = { actorId: 'u1', kind: 'local-human' as const, displayName: 'Test User' };
+
+const checkpoints: readonly CheckpointRecord[] = [
+  {
+    projectId: 'proj-1',
+    id: 'cp-1',
+    snapshotId: 'snap-cp-1',
+    sourceBranchId: 'branch-1',
+    label: 'Before big change',
+    actor: testActor,
+    createdAt: Date.UTC(2026, 8, 11, 16, 20),
+  },
+];
+
+const commits: readonly CommitRecord[] = [
+  {
+    projectId: 'proj-1',
+    id: 'commit-1',
+    branchId: 'branch-1',
+    parentIds: [],
+    snapshotId: 'snap-commit-1',
+    message: 'Handle checkout retries in the order queue',
+    evidence: [{ scenarioId: 's1', fingerprint: 'fp1', runId: 'run-1' }],
+    evidenceManifest: null,
+    actor: testActor,
+    createdAt: Date.UTC(2026, 8, 11, 16, 25),
+  } as unknown as CommitRecord,
+];
+
+const publications: readonly PublicationRecord[] = [
+  {
+    projectId: 'proj-1',
+    id: 'pub-1',
+    commitId: 'commit-1',
+    sourceBranchId: 'branch-1',
+    previousMainHeadId: null,
+    ordinal: 1,
+    actor: testActor,
+    createdAt: Date.UTC(2026, 8, 11, 17, 0),
+    metadata: {
+      version: { major: 2, minor: 2, patch: 1 },
+      title: 'Split gateway from storefront',
+      rationale: '',
+      ticketUrl: null,
+    },
+    versionKey: '2.2.1',
+  },
+];
+
+describe('HistoryLadder static markup (22A)', () => {
+  it('renders branch, working edits, checkpoints, commits, publications without excluded texts', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        branchName: 'feature/checkout',
+        isMain: false,
+        aheadOfVersion: { aheadCount: 3, versionKey: '2.2.1' },
+        workingEdits: ['Renamed queue to Order queue', 'Added retry policy'],
+        checkpoints,
+        commits,
+        publications,
+        commitDiffSummaries: { 'commit-1': '2 fields changed' },
+        canUndo: true,
+        canRedo: false,
+        onUndo: vi.fn(),
+        onRedo: vi.fn(),
+        onOpenCommit: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('feature/checkout');
+    expect(html).toContain('NOW');
+    expect(html).toContain('NOT COMMITTED');
+    expect(html).toContain('Renamed queue to Order queue');
+    expect(html).toContain('CHECKPOINTS');
+    expect(html).toContain('Before big change');
+    expect(html).toContain('COMMITS');
+    expect(html).toContain('2 fields changed');
+    expect(html).toContain('scenario');
+    expect(html).toContain('PUBLISHED ON MAIN');
+    expect(html).toContain('2.2.1');
+    expect(html).toContain('Commit');
+    expect(html).toContain('Publish draft to main');
+    expect(html).toContain('Publishing arrives in the next step');
+
+    for (const text of EXCLUDED_TEXTS) {
+      expect(html.toLowerCase()).not.toContain(text.toLowerCase());
+    }
+  });
+
+  it('disables Commit and restore with a stated reason on main (D40)', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        branchName: 'main',
+        isMain: true,
+        workingEdits: [],
+        checkpoints,
+        commits: [],
+        publications: [],
+        onOpenCommit: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('Main never holds edits');
+    expect(html).toContain('disabled');
+  });
+
+  it('omits "ahead of" when not computable, and omits fields-changed line when not computable', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        branchName: 'feature/x',
+        isMain: false,
+        aheadOfVersion: null,
+        workingEdits: [],
+        checkpoints: [],
+        commits,
+        publications: [],
+        commitDiffSummaries: { 'commit-1': null },
+        onOpenCommit: vi.fn(),
+      }),
+    );
+
+    expect(html).not.toContain('ahead of');
+    expect(html).not.toContain('fields-changed-text');
+  });
+});
+
+function makeScenarios(overrides: readonly Partial<ScenarioWithStatus>[]): ScenarioWithStatus[] {
+  return overrides.map((o, i) => ({
+    scenario: { id: `s${i}`, label: `Scenario ${i}` } as ScenarioWithStatus['scenario'],
+    status: { kind: 'not-run' },
+    currentFingerprint: null,
+    latestRun: null,
+    ...o,
+  }));
+}
+
+const changes: readonly RecordChangeItem[] = [
+  { recordKind: 'element', id: 'elem-queue', change: 'modified', label: 'Order queue', detail: 'capacity 2 → 4' },
+  { recordKind: 'connection', id: 'conn-1', change: 'added', label: 'Queue → payment provider', detail: 'new connection' },
+];
+
+describe('CommitPanel static markup (scenario_commit_gate.png)', () => {
+  it('renders CHANGES, message field, and the every-scenario gate without excluded texts', () => {
+    const scenarios = makeScenarios([
+      { status: { kind: 'passed' } },
+      { status: { kind: 'not-run' } },
+    ]);
+
+    const html = renderToStaticMarkup(
+      React.createElement(CommitPanel, {
+        isMain: false,
+        changes,
+        scenariosWithStatus: scenarios,
+        onRunScenario: vi.fn(),
+        onRunAll: vi.fn(),
+        onCancel: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('CHANGES');
+    expect(html).toContain('Order queue');
+    expect(html).toContain('capacity 2');
+    expect(html).toContain('Commit message');
+    expect(html).toContain('EVERY SCENARIO MUST PASS');
+    expect(html).toContain('Scenario 0');
+    expect(html).toContain('Scenario 1');
+    expect(html).toContain('Run');
+    expect(html).toContain('1 of 2 passing');
+    expect(html).toContain('Commit unlocks when all 2 scenarios pass');
+
+    for (const text of EXCLUDED_TEXTS) {
+      expect(html.toLowerCase()).not.toContain(text.toLowerCase());
+    }
+  });
+
+  it('shows the passed check and no Run button once every scenario passes', () => {
+    const scenarios = makeScenarios([{ status: { kind: 'passed' } }, { status: { kind: 'passed' } }]);
+
+    const html = renderToStaticMarkup(
+      React.createElement(CommitPanel, {
+        isMain: false,
+        changes: [],
+        scenariosWithStatus: scenarios,
+        onCancel: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('2 of 2 passing');
+    expect(html).not.toContain('Commit unlocks when all');
+    for (const text of EXCLUDED_TEXTS) {
+      expect(html.toLowerCase()).not.toContain(text.toLowerCase());
+    }
+  });
+
+  it('never shows a default/suggested commit message', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(CommitPanel, {
+        isMain: false,
+        changes: [],
+        scenariosWithStatus: [],
+        onCancel: vi.fn(),
+      }),
+    );
+
+    // Input must not carry a value attribute pre-filled with suggested text.
+    expect(html).not.toMatch(/value="[^"]+"/);
+  });
+});
