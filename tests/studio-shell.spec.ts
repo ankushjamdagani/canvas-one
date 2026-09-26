@@ -128,7 +128,9 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await page.getByTestId('dock-zoom-out-btn').click();
     await page.waitForTimeout(250);
 
-    // 7. Create blank project via "Open an empty canvas" -> empty-view state
+    // 7. Create blank project via "Open an empty canvas" -> D43(a): opens
+    //    straight onto its seeded "Main" view (canvas + dock, zero nodes),
+    //    not the (now unreachable from this flow) empty-views-state.
     await page.getByTestId('breadcrumb-project-btn').click();
     await page.getByTestId('project-menu-all-projects').click();
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
@@ -139,7 +141,9 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('My Blank Architecture');
-    await expect(page.getByTestId('empty-views-state')).toBeVisible();
+    await expect(page.getByTestId('canvas-container')).toBeVisible();
+    await expect(page.getByTestId('dock-component-btn')).toBeVisible();
+    expect(await page.locator('.component-node').count()).toBe(0);
 
     // 8. Mobile 390x844: no horizontal scroll, dock fully visible
     await page.setViewportSize({ width: 390, height: 844 });
