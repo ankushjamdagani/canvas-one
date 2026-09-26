@@ -31,17 +31,45 @@ function findRecordLabel(doc: Document | null, recordKind: string, id: Id): stri
       return doc.relations.find((r) => r.id === id)?.label ?? null;
     case 'schema':
       return doc.schemas.find((s) => s.id === id)?.label ?? null;
-    case 'fixture':
-      return doc.fixtures.find((f) => f.id === id)?.id ?? null;
-    case 'refinement':
-      return doc.refinements.find((r) => r.id === id)?.id ?? null;
     case 'scenario':
       return doc.scenarios.find((s) => s.id === id)?.label ?? null;
     case 'view':
       return doc.views.find((v) => v.id === id)?.label ?? null;
+    // Fixtures and refinements (model.ts §2/§6) have no label field of their own;
+    // they are described from linked context by describeFixtureLabel /
+    // describeRefinementLabel below rather than via this label lookup.
+    case 'fixture':
+    case 'refinement':
+      return null;
     default:
       return null;
   }
+}
+
+/**
+ * Fixture (model.ts §2: {id, schemaId, value}) has no label. Describe it by its
+ * payload schema's label when the schema is still resolvable, or by kind alone —
+ * never by its raw id.
+ */
+function describeFixtureLabel(doc: Document | null, id: Id): string | null {
+  if (!doc) return null;
+  const fixture = doc.fixtures.find((f) => f.id === id);
+  if (!fixture) return null;
+  const schema = doc.schemas.find((s) => s.id === fixture.schemaId);
+  return schema ? `Fixture · ${schema.label}` : 'Fixture';
+}
+
+/**
+ * Refinement (model.ts §6: {id, ownerElementId, memberElementIds, portMappings})
+ * has no label. Describe it by its owning element's label when resolvable, or by
+ * kind alone — never by its raw id.
+ */
+function describeRefinementLabel(doc: Document | null, id: Id): string | null {
+  if (!doc) return null;
+  const refinement = doc.refinements.find((r) => r.id === id);
+  if (!refinement) return null;
+  const owner = doc.elements.find((e) => e.id === refinement.ownerElementId);
+  return owner ? `Refinement · ${owner.label}` : 'Refinement';
 }
 
 // ============================================================================
@@ -94,12 +122,40 @@ function describeChange(
   workingDoc: Document,
   diff: RecordDiff,
 ): { label: string; detail: string } {
-  // Try to find label in working document first, fallback to base document.
-  // If neither document carries a label for this record, say so explicitly
-  // rather than showing an empty or raw-id label to the user.
+  // Fixtures and refinements carry no label of their own (model.ts §2/§6); describe
+  // them from linked context (schema label / owning element label) instead, never
+  // by raw id, and never via the generic label lookup below.
+  if (diff.recordKind === 'fixture') {
+    const label =
+      describeFixtureLabel(workingDoc, diff.id) ?? describeFixtureLabel(baseDoc, diff.id) ?? 'Fixture';
+    if (diff.change === 'added') return { label, detail: 'new fixture' };
+    if (diff.change === 'removed') return { label, detail: 'removed fixture' };
+    return { label, detail: 'modified fixture' };
+  }
+
+  if (diff.recordKind === 'refinement') {
+    const label =
+      describeRefinementLabel(workingDoc, diff.id) ??
+      describeRefinementLabel(baseDoc, diff.id) ??
+      'Refinement';
+    if (diff.change === 'added') return { label, detail: 'new refinement' };
+    if (diff.change === 'removed') return { label, detail: 'removed refinement' };
+    return { label, detail: 'modified refinement' };
+  }
+
+  // Every other record kind (document/element/connection/relation/schema/scenario/
+  // view) has a required `label` (or `title`) field per model.ts. Try the working
+  // document first, then the base document (covers a removed record, which only
+  // exists in the base). If the record is found in neither document, that is a
+  // model contract violation — never paper over it with an invented placeholder.
   const workingLabel = findRecordLabel(workingDoc, diff.recordKind, diff.id);
   const baseLabel = findRecordLabel(baseDoc, diff.recordKind, diff.id);
-  const label = workingLabel ?? baseLabel ?? 'Unlabelled';
+  const label = workingLabel ?? baseLabel;
+  if (label === null) {
+    throw new Error(
+      `No label found for ${diff.recordKind} ${diff.id} in either document; this indicates a model contract violation`,
+    );
+  }
 
   if (diff.recordKind === 'document') {
     const fromTitle = baseDoc.title;

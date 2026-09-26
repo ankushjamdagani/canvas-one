@@ -78,8 +78,15 @@ function formatScenarioStatusReason(status: ScenarioStatus): string {
       return 'needs a rerun (ran on an earlier version)';
     case 'failed':
       return `failed ${status.totalChecks - status.passedChecks} of ${status.totalChecks} checks`;
-    case 'not-ready':
-      return `not ready: ${status.issues[0]?.message ?? 'readiness check failed'}`;
+    case 'not-ready': {
+      const firstIssue = status.issues[0];
+      if (!firstIssue) {
+        // Contract violation: a not-ready status must carry the issue(s) that made it
+        // not ready. Never invent a generic reason in its place.
+        throw new Error('Scenario status "not-ready" has no issues; contract violation');
+      }
+      return `not ready: ${firstIssue.message}`;
+    }
     case 'passed':
       return 'passed';
   }
@@ -365,7 +372,27 @@ export class HistoryController {
   // Restore Action
   // ==========================================================================
 
-  async restore(targetId: string, label?: string): Promise<RestoreResult> {
+  async restore(targetId: string, label: string): Promise<RestoreResult> {
+    if (typeof label !== 'string') {
+      throw new TypeError('restore requires a string label for the pre-restore checkpoint');
+    }
+    // Pre-restore checkpoint label bound identically to saveCheckpoint (contracts/storage.md
+    // §5 "labels/title 1-80 code points"); never invented — the caller must supply it
+    // (commands.md history.restore payload {snapshotId, checkpointId, label}).
+    const trimmedLabel = label.trim();
+    if (trimmedLabel.length < 1 || trimmedLabel.length > 80) {
+      return {
+        status: 'invalid',
+        issues: [
+          createIssue(
+            'too-long',
+            'Pre-restore checkpoint label must be between 1 and 80 code points',
+            ['payload', 'label'],
+          ),
+        ],
+      };
+    }
+
     const sessionState = this.session.getState();
     if (
       !sessionState.projectId ||
@@ -406,7 +433,6 @@ export class HistoryController {
 
     // Contract: Checkpoints current work first, then replaces it in the same transaction
     const checkpointId = this.mintId();
-    const cpLabel = label?.trim() || 'Pre-restore checkpoint';
 
     const command: HistoryRestoreCommand = {
       commandId: 'history.restore',
@@ -418,7 +444,7 @@ export class HistoryController {
       payload: {
         snapshotId,
         checkpointId,
-        label: cpLabel,
+        label: trimmedLabel,
       },
     };
 

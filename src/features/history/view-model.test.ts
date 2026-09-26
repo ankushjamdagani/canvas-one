@@ -115,6 +115,59 @@ describe('diffSummary view-model helpers', () => {
     expect(connChange?.detail).toBe('new connection');
   });
 
+  it('computeChangesList describes fixtures and refinements by linked context, never by raw id', () => {
+    const docWithFixtureAndRefinement: Document = {
+      ...baseDoc,
+      schemas: [
+        {
+          id: 'schema-order',
+          label: 'Order payload',
+          shape: { type: 'record', nullable: true, fields: [] },
+        },
+      ],
+      fixtures: [{ id: 'fixture-1', schemaId: 'schema-order', value: {} }],
+      refinements: [
+        { id: 'refinement-1', ownerElementId: 'elem-queue', memberElementIds: [], portMappings: [] },
+      ],
+    };
+
+    const changes = computeChangesList(baseDoc, docWithFixtureAndRefinement);
+
+    const fixtureChange = changes.find((c) => c.recordKind === 'fixture');
+    expect(fixtureChange).toBeDefined();
+    expect(fixtureChange?.label).toBe('Fixture · Order payload');
+    expect(fixtureChange?.label).not.toContain('fixture-1');
+
+    const refinementChange = changes.find((c) => c.recordKind === 'refinement');
+    expect(refinementChange).toBeDefined();
+    expect(refinementChange?.label).toBe('Refinement · Order queue');
+    expect(refinementChange?.label).not.toContain('refinement-1');
+
+    // No raw ids anywhere in any change's label or detail text.
+    for (const change of changes) {
+      expect(change.label).not.toContain(change.id);
+      expect(change.detail).not.toContain(change.id);
+    }
+  });
+
+  it('describes a fixture/refinement by kind alone when its linked context cannot be resolved', () => {
+    const docWithUnresolvedLinks: Document = {
+      ...baseDoc,
+      fixtures: [{ id: 'fixture-2', schemaId: 'missing-schema', value: {} }],
+      refinements: [
+        { id: 'refinement-2', ownerElementId: 'missing-element', memberElementIds: [], portMappings: [] },
+      ],
+    };
+
+    const changes = computeChangesList(baseDoc, docWithUnresolvedLinks);
+
+    const fixtureChange = changes.find((c) => c.recordKind === 'fixture');
+    expect(fixtureChange?.label).toBe('Fixture');
+
+    const refinementChange = changes.find((c) => c.recordKind === 'refinement');
+    expect(refinementChange?.label).toBe('Refinement');
+  });
+
   it('computeChangesList handles empty or identical documents cleanly', () => {
     expect(computeChangesList(null, baseDoc)).toEqual([]);
     expect(computeChangesList(baseDoc, null)).toEqual([]);

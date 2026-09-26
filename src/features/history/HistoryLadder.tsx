@@ -25,6 +25,21 @@ import {
 } from './diffSummary';
 import type { AheadOfVersionInfo } from './types';
 
+/** Any repository/controller action result shape that may carry a specific,
+ * real reason for failure — never a generic invented one. */
+type ResultWithDetail = { readonly status: string } & Record<string, unknown>;
+
+function extractResultDetail(res: ResultWithDetail): string | undefined {
+  if ('issues' in res) {
+    const issues = res.issues as readonly { readonly message: string }[];
+    return issues[0]?.message;
+  }
+  if ('message' in res && typeof res.message === 'string') {
+    return res.message;
+  }
+  return undefined;
+}
+
 export interface HistoryLadderProps {
   readonly controller?: HistoryController;
   readonly branchName?: string;
@@ -40,7 +55,7 @@ export interface HistoryLadderProps {
   readonly onUndo?: () => void;
   readonly onRedo?: () => void;
   readonly onSaveCheckpoint?: (label: string) => Promise<unknown> | void;
-  readonly onRestore?: (snapshotIdOrCheckpointId: string) => Promise<unknown> | void;
+  readonly onRestore?: (snapshotIdOrCheckpointId: string, label: string) => Promise<unknown> | void;
   readonly onOpenCommit?: () => void;
   readonly onClose?: () => void;
   readonly className?: string;
@@ -73,7 +88,10 @@ export function HistoryLadder({
     controller ? controller.getState : () => null,
   );
 
-  const branchName = propBranchName ?? controllerState?.branch?.label ?? 'main';
+  // No invented default: branch name comes only from the prop or the controller's
+  // real branch record. If neither is present yet (e.g. history still loading), the
+  // branch row is omitted rather than showing a made-up name.
+  const branchName = propBranchName ?? controllerState?.branch?.label ?? null;
   const isMain = propIsMain ?? controllerState?.isMain ?? false;
   const aheadOfVersion =
     propAheadOfVersion !== undefined
@@ -90,6 +108,15 @@ export function HistoryLadder({
   const [checkpointLabel, setCheckpointLabel] = React.useState('');
   const [isSavingCheckpoint, setIsSavingCheckpoint] = React.useState(false);
   const [checkpointError, setCheckpointError] = React.useState<string | null>(null);
+
+  // Restore confirmation: which item (checkpoint id or commit snapshotId) has its
+  // inline "pre-restore checkpoint label" field open, matching 22B's checkpoint
+  // affordance. No label is ever prefilled — Confirm stays disabled until the
+  // person types one.
+  const [restoreTargetId, setRestoreTargetId] = React.useState<string | null>(null);
+  const [restoreLabel, setRestoreLabel] = React.useState('');
+  const [isRestoring, setIsRestoring] = React.useState(false);
+  const [restoreError, setRestoreError] = React.useState<string | null>(null);
 
   // Dynamic commit diff summaries cache
   const [diffSummaries, setDiffSummaries] = React.useState<Record<string, string | null>>(
@@ -131,26 +158,61 @@ export function HistoryLadder({
         await propOnSaveCheckpoint(trimmed);
       } else if (controller) {
         const res = await controller.saveCheckpoint(trimmed);
-        if (res.status === 'invalid' || res.status === 'failed') {
-          const firstIssue = (res as { issues?: readonly { message: string }[] }).issues?.[0];
-          setCheckpointError(firstIssue?.message ?? 'Failed to save checkpoint');
+        if (res.status !== 'applied') {
+          const detail = extractResultDetail(res);
+          setCheckpointError(`Couldn't save the checkpoint.${detail ? ` ${detail}` : ''}`);
           return;
         }
       }
       setCheckpointLabel('');
     } catch (err) {
-      setCheckpointError(err instanceof Error ? err.message : 'Error saving checkpoint');
+      const detail = err instanceof Error ? err.message : undefined;
+      setCheckpointError(`Couldn't save the checkpoint.${detail ? ` ${detail}` : ''}`);
     } finally {
       setIsSavingCheckpoint(false);
     }
   };
 
-  const handleRestore = async (id: string) => {
+  // Restore requires its own pre-restore checkpoint label (commands.md
+  // history.restore payload {snapshotId, checkpointId, label}) — never invented,
+  // always collected from the person via the inline field below.
+  const beginRestore = (id: string) => {
     if (isMain) return;
-    if (propOnRestore) {
-      await propOnRestore(id);
-    } else if (controller) {
-      await controller.restore(id);
+    setRestoreTargetId(id);
+    setRestoreLabel('');
+    setRestoreError(null);
+  };
+
+  const cancelRestore = () => {
+    setRestoreTargetId(null);
+    setRestoreLabel('');
+    setRestoreError(null);
+  };
+
+  const confirmRestore = async (id: string) => {
+    const trimmed = restoreLabel.trim();
+    if (!trimmed) return;
+
+    setIsRestoring(true);
+    setRestoreError(null);
+    try {
+      if (propOnRestore) {
+        await propOnRestore(id, trimmed);
+      } else if (controller) {
+        const res = await controller.restore(id, trimmed);
+        if (res.status !== 'applied') {
+          const detail = extractResultDetail(res);
+          setRestoreError(`Couldn't restore this version.${detail ? ` ${detail}` : ''}`);
+          return;
+        }
+      }
+      setRestoreTargetId(null);
+      setRestoreLabel('');
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : undefined;
+      setRestoreError(`Couldn't restore this version.${detail ? ` ${detail}` : ''}`);
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -187,24 +249,26 @@ export function HistoryLadder({
 
       {/* Scrollable Content Body */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
-        {/* 2. Branch selector row */}
-        <div
-          data-testid="branch-selector-row"
-          className="flex items-center justify-between px-3 py-2 rounded-control bg-accent/40 border border-selected-edge/30 text-sm font-medium"
-        >
-          <div className="flex items-center gap-2 truncate">
-            <GitBranch className="size-4 text-branch shrink-0" />
-            <span className="font-mono text-sm truncate text-foreground">{branchName}</span>
+        {/* 2. Branch selector row — omitted entirely when no real branch name is known */}
+        {branchName && (
+          <div
+            data-testid="branch-selector-row"
+            className="flex items-center justify-between px-3 py-2 rounded-control bg-accent/40 border border-selected-edge/30 text-sm font-medium"
+          >
+            <div className="flex items-center gap-2 truncate">
+              <GitBranch className="size-4 text-branch shrink-0" />
+              <span className="font-mono text-sm truncate text-foreground">{branchName}</span>
+            </div>
+            {aheadOfVersion && (
+              <span
+                data-testid="ahead-of-version"
+                className="font-mono text-xs text-muted-foreground shrink-0 ml-2"
+              >
+                {aheadOfVersion.aheadCount} ahead of {aheadOfVersion.versionKey}
+              </span>
+            )}
           </div>
-          {aheadOfVersion && (
-            <span
-              data-testid="ahead-of-version"
-              className="font-mono text-xs text-muted-foreground shrink-0 ml-2"
-            >
-              {aheadOfVersion.aheadCount} ahead of {aheadOfVersion.versionKey}
-            </span>
-          )}
-        </div>
+        )}
 
         {/* 3. NOW · NOT COMMITTED block */}
         <section aria-labelledby="now-not-committed-header" className="space-y-2">
@@ -333,18 +397,60 @@ export function HistoryLadder({
                       {formatCommitTime(cp.createdAt)}
                     </span>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs text-primary hover:text-primary-hover shrink-0"
-                    disabled={isMain}
-                    title={isMain ? mainRestoreDisabledReason : undefined}
-                    onClick={() => handleRestore(cp.id)}
-                  >
-                    <RotateCcw className="size-3 mr-1" />
-                    Restore
-                  </Button>
+                  {restoreTargetId === cp.id ? (
+                    <div
+                      className="flex flex-col items-end gap-1 shrink-0"
+                      data-testid={`restore-confirm-${cp.id}`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="text"
+                          autoFocus
+                          value={restoreLabel}
+                          onChange={(e) => setRestoreLabel(e.target.value)}
+                          placeholder="Checkpoint label for current work"
+                          maxLength={80}
+                          className="h-6 text-[11px] w-40"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          disabled={isRestoring || restoreLabel.trim().length === 0}
+                          onClick={() => confirmRestore(cp.id)}
+                        >
+                          Confirm
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          disabled={isRestoring}
+                          onClick={cancelRestore}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      {restoreError && (
+                        <p className="text-[11px] text-risk-text font-medium">{restoreError}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-primary hover:text-primary-hover shrink-0"
+                      disabled={isMain}
+                      title={isMain ? mainRestoreDisabledReason : undefined}
+                      onClick={() => beginRestore(cp.id)}
+                    >
+                      <RotateCcw className="size-3 mr-1" />
+                      Restore
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -385,6 +491,46 @@ export function HistoryLadder({
                         <Badge variant="solid" className="text-[10px] px-1.5 py-0 uppercase shrink-0">
                           Current
                         </Badge>
+                      ) : restoreTargetId === commit.snapshotId ? (
+                        <div
+                          className="flex flex-col items-end gap-1 shrink-0"
+                          data-testid={`restore-confirm-${commit.snapshotId}`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="text"
+                              autoFocus
+                              value={restoreLabel}
+                              onChange={(e) => setRestoreLabel(e.target.value)}
+                              placeholder="Checkpoint label for current work"
+                              maxLength={80}
+                              className="h-6 text-[11px] w-40"
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              disabled={isRestoring || restoreLabel.trim().length === 0}
+                              onClick={() => confirmRestore(commit.snapshotId)}
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              disabled={isRestoring}
+                              onClick={cancelRestore}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                          {restoreError && (
+                            <p className="text-[11px] text-risk-text font-medium">{restoreError}</p>
+                          )}
+                        </div>
                       ) : (
                         <Button
                           type="button"
@@ -393,7 +539,7 @@ export function HistoryLadder({
                           className="h-6 px-2 text-xs text-primary hover:text-primary-hover shrink-0"
                           disabled={isMain}
                           title={isMain ? mainRestoreDisabledReason : undefined}
-                          onClick={() => handleRestore(commit.snapshotId)}
+                          onClick={() => beginRestore(commit.snapshotId)}
                         >
                           Restore
                         </Button>

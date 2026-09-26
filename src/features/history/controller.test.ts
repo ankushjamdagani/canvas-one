@@ -148,11 +148,48 @@ describe('HistoryController (real LocalRepository, S01)', () => {
     const checkpoint = history.checkpoints[0];
     expect(checkpoint.label).toBe('Before big change');
 
-    const restoreRes = await history.restore(checkpoint.id);
+    const restoreRes = await history.restore(checkpoint.id, 'Pre-restore checkpoint');
     expect(restoreRes.status).toBe('applied');
 
     db.close();
     void session;
+  });
+
+  it('rejects restore when the pre-restore checkpoint label is missing, empty, or too long', async () => {
+    const { db, history } = await setup();
+
+    const cpRes = await history.saveCheckpoint('Before big change');
+    expect(cpRes.status).toBe('applied');
+    const checkpoint = history.checkpoints[0];
+
+    const emptyRes = await history.restore(checkpoint.id, '');
+    expect(emptyRes.status).toBe('invalid');
+
+    const whitespaceRes = await history.restore(checkpoint.id, '   ');
+    expect(whitespaceRes.status).toBe('invalid');
+
+    const tooLongRes = await history.restore(checkpoint.id, 'x'.repeat(81));
+    expect(tooLongRes.status).toBe('invalid');
+
+    db.close();
+  });
+
+  it('restore passes the given pre-restore checkpoint label through to the new checkpoint', async () => {
+    const { db, history } = await setup();
+
+    const cpRes = await history.saveCheckpoint('Before big change');
+    expect(cpRes.status).toBe('applied');
+    const checkpoint = history.checkpoints[0];
+
+    const restoreRes = await history.restore(checkpoint.id, 'My custom restore label');
+    expect(restoreRes.status).toBe('applied');
+
+    const preRestoreCheckpoint = history.checkpoints.find(
+      (c) => c.label === 'My custom restore label',
+    );
+    expect(preRestoreCheckpoint).toBeDefined();
+
+    db.close();
   });
 
   it('rejects commit and restore directly on main (D40)', async () => {
@@ -170,7 +207,7 @@ describe('HistoryController (real LocalRepository, S01)', () => {
     const commitRes = await history.commit('Direct commit on main');
     expect(commitRes.status).toBe('invalid');
 
-    const restoreRes = await history.restore('some-id');
+    const restoreRes = await history.restore('some-id', 'Pre-restore checkpoint');
     expect(restoreRes.status).toBe('invalid');
 
     db.close();

@@ -142,6 +142,23 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(html).not.toContain('ahead of');
     expect(html).not.toContain('fields-changed-text');
   });
+
+  it('omits the branch row entirely rather than inventing a branch name when none is known', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        // No branchName prop and no controller: there is no real branch name to show.
+        isMain: false,
+        workingEdits: [],
+        checkpoints: [],
+        commits: [],
+        publications: [],
+        onOpenCommit: vi.fn(),
+      }),
+    );
+
+    expect(html).not.toContain('branch-selector-row');
+    expect(html).not.toContain('lucide-git-branch');
+  });
 });
 
 function makeScenarios(overrides: readonly Partial<ScenarioWithStatus>[]): ScenarioWithStatus[] {
