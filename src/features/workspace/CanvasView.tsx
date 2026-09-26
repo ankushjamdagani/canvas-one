@@ -17,6 +17,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Document, Id } from '../../domain/studio/model';
+import type { RecordChange } from '../../persistence/studio/types';
 import { NodeCard } from './NodeCard';
 import { GroupNode } from './GroupNode';
 import { NoteNode } from './NoteNode';
@@ -26,8 +27,24 @@ import {
   projectDocumentToCanvas,
   type ProjectedNodeData,
 } from './projection';
+import { planDelete, type DeletePlan } from './deletePlan';
 import { NativeSelect } from '@/components/ui/native-select';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Trash2 } from 'lucide-react';
 import type { InspectorTargetKind } from '../inspector';
+import { LibraryPicker } from '../library';
+import { CATALOG_ENTRY_MIME_TYPE } from '../library/types';
+import { getEntry } from '../catalog/catalog';
+import { placeEntry } from '../catalog/place';
+import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
 
 export type CanvasSelectionRequest = {
   readonly kind: InspectorTargetKind;
@@ -43,6 +60,19 @@ const nodeTypes = {
 
 const edgeTypes = {
   traffic: TrafficEdge,
+};
+
+type DragMode = 'select' | 'pan' | 'connect';
+
+type RejectMessage = { readonly text: string; readonly x: number; readonly y: number };
+type ResourceFormState = {
+  readonly draft: ConnectionDraft;
+  readonly x: number;
+  readonly y: number;
+  readonly requestClass: string;
+  readonly operation: 'read' | 'write';
+  readonly deadlineMs: string;
+  readonly error: string | null;
 };
 
 export interface CanvasViewProps {
@@ -65,6 +95,14 @@ export interface CanvasViewProps {
   onRequestSelection?: (request: CanvasSelectionRequest) => void;
   /** Empty canvas was clicked -- clears selection through the guard. */
   onRequestClearSelection?: () => void;
+  /** RV-12e: mints ids for placeEntry / planConnection RecordChange batches. */
+  mintId: () => Id;
+  /**
+   * RV-12e: applies one model.apply-records batch (one gesture == one undo).
+   * Returns false on busy/failed/rejected so callers can leave nothing
+   * destructive on screen and let the user retry (commands.md "busy").
+   */
+  onApplyChanges: (changes: readonly RecordChange[], label: string) => Promise<boolean>;
 }
 
 function CanvasFlowInner({
@@ -81,10 +119,13 @@ function CanvasFlowInner({
   selectedConnectionIds,
   onRequestSelection,
   onRequestClearSelection,
+  mintId,
+  onApplyChanges,
 }: CanvasViewProps) {
-  const [dragMode, setDragMode] = React.useState<'select' | 'pan'>('select');
+  const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
   const { zoom } = useViewport();
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   const projection = React.useMemo(() => {
     return projectDocumentToCanvas(document, activeViewId);
@@ -121,14 +162,22 @@ function CanvasFlowInner({
     setEdges(projection.edges as unknown as Edge[]);
   }, [projection, setNodes, setEdges]);
 
+  // RV-12e: handles are connectable in Connect mode, and also mid-drag from a
+  // handle while in Select mode (commands.md §4). ReactFlow only starts a
+  // connection gesture from a pointerdown on the handle itself, so marking
+  // handles connectable in both modes is what makes "drag from a handle while
+  // in Select mode" possible without hijacking ordinary node dragging/panning.
   const displayNodes = React.useMemo(
     () =>
       nodes.map((n) => {
         const data = n.data as unknown as ProjectedNodeData;
-        const selected = data.kind === 'element' ? Boolean(selectedElementIds?.has(data.element.id)) : false;
-        return selected === n.selected ? n : { ...n, selected };
+        if (data.kind !== 'element') return n;
+        const selected = Boolean(selectedElementIds?.has(data.element.id));
+        const connectable = dragMode !== 'pan';
+        if (selected === n.selected && connectable === data.connectable) return n;
+        return { ...n, selected, data: { ...data, connectable } };
       }),
-    [nodes, selectedElementIds],
+    [nodes, selectedElementIds, dragMode],
   );
 
   const displayEdges = React.useMemo(
@@ -250,6 +299,264 @@ function CanvasFlowInner({
     }
   }, [document?.id, projection.activeView?.id, reactFlow]);
 
+  // ==========================================================================
+  // RV-12e: Component (library.open) -- 16E picker anchored above the dock
+  // ==========================================================================
+
+  const [componentPickerOpen, setComponentPickerOpen] = React.useState(false);
+  const pickerContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const closeComponentPicker = React.useCallback(() => setComponentPickerOpen(false), []);
+
+  // Outside click closes the picker (D30: single instance, no stacked overlays).
+  React.useEffect(() => {
+    if (!componentPickerOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (pickerContainerRef.current && !pickerContainerRef.current.contains(e.target as globalThis.Node)) {
+        setComponentPickerOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
+    return () => window.removeEventListener('pointerdown', onPointerDown, true);
+  }, [componentPickerOpen]);
+
+  const applyPlacement = React.useCallback(
+    async (entryId: string, anchor: { x: number; y: number }) => {
+      if (!document || !projection.activeView || isSaving) return;
+      const result = placeEntry({
+        document,
+        viewId: projection.activeView.id,
+        entryId,
+        anchor,
+        mintId,
+      });
+      if (!result.ok) return;
+      const applied = await onApplyChanges(result.changes, 'Add component');
+      if (!applied) return;
+      onRequestSelection?.({ kind: 'element', id: result.elementId, additive: false });
+    },
+    [document, projection.activeView, isSaving, mintId, onApplyChanges, onRequestSelection],
+  );
+
+  // Enter / "Place": places the focused entry at the viewport centre.
+  const handlePlaceAtCentre = React.useCallback(
+    async (entryId: string) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      const centreScreen = rect
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      const centreFlow = reactFlow.screenToFlowPosition(centreScreen);
+      setComponentPickerOpen(false);
+      await applyPlacement(entryId, centreFlow);
+    },
+    [reactFlow, applyPlacement],
+  );
+
+  // Dragging a picker card onto the canvas places it at the drop point.
+  const handleCanvasDragOver = React.useCallback((e: React.DragEvent) => {
+    if (Array.from(e.dataTransfer.types).includes(CATALOG_ENTRY_MIME_TYPE)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const handleCanvasDrop = React.useCallback(
+    async (e: React.DragEvent) => {
+      const entryId = e.dataTransfer.getData(CATALOG_ENTRY_MIME_TYPE);
+      if (!entryId || !getEntry(entryId)) return;
+      e.preventDefault();
+      const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      // D30 single instance: a drag-drop placement closes the picker too (not
+      // just Enter/"Place" via handlePlaceAtCentre) -- otherwise it stays
+      // open, covering the canvas.
+      setComponentPickerOpen(false);
+      await applyPlacement(entryId, flowPoint);
+    },
+    [reactFlow, applyPlacement],
+  );
+
+  // ==========================================================================
+  // RV-12e: Connect tool -- planConnection / completeConnection
+  // ==========================================================================
+
+  const [rejectMessage, setRejectMessage] = React.useState<RejectMessage | null>(null);
+  const [resourceForm, setResourceForm] = React.useState<ResourceFormState | null>(null);
+
+  React.useEffect(() => {
+    if (!rejectMessage) return;
+    const timer = setTimeout(() => setRejectMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [rejectMessage]);
+
+  const handleConnectEnd = React.useCallback(
+    async (event: MouseEvent | TouchEvent, connectionState: unknown) => {
+      if (!document || !projection.activeView || isSaving) return;
+      const state = connectionState as {
+        isValid: boolean | null;
+        fromNode: { id: string } | null;
+        fromHandle: { type: 'source' | 'target' } | null;
+        toNode: { id: string } | null;
+      };
+      const fromNodeId = state.fromNode?.id ?? null;
+      const toNodeId = state.toNode?.id ?? null;
+      if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) return;
+
+      // A connection can be dragged starting from either handle; normalize to
+      // sourceNodeId (the 'out' side) -> targetNodeId (the 'in' side).
+      const startedFromSource = state.fromHandle?.type !== 'target';
+      const sourceNodeId = startedFromSource ? fromNodeId : toNodeId;
+      const targetNodeId = startedFromSource ? toNodeId : fromNodeId;
+
+      const clientPoint =
+        'changedTouches' in event && event.changedTouches.length > 0
+          ? { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY }
+          : { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
+
+      const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+      const targetNode = nodes.find((n) => n.id === targetNodeId);
+      const sourceData = sourceNode?.data as unknown as ProjectedNodeData | undefined;
+      const targetData = targetNode?.data as unknown as ProjectedNodeData | undefined;
+      if (!sourceData || sourceData.kind !== 'element' || !targetData || targetData.kind !== 'element') {
+        return;
+      }
+
+      const sourceElement = sourceData.element;
+      const targetElement = targetData.element;
+      const sourcePort = sourceElement.ports.find((p) => p.direction === 'out' && p.channel !== 'event');
+      if (!sourcePort) {
+        setRejectMessage({ text: `'${sourceElement.label}' has no outbound port to connect from.`, ...clientPoint });
+        return;
+      }
+
+      const result = planConnection({
+        document,
+        viewId: projection.activeView.id,
+        source: { elementId: sourceElement.id, portId: sourcePort.id },
+        target: { elementId: targetElement.id },
+        mintId,
+      });
+
+      if (result.kind === 'rejected') {
+        setRejectMessage({
+          text: result.issues[0]?.message ?? 'This connection is not allowed.',
+          ...clientPoint,
+        });
+        return;
+      }
+      if (result.kind === 'needs-resource-metadata') {
+        setResourceForm({
+          draft: result.draft,
+          ...clientPoint,
+          requestClass: '',
+          operation: 'read',
+          deadlineMs: '',
+          error: null,
+        });
+        return;
+      }
+      await onApplyChanges(result.changes, 'Connect');
+    },
+    [document, projection.activeView, isSaving, nodes, mintId, onApplyChanges],
+  );
+
+  const cancelResourceForm = React.useCallback(() => setResourceForm(null), []);
+
+  const confirmResourceForm = React.useCallback(async () => {
+    if (!resourceForm) return;
+    const deadline = Number(resourceForm.deadlineMs);
+    if (resourceForm.requestClass.trim().length === 0) {
+      setResourceForm({ ...resourceForm, error: 'Request class is required.' });
+      return;
+    }
+    if (!Number.isFinite(deadline) || deadline <= 0) {
+      setResourceForm({ ...resourceForm, error: 'Deadline must be a positive number of ms.' });
+      return;
+    }
+    // catalog.md resolution 8: the form asks for request class (text),
+    // read/write and deadline; requestClassId stays a UUID-shaped
+    // classification token, never resolved against a RequestClass record
+    // (model-and-runner.md §6). A fresh id is minted per confirm to satisfy
+    // that shape.
+    //
+    // KNOWN GAP (out of this task's scope): decisions.md D43(b) later adds a
+    // presentation-only `ResourceCallMetadata.requestClassLabel` so the typed
+    // text can be persisted and reused by label instead of re-minting an id
+    // per connection. Wiring that needs a shared-model change (model.ts /
+    // validate.ts) plus matching support in the catalog compiler
+    // (src/features/catalog/connect.ts's ResourceMetadataInput/
+    // completeConnection) -- neither file is in this task's allowed-write
+    // set, and connect.ts's own tests assume the current (label-less) shape.
+    // Until that lands, the typed text here is validation-only (the field
+    // must be filled in) and is not persisted; only the minted id is stored.
+    const result = completeConnection(resourceForm.draft, {
+      requestClassId: mintId(),
+      operation: resourceForm.operation,
+      deadlineDurationMs: deadline,
+    });
+    if (!result.ok) {
+      setResourceForm({ ...resourceForm, error: result.issues[0]?.message ?? 'Invalid metadata.' });
+      return;
+    }
+    setResourceForm(null);
+    await onApplyChanges(result.changes, 'Connect');
+  }, [resourceForm, onApplyChanges, mintId]);
+
+  // ==========================================================================
+  // RV-12e: Delete -- Delete/Backspace on canvas focus, or the 16D toolbar
+  // ==========================================================================
+
+  const [deleteConfirm, setDeleteConfirm] = React.useState<DeletePlan | null>(null);
+
+  const currentSelection = React.useMemo(
+    () => ({
+      elementIds: Array.from(selectedElementIds ?? []),
+      connectionIds: Array.from(selectedConnectionIds ?? []),
+    }),
+    [selectedElementIds, selectedConnectionIds],
+  );
+  const hasSelection = currentSelection.elementIds.length > 0 || currentSelection.connectionIds.length > 0;
+
+  const runDeletePlan = React.useCallback(
+    (plan: DeletePlan) => {
+      if (plan.changes.length === 0) return;
+      if (plan.requiresConfirmation) {
+        setDeleteConfirm(plan);
+        return;
+      }
+      void onApplyChanges(plan.changes, 'Delete').then((applied) => {
+        if (applied) onRequestClearSelection?.();
+      });
+    },
+    [onApplyChanges, onRequestClearSelection],
+  );
+
+  const handleDeleteSelection = React.useCallback(() => {
+    if (!document || !projection.activeView || isSaving || !hasSelection) return;
+    const plan = planDelete(document, projection.activeView.id, currentSelection);
+    runDeletePlan(plan);
+  }, [document, projection.activeView, isSaving, hasSelection, currentSelection, runDeletePlan]);
+
+  const confirmDelete = React.useCallback(async () => {
+    if (!deleteConfirm) return;
+    const applied = await onApplyChanges(deleteConfirm.changes, 'Delete');
+    setDeleteConfirm(null);
+    if (applied) onRequestClearSelection?.();
+  }, [deleteConfirm, onApplyChanges, onRequestClearSelection]);
+
+  const handleCanvasKeyDown = React.useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (!hasSelection) return;
+      e.preventDefault();
+      handleDeleteSelection();
+    },
+    [hasSelection, handleDeleteSelection],
+  );
+
   if (projection.empty) {
     return (
       <div
@@ -270,8 +577,13 @@ function CanvasFlowInner({
 
   return (
     <div
+      ref={containerRef}
       data-testid="canvas-container"
-      className="relative flex-1 w-full h-full overflow-hidden bg-canvas"
+      tabIndex={0}
+      onKeyDown={handleCanvasKeyDown}
+      onDragOver={handleCanvasDragOver}
+      onDrop={(e) => void handleCanvasDrop(e)}
+      className="relative flex-1 w-full h-full overflow-hidden bg-canvas outline-none"
     >
       {/* View selector when the document has more than one view */}
       {projection.hasMultipleViews && (
@@ -315,6 +627,27 @@ function CanvasFlowInner({
         </div>
       )}
 
+      {/* 16D "Selection-scoped actions" -- delete only, per this task's scope */}
+      {hasSelection && (
+        <div
+          data-testid="selection-toolbar"
+          className="absolute top-3 right-3 z-10 flex items-center gap-1 px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
+        >
+          <Button
+            data-testid="selection-delete-btn"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-destructive hover:text-destructive"
+            aria-label="Delete selection"
+            disabled={isSaving}
+            onClick={handleDeleteSelection}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      )}
+
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -326,8 +659,9 @@ function CanvasFlowInner({
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        onConnectEnd={(event, state) => void handleConnectEnd(event, state)}
         nodesDraggable={!isSaving}
-        nodesConnectable={false}
+        nodesConnectable={!isSaving}
         panOnDrag={dragMode === 'pan'}
         selectionOnDrag={dragMode === 'select'}
         panOnScroll
@@ -351,6 +685,111 @@ function CanvasFlowInner({
         <Background color="var(--control-border)" gap={16} size={1} />
       </ReactFlow>
 
+      {/* Connect: rejected -- small inline message near the pointer/edge */}
+      {rejectMessage && (
+        <div
+          data-testid="connect-rejected-message"
+          role="status"
+          className="fixed z-tooltip max-w-xs px-2.5 py-1.5 rounded-control bg-destructive text-white text-xs shadow-raised pointer-events-none"
+          style={{ left: rejectMessage.x + 12, top: rejectMessage.y + 12 }}
+        >
+          {rejectMessage.text}
+        </div>
+      )}
+
+      {/* Connect into a resource: compact popover form at the drop point */}
+      {resourceForm && (
+        <div
+          data-testid="connect-resource-form"
+          role="dialog"
+          aria-label="Connection details"
+          className="fixed z-modal w-64 p-3 rounded-card border border-control-border bg-panel shadow-floating text-xs"
+          style={{ left: Math.min(resourceForm.x, window.innerWidth - 272), top: Math.min(resourceForm.y, window.innerHeight - 220) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              cancelResourceForm();
+            } else if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+              e.preventDefault();
+              void confirmResourceForm();
+            }
+          }}
+        >
+          <div className="font-semibold text-ink mb-2">Connection details</div>
+
+          <label className="block mb-2">
+            <span className="block text-secondary-text mb-0.5">Request class</span>
+            <input
+              data-testid="connect-form-request-class"
+              autoFocus
+              type="text"
+              value={resourceForm.requestClass}
+              onChange={(e) => setResourceForm({ ...resourceForm, requestClass: e.target.value, error: null })}
+              className="w-full h-7 px-2 rounded-tag border border-control-border bg-canvas text-ink"
+            />
+          </label>
+
+          <fieldset className="mb-2">
+            <legend className="text-secondary-text mb-0.5">Operation</legend>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1">
+                <input
+                  data-testid="connect-form-op-read"
+                  type="radio"
+                  name="operation"
+                  checked={resourceForm.operation === 'read'}
+                  onChange={() => setResourceForm({ ...resourceForm, operation: 'read', error: null })}
+                />
+                read
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  data-testid="connect-form-op-write"
+                  type="radio"
+                  name="operation"
+                  checked={resourceForm.operation === 'write'}
+                  onChange={() => setResourceForm({ ...resourceForm, operation: 'write', error: null })}
+                />
+                write
+              </label>
+            </div>
+          </fieldset>
+
+          <label className="block mb-2">
+            <span className="block text-secondary-text mb-0.5">Deadline (ms)</span>
+            <input
+              data-testid="connect-form-deadline"
+              type="number"
+              min={1}
+              value={resourceForm.deadlineMs}
+              onChange={(e) => setResourceForm({ ...resourceForm, deadlineMs: e.target.value, error: null })}
+              className="w-full h-7 px-2 rounded-tag border border-control-border bg-canvas text-ink"
+            />
+          </label>
+
+          {resourceForm.error && (
+            <p data-testid="connect-form-error" className="text-destructive mb-2">
+              {resourceForm.error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-1.5">
+            <Button type="button" variant="ghost" size="sm" onClick={cancelResourceForm}>
+              Cancel
+            </Button>
+            <Button
+              data-testid="connect-form-confirm"
+              type="button"
+              variant="tint"
+              size="sm"
+              onClick={() => void confirmResourceForm()}
+            >
+              Connect
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* 16A Canvas Dock */}
       <FloatingDock
         dragMode={dragMode}
@@ -363,7 +802,55 @@ function CanvasFlowInner({
         onZoomOut={handleZoomOut}
         onFitView={handleFitView}
         zoom={zoom}
+        onToggleComponentPicker={() => setComponentPickerOpen((v) => !v)}
+        componentPickerOpen={componentPickerOpen}
+        disabled={isSaving}
       />
+
+      {/* 16E LibraryPicker, anchored above the dock -- D30 single instance */}
+      {componentPickerOpen && (
+        <div
+          ref={pickerContainerRef}
+          data-testid="component-picker-anchor"
+          className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-dock px-4 w-full max-w-[640px]"
+        >
+          <LibraryPicker
+            onPlace={(entryId) => void handlePlaceAtCentre(entryId)}
+            onOpenFullLibrary={() => {}}
+            onClose={closeComponentPicker}
+          />
+        </div>
+      )}
+
+      {/* Delete confirmation when a scenario references what would be removed */}
+      <Dialog open={deleteConfirm !== null} onOpenChange={(next) => { if (!next) setDeleteConfirm(null); }}>
+        <DialogContent data-testid="delete-confirm-dialog" className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete will affect scenarios</DialogTitle>
+            <DialogDescription>
+              {deleteConfirm && (
+                <>
+                  These scenarios reference what you're deleting and will need attention:{' '}
+                  <strong>{deleteConfirm.affectedScenarioLabels.join(', ')}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setDeleteConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              data-testid="delete-confirm-btn"
+              type="button"
+              variant="destructive"
+              onClick={() => void confirmDelete()}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

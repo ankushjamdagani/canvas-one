@@ -104,6 +104,14 @@ export type ProjectedNodeData =
       readonly placement: Placement;
       readonly layer: CatalogLayer | null;
       readonly stripeColor: string | null;
+      /**
+       * RV-12e: ports render as connectable handles only while the Connect
+       * tool/gesture is active (commands.md §4, "Handles become interactive
+       * only in Connect mode/drag"). Not part of the pure projection itself --
+       * CanvasView sets this per current dragMode, so projectDocumentToCanvas
+       * stays a pure function of Document + activeViewId.
+       */
+      readonly connectable?: boolean;
     }
   | {
       readonly kind: 'group';

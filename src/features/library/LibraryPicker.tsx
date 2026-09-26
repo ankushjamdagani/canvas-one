@@ -334,11 +334,19 @@ export function LibraryPicker({
         <div className="text-[11px] font-mono text-[var(--color-secondary-text,#626D68)]">
           ↵ place at centre · drag to position
         </div>
+        {/*
+          RV-12e: the docked Library panel is a later task (D30's "single
+          instance" is this picker for now) -- rendered disabled with the
+          reason, per this task's brief, rather than wired to a panel that
+          doesn't exist yet. `onOpenFullLibrary` is intentionally unused.
+        */}
         <button
           type="button"
-          onClick={onOpenFullLibrary}
-          aria-label="Browse full library"
-          className="flex items-center gap-1 font-medium text-[var(--color-primary,#0B5C54)] hover:text-[var(--color-primary-hover,#0A4E47)] hover:underline cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none rounded px-1 py-0.5"
+          disabled
+          aria-disabled="true"
+          aria-label="Browse full library (unavailable): Library panel arrives with panel docking"
+          title="Library panel arrives with panel docking"
+          className="flex items-center gap-1 font-medium text-[var(--color-secondary-text,#626D68)] cursor-not-allowed rounded px-1 py-0.5"
         >
           <span>Browse full library</span>
           <ExternalLink className="w-3 h-3" />
