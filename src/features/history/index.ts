@@ -7,3 +7,5 @@ export * from './diffSummary';
 export * from './controller';
 export * from './HistoryLadder';
 export * from './CommitPanel';
+export * from './publishController';
+export * from './PublishFlow';

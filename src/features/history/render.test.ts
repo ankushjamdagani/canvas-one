@@ -84,6 +84,7 @@ describe('HistoryLadder static markup (22A)', () => {
         onUndo: vi.fn(),
         onRedo: vi.fn(),
         onOpenCommit: vi.fn(),
+        onOpenPublish: vi.fn(),
       }),
     );
 
@@ -100,7 +101,10 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(html).toContain('2.2.1');
     expect(html).toContain('Commit');
     expect(html).toContain('Publish draft to main');
-    expect(html).toContain('Publishing arrives in the next step');
+    const publishButtonMatch = html.match(/<button[^>]*data-testid="open-publish-button"[^>]*>/);
+    expect(publishButtonMatch).not.toBeNull();
+    expect(publishButtonMatch![0]).not.toContain('disabled=""');
+    expect(publishButtonMatch![0]).toContain('aria-disabled="false"');
 
     for (const text of EXCLUDED_TEXTS) {
       expect(html.toLowerCase()).not.toContain(text.toLowerCase());
@@ -122,6 +126,26 @@ describe('HistoryLadder static markup (22A)', () => {
 
     expect(html).toContain('Main never holds edits');
     expect(html).toContain('disabled');
+  });
+
+  it('disables Publish with a stated reason before the branch has any commits', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        branchName: 'feature/checkout',
+        isMain: false,
+        workingEdits: [],
+        checkpoints: [],
+        commits: [],
+        publications: [],
+        onOpenCommit: vi.fn(),
+        onOpenPublish: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('Commit at least once before publishing');
+    const publishButtonMatch = html.match(/<button[^>]*data-testid="open-publish-button"[^>]*>/);
+    expect(publishButtonMatch).not.toBeNull();
+    expect(publishButtonMatch![0]).toContain('disabled=""');
   });
 
   it('omits "ahead of" when not computable, and omits fields-changed line when not computable', () => {

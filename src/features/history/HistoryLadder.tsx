@@ -57,6 +57,7 @@ export interface HistoryLadderProps {
   readonly onSaveCheckpoint?: (label: string) => Promise<unknown> | void;
   readonly onRestore?: (snapshotIdOrCheckpointId: string, label: string) => Promise<unknown> | void;
   readonly onOpenCommit?: () => void;
+  readonly onOpenPublish?: () => void;
   readonly onClose?: () => void;
   readonly className?: string;
 }
@@ -78,6 +79,7 @@ export function HistoryLadder({
   onSaveCheckpoint: propOnSaveCheckpoint,
   onRestore: propOnRestore,
   onOpenCommit,
+  onOpenPublish,
   onClose,
   className,
 }: HistoryLadderProps): React.JSX.Element {
@@ -627,13 +629,28 @@ export function HistoryLadder({
           {workingEdits.length > 0 ? ` · ${workingEdits.length} edit${workingEdits.length === 1 ? '' : 's'}` : ''}
         </Button>
 
-        {/* Disabled Publish Link per prompt */}
+        {/* Publish affordance: opens PublishFlow (RV-11b). Disabled on main (D40)
+         * and while the branch has no committed head yet (prepare-publish
+         * requires a committed source head per transactions.md §4). */}
         <button
           type="button"
-          disabled
-          aria-disabled="true"
-          title="Publishing arrives in the next step"
-          className="w-full text-xs text-muted-foreground text-center py-1 cursor-not-allowed opacity-60 block select-none"
+          data-testid="open-publish-button"
+          disabled={isMain || commits.length === 0 || !onOpenPublish}
+          aria-disabled={isMain || commits.length === 0 || !onOpenPublish}
+          title={
+            isMain
+              ? mainCommitDisabledReason
+              : commits.length === 0
+                ? 'Commit at least once before publishing'
+                : undefined
+          }
+          onClick={onOpenPublish}
+          className={cn(
+            'w-full text-xs text-center py-1 block select-none',
+            isMain || commits.length === 0 || !onOpenPublish
+              ? 'text-muted-foreground cursor-not-allowed opacity-60'
+              : 'text-primary hover:underline font-medium',
+          )}
         >
           Publish draft to main
         </button>
