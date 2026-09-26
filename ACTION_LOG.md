@@ -1225,3 +1225,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Gemini (RV-12c4 build; quota hit mid-review), Sonnet subagents (RV-03s, RV-12c4 fixes, RV-12d; one Sonnet rate-limit interruption resumed); Claude review with screenshots each round.
 - **Verification**: 848 unit, `npx tsc -b`, build, production e2e 6 passed / 4 skipped (specimen dev-only).
 - **Limitations**: Scenario editing waits for the inspector (RV-05); no add/connect yet (RV-06a catalog module in progress); canvas doesn't refit when results details expand.
+
+## 2026-09-27
+
+### RV-11a history ladder + commit panel
+
+- **Outcome**: `c3f49df` merged on the UI line @ `a891c5a`. `src/features/history/`: HistoryController (checkpoint/restore/commit on the repository commands), HistoryLadder (22A/22B), CommitPanel (commit gate). Not wired into the shell yet.
+- **Platform**: Gemini (agy) build, quota exhausted mid-task; Sonnet subagent finished, one review round; Claude reviewer.
+- **Review round**: removed invented fallbacks (branch 'main', restore label, 'Unlabelled', readiness text); restore now needs a user-entered label; fixture/refinement changes no longer show raw IDs.
+- **Verification**: 1106 unit (one earlier run timed out one repository test under machine load; rerun clean), `npx tsc -b`, `npm run build`.
+- **Limitations**: raw Tailwind amber classes (primitive precedent); publish/merge is RV-11b.
