@@ -1278,3 +1278,14 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Sonnet subagent, one review round (interrupted once by the Sonnet limit and resumed); Claude reviewer.
 - **Verification**: 1203 unit, `npx tsc -b`, build, production e2e 23 passed / 4 skipped; screenshots in the rv-12h worktree `artifacts/rv-12h/`.
 - **Limitations**: duplicated panel headers, clipped Library cards, "current none" copy, preferences in memory only.
+
+### RV-05c scenario switcher, editor and dialogs
+
+- **Outcome**: merged on the UI line @ `96a3284`. Self-contained `src/features/scenarios/` (D41) — not mounted yet.
+- **Platform**: Sonnet subagent, one review round (invented defaults removed), resumed once after the Sonnet limit; Claude reviewer.
+- **Verification**: 1225 unit, `npx tsc -b`, build, production e2e 23 passed / 4 skipped; preview screenshots in `artifacts/rv-05c/`.
+- **Limitations**: no boundary authoring (Guard builder), nested assertion paths, payload bindings; mounting pending.
+
+### Session stop
+
+- **Status**: user asked to stop picking new work (weekly limit). HANDOFF "Current (2026-09-28)" lists state, unmounted modules, debt and next candidates for the next models.
