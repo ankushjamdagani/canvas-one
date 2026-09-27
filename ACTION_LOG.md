@@ -1249,3 +1249,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Codex executor (sandbox blocked Chromium, so no e2e from Codex); Claude reviewer + e2e.
 - **Verification**: 1126 unit, `npx tsc -b`, build; production e2e 12 passed / 4 skipped with one drag test timing out per full run (different test each run; studio-authoring passes 5/5 alone).
 - **Limitations**: flaky drag-based authoring e2e on the S05 layout (debt); combined fixture has two "Order" classes.
+
+### RV-12g authoring e2e stability (user request)
+
+- **Outcome**: `4193346` merged on the UI line @ `3d76460`. The flakes traced to three app bugs, all fixed in `CanvasView.tsx`: nodes lost their ReactFlow measurement on every document sync (a node could stay hidden with its edges), the `fitView` prop moved the camera after the first placement on an empty view, and ReactFlow's Backspace removed nodes locally even when the delete preview was cancelled. Authoring e2e rewritten as small tests on blank projects with condition waits; `save-status` gains `data-state`.
+- **Platform**: Claude (lead) directly — Sonnet rate-limited, Codex sandbox can't run Chromium.
+- **Verification**: 1126 unit, `npx tsc -b`, build; authoring spec 135/135 under load with no retries; full production e2e 17 passed / 4 skipped ×3; the Backspace test fails with the fix removed.
