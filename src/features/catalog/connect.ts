@@ -44,6 +44,7 @@ export type ConnectionDraft = {
 
 export type ResourceMetadataInput = {
   readonly requestClassId: Id;
+  readonly requestClassLabel: string;
   readonly operation: 'read' | 'write';
   readonly deadlineDurationMs: number;
   readonly key?: string | null;
@@ -517,6 +518,16 @@ export function completeConnection(
     };
   }
 
+  if (typeof metadata.requestClassLabel !== 'string' ||
+      Array.from(metadata.requestClassLabel).length < 1 ||
+      Array.from(metadata.requestClassLabel).length > 60) {
+    return {
+      ok: false,
+      kind: 'rejected',
+      issues: [createIssue('out-of-range', 'Request class must contain 1–60 characters', ['metadata', 'requestClassLabel'])],
+    };
+  }
+
   if (metadata.operation !== 'read' && metadata.operation !== 'write') {
     return {
       ok: false,
@@ -546,6 +557,7 @@ export function completeConnection(
 
   const resourceCallMetadata: ResourceCallMetadata = {
     requestClassId: metadata.requestClassId,
+    requestClassLabel: metadata.requestClassLabel,
     operation: metadata.operation,
     key: metadata.key ?? null,
     tags: metadata.tags ?? [],

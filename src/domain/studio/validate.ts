@@ -1441,6 +1441,7 @@ export function validateDocument(
   // Section D: Connections (§2 & §4)
   // ==========================================================================
   if (validateArray(doc.connections, 200, ['connections'], docId, issues, 'Document connections')) {
+    const requestClassLabels = new Map<string, string>();
     const connections = doc.connections as unknown[];
     for (let cIdx = 0; cIdx < connections.length; cIdx++) {
       const c = connections[cIdx];
@@ -1475,6 +1476,26 @@ export function validateDocument(
 
         // Connection config
         validateConnectionConfig(c.kind, c.config, [...cPath, 'config'], cId, issues);
+        if ((c.kind === 'call' || c.kind === 'message') &&
+            c.config !== null && typeof c.config === 'object' && 'resource' in c.config) {
+          const resource = c.config.resource;
+          if (resource !== null && typeof resource === 'object' &&
+              'requestClassId' in resource && typeof resource.requestClassId === 'string' &&
+              'requestClassLabel' in resource && typeof resource.requestClassLabel === 'string') {
+            const previous = requestClassLabels.get(resource.requestClassId);
+            if (previous !== undefined && previous !== resource.requestClassLabel) {
+              issues.push({
+                code: 'structural-rule',
+                path: [...cPath, 'config', 'resource', 'requestClassLabel'],
+                entityId: cId,
+                severity: 'error',
+                message: 'Connections with the same request class must use the same label',
+              });
+            } else {
+              requestClassLabels.set(resource.requestClassId, resource.requestClassLabel);
+            }
+          }
+        }
       }
     }
   }
@@ -2627,10 +2648,11 @@ function validateResourceCallMetadata(
   issues: Issue[],
 ): void {
   if (res === null) return;
-  if (checkRecord(res, ['requestClassId', 'operation', 'key', 'tags', 'deadlineDurationMs'], ['requestClassId', 'operation', 'key', 'tags', 'deadlineDurationMs'], path, entityId, issues, 'ResourceCallMetadata')) {
+  if (checkRecord(res, ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags', 'deadlineDurationMs'], ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags', 'deadlineDurationMs'], path, entityId, issues, 'ResourceCallMetadata')) {
     const rec = res as Record<string, unknown>;
     // requestClassId is a classification token, not a reference
     validateId(rec.requestClassId, [...path, 'requestClassId'], entityId, issues);
+    validateString(rec.requestClassLabel, 1, 60, [...path, 'requestClassLabel'], entityId, issues, 'Request class label');
     if (rec.operation !== 'read' && rec.operation !== 'write') {
       issues.push({
         code: 'invalid-literal',

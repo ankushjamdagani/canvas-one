@@ -276,7 +276,7 @@ describe('fieldsForConnection', () => {
         weight: 1,
         condition: { field: 'class', value: 'premium' },
         fallback: true,
-        resource: { requestClassId: 'rc1', operation: 'write', key: null, tags: [], deadlineDurationMs: 500 },
+        resource: { requestClassId: 'rc1', requestClassLabel: 'Order', operation: 'write', key: null, tags: [], deadlineDurationMs: 500 },
       },
     } as Partial<Connection>);
     const fields = fieldsForConnection(withExtras);

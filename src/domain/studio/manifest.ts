@@ -43,7 +43,10 @@ import type {
   Shape,
   Connection,
   ConnectionKind,
-  ConnectionConfig,
+  DataConnectionConfig,
+  CallConnectionConfig,
+  MessageConnectionConfig,
+  ResourceCallMetadata,
   Relation,
   Refinement,
   PortMapping,
@@ -101,7 +104,10 @@ export type ManifestConnection = {
   readonly kind: ConnectionKind;
   readonly source: Endpoint;
   readonly target: Endpoint;
-  readonly config: ConnectionConfig;
+  readonly config: DataConnectionConfig |
+    ((Omit<CallConnectionConfig, 'resource'> | Omit<MessageConnectionConfig, 'resource'>) & {
+      readonly resource: Omit<ResourceCallMetadata, 'requestClassLabel'> | null;
+    });
 };
 
 export type ManifestStructuralConstraint =
@@ -363,7 +369,22 @@ export async function buildManifest(
     const c = connectionsById.get(id);
     if (!c) throw new Error(`buildManifest: included connection '${id}' missing from document (invariant violated)`);
     assertClosedKeys(c as unknown as Record<string, unknown>, CONNECTION_KEYS, 'Connection', c.id);
-    return { id: c.id, kind: c.kind, source: c.source, target: c.target, config: c.config };
+    let config: ManifestConnection['config'] = c.config;
+    if ((c.kind === 'call' || c.kind === 'message') && c.config.resource !== null) {
+      const resource = c.config.resource;
+      assertClosedKeys(resource, ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags', 'deadlineDurationMs'], 'ResourceCallMetadata', c.id);
+      config = {
+        ...c.config,
+        resource: {
+          requestClassId: resource.requestClassId,
+          operation: resource.operation,
+          key: resource.key,
+          tags: resource.tags,
+          deadlineDurationMs: resource.deadlineDurationMs,
+        },
+      };
+    }
+    return { id: c.id, kind: c.kind, source: c.source, target: c.target, config };
   }).sort(byId);
 
   // --------------------------------------------------------------------------

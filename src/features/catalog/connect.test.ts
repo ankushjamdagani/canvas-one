@@ -177,14 +177,26 @@ describe('connect.ts', () => {
     // Reject invalid metadata
     const badComplete = completeConnection(plan.draft, {
       requestClassId: '',
+      requestClassLabel: 'Order',
       operation: 'read',
       deadlineDurationMs: 0,
     });
     expect(badComplete.ok).toBe(false);
 
+    const requestClassId = mintId();
+    for (const requestClassLabel of ['', '😀'.repeat(61)]) {
+      expect(completeConnection(plan.draft, {
+        requestClassId, requestClassLabel, operation: 'read', deadlineDurationMs: 500,
+      }).ok).toBe(false);
+    }
+    expect(completeConnection(plan.draft, {
+      requestClassId, requestClassLabel: '😀'.repeat(60), operation: 'read', deadlineDurationMs: 500,
+    }).ok).toBe(true);
+
     // Complete with valid metadata
     const complete = completeConnection(plan.draft, {
-      requestClassId: mintId(),
+      requestClassId,
+      requestClassLabel: 'Order',
       operation: 'read',
       deadlineDurationMs: 500,
     });
@@ -194,7 +206,8 @@ describe('connect.ts', () => {
 
     const connChange = complete.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'connection');
     expect((connChange as any).value.record.config.resource).toEqual({
-      requestClassId: expect.any(String),
+      requestClassId,
+      requestClassLabel: 'Order',
       operation: 'read',
       key: null,
       tags: [],
@@ -236,6 +249,7 @@ describe('connect.ts', () => {
 
     const comp1 = completeConnection(plan1.draft, {
       requestClassId: mintId(),
+      requestClassLabel: 'Order',
       operation: 'read',
       deadlineDurationMs: 200,
     });
@@ -262,6 +276,7 @@ describe('connect.ts', () => {
 
     const comp2 = completeConnection(plan2.draft, {
       requestClassId: mintId(),
+      requestClassLabel: 'Order',
       operation: 'read',
       deadlineDurationMs: 200,
     });
