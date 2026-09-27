@@ -17,7 +17,7 @@ import type { AheadOfVersionInfo, RecordChangeItem } from './types';
 // Record label lookup
 // ============================================================================
 
-function findRecordLabel(doc: Document | null, recordKind: string, id: Id): string | null {
+export function findRecordLabel(doc: Document | null, recordKind: string, id: Id): string | null {
   if (!doc) return null;
 
   switch (recordKind) {
@@ -51,7 +51,7 @@ function findRecordLabel(doc: Document | null, recordKind: string, id: Id): stri
  * payload schema's label when the schema is still resolvable, or by kind alone —
  * never by its raw id.
  */
-function describeFixtureLabel(doc: Document | null, id: Id): string | null {
+export function describeFixtureLabel(doc: Document | null, id: Id): string | null {
   if (!doc) return null;
   const fixture = doc.fixtures.find((f) => f.id === id);
   if (!fixture) return null;
@@ -64,12 +64,42 @@ function describeFixtureLabel(doc: Document | null, id: Id): string | null {
  * has no label. Describe it by its owning element's label when resolvable, or by
  * kind alone — never by its raw id.
  */
-function describeRefinementLabel(doc: Document | null, id: Id): string | null {
+export function describeRefinementLabel(doc: Document | null, id: Id): string | null {
   if (!doc) return null;
   const refinement = doc.refinements.find((r) => r.id === id);
   if (!refinement) return null;
   const owner = doc.elements.find((e) => e.id === refinement.ownerElementId);
   return owner ? `Refinement · ${owner.label}` : 'Refinement';
+}
+
+/**
+ * Resolves a record's real display label by trying each candidate document in
+ * order (e.g. ours, theirs, base — whichever side still has the record) and
+ * falling back to a kind-only description for fixtures/refinements, which have
+ * no label of their own. Never falls back to the raw ID: returns null when the
+ * record cannot be found in any supplied document, and the caller decides how
+ * to surface that (e.g. a document-kind conflict has no record to look up).
+ */
+export function findRecordLabelAcrossDocuments(
+  docs: readonly (Document | null)[],
+  recordKind: string,
+  id: Id,
+): string | null {
+  for (const doc of docs) {
+    if (recordKind === 'fixture') {
+      const label = describeFixtureLabel(doc, id);
+      if (label) return label;
+      continue;
+    }
+    if (recordKind === 'refinement') {
+      const label = describeRefinementLabel(doc, id);
+      if (label) return label;
+      continue;
+    }
+    const label = findRecordLabel(doc, recordKind, id);
+    if (label) return label;
+  }
+  return null;
 }
 
 // ============================================================================

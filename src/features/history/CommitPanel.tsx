@@ -20,6 +20,7 @@ import type { ScenarioStatus, ScenarioWithStatus } from '../runs/scenarioStatus'
 import type { HistoryController } from './controller';
 import { computeChangesList } from './diffSummary';
 import type { RecordChangeItem } from './types';
+import { requireResultMessage, ResultMessageContractError } from './resultMessage';
 
 export interface CommitPanelProps {
   readonly controller?: HistoryController;
@@ -104,7 +105,7 @@ export function CommitPanel({
         if (!propScenariosWithStatus) setScenarios(preview.scenarios);
       } catch (err) {
         if (isMounted) {
-          setCommitError(err instanceof Error ? err.message : 'Error loading scenario statuses');
+          setCommitError(requireResultMessage(err));
         }
       }
     }
@@ -149,18 +150,17 @@ export function CommitPanel({
       } else if (controller) {
         const res = await controller.commit(trimmedMessage);
         if (res.status !== 'applied') {
-          if ('issues' in res && res.issues.length > 0) {
-            setCommitError(res.issues[0].message);
-          } else if (res.status === 'stale') {
+          if (res.status === 'stale') {
             setCommitError('Working copy changed concurrently. Please reload.');
           } else {
-            setCommitError(`Commit failed with status: ${res.status}`);
+            setCommitError(requireResultMessage(res));
           }
           return;
         }
       }
     } catch (err) {
-      setCommitError(err instanceof Error ? err.message : 'Failed to commit');
+      if (err instanceof ResultMessageContractError) throw err;
+      setCommitError(requireResultMessage(err));
     } finally {
       setIsCommitting(false);
     }
@@ -331,7 +331,7 @@ export function CommitPanel({
                           size="sm"
                           className="h-7 px-2.5 text-xs"
                           disabled={isNotReady}
-                          title={isNotReady ? (status as { issues: readonly { message: string }[] }).issues[0]?.message : undefined}
+                          title={status.kind === 'not-ready' ? status.issues[0]?.message : undefined}
                           onClick={() => onRunScenario?.(scenario.id)}
                         >
                           <Play className="size-3 mr-1 fill-current" />
