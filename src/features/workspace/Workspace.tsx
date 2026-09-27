@@ -2,13 +2,32 @@ import * as React from 'react';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
 import { TopBar } from './TopBar';
-import { CanvasView, type CanvasSelectionRequest } from './CanvasView';
+import { CanvasView, type CanvasSelectionRequest, type CanvasViewHandle } from './CanvasView';
 import { buildMoveChange } from './projection';
+import {
+  createInitialPanelState,
+  panelReducer,
+  type PanelId,
+  type WorkspacePanelState,
+  type WorkspacePanelAction,
+} from './panels';
+import { PanelHost } from '../panels';
+import {
+  HistoryController,
+  HistoryLadder,
+  CommitPanel,
+  PublishController,
+  PublishFlow,
+  DraftBehindMainBanner,
+  type CommitPreview,
+} from '../history';
+import { LibraryPanel, type LibraryView } from '../library';
 import type {
   BranchRecord,
   ProjectRecord,
   StudioRepository,
 } from '../../persistence/studio/types';
+import { createCandidateController, type Actor } from '../../persistence/studio';
 import type { Id } from '../../domain/studio/model';
 import {
   loadScenarioStatuses,
@@ -41,6 +60,29 @@ import {
 } from '../inspector';
 
 const MOBILE_BREAKPOINT_PX = 768;
+
+/** localStorage key App.tsx mints the session's Actor from (getOrCreateActorId) --
+ * read here too so HistoryController/PublishController act as the same
+ * local-human actor as the session they observe, without a new identity. */
+const ACTOR_STORAGE_KEY = 'system-studio.actor-id';
+
+function useLocalActor(): Actor {
+  return React.useMemo<Actor>(() => {
+    let actorId: string;
+    try {
+      const stored = typeof localStorage === 'undefined' ? null : localStorage.getItem(ACTOR_STORAGE_KEY);
+      if (stored) {
+        actorId = stored;
+      } else {
+        actorId = crypto.randomUUID();
+        if (typeof localStorage !== 'undefined') localStorage.setItem(ACTOR_STORAGE_KEY, actorId);
+      }
+    } catch {
+      actorId = crypto.randomUUID();
+    }
+    return { actorId, kind: 'local-human', displayName: 'You' };
+  }, []);
+}
 
 function useViewportWidth(): number {
   const [width, setWidth] = React.useState<number>(() =>
@@ -454,9 +496,6 @@ export function Workspace({
     setLastRunSnapshotId(null);
   }, [runController]);
 
-  // Scenario editing (new/duplicate/edit/rename/delete) is a real D41 command
-  // set, but the inspector editor isn't built yet (RV-12d NOTES) -- the
-  // control renders these disabled with a reason, so these handlers never fire.
   const noopScenarioEdit = React.useCallback(() => {}, []);
 
   const scenarioEntries: ScenarioEntry[] = React.useMemo(
@@ -655,6 +694,252 @@ export function Workspace({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [session, sessionState.canUndo, sessionState.canRedo, sessionState.status]);
 
+  // ==========================================================================
+  // RV-12h: History and Library panels
+  // ==========================================================================
+
+  const actor = useLocalActor();
+
+  // One HistoryController / CandidateController / PublishController per
+  // mounted workspace (mirrors the RunController pattern above), created
+  // once via a lazy state initializer rather than on every render.
+  const [historyController] = React.useState(
+    () => new HistoryController({ repository, session, mintId, actor }),
+  );
+  const [candidateController] = React.useState(() => createCandidateController({ mintId }));
+  const [publishController] = React.useState(
+    () =>
+      new PublishController({
+        repository,
+        session,
+        candidateController,
+        mintId,
+        actor,
+        // Reuses CandidateController's own already-tested runner (RV-11b) --
+        // never a bespoke one, matching the exact pattern in
+        // publishController.test.ts.
+        runScenario: (params) => candidateController.startCandidateRun(repository, params),
+      }),
+  );
+
+  // HistoryController's getState/subscribe are ordinary methods (not
+  // auto-bound arrow properties, unlike SessionController's and
+  // PublishController's), so they're wrapped here rather than passed bare --
+  // controller.ts isn't in this task's allowed files to add a `.bind` call to.
+  const historySubscribe = React.useCallback(
+    (onStoreChange: () => void) => historyController.subscribe(onStoreChange),
+    [historyController],
+  );
+  const historyGetState = React.useCallback(
+    () => historyController.getState(),
+    [historyController],
+  );
+  const historyControllerState = React.useSyncExternalStore(
+    historySubscribe,
+    historyGetState,
+    historyGetState,
+  );
+  const publishControllerState = React.useSyncExternalStore(
+    publishController.subscribe,
+    publishController.getState,
+    publishController.getState,
+  );
+
+  // Panel placement/collapse/width preferences (commands.md §7): the panel
+  // reducer's own contract defines `save` effects meant for
+  // StudioRepository.savePreferences, but the public StudioRepository
+  // surface (persistence/studio/types.ts) exposes `savePreferences` with no
+  // matching `loadPreferences` to read a prior value back on the next
+  // session -- and persistence/studio isn't in this task's allowed files.
+  // Preferences are kept in memory only for this task; see the final report.
+  const [panelState, setPanelState] = React.useState<WorkspacePanelState>(() =>
+    createInitialPanelState(
+      typeof window === 'undefined'
+        ? undefined
+        : { viewport: { width: window.innerWidth, height: window.innerHeight } },
+    ),
+  );
+
+  const panelDispatch = React.useCallback((action: WorkspacePanelAction) => {
+    setPanelState((prev) => {
+      const { state: next } = panelReducer(prev, action);
+      // 'save' effects have nowhere to persist to (see note above) and
+      // 'announce' effects have no accessible live-region sink wired into
+      // this shell yet -- both are dropped rather than invented.
+      return next;
+    });
+  }, []);
+
+  React.useEffect(() => {
+    const syncViewport = () => {
+      panelDispatch({ type: 'VIEWPORT_CHANGED', width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
+  }, [panelDispatch]);
+
+  // History panel's own view: the ladder (22A), or the commit gate (scenario
+  // "commit_gate" screen) swapped in when the ladder's Commit action fires.
+  const [historyView, setHistoryView] = React.useState<'ladder' | 'commit'>('ladder');
+  React.useEffect(() => {
+    if (!panelState.panels.history.open) setHistoryView('ladder');
+  }, [panelState.panels.history.open]);
+
+  // Returns to the ladder once a commit really lands (the controller's own
+  // commits list grows), rather than assuming success from a click.
+  const prevCommitCountRef = React.useRef(historyControllerState.commits.length);
+  React.useEffect(() => {
+    const len = historyControllerState.commits.length;
+    if (historyView === 'commit' && len > prevCommitCountRef.current) {
+      setHistoryView('ladder');
+    }
+    prevCommitCountRef.current = len;
+  }, [historyControllerState.commits.length, historyView]);
+
+  // CommitPanel's `controller` prop path also hits the unbound-method issue
+  // above (its own internal useSyncExternalStore(controller.subscribe, ...)),
+  // so its commit preview is loaded here instead, through a direct, properly
+  // bound `historyController.loadCommitPreview()` call.
+  const [commitPreview, setCommitPreview] = React.useState<CommitPreview | null>(null);
+  React.useEffect(() => {
+    if (historyView !== 'commit') return;
+    let cancelled = false;
+    void historyController.loadCommitPreview().then((preview) => {
+      if (!cancelled) setCommitPreview(preview);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [historyView, historyController]);
+
+  const [libraryView, setLibraryView] = React.useState<LibraryView>('list');
+
+  const [publishOpen, setPublishOpen] = React.useState(false);
+  const [behindMainBannerDismissed, setBehindMainBannerDismissed] = React.useState(false);
+
+  // 22E "draft behind main": proactively prepares a real publish candidate
+  // against main whenever the open branch is a non-main draft, so the real
+  // conflict count is known before the user opens Publish (matching
+  // DraftBehindMainBanner's own doc comment: "the app shell mounts [it]
+  // typically after calling PublishController.prepare()"). PublishFlow
+  // reuses this same prepared candidate when opened (its own effect only
+  // calls prepare() while status is 'idle').
+  const mainBranchId = projectRecord?.mainBranchId ?? null;
+  React.useEffect(() => {
+    if (!sessionState.projectId || !sessionState.branchId || !mainBranchId) return;
+    if (sessionState.branchId === mainBranchId) {
+      publishController.reset();
+      setPublishOpen(false);
+      setBehindMainBannerDismissed(false);
+      return;
+    }
+    setBehindMainBannerDismissed(false);
+    void publishController.prepare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionState.projectId, sessionState.branchId, mainBranchId, publishController]);
+
+  // A real conflict count from a successful prepare() -- never invented; the
+  // banner and the ladder's own behind-main callout both read this.
+  const behindMainInfo =
+    publishControllerState.status === 'review' && publishControllerState.conflicts.length > 0
+      ? {
+          conflictCount: publishControllerState.conflicts.length,
+          versionsPublishedSinceFork: publishControllerState.versionsPublishedSinceFork,
+          forkVersionKey: publishControllerState.forkVersionKey,
+        }
+      : null;
+
+  const canvasViewRef = React.useRef<CanvasViewHandle>(null);
+
+  const openLibraryPanel = React.useCallback(() => {
+    panelDispatch({ type: 'OPEN', panel: 'library' });
+  }, [panelDispatch]);
+
+  const renderPanel = React.useCallback(
+    (panelId: PanelId): React.ReactNode => {
+      if (panelId === 'history') {
+        if (historyView === 'commit') {
+          return (
+            <CommitPanel
+              workingDocument={commitPreview?.workingDocument ?? null}
+              baseDocument={commitPreview?.baseDocument ?? null}
+              changes={commitPreview?.changes ?? []}
+              scenariosWithStatus={commitPreview?.scenarios ?? []}
+              isMain={historyControllerState.isMain}
+              onCommit={async (message) => {
+                const res = await historyController.commit(message);
+                if (res.status !== 'applied') throw res;
+              }}
+              onCancel={() => setHistoryView('ladder')}
+              onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
+              onRunAll={() => void handleRunAll()}
+            />
+          );
+        }
+        return (
+          <HistoryLadder
+            branchName={historyControllerState.branch?.label ?? ''}
+            isMain={historyControllerState.isMain}
+            aheadOfVersion={historyControllerState.aheadOfVersion}
+            workingEdits={historyControllerState.workingEdits}
+            checkpoints={historyControllerState.checkpoints}
+            commits={historyControllerState.commits}
+            publications={historyControllerState.publications}
+            canUndo={sessionState.canUndo && sessionState.status === 'ready'}
+            canRedo={sessionState.canRedo && sessionState.status === 'ready'}
+            onUndo={() => void handleUndo()}
+            onRedo={() => void handleRedo()}
+            onSaveCheckpoint={async (label) => {
+              const res = await historyController.saveCheckpoint(label);
+              if (res.status !== 'applied') throw res;
+            }}
+            onRestore={async (targetId, label) => {
+              const res = await historyController.restore(targetId, label);
+              if (res.status !== 'applied') throw res;
+            }}
+            onOpenCommit={() => setHistoryView('commit')}
+            onOpenPublish={() => setPublishOpen(true)}
+            behindMain={
+              behindMainInfo
+                ? {
+                    conflictCount: behindMainInfo.conflictCount,
+                    versionsPublishedSinceFork: behindMainInfo.versionsPublishedSinceFork,
+                  }
+                : null
+            }
+            onReviewAndResolve={() => setPublishOpen(true)}
+            onClose={() => panelDispatch({ type: 'CLOSE', panel: 'history' })}
+          />
+        );
+      }
+      return (
+        <LibraryPanel
+          view={libraryView}
+          onViewChange={setLibraryView}
+          onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
+          onClose={() => panelDispatch({ type: 'CLOSE', panel: 'library' })}
+        />
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      historyView,
+      historyController,
+      historyControllerState,
+      commitPreview,
+      behindMainInfo,
+      libraryView,
+      panelDispatch,
+      sessionState.canUndo,
+      sessionState.canRedo,
+      sessionState.status,
+    ],
+  );
+
+  // Scenario editing (new/duplicate/edit/rename/delete) is a real D41 command
+  // set, but the inspector editor isn't built yet (RV-12d NOTES) -- the
+  // control renders these disabled with a reason, so these handlers never fire.
+
   const handleSwitchBranch = React.useCallback(
     (branchId: string) => {
       if (!sessionState.projectId || isSaving) return;
@@ -704,6 +989,8 @@ export function Workspace({
           isSaving={isSaving}
           hasError={hasError}
           runControl={runControl ?? runControlSlot}
+          onOpenHistory={() => panelDispatch({ type: 'OPEN', panel: 'history' })}
+          historyActive={panelState.panels.history.open}
         />
       ) : (
         <header
@@ -717,26 +1004,76 @@ export function Workspace({
           collapsed panels (23F/23G), not built here. */}
       <div className="flex flex-1 w-full max-w-full min-h-0 overflow-hidden relative">
         <main className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
-          {/* Canvas shrinks to make room for the results strip below it. */}
+          {/* Canvas shrinks to make room for the results strip below it. The
+              History and Library panels dock/float/collapse around the
+              canvas through PanelHost (RV-03a); the inspector stays its own
+              contextual region below (commands.md §5) and is never a panel. */}
           <div className="flex-1 min-h-0 relative">
-            <CanvasView
-              document={document}
-              activeViewId={activeViewId}
-              onSelectView={setActiveViewId}
-              isSaving={isSaving}
-              canUndo={sessionState.canUndo && sessionState.status === 'ready'}
-              canRedo={sessionState.canRedo && sessionState.status === 'ready'}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-              onMoveNodes={handleMoveNodes}
-              selectedElementIds={selectedElementIds}
-              selectedConnectionIds={selectedConnectionIds}
-              onRequestSelection={handleRequestSelection}
-              onRequestClearSelection={handleRequestClearSelection}
-              mintId={mintId}
-              onApplyChanges={handleApplyChanges}
+            <PanelHost
+              state={panelState}
+              dispatch={panelDispatch}
+              renderPanel={renderPanel}
+              panelBadges={{
+                history:
+                  historyControllerState.workingEdits.length > 0
+                    ? `${historyControllerState.workingEdits.length} edit${historyControllerState.workingEdits.length === 1 ? '' : 's'}`
+                    : undefined,
+              }}
+              canvas={
+                <>
+                  <CanvasView
+                    ref={canvasViewRef}
+                    document={document}
+                    activeViewId={activeViewId}
+                    onSelectView={setActiveViewId}
+                    isSaving={isSaving}
+                    canUndo={sessionState.canUndo && sessionState.status === 'ready'}
+                    canRedo={sessionState.canRedo && sessionState.status === 'ready'}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    onMoveNodes={handleMoveNodes}
+                    selectedElementIds={selectedElementIds}
+                    selectedConnectionIds={selectedConnectionIds}
+                    onRequestSelection={handleRequestSelection}
+                    onRequestClearSelection={handleRequestClearSelection}
+                    mintId={mintId}
+                    onApplyChanges={handleApplyChanges}
+                    onOpenFullLibrary={openLibraryPanel}
+                  />
+
+                  {/* 22E draft behind main: a real conflict count from
+                      PublishController.prepare(), never invented. */}
+                  {behindMainInfo && !behindMainBannerDismissed && (
+                    <div className="absolute top-3 left-3 right-3 z-dock">
+                      <DraftBehindMainBanner
+                        conflictCount={behindMainInfo.conflictCount}
+                        versionsPublishedSinceFork={behindMainInfo.versionsPublishedSinceFork}
+                        forkVersionKey={behindMainInfo.forkVersionKey}
+                        onLater={() => setBehindMainBannerDismissed(true)}
+                        onReviewAndResolve={() => {
+                          setBehindMainBannerDismissed(true);
+                          setPublishOpen(true);
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
+              }
             />
           </div>
+
+          {/* 22C/22F publish review + compare-and-resolve, driven by the same
+              proactively-prepared PublishController used for the 22E banner. */}
+          {publishOpen && (
+            <div
+              data-testid="publish-flow-overlay"
+              className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4"
+            >
+              <div className="w-full max-w-2xl max-h-[85vh] overflow-hidden">
+                <PublishFlow controller={publishController} onClose={() => setPublishOpen(false)} />
+              </div>
+            </div>
+          )}
 
           {/* Results region (RV-12d): below the canvas, not floating. Not
               rendered at all with no scenario selected and no run (blank

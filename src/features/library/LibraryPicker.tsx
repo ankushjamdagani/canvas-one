@@ -335,18 +335,17 @@ export function LibraryPicker({
           ↵ place at centre · drag to position
         </div>
         {/*
-          RV-12e: the docked Library panel is a later task (D30's "single
-          instance" is this picker for now) -- rendered disabled with the
-          reason, per this task's brief, rather than wired to a panel that
-          doesn't exist yet. `onOpenFullLibrary` is intentionally unused.
+          RV-12h: the docked Library panel now exists (panels.ts / PanelHost),
+          so the picker's full-library link opens it via the caller-supplied
+          onOpenFullLibrary rather than rendering permanently disabled.
         */}
         <button
           type="button"
-          disabled
-          aria-disabled="true"
-          aria-label="Browse full library (unavailable): Library panel arrives with panel docking"
-          title="Library panel arrives with panel docking"
-          className="flex items-center gap-1 font-medium text-secondary-text cursor-not-allowed rounded px-1 py-0.5"
+          data-testid="library-picker-full-library-btn"
+          onClick={onOpenFullLibrary}
+          aria-label="Browse full library"
+          title="Browse full library"
+          className="flex items-center gap-1 font-medium text-primary hover:underline rounded px-1 py-0.5"
         >
           <span>Browse full library</span>
           <ExternalLink className="w-3 h-3" />

@@ -105,6 +105,21 @@ export interface CanvasViewProps {
    * destructive on screen and let the user retry (commands.md "busy").
    */
   onApplyChanges: (changes: readonly RecordChange[], label: string) => Promise<boolean>;
+  /**
+   * RV-12h: called when the compact picker's "Browse full library" link is
+   * clicked -- the caller (Workspace) opens the docked Library panel.
+   */
+  onOpenFullLibrary?: () => void;
+}
+
+/**
+ * RV-12h: imperative handle so the docked Library panel (rendered by
+ * PanelHost outside this component's ReactFlowProvider tree) can place a
+ * catalog entry through the exact same `applyPlacement` path the 16E picker
+ * uses -- never a second, parallel placement implementation.
+ */
+export interface CanvasViewHandle {
+  placeAtCentre: (entryId: string) => Promise<void>;
 }
 
 /** Rebuilds canvas nodes from the projection, keeping each existing node's
@@ -120,7 +135,7 @@ function keepMeasurements(
   });
 }
 
-function CanvasFlowInner({
+const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(function CanvasFlowInner({
   document,
   activeViewId,
   onSelectView,
@@ -136,7 +151,8 @@ function CanvasFlowInner({
   onRequestClearSelection,
   mintId,
   onApplyChanges,
-}: CanvasViewProps) {
+  onOpenFullLibrary,
+}: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
   const { zoom } = useViewport();
@@ -369,6 +385,24 @@ function CanvasFlowInner({
       setComponentPickerOpen(false);
       await applyPlacement(entryId, centreFlow);
     },
+    [reactFlow, applyPlacement],
+  );
+
+  // RV-12h: the docked Library panel places through this same imperative
+  // entry point -- computed the same way as the picker's Enter/"Place"
+  // (viewport centre via containerRef), never a second placement path.
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      placeAtCentre: async (entryId: string) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        const centreScreen = rect
+          ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+          : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        const centreFlow = reactFlow.screenToFlowPosition(centreScreen);
+        await applyPlacement(entryId, centreFlow);
+      },
+    }),
     [reactFlow, applyPlacement],
   );
 
@@ -863,7 +897,10 @@ function CanvasFlowInner({
         >
           <LibraryPicker
             onPlace={(entryId) => void handlePlaceAtCentre(entryId)}
-            onOpenFullLibrary={() => {}}
+            onOpenFullLibrary={() => {
+              setComponentPickerOpen(false);
+              onOpenFullLibrary?.();
+            }}
             onClose={closeComponentPicker}
           />
         </div>
@@ -900,12 +937,12 @@ function CanvasFlowInner({
       </Dialog>
     </div>
   );
-}
+});
 
-export function CanvasView(props: CanvasViewProps) {
+export const CanvasView = React.forwardRef<CanvasViewHandle, CanvasViewProps>(function CanvasView(props, ref) {
   return (
     <ReactFlowProvider>
-      <CanvasFlowInner {...props} />
+      <CanvasFlowInner {...props} ref={ref} />
     </ReactFlowProvider>
   );
-}
+});

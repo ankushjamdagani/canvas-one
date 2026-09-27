@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronDown, GitBranch } from 'lucide-react';
+import { ChevronDown, GitBranch, History as HistoryIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -24,14 +24,21 @@ export interface TopBarProps {
    * is where it mounts; empty until that lane wires it in.
    */
   runControl?: React.ReactNode;
+  /**
+   * RV-12h (D38, 22A): History is a top-bar command, never a dock item.
+   * Dispatches history.open (panel reducer OPEN 'history') in the caller.
+   */
+  onOpenHistory?: () => void;
+  /** Highlights the History button while the History panel is open/focused. */
+  historyActive?: boolean;
 }
 
 /**
  * 22A "nav live" top bar.
  *
- * Per D38/brief: Quick options (no command registry yet), History (no history
- * panel yet) and the "…" menu (nothing real to put in it) are absent, not
- * fake. Undo/redo moved to the canvas dock (16A).
+ * Per D38/brief: Quick options (no command registry yet) and the "…" menu
+ * (nothing real to put in it) are absent, not fake. Undo/redo moved to the
+ * canvas dock (16A). History (RV-12h) opens the History panel.
  */
 export function TopBar({
   project,
@@ -44,6 +51,8 @@ export function TopBar({
   isSaving,
   hasError,
   runControl,
+  onOpenHistory,
+  historyActive,
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
   const [titleDraft, setTitleDraft] = React.useState(project.title);
@@ -214,6 +223,19 @@ export function TopBar({
 
       {/* D38: Run + scenario switcher slot, owned by the runs lane */}
       <div data-slot="run-control" className="flex items-center gap-2 shrink-0">
+        {onOpenHistory && (
+          <Button
+            type="button"
+            data-testid="topbar-history-btn"
+            variant={historyActive ? 'tint' : 'outline'}
+            size="sm"
+            className="h-7 px-2.5 text-xs font-medium"
+            onClick={onOpenHistory}
+          >
+            <HistoryIcon className="size-3.5 mr-1" />
+            History
+          </Button>
+        )}
         {runControl ?? null}
       </div>
     </header>
