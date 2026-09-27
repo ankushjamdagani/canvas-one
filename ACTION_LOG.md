@@ -1289,3 +1289,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 ### Session stop
 
 - **Status**: user asked to stop picking new work (weekly limit). HANDOFF "Current (2026-09-28)" lists state, unmounted modules, debt and next candidates for the next models.
+
+### RV-12i export/scenario integration and panel debt
+
+- **Outcome**: `5966b3b` merged on the UI line @ `bcd2f2e`. ExportMenu now lives under the project menu; CSV is enabled only for the displayed durably saved run. ScenarioSwitcher replaces ScenarioRunControl and New/Copy/Edit/Rename/Delete open the guarded ScenarioEditor dock/sheet. Hosted History/Commit/Library chrome is de-duplicated, Library grid cards stay within narrow docks, and unpublished version copy reads "first publication".
+- **Files**: workspace TopBar/ProjectMenu/Workspace integration and helper/tests; ScenarioEditor close/focus bridge; hosted History/Commit/Library variants; publish copy and production e2e coverage.
+- **Platform**: Codex delegate produced the initial patch; Codex lead completed it and performed one review round. No push.
+- **Verification**: 1231 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5198 with two workers/no retries: 24 passed / 4 skipped; `git diff --check` clean.
+- **Limitations**: panel preferences remain in memory; existing RV-05c gaps remain (Guard builder, nested assertion paths, boundary payload bindings, step drag-reorder).
