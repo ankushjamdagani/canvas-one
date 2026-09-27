@@ -464,6 +464,19 @@ function CanvasFlowInner({
 
   const cancelResourceForm = React.useCallback(() => setResourceForm(null), []);
 
+  const requestClasses = React.useMemo(() => {
+    const classes = new Map<Id, { requestClassId: Id; requestClassLabel: string }>();
+    if (!document) return [];
+    for (const connection of document.connections) {
+      if ((connection.kind === 'call' || connection.kind === 'message') && connection.config.resource) {
+        const { requestClassId, requestClassLabel } = connection.config.resource;
+        classes.set(requestClassId, { requestClassId, requestClassLabel });
+      }
+    }
+    return [...classes.values()];
+  }, [document]);
+  const requestClassListId = React.useId();
+
   // catalog.md resolution 8: request class (text), read/write and deadline
   // have no contracted default -- neither operation nor deadline is
   // preselected, and Connect stays disabled until every field is filled in.
@@ -471,7 +484,8 @@ function CanvasFlowInner({
     if (!resourceForm) return false;
     const deadline = Number(resourceForm.deadlineMs);
     return (
-      resourceForm.requestClass.trim().length > 0 &&
+      Array.from(resourceForm.requestClass).length > 0 &&
+      Array.from(resourceForm.requestClass).length <= 60 &&
       resourceForm.operation !== null &&
       resourceForm.deadlineMs.trim().length > 0 &&
       Number.isFinite(deadline) &&
@@ -481,8 +495,8 @@ function CanvasFlowInner({
 
   const confirmResourceForm = React.useCallback(async () => {
     if (!resourceForm) return;
-    if (resourceForm.requestClass.trim().length === 0) {
-      setResourceForm({ ...resourceForm, error: 'Request class is required.' });
+    if (Array.from(resourceForm.requestClass).length === 0 || Array.from(resourceForm.requestClass).length > 60) {
+      setResourceForm({ ...resourceForm, error: 'Request class must contain 1–60 characters.' });
       return;
     }
     if (resourceForm.operation === null) {
@@ -494,23 +508,10 @@ function CanvasFlowInner({
       setResourceForm({ ...resourceForm, error: 'Deadline must be a positive number of ms.' });
       return;
     }
-    // requestClassId stays a UUID-shaped classification token, never resolved
-    // against a RequestClass record (model-and-runner.md §6). A fresh id is
-    // minted per confirm to satisfy that shape.
-    //
-    // KNOWN GAP: decisions.md D43(b) adds a presentation-only
-    // `ResourceCallMetadata.requestClassLabel` so this typed text can be
-    // persisted and reused by label instead of re-minting an id every time.
-    // Checked this round: specs/revamp/fixtures/{s02,s04,s05,combined}.json
-    // (the app's own example projects, loaded verbatim as `Document`s) carry
-    // ResourceCallMetadata without a label; making the field required, as
-    // D43(b) specifies, fails validateDocument on load for those read-only
-    // fixtures (12 tests across validate.test.ts, merge.test.ts,
-    // s01-s05-candidates.test.ts, compile.test.ts and refinement.test.ts).
-    // Reported to the lead rather than edited; the typed text here remains
-    // validation-only (the field must be filled in) until that's resolved.
+    const existingClass = requestClasses.find((entry) => entry.requestClassLabel === resourceForm.requestClass);
     const result = completeConnection(resourceForm.draft, {
-      requestClassId: mintId(),
+      requestClassId: existingClass ? existingClass.requestClassId : mintId(),
+      requestClassLabel: resourceForm.requestClass,
       operation: resourceForm.operation,
       deadlineDurationMs: deadline,
     });
@@ -523,7 +524,7 @@ function CanvasFlowInner({
     }
     setResourceForm(null);
     await onApplyChanges(result.changes, 'Connect');
-  }, [resourceForm, onApplyChanges, mintId]);
+  }, [resourceForm, requestClasses, onApplyChanges, mintId]);
 
   // ==========================================================================
   // RV-12e: Delete -- Delete/Backspace on canvas focus, or the 16D toolbar
@@ -745,12 +746,19 @@ function CanvasFlowInner({
             <span className="block text-secondary-text mb-0.5">Request class</span>
             <input
               data-testid="connect-form-request-class"
+              list={requestClassListId}
+              placeholder="Choose or name a class"
               autoFocus
               type="text"
               value={resourceForm.requestClass}
               onChange={(e) => setResourceForm({ ...resourceForm, requestClass: e.target.value, error: null })}
               className="w-full h-7 px-2 rounded-tag border border-control-border bg-canvas text-ink"
             />
+            <datalist id={requestClassListId}>
+              {requestClasses.map((entry) => (
+                <option key={entry.requestClassId} value={entry.requestClassLabel} />
+              ))}
+            </datalist>
           </label>
 
           <fieldset className="mb-2">

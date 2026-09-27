@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { SnapshotRecord } from '../src/persistence/studio/types';
 
 const SCREENSHOT_DIR = new URL('../artifacts/rv-12e/', import.meta.url).pathname;
 
@@ -143,6 +144,65 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
   // than a click -- dragConnect() already retries the gesture itself; this is
   // a second line of defense for the rest of the flow.
   test.describe.configure({ retries: 2 });
+
+  test('D43(b): creates Order and reuses its persisted class ID on a second connection', async ({ page }) => {
+    await openBlankProject(page, 'Request class labels');
+    const gateway = await placeAtFraction(page, 'gateway', 0.15, 0.3);
+    const serviceA = await placeAtFraction(page, 'service', 0.45, 0.3);
+    const serviceB = await placeAtFraction(page, 'service', 0.45, 0.65);
+
+    async function readResources(connectionCount: number) {
+      return page.evaluate(async (count) => {
+        const snapshots = await new Promise<SnapshotRecord[]>((resolve, reject) => {
+          const open = indexedDB.open('system-studio-local-v1');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const db = open.result;
+            const transaction = db.transaction('snapshots', 'readonly');
+            const request: IDBRequest<SnapshotRecord[]> = transaction.objectStore('snapshots').getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+            transaction.oncomplete = () => db.close();
+          };
+        });
+        const snapshot = snapshots.find((entry) => entry.document.connections.length === count);
+        if (!snapshot) throw new Error('Expected authored snapshot is missing');
+        return snapshot.document.connections.flatMap((connection) =>
+          connection.kind !== 'data' && connection.config.resource ? [connection.config.resource] : []);
+      }, connectionCount);
+    }
+
+    await dragConnect(page, gateway, serviceA);
+    await expect(page.getByTestId('connect-resource-form')).toBeVisible();
+    const classInput = page.getByTestId('connect-form-request-class');
+    await expect(classInput).toHaveValue('');
+    await expect(page.locator('datalist option')).toHaveCount(0);
+    await classInput.fill('Order');
+    await page.getByTestId('connect-form-op-read').check();
+    await page.getByTestId('connect-form-deadline').fill('250');
+    await page.getByTestId('connect-form-confirm').click();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+    const first = await readResources(1);
+    expect(first).toHaveLength(1);
+    expect(first[0].requestClassLabel).toBe('Order');
+    expect(first[0].requestClassId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/);
+
+    await dragConnect(page, gateway, serviceB);
+    await expect(page.getByTestId('connect-resource-form')).toBeVisible();
+    await expect(classInput).toHaveValue('');
+    await expect(page.locator('datalist option')).toHaveAttribute('value', 'Order');
+    await classInput.fill('Order');
+    await page.getByTestId('connect-form-op-write').check();
+    await page.getByTestId('connect-form-deadline').fill('250');
+    await page.getByTestId('connect-form-confirm').click();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(2);
+    const second = await readResources(2);
+    expect(second).toHaveLength(2);
+    expect(second.map((resource) => resource.requestClassLabel)).toEqual(['Order', 'Order']);
+    expect(second.map((resource) => resource.requestClassId)).toEqual([
+      first[0].requestClassId, first[0].requestClassId,
+    ]);
+  });
 
   test('place, drag-place, connect (ready / metadata / rejected / route ports), delete', async ({ page }) => {
     test.setTimeout(60000);

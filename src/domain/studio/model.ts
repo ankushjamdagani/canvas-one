@@ -132,10 +132,12 @@ export type RouteCondition = {
 /**
  * Contract §4 & §6: ResourceCallMetadata
  * Call/message edges from non-resource behavior into a resource need
- * ResourceCallMetadata={requestClassId:Id,operation:'read'|'write',key:string|null,tags:string[],deadlineDurationMs:number}
+ * ResourceCallMetadata={requestClassId:Id,requestClassLabel:string,operation:'read'|'write',key:string|null,tags:string[],deadlineDurationMs:number}
  */
 export type ResourceCallMetadata = {
   readonly requestClassId: Id;
+  /** Presentation only; 1–60 Unicode code points. */
+  readonly requestClassLabel: string;
   readonly operation: 'read' | 'write';
   readonly key: string | null;
   readonly tags: readonly string[];

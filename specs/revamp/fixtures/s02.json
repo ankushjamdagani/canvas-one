@@ -488,6 +488,7 @@
         "fallback": false,
         "resource": {
           "requestClassId": "7480821d-f678-5d62-8290-e986ccffa5df",
+          "requestClassLabel": "Order",
           "operation": "read",
           "key": null,
           "tags": [
