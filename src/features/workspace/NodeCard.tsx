@@ -8,11 +8,13 @@ export function NodeCard({ data, selected }: NodeProps) {
   const nodeData = data as ProjectedNodeData;
   if (nodeData.kind !== 'element') return null;
 
-  const { element, layer, stripeColor, placement } = nodeData;
+  const { element, layer, stripeColor, placement, connectable } = nodeData;
   // placement.width stays authoritative (2A workspace: ~184px nominal card,
   // wider placements render as authored rather than truncating fields).
   const Icon = getNodeIcon(element.visualKind);
   const caption = getNodeCaption(element);
+  const hasOutPort = element.ports.some((p) => p.direction === 'out' && p.channel !== 'event');
+  const hasInPort = element.ports.some((p) => p.direction === 'in' && p.channel !== 'event');
 
   return (
     <div
@@ -45,8 +47,14 @@ export function NodeCard({ data, selected }: NodeProps) {
       <Handle
         type="target"
         position={Position.Left}
-        isConnectable={false}
-        className="!size-1 !bg-control-border !border-none !pointer-events-none opacity-40"
+        isConnectable={Boolean(connectable) && hasInPort}
+        data-testid={`node-handle-target-${element.id}`}
+        className={cn(
+          '!size-2 !border-none',
+          connectable && hasInPort
+            ? '!bg-primary opacity-90'
+            : '!bg-control-border opacity-40 !pointer-events-none',
+        )}
       />
 
       <div className="p-2.5 pt-3 flex flex-col gap-1">
@@ -80,8 +88,14 @@ export function NodeCard({ data, selected }: NodeProps) {
       <Handle
         type="source"
         position={Position.Right}
-        isConnectable={false}
-        className="!size-1 !bg-control-border !border-none !pointer-events-none opacity-40"
+        isConnectable={Boolean(connectable) && hasOutPort}
+        data-testid={`node-handle-source-${element.id}`}
+        className={cn(
+          '!size-2 !border-none',
+          connectable && hasOutPort
+            ? '!bg-primary opacity-90'
+            : '!bg-control-border opacity-40 !pointer-events-none',
+        )}
       />
     </div>
   );

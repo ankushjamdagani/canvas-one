@@ -171,12 +171,23 @@ export function Workspace({
 
   const openInspectorFor = React.useCallback(
     (target: DraftTarget) => {
-      if (!document || sessionState.workingRevision === null) return;
-      const handle = openDraft(mintId(), target, sessionState.workingRevision, document);
+      // RV-12e: read the session's live state, not the `document`/`sessionState`
+      // render closure. A caller can request selection of a just-applied
+      // record synchronously after `await session.apply(...)` resolves --
+      // `session.apply` updates its internal state before that promise
+      // settles, but this component may not have re-rendered with it yet, so
+      // the closed-over `document` can still be the pre-apply snapshot. Using
+      // that stale snapshot here would look up the brand-new record in a
+      // document that doesn't have it yet and mis-report it as "deleted
+      // elsewhere" (buildFieldsAndLabel's not-found path), even though it was
+      // never removed.
+      const live = session.getState();
+      if (!live.document || live.workingRevision === null) return;
+      const handle = openDraft(mintId(), target, live.workingRevision, live.document);
       setDraft(handle);
       setFocusFieldId(null);
     },
-    [document, sessionState.workingRevision, mintId],
+    [session, mintId],
   );
 
   const closeInspector = React.useCallback(() => {
@@ -568,6 +579,20 @@ export function Workspace({
     await session.redo();
   }, [session, sessionState.canRedo, isSaving]);
 
+  // RV-12e: generic apply for place/connect/delete -- each caller builds its
+  // own model.apply-records batch (placeEntry / planConnection / planDelete)
+  // and this just runs it through the session (one gesture == one undo). A
+  // busy/failed/unsupported result returns false so the caller leaves nothing
+  // destructive on screen and the user can retry (commands.md "busy").
+  const handleApplyChanges = React.useCallback(
+    async (changes: Parameters<SessionController['apply']>[0], label: string): Promise<boolean> => {
+      if (!document || isSaving) return false;
+      const result = await session.apply(changes, label);
+      return result.status === 'applied';
+    },
+    [document, isSaving, session],
+  );
+
   // Move nodes handler
   const handleMoveNodes = React.useCallback(
     async (
@@ -708,6 +733,8 @@ export function Workspace({
               selectedConnectionIds={selectedConnectionIds}
               onRequestSelection={handleRequestSelection}
               onRequestClearSelection={handleRequestClearSelection}
+              mintId={mintId}
+              onApplyChanges={handleApplyChanges}
             />
           </div>
 

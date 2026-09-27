@@ -7,6 +7,8 @@ import {
   Minus,
   Plus,
   Maximize2,
+  Component as ComponentIcon,
+  Cable,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -19,8 +21,8 @@ import {
 import { cn } from '@/lib/utils';
 
 export interface FloatingDockProps {
-  dragMode: 'select' | 'pan';
-  onSetDragMode: (mode: 'select' | 'pan') => void;
+  dragMode: 'select' | 'pan' | 'connect';
+  onSetDragMode: (mode: 'select' | 'pan' | 'connect') => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -30,18 +32,21 @@ export interface FloatingDockProps {
   onFitView: () => void;
   /** Live zoom factor (1 = 100%), from useViewport(). */
   zoom: number;
+  /** library.open (D38 "Component"): toggles the 16E picker anchored above the dock. */
+  onToggleComponentPicker: () => void;
+  componentPickerOpen: boolean;
+  /** True while the session is saving -- placing/connecting is disabled, not silently dropped. */
+  disabled?: boolean;
 }
 
 /**
  * 16A "Resting dock" (D38).
  *
  * D38 dock inventory is: undo, redo, Select, Pan, Component, Connect, Note,
- * More, zoom out, zoom %, zoom in, fit. Component/Connect/Note are left out
- * here — D39's standard catalog contract (per-entry visualKind/behavior/ports/
- * defaults, plus connection defaults) hasn't landed yet, so there is nothing
- * real for them to do. A "More" overflow popover (16B) is likewise omitted:
- * with only 8 live commands the dock fits at 390px without one, and there are
- * no extra real commands to put in it yet (absent, not fake). Run/History/the
+ * More, zoom out, zoom %, zoom in, fit. Component (library.open) and Connect
+ * (canvas.connect-tool) are wired here per RV-12e now that D39/D42's standard
+ * catalog contract has landed. Note and the "More" overflow (16B) stay out --
+ * there is still nothing real behind them (absent, not fake). Run/History/the
  * "…" menu live only in the top bar (22A) per D38, not in this dock.
  */
 export function FloatingDock({
@@ -55,6 +60,9 @@ export function FloatingDock({
   onZoomOut,
   onFitView,
   zoom,
+  onToggleComponentPicker,
+  componentPickerOpen,
+  disabled,
 }: FloatingDockProps) {
   const zoomPercent = Math.round(zoom * 100);
 
@@ -164,6 +172,57 @@ export function FloatingDock({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Pan tool</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
+
+        {/* Component (library.open) / Connect (canvas.connect-tool), D38 order */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-component-btn"
+                type="button"
+                variant={componentPickerOpen ? 'tint' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
+                  componentPickerOpen ? 'text-primary' : 'text-body hover:text-foreground',
+                )}
+                aria-label="Component"
+                aria-pressed={componentPickerOpen}
+                disabled={disabled}
+                onClick={onToggleComponentPicker}
+              >
+                <ComponentIcon className="size-4 stroke-current" />
+                <span className="hidden sm:inline">Component</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Add a component</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                data-testid="dock-connect-btn"
+                type="button"
+                variant={dragMode === 'connect' ? 'tint' : 'ghost'}
+                size="sm"
+                className={cn(
+                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
+                  dragMode === 'connect' ? 'text-primary' : 'text-body hover:text-foreground',
+                )}
+                aria-label="Connect tool"
+                aria-pressed={dragMode === 'connect'}
+                disabled={disabled}
+                onClick={() => onSetDragMode(dragMode === 'connect' ? 'select' : 'connect')}
+              >
+                <Cable className="size-4 stroke-current" />
+                <span className="hidden sm:inline">Connect</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Connect tool</TooltipContent>
           </Tooltip>
         </div>
 

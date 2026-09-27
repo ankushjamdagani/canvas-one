@@ -174,6 +174,71 @@ describe('Session Layer (RV-12c1)', () => {
     expect(state.lastError).toBeNull();
   });
 
+  it('D43(a): createProject with no views seeds one empty "Main" view (id from mintId, not a client default)', async () => {
+    const dbName = `test-blank-view-${Date.now()}-${idCounter++}`;
+    const mintId = createMintId();
+    const bootResult = await openStudioRepository({ dbName, mintId });
+    if (!bootResult.ok) throw new Error('Boot failed');
+
+    const controller = new SessionController({
+      repository: bootResult.repository,
+      mintId,
+      actor: testActor,
+    });
+
+    const createRes = await controller.createProject({
+      title: 'Blank Project',
+      initialDocument: createTestDocument(mintId(), 'Blank Project'),
+    });
+    expect(createRes.status).toBe('applied');
+
+    const { document } = controller.getState();
+    expect(document?.views).toHaveLength(1);
+    const view = document?.views[0];
+    expect(view?.label).toBe('Main');
+    expect(view?.placements).toEqual([]);
+    expect(view?.connectionIds).toEqual([]);
+    expect(view?.relationIds).toEqual([]);
+    expect(view?.groups).toEqual([]);
+    expect(view?.notes).toEqual([]);
+    // The id is minted, not a hardcoded/client-invented value.
+    expect(view?.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('D43(a): createProject with an existing view (e.g. a template) is left untouched', async () => {
+    const dbName = `test-template-views-${Date.now()}-${idCounter++}`;
+    const mintId = createMintId();
+    const bootResult = await openStudioRepository({ dbName, mintId });
+    if (!bootResult.ok) throw new Error('Boot failed');
+
+    const controller = new SessionController({
+      repository: bootResult.repository,
+      mintId,
+      actor: testActor,
+    });
+
+    const templateView = {
+      id: mintId(),
+      label: 'Overview',
+      placements: [],
+      connectionIds: [],
+      relationIds: [],
+      groups: [],
+      notes: [],
+    };
+    const templateDoc: Document = { ...createTestDocument(mintId(), 'Template Project'), views: [templateView] };
+
+    const createRes = await controller.createProject({
+      title: 'Template Project',
+      initialDocument: templateDoc,
+    });
+    expect(createRes.status).toBe('applied');
+
+    const { document } = controller.getState();
+    expect(document?.views).toHaveLength(1);
+    expect(document?.views[0]).toEqual(templateView);
+  });
+
   it('apply insert element → document + revision updated, one undo entry', async () => {
     const dbName = `test-apply-insert-${Date.now()}-${idCounter++}`;
     const mintId = createMintId();

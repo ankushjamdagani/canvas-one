@@ -186,7 +186,7 @@ export function LibraryPicker({
     >
       {/* Search Bar */}
       <div className="relative flex items-center mb-2.5">
-        <Search className="absolute left-2.5 w-4 h-4 text-[var(--color-secondary-text,#626D68)] pointer-events-none" />
+        <Search className="absolute left-2.5 w-4 h-4 text-secondary-text pointer-events-none" />
         <input
           ref={searchInputRef}
           type="search"
@@ -205,14 +205,14 @@ export function LibraryPicker({
           }}
           placeholder="Search components, tags, groups..."
           aria-label="Search components"
-          className="w-full h-8 pl-8 pr-16 text-xs rounded-md bg-white border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-[var(--color-secondary-text,#626D68)] focus:border-[var(--color-control-border-strong,#948D80)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
+          className="w-full h-8 pl-8 pr-16 text-xs rounded-md bg-white border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-secondary-text focus:border-[var(--color-control-border-strong,#948D80)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
         />
         {searchQuery.trim().length > 0 && (
           <button
             type="button"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search query"
-            className="absolute right-2 p-1 text-[var(--color-secondary-text,#626D68)] hover:text-[var(--color-foreground,#16201D)]"
+            className="absolute right-2 p-1 text-secondary-text hover:text-[var(--color-foreground,#16201D)]"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -238,7 +238,7 @@ export function LibraryPicker({
               className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none ${
                 isActive
                   ? 'bg-[var(--color-accent,#EAEFEC)] border-[var(--color-primary,#0B5C54)] text-[var(--color-primary,#0B5C54)] font-semibold shadow-2xs'
-                  : 'bg-white border-[var(--color-control-border,#DCD7CD)] text-[var(--color-secondary-text,#626D68)] hover:bg-[var(--color-sunken,#F2EFE9)] hover:text-[var(--color-foreground,#16201D)]'
+                  : 'bg-white border-[var(--color-control-border,#DCD7CD)] text-secondary-text hover:bg-[var(--color-sunken,#F2EFE9)] hover:text-[var(--color-foreground,#16201D)]'
               }`}
             >
               {chip}
@@ -257,7 +257,7 @@ export function LibraryPicker({
       >
         {filteredEntries.length === 0 ? (
           <div className="col-span-full py-8 text-center">
-            <p className="text-xs text-[var(--color-secondary-text,#626D68)] mb-2">
+            <p className="text-xs text-secondary-text mb-2">
               No matching components found
             </p>
             <button
@@ -312,13 +312,13 @@ export function LibraryPicker({
                 <div className="text-xs font-semibold text-[var(--color-foreground,#16201D)] truncate leading-tight">
                   {entry.label}
                 </div>
-                <div className="text-[10px] font-mono text-[var(--color-secondary-text,#626D68)] truncate mt-0.5">
+                <div className="text-[10px] font-mono text-secondary-text truncate mt-0.5">
                   {entry.behaviorKind === 'unmodeled' ? entry.models : libraryCaption(entry)}
                 </div>
 
                 {unmodeled && (
                   <div className="mt-1">
-                    <span className="inline-block text-[9px] font-mono px-1 py-0.2 rounded bg-[var(--color-sunken,#F2EFE9)] text-[var(--color-secondary-text,#626D68)] border border-[var(--color-border,#E7E3DB)]">
+                    <span className="inline-block text-[9px] font-mono px-1 py-0.2 rounded bg-[var(--color-sunken,#F2EFE9)] text-secondary-text border border-[var(--color-border,#E7E3DB)]">
                       Not simulated
                     </span>
                   </div>
@@ -331,14 +331,22 @@ export function LibraryPicker({
 
       {/* Footer (16E) */}
       <div className="pt-2 border-t border-[var(--color-border,#E7E3DB)] flex items-center justify-between text-xs">
-        <div className="text-[11px] font-mono text-[var(--color-secondary-text,#626D68)]">
+        <div className="text-[11px] font-mono text-secondary-text">
           ↵ place at centre · drag to position
         </div>
+        {/*
+          RV-12e: the docked Library panel is a later task (D30's "single
+          instance" is this picker for now) -- rendered disabled with the
+          reason, per this task's brief, rather than wired to a panel that
+          doesn't exist yet. `onOpenFullLibrary` is intentionally unused.
+        */}
         <button
           type="button"
-          onClick={onOpenFullLibrary}
-          aria-label="Browse full library"
-          className="flex items-center gap-1 font-medium text-[var(--color-primary,#0B5C54)] hover:text-[var(--color-primary-hover,#0A4E47)] hover:underline cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none rounded px-1 py-0.5"
+          disabled
+          aria-disabled="true"
+          aria-label="Browse full library (unavailable): Library panel arrives with panel docking"
+          title="Library panel arrives with panel docking"
+          className="flex items-center gap-1 font-medium text-secondary-text cursor-not-allowed rounded px-1 py-0.5"
         >
           <span>Browse full library</span>
           <ExternalLink className="w-3 h-3" />

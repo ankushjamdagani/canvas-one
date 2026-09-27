@@ -173,7 +173,10 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     await page.getByTestId('create-blank-project-btn').click();
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('empty-views-state')).toBeVisible();
+    // D43(a): a blank project opens straight onto its seeded "Main" view
+    // (canvas + dock, zero nodes), not the empty-views-state placeholder.
+    await expect(page.getByTestId('canvas-container')).toBeVisible();
+    expect(await page.locator('.component-node').count()).toBe(0);
 
     const switcherTrigger = page.getByTestId('scenario-switcher-trigger');
     await expect(switcherTrigger).toContainText('No scenario');
@@ -198,7 +201,7 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     // RV-12d review round 1: with no scenario and no run, ResultsRegion isn't
     // rendered at all -- the canvas takes the full height instead.
     await expect(page.getByTestId('results-region')).toHaveCount(0);
-    await expect(page.getByTestId('empty-views-state')).toBeVisible();
+    await expect(page.getByTestId('canvas-container')).toBeVisible();
 
     await page.screenshot({
       path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv12d-mobile-blank.png',

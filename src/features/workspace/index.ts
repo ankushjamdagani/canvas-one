@@ -6,3 +6,4 @@ export * from './FloatingDock';
 export * from './CanvasView';
 export * from './projection';
 export * from './nodeVisuals';
+export * from './deletePlan';
