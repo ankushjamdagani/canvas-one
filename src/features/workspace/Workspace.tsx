@@ -32,11 +32,23 @@ import {
   loadScenarioStatuses,
   RunController,
   ResultsRegion,
-  ScenarioRunControl,
   WorkerTransport,
-  type ScenarioEntry,
   type ScenariosStatusResult,
 } from '../runs';
+import {
+  applyScenarioDraft,
+  changeScenarioDraft,
+  deleteScenario,
+  DeleteScenarioDialog,
+  NewScenarioDialog,
+  openScenarioDraft,
+  ScenarioEditor,
+  ScenarioSwitcher,
+  type NewScenarioDialogProps,
+  type ScenarioDraftHandle,
+  type ScenarioSwitcherEntry,
+} from '../scenarios';
+import { createBrowserDownloadSink, useTransferActions } from '../transfer';
 import {
   computeSessionRunDisabledReason,
   readScenarioSelection,
@@ -57,6 +69,7 @@ import {
   type DraftSession,
   type DraftTarget,
 } from '../inspector';
+import { buildTransferSessionState, createScenarioDraftSession } from './integrationState';
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -156,6 +169,8 @@ export function Workspace({
   const isMobileInspector = viewportWidth < MOBILE_BREAKPOINT_PX;
 
   const [draft, setDraft] = React.useState<DraftHandle | null>(null);
+  const [scenarioDraft, setScenarioDraft] = React.useState<ScenarioDraftHandle | null>(null);
+  const [scenarioEditorFocusName, setScenarioEditorFocusName] = React.useState(false);
   const [focusFieldId, setFocusFieldId] = React.useState<string | null>(null);
   const [guardOpen, setGuardOpen] = React.useState(false);
   const [guardApplying, setGuardApplying] = React.useState(false);
@@ -177,6 +192,10 @@ export function Workspace({
     }),
     [session],
   );
+  const scenarioDraftSession = React.useMemo(
+    () => createScenarioDraftSession(session),
+    [session],
+  );
 
   /**
    * commands.md §6 "Navigation guard": clean -> proceed; dirty -> Apply / Discard /
@@ -185,14 +204,18 @@ export function Workspace({
    */
   const runGuarded = React.useCallback(
     (action: () => void) => {
-      if (decideNavigation(draft) === 'proceed') {
+      if (scenarioDraft?.status === 'saving') return;
+      const hasUnsavedScenarioDraft = Boolean(
+        scenarioDraft && (scenarioDraft.dirty || scenarioDraft.isNew),
+      );
+      if (decideNavigation(draft) === 'proceed' && !hasUnsavedScenarioDraft) {
         action();
         return;
       }
       pendingActionRef.current = action;
       setGuardOpen(true);
     },
-    [draft],
+    [draft, scenarioDraft],
   );
 
   const openInspectorFor = React.useCallback(
@@ -210,6 +233,7 @@ export function Workspace({
       const live = session.getState();
       if (!live.document || live.workingRevision === null) return;
       const handle = openDraft(mintId(), target, live.workingRevision, live.document);
+      setScenarioDraft(null);
       setDraft(handle);
       setFocusFieldId(null);
     },
@@ -218,6 +242,7 @@ export function Workspace({
 
   const closeInspector = React.useCallback(() => {
     setDraft(null);
+    setScenarioDraft(null);
     setFocusFieldId(null);
   }, []);
 
@@ -254,9 +279,9 @@ export function Workspace({
   );
 
   const handleRequestClearSelection = React.useCallback(() => {
-    if (!draft) return;
+    if (!draft && !scenarioDraft) return;
     runGuarded(closeInspector);
-  }, [draft, runGuarded, closeInspector]);
+  }, [draft, scenarioDraft, runGuarded, closeInspector]);
 
   const handleChangeField = React.useCallback((fieldId: string, raw: string) => {
     setDraft((prev) => (prev ? changeDraftField(prev, fieldId, raw) : prev));
@@ -288,11 +313,31 @@ export function Workspace({
     pendingActionRef.current = null;
     setGuardOpen(false);
     setDraft(null);
+    setScenarioDraft(null);
     setFocusFieldId(null);
     action?.();
   }, []);
 
   const handleGuardApply = React.useCallback(async () => {
+    if (scenarioDraft) {
+      setGuardApplying(true);
+      setScenarioDraft((current) =>
+        current ? Object.freeze({ ...current, status: 'saving' }) : current,
+      );
+      const next = await applyScenarioDraft(scenarioDraft, scenarioDraftSession);
+      setGuardApplying(false);
+      if (next.status === 'clean') {
+        const action = pendingActionRef.current;
+        pendingActionRef.current = null;
+        setGuardOpen(false);
+        setScenarioDraft(null);
+        action?.();
+      } else {
+        setGuardOpen(false);
+        setScenarioDraft(next);
+      }
+      return;
+    }
     if (!draft) {
       setGuardOpen(false);
       return;
@@ -314,7 +359,7 @@ export function Workspace({
       setDraft(result.handle);
       setFocusFieldId(result.firstInvalidFieldId);
     }
-  }, [draft, draftSession]);
+  }, [draft, draftSession, scenarioDraft, scenarioDraftSession]);
 
   const selectedElementIds = React.useMemo(
     () => new Set(draft && draft.target.kind === 'element' ? draft.target.ids : []),
@@ -361,6 +406,43 @@ export function Workspace({
       [runController],
     ),
   );
+
+  // Results displays the controller's current run. It becomes a selectable
+  // immutable CSV source only after the repository save succeeds.
+  const selectedSavedRunId: Id | null =
+    runControllerState?.current?.saveStatus === 'saved'
+      ? runControllerState.current.runId
+      : null;
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!selectedSavedRunId || !sessionState.projectId) return;
+    void repository.loadProject(sessionState.projectId).then((project) => {
+      if (!cancelled && project) setProjectRecord(project);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repository, selectedSavedRunId, sessionState.projectId]);
+
+  const transferSessionSource = React.useMemo(
+    () => ({
+      projectId: sessionState.projectId,
+      projectRevision: projectRecord?.revision ?? null,
+      document: sessionState.document,
+    }),
+    [projectRecord?.revision, sessionState.document, sessionState.projectId],
+  );
+  const transferSession = React.useMemo(
+    () => buildTransferSessionState(transferSessionSource, activeViewId, selectedSavedRunId),
+    [transferSessionSource, activeViewId, selectedSavedRunId],
+  );
+  const downloadSink = React.useMemo(() => createBrowserDownloadSink(), []);
+  const transferActions = useTransferActions({
+    repository,
+    session: transferSession,
+    mintId,
+    downloadSink,
+  });
 
   // loadScenarioStatuses for the current document; recomputed after every
   // document change and after every saved run (commands.md "Scenarios (D41)").
@@ -480,9 +562,149 @@ export function Workspace({
     setLastRunSnapshotId(null);
   }, [runController]);
 
-  const noopScenarioEdit = React.useCallback(() => {}, []);
+  const [newScenarioDialogOpen, setNewScenarioDialogOpen] = React.useState(false);
+  const [initialCopySourceId, setInitialCopySourceId] = React.useState<Id | null>(null);
+  const [deleteScenarioTarget, setDeleteScenarioTarget] = React.useState<{
+    readonly id: Id;
+    readonly label: string;
+  } | null>(null);
+  const [deletingScenario, setDeletingScenario] = React.useState(false);
 
-  const scenarioEntries: ScenarioEntry[] = React.useMemo(
+  const copySources = React.useMemo(
+    () =>
+      (document?.scenarios ?? []).map((scenario) => ({
+        scenarioId: scenario.id,
+        label: scenario.label,
+        mode: scenario.mode,
+      })),
+    [document],
+  );
+
+  const openScenarioEditor = React.useCallback(
+    (scenarioId: Id, focusName: boolean) => {
+      const live = session.getState();
+      if (!live.document || live.workingRevision === null) return;
+      setDraft(null);
+      setFocusFieldId(null);
+      setScenarioEditorFocusName(focusName);
+      setScenarioDraft(
+        openScenarioDraft({
+          draftId: mintId(),
+          target: { kind: 'edit', scenarioId },
+          document: live.document,
+          baseWorkingRevision: live.workingRevision,
+          mintId,
+          randomSource: Math.random,
+        }),
+      );
+    },
+    [mintId, session],
+  );
+
+  const handleNewScenario = React.useCallback(() => {
+    runGuarded(() => {
+      closeInspector();
+      setInitialCopySourceId(null);
+      setNewScenarioDialogOpen(true);
+    });
+  }, [closeInspector, runGuarded]);
+
+  const handleDuplicateScenario = React.useCallback(
+    (scenarioId: Id) => {
+      if (!document?.scenarios.some((scenario) => scenario.id === scenarioId)) return;
+      runGuarded(() => {
+        closeInspector();
+        setInitialCopySourceId(scenarioId);
+        setNewScenarioDialogOpen(true);
+      });
+    },
+    [closeInspector, document, runGuarded],
+  );
+
+  const handleCreateScenario = React.useCallback(
+    (params: Parameters<NewScenarioDialogProps['onCreate']>[0]) => {
+      const live = session.getState();
+      if (!live.document || live.workingRevision === null) return;
+      setNewScenarioDialogOpen(false);
+      setDraft(null);
+      setFocusFieldId(null);
+      setScenarioEditorFocusName(false);
+      setScenarioDraft(
+        openScenarioDraft({
+          draftId: mintId(),
+          target: { kind: 'new', mode: params.mode, from: params.from, label: params.label },
+          document: live.document,
+          baseWorkingRevision: live.workingRevision,
+          mintId,
+          randomSource: Math.random,
+        }),
+      );
+    },
+    [mintId, session],
+  );
+
+  const handleEditScenario = React.useCallback(
+    (scenarioId: Id) => runGuarded(() => openScenarioEditor(scenarioId, false)),
+    [openScenarioEditor, runGuarded],
+  );
+
+  const handleRenameScenario = React.useCallback(
+    (scenarioId: Id) => runGuarded(() => openScenarioEditor(scenarioId, true)),
+    [openScenarioEditor, runGuarded],
+  );
+
+  const handleRequestDeleteScenario = React.useCallback(
+    (scenarioId: Id) => {
+      const scenario = document?.scenarios.find((candidate) => candidate.id === scenarioId);
+      if (!scenario) return;
+      runGuarded(() => {
+        closeInspector();
+        setDeleteScenarioTarget({ id: scenario.id, label: scenario.label });
+      });
+    },
+    [closeInspector, document, runGuarded],
+  );
+
+  const handleConfirmDeleteScenario = React.useCallback(async () => {
+    if (!deleteScenarioTarget) return;
+    setDeletingScenario(true);
+    const result = await deleteScenario(
+      deleteScenarioTarget.id,
+      deleteScenarioTarget.label,
+      scenarioDraftSession,
+    );
+    setDeletingScenario(false);
+    if (result.status === 'applied') setDeleteScenarioTarget(null);
+  }, [deleteScenarioTarget, scenarioDraftSession]);
+
+  const handleChangeScenarioDraft = React.useCallback(
+    (patch: Parameters<typeof changeScenarioDraft>[2]) => {
+      const liveDocument = session.getState().document;
+      if (!liveDocument) return;
+      setScenarioDraft((current) =>
+        current ? changeScenarioDraft(current, liveDocument, patch) : current,
+      );
+    },
+    [session],
+  );
+
+  const handleApplyScenarioDraft = React.useCallback(async () => {
+    if (!scenarioDraft || scenarioDraft.status === 'saving') return;
+    const wasNew = scenarioDraft.isNew;
+    setScenarioDraft(Object.freeze({ ...scenarioDraft, status: 'saving' }));
+    const next = await applyScenarioDraft(scenarioDraft, scenarioDraftSession);
+    setScenarioDraft(next);
+    if (next.status === 'clean' && wasNew && next.sourceScenarioId) {
+      handleSelectScenario(next.sourceScenarioId);
+    }
+  }, [handleSelectScenario, scenarioDraft, scenarioDraftSession]);
+
+  const handleCancelScenarioDraft = React.useCallback(() => {
+    setScenarioDraft(null);
+    setScenarioEditorFocusName(false);
+  }, []);
+
+  const scenarioEntries: ScenarioSwitcherEntry[] = React.useMemo(
     () =>
       scenariosWithStatus.map((s) => ({
         id: s.scenario.id,
@@ -496,15 +718,20 @@ export function Workspace({
   // D25 / commands.md §6: Run is disabled while a configuration draft is dirty,
   // with this exact reason -- checked ahead of the session's own busy reasons.
   const sessionRunDisabledReason =
-    draft?.dirty
+    draft?.dirty || scenarioDraft?.dirty || scenarioDraft?.isNew
       ? RUN_DISABLED_DIRTY_DRAFT_REASON
       : computeSessionRunDisabledReason(sessionState.status, sessionState.needsReload);
 
+  const scenarioRunPhase =
+    runControllerState?.phase === 'done'
+      ? 'idle'
+      : (runControllerState?.phase ?? 'idle');
+
   const runControlSlot = (
-    <ScenarioRunControl
+    <ScenarioSwitcher
       scenarios={scenarioEntries}
       selectedId={selectedScenarioId}
-      runPhase={runControllerState?.phase ?? 'idle'}
+      runPhase={scenarioRunPhase}
       disabledReason={sessionRunDisabledReason}
       onSelect={handleSelectScenario}
       onRun={handleRunScenario}
@@ -512,11 +739,11 @@ export function Workspace({
       onPause={() => runController?.pause()}
       onResume={() => runController?.resume()}
       onReset={handleResetRun}
-      onNew={noopScenarioEdit}
-      onDuplicate={noopScenarioEdit}
-      onEdit={noopScenarioEdit}
-      onRename={noopScenarioEdit}
-      onDelete={noopScenarioEdit}
+      onNew={handleNewScenario}
+      onDuplicate={handleDuplicateScenario}
+      onEdit={handleEditScenario}
+      onRename={handleRenameScenario}
+      onDelete={handleRequestDeleteScenario}
     />
   );
 
@@ -546,6 +773,14 @@ export function Workspace({
     if (!selected) return selectMeasuredSection(elementId, null, 'this scenario', 'timed');
     return selectMeasuredSection(elementId, selected.latestRun, selected.scenario.label, selected.scenario.mode);
   }, [draft, scenariosWithStatus, selectedScenarioId]);
+
+  const scenarioEditorChecks = React.useMemo(() => {
+    const scenarioId = scenarioDraft?.sourceScenarioId ?? scenarioDraft?.scenario?.id ?? null;
+    if (!scenarioId) return null;
+    const latestRun = scenariosWithStatus.find((item) => item.scenario.id === scenarioId)?.latestRun;
+    if (!latestRun) return null;
+    return new Map(latestRun.checks.map((check) => [check.assertionId, check]));
+  }, [scenarioDraft, scenariosWithStatus]);
 
   // RV-12d review round 1: every check's assertion label, looked up from the
   // scenario that ran (never the raw assertionId) so ResultsRegion can show
@@ -838,6 +1073,7 @@ export function Workspace({
         if (historyView === 'commit') {
           return (
             <CommitPanel
+              hosted
               controller={historyController}
               onCancel={() => setHistoryView('ladder')}
               onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
@@ -847,6 +1083,7 @@ export function Workspace({
         }
         return (
           <HistoryLadder
+            hosted
             controller={historyController}
             canUndo={sessionState.canUndo && sessionState.status === 'ready'}
             canRedo={sessionState.canRedo && sessionState.status === 'ready'}
@@ -875,6 +1112,7 @@ export function Workspace({
       }
       return (
         <LibraryPanel
+          hosted
           view={libraryView}
           onViewChange={setLibraryView}
           onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
@@ -896,10 +1134,6 @@ export function Workspace({
     ],
   );
 
-  // Scenario editing (new/duplicate/edit/rename/delete) is a real D41 command
-  // set, but the inspector editor isn't built yet (RV-12d NOTES) -- the
-  // control renders these disabled with a reason, so these handlers never fire.
-
   const handleSwitchBranch = React.useCallback(
     (branchId: string) => {
       if (!sessionState.projectId || isSaving) return;
@@ -919,17 +1153,17 @@ export function Workspace({
   // With no overlay open, Escape on a clean inspector closes it; a dirty draft is
   // left untouched (Apply/Discard/Stay only).
   React.useEffect(() => {
-    if (!draft) return;
+    if (!draft && !scenarioDraft) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || guardOpen) return;
-      if (!draft.dirty) {
+      if (!draft?.dirty && !scenarioDraft?.dirty && !scenarioDraft?.isNew) {
         e.preventDefault();
         closeInspector();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [draft, guardOpen, closeInspector]);
+  }, [draft, scenarioDraft, guardOpen, closeInspector]);
 
   return (
     <div
@@ -949,6 +1183,7 @@ export function Workspace({
           isSaving={isSaving}
           hasError={hasError}
           runControl={runControl ?? runControlSlot}
+          transferActions={transferActions}
           onOpenHistory={() => {
             panelDispatch({ type: 'OPEN', panel: 'history' });
             refreshBehindMainCheck();
@@ -1074,6 +1309,25 @@ export function Workspace({
             variant="dock"
           />
         ) : null}
+        {scenarioDraft && document && !isMobileInspector ? (
+          <aside
+            data-testid="scenario-inspector-dock"
+            className="w-[320px] min-w-[320px] h-full overflow-hidden border-l border-border bg-panel"
+            aria-label="Scenario inspector"
+          >
+            <ScenarioEditor
+              document={document}
+              handle={scenarioDraft}
+              onChange={handleChangeScenarioDraft}
+              onApply={() => void handleApplyScenarioDraft()}
+              onCancel={handleCancelScenarioDraft}
+              onClose={handleCloseInspector}
+              mintId={mintId}
+              lastRunChecks={scenarioEditorChecks}
+              focusName={scenarioEditorFocusName}
+            />
+          </aside>
+        ) : null}
       </div>
 
       {draft && isMobileInspector ? (
@@ -1100,6 +1354,44 @@ export function Workspace({
           />
         </div>
       ) : null}
+
+      {scenarioDraft && document && isMobileInspector ? (
+        <div
+          data-testid="scenario-inspector-sheet-overlay"
+          className="fixed inset-x-0 bottom-0 z-modal h-[70vh] max-h-[70vh] overflow-hidden shadow-md rounded-t-lg border-t border-control-border bg-panel"
+        >
+          <ScenarioEditor
+            document={document}
+            handle={scenarioDraft}
+            onChange={handleChangeScenarioDraft}
+            onApply={() => void handleApplyScenarioDraft()}
+            onCancel={handleCancelScenarioDraft}
+            onClose={handleCloseInspector}
+            mintId={mintId}
+            lastRunChecks={scenarioEditorChecks}
+            focusName={scenarioEditorFocusName}
+          />
+        </div>
+      ) : null}
+
+      <NewScenarioDialog
+        open={newScenarioDialogOpen}
+        onOpenChange={setNewScenarioDialogOpen}
+        copySources={copySources}
+        initialCopySourceId={initialCopySourceId}
+        onCreate={handleCreateScenario}
+      />
+
+      <DeleteScenarioDialog
+        open={deleteScenarioTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingScenario) setDeleteScenarioTarget(null);
+        }}
+        scenarioLabel={deleteScenarioTarget?.label ?? ''}
+        remainingCount={Math.max((document?.scenarios.length ?? 0) - 1, 0)}
+        onConfirm={() => void handleConfirmDeleteScenario()}
+        confirming={deletingScenario}
+      />
 
       <NavigationGuardDialog
         open={guardOpen}

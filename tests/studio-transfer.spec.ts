@@ -91,6 +91,38 @@ async function buildExportedS05BundleFile(s05: Document): Promise<string> {
 }
 
 test.describe('Studio Transfer E2E (RV-10b)', () => {
+  test('mounts Export under the project menu and enables CSV only for the displayed saved run', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s01').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+
+    const openExportMenu = async () => {
+      await page.getByTestId('breadcrumb-project-btn').click();
+      await page.getByTestId('export-menu-trigger').click();
+      await expect(page.getByTestId('export-submenu')).toBeVisible();
+    };
+
+    await openExportMenu();
+    const csvItem = page.getByTestId('export-menu-csv');
+    await expect(csvItem).toBeDisabled();
+    await expect(csvItem).toHaveAttribute(
+      'title',
+      'Select a saved run to export its results as CSV.',
+    );
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+
+    await page.getByTestId('scenario-run-btn').click();
+    await expect(page.getByTestId('results-region')).toContainText('Saved', {
+      timeout: 15_000,
+    });
+
+    await openExportMenu();
+    await expect(page.getByTestId('export-menu-csv')).toBeEnabled();
+  });
+
   test('imports an exported S05 project bundle via the entry screen "Import project" action', async ({
     page,
   }) => {

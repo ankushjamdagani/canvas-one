@@ -197,11 +197,23 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     );
     expect(hasHorizontalScroll).toBe(false);
 
-    await expect(page.getByTestId('scenario-run-control')).toBeVisible();
+    await expect(page.getByTestId('scenario-switcher')).toBeVisible();
     // RV-12d review round 1: with no scenario and no run, ResultsRegion isn't
     // rendered at all -- the canvas takes the full height instead.
     await expect(page.getByTestId('results-region')).toHaveCount(0);
     await expect(page.getByTestId('canvas-container')).toBeVisible();
+
+    // D41 integration: New opens an unsaved scenario in the mobile inspector
+    // sheet. Cancel discards it, leaving the blank project unchanged.
+    await switcherTrigger.click();
+    await page.getByRole('button', { name: 'New scenario' }).click();
+    await page.getByLabel('Name').fill('First traffic test');
+    await page.getByTestId('new-scenario-create').click();
+    await expect(page.getByTestId('scenario-inspector-sheet-overlay')).toBeVisible();
+    await expect(page.getByLabel('Scenario name')).toHaveValue('First traffic test');
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.getByTestId('scenario-inspector-sheet-overlay')).toHaveCount(0);
+    await expect(switcherTrigger).toContainText('No scenario');
 
     await page.screenshot({
       path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv12d-mobile-blank.png',

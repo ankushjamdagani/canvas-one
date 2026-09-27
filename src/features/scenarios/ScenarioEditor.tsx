@@ -33,15 +33,17 @@ export interface ScenarioEditorProps {
   readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly onApply: () => void;
   readonly onCancel: () => void;
+  readonly onClose?: () => void;
   readonly mintId: MintId;
   readonly lastRunChecks?: ReadonlyMap<string, CheckResult> | null;
+  readonly focusName?: boolean;
 }
 
 function sectionErrorCount(handle: ScenarioDraftHandle, section: ScenarioSection): number {
   return handle.issuesBySection[section].filter((i) => i.severity === 'error').length;
 }
 
-export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, mintId, lastRunChecks }: ScenarioEditorProps) {
+export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, onClose = onCancel, mintId, lastRunChecks, focusName = false }: ScenarioEditorProps) {
   const scenario = handle.scenario;
 
   if (!scenario) {
@@ -76,7 +78,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
         <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
           Scenario
         </span>
-        <button type="button" onClick={onCancel} aria-label="Close editor" className="text-secondary-text hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label="Close editor" className="text-secondary-text hover:text-foreground">
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>
@@ -85,6 +87,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
         {/* Header */}
         <section data-testid="scenario-section-header" className="space-y-1.5">
           <Input
+            autoFocus={focusName}
             value={scenario.label}
             onChange={(e) => onChange((s) => ({ ...s, label: e.target.value }))}
             aria-label="Scenario name"

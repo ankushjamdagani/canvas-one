@@ -325,6 +325,23 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).not.toMatch(/platform team/i);
     });
 
+    it('omits duplicate chrome and permits narrow grid cards when hosted', () => {
+      const html = renderToStaticMarkup(
+        React.createElement(LibraryPanel, {
+          hosted: true,
+          onPlace: () => {},
+          onClose: () => {},
+          view: 'grid',
+          onViewChange: () => {},
+        }),
+      );
+
+      expect(html).not.toContain('aria-label="Close library"');
+      expect(html).not.toContain('<h2');
+      expect(html).toContain('min-w-0');
+      expect(html).not.toContain('min-w-[320px]');
+    });
+
     it('renders LibraryPicker (16E) with group filter chips, 4-col grid, and footer hints', () => {
       const html = renderToStaticMarkup(
         React.createElement(LibraryPicker, {
@@ -444,4 +461,3 @@ describe('Library Feature (RV-06b)', () => {
     });
   });
 });
-

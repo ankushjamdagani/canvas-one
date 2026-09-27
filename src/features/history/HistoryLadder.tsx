@@ -53,6 +53,8 @@ export interface HistoryLadderProps {
   readonly onComparePublication?: (publication: Readonly<PublicationRecord>) => void;
   readonly onClose?: () => void;
   readonly className?: string;
+  /** PanelHost already supplies the panel title, controls, and outer chrome. */
+  readonly hosted?: boolean;
 }
 
 export function HistoryLadder({
@@ -80,6 +82,7 @@ export function HistoryLadder({
   onComparePublication,
   onClose,
   className,
+  hosted = false,
 }: HistoryLadderProps): React.JSX.Element {
   // Subscribe to controller state if provided
   const controllerState = React.useSyncExternalStore(
@@ -229,24 +232,27 @@ export function HistoryLadder({
     <div
       data-testid="history-ladder"
       className={cn(
-        'flex flex-col h-full bg-card text-foreground rounded-panel border border-border shadow-panel overflow-hidden select-none',
+        'flex flex-col h-full bg-card text-foreground overflow-hidden select-none',
+        hosted ? 'rounded-none border-0 shadow-none' : 'rounded-panel border border-border shadow-panel',
         className,
       )}
     >
       {/* 1. Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">History</h2>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close history panel"
-            className="p-1 rounded-control text-muted-foreground hover:text-foreground hover:bg-sunken transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
+      {!hosted && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">History</h2>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close history panel"
+              className="p-1 rounded-control text-muted-foreground hover:text-foreground hover:bg-sunken transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Scrollable Content Body */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">

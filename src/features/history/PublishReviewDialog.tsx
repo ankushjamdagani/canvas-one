@@ -340,7 +340,7 @@ export function PublishReviewBody({
             <span id="review-version-header">Version number</span>
           </span>
           <span className="text-[11px] font-mono font-normal text-muted-foreground">
-            current {currentVersionKey ?? 'none'} ·{' '}
+            {currentVersionKey ? `current ${currentVersionKey}` : 'first publication'} ·{' '}
             {selectedSuggestion ? `chosen ${selectedSuggestion.versionKey}` : 'nothing chosen yet'}
           </span>
         </div>

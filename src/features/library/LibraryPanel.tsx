@@ -38,6 +38,7 @@ import {
   keyboardNavigationReducer,
 } from './viewModel';
 import { EntryDetailCard } from './EntryDetailCard';
+import { cn } from '../../lib/utils';
 
 export function LibraryPanel({
   onPlace,
@@ -48,6 +49,7 @@ export function LibraryPanel({
   onSelect,
   initialSearchQuery = '',
   className,
+  hosted = false,
 }: LibraryPanelProps) {
   const [searchQuery, setSearchQuery] = React.useState(initialSearchQuery);
   const [internalSelectedId, setInternalSelectedId] = React.useState<string | null>(
@@ -209,23 +211,27 @@ export function LibraryPanel({
       aria-label="Component Library"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className={`relative flex flex-col h-full w-full max-w-[440px] min-w-[320px] bg-[var(--color-panel,#F7F5F1)] border-l border-[var(--color-border,#E7E3DB)] text-[var(--color-foreground,#16201D)] font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary,#0B5C54)] ${className ?? ''}`}
+      className={cn(
+        'relative flex flex-col h-full w-full bg-panel text-foreground font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        hosted ? 'min-w-0 max-w-none border-0' : 'min-w-[320px] max-w-[440px] border-l border-border',
+        className,
+      )}
       data-testid="library-panel"
     >
       {/* 1. Header (12A/12B): "Library" + Close Button */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border,#E7E3DB)]">
-        <h2 className="text-base font-semibold text-[var(--color-foreground,#16201D)] tracking-tight">
-          Library
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close library"
-          className="p-1 rounded-md text-[var(--color-secondary-text,#626D68)] hover:text-[var(--color-foreground,#16201D)] hover:bg-[var(--color-sunken,#F2EFE9)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+      {!hosted && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h2 className="text-base font-semibold text-foreground tracking-tight">Library</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close library"
+            className="p-1 rounded-control text-secondary-text hover:text-foreground hover:bg-sunken transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* 2. Search Field (12A/12B) */}
       <div className="p-3 pb-2">
@@ -423,7 +429,7 @@ export function LibraryPanel({
                   })}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 min-w-0">
                   {section.entries.map((entry) => {
                     const isSelected = selectedEntry?.entryId === entry.entryId;
                     const unmodeled = isUnmodeledEntry(entry);
@@ -445,7 +451,7 @@ export function LibraryPanel({
                         onMouseLeave={handleMouseLeaveEntry}
                         onFocus={(e) => handleMouseEnterEntry(e as unknown as React.MouseEvent<HTMLElement>, entry.entryId)}
                         onBlur={handleMouseLeaveEntry}
-                        className={`group relative flex flex-col p-2 rounded-lg border transition-all cursor-pointer select-none ${
+                        className={`group relative flex flex-col min-w-0 p-2 rounded-lg border transition-all cursor-pointer select-none ${
                           isSelected
                             ? 'border-[var(--color-primary,#0B5C54)] bg-[var(--color-accent,#EAEFEC)]/60 ring-1 ring-[var(--color-primary,#0B5C54)]'
                             : 'border-[var(--color-border,#E7E3DB)] bg-white hover:border-[var(--color-control-border-strong,#948D80)] hover:bg-[var(--color-sunken,#F2EFE9)]/50'

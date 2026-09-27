@@ -35,6 +35,8 @@ export interface CommitPanelProps {
   readonly onRunAll?: () => void;
   readonly isCommitting?: boolean;
   readonly className?: string;
+  /** PanelHost already supplies the History title, controls, and outer chrome. */
+  readonly hosted?: boolean;
 }
 
 function getScenarioStatusLabel(status: ScenarioStatus): string {
@@ -65,6 +67,7 @@ export function CommitPanel({
   onRunAll,
   isCommitting: propIsCommitting,
   className,
+  hosted = false,
 }: CommitPanelProps): React.JSX.Element {
   // Controller state subscription
   const controllerState = React.useSyncExternalStore(
@@ -178,24 +181,27 @@ export function CommitPanel({
     <div
       data-testid="commit-panel"
       className={cn(
-        'flex flex-col h-full bg-card text-foreground rounded-panel border border-border shadow-panel overflow-hidden select-none',
+        'flex flex-col h-full bg-card text-foreground overflow-hidden select-none',
+        hosted ? 'rounded-none border-0 shadow-none' : 'rounded-panel border border-border shadow-panel',
         className,
       )}
     >
       {/* 1. Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">Commit</h2>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label="Close commit panel"
-            className="p-1 rounded-control text-muted-foreground hover:text-foreground hover:bg-sunken transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
+      {!hosted && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">Commit</h2>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Close commit panel"
+              className="p-1 rounded-control text-muted-foreground hover:text-foreground hover:bg-sunken transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Scrollable Form Body */}
       <form onSubmit={handleCommit} className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
