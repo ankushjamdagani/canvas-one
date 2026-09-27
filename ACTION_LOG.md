@@ -1269,3 +1269,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Sonnet subagent (Codex hit its usage limit at launch); Claude review fixes (single session actor, no invented import text, truthful Mermaid label).
 - **Verification**: 1202 unit, `npx tsc -b`, build, production e2e 19 passed / 4 skipped.
 - **Limitations**: CSV export needs a selected saved run from the results lane; top-bar mount after RV-12h.
+
+## 2026-09-28
+
+### RV-12h History and Library panels
+
+- **Outcome**: merged on the UI line @ `b019d1a`. History (ladder, commit, publish, compare & resolve, behind-main banner) and Library now open as panels in the workspace; HistoryController methods bound; single session actor from App.
+- **Platform**: Sonnet subagent, one review round (interrupted once by the Sonnet limit and resumed); Claude reviewer.
+- **Verification**: 1203 unit, `npx tsc -b`, build, production e2e 23 passed / 4 skipped; screenshots in the rv-12h worktree `artifacts/rv-12h/`.
+- **Limitations**: duplicated panel headers, clipped Library cards, "current none" copy, preferences in memory only.
