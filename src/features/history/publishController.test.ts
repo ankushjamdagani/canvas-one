@@ -31,6 +31,7 @@ import {
 } from '../../persistence/studio/types';
 import { SessionController } from '../session/controller';
 import { PublishController } from './publishController';
+import { setAtPath } from './CompareAndResolvePanel';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 const s01Doc: Document = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8'));
@@ -153,7 +154,7 @@ async function rawPrepareAndPublish(
     }
     evidence.push({
       scenarioId: scenario.id,
-      fingerprint: runRes.saveResult.status === 'applied' ? (runRes.saveResult as any).run.fingerprint : '',
+      fingerprint: runRes.saveResult.status === 'applied' ? runRes.saveResult.run.fingerprint : '',
       runId: runRes.runId,
     });
   }
@@ -322,6 +323,19 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     expect(state.eligible).toBe(true);
     expect(state.scenarios.every((s) => s.status.kind === 'passed')).toBe(true);
 
+    // RV-11b review round: real commit-since-fork/components-touched/fork data
+    // for 22C's "What goes onto main" section, not fabricated.
+    expect(state.commitsSinceFork.length).toBe(1);
+    expect(state.commitsSinceFork[0].message).toBe('Initial checkout scenarios');
+    // No element edits were made on top of the initial document in this
+    // fixture, so the real components-touched count is 0 — never invented.
+    expect(state.componentsTouchedCount).toBe(0);
+    expect(state.sourceBranchLabel).not.toBeNull();
+    expect(state.mainBranchLabel).not.toBeNull();
+    expect(state.versionsPublishedSinceFork).toBe(0); // no publications exist yet
+    expect(state.forkVersionKey).toBeNull(); // forked before any publication existed
+    expect(state.resolvedFields).toEqual([]); // nothing resolved yet
+
     // Exercise the injected run function directly even though the scenario already
     // passed, proving the wiring: PublishController -> injected fn -> the existing
     // candidate runner (CandidateController.startCandidateRun), never a bespoke one.
@@ -352,6 +366,7 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
 
     const sourceAfter = await repo.loadBranch(projectId, draftBranchId);
     expect(sourceAfter?.state).toBe('closed'); // D29: closes by default
+    expect(session.getState().branchId).toBe(mainBranchId);
 
     const mainAfter = await repo.loadBranch(projectId, mainBranchId);
     expect(mainAfter?.headCommitId).not.toBeNull();
@@ -473,14 +488,12 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     // resulting candidate genuinely needs fresh evidence (never re-using B1/B2/B3's
     // already-saved runs for capacity 20/30/40).
     const candidateBefore = candidateController.get(preResolveCandidateId)!;
-    const theirsElement = candidateBefore.mergeState.inputs.theirs.elements.find(
+    const oursElement = candidateBefore.mergeState.inputs.ours.elements.find(
       (e) => e.id === workerElementId,
     )!;
-    if (theirsElement.behavior.kind !== 'resource') throw new Error('expected resource element');
-    const editedElement: Element = {
-      ...theirsElement,
-      behavior: { ...theirsElement.behavior, config: { ...theirsElement.behavior.config, capacity: 25 } },
-    };
+    if (oursElement.behavior.kind !== 'resource') throw new Error('expected resource element');
+    const editedElement = setAtPath(oursElement, capacityConflict!.path, 25);
+    expect(editedElement).toEqual({ ...oursElement, behavior: { ...oursElement.behavior, config: { ...oursElement.behavior.config, capacity: 25 } } });
 
     const resolveRes = await controller.resolveConflict(capacityConflict!.id, {
       kind: 'edited',
@@ -492,6 +505,19 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     expect(state.status).toBe('review');
     expect(state.conflicts.length).toBe(0);
     expect(state.candidateId).not.toBe(preResolveCandidateId); // new candidate (D25/commands.md)
+
+    // RV-11b review round: the resolution is tracked for 22F's "resolved ·
+    // field · side" display, with the real recordId/path/kind, not invented.
+    expect(state.resolvedFields).toEqual([
+      {
+        recordKind: 'element',
+        recordId: workerElementId,
+        path: ['behavior', 'config', 'capacity'],
+        resolution: 'edited',
+      },
+    ]);
+    expect(state.mergedDocument).not.toBeNull();
+    expect(state.mergeInputs).not.toBeNull();
 
     // The superseded candidate is no longer independently usable.
     const supersededEval = await candidateController.evaluate(repo, preResolveCandidateId);
@@ -524,6 +550,75 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     );
     expect(pubRes.status).toBe('applied');
     expect(controller.getState().status).toBe('published');
+
+    db.close();
+  });
+
+  it('resolveAllConflicts resolves every open conflict with the same real side, one at a time', async () => {
+    const db = createStudioDatabase(`test-publish-resolve-all-${crypto.randomUUID()}`);
+    const repo = new LocalRepository(db);
+    const mintId = () => crypto.randomUUID();
+    const session = new SessionController({ repository: repo, mintId, actor: testActor });
+    const candidateController = createCandidateController({ mintId });
+
+    const created = await session.createProject({ title: 'Resolve All Test', initialDocument: s02Doc });
+    expect(created.status).toBe('applied');
+    const { projectId, branchId: b1, mainBranchId } = session.getState();
+    if (!projectId || !b1 || !mainBranchId) throw new Error('session not ready');
+
+    const workerElementId = s02Doc.elements.find((e) => e.label === 'Fulfillment worker')!.id;
+
+    const b1Doc = await editCapacity(repo, projectId, b1, workerElementId, 20);
+    await runAllAndCommit(repo, projectId, b1, b1Doc, 'B1: capacity 20');
+    await rawPrepareAndPublish(repo, candidateController, projectId, b1, {
+      version: { major: 0, minor: 1, patch: 0 },
+      title: 'M1',
+      rationale: '',
+      ticketUrl: null,
+    });
+
+    const b2 = await createBranchFromMainHead(repo, projectId, mainBranchId, 'b2');
+    const b3 = await createBranchFromMainHead(repo, projectId, mainBranchId, 'b3');
+
+    const b2Doc = await editCapacity(repo, projectId, b2, workerElementId, 30);
+    await runAllAndCommit(repo, projectId, b2, b2Doc, 'B2: capacity 30');
+    await rawPrepareAndPublish(repo, candidateController, projectId, b2, {
+      version: { major: 0, minor: 2, patch: 0 },
+      title: 'M2',
+      rationale: '',
+      ticketUrl: null,
+    });
+
+    const b3Doc = await editCapacity(repo, projectId, b3, workerElementId, 40);
+    await runAllAndCommit(repo, projectId, b3, b3Doc, 'B3: capacity 40');
+
+    await session.openProject(projectId, b3);
+    const controller = makePublishController(repo, session, candidateController);
+    const prepRes = await controller.prepare();
+    expect(prepRes.status).toBe('done');
+    expect(controller.getState().conflicts.length).toBeGreaterThan(0);
+
+    const result = await controller.resolveAllConflicts('theirs');
+    expect(result?.status).toBe('done');
+
+    const state = controller.getState();
+    expect(state.conflicts.length).toBe(0);
+    expect(state.resolvedFields.length).toBeGreaterThan(0);
+    expect(state.resolvedFields.every((r) => r.resolution === 'theirs')).toBe(true);
+    const resolvedField = state.resolvedFields[0];
+    const previousId = state.candidateId;
+    await controller.reopenConflict(resolvedField);
+    const reopened = controller.getState();
+    expect(reopened.status).toBe('review');
+    expect(reopened.candidateId).not.toBe(previousId);
+    expect(reopened.conflicts.some((c) => c.recordId === resolvedField.recordId && JSON.stringify(c.path) === JSON.stringify(resolvedField.path))).toBe(true);
+    expect(reopened.resolvedFields).not.toContainEqual(resolvedField);
+
+    // "theirs" (the source branch, B3) chose capacity 40: resolving with theirs
+    // everywhere must land that real value, not an invented one.
+    const mergedWorker = state.mergedDocument!.elements.find((e) => e.id === workerElementId);
+    if (!mergedWorker || mergedWorker.behavior.kind !== 'resource') throw new Error('expected resource element');
+    expect(mergedWorker.behavior.config.capacity).toBe(40);
 
     db.close();
   });

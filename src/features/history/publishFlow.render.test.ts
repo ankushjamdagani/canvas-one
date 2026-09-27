@@ -1,31 +1,39 @@
 /**
- * Pure renderToStaticMarkup fidelity tests for PublishFlow (RV-11b).
- *
- * renderToStaticMarkup never runs effects, so PublishFlow's mount effect
- * (controller.prepare()) never fires here — these tests exercise pure
- * state -> markup mapping with a lightweight PublishControllerLike stub,
- * never a real repository.
+ * Pure renderToStaticMarkup fidelity tests for PublishFlow's non-dialog states
+ * (RV-11b review round). The 'review' status renders PublishReviewDialog,
+ * which wraps content in the project's real Dialog primitive — Radix mounts
+ * Portal content on the client only, so it renders nothing in static server
+ * markup (verified empirically). That content is covered directly by
+ * publishReview.render.test.ts (PublishReviewBody) and
+ * compareAndResolve.render.test.ts (CompareAndResolvePanel) instead.
  */
 import { describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PublishFlow } from './PublishFlow';
 import type { PublishControllerLike, PublishControllerState } from './publishController';
-import type { MergeConflict } from '../../domain/versioning/merge';
-import type { ScenarioWithStatus } from '../runs/scenarioStatus';
-
-const EXCLUDED_TEXTS = ['p95', 'p99', 'burst', 'no run'];
 
 const BASE_STATE: PublishControllerState = {
   status: 'idle',
   candidateId: null,
   conflicts: [],
   scenarios: [],
+  mergedDocument: null,
+  mergeInputs: null,
   eligible: false,
   versionSuggestions: null,
+  currentVersionKey: null,
+  sourceBranchLabel: null,
+  mainBranchLabel: null,
+  commitsSinceFork: [],
+  componentsTouchedCount: 0,
+  versionsPublishedSinceFork: 0,
+  forkVersionKey: null,
+  resolvedFields: [],
   staleInfo: null,
   blockedMessage: null,
   publication: null,
+  publishedSourceClosed: null,
   lastError: null,
 };
 
@@ -35,159 +43,71 @@ function makeStubController(state: PublishControllerState): PublishControllerLik
     subscribe: () => () => {},
     prepare: vi.fn(),
     resolveConflict: vi.fn(),
+    resolveAllConflicts: vi.fn(),
+    reopenConflict: vi.fn(),
     runScenario: vi.fn(),
     publish: vi.fn(),
     reset: vi.fn(),
-  } as unknown as PublishControllerLike;
-}
-
-function makeScenario(overrides: Partial<ScenarioWithStatus>): ScenarioWithStatus {
-  return {
-    scenario: { id: 's1', label: 'Invalid cart' } as ScenarioWithStatus['scenario'],
-    status: { kind: 'not-run' },
-    currentFingerprint: null,
-    latestRun: null,
-    ...overrides,
   };
 }
 
-describe('PublishFlow static markup', () => {
-  it('shows a real behind-main notice with the actual expected/actual revisions (22E)', () => {
+describe('PublishFlow static markup (non-dialog states)', () => {
+  it('shows a preparing notice while idle/preparing', () => {
+    const controller = makeStubController({ ...BASE_STATE, status: 'preparing' });
+    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
+    expect(html).toContain('publish-preparing');
+  });
+
+  it('shows the real blocked message rather than a generic one', () => {
+    const controller = makeStubController({
+      ...BASE_STATE,
+      status: 'blocked',
+      blockedMessage: 'Source branch is closed; cannot prepare candidate from closed branch',
+    });
+    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
+    expect(html).toContain('publish-blocked');
+    expect(html).toContain('closed branch');
+  });
+
+  it('throws rather than showing an invented message when status is "blocked" with no blockedMessage', () => {
+    const controller = makeStubController({ ...BASE_STATE, status: 'blocked', blockedMessage: null });
+    expect(() => renderToStaticMarkup(React.createElement(PublishFlow, { controller }))).toThrow(/blockedMessage/);
+  });
+
+  it('shows the real error message rather than a generic one', () => {
+    const controller = makeStubController({
+      ...BASE_STATE,
+      status: 'error',
+      lastError: { status: 'failed', code: 'unavailable', issues: [{ message: 'IndexedDB is unavailable in this context' }] },
+    });
+    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
+    expect(html).toContain('IndexedDB is unavailable in this context');
+  });
+
+  it('throws rather than showing an invented message when status is "error" with no extractable message', () => {
+    const controller = makeStubController({ ...BASE_STATE, status: 'error', lastError: null });
+    expect(() => renderToStaticMarkup(React.createElement(PublishFlow, { controller }))).toThrow(/real message/);
+  });
+
+  it('shows the real stale revision numbers for a genuine optimistic-concurrency mismatch', () => {
     const controller = makeStubController({
       ...BASE_STATE,
       status: 'behind-main',
       staleInfo: { scope: 'branch', expected: 3, actual: 5 },
     });
-
     const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
-
-    expect(html).toContain('publish-behind-main');
-    expect(html).toContain('behind main');
+    expect(html).toContain('publish-stale');
     expect(html).toContain('3');
     expect(html).toContain('5');
-    expect(html).toContain('Compare and resolve');
-    for (const text of EXCLUDED_TEXTS) {
-      expect(html.toLowerCase()).not.toContain(text.toLowerCase());
-    }
+    expect(html).toContain('Try again');
   });
 
-  it('shows a real blocked message rather than a generic one', () => {
-    const controller = makeStubController({
-      ...BASE_STATE,
-      status: 'blocked',
-      blockedMessage: "Source branch has no committed head; cannot prepare candidate from unborn branch",
-    });
-
-    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
-
-    expect(html).toContain('publish-blocked');
-    expect(html).toContain('unborn branch');
-  });
-
-  it('renders real conflicts with base/ours/theirs and ours/theirs/edit actions (22F)', () => {
-    const conflict: MergeConflict = {
-      id: 'conflict-1',
-      kind: 'value',
-      recordKind: 'element',
-      recordId: 'elem-1',
-      path: ['behavior', 'config', 'capacity'],
-      base: { present: true, value: 20 },
-      ours: { present: true, value: 30 },
-      theirs: { present: true, value: 40 },
-    };
-
-    const controller = makeStubController({
-      ...BASE_STATE,
-      status: 'review',
-      candidateId: 'cand-1',
-      conflicts: [conflict],
-      scenarios: [],
-      eligible: false,
-    });
-
-    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
-
-    expect(html).toContain('conflict-row-conflict-1');
-    expect(html).toContain('Keep ours');
-    expect(html).toContain('Keep theirs');
-    expect(html).toContain('Edit');
-    expect(html).toContain('30'); // ours value, real not invented
-    expect(html).toContain('40'); // theirs value
-    // No metadata form / publish button while conflicts remain unresolved.
-    expect(html).not.toContain('publish-review-button');
-  });
-
-  it('offers no "Edit" action for a document-kind (title) conflict, per resolve.ts / D25', () => {
-    const conflict: MergeConflict = {
-      id: 'conflict-title',
-      kind: 'value',
-      recordKind: 'document',
-      recordId: 'doc',
-      path: ['title'],
-      base: { present: true, value: 'Base title' },
-      ours: { present: true, value: 'Our title' },
-      theirs: { present: true, value: 'Their title' },
-    };
-
-    const controller = makeStubController({
-      ...BASE_STATE,
-      status: 'review',
-      candidateId: 'cand-1',
-      conflicts: [conflict],
-    });
-
-    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
-
-    expect(html).toContain('conflict-row-conflict-title');
-    expect(html).toContain('Keep ours');
-    expect(html).toContain('Keep theirs');
-    // resolve.ts rejects 'edited' for document-kind conflicts, so no Edit action
-    // is offered anywhere on this single-conflict page.
-    expect(html).not.toContain('>Edit<');
-  });
-
-  it('renders the scenario gate and version suggestions, gating the Publish action behind an explicit un-clicked step, never auto-publishing (D26)', () => {
-    const controller = makeStubController({
-      ...BASE_STATE,
-      status: 'review',
-      candidateId: 'cand-1',
-      conflicts: [],
-      scenarios: [makeScenario({ status: { kind: 'passed' } })],
-      eligible: true,
-      versionSuggestions: {
-        isFirst: true,
-        proposed: { major: 0, minor: 1, patch: 0 },
-        proposedKey: '0.1.0',
-        suggestions: [
-          { kind: 'major', version: { major: 1, minor: 0, patch: 0 }, versionKey: '1.0.0', disabled: false },
-          { kind: 'minor', version: { major: 0, minor: 1, patch: 0 }, versionKey: '0.1.0', disabled: false },
-          { kind: 'patch', version: { major: 0, minor: 0, patch: 1 }, versionKey: '0.0.1', disabled: false },
-        ],
-      },
-    });
-
-    const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
-
-    expect(html).toContain('EVERY SCENARIO MUST PASS');
-    expect(html).toContain('Invalid cart');
-    expect(html).toContain('0.1.0');
-    expect(html).toContain('publish-review-button');
-    // The irreversible confirmation copy only appears after clicking Publish
-    // (component-internal `confirming` state) — never present on first render,
-    // and mounting never itself calls controller.publish.
-    expect(html).not.toContain('publish-confirm');
-    expect(html).not.toContain('be undone');
-    expect(controller.publish).not.toHaveBeenCalled();
-
-    for (const text of EXCLUDED_TEXTS) {
-      expect(html.toLowerCase()).not.toContain(text.toLowerCase());
-    }
-  });
-
-  it('shows the published confirmation with the real version and title, and the no-undo notice (22D)', () => {
+  it('shows the published notice with the real version and title, never "Undo publish" (D26)', () => {
     const controller = makeStubController({
       ...BASE_STATE,
       status: 'published',
+      publishedSourceClosed: true,
+      sourceBranchLabel: 'async-fulfilment',
       publication: {
         projectId: 'proj-1',
         id: 'pub-1',
@@ -196,22 +116,14 @@ describe('PublishFlow static markup', () => {
         previousMainHeadId: null,
         ordinal: 1,
         actor: { actorId: 'u1', kind: 'local-human', displayName: 'Test User' },
-        createdAt: Date.UTC(2026, 8, 27, 12, 0),
-        metadata: {
-          version: { major: 0, minor: 1, patch: 0 },
-          title: 'Initial release',
-          rationale: '',
-          ticketUrl: null,
-        },
-        versionKey: '0.1.0',
+        createdAt: Date.UTC(2026, 8, 27, 17, 6),
+        metadata: { version: { major: 2, minor: 3, patch: 0 }, title: 'Absorb bursts in the order queue', rationale: '', ticketUrl: null },
+        versionKey: '2.3.0',
       },
     });
-
     const html = renderToStaticMarkup(React.createElement(PublishFlow, { controller }));
-
     expect(html).toContain('publish-published');
-    expect(html).toContain('0.1.0');
-    expect(html).toContain('Initial release');
-    expect(html).toContain('be undone');
+    expect(html).toContain('2.3.0');
+    expect(html).not.toContain('Undo publish');
   });
 });

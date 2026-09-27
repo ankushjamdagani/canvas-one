@@ -28,16 +28,18 @@
  * and publish.test.ts), never a bespoke runner built for this feature.
  */
 
-import type { Id } from '../../domain/studio/model';
+import type { Document, Id } from '../../domain/studio/model';
 import type { EvidenceRef } from '../../domain/studio/runner/evidence';
 import { createIssue, mapErrorToFailedResult } from '../../persistence/studio/errors';
 import type {
   Actor,
   AuthoredResult,
+  CommitRecord,
   PublicationMetadata,
   PublicationRecord,
   StudioRepository,
 } from '../../persistence/studio';
+import { diffDocuments } from '../../domain/versioning/diff';
 import type {
   Candidate,
   CandidateController,
@@ -61,6 +63,7 @@ import {
   type ScenarioWithStatus,
 } from '../runs/scenarioStatus';
 import type { SessionController } from '../session/controller';
+import { requireResultMessage, ResultMessageContractError } from './resultMessage';
 
 // ============================================================================
 // Injected run function
@@ -89,6 +92,13 @@ export type PublishControllerOptions = {
   readonly runScenario: PublishRunScenarioFn;
 };
 
+export type ResolvedFieldRecord = {
+  readonly recordKind: string;
+  readonly recordId: Id;
+  readonly path: readonly (string | number)[];
+  readonly resolution: 'ours' | 'theirs' | 'edited';
+};
+
 export type PublishStaleInfo = {
   readonly scope: 'project' | 'branch' | 'preferences';
   readonly expected: unknown;
@@ -112,15 +122,39 @@ export type PublishControllerState = {
   readonly conflicts: readonly Readonly<MergeConflict>[];
   /** Per-scenario status computed on the candidate's merged document. */
   readonly scenarios: readonly ScenarioWithStatus[];
+  /** The candidate's merged document and the three real inputs the merge was
+   * computed from (22F compare and resolve needs both — labels and auto-merged
+   * detection read the inputs; the field list reads the merged document). */
+  readonly mergedDocument: Document | null;
+  readonly mergeInputs: { readonly base: Document; readonly ours: Document; readonly theirs: Document } | null;
   /** Authoritative eligibility from CandidateController.evaluate. */
   readonly eligible: boolean;
   readonly versionSuggestions: VersionSuggestions | null;
+  /** The latest published version's key, or null before any publication (22C "current X · nothing chosen yet"). */
+  readonly currentVersionKey: string | null;
+  /** Real branch labels (22C "async-fulfilment · 6 commits → main"), never a raw ID. */
+  readonly sourceBranchLabel: string | null;
+  readonly mainBranchLabel: string | null;
+  /** Commits on the source branch since the merge base, newest first (22C "What goes onto main"). */
+  readonly commitsSinceFork: readonly Readonly<CommitRecord>[];
+  /** Distinct elements changed between the merge base and the source head (22C "M components touched"). */
+  readonly componentsTouchedCount: number;
+  /** How many publications landed on main since this branch's fork point, and the
+   * fork point's own version (null when the branch forked before any publication
+   * existed) — 22E "2 versions published since you forked at 2.2.1". */
+  readonly versionsPublishedSinceFork: number;
+  readonly forkVersionKey: string | null;
+  /** Fields resolved so far on this candidate lineage (22F "resolved · field ·
+   * side"). Accumulated across resolveConflict calls within one prepare(); reset
+   * on the next prepare() since a fresh merge has no resolution history yet. */
+  readonly resolvedFields: readonly Readonly<ResolvedFieldRecord>[];
   /** Set when prepare-publish returns stale (22E draft behind main). */
   readonly staleInfo: PublishStaleInfo | null;
   /** First real issue message when prepare/resolve is blocked outright (missing/invalid/failed). */
   readonly blockedMessage: string | null;
   /** Set once history.publish applies (22D published). */
   readonly publication: Readonly<PublicationRecord> | null;
+  readonly publishedSourceClosed: boolean | null;
   readonly lastError: unknown | null;
 };
 
@@ -129,16 +163,27 @@ const INITIAL_STATE: PublishControllerState = Object.freeze({
   candidateId: null,
   conflicts: Object.freeze([]),
   scenarios: Object.freeze([]),
+  mergedDocument: null,
+  mergeInputs: null,
   eligible: false,
   versionSuggestions: null,
+  currentVersionKey: null,
+  sourceBranchLabel: null,
+  mainBranchLabel: null,
+  commitsSinceFork: Object.freeze([]),
+  componentsTouchedCount: 0,
+  versionsPublishedSinceFork: 0,
+  forkVersionKey: null,
+  resolvedFields: Object.freeze([]),
   staleInfo: null,
   blockedMessage: null,
   publication: null,
+  publishedSourceClosed: null,
   lastError: null,
 });
 
-function firstIssueMessage(res: { readonly issues?: readonly { readonly message: string }[] }): string | null {
-  return res.issues?.[0]?.message ?? null;
+function firstIssueMessage(res: { readonly issues?: readonly { readonly message: string }[] }): string {
+  return requireResultMessage(res);
 }
 
 export class PublishController {
@@ -150,6 +195,7 @@ export class PublishController {
   private readonly injectedRunScenario: PublishRunScenarioFn;
 
   private state: PublishControllerState = INITIAL_STATE;
+  private resolutions: { conflict: Readonly<MergeConflict>; resolution: ConflictResolution }[] = [];
   private readonly listeners = new Set<() => void>();
 
   constructor(options: PublishControllerOptions) {
@@ -218,6 +264,7 @@ export class PublishController {
 
   /** Discards any in-progress review/candidate and returns to idle. */
   reset(): void {
+    this.resolutions = [];
     this.updateState(INITIAL_STATE);
   }
 
@@ -226,6 +273,7 @@ export class PublishController {
   // ==========================================================================
 
   async prepare(): Promise<PrepareCandidateResult> {
+    this.resolutions = [];
     const sessionState = this.session.getState();
     if (!sessionState.projectId || !sessionState.branchId) {
       const result: PrepareCandidateResult = {
@@ -234,12 +282,18 @@ export class PublishController {
       };
       this.updateState({
         status: 'blocked',
-        blockedMessage: firstIssueMessage(result) ?? 'No project is open in session',
+        blockedMessage: firstIssueMessage(result),
       });
       return result;
     }
 
-    this.updateState({ status: 'preparing', staleInfo: null, blockedMessage: null, lastError: null });
+    this.updateState({
+      status: 'preparing',
+      staleInfo: null,
+      blockedMessage: null,
+      lastError: null,
+      resolvedFields: Object.freeze([]),
+    });
 
     try {
       const project = await this.repository.loadProject(sessionState.projectId);
@@ -283,6 +337,11 @@ export class PublishController {
         return result;
       }
 
+      this.updateState({
+        sourceBranchLabel: sourceBranch.label,
+        mainBranchLabel: mainBranch.label,
+      });
+
       const result = await this.candidateController.prepare(this.repository, {
         projectId: sessionState.projectId,
         sourceBranchId: sourceBranch.id,
@@ -311,14 +370,15 @@ export class PublishController {
       // preparable state (e.g. uncommitted changes, closed branch, ambiguous base).
       const message =
         'issues' in result
-          ? firstIssueMessage(result) ?? `prepare-publish failed with status '${result.status}'`
-          : `prepare-publish failed with status '${result.status}'`;
+          ? firstIssueMessage(result)
+          : `Missing records: ${result.ids.join(', ')}`;
       this.updateState({ status: 'blocked', blockedMessage: message });
       return result;
     } catch (err) {
+      if (err instanceof ResultMessageContractError) throw err;
       const failed = mapErrorToFailedResult(err);
       this.updateState({ status: 'error', lastError: failed });
-      return failed as PrepareCandidateResult;
+      return failed;
     }
   }
 
@@ -338,6 +398,37 @@ export class PublishController {
     return candidate;
   }
 
+  /**
+   * Walks the source branch's real commit ancestry from its head back to (but
+   * excluding) the merge base, newest first — "What goes onto main" (22C).
+   * Never invents a commit list: an unreachable/missing link throws rather than
+   * silently truncating the walk.
+   */
+  private async loadCommitsSinceFork(
+    projectId: Id,
+    sourceHeadId: Id | null,
+    mergeBaseCommitId: Id | null,
+  ): Promise<readonly Readonly<CommitRecord>[]> {
+    const commits: CommitRecord[] = [];
+    const seen = new Set<Id>();
+    let cursor = sourceHeadId;
+    while (cursor !== null && cursor !== mergeBaseCommitId) {
+      if (seen.has(cursor)) throw new Error('Cycle in source commit ancestry');
+      seen.add(cursor);
+      const commit = await this.repository.loadCommit(projectId, cursor);
+      if (!commit) {
+        throw new Error(`Commit '${cursor}' referenced by branch ancestry was not found`);
+      }
+      commits.push(commit);
+      // History transitions are linear per commit (transactions.md §4: parent =
+      // branch head); a merge commit's ancestry is walked via its first parent,
+      // which is always the branch that carried it forward.
+      cursor = commit.parentIds[0] ?? null;
+    }
+    if (cursor !== mergeBaseCommitId) throw new Error('Source commit ancestry does not reach the merge base');
+    return commits;
+  }
+
   private async refreshFromCandidate(): Promise<void> {
     const candidateId = this.state.candidateId;
     if (!candidateId) return;
@@ -351,19 +442,49 @@ export class PublishController {
       return;
     }
 
-    const statusResult = await loadScenarioStatuses(
-      this.repository,
-      candidate.projectId,
-      candidate.mergeState.document,
-    );
+    const [statusResult, evalResult, commitsSinceFork, publications] = await Promise.all([
+      loadScenarioStatuses(this.repository, candidate.projectId, candidate.mergeState.document),
+      this.candidateController.evaluate(this.repository, candidateId),
+      this.loadCommitsSinceFork(
+        candidate.projectId,
+        // "theirs" is the source branch's head document; its head commit id is
+        // stored on the candidate as expectedSourceHeadId.
+        candidate.expectedSourceHeadId,
+        candidate.mergeBase.commitId,
+      ),
+      this.repository.listPublications(candidate.projectId),
+    ]);
 
-    const evalResult = await this.candidateController.evaluate(this.repository, candidateId);
+    // Components touched: distinct elements that differ between the merge base
+    // and the source head — both already held in full by the merge inputs, so
+    // no extra snapshot reads are needed.
+    const componentsTouchedCount = diffDocuments(
+      candidate.mergeState.inputs.base,
+      candidate.mergeState.inputs.theirs,
+    ).filter((d) => d.recordKind === 'element').length;
+
+    // Versions published since the fork: the merge base is either a real commit
+    // (some publication's commitId matches it — count publications strictly
+    // after that one by ordinal) or the project's initial snapshot with no
+    // publication yet (every existing publication happened after the fork).
+    const forkPublication = candidate.mergeBase.commitId
+      ? publications.find((p) => p.commitId === candidate.mergeBase.commitId)
+      : undefined;
+    const versionsPublishedSinceFork = forkPublication
+      ? publications.filter((p) => p.ordinal > forkPublication.ordinal).length
+      : publications.length;
 
     this.updateState({
       status: 'review',
       conflicts: candidate.mergeState.conflicts,
       scenarios: statusResult.scenarios,
+      mergedDocument: candidate.mergeState.document,
+      mergeInputs: candidate.mergeState.inputs,
       eligible: evalResult.status === 'done' && evalResult.eligible,
+      commitsSinceFork,
+      componentsTouchedCount,
+      versionsPublishedSinceFork,
+      forkVersionKey: forkPublication?.versionKey ?? null,
     });
   }
 
@@ -380,6 +501,8 @@ export class PublishController {
       throw new Error('PublishController has no active candidate to resolve a conflict on');
     }
 
+    const targetConflict = this.state.conflicts.find((c) => c.id === conflictId);
+
     const result = await this.candidateController.resolveConflict(this.repository, {
       candidateId,
       conflictId,
@@ -387,11 +510,67 @@ export class PublishController {
     });
 
     if (result.status === 'done') {
-      this.updateState({ candidateId: result.value.candidateId });
+      if (targetConflict) {
+        if (resolution.kind === 'edited') this.resolutions = this.resolutions.filter(({ conflict }) => conflict.recordKind !== targetConflict.recordKind || conflict.recordId !== targetConflict.recordId);
+        this.resolutions.push({ conflict: targetConflict, resolution });
+      }
+      const nextCandidate = this.candidateController.get(result.value.candidateId);
+      if (!nextCandidate) throw new Error('Resolved candidate was not found');
+      const removed = this.state.conflicts.filter((conflict) => !nextCandidate.mergeState.conflicts.some((next) => next.id === conflict.id));
+      const resolvedFields = targetConflict
+        ? Object.freeze([
+            ...this.state.resolvedFields.map((field) => resolution.kind === 'edited' && field.recordKind === targetConflict.recordKind && field.recordId === targetConflict.recordId ? { ...field, resolution: resolution.kind } : field),
+            ...removed.map((conflict) => ({
+              recordKind: conflict.recordKind,
+              recordId: conflict.recordId,
+              path: conflict.path,
+              resolution: resolution.kind,
+            })),
+          ])
+        : this.state.resolvedFields;
+
+      this.updateState({ candidateId: result.value.candidateId, resolvedFields });
       await this.refreshFromCandidate();
     }
 
     return result;
+  }
+
+  /** Rebuild through the existing candidate API and replay the remaining choices.
+   * An edited resolution replaces its record, so reopening one of its fields
+   * reopens all conflicts cleared by that record edit. */
+  async reopenConflict(field: ResolvedFieldRecord): Promise<void> {
+    const remaining = this.resolutions.filter(({ conflict, resolution }) =>
+      conflict.recordKind !== field.recordKind || conflict.recordId !== field.recordId ||
+      (resolution.kind !== 'edited' && JSON.stringify(conflict.path) !== JSON.stringify(field.path)),
+    );
+    const prepared = await this.prepare();
+    if (prepared.status !== 'done') return;
+    for (const choice of remaining) {
+      const conflict = this.state.conflicts.find((c) => c.recordKind === choice.conflict.recordKind && c.recordId === choice.conflict.recordId && JSON.stringify(c.path) === JSON.stringify(choice.conflict.path));
+      if (!conflict) continue;
+      const result = await this.resolveConflict(conflict.id, choice.resolution);
+      if (result.status !== 'done') throw new Error('Candidate replay failed while reopening a conflict');
+    }
+  }
+
+  /**
+   * Bulk "ours everywhere" / "theirs everywhere" (22F): resolves every currently
+   * open conflict with the same side, one at a time — each resolution supersedes
+   * the candidate and yields a new one, exactly as a single resolveConflict call
+   * does, so this is a loop over the real one-at-a-time contract, never a new
+   * bulk-merge code path.
+   */
+  async resolveAllConflicts(side: 'ours' | 'theirs'): Promise<ResolveConflictResult | null> {
+    let last: ResolveConflictResult | null = null;
+    while (this.state.conflicts.length > 0) {
+      const conflictId = this.state.conflicts[0].id;
+      last = await this.resolveConflict(conflictId, { kind: side });
+      if (last.status !== 'done') {
+        return last;
+      }
+    }
+    return last;
   }
 
   // ==========================================================================
@@ -424,11 +603,16 @@ export class PublishController {
   private async loadVersionSuggestions(projectId: Id): Promise<void> {
     const publications = await this.repository.listPublications(projectId);
     let latestVersion = null;
+    let currentVersionKey: string | null = null;
     if (publications.length > 0) {
       const sorted = [...publications].sort((a, b) => b.ordinal - a.ordinal);
       latestVersion = sorted[0].metadata.version;
+      currentVersionKey = sorted[0].versionKey;
     }
-    this.updateState({ versionSuggestions: proposeVersionSuggestions(latestVersion) });
+    this.updateState({
+      versionSuggestions: proposeVersionSuggestions(latestVersion),
+      currentVersionKey,
+    });
   }
 
   // ==========================================================================
@@ -549,10 +733,12 @@ export class PublishController {
         // Reload session so the source branch's (possibly now closed) state and
         // main's advanced head are reflected, mirroring HistoryController's
         // post-commit/-restore reload.
-        await this.session.openProject(candidate.projectId, sessionState.branchId ?? null);
+        if (!publication) throw new Error('Applied publication record is missing');
+        await this.session.openProject(candidate.projectId, candidate.mainBranchId);
         this.updateState({
           status: 'published',
           publication,
+          publishedSourceClosed: !keepSourceOpen,
           lastError: null,
         });
         return result;
@@ -576,5 +762,13 @@ export class PublishController {
  */
 export type PublishControllerLike = Pick<
   PublishController,
-  'getState' | 'subscribe' | 'prepare' | 'resolveConflict' | 'runScenario' | 'publish' | 'reset'
+  | 'getState'
+  | 'subscribe'
+  | 'prepare'
+  | 'resolveConflict'
+  | 'resolveAllConflicts'
+  | 'reopenConflict'
+  | 'runScenario'
+  | 'publish'
+  | 'reset'
 >;

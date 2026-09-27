@@ -8,4 +8,8 @@ export * from './controller';
 export * from './HistoryLadder';
 export * from './CommitPanel';
 export * from './publishController';
+export * from './PublishReviewDialog';
+export * from './CompareAndResolvePanel';
+export * from './PublishedNotice';
+export * from './DraftBehindMainBanner';
 export * from './PublishFlow';

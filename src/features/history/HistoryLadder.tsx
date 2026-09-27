@@ -24,21 +24,7 @@ import {
   formatPublicationDate,
 } from './diffSummary';
 import type { AheadOfVersionInfo } from './types';
-
-/** Any repository/controller action result shape that may carry a specific,
- * real reason for failure — never a generic invented one. */
-type ResultWithDetail = { readonly status: string } & Record<string, unknown>;
-
-function extractResultDetail(res: ResultWithDetail): string | undefined {
-  if ('issues' in res) {
-    const issues = res.issues as readonly { readonly message: string }[];
-    return issues[0]?.message;
-  }
-  if ('message' in res && typeof res.message === 'string') {
-    return res.message;
-  }
-  return undefined;
-}
+import { requireResultMessage, ResultMessageContractError } from './resultMessage';
 
 export interface HistoryLadderProps {
   readonly controller?: HistoryController;
@@ -58,6 +44,13 @@ export interface HistoryLadderProps {
   readonly onRestore?: (snapshotIdOrCheckpointId: string, label: string) => Promise<unknown> | void;
   readonly onOpenCommit?: () => void;
   readonly onOpenPublish?: () => void;
+  /** Set once a real prepare-publish has run and found the draft behind main
+   * (22E) — never invented; omitted/null shows the plain Publish affordance. */
+  readonly behindMain?: { readonly conflictCount: number; readonly versionsPublishedSinceFork: number } | null;
+  readonly onReviewAndResolve?: () => void;
+  readonly onStartDraft?: (publication: Readonly<PublicationRecord>) => void;
+  readonly onEditMain?: () => void;
+  readonly onComparePublication?: (publication: Readonly<PublicationRecord>) => void;
   readonly onClose?: () => void;
   readonly className?: string;
 }
@@ -80,6 +73,11 @@ export function HistoryLadder({
   onRestore: propOnRestore,
   onOpenCommit,
   onOpenPublish,
+  behindMain,
+  onReviewAndResolve,
+  onStartDraft,
+  onEditMain,
+  onComparePublication,
   onClose,
   className,
 }: HistoryLadderProps): React.JSX.Element {
@@ -103,6 +101,9 @@ export function HistoryLadder({
   const checkpoints = propCheckpoints ?? controllerState?.checkpoints ?? [];
   const commits = propCommits ?? controllerState?.commits ?? [];
   const publications = propPublications ?? controllerState?.publications ?? [];
+  const orderedPublications = [...publications].sort((a, b) => b.ordinal - a.ordinal);
+  const currentPublication = orderedPublications[0];
+  const publishedMain = isMain && currentPublication !== undefined;
 
   // Local state for UI toggles and forms
   const [showAllEdits, setShowAllEdits] = React.useState(false);
@@ -161,15 +162,14 @@ export function HistoryLadder({
       } else if (controller) {
         const res = await controller.saveCheckpoint(trimmed);
         if (res.status !== 'applied') {
-          const detail = extractResultDetail(res);
-          setCheckpointError(`Couldn't save the checkpoint.${detail ? ` ${detail}` : ''}`);
+          setCheckpointError(requireResultMessage(res));
           return;
         }
       }
       setCheckpointLabel('');
     } catch (err) {
-      const detail = err instanceof Error ? err.message : undefined;
-      setCheckpointError(`Couldn't save the checkpoint.${detail ? ` ${detail}` : ''}`);
+      if (err instanceof ResultMessageContractError) throw err;
+      setCheckpointError(requireResultMessage(err));
     } finally {
       setIsSavingCheckpoint(false);
     }
@@ -203,16 +203,15 @@ export function HistoryLadder({
       } else if (controller) {
         const res = await controller.restore(id, trimmed);
         if (res.status !== 'applied') {
-          const detail = extractResultDetail(res);
-          setRestoreError(`Couldn't restore this version.${detail ? ` ${detail}` : ''}`);
+          setRestoreError(requireResultMessage(res));
           return;
         }
       }
       setRestoreTargetId(null);
       setRestoreLabel('');
     } catch (err) {
-      const detail = err instanceof Error ? err.message : undefined;
-      setRestoreError(`Couldn't restore this version.${detail ? ` ${detail}` : ''}`);
+      if (err instanceof ResultMessageContractError) throw err;
+      setRestoreError(requireResultMessage(err));
     } finally {
       setIsRestoring(false);
     }
@@ -269,11 +268,34 @@ export function HistoryLadder({
                 {aheadOfVersion.aheadCount} ahead of {aheadOfVersion.versionKey}
               </span>
             )}
+            {publishedMain && <span className="text-xs font-mono text-primary">up to date · {currentPublication.versionKey}</span>}
+          </div>
+        )}
+
+        {/* 2b. "This draft is behind main" callout (22E) — shown only once a real
+         * prepare-publish has found the draft behind main (never inferred). */}
+        {behindMain && (
+          <div
+            data-testid="ladder-behind-main"
+            className="rounded-control border border-risk-edge bg-risk-tint px-3 py-2.5 space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-risk-text">This draft is behind main</p>
+              {onReviewAndResolve && (
+                <button type="button" onClick={onReviewAndResolve} className="text-xs font-medium text-primary hover:underline shrink-0">
+                  Review
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {behindMain.versionsPublishedSinceFork} version{behindMain.versionsPublishedSinceFork === 1 ? '' : 's'} published
+              since you forked
+            </p>
           </div>
         )}
 
         {/* 3. NOW · NOT COMMITTED block */}
-        <section aria-labelledby="now-not-committed-header" className="space-y-2">
+        {!publishedMain && (!behindMain || workingEdits.length > 0) && <section aria-labelledby="now-not-committed-header" className="space-y-2">
           <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground">
             <span id="now-not-committed-header" className="font-semibold text-risk-text">
               NOW · NOT COMMITTED
@@ -352,10 +374,10 @@ export function HistoryLadder({
               </Button>
             </div>
           </div>
-        </section>
+        </section>}
 
         {/* 4. CHECKPOINTS Section & Save checkpoint inline form */}
-        <section aria-labelledby="checkpoints-header" className="space-y-2">
+        {!publishedMain && (!behindMain || checkpoints.length > 0) && <section aria-labelledby="checkpoints-header" className="space-y-2">
           <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground">
             <span id="checkpoints-header">CHECKPOINTS ({checkpoints.length})</span>
           </div>
@@ -457,10 +479,10 @@ export function HistoryLadder({
               ))}
             </ul>
           )}
-        </section>
+        </section>}
 
         {/* 5. COMMITS Section */}
-        <section aria-labelledby="commits-header" className="space-y-2">
+        {!publishedMain && <section aria-labelledby="commits-header" className="space-y-2">
           <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground">
             <span id="commits-header">COMMITS ({commits.length})</span>
           </div>
@@ -583,7 +605,7 @@ export function HistoryLadder({
               )}
             </div>
           )}
-        </section>
+        </section>}
 
         {/* 6. PUBLISHED ON MAIN Section */}
         {publications.length > 0 && (
@@ -592,22 +614,25 @@ export function HistoryLadder({
               <span id="published-on-main-header">PUBLISHED ON MAIN</span>
             </div>
             <div className="space-y-2">
-              {publications.map((pub) => (
+              {orderedPublications.map((pub, index) => (
                 <div
                   key={pub.id}
                   data-testid={`publication-card-${pub.id}`}
-                  className="flex items-center justify-between rounded-control border border-border bg-sunken/30 px-3 py-2 text-sm"
+                  className={cn('flex items-center justify-between rounded-control border px-3 py-2 text-sm', index === 0 && isMain ? 'border-primary bg-card ring-2 ring-primary/10' : 'border-border bg-sunken/30')}
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <Badge variant="neutral" className="font-mono text-xs font-semibold px-1.5">
                       {pub.versionKey}
                     </Badge>
-                    <span className="font-medium text-foreground truncate">
-                      {pub.metadata.title}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="font-medium text-foreground truncate">{pub.metadata.title}</span>
+                      {isMain && index === 0 && <p className="text-[11px] text-muted-foreground">{formatPublicationDate(pub.createdAt)}</p>}
+                      {commits.find((commit) => commit.id === pub.commitId)?.evidence.length ? <p className="text-[10px] font-mono text-primary">REFERENCE · {computeEvidenceSummary(commits.find((commit) => commit.id === pub.commitId)!)}</p> : null}
+                    </div>
                   </div>
                   <span className="font-mono text-xs text-muted-foreground shrink-0 ml-2">
-                    {formatPublicationDate(pub.createdAt)}
+                    {index === 0 && isMain ? 'CURRENT' : formatPublicationDate(pub.createdAt)}
+                    {index > 0 && onComparePublication && <button type="button" className="ml-2 text-primary" onClick={() => onComparePublication(pub)}>Compare</button>}
                   </span>
                 </div>
               ))}
@@ -618,7 +643,12 @@ export function HistoryLadder({
 
       {/* 7. Footer */}
       <div className="px-4 py-3 border-t border-border bg-card space-y-2">
-        <Button
+        {publishedMain ? <>
+          <Button type="button" className="w-full" disabled={!onStartDraft} onClick={() => onStartDraft?.(currentPublication)}>Start a new draft from {currentPublication.versionKey}</Button>
+          <button type="button" className="text-xs text-primary disabled:text-muted-foreground" disabled={!onEditMain} onClick={onEditMain}>Edit main directly</button>
+          <span className="text-[10px] text-muted-foreground ml-2">creates a draft on first edit</span>
+        </> : <>
+        {!behindMain && <Button
           type="button"
           className="w-full bg-primary hover:bg-primary-hover text-primary-foreground font-semibold"
           disabled={isMain}
@@ -627,33 +657,47 @@ export function HistoryLadder({
         >
           Commit
           {workingEdits.length > 0 ? ` · ${workingEdits.length} edit${workingEdits.length === 1 ? '' : 's'}` : ''}
-        </Button>
+        </Button>}
 
         {/* Publish affordance: opens PublishFlow (RV-11b). Disabled on main (D40)
          * and while the branch has no committed head yet (prepare-publish
-         * requires a committed source head per transactions.md §4). */}
-        <button
-          type="button"
-          data-testid="open-publish-button"
-          disabled={isMain || commits.length === 0 || !onOpenPublish}
-          aria-disabled={isMain || commits.length === 0 || !onOpenPublish}
-          title={
-            isMain
-              ? mainCommitDisabledReason
-              : commits.length === 0
-                ? 'Commit at least once before publishing'
-                : undefined
-          }
-          onClick={onOpenPublish}
-          className={cn(
-            'w-full text-xs text-center py-1 block select-none',
-            isMain || commits.length === 0 || !onOpenPublish
-              ? 'text-muted-foreground cursor-not-allowed opacity-60'
-              : 'text-primary hover:underline font-medium',
-          )}
-        >
-          Publish draft to main
-        </button>
+         * requires a committed source head per transactions.md §4). When the
+         * draft is known behind main (22E), the primary action becomes
+         * reviewing the real conflict count instead. */}
+        {behindMain ? (
+          <>
+            {onReviewAndResolve && (
+              <Button type="button" className="w-full font-semibold" onClick={onReviewAndResolve}>
+                Review and resolve {behindMain.conflictCount} conflict{behindMain.conflictCount === 1 ? '' : 's'}
+              </Button>
+            )}
+            <p className="text-xs text-muted-foreground text-center py-1">Publish draft to main — blocked until updated</p>
+          </>
+        ) : (
+          <button
+            type="button"
+            data-testid="open-publish-button"
+            disabled={isMain || commits.length === 0 || !onOpenPublish}
+            aria-disabled={isMain || commits.length === 0 || !onOpenPublish}
+            title={
+              isMain
+                ? mainCommitDisabledReason
+                : commits.length === 0
+                  ? 'Commit at least once before publishing'
+                  : undefined
+            }
+            onClick={onOpenPublish}
+            className={cn(
+              'w-full text-xs text-center py-1 block select-none',
+              isMain || commits.length === 0 || !onOpenPublish
+                ? 'text-muted-foreground cursor-not-allowed opacity-60'
+                : 'text-primary hover:underline font-medium',
+            )}
+          >
+            Publish draft to main
+          </button>
+        )}
+        </>}
       </div>
     </div>
   );

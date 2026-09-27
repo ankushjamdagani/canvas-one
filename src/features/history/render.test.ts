@@ -9,6 +9,11 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { HistoryLadder } from './HistoryLadder';
 import { CommitPanel } from './CommitPanel';
+import { DraftBehindMainBanner } from './DraftBehindMainBanner';
+import { PublishedNotice } from './PublishedNotice';
+import { readFileSync } from 'node:fs';
+import type { Document } from '../../domain/studio/model';
+const fixture: Document = JSON.parse(readFileSync('specs/revamp/fixtures/s02.json', 'utf8'));
 import type { CheckpointRecord, CommitRecord, PublicationRecord } from '../../persistence/studio';
 import type { ScenarioWithStatus } from '../runs/scenarioStatus';
 import type { RecordChangeItem } from './types';
@@ -36,15 +41,13 @@ const commits: readonly CommitRecord[] = [
   {
     projectId: 'proj-1',
     id: 'commit-1',
-    branchId: 'branch-1',
     parentIds: [],
     snapshotId: 'snap-commit-1',
     message: 'Handle checkout retries in the order queue',
     evidence: [{ scenarioId: 's1', fingerprint: 'fp1', runId: 'run-1' }],
-    evidenceManifest: null,
     actor: testActor,
     createdAt: Date.UTC(2026, 8, 11, 16, 25),
-  } as unknown as CommitRecord,
+  },
 ];
 
 const publications: readonly PublicationRecord[] = [
@@ -68,6 +71,30 @@ const publications: readonly PublicationRecord[] = [
 ];
 
 describe('HistoryLadder static markup (22A)', () => {
+  it('shows the published main ladder with current release and draft actions (22D)', () => {
+    const html = renderToStaticMarkup(React.createElement(HistoryLadder, { isMain: true, branchName: 'main', publications, onStartDraft: vi.fn(), onEditMain: vi.fn() }));
+    expect(html).toContain('CURRENT');
+    expect(html).toContain('Start a new draft from 2.2.1');
+    expect(html).toContain('Edit main directly');
+    expect(html).not.toContain('NOW · NOT COMMITTED');
+    expect(html).not.toContain('open-publish-button');
+  });
+
+  it('renders the standalone behind-main banner with supplied counts and actions (22E)', () => {
+    const html = renderToStaticMarkup(React.createElement(DraftBehindMainBanner, { conflictCount: 3, versionsPublishedSinceFork: 2, forkVersionKey: '2.2.1', onLater: vi.fn(), onReviewAndResolve: vi.fn() }));
+    expect(html).toContain('Main has moved on · 3 conflicts with your edits');
+    expect(html).toContain('forked at 2.2.1');
+    expect(html).toContain('Later');
+    expect(html).toContain('Review and resolve');
+  });
+
+  it('accurately distinguishes a closed source from one kept open, without Undo publish', () => {
+    for (const sourceBranchClosed of [true, false]) {
+      const html = renderToStaticMarkup(React.createElement(PublishedNotice, { publication: publications[0], sourceBranchLabel: 'Checkout draft', sourceBranchClosed }));
+      expect(html).toContain(sourceBranchClosed ? 'Checkout draft closed' : 'Checkout draft stays open');
+      expect(html).not.toContain('Undo publish');
+    }
+  });
   it('renders branch, working edits, checkpoints, commits, publications without excluded texts', () => {
     const html = renderToStaticMarkup(
       React.createElement(HistoryLadder, {
@@ -148,6 +175,31 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(publishButtonMatch![0]).toContain('disabled=""');
   });
 
+  it('shows the real behind-main callout and "Review and resolve N conflicts" primary action (22E)', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        branchName: 'async-fulfilment',
+        isMain: false,
+        workingEdits: [],
+        checkpoints: [],
+        commits,
+        publications: [],
+        onOpenCommit: vi.fn(),
+        onOpenPublish: vi.fn(),
+        behindMain: { conflictCount: 3, versionsPublishedSinceFork: 2 },
+        onReviewAndResolve: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('ladder-behind-main');
+    expect(html).toContain('This draft is behind main');
+    expect(html).toContain('2 versions published');
+    expect(html).toContain('Review and resolve 3 conflicts');
+    expect(html).toContain('blocked until updated');
+    // The plain Publish link is replaced entirely while behind main.
+    expect(html).not.toContain('open-publish-button');
+  });
+
   it('omits "ahead of" when not computable, and omits fields-changed line when not computable', () => {
     const html = renderToStaticMarkup(
       React.createElement(HistoryLadder, {
@@ -187,7 +239,7 @@ describe('HistoryLadder static markup (22A)', () => {
 
 function makeScenarios(overrides: readonly Partial<ScenarioWithStatus>[]): ScenarioWithStatus[] {
   return overrides.map((o, i) => ({
-    scenario: { id: `s${i}`, label: `Scenario ${i}` } as ScenarioWithStatus['scenario'],
+    scenario: { ...fixture.scenarios[0], id: `s${i}`, label: `Scenario ${i}` },
     status: { kind: 'not-run' },
     currentFingerprint: null,
     latestRun: null,
