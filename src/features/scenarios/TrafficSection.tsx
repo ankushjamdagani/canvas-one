@@ -3,35 +3,43 @@
  *
  * commands.md §4 "Editor sections": "timed: workloads with entry, rate and request
  * mix." Screen: scenario_traffic_editor.png.
+ *
+ * Review round: a new request class's `keyDistribution` starts fully unset (no
+ * uniform/catalogSize-1 default) -- model-and-runner.md §6 Workloads: `keyDistribution`
+ * is a required, always-present object on every `RequestClass` regardless of `kind`
+ * (`src/domain/studio/validate.ts`'s `validateRequestClass` checks all four fields
+ * unconditionally). Apply is blocked (draft.ts's `draftCompletenessIssues`) until the
+ * user has explicitly chosen `kind` and typed `catalogSize`/`hotSubset`/`hotShare`.
+ * `tags` starts as a real, valid empty list (not a placeholder) and is shown as an
+ * editable list.
  */
 
 import * as React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Document, KeyDistribution, RequestClass, Scenario, Workload } from '../../domain/studio/model';
+import type { Document, Workload } from '../../domain/studio/model';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { Switch } from '../../components/ui/switch';
 import { inboundEndpointOptions, endpointLabel } from './pickers';
+import { UNSET_KEY_DISTRIBUTION, type DraftRequestClass, type DraftScenario, type DraftWorkload } from './draftScenario';
 import type { MintId } from './types';
 
-const DEFAULT_KEY_DISTRIBUTION: KeyDistribution = { kind: 'uniform', catalogSize: 1, hotSubset: 1, hotShare: 0 };
-
-function newRequestClass(mintId: MintId): RequestClass {
+function newRequestClass(mintId: MintId): DraftRequestClass {
   return {
     id: mintId(),
     name: 'Requests',
     weight: 1,
     operation: 'read',
     tags: [],
-    keyDistribution: DEFAULT_KEY_DISTRIBUTION,
+    keyDistribution: UNSET_KEY_DISTRIBUTION,
   };
 }
 
 export interface TrafficSectionProps {
   readonly document: Document;
-  readonly scenario: Scenario;
-  readonly onChange: (patch: (s: Scenario) => Scenario) => void;
+  readonly scenario: DraftScenario;
+  readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly mintId: MintId;
 }
 
@@ -41,7 +49,7 @@ export function TrafficSection({ document, scenario, onChange, mintId }: Traffic
   const addWorkload = () => {
     if (entryOptions.length === 0) return;
     const first = entryOptions[0];
-    const workload: Workload = {
+    const workload: DraftWorkload = {
       id: mintId(),
       entry: { elementId: first.elementId, portId: first.portId },
       enabled: true,
@@ -54,7 +62,7 @@ export function TrafficSection({ document, scenario, onChange, mintId }: Traffic
     onChange((s) => ({ ...s, workloads: [...s.workloads, workload] }));
   };
 
-  const updateWorkload = (id: string, patch: (w: Workload) => Workload) => {
+  const updateWorkload = (id: string, patch: (w: DraftWorkload) => DraftWorkload) => {
     onChange((s) => ({ ...s, workloads: s.workloads.map((w) => (w.id === id ? patch(w) : w)) }));
   };
 
@@ -159,60 +167,19 @@ export function TrafficSection({ document, scenario, onChange, mintId }: Traffic
                 <p className="text-[11px] text-secondary-text">One request class, undifferentiated traffic.</p>
               )}
               {workload.classes.map((cls) => (
-                <div key={cls.id} className="flex items-center gap-1.5">
-                  <Input
-                    className="h-7 text-xs"
-                    value={cls.name}
-                    onChange={(e) =>
-                      updateWorkload(workload.id, (w) => ({
-                        ...w,
-                        classes: w.classes.map((c) => (c.id === cls.id ? { ...c, name: e.target.value } : c)),
-                      }))
-                    }
-                    aria-label="Class name"
-                  />
-                  <Input
-                    className="h-7 w-20 text-xs"
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={cls.weight}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      updateWorkload(workload.id, (w) => ({
-                        ...w,
-                        classes: w.classes.map((c) => (c.id === cls.id ? { ...c, weight: Number.isFinite(value) ? value : c.weight } : c)),
-                      }));
-                    }}
-                    aria-label="Class weight"
-                  />
-                  <NativeSelect
-                    className="h-7 w-24 text-xs"
-                    value={cls.operation}
-                    onChange={(e) =>
-                      updateWorkload(workload.id, (w) => ({
-                        ...w,
-                        classes: w.classes.map((c) =>
-                          c.id === cls.id ? { ...c, operation: e.target.value === 'write' ? 'write' : 'read' } : c,
-                        ),
-                      }))
-                    }
-                    aria-label="Class operation"
-                  >
-                    <NativeSelectOption value="read">read</NativeSelectOption>
-                    <NativeSelectOption value="write">write</NativeSelectOption>
-                  </NativeSelect>
-                  <button
-                    type="button"
-                    className="text-secondary-text hover:text-risk-text"
-                    onClick={() =>
-                      updateWorkload(workload.id, (w) => ({ ...w, classes: w.classes.filter((c) => c.id !== cls.id) }))
-                    }
-                    aria-label="Remove class"
-                  >
-                    <Trash2 className="size-3" aria-hidden="true" />
-                  </button>
-                </div>
+                <RequestClassRow
+                  key={cls.id}
+                  cls={cls}
+                  onChange={(patch) =>
+                    updateWorkload(workload.id, (w) => ({
+                      ...w,
+                      classes: w.classes.map((c) => (c.id === cls.id ? patch(c) : c)),
+                    }))
+                  }
+                  onRemove={() =>
+                    updateWorkload(workload.id, (w) => ({ ...w, classes: w.classes.filter((c) => c.id !== cls.id) }))
+                  }
+                />
               ))}
             </div>
           </div>
@@ -223,5 +190,161 @@ export function TrafficSection({ document, scenario, onChange, mintId }: Traffic
         )}
       </div>
     </section>
+  );
+}
+
+function RequestClassRow({
+  cls,
+  onChange,
+  onRemove,
+}: {
+  readonly cls: DraftRequestClass;
+  readonly onChange: (patch: (c: DraftRequestClass) => DraftRequestClass) => void;
+  readonly onRemove: () => void;
+}) {
+  const [newTag, setNewTag] = React.useState('');
+  const kd = cls.keyDistribution;
+
+  return (
+    <div className="rounded-control border border-control-border/60 bg-background p-2 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <Input
+          className="h-7 text-xs"
+          value={cls.name}
+          onChange={(e) => onChange((c) => ({ ...c, name: e.target.value }))}
+          aria-label="Class name"
+        />
+        <Input
+          className="h-7 w-20 text-xs"
+          type="number"
+          min={0}
+          step="any"
+          value={cls.weight}
+          onChange={(e) => {
+            const value = Number(e.target.value);
+            onChange((c) => ({ ...c, weight: Number.isFinite(value) ? value : c.weight }));
+          }}
+          aria-label="Class weight"
+        />
+        <NativeSelect
+          className="h-7 w-24 text-xs"
+          value={cls.operation}
+          onChange={(e) => onChange((c) => ({ ...c, operation: e.target.value === 'write' ? 'write' : 'read' }))}
+          aria-label="Class operation"
+        >
+          <NativeSelectOption value="read">read</NativeSelectOption>
+          <NativeSelectOption value="write">write</NativeSelectOption>
+        </NativeSelect>
+        <button type="button" className="text-secondary-text hover:text-risk-text" onClick={onRemove} aria-label="Remove class">
+          <Trash2 className="size-3" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1.5 items-end">
+        <label className="space-y-0.5 text-[10px] text-secondary-text">
+          Key distribution
+          <NativeSelect
+            className="h-7 text-xs"
+            value={kd.kind ?? ''}
+            onChange={(e) => {
+              const kind = e.target.value === 'hot' ? 'hot' : e.target.value === 'uniform' ? 'uniform' : null;
+              onChange((c) => ({ ...c, keyDistribution: { ...c.keyDistribution, kind } }));
+            }}
+            aria-label="Key distribution kind"
+          >
+            <NativeSelectOption value="">Choose…</NativeSelectOption>
+            <NativeSelectOption value="uniform">Uniform</NativeSelectOption>
+            <NativeSelectOption value="hot">Hot subset</NativeSelectOption>
+          </NativeSelect>
+        </label>
+        <label className="space-y-0.5 text-[10px] text-secondary-text">
+          Catalog size
+          <Input
+            className="h-7 text-xs"
+            type="number"
+            min={1}
+            placeholder="—"
+            value={kd.catalogSize ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const value = raw === '' ? null : Number(raw);
+              onChange((c) => ({
+                ...c,
+                keyDistribution: { ...c.keyDistribution, catalogSize: value === null || Number.isFinite(value) ? value : c.keyDistribution.catalogSize },
+              }));
+            }}
+            aria-label="Catalog size"
+          />
+        </label>
+        <label className="space-y-0.5 text-[10px] text-secondary-text">
+          Hot subset
+          <Input
+            className="h-7 text-xs"
+            type="number"
+            min={1}
+            placeholder="—"
+            value={kd.hotSubset ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const value = raw === '' ? null : Number(raw);
+              onChange((c) => ({
+                ...c,
+                keyDistribution: { ...c.keyDistribution, hotSubset: value === null || Number.isFinite(value) ? value : c.keyDistribution.hotSubset },
+              }));
+            }}
+            aria-label="Hot subset"
+          />
+        </label>
+        <label className="space-y-0.5 text-[10px] text-secondary-text">
+          Hot share (%)
+          <Input
+            className="h-7 text-xs"
+            type="number"
+            min={0}
+            max={100}
+            placeholder="—"
+            value={kd.hotShare ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const value = raw === '' ? null : Number(raw);
+              onChange((c) => ({
+                ...c,
+                keyDistribution: { ...c.keyDistribution, hotShare: value === null || Number.isFinite(value) ? value : c.keyDistribution.hotShare },
+              }));
+            }}
+            aria-label="Hot share"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {cls.tags.map((tag, i) => (
+          <span key={`${tag}-${i}`} className="inline-flex items-center gap-1 rounded-tag bg-sunken px-1.5 py-0.5 text-[10px] text-body">
+            {tag}
+            <button
+              type="button"
+              onClick={() => onChange((c) => ({ ...c, tags: c.tags.filter((_, j) => j !== i) }))}
+              aria-label={`Remove tag ${tag}`}
+            >
+              <Trash2 className="size-2.5" aria-hidden="true" />
+            </button>
+          </span>
+        ))}
+        <Input
+          className="h-6 w-24 text-[10px]"
+          placeholder="Add tag"
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newTag.trim() !== '') {
+              e.preventDefault();
+              onChange((c) => ({ ...c, tags: [...c.tags, newTag.trim()] }));
+              setNewTag('');
+            }
+          }}
+          aria-label="Add tag"
+        />
+      </div>
+    </div>
   );
 }

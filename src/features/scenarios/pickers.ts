@@ -6,7 +6,7 @@
  * ID typed or shown in the UI.
  */
 
-import type { Document, Element, Endpoint, Id, Port } from '../../domain/studio/model';
+import type { Document, Element, Endpoint, Id, Path, Port } from '../../domain/studio/model';
 
 export type EndpointOption = {
   readonly elementId: Id;
@@ -103,4 +103,29 @@ export type ElementOption = {
 
 export function allElementOptions(document: Document): readonly ElementOption[] {
   return document.elements.map((e) => ({ elementId: e.id, label: e.label }));
+}
+
+export type PathOption = {
+  /** Stable string key for a <select>; "" means "Whole value" (path = []). */
+  readonly key: string;
+  readonly label: string;
+  readonly path: Path;
+};
+
+/**
+ * Path choices for an assertion's `output`/`context` subject: "Whole value" (path =
+ * []) plus, when `schemaId` resolves to a record shape, one option per top-level field
+ * key. GAP: only top-level record fields are offered -- nested paths and list indices
+ * aren't (model-and-runner.md §3 Shapes can nest records/lists arbitrarily up to depth
+ * 8; a general path builder is out of this task's scope).
+ */
+export function pathOptionsForSchema(document: Document, schemaId: Id | null): readonly PathOption[] {
+  const wholeValue: PathOption = { key: '', label: 'Whole value', path: [] };
+  if (schemaId === null) return [wholeValue];
+  const schema = document.schemas.find((s) => s.id === schemaId);
+  if (!schema || schema.shape.type !== 'record') return [wholeValue];
+  return [
+    wholeValue,
+    ...schema.shape.fields.map((f) => ({ key: f.key, label: f.key, path: [f.key] })),
+  ];
 }

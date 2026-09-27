@@ -8,19 +8,24 @@
  * `expected` is Json in the contract, but the brief requires "typed controls, never raw
  * JSON": a small kind selector (number / text / true / false) plus the matching typed
  * input produces the Json value, instead of a free-text JSON box.
+ *
+ * Review round: a new `output`/`context` subject's `path` starts unset (`null`), not a
+ * silent `[]`. The path picker always offers "Whole value" as an explicit option
+ * (mapping to `[]` only once chosen) plus, when the relevant schema is a record shape,
+ * one option per top-level field key (pickers.ts's `pathOptionsForSchema`) -- nothing
+ * is preselected, and draft.ts's `draftCompletenessIssues` blocks Apply while `path` is
+ * still `null`.
  */
 
 import * as React from 'react';
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import type {
-  Assertion,
   AssertionSubject,
   CountSubjectOutcome,
   CountSubjectScope,
   Document,
   Json,
   MetricSubjectKey,
-  Scenario,
 } from '../../domain/studio/model';
 import {
   ASSERTION_OPERATORS,
@@ -33,13 +38,14 @@ import type { CheckResult } from '../../domain/studio/runner/types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
-import { allElementOptions, inboundEndpointOptions, outboundEndpointOptions } from './pickers';
+import { allElementOptions, inboundEndpointOptions, outboundEndpointOptions, pathOptionsForSchema } from './pickers';
+import type { DraftAssertion, DraftAssertionSubject, DraftScenario } from './draftScenario';
 import type { MintId } from './types';
 
 export interface AssertionsSectionProps {
   readonly document: Document;
-  readonly scenario: Scenario;
-  readonly onChange: (patch: (s: Scenario) => Scenario) => void;
+  readonly scenario: DraftScenario;
+  readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly mintId: MintId;
   /** commands.md §4: "last-run pass/fail marks per check." */
   readonly lastRunChecks?: ReadonlyMap<string, CheckResult> | null;
@@ -53,7 +59,7 @@ function expectedKindOf(value: Json): ExpectedKind {
   return 'text';
 }
 
-function defaultSubject(): AssertionSubject {
+function defaultSubject(): DraftAssertionSubject {
   return { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' };
 }
 
@@ -65,7 +71,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
   );
 
   const addAssertion = () => {
-    const assertion: Assertion = {
+    const assertion: DraftAssertion = {
       id: mintId(),
       label: 'New check',
       subject: defaultSubject(),
@@ -75,7 +81,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
     onChange((s) => ({ ...s, assertions: [...s.assertions, assertion] }));
   };
 
-  const updateAssertion = (id: string, patch: (a: Assertion) => Assertion) => {
+  const updateAssertion = (id: string, patch: (a: DraftAssertion) => DraftAssertion) => {
     onChange((s) => ({ ...s, assertions: s.assertions.map((a) => (a.id === id ? patch(a) : a)) }));
   };
 
@@ -142,6 +148,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
               </div>
 
               <SubjectEditor
+                document={document}
                 elements={elements}
                 outputPorts={outputPorts}
                 subject={assertion.subject}
@@ -156,7 +163,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
                     onChange={(e) =>
                       updateAssertion(assertion.id, (a) => ({
                         ...a,
-                        operator: e.target.value as Assertion['operator'],
+                        operator: e.target.value as DraftAssertion['operator'],
                       }))
                     }
                     aria-label="Operator"
@@ -217,16 +224,20 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
   );
 }
 
+const UNSET_PATH_VALUE = '__unset__';
+
 function SubjectEditor({
+  document,
   elements,
   outputPorts,
   subject,
   onChange,
 }: {
+  readonly document: Document;
   readonly elements: readonly { readonly elementId: string; readonly label: string }[];
   readonly outputPorts: readonly { readonly elementId: string; readonly portId: string; readonly label: string }[];
-  readonly subject: AssertionSubject;
-  readonly onChange: (subject: AssertionSubject) => void;
+  readonly subject: DraftAssertionSubject;
+  readonly onChange: (subject: DraftAssertionSubject) => void;
 }) {
   const firstElementId = elements[0]?.elementId ?? '';
 
@@ -243,7 +254,7 @@ function SubjectEditor({
                 onChange({ kind, elementId: firstElementId });
                 break;
               case 'context':
-                onChange({ kind, elementId: firstElementId, path: [] });
+                onChange({ kind, elementId: firstElementId, path: null });
                 break;
               case 'output':
                 onChange({
@@ -251,7 +262,7 @@ function SubjectEditor({
                   port: outputPorts[0]
                     ? { elementId: outputPorts[0].elementId, portId: outputPorts[0].portId }
                     : { elementId: firstElementId, portId: '' },
-                  path: [],
+                  path: null,
                 });
                 break;
               case 'count':
@@ -359,23 +370,44 @@ function SubjectEditor({
       )}
 
       {subject.kind === 'output' && (
-        <label className="space-y-1 text-[11px] text-secondary-text col-span-2">
-          Port
-          <NativeSelect
-            value={`${subject.port.elementId}:${subject.port.portId}`}
-            onChange={(e) => {
-              const [elementId, portId] = e.target.value.split(':');
-              onChange({ ...subject, port: { elementId, portId } });
-            }}
-            aria-label="Output port"
-          >
-            {outputPorts.map((p) => (
-              <NativeSelectOption key={`${p.elementId}:${p.portId}`} value={`${p.elementId}:${p.portId}`}>
-                {p.label}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </label>
+        <>
+          <label className="space-y-1 text-[11px] text-secondary-text col-span-2">
+            Port
+            <NativeSelect
+              value={`${subject.port.elementId}:${subject.port.portId}`}
+              onChange={(e) => {
+                const [elementId, portId] = e.target.value.split(':');
+                onChange({ ...subject, port: { elementId, portId }, path: null });
+              }}
+              aria-label="Output port"
+            >
+              {outputPorts.map((p) => (
+                <NativeSelectOption key={`${p.elementId}:${p.portId}`} value={`${p.elementId}:${p.portId}`}>
+                  {p.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </label>
+          <PathPicker
+            className="col-span-2"
+            options={pathOptionsForSchema(
+              document,
+              document.elements.find((e) => e.id === subject.port.elementId)?.ports.find((p) => p.id === subject.port.portId)
+                ?.schemaId ?? null,
+            )}
+            path={subject.path}
+            onChange={(path) => onChange({ ...subject, path })}
+          />
+        </>
+      )}
+
+      {subject.kind === 'context' && (
+        <PathPicker
+          className="col-span-2"
+          options={pathOptionsForSchema(document, contextSchemaId(document, subject.elementId))}
+          path={subject.path}
+          onChange={(path) => onChange({ ...subject, path })}
+        />
       )}
 
       {subject.kind === 'trace-count' && (
@@ -389,5 +421,51 @@ function SubjectEditor({
         </label>
       )}
     </div>
+  );
+}
+
+function contextSchemaId(document: Document, elementId: string): string | null {
+  const element = document.elements.find((e) => e.id === elementId);
+  return element && element.behavior.kind === 'machine' ? element.behavior.contextSchemaId : null;
+}
+
+function PathPicker({
+  options,
+  path,
+  onChange,
+  className,
+}: {
+  readonly options: ReturnType<typeof pathOptionsForSchema>;
+  readonly path: readonly (string | number)[] | null;
+  readonly onChange: (path: readonly (string | number)[]) => void;
+  readonly className?: string;
+}) {
+  const selectedKey = path === null ? UNSET_PATH_VALUE : path.length === 0 ? '' : String(path[0]);
+
+  return (
+    <label className={`space-y-1 text-[11px] text-secondary-text ${className ?? ''}`}>
+      Which part of the value
+      <NativeSelect
+        value={selectedKey}
+        onChange={(e) => {
+          if (e.target.value === UNSET_PATH_VALUE) return;
+          const option = options.find((o) => o.key === e.target.value);
+          if (option) onChange(option.path);
+        }}
+        aria-label="Which part of the value"
+        aria-invalid={path === null}
+      >
+        {path === null && (
+          <NativeSelectOption value={UNSET_PATH_VALUE} disabled>
+            Choose…
+          </NativeSelectOption>
+        )}
+        {options.map((o) => (
+          <NativeSelectOption key={o.key} value={o.key}>
+            {o.label}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </label>
   );
 }

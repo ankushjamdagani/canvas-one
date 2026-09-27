@@ -19,10 +19,11 @@
  * fields.ts), so "raw strings never enter the Document" still holds.
  */
 
-import type { Document, Id, Scenario, ScenarioMode } from '../../domain/studio/model';
+import type { Document, Id, ScenarioMode } from '../../domain/studio/model';
 import type { Issue } from '../../domain/studio/validate';
 import type { ReadinessIssue } from '../../domain/studio/readiness';
 import type { AuthoredResult, RecordChange } from '../../persistence/studio/types';
+import type { DraftScenario } from './draftScenario';
 
 /**
  * A validator (storable) or readiness (runnable) issue, unified for editor display.
@@ -95,9 +96,9 @@ export type ScenarioDraftHandle = {
    * Null only for `target.kind === 'edit'` against a scenario that no longer exists
    * (deleted elsewhere) -- `status` is then `'missing'`.
    */
-  readonly scenario: Scenario | null;
+  readonly scenario: DraftScenario | null;
   /** The accepted (baseline) value; equals `scenario` when `dirty` is false. */
-  readonly baseScenario: Scenario | null;
+  readonly baseScenario: DraftScenario | null;
   readonly dirty: boolean;
   readonly status: ScenarioDraftStatus;
   readonly issuesBySection: Readonly<Record<ScenarioSection, readonly ScenarioIssue[]>>;

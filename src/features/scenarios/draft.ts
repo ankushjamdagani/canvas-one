@@ -19,7 +19,7 @@
  * raw-string FieldSpec bridge.
  */
 
-import type { Document, Id, Scenario, ScenarioMode, CompletionPolicy } from '../../domain/studio/model';
+import type { Document, Id, ScenarioMode } from '../../domain/studio/model';
 import { validateDocument } from '../../domain/studio/validate';
 import { checkReadiness } from '../../domain/studio/readiness';
 import type { RecordChange, AuthoredResult } from '../../persistence/studio/types';
@@ -35,34 +35,39 @@ import {
   type ScenarioIssue,
   type ScenarioSection,
 } from './types';
+import {
+  UNSET_COMPLETION,
+  scenarioToDraft,
+  toStorableScenario,
+  toValidationScenario,
+  type DraftScenario,
+} from './draftScenario';
 
 // ============================================================================
 // Empty draft construction ("Empty drafts invent nothing")
 // ============================================================================
-
-/** commands.md §4: "completion:{kind:'quiescent'} for step-by-step (the only legal value)". */
-function defaultCompletionForMode(mode: ScenarioMode): CompletionPolicy {
-  if (mode === 'logical') {
-    return { kind: 'quiescent' };
-  }
-  // Timed: model-and-runner.md §6 lists horizon and drain as the two timed policies;
-  // horizon is the simpler one-field policy and the one shown in scenario_traffic_editor.png
-  // ("Run settings ... horizon or drain"), so it is the starting selection. horizonMs is
-  // chosen at the low end of the contracted 1-300s range (storage.md §6) rather than
-  // invented -- 30s is a plain round default, editable immediately in Run settings.
-  return { kind: 'horizon', horizonMs: 30000 };
-}
 
 function scopeElementIdsAtDraftOpen(document: Document): readonly Id[] {
   return document.elements.map((e) => e.id);
 }
 
 /**
- * commands.md §4/"Empty drafts invent nothing": builds a brand-new, unsaved Scenario
- * with no workloads/inputs/faults/boundaries/assertions, scope = every element in the
- * document right now, contracted budget defaults, mode-correct completion default, and
- * a freshly drawn seed. `revision: 0` -- a never-yet-persisted record; see
- * idRemap.ts's remapScenarioForCopy for the same choice on a copy.
+ * commands.md §4/"Empty drafts invent nothing": builds a brand-new, unsaved
+ * DraftScenario with no workloads/inputs/faults/boundaries/assertions, scope = every
+ * element in the document right now, contracted budget defaults, a freshly drawn
+ * seed, and completion:{kind:'quiescent'} for logical (the one allowed prefill,
+ * "the only legal value"). Timed scenarios get NO completion prefill --
+ * `completion.kind === null` until the user picks horizon/drain and fills its
+ * value(s); see draftScenario.ts's DraftCompletion and draftCompletenessIssues below.
+ * `revision: 0` -- a never-yet-persisted record; see idRemap.ts's
+ * remapScenarioForCopy for the same choice on a copy.
+ *
+ * `entryPorts: []` and stays that way: closure.ts seeds scope from `entryPorts`,
+ * every `input.entry` and every `workload.entry` combined (model-and-runner.md §6 /
+ * closure.ts "Start from the scenario entry points"), so inputs/workloads alone
+ * already make the scenario's entry points reachable. No readiness rule requires
+ * `entryPorts` itself to be non-empty, so it is never something the user is forced to
+ * author separately, and this module offers no editor for it.
  */
 export function buildEmptyScenario(params: {
   readonly mintId: MintId;
@@ -70,7 +75,7 @@ export function buildEmptyScenario(params: {
   readonly mode: ScenarioMode;
   readonly label: string;
   readonly document: Document;
-}): Scenario {
+}): DraftScenario {
   const { mintId, randomSource, mode, label, document } = params;
   return {
     id: mintId(),
@@ -88,7 +93,7 @@ export function buildEmptyScenario(params: {
     assertions: [],
     seed: drawSeed(randomSource),
     budgets: DEFAULT_SCENARIO_BUDGETS,
-    completion: defaultCompletionForMode(mode),
+    completion: mode === 'logical' ? { kind: 'quiescent' } : UNSET_COMPLETION,
     assumptions: [],
   };
 }
@@ -129,34 +134,89 @@ function emptyIssuesBySection(): Record<ScenarioSection, ScenarioIssue[]> {
 }
 
 /**
- * Builds a candidate Document with `candidate` inserted (new) or replacing the scenario
- * `sourceScenarioId` (edit) at the same index, runs the storable validator over the
- * whole document, and -- only when storable is clean -- runs readiness for this
- * scenario (model-and-runner.md §1: "Readiness errors never block saving a structurally
- * valid design", so readiness only needs checking once storable already passes).
- * Storable issues are filtered to this scenario's own subtree (`path[0] === 'scenarios'
- * && path[1] === candidateIndex`); readiness issues are already scoped to one scenario
- * by `checkReadiness(doc, scenarioId)`.
+ * A locally-crafted issue for a value the draft layer requires but the stored
+ * `Scenario` schema has no field-presence check for (its type simply isn't optional):
+ * "not yet chosen" only exists at the draft layer, so the storable/readiness
+ * validators can never report it themselves. Shaped exactly like `Issue`
+ * (`{code,path,entityId,severity,message}`) so it flows through the same
+ * `issuesBySection`/`allIssues` plumbing; `path` mirrors the `['scenarios', <index>,
+ * field, ...]` shape `sectionForField` already reads (index 0 is a placeholder --
+ * never used to look anything up, only `path[2]` is read).
+ */
+function draftIssue(entityId: Id, field: string, message: string): ScenarioIssue {
+  return { code: 'structural-rule', path: ['scenarios', 0, field], entityId, severity: 'error', message };
+}
+
+/**
+ * commands.md §4 "Empty drafts invent nothing": everything the record requires but the
+ * user hasn't chosen yet blocks Apply. Reports exactly the three draft-only "unset"
+ * states (see draftScenario.ts): timed completion, each workload class's key
+ * distribution, each output/context assertion's path.
+ */
+function draftCompletenessIssues(draft: DraftScenario): ScenarioIssue[] {
+  const issues: ScenarioIssue[] = [];
+
+  if (draft.mode === 'timed' && draft.completion.kind === null) {
+    issues.push(draftIssue(draft.id, 'completion', 'Choose when the run ends'));
+  } else if (draft.completion.kind === 'horizon' && draft.completion.horizonMs === null) {
+    issues.push(draftIssue(draft.id, 'completion', 'Enter a horizon'));
+  } else if (
+    draft.completion.kind === 'drain' &&
+    (draft.completion.arrivalHorizonMs === null || draft.completion.deadlineMs === null)
+  ) {
+    issues.push(draftIssue(draft.id, 'completion', 'Enter both drain fields'));
+  }
+
+  for (const workload of draft.workloads) {
+    for (const cls of workload.classes) {
+      const kd = cls.keyDistribution;
+      if (kd.kind === null || kd.catalogSize === null || kd.hotSubset === null || kd.hotShare === null) {
+        issues.push(draftIssue(draft.id, 'workloads', `Choose how keys are distributed for "${cls.name}"`));
+      }
+    }
+  }
+
+  for (const assertion of draft.assertions) {
+    if ((assertion.subject.kind === 'output' || assertion.subject.kind === 'context') && assertion.subject.path === null) {
+      issues.push(draftIssue(draft.id, 'assertions', `Choose which part of the value "${assertion.label}" checks`));
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Builds a candidate Document with `candidate` (converted to its best-effort stored
+ * shape via `toValidationScenario` -- see that function's doc comment on why this is
+ * safe) inserted (new) or replacing the scenario `sourceScenarioId` (edit) at the same
+ * index, runs the storable validator over the whole document, and -- only when
+ * storable is clean -- runs readiness for this scenario (model-and-runner.md §1:
+ * "Readiness errors never block saving a structurally valid design", so readiness only
+ * needs checking once storable already passes). Storable issues are filtered to this
+ * scenario's own subtree (`path[0] === 'scenarios' && path[1] === candidateIndex`);
+ * readiness issues are already scoped to one scenario by `checkReadiness(doc,
+ * scenarioId)`. `draftCompletenessIssues` issues are always included regardless.
  */
 export function computeScenarioIssues(
   document: Document,
-  candidate: Scenario,
+  candidate: DraftScenario,
   sourceScenarioId: Id | null,
 ): {
   readonly issuesBySection: Readonly<Record<ScenarioSection, readonly ScenarioIssue[]>>;
   readonly allIssues: readonly ScenarioIssue[];
 } {
+  const validationScenario = toValidationScenario(candidate);
   const matchId = sourceScenarioId ?? candidate.id;
   const existingIndex = document.scenarios.findIndex((s) => s.id === matchId);
   const scenarios =
     existingIndex >= 0
-      ? document.scenarios.map((s, i) => (i === existingIndex ? candidate : s))
-      : [...document.scenarios, candidate];
+      ? document.scenarios.map((s, i) => (i === existingIndex ? validationScenario : s))
+      : [...document.scenarios, validationScenario];
   const candidateIndex = existingIndex >= 0 ? existingIndex : scenarios.length - 1;
   const candidateDocument: Document = { ...document, scenarios };
 
   const storableResult = validateDocument(candidateDocument);
-  const allIssues: ScenarioIssue[] = [];
+  const allIssues: ScenarioIssue[] = [...draftCompletenessIssues(candidate)];
 
   if (!storableResult.ok) {
     for (const issue of storableResult.issues) {
@@ -224,24 +284,25 @@ export function openScenarioDraft(params: {
         generalIssue: null,
       });
     }
+    const draftScenario = scenarioToDraft(source);
     return Object.freeze({
       draftId,
       target,
       baseWorkingRevision,
       isNew: false,
       sourceScenarioId: source.id,
-      scenario: source,
-      baseScenario: source,
+      scenario: draftScenario,
+      baseScenario: draftScenario,
       dirty: false,
       status: 'clean',
-      ...computeScenarioIssues(document, source, source.id),
+      ...computeScenarioIssues(document, draftScenario, source.id),
       generalIssue: null,
     });
   }
 
   // target.kind === 'new'
   const from = target.from;
-  let scenario: Scenario;
+  let scenario: DraftScenario;
   if (from.kind === 'empty') {
     scenario = buildEmptyScenario({ mintId, randomSource, mode: target.mode, label: target.label, document });
   } else {
@@ -258,7 +319,7 @@ export function openScenarioDraft(params: {
         `scenario.new: mode '${target.mode}' must equal the copied scenario's mode '${source.mode}'`,
       );
     }
-    scenario = remapScenarioForCopy(source, mintId, target.label);
+    scenario = scenarioToDraft(remapScenarioForCopy(source, mintId, target.label));
   }
 
   return Object.freeze({
@@ -285,7 +346,7 @@ export function openScenarioDraft(params: {
 export function changeScenarioDraft(
   handle: ScenarioDraftHandle,
   document: Document,
-  patch: (scenario: Scenario) => Scenario,
+  patch: (scenario: DraftScenario) => DraftScenario,
 ): ScenarioDraftHandle {
   if (handle.scenario === null) return handle;
   const scenario = patch(handle.scenario);
@@ -363,9 +424,20 @@ export async function applyScenarioDraft(
     return Object.freeze({ ...withIssues, status: 'stale' });
   }
 
+  // No error-severity issue survived the check above, so every draft-only "unset"
+  // field (completion / keyDistribution / assertion path) is filled -- this can never
+  // return null here; `draftCompletenessIssues` (folded into `allIssues` above) and
+  // this function agree exactly on what counts as unset.
+  const storableCandidate = toStorableScenario(handle.scenario);
+  if (!storableCandidate) {
+    throw new Error(
+      'Contract violation: toStorableScenario returned null after computeScenarioIssues reported no blocking issues',
+    );
+  }
+
   const savingHandle: ScenarioDraftHandle = Object.freeze({ ...withIssues, status: 'saving' });
 
-  let outgoingScenario = handle.scenario;
+  let outgoingScenario = storableCandidate;
   let change: RecordChange;
   if (handle.isNew) {
     change = { kind: 'insert', value: { recordKind: 'scenario', record: outgoingScenario } };
@@ -380,7 +452,7 @@ export async function applyScenarioDraft(
     // from (or 0 for a copy); the outgoing record bumps from the *current session*
     // record's revision so a concurrently-applied unrelated edit (already ruled out
     // above by the working-revision stale check) is never silently skipped.
-    outgoingScenario = { ...handle.scenario, revision: currentRecord.revision + 1 };
+    outgoingScenario = { ...storableCandidate, revision: currentRecord.revision + 1 };
     change = { kind: 'replace', value: { recordKind: 'scenario', record: outgoingScenario } };
   }
 
@@ -394,12 +466,13 @@ export async function applyScenarioDraft(
         'Contract violation: session.getState().workingRevision is null after an applied scenario edit',
       );
     }
+    const acceptedDraft = scenarioToDraft(outgoingScenario);
     return Object.freeze({
       ...savingHandle,
       isNew: false,
       sourceScenarioId: outgoingScenario.id,
-      scenario: outgoingScenario,
-      baseScenario: outgoingScenario,
+      scenario: acceptedDraft,
+      baseScenario: acceptedDraft,
       baseWorkingRevision: newWorkingRevision,
       dirty: false,
       status: 'clean',

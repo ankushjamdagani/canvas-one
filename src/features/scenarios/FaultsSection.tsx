@@ -11,7 +11,8 @@
 
 import * as React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Document, Fault, Scenario } from '../../domain/studio/model';
+import type { Document, Fault } from '../../domain/studio/model';
+import type { DraftScenario } from './draftScenario';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
@@ -20,8 +21,8 @@ import type { MintId } from './types';
 
 export interface FaultsSectionProps {
   readonly document: Document;
-  readonly scenario: Scenario;
-  readonly onChange: (patch: (s: Scenario) => Scenario) => void;
+  readonly scenario: DraftScenario;
+  readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly mintId: MintId;
 }
 

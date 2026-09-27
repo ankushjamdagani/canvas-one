@@ -14,7 +14,8 @@
 
 import * as React from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
-import type { Document, Input, Scenario } from '../../domain/studio/model';
+import type { Document, Input } from '../../domain/studio/model';
+import type { DraftScenario } from './draftScenario';
 import { Button } from '../../components/ui/button';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -23,8 +24,8 @@ import type { MintId } from './types';
 
 export interface StepsSectionProps {
   readonly document: Document;
-  readonly scenario: Scenario;
-  readonly onChange: (patch: (s: Scenario) => Scenario) => void;
+  readonly scenario: DraftScenario;
+  readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly mintId: MintId;
 }
 

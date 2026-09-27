@@ -3,121 +3,63 @@
  * boundaries (RV-05c).
  *
  * commands.md §4 "Editor sections": "logical: ... replies from outside = boundaries."
- * model-and-runner.md §6: `Boundary={id,source:Endpoint,schemaId,responses:[...]}`.
- * "Boundary ports must lie on scope crossings" and a boundary answers a call this
- * scenario's scope makes to something outside it, so the source is restricted to
- * outbound *call* ports (the only channel with a `responseSchemaId` to answer against);
- * `schemaId` is set from that port's `responseSchemaId` since `match` evaluates the
- * eventual reply's shape, and `responseFixtureId` is picked from fixtures declared
- * against that same schema. Logical: `delayMs` is always null (model-and-runner.md §6).
- * `match` defaults to `{op:'exists', value:{kind:'literal', value:true}}`, an
- * always-true guard (an `exists` check on a literal is never missing) -- a legitimate,
- * always-matching first response, editable later; this task's brief lists boundaries as
- * a required section but does not specify a match-condition builder, so no richer guard
- * editor is invented here (reported as a lead reading).
+ * model-and-runner.md §6: `Boundary={id,source:Endpoint,schemaId,responses:[{...,
+ * match:Guard,...}]}`, where `Guard` is a recursive typed tree (equals/notEquals/
+ * exists/all/any/positiveInteger/nonEmpty/every over `Value` operands that are
+ * themselves recursive: literal/read/record/list/outcome).
+ *
+ * Review round: this module does not offer "Add reply from outside." A previous round
+ * created a new boundary with a fabricated always-true `match` guard, which the review
+ * correctly flagged as an invented default -- per commands.md "Empty drafts invent
+ * nothing," no field the record requires may be silently filled, and a full match-
+ * condition builder covering every Guard/Value variant above is out of this task's
+ * scope. GAP: a boundary added by copying an existing scenario (idRemap.ts keeps its
+ * `match` untouched) still displays here with its other fields (payload, outcome,
+ * "deliver after step") editable -- only *creating* a new one is unavailable. A typed
+ * match builder is left for a follow-up task.
  */
 
 import * as React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import type { Boundary, BoundaryResponse, Document, Scenario, TransportOutcome } from '../../domain/studio/model';
+import { Trash2 } from 'lucide-react';
+import type { BoundaryResponse, Document, TransportOutcome } from '../../domain/studio/model';
 import { TRANSPORT_OUTCOMES } from '../../domain/studio/model';
-import { Button } from '../../components/ui/button';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { endpointLabel, fixtureOptionsForSchema } from './pickers';
-import type { MintId } from './types';
+import type { DraftScenario } from './draftScenario';
 
 export interface BoundariesSectionProps {
   readonly document: Document;
-  readonly scenario: Scenario;
-  readonly onChange: (patch: (s: Scenario) => Scenario) => void;
-  readonly mintId: MintId;
+  readonly scenario: DraftScenario;
+  readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
 }
 
-const ALWAYS_MATCH = { op: 'exists' as const, value: { kind: 'literal' as const, value: true } };
-
-function callSourceOptions(document: Document) {
-  const options: { elementId: string; portId: string; label: string; responseSchemaId: string }[] = [];
-  for (const element of document.elements) {
-    for (const port of element.ports) {
-      if (port.direction === 'out' && port.channel === 'call' && port.responseSchemaId) {
-        options.push({
-          elementId: element.id,
-          portId: port.id,
-          label: `${element.label} · ${port.label}`,
-          responseSchemaId: port.responseSchemaId,
-        });
-      }
-    }
-  }
-  return options;
-}
-
-export function BoundariesSection({ document, scenario, onChange, mintId }: BoundariesSectionProps) {
-  const sources = React.useMemo(() => callSourceOptions(document), [document]);
-
-  const eligible = React.useMemo(
-    () => sources.filter((s) => fixtureOptionsForSchema(document, s.responseSchemaId).length > 0),
-    [document, sources],
-  );
-
-  const addBoundary = () => {
-    if (eligible.length === 0) return;
-    const first = eligible[0];
-    const fixtures = fixtureOptionsForSchema(document, first.responseSchemaId);
-    const boundary: Boundary = {
-      id: mintId(),
-      source: { elementId: first.elementId, portId: first.portId },
-      schemaId: first.responseSchemaId,
-      responses: [
-        {
-          id: mintId(),
-          match: ALWAYS_MATCH,
-          responseFixtureId: fixtures[0].fixtureId,
-          payloadBindings: [],
-          delayMs: null,
-          afterInputId: null,
-          outcome: 'succeeded',
-        },
-      ],
-    };
-    onChange((s) => ({ ...s, boundaries: [...s.boundaries, boundary] }));
-  };
-
-  const updateBoundary = (id: string, patch: (b: Boundary) => Boundary) => {
-    onChange((s) => ({ ...s, boundaries: s.boundaries.map((b) => (b.id === id ? patch(b) : b)) }));
+export function BoundariesSection({ document, scenario, onChange }: BoundariesSectionProps) {
+  const updateResponse = (boundaryId: string, responseId: string, patch: (r: BoundaryResponse) => BoundaryResponse) => {
+    onChange((s) => ({
+      ...s,
+      boundaries: s.boundaries.map((b) =>
+        b.id === boundaryId ? { ...b, responses: b.responses.map((r) => (r.id === responseId ? patch(r) : r)) } : b,
+      ),
+    }));
   };
 
   const removeBoundary = (id: string) => {
     onChange((s) => ({ ...s, boundaries: s.boundaries.filter((b) => b.id !== id) }));
   };
 
-  const updateResponse = (boundaryId: string, responseId: string, patch: (r: BoundaryResponse) => BoundaryResponse) => {
-    updateBoundary(boundaryId, (b) => ({
-      ...b,
-      responses: b.responses.map((r) => (r.id === responseId ? patch(r) : r)),
-    }));
-  };
-
   return (
     <section data-testid="scenario-section-boundaries" className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
-            What happens during the run
-          </div>
-          <div className="text-[11px] text-secondary-text">Replies from outside this scenario's scope.</div>
+      <div>
+        <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
+          What happens during the run
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={addBoundary} disabled={eligible.length === 0}>
-          <Plus className="size-3.5" aria-hidden="true" />
-          Add reply
-        </Button>
+        <div className="text-[11px] text-secondary-text">Replies from outside this scenario's scope.</div>
       </div>
 
-      {eligible.length === 0 && (
-        <p className="text-[11px] text-secondary-text">
-          No outbound call port with a matching response fixture in this document yet.
-        </p>
-      )}
+      <p className="text-[11px] text-secondary-text" data-testid="boundaries-gap-note">
+        Adding a new reply isn't available yet -- it needs a match-condition builder this task doesn't include. A
+        reply copied from another scenario can still be reviewed and its payload, outcome and timing edited below.
+      </p>
 
       <div className="space-y-2">
         {scenario.boundaries.map((boundary) => (

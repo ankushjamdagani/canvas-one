@@ -12,7 +12,7 @@
 
 import * as React from 'react';
 import { Activity, AlertCircle, GitCommitHorizontal, X } from 'lucide-react';
-import type { CompletionKind } from '../../domain/studio/model';
+import type { Document } from '../../domain/studio/model';
 import type { CheckResult } from '../../domain/studio/runner/types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -24,12 +24,13 @@ import { FaultsSection } from './FaultsSection';
 import { BoundariesSection } from './BoundariesSection';
 import { AssertionsSection } from './AssertionsSection';
 import type { ScenarioDraftHandle, ScenarioSection, MintId } from './types';
+import type { DraftScenario } from './draftScenario';
 import { SCENARIO_SEED_MAX } from './budgets';
 
 export interface ScenarioEditorProps {
-  readonly document: import('../../domain/studio/model').Document;
+  readonly document: Document;
   readonly handle: ScenarioDraftHandle;
-  readonly onChange: (patch: (s: import('../../domain/studio/model').Scenario) => import('../../domain/studio/model').Scenario) => void;
+  readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly onApply: () => void;
   readonly onCancel: () => void;
   readonly mintId: MintId;
@@ -115,7 +116,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
         {scenario.mode === 'timed' ? (
           <FaultsSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} />
         ) : (
-          <BoundariesSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} />
+          <BoundariesSection document={document} scenario={scenario} onChange={onChange} />
         )}
         {handle.issuesBySection[scenario.mode === 'timed' ? 'faults' : 'boundaries'].length > 0 && (
           <IssueList issues={handle.issuesBySection[scenario.mode === 'timed' ? 'faults' : 'boundaries']} />
@@ -141,21 +142,25 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
               <label className="space-y-1 text-[11px] text-secondary-text">
                 Completion
                 <NativeSelect
-                  value={scenario.completion.kind}
+                  value={scenario.completion.kind ?? ''}
+                  aria-invalid={scenario.completion.kind === null}
                   onChange={(e) => {
-                    const kind = e.target.value as CompletionKind;
+                    const value = e.target.value;
                     onChange((s) => ({
                       ...s,
                       completion:
-                        kind === 'horizon'
-                          ? { kind: 'horizon', horizonMs: 30000 }
-                          : kind === 'drain'
-                            ? { kind: 'drain', arrivalHorizonMs: 20000, deadlineMs: 30000 }
-                            : s.completion,
+                        value === 'horizon'
+                          ? { kind: 'horizon', horizonMs: null }
+                          : value === 'drain'
+                            ? { kind: 'drain', arrivalHorizonMs: null, deadlineMs: null }
+                            : { kind: null },
                     }));
                   }}
                   aria-label="Completion kind"
                 >
+                  <NativeSelectOption value="" disabled>
+                    Choose…
+                  </NativeSelectOption>
                   <NativeSelectOption value="horizon">Fixed horizon</NativeSelectOption>
                   <NativeSelectOption value="drain">Drain</NativeSelectOption>
                 </NativeSelect>
@@ -168,11 +173,13 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                     type="number"
                     min={1000}
                     max={300000}
-                    value={scenario.completion.horizonMs}
+                    placeholder="—"
+                    value={scenario.completion.horizonMs ?? ''}
                     onChange={(e) => {
-                      const v = Number(e.target.value);
+                      const raw = e.target.value;
+                      const v = raw === '' ? null : Number(raw);
                       onChange((s) =>
-                        s.completion.kind === 'horizon' && Number.isFinite(v)
+                        s.completion.kind === 'horizon' && (v === null || Number.isFinite(v))
                           ? { ...s, completion: { kind: 'horizon', horizonMs: v } }
                           : s,
                       );
@@ -188,11 +195,13 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                     <Input
                       type="number"
                       min={0}
-                      value={scenario.completion.arrivalHorizonMs}
+                      placeholder="—"
+                      value={scenario.completion.arrivalHorizonMs ?? ''}
                       onChange={(e) => {
-                        const v = Number(e.target.value);
+                        const raw = e.target.value;
+                        const v = raw === '' ? null : Number(raw);
                         onChange((s) =>
-                          s.completion.kind === 'drain' && Number.isFinite(v)
+                          s.completion.kind === 'drain' && (v === null || Number.isFinite(v))
                             ? { ...s, completion: { ...s.completion, arrivalHorizonMs: v } }
                             : s,
                         );
@@ -205,11 +214,13 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                       type="number"
                       min={0}
                       max={600000}
-                      value={scenario.completion.deadlineMs}
+                      placeholder="—"
+                      value={scenario.completion.deadlineMs ?? ''}
                       onChange={(e) => {
-                        const v = Number(e.target.value);
+                        const raw = e.target.value;
+                        const v = raw === '' ? null : Number(raw);
                         onChange((s) =>
-                          s.completion.kind === 'drain' && Number.isFinite(v)
+                          s.completion.kind === 'drain' && (v === null || Number.isFinite(v))
                             ? { ...s, completion: { ...s.completion, deadlineMs: v } }
                             : s,
                         );
