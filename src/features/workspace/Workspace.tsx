@@ -19,7 +19,6 @@ import {
   PublishController,
   PublishFlow,
   DraftBehindMainBanner,
-  type CommitPreview,
 } from '../history';
 import { LibraryPanel, type LibraryView } from '../library';
 import type {
@@ -61,29 +60,6 @@ import {
 
 const MOBILE_BREAKPOINT_PX = 768;
 
-/** localStorage key App.tsx mints the session's Actor from (getOrCreateActorId) --
- * read here too so HistoryController/PublishController act as the same
- * local-human actor as the session they observe, without a new identity. */
-const ACTOR_STORAGE_KEY = 'system-studio.actor-id';
-
-function useLocalActor(): Actor {
-  return React.useMemo<Actor>(() => {
-    let actorId: string;
-    try {
-      const stored = typeof localStorage === 'undefined' ? null : localStorage.getItem(ACTOR_STORAGE_KEY);
-      if (stored) {
-        actorId = stored;
-      } else {
-        actorId = crypto.randomUUID();
-        if (typeof localStorage !== 'undefined') localStorage.setItem(ACTOR_STORAGE_KEY, actorId);
-      }
-    } catch {
-      actorId = crypto.randomUUID();
-    }
-    return { actorId, kind: 'local-human', displayName: 'You' };
-  }, []);
-}
-
 function useViewportWidth(): number {
   const [width, setWidth] = React.useState<number>(() =>
     typeof window === 'undefined' ? 1280 : window.innerWidth,
@@ -103,6 +79,13 @@ export interface WorkspaceProps {
   onBackToProjects: () => void;
   /** RV-12d: mints ids for the workspace's RunController runs (the app's mintId). */
   mintId: () => string;
+  /**
+   * RV-12h review round: the one session actor App.tsx already holds in its
+   * bootState and threads to EntryScreen -- Workspace's HistoryController
+   * and PublishController act as this same local-human actor rather than
+   * minting or reading a second identity of their own.
+   */
+  actor: Actor;
   /** D38 run-control slot; owned by the runs lane, empty until wired in. */
   runControl?: React.ReactNode;
 }
@@ -112,6 +95,7 @@ export function Workspace({
   repository,
   onBackToProjects,
   mintId,
+  actor,
   runControl,
 }: WorkspaceProps) {
   // Read session state via useSyncExternalStore
@@ -698,8 +682,6 @@ export function Workspace({
   // RV-12h: History and Library panels
   // ==========================================================================
 
-  const actor = useLocalActor();
-
   // One HistoryController / CandidateController / PublishController per
   // mounted workspace (mirrors the RunController pattern above), created
   // once via a lazy state initializer rather than on every render.
@@ -722,22 +704,13 @@ export function Workspace({
       }),
   );
 
-  // HistoryController's getState/subscribe are ordinary methods (not
-  // auto-bound arrow properties, unlike SessionController's and
-  // PublishController's), so they're wrapped here rather than passed bare --
-  // controller.ts isn't in this task's allowed files to add a `.bind` call to.
-  const historySubscribe = React.useCallback(
-    (onStoreChange: () => void) => historyController.subscribe(onStoreChange),
-    [historyController],
-  );
-  const historyGetState = React.useCallback(
-    () => historyController.getState(),
-    [historyController],
-  );
+  // HistoryController binds getState/subscribe in its own constructor
+  // (matching SessionController/PublishController), so they're safe to pass
+  // bare here.
   const historyControllerState = React.useSyncExternalStore(
-    historySubscribe,
-    historyGetState,
-    historyGetState,
+    historyController.subscribe,
+    historyController.getState,
+    historyController.getState,
   );
   const publishControllerState = React.useSyncExternalStore(
     publishController.subscribe,
@@ -796,47 +769,51 @@ export function Workspace({
     prevCommitCountRef.current = len;
   }, [historyControllerState.commits.length, historyView]);
 
-  // CommitPanel's `controller` prop path also hits the unbound-method issue
-  // above (its own internal useSyncExternalStore(controller.subscribe, ...)),
-  // so its commit preview is loaded here instead, through a direct, properly
-  // bound `historyController.loadCommitPreview()` call.
-  const [commitPreview, setCommitPreview] = React.useState<CommitPreview | null>(null);
-  React.useEffect(() => {
-    if (historyView !== 'commit') return;
-    let cancelled = false;
-    void historyController.loadCommitPreview().then((preview) => {
-      if (!cancelled) setCommitPreview(preview);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [historyView, historyController]);
-
   const [libraryView, setLibraryView] = React.useState<LibraryView>('list');
 
   const [publishOpen, setPublishOpen] = React.useState(false);
   const [behindMainBannerDismissed, setBehindMainBannerDismissed] = React.useState(false);
 
   // 22E "draft behind main": proactively prepares a real publish candidate
-  // against main whenever the open branch is a non-main draft, so the real
-  // conflict count is known before the user opens Publish (matching
-  // DraftBehindMainBanner's own doc comment: "the app shell mounts [it]
-  // typically after calling PublishController.prepare()"). PublishFlow
-  // reuses this same prepared candidate when opened (its own effect only
-  // calls prepare() while status is 'idle').
+  // against main so the real conflict count is known before the user opens
+  // Publish (matching DraftBehindMainBanner's own doc comment: "the app
+  // shell mounts [it] typically after calling PublishController.prepare()").
+  // PublishFlow reuses this same prepared candidate when opened (its own
+  // effect only calls prepare() while status is 'idle').
+  //
+  // PublishController exposes no cheaper "is main ahead of this draft"
+  // check (PublishControllerLike is only getState/subscribe/prepare/
+  // resolveConflict/resolveAllConflicts/reopenConflict/runScenario/publish/
+  // reset) -- prepare() itself, which builds a real isolated merge
+  // candidate, is the only way to learn the real conflict count. It is
+  // therefore run only on real navigation events -- opening/switching to a
+  // draft branch, and the user opening History or Publish -- never on a
+  // timer and never per document edit/keystroke.
   const mainBranchId = projectRecord?.mainBranchId ?? null;
+  const isOnDraftBranch = Boolean(sessionState.projectId && sessionState.branchId && mainBranchId && sessionState.branchId !== mainBranchId);
+
+  const refreshBehindMainCheck = React.useCallback(() => {
+    if (!isOnDraftBranch) return;
+    setBehindMainBannerDismissed(false);
+    void publishController.prepare();
+  }, [isOnDraftBranch, publishController]);
+
   React.useEffect(() => {
     if (!sessionState.projectId || !sessionState.branchId || !mainBranchId) return;
     if (sessionState.branchId === mainBranchId) {
+      // Main's head only ever moves (in this local, single-actor app)
+      // through this session's own publish, which already reloads the
+      // session onto main -- reaching this branch. Nothing to prepare while
+      // sitting on main itself.
       publishController.reset();
       setPublishOpen(false);
       setBehindMainBannerDismissed(false);
       return;
     }
-    setBehindMainBannerDismissed(false);
-    void publishController.prepare();
+    // Opened/switched to a draft branch.
+    refreshBehindMainCheck();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionState.projectId, sessionState.branchId, mainBranchId, publishController]);
+  }, [sessionState.projectId, sessionState.branchId, mainBranchId]);
 
   // A real conflict count from a successful prepare() -- never invented; the
   // banner and the ladder's own behind-main callout both read this.
@@ -861,15 +838,7 @@ export function Workspace({
         if (historyView === 'commit') {
           return (
             <CommitPanel
-              workingDocument={commitPreview?.workingDocument ?? null}
-              baseDocument={commitPreview?.baseDocument ?? null}
-              changes={commitPreview?.changes ?? []}
-              scenariosWithStatus={commitPreview?.scenarios ?? []}
-              isMain={historyControllerState.isMain}
-              onCommit={async (message) => {
-                const res = await historyController.commit(message);
-                if (res.status !== 'applied') throw res;
-              }}
+              controller={historyController}
               onCancel={() => setHistoryView('ladder')}
               onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
               onRunAll={() => void handleRunAll()}
@@ -878,27 +847,16 @@ export function Workspace({
         }
         return (
           <HistoryLadder
-            branchName={historyControllerState.branch?.label ?? ''}
-            isMain={historyControllerState.isMain}
-            aheadOfVersion={historyControllerState.aheadOfVersion}
-            workingEdits={historyControllerState.workingEdits}
-            checkpoints={historyControllerState.checkpoints}
-            commits={historyControllerState.commits}
-            publications={historyControllerState.publications}
+            controller={historyController}
             canUndo={sessionState.canUndo && sessionState.status === 'ready'}
             canRedo={sessionState.canRedo && sessionState.status === 'ready'}
             onUndo={() => void handleUndo()}
             onRedo={() => void handleRedo()}
-            onSaveCheckpoint={async (label) => {
-              const res = await historyController.saveCheckpoint(label);
-              if (res.status !== 'applied') throw res;
-            }}
-            onRestore={async (targetId, label) => {
-              const res = await historyController.restore(targetId, label);
-              if (res.status !== 'applied') throw res;
-            }}
             onOpenCommit={() => setHistoryView('commit')}
-            onOpenPublish={() => setPublishOpen(true)}
+            onOpenPublish={() => {
+              refreshBehindMainCheck();
+              setPublishOpen(true);
+            }}
             behindMain={
               behindMainInfo
                 ? {
@@ -907,7 +865,10 @@ export function Workspace({
                   }
                 : null
             }
-            onReviewAndResolve={() => setPublishOpen(true)}
+            onReviewAndResolve={() => {
+              refreshBehindMainCheck();
+              setPublishOpen(true);
+            }}
             onClose={() => panelDispatch({ type: 'CLOSE', panel: 'history' })}
           />
         );
@@ -925,11 +886,10 @@ export function Workspace({
     [
       historyView,
       historyController,
-      historyControllerState,
-      commitPreview,
       behindMainInfo,
       libraryView,
       panelDispatch,
+      refreshBehindMainCheck,
       sessionState.canUndo,
       sessionState.canRedo,
       sessionState.status,
@@ -989,7 +949,10 @@ export function Workspace({
           isSaving={isSaving}
           hasError={hasError}
           runControl={runControl ?? runControlSlot}
-          onOpenHistory={() => panelDispatch({ type: 'OPEN', panel: 'history' })}
+          onOpenHistory={() => {
+            panelDispatch({ type: 'OPEN', panel: 'history' });
+            refreshBehindMainCheck();
+          }}
           historyActive={panelState.panels.history.open}
         />
       ) : (
@@ -1052,6 +1015,7 @@ export function Workspace({
                         onLater={() => setBehindMainBannerDismissed(true)}
                         onReviewAndResolve={() => {
                           setBehindMainBannerDismissed(true);
+                          refreshBehindMainCheck();
                           setPublishOpen(true);
                         }}
                       />

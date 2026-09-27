@@ -86,6 +86,33 @@ async function setup() {
 }
 
 describe('HistoryController (real LocalRepository, S01)', () => {
+  // RV-12h review round: getState/subscribe must work when extracted as bare
+  // references (the exact shape HistoryLadder/CommitPanel's `controller` prop
+  // passes into React.useSyncExternalStore, and any other library that
+  // destructures a store's API off the instance) -- not only when called as
+  // `history.getState()`.
+  it('getState and subscribe work when extracted as bare references (not called as history.method())', async () => {
+    const { db, history } = await setup();
+
+    const { subscribe, getState } = history;
+
+    expect(getState()).toBe(history.getState());
+    expect(getState().status).toBe('ready');
+
+    let notified = 0;
+    const unsubscribe = subscribe(() => {
+      notified += 1;
+    });
+
+    const res = await history.saveCheckpoint('bare-reference checkpoint');
+    expect(res.status).toBe('applied');
+    expect(notified).toBeGreaterThan(0);
+    expect(getState().checkpoints.some((cp) => cp.label === 'bare-reference checkpoint')).toBe(true);
+
+    unsubscribe();
+    db.close();
+  });
+
   it('refuses commit until every scenario has a qualifying run for the current fingerprint', async () => {
     const { db, repo, history } = await setup();
 
