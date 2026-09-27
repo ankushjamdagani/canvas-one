@@ -107,6 +107,19 @@ export interface CanvasViewProps {
   onApplyChanges: (changes: readonly RecordChange[], label: string) => Promise<boolean>;
 }
 
+/** Rebuilds canvas nodes from the projection, keeping each existing node's
+ * ReactFlow measurement (see the sync effect in CanvasView). */
+function keepMeasurements(
+  previous: readonly Node<ProjectedNodeData>[],
+  next: readonly Node<ProjectedNodeData>[],
+): Node<ProjectedNodeData>[] {
+  const measuredById = new Map(previous.map((node) => [node.id, node.measured]));
+  return next.map((node) => {
+    const measured = measuredById.get(node.id);
+    return measured ? { ...node, measured } : node;
+  });
+}
+
 function CanvasFlowInner({
   document,
   activeViewId,
@@ -158,9 +171,14 @@ function CanvasFlowInner({
     [onEdgesChangeRaw],
   );
 
-  // Sync projected nodes and edges when document or activeViewId changes
+  // Sync projected nodes and edges when document or activeViewId changes.
+  // Projection builds fresh node objects without ReactFlow's `measured`
+  // size; ReactFlow hides an unmeasured node (and skips its edges) until a
+  // ResizeObserver callback, which never comes when the DOM size is
+  // unchanged. Carrying the last measurement over keeps existing nodes
+  // visible; a real size change still re-measures through the observer.
   React.useEffect(() => {
-    setNodes(projection.nodes as Node<ProjectedNodeData>[]);
+    setNodes((previous) => keepMeasurements(previous, projection.nodes));
     setEdges(projection.edges as unknown as Edge[]);
   }, [projection, setNodes, setEdges]);
 
@@ -239,7 +257,7 @@ function CanvasFlowInner({
       const success = await onMoveNodes(movedList);
       if (!success) {
         // Snap back to document positions on failure
-        setNodes(projection.nodes as Node<ProjectedNodeData>[]);
+        setNodes((previous) => keepMeasurements(previous, projection.nodes));
       }
     },
     [projection, isSaving, onMoveNodes, setNodes],
@@ -692,17 +710,13 @@ function CanvasFlowInner({
         panOnScroll
         minZoom={0.1}
         maxZoom={2.0}
-        fitView
-        fitViewOptions={{
-          padding: '32px',
-          minZoom: 0.1,
-          // Mount-time auto-fit is passive, not a user zoom gesture: cap at
-          // 100% so a small diagram never opens zoomed in past 1x (matches
-          // the maxZoom:1 effect below; the viewport's own maxZoom={2.0}
-          // above still bounds user-driven zoom/pan gestures per the 0.1–2
-          // contract clamp).
-          maxZoom: 1,
-        }}
+        // Delete/Backspace are handled above as one undoable command (with
+        // the dependency preview); ReactFlow's own key would drop the node
+        // locally even when that preview is cancelled.
+        deleteKeyCode={null}
+        // No `fitView` prop: it also fires when an empty view gets its first
+        // node, moving the camera after a placement. The open/view-switch
+        // effect above is the only automatic fit.
         proOptions={{ hideAttribution: true }}
         className="system-canvas bg-canvas"
       >
