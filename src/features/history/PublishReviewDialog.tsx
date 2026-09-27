@@ -291,7 +291,10 @@ export function PublishReviewBody({
       {conflicts.length === 0 && (
         <section aria-labelledby="review-conflicts-header" className="space-y-2">
           <h3 id="review-conflicts-header" className="text-sm font-semibold">
-            <span className="mr-2 font-mono">3</span>Conflicts with main
+            <span className="mr-1.5 inline-flex items-center justify-center size-4 rounded-full border border-control-border text-[10px] font-mono text-muted-foreground align-middle">
+              3
+            </span>
+            Conflicts with main
           </h3>
           <p className="text-xs text-muted-foreground">No conflicts with main.</p>
         </section>

@@ -34,6 +34,7 @@ import { diffDocuments, type DiffRecordKind } from '../../domain/versioning/diff
 import type { ConflictResolution } from '../../domain/versioning/resolve';
 import type { MergeConflict } from '../../domain/versioning/merge';
 import { findRecordLabelAcrossDocuments } from './diffSummary';
+import { fieldsForConnection, fieldsForElement } from '../inspector';
 import type { ResolvedFieldRecord } from './publishController';
 
 const KIND_TO_COLLECTION_KEY = {
@@ -201,7 +202,7 @@ function ConflictField({
     <div
       id={`merge-conflict-${conflict.id}`}
       tabIndex={-1}
-      data-testid={`field-conflict-${entry.pathLabel}`}
+      data-testid={`field-conflict-${fieldTestId(entry.path)}`}
       className="rounded-control border border-risk-edge bg-risk-tint/40 px-3 py-2 space-y-1.5"
     >
       <div className="flex items-center justify-between gap-2">
@@ -256,7 +257,7 @@ function ConflictField({
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2" data-testid={`field-edit-${entry.pathLabel}`}>
+        <div className="flex items-center gap-2" data-testid={`field-edit-${fieldTestId(entry.path)}`}>
           <Input
             aria-label={`Edit ${entry.pathLabel}`}
             type={scalarKind === 'number' ? 'number' : 'text'}
@@ -295,6 +296,35 @@ function ConflictField({
   );
 }
 
+/** Stable test ID for a field row: its key path, independent of the label. */
+function fieldTestId(path: readonly (string | number)[]): string {
+  return path.length > 0 ? path.join('.') : '(record)';
+}
+
+function inspectorFieldLabel(
+  documents: readonly Document[],
+  recordKind: string,
+  recordId: Id,
+  path: readonly (string | number)[],
+): string | null {
+  const key = path.join('.');
+  for (const doc of documents) {
+    if (recordKind === 'element') {
+      const element = doc.elements.find((e) => e.id === recordId);
+      if (!element) continue;
+      const spec = fieldsForElement(element).find((f) => f.id === key || `behavior.${f.id}` === key);
+      return spec ? spec.label : null;
+    }
+    if (recordKind === 'connection') {
+      const connection = doc.connections.find((c) => c.id === recordId);
+      if (!connection) continue;
+      const spec = fieldsForConnection(connection).find((f) => f.id === key);
+      return spec ? spec.label : null;
+    }
+  }
+  return null;
+}
+
 export function CompareAndResolvePanel({
   sourceBranchLabel,
   mainBranchLabel,
@@ -331,6 +361,11 @@ export function CompareAndResolvePanel({
   };
   const formatPath = (path: readonly (string | number)[]) =>
     path.map((part) => (typeof part === 'string' ? (labels.get(part) ?? part) : part)).join('.') || '(record)';
+  // The inspector's label for this field when it edits it ("Capacity per
+  // slot"), else the key path.
+  const describeField = (recordKind: string, recordId: Id, path: readonly (string | number)[]) =>
+    inspectorFieldLabel([mergeInputs.ours, mergeInputs.theirs, mergeInputs.base], recordKind, recordId, path) ??
+    formatPath(path);
 
   const unresolvedRecords = React.useMemo(() => {
     const map = new Map<RecordKey, { recordKind: string; recordId: Id; count: number; label: string }>();
@@ -496,7 +531,7 @@ export function CompareAndResolvePanel({
         const matchesTheirs = JSON.stringify(mergedValue) === JSON.stringify(theirsLeaves.get(pathKey)?.value);
         autoSide = matchesTheirs ? 'theirs' : 'ours';
       }
-      entries.push({ path, pathLabel: formatPath(path), baseValue, mergedValue, conflict, resolved, autoSide });
+      entries.push({ path, pathLabel: describeField(selected.recordKind, selected.recordId, path), baseValue, mergedValue, conflict, resolved, autoSide });
     }
 
     entries.sort((a, b) => a.pathLabel.localeCompare(b.pathLabel));
@@ -541,7 +576,7 @@ export function CompareAndResolvePanel({
           Merge {theirsBranchLabel} → {oursBranchLabel}
         </h2>
         <div className="flex items-center gap-3 text-xs font-mono">
-          <span className="text-risk-text font-semibold">{conflicts.length} conflicts open</span>
+          <span className="text-risk-text font-semibold">{conflicts.length} {conflicts.length === 1 ? 'conflict' : 'conflicts'} open</span>
           <span className="text-muted-foreground">{autoMergedRecords.length} auto</span>
           {onClose && (
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
@@ -658,7 +693,7 @@ export function CompareAndResolvePanel({
                   className="block text-xs py-1"
                   onClick={() => setSelected({ recordKind: field.recordKind, recordId: field.recordId })}
                 >
-                  {requireLabel(field.recordKind, field.recordId)} · {formatPath(field.path)}
+                  {requireLabel(field.recordKind, field.recordId)} · {describeField(field.recordKind, field.recordId, field.path)}
                 </button>
               ))}
             </div>
@@ -696,7 +731,7 @@ export function CompareAndResolvePanel({
               {resolvedEntries.map((entry) => (
                 <div
                   key={entry.pathLabel}
-                  data-testid={`field-resolved-${entry.pathLabel}`}
+                  data-testid={`field-resolved-${fieldTestId(entry.path)}`}
                   className="flex items-center justify-between rounded-control border border-primary/30 bg-primary/10 px-3 py-2 text-xs"
                 >
                   <span className="font-mono">

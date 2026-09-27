@@ -67,7 +67,7 @@ describe('CompareAndResolvePanel static markup (22F)', () => {
   it('counts fields, including resolved fields on the same record, rather than records', () => {
     const html = renderPanel({ resolvedFields: [{ recordKind: 'element', recordId: WORKER_ID, path: ['label'], resolution: 'ours' }] });
     expect(html).toContain('1 of 2 resolved');
-    expect(html).toContain('1 conflicts open');
+    expect(html).toContain('1 conflict open');
   });
 
   it('renders record-level conflicts even when the record was deleted, without scalar edit', () => {
@@ -113,7 +113,7 @@ describe('CompareAndResolvePanel static markup (22F)', () => {
 
   it('tags the genuinely one-sided field as auto · <real branch label>, not a conflict', () => {
     const html = renderPanel();
-    expect(html).toContain('behavior.config.concurrency');
+    expect(html).toContain('Concurrency');
     expect(html).toContain('auto · theirs');
     // It must not be rendered as a conflict row.
     expect(html).not.toContain('field-conflict-behavior.config.concurrency');
@@ -148,7 +148,7 @@ describe('CompareAndResolvePanel static markup (22F)', () => {
         { recordKind: 'element', recordId: WORKER_ID, path: ['behavior', 'config', 'capacity'], resolution: 'theirs' },
       ],
     });
-    expect(html).toContain('resolved · behavior.config.capacity · theirs');
+    expect(html).toContain('resolved · Capacity per slot · theirs');
     expect(html).toContain('reopen');
     expect(html).not.toContain("can&#x27;t be reopened");
   });
