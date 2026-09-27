@@ -102,6 +102,12 @@ describe('PublishReviewBody static markup (22C)', () => {
     expect(html).toContain('current 2.2.1');
   });
 
+  it('labels an unpublished project as the first publication, never current none', () => {
+    const html = render({ currentVersionKey: null });
+    expect(html).toContain('first publication');
+    expect(html).not.toContain('current none');
+  });
+
   it('disables Publish with "resolve N conflicts first" when conflicts remain, and offers Open diff view', () => {
     const conflict: MergeConflict = {
       id: 'c1',

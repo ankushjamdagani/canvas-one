@@ -71,6 +71,19 @@ const publications: readonly PublicationRecord[] = [
 ];
 
 describe('HistoryLadder static markup (22A)', () => {
+  it('omits its own header and outer chrome when hosted by PanelHost', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(HistoryLadder, {
+        hosted: true,
+        branchName: 'Draft',
+        onClose: vi.fn(),
+      }),
+    );
+    expect(html).not.toContain('Close history panel');
+    expect(html).not.toContain('>History<');
+    expect(html).toContain('border-0');
+  });
+
   it('shows the published main ladder with current release and draft actions (22D)', () => {
     const html = renderToStaticMarkup(React.createElement(HistoryLadder, { isMain: true, branchName: 'main', publications, onStartDraft: vi.fn(), onEditMain: vi.fn() }));
     expect(html).toContain('CURRENT');
@@ -253,6 +266,21 @@ const changes: readonly RecordChangeItem[] = [
 ];
 
 describe('CommitPanel static markup (scenario_commit_gate.png)', () => {
+  it('omits its own header and outer chrome when hosted by PanelHost', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(CommitPanel, {
+        hosted: true,
+        isMain: false,
+        changes: [],
+        scenariosWithStatus: [],
+        onCancel: vi.fn(),
+      }),
+    );
+    expect(html).not.toContain('Close commit panel');
+    expect(html).not.toMatch(/<h2[^>]*>Commit<\/h2>/);
+    expect(html).toContain('border-0');
+  });
+
   it('renders CHANGES, message field, and the every-scenario gate without excluded texts', () => {
     const scenarios = makeScenarios([
       { status: { kind: 'passed' } },

@@ -124,6 +124,23 @@ test.describe('RV-12h: History and Library panels', () => {
     const panel = page.getByTestId('library-panel');
     await expect(panel).toBeVisible();
 
+    // RV-12h debt: the two-column cards must stay inside the hosted panel's
+    // narrower dock instead of retaining the standalone panel's minimum width.
+    await panel.getByRole('button', { name: 'Grid view' }).click();
+    const panelBox = await panel.boundingBox();
+    const gridCardBoxes = await panel.locator('[data-entry-id]').evaluateAll((cards) =>
+      cards.slice(0, 4).map((card) => {
+        const rect = card.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
+      }),
+    );
+    expect(panelBox).not.toBeNull();
+    expect(gridCardBoxes.length).toBeGreaterThan(0);
+    for (const box of gridCardBoxes) {
+      expect(box.left).toBeGreaterThanOrEqual(panelBox!.x - 1);
+      expect(box.right).toBeLessThanOrEqual(panelBox!.x + panelBox!.width + 1);
+    }
+
     // Place a catalog entry from the full panel through the same placement
     // path as the compact picker (CanvasView applyPlacement).
     const before = await elementIds(page);

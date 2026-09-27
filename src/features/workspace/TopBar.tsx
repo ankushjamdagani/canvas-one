@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
 import { ProjectMenu } from './ProjectMenu';
 import { BranchPopover } from './BranchPopover';
+import type { TransferActions } from '../transfer';
 
 export interface TopBarProps {
   project: ProjectRecord;
@@ -31,6 +32,7 @@ export interface TopBarProps {
   onOpenHistory?: () => void;
   /** Highlights the History button while the History panel is open/focused. */
   historyActive?: boolean;
+  transferActions: TransferActions;
 }
 
 /**
@@ -53,6 +55,7 @@ export function TopBar({
   runControl,
   onOpenHistory,
   historyActive,
+  transferActions,
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
   const [titleDraft, setTitleDraft] = React.useState(project.title);
@@ -144,6 +147,7 @@ export function TopBar({
               branchCount={branches.length}
               onRenameProject={() => setIsRenaming(true)}
               onAllProjects={onAllProjects}
+              transferActions={transferActions}
             >
               <button
                 type="button"

@@ -6,6 +6,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { ExportMenu, type TransferActions } from '../transfer';
 
 export interface ProjectMenuProps {
   projectTitle: string;
@@ -13,6 +14,7 @@ export interface ProjectMenuProps {
   children: React.ReactNode;
   onRenameProject: () => void;
   onAllProjects: () => void;
+  transferActions: TransferActions;
 }
 
 /**
@@ -30,6 +32,7 @@ export function ProjectMenu({
   children,
   onRenameProject,
   onAllProjects,
+  transferActions,
 }: ProjectMenuProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -70,6 +73,8 @@ export function ProjectMenu({
             <Pencil size={13} className="shrink-0" />
             Rename project
           </button>
+
+          <ExportMenu actions={transferActions} align="start" />
 
           <button
             type="button"

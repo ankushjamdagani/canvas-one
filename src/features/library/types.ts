@@ -37,6 +37,8 @@ export interface LibraryPanelProps {
   initialSearchQuery?: string;
   /** Optional container class name */
   className?: string;
+  /** PanelHost already supplies the panel title, controls, and outer chrome. */
+  hosted?: boolean;
 }
 
 /**
