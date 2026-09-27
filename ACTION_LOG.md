@@ -1255,3 +1255,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Outcome**: `4193346` merged on the UI line @ `3d76460`. The flakes traced to three app bugs, all fixed in `CanvasView.tsx`: nodes lost their ReactFlow measurement on every document sync (a node could stay hidden with its edges), the `fitView` prop moved the camera after the first placement on an empty view, and ReactFlow's Backspace removed nodes locally even when the delete preview was cancelled. Authoring e2e rewritten as small tests on blank projects with condition waits; `save-status` gains `data-state`.
 - **Platform**: Claude (lead) directly — Sonnet rate-limited, Codex sandbox can't run Chromium.
 - **Verification**: 1126 unit, `npx tsc -b`, build; authoring spec 135/135 under load with no retries; full production e2e 17 passed / 4 skipped ×3; the Backspace test fails with the fix removed.
+
+### RV-11b publish review, behind main, conflict resolution
+
+- **Outcome**: merged on the UI line @ `469dd52`. Publish review dialog (22C), published notice (22D), behind-main banner (22E, exported only), compare & resolve (22F) over CandidateController; not wired into the shell.
+- **Platform**: Sonnet first pass (built without the screens); review round interrupted by the Sonnet limit; Codex finished it (first launch hung — `-i` swallowed the prompt; relaunched with the prompt on stdin); Claude final fixes (inspector field labels, plural, step marker).
+- **Verification**: 1174 unit, `npx tsc -b`, build, production e2e 17 passed / 4 skipped; 22C/22F checked from static renders with the built CSS.
+- **Limitations**: shell wiring pending (History panel slot); 22F edit covers scalar number/string fields only.
