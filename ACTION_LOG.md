@@ -1242,3 +1242,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Sonnet subagent (resumed an interrupted Sonnet pass), three review rounds; Claude reviewer.
 - **Verification**: tsc, build, production e2e 12 passed / 4 skipped (single worker, isolated port); unit 1114/1115 on the full run with load-average-16 timeouts in different files each run, those files pass alone.
 - **Limitations**: D43(b) blocked — fixtures lacked labels and the manifest copies connection config wholesale; user chose to label the fixtures "Order" (RV-12f READY). RV-11b fix round interrupted by the Sonnet session limit; partial edits kept in its worktree.
+
+### RV-12f request-class labels (D43b)
+
+- **Outcome**: `aecb33f` merged on the UI line @ `10a31f2`. Required `requestClassLabel` on resource call metadata, excluded from the manifest/fingerprint; the connect form reuses an existing class by label or names a new one. Fixtures s02/s05/combined label their two classes "Order" (user decision); measurements regenerated and mirrored here.
+- **Platform**: Codex executor (sandbox blocked Chromium, so no e2e from Codex); Claude reviewer + e2e.
+- **Verification**: 1126 unit, `npx tsc -b`, build; production e2e 12 passed / 4 skipped with one drag test timing out per full run (different test each run; studio-authoring passes 5/5 alone).
+- **Limitations**: flaky drag-based authoring e2e on the S05 layout (debt); combined fixture has two "Order" classes.

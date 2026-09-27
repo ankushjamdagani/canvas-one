@@ -2342,6 +2342,7 @@
         "fallback": false,
         "resource": {
           "requestClassId": "7480821d-f678-5d62-8290-e986ccffa5df",
+          "requestClassLabel": "Order",
           "operation": "read",
           "key": null,
           "tags": [
@@ -2505,6 +2506,7 @@
         "fallback": false,
         "resource": {
           "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
+          "requestClassLabel": "Order",
           "operation": "read",
           "key": null,
           "tags": [
@@ -2556,6 +2558,7 @@
         "fallback": false,
         "resource": {
           "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
+          "requestClassLabel": "Order",
           "operation": "read",
           "key": null,
           "tags": [

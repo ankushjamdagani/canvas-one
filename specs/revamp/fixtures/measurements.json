@@ -18,8 +18,8 @@
     },
     {
       "name": "s02.json",
-      "bytes": 17836,
-      "sha256": "2af768a972c92a396d4321cdecce72c948e1ff699c7768759fcd1aeee6e8a946",
+      "bytes": 17864,
+      "sha256": "e132e9626cea4e8791655ca7cd3b2482ac97a2bb8d15f82bcae57fec63cad64a",
       "definitions": 80,
       "rawDepth": 12,
       "elements": 6,
@@ -57,8 +57,8 @@
     },
     {
       "name": "s05.json",
-      "bytes": 31483,
-      "sha256": "c3d02784302a732ff7fcc63d2999b96667d5a3e59e500734233ac0cb91d2428f",
+      "bytes": 31539,
+      "sha256": "e6381bdbb8d9feeacbba9aa1e87e5e416b31180215fafc6bb78cec8c646b5ea2",
       "definitions": 150,
       "rawDepth": 13,
       "elements": 9,
@@ -70,8 +70,8 @@
     },
     {
       "name": "combined.json",
-      "bytes": 92412,
-      "sha256": "330fc68e284b02182c391e430822780b0aac337c7f611dae00ff8b74d1742ffd",
+      "bytes": 92496,
+      "sha256": "7405cecac6d9573e43daa0447039badb60c1409f2503442b276563c2332fd9f9",
       "definitions": 420,
       "rawDepth": 13,
       "elements": 25,
@@ -105,8 +105,8 @@
     "note": "Row count and byte cap are simultaneous bounds; reaching either stops incomplete. Payload-table bytes are additional."
   },
   "syntheticHistory": {
-    "bytes": 148164,
-    "sha256": "1f51541c04ce90ba213842a8cb941181983817d3142c98172ac8563f871dddaa",
+    "bytes": 148248,
+    "sha256": "679e4db0b9ef23044f63cd5e76e645cba3006ef55e50b3e5e64aa74a92a991d4",
     "rawDepth": 17,
     "containers": 1592,
     "branches": 100,
