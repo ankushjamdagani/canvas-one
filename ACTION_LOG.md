@@ -1262,3 +1262,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Sonnet first pass (built without the screens); review round interrupted by the Sonnet limit; Codex finished it (first launch hung — `-i` swallowed the prompt; relaunched with the prompt on stdin); Claude final fixes (inspector field labels, plural, step marker).
 - **Verification**: 1174 unit, `npx tsc -b`, build, production e2e 17 passed / 4 skipped; 22C/22F checked from static renders with the built CSS.
 - **Limitations**: shell wiring pending (History panel slot); 22F edit covers scalar number/string fields only.
+
+### RV-10b export menu module and project import
+
+- **Outcome**: merged on the UI line @ `24b81f1`. Export submenu module (18B) over the RV-10a exporters, not yet mounted; entry-screen project import with typed errors.
+- **Platform**: Sonnet subagent (Codex hit its usage limit at launch); Claude review fixes (single session actor, no invented import text, truthful Mermaid label).
+- **Verification**: 1202 unit, `npx tsc -b`, build, production e2e 19 passed / 4 skipped.
+- **Limitations**: CSV export needs a selected saved run from the results lane; top-bar mount after RV-12h.
