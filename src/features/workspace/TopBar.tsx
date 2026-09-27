@@ -195,6 +195,7 @@ export function TopBar({
         {/* Save Status */}
         <span
           data-testid="save-status"
+          data-state={isSaving ? 'saving' : 'idle'}
           className="text-xs text-secondary-text hidden md:flex items-center gap-1.5 ml-1 shrink-0 whitespace-nowrap"
           role="status"
           aria-label={saveStatusText}
