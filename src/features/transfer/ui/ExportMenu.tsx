@@ -5,18 +5,16 @@
  * "export.csv") and parts-and-export.md ("JSON, images and files", "CSV v1",
  * "Mermaid v1"), matching specs/revamp/screens/18B_Export_submenu.png: Diagram as
  * PNG, Diagram as SVG, System as JSON, Run results as CSV, then (below a divider)
- * Copy as Mermaid.
+ * the Mermaid item.
  *
  * Out of scope (RV-10b task / design-revalidation.md §2): this component is the
  * 18B submenu content only. Mounting it under 18A's header "Export..." row, inside
  * Workspace.tsx/TopBar.tsx, belongs to another lane -- see the "Mounting" doc block
  * below for the props it needs.
  *
- * LEAD READING: 18B labels the Mermaid item "Copy as Mermaid," but the contracted
- * Mermaid exporter (mermaid-export.ts) only produces text for a file download
- * (extension .mmd, MIME text/plain) -- there's no clipboard integration in the
- * transfer module (RV-10a) or in this task's scope. The item keeps the screen's
- * literal label but performs the same download-sink flow as the other exports.
+ * 18B labels the Mermaid item "Copy as Mermaid", but the contracted Mermaid export
+ * (commands.md export.mermaid, parts-and-export.md) is a file download (.mmd), so
+ * the item says what it does: "Diagram as Mermaid".
  */
 
 import * as React from 'react';
@@ -97,7 +95,7 @@ const PRIMARY_ITEMS: readonly ExportMenuItemDef[] = [
 
 const MERMAID_ITEM: ExportMenuItemDef = {
   kind: 'mermaid',
-  label: 'Copy as Mermaid',
+  label: 'Diagram as Mermaid',
   icon: Workflow,
   testId: 'export-menu-mermaid',
   run: (actions) => actions.exportMermaid(),

@@ -8,7 +8,6 @@ import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
 import { importProjectJson } from '../transfer';
 import { formatImportError } from './importError';
-import { getLocalHumanActor } from './localActor';
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -22,9 +21,8 @@ export interface EntryScreenProps {
   repository: StudioRepository;
   mintId: () => string;
   onOpenSuccess?: () => void;
-  /** Overrides the local-human actor used for project.import; defaults to the same
-   *  browser-persisted actor App.tsx constructs for the session controller. */
-  actor?: Actor;
+  /** The session's actor (App.tsx), recorded on project.import. */
+  actor: Actor;
 }
 
 export type OpenBranchChoice = {
@@ -219,7 +217,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
         repository,
         file,
         mintId,
-        actor: actor ?? getLocalHumanActor(),
+        actor,
       });
 
       if (result.ok) {

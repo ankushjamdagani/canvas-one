@@ -55,13 +55,13 @@ describe('formatImportError', () => {
     expect(formatImportError(failure)).toBe('project is missing; title must be a string');
   });
 
-  it('falls back to a generic message when there is neither a message nor issues', () => {
+  it('throws when a failure has neither a message nor issues (contract violation)', () => {
     const failure: ImportProjectJsonFailure = {
       ok: false,
       kind: 'invalid',
       issues: [],
     };
-    expect(formatImportError(failure)).toBe('The project file could not be imported.');
+    expect(() => formatImportError(failure)).toThrow(/contract violation/);
   });
 
   it('uses the quota message for quota failures', () => {
