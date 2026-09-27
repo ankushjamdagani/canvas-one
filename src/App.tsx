@@ -36,6 +36,7 @@ type BootState =
       status: 'ready';
       repository: StudioRepository;
       session: SessionController;
+      actor: Actor;
     };
 
 export default function App() {
@@ -78,6 +79,7 @@ export default function App() {
         status: 'ready',
         repository: bootRes.repository,
         session,
+        actor,
       });
     } catch (err) {
       console.error('Boot error:', err);
@@ -140,6 +142,7 @@ export default function App() {
     <StudioShell
       repository={bootState.repository}
       session={bootState.session}
+      actor={bootState.actor}
     />
   );
 }
@@ -147,9 +150,11 @@ export default function App() {
 function StudioShell({
   repository,
   session,
+  actor,
 }: {
   repository: StudioRepository;
   session: SessionController;
+  actor: Actor;
 }) {
   const sessionState = React.useSyncExternalStore(
     session.subscribe,
@@ -175,6 +180,7 @@ function StudioShell({
       session={session}
       repository={repository}
       mintId={MINT_ID}
+      actor={actor}
       onOpenSuccess={() => setActiveScreen('workspace')}
     />
   );

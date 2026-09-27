@@ -1,16 +1,18 @@
 import * as React from 'react';
-import { Plus, ArrowRight, FolderOpen, LayoutTemplate } from 'lucide-react';
+import { Plus, ArrowRight, FolderOpen, LayoutTemplate, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
+import { importProjectJson } from '../transfer';
+import { formatImportError } from './importError';
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
-import type { StudioRepository, ProjectRecord } from '../../persistence/studio/types';
+import type { Actor, StudioRepository, ProjectRecord } from '../../persistence/studio/types';
 import type { Document, Id } from '../../domain/studio/model';
 import { REFERENCE_EXAMPLES } from './fixtures';
 
@@ -19,6 +21,8 @@ export interface EntryScreenProps {
   repository: StudioRepository;
   mintId: () => string;
   onOpenSuccess?: () => void;
+  /** The session's actor (App.tsx), recorded on project.import. */
+  actor: Actor;
 }
 
 export type OpenBranchChoice = {
@@ -38,15 +42,20 @@ export type ProjectRowItem = {
  * 2A "new system" entry screen: two columns.
  *
  * D12/design-revalidation.md §2: no prompt box ("Describe the system…"), no
- * question chips, no team/shared items. "Bring in what exists" (transfer) is
- * left out entirely rather than shown disabled — RV-10 owns that later.
+ * question chips, no team/shared items. The old 2A screen's "Bring in what
+ * exists" drop zone is not reproduced (no plausible-defaults auto-build to drop
+ * onto); RV-10b instead adds a plain "Import a project" action that runs the
+ * contracted project.import flow (JSON v9 bundle only) and surfaces its typed
+ * errors, same one the Export submenu's "System as JSON" writes.
  */
-export function EntryScreen({ session, repository, mintId, onOpenSuccess }: EntryScreenProps) {
+export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor }: EntryScreenProps) {
   const [projectRows, setProjectRows] = React.useState<readonly ProjectRowItem[]>([]);
   const [loadingProjects, setLoadingProjects] = React.useState(true);
   const [blankProjectName, setBlankProjectName] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [isImporting, setIsImporting] = React.useState(false);
+  const importFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Load existing projects on mount and fetch their open branches via loadHistory
   const refreshProjects = React.useCallback(async () => {
@@ -190,6 +199,45 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess }: Entr
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Import a portable v9 project JSON bundle (RV-10b): register the file's bytes
+  // with the repository's FileToken registry, run project.import, and surface any
+  // typed failure (unsupported version, byte cap, validation) without raw exception
+  // text. On success, just refresh the project list -- the imported project is not
+  // auto-opened.
+  const handleImportFile = async (file: File) => {
+    if (isImporting || isSubmitting) return;
+
+    setIsImporting(true);
+    setErrorMessage(null);
+
+    try {
+      const result = await importProjectJson({
+        repository,
+        file,
+        mintId,
+        actor,
+      });
+
+      if (result.ok) {
+        await refreshProjects();
+      } else {
+        setErrorMessage(formatImportError(result));
+      }
+    } catch (err) {
+      console.error('Unexpected error importing project:', err);
+      setErrorMessage('An unexpected error occurred while importing the project');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleImportFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    // Reset so selecting the same file again still fires onChange.
+    e.target.value = '';
+    if (file) void handleImportFile(file);
   };
 
   return (
@@ -350,6 +398,42 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess }: Entr
                       <span>Create</span>
                     </Button>
                   </form>
+                </CardContent>
+              </Card>
+            </section>
+
+            <section aria-labelledby="import-project-heading">
+              <h2 id="import-project-heading" className="text-base font-semibold text-ink mb-3">
+                Import a project
+              </h2>
+              <Card className="border border-control-border bg-panel shadow-raised">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+                    <p className="flex-1 text-xs text-secondary-text">
+                      Import a project exported as JSON (<code>.system-studio.json</code>).
+                    </p>
+                    <input
+                      ref={importFileInputRef}
+                      data-testid="import-project-file-input"
+                      type="file"
+                      accept=".json,application/json"
+                      className="hidden"
+                      disabled={isImporting}
+                      onChange={handleImportFileInputChange}
+                    />
+                    <Button
+                      data-testid="import-project-btn"
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-4 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0"
+                      disabled={isImporting}
+                      onClick={() => importFileInputRef.current?.click()}
+                    >
+                      <Upload size={14} />
+                      <span>{isImporting ? 'Importing…' : 'Import project'}</span>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </section>

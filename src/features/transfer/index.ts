@@ -16,3 +16,4 @@ export * from './svg-export';
 export * from './png-export';
 export * from './mermaid-export';
 export * from './csv-export';
+export * from './ui';
