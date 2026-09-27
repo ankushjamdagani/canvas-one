@@ -125,6 +125,13 @@ export class HistoryController {
     this.mintId = options.mintId;
     this.actor = options.actor;
 
+    // Bound so callers (HistoryLadder/CommitPanel's `controller` prop via
+    // React.useSyncExternalStore, or any other extracted reference) can pass
+    // these bare without losing `this`, matching SessionController and
+    // PublishController.
+    this.getState = this.getState.bind(this);
+    this.subscribe = this.subscribe.bind(this);
+
     // React to session state changes (edits, branch switch, reload)
     this.session.subscribe(() => {
       this.handleSessionChange();

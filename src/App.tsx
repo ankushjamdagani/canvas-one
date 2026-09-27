@@ -170,6 +170,7 @@ function StudioShell({
         repository={repository}
         onBackToProjects={() => setActiveScreen('entry')}
         mintId={MINT_ID}
+        actor={actor}
       />
     );
   }
