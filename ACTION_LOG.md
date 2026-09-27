@@ -1235,3 +1235,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Review round**: removed invented fallbacks (branch 'main', restore label, 'Unlabelled', readiness text); restore now needs a user-entered label; fixture/refinement changes no longer show raw IDs.
 - **Verification**: 1106 unit (one earlier run timed out one repository test under machine load; rerun clean), `npx tsc -b`, `npm run build`.
 - **Limitations**: raw Tailwind amber classes (primitive precedent); publish/merge is RV-11b.
+
+### RV-12e place, connect, delete
+
+- **Outcome**: merged on the UI line. Component picker placement (centre or drag), Connect with the resource form and route ports, Delete with scenario-dependency preview, each one undo; D43(a) blank projects open on an empty "Main" view; stale-document inspector bug fixed.
+- **Platform**: Sonnet subagent (resumed an interrupted Sonnet pass), three review rounds; Claude reviewer.
+- **Verification**: tsc, build, production e2e 12 passed / 4 skipped (single worker, isolated port); unit 1114/1115 on the full run with load-average-16 timeouts in different files each run, those files pass alone.
+- **Limitations**: D43(b) blocked — fixtures lacked labels and the manifest copies connection config wholesale; user chose to label the fixtures "Order" (RV-12f READY). RV-11b fix round interrupted by the Sonnet session limit; partial edits kept in its worktree.
