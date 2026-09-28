@@ -1,7 +1,7 @@
 /** 16D selection-scoped actions, routed through the command registry. */
 
 import * as React from 'react';
-import { ChevronDown, Group, Trash2, Ungroup } from 'lucide-react';
+import { ChevronDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import {
 } from './commands/registry';
 
 export type CanvasAuthoringCommandId =
+  | 'selection.duplicate'
   | 'selection.group'
   | 'selection.ungroup'
   | 'selection.align'
@@ -63,6 +64,7 @@ export function SelectionToolbar({ context, executeCommand, onDelete }: Selectio
   const ungroupAvailability = getAvailability('selection.ungroup', context, {
     groupIds: context.selectedGroupIds,
   });
+  const duplicateAvailability = getAvailability('selection.duplicate', context, {});
   const count = context.selectedElementIds.length;
 
   async function submitGroup() {
@@ -222,6 +224,20 @@ export function SelectionToolbar({ context, executeCommand, onDelete }: Selectio
           })}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Button
+        data-testid="selection-duplicate-btn"
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        aria-label="Duplicate selection"
+        disabled={!duplicateAvailability.enabled}
+        title={duplicateAvailability.enabled ? undefined : duplicateAvailability.reason}
+        onClick={() => void executeCommand('selection.duplicate', {})}
+      >
+        <Copy className="size-4" />
+      </Button>
 
       <Button
         data-testid="selection-delete-btn"

@@ -34,6 +34,9 @@ import type {
 } from '../../persistence/studio/types';
 import { createCandidateController, type Actor } from '../../persistence/studio';
 import type { Id } from '../../domain/studio/model';
+import { captureSelection } from '../../domain/parts/capture';
+import { planPlacement } from '../../domain/parts/place';
+import type { PartContent } from '../../domain/parts/types';
 import {
   loadScenarioStatuses,
   RunController,
@@ -98,6 +101,15 @@ import {
   type SelectionPlan,
 } from './selectionPlans';
 import type { CanvasCommandExecutor } from './SelectionToolbar';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -119,6 +131,64 @@ function renameOutcome(result: SessionRenameResult): RenameOutcome {
     default:
       return { ok: false, message: 'Rename failed. Try again.' };
   }
+}
+
+type DuplicateDialogState =
+  | {
+      readonly kind: 'confirm';
+      readonly content: PartContent;
+      readonly anchor: { readonly x: number; readonly y: number };
+      readonly items: readonly string[];
+      readonly warnings: readonly string[];
+    }
+  | { readonly kind: 'error'; readonly messages: readonly string[] };
+
+const UUID_IN_MESSAGE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/g;
+
+function duplicateIssueMessages(
+  issues: readonly { readonly message: string }[],
+  fallback: string,
+): readonly string[] {
+  const messages = issues.map((issue) =>
+    issue.message.replace(UUID_IN_MESSAGE, 'the referenced item'),
+  );
+  return messages.length > 0 ? messages : [fallback];
+}
+
+function duplicateConfirmationItems(preview: {
+  readonly excludedConnectionIds: readonly Id[];
+  readonly excludedRelationIds: readonly Id[];
+  readonly omittedPartialGroupIds: readonly Id[];
+  readonly excludedNoteIds: readonly Id[];
+  readonly notices: readonly string[];
+}): readonly string[] {
+  const items = [...preview.notices];
+  const addFallback = (count: number, keyword: string, message: string) => {
+    if (count > 0 && !items.some((item) => item.toLowerCase().includes(keyword))) {
+      items.push(message);
+    }
+  };
+  addFallback(
+    preview.excludedConnectionIds.length,
+    'connection',
+    `${preview.excludedConnectionIds.length} external connection(s) will not be duplicated.`,
+  );
+  addFallback(
+    preview.excludedRelationIds.length,
+    'relation',
+    `${preview.excludedRelationIds.length} external relation(s) will not be duplicated.`,
+  );
+  addFallback(
+    preview.omittedPartialGroupIds.length,
+    'group',
+    `${preview.omittedPartialGroupIds.length} partially selected group(s) will not be duplicated.`,
+  );
+  addFallback(
+    preview.excludedNoteIds.length,
+    'note',
+    `${preview.excludedNoteIds.length} note(s) with mixed or external attachments will not be duplicated.`,
+  );
+  return Array.from(new Set(items));
 }
 
 function useViewportWidth(): number {
@@ -1308,6 +1378,8 @@ export function Workspace({
   // ==========================================================================
 
   const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
+  const [duplicateDialog, setDuplicateDialog] = React.useState<DuplicateDialogState | null>(null);
+  const [duplicateApplying, setDuplicateApplying] = React.useState(false);
 
   const openHistoryPanel = React.useCallback(() => {
     panelDispatch({ type: 'OPEN', panel: 'history' });
@@ -1394,6 +1466,85 @@ export function Workspace({
     [handleApplyChanges],
   );
 
+  const applyDuplicate = React.useCallback(
+    async (
+      content: PartContent,
+      anchor: { readonly x: number; readonly y: number },
+    ): Promise<RenameOutcome> => {
+      const liveDocument = session.getState().document;
+      if (!liveDocument || !activeViewId) {
+        const message = 'No canvas view is open';
+        setDuplicateDialog({ kind: 'error', messages: [message] });
+        return { ok: false, message };
+      }
+      const placement = planPlacement(liveDocument, activeViewId, content, anchor, mintId);
+      if (!placement.ok) {
+        const messages = duplicateIssueMessages(
+          placement.issues,
+          'Could not duplicate this selection',
+        );
+        setDuplicateDialog({ kind: 'error', messages });
+        return { ok: false, message: messages[0] ?? 'Could not duplicate this selection' };
+      }
+      const applied = await handleApplyChanges(placement.changes, 'Duplicate selection');
+      if (!applied) {
+        const message = 'Could not save the duplicated selection';
+        setDuplicateDialog({ kind: 'error', messages: [message] });
+        return { ok: false, message };
+      }
+      setDuplicateDialog(null);
+      if (placement.newElementIds.length > 0) {
+        openInspectorFor({ kind: 'element', ids: [...placement.newElementIds] });
+      }
+      return { ok: true };
+    },
+    [activeViewId, handleApplyChanges, mintId, openInspectorFor, session],
+  );
+
+  const handleDuplicateSelection = React.useCallback(async (): Promise<RenameOutcome> => {
+    if (!document || !activeView || !activeViewId) {
+      const message = 'No canvas view is open';
+      setDuplicateDialog({ kind: 'error', messages: [message] });
+      return { ok: false, message };
+    }
+    const selectedIds = commandContext.selectedElementIds;
+    const selected = new Set(selectedIds);
+    const sourcePlacements = activeView.placements.filter((placement) => selected.has(placement.elementId));
+    if (sourcePlacements.length !== selectedIds.length) {
+      const message = 'Every selected component must be placed in the active view';
+      setDuplicateDialog({ kind: 'error', messages: [message] });
+      return { ok: false, message };
+    }
+    const captured = captureSelection(document, activeViewId, {
+      elementIds: selectedIds,
+      noteIds: [],
+    });
+    if (!captured.ok) {
+      const messages = duplicateIssueMessages(
+        captured.issues,
+        'Could not capture this selection',
+      );
+      setDuplicateDialog({ kind: 'error', messages });
+      return { ok: false, message: messages[0] ?? 'Could not capture this selection' };
+    }
+    const anchor = {
+      x: Math.min(...sourcePlacements.map((placement) => placement.x)) + 24,
+      y: Math.min(...sourcePlacements.map((placement) => placement.y)) + 24,
+    };
+    const items = duplicateConfirmationItems(captured.preview);
+    if (items.length > 0) {
+      setDuplicateDialog({
+        kind: 'confirm',
+        content: captured.content,
+        anchor,
+        items,
+        warnings: captured.preview.warnings,
+      });
+      return { ok: true };
+    }
+    return applyDuplicate(captured.content, anchor);
+  }, [activeView, activeViewId, applyDuplicate, commandContext.selectedElementIds, document]);
+
   // Exhaustive over CommandId: keyboard and Quick options share these.
   const commandHandlers: CommandHandlers = React.useMemo(
     () => ({
@@ -1415,6 +1566,7 @@ export function Workspace({
       'export.mermaid': () => transferActions.exportMermaid(),
       'edit.undo': () => handleUndo(),
       'edit.redo': () => handleRedo(),
+      'selection.duplicate': () => handleDuplicateSelection(),
       'selection.group': ({ label }) =>
         document && activeViewId
           ? applySelectionPlan(planGroup(document, activeViewId, commandContext.selectedElementIds, mintId(), label))
@@ -1441,6 +1593,7 @@ export function Workspace({
     [
       handleBackToProjects,
       handleRedo,
+      handleDuplicateSelection,
       handleRenameProject,
       handleResetRun,
       handleRunAll,
@@ -1796,6 +1949,88 @@ export function Workspace({
         onRename={handleQuickRename}
         onTextCommand={handleQuickTextCommand}
       />
+
+      <Dialog
+        open={duplicateDialog !== null}
+        onOpenChange={(open) => {
+          if (!open && !duplicateApplying) setDuplicateDialog(null);
+        }}
+      >
+        <DialogContent
+          data-testid={
+            duplicateDialog?.kind === 'confirm'
+              ? 'duplicate-confirm-dialog'
+              : 'duplicate-error-dialog'
+          }
+          className="sm:max-w-md"
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {duplicateDialog?.kind === 'confirm'
+                ? 'Duplicate this selection?'
+                : 'Can’t duplicate selection'}
+            </DialogTitle>
+            <DialogDescription>
+              {duplicateDialog?.kind === 'confirm'
+                ? 'Some content crosses the selection boundary and will be left behind.'
+                : 'The selection was not changed.'}
+            </DialogDescription>
+          </DialogHeader>
+          {duplicateDialog?.kind === 'confirm' ? (
+            <div className="space-y-3 text-sm text-ink">
+              <ul className="list-disc space-y-1 pl-5">
+                {duplicateDialog.items.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              {duplicateDialog.warnings.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-secondary-text">Also note</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-secondary-text">
+                    {duplicateDialog.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : duplicateDialog?.kind === 'error' ? (
+            <ul role="alert" className="list-disc space-y-1 pl-5 text-sm text-destructive">
+              {duplicateDialog.messages.map((message) => <li key={message}>{message}</li>)}
+            </ul>
+          ) : null}
+          <DialogFooter className="flex-row justify-end gap-2">
+            {duplicateDialog?.kind === 'confirm' ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={duplicateApplying}
+                  onClick={() => setDuplicateDialog(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  data-testid="duplicate-confirm-btn"
+                  type="button"
+                  variant="tint"
+                  disabled={duplicateApplying}
+                  onClick={() => {
+                    if (duplicateDialog.kind !== 'confirm') return;
+                    const pending = duplicateDialog;
+                    setDuplicateApplying(true);
+                    void applyDuplicate(pending.content, pending.anchor).finally(() => {
+                      setDuplicateApplying(false);
+                    });
+                  }}
+                >
+                  {duplicateApplying ? 'Duplicating…' : 'Duplicate'}
+                </Button>
+              </>
+            ) : (
+              <Button type="button" variant="ghost" onClick={() => setDuplicateDialog(null)}>
+                Close
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <NavigationGuardDialog
         open={guardOpen}

@@ -47,6 +47,7 @@ export const COMMAND_IDS = [
   'export.mermaid',
   'edit.undo',
   'edit.redo',
+  'selection.duplicate',
   'selection.group',
   'selection.ungroup',
   'selection.align',
@@ -79,6 +80,7 @@ export interface CommandPayloads {
   'export.mermaid': Empty;
   'edit.undo': Empty;
   'edit.redo': Empty;
+  'selection.duplicate': Empty;
   'selection.group': { readonly label: string };
   'selection.ungroup': { readonly groupIds: readonly Id[] };
   'selection.align': {
@@ -120,6 +122,7 @@ export type CommandIconKey =
   | 'diagram'
   | 'undo'
   | 'redo'
+  | 'duplicate'
   | 'group'
   | 'ungroup'
   | 'align'
@@ -437,6 +440,21 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: { key: 'z', modifiers: ['Mod', 'Shift'], scope: 'global' },
     availability: (ctx) =>
       requireIdle(ctx) ?? (ctx.canRedo ? ENABLED : disabled('nothing-to-redo', 'Nothing to redo')),
+  },
+  'selection.duplicate': {
+    id: 'selection.duplicate',
+    label: 'Duplicate selection',
+    keywords: ['duplicate', 'copy', 'selection', 'parts'],
+    group: 'selection',
+    iconKey: 'duplicate',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select at least 1 component to duplicate');
+    },
   },
   'selection.group': {
     id: 'selection.group',
@@ -759,6 +777,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
     ctx.selectedGroupIds.length > 0;
   const selection: QuickOption[] = hasSelection
     ? [
+        option('selection.duplicate', {}, ctx),
         option('selection.group', { label: '' }, ctx),
         option('selection.ungroup', { groupIds: ctx.selectedGroupIds }, ctx),
         option('selection.align', { edge: 'left' }, ctx, { key: 'selection.align:left', label: 'Align left' }),
