@@ -308,10 +308,27 @@ describe('CommitPanel static markup (scenario_commit_gate.png)', () => {
     expect(html).toContain('Run');
     expect(html).toContain('1 of 2 passing');
     expect(html).toContain('Commit unlocks when all 2 scenarios pass');
+    expect(html).toContain('text-warning-text');
+    expect(html).not.toMatch(/(?:text|bg|border)-amber-\d/);
 
     for (const text of EXCLUDED_TEXTS) {
       expect(html.toLowerCase()).not.toContain(text.toLowerCase());
     }
+  });
+
+  it('uses the semantic warning token for needs-rerun state', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(CommitPanel, {
+        isMain: false,
+        changes: [],
+        scenariosWithStatus: makeScenarios([{ status: { kind: 'needs-rerun' } }]),
+        onRunScenario: vi.fn(),
+        onCancel: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('bg-warning');
+    expect(html).not.toMatch(/(?:text|bg|border)-amber-\d/);
   });
 
   it('shows the passed check and no Run button once every scenario passes', () => {

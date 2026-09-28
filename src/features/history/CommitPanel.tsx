@@ -223,7 +223,7 @@ export function CommitPanel({
                   ? 'text-primary'
                   : isRemove
                     ? 'text-risk-text'
-                    : 'text-amber-700';
+                    : 'text-warning-text';
 
                 return (
                   <div
@@ -309,7 +309,7 @@ export function CommitPanel({
                         className={cn(
                           'size-2 rounded-full shrink-0 mt-1',
                           isPassed && 'bg-primary',
-                          status.kind === 'needs-rerun' && 'bg-amber-600',
+                          status.kind === 'needs-rerun' && 'bg-warning',
                           status.kind === 'failed' && 'bg-risk-text',
                           status.kind === 'not-run' && 'bg-muted-foreground/40',
                           isNotReady && 'bg-risk-text',

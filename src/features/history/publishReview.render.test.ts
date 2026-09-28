@@ -138,6 +138,16 @@ describe('PublishReviewBody static markup (22C)', () => {
     expect(publishButtonMatch![0]).toContain('disabled=""');
   });
 
+  it('uses the semantic warning token for evidence from an earlier version', () => {
+    const html = render({
+      eligible: false,
+      scenarios: [makeScenario({ status: { kind: 'needs-rerun' } })],
+    });
+
+    expect(html).toContain('bg-warning');
+    expect(html).not.toMatch(/(?:text|bg|border)-amber-\d/);
+  });
+
   it('disables Publish with "choose a version number" when nothing is selected', () => {
     const html = render({ selectedBump: null });
     expect(html).toContain('publish-blocking-reason');
