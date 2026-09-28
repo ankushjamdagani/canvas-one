@@ -26,6 +26,31 @@ const testActor: Actor = {
 
 describe('LocalRepository', () => {
   describe('Preferences CAS', () => {
+    it('loads a cloned preference record and returns null when none exists', async () => {
+      const db = createStudioDatabase(`test-pref-load-${crypto.randomUUID()}`);
+      const repo = new LocalRepository(db);
+
+      expect(await repo.loadPreferences()).toBeNull();
+
+      const value = { camera: { x: 100, y: 200, zoom: 1 } };
+      expect((await repo.savePreferences(0, value)).status).toBe('applied');
+
+      const first = await repo.loadPreferences();
+      expect(first).toMatchObject({
+        key: 'user',
+        schema: PREFERENCES_SCHEMA,
+        revision: 1,
+        value,
+      });
+
+      (first!.value as { camera: { x: number } }).camera.x = -1;
+      const second = await repo.loadPreferences();
+      expect(second?.value).toEqual(value);
+      expect(second).not.toBe(first);
+
+      db.close();
+    });
+
     it('manages preferences CAS independently of workingRevision with schema studio-preferences/1', async () => {
       const db = createStudioDatabase(`test-pref-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);

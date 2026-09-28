@@ -276,6 +276,24 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
+   * Loads the browser-local user preference record. Preferences are outside
+   * project content and therefore use their own singleton key and revision.
+   */
+  async loadPreferences(): Promise<Readonly<PreferenceRecord> | null> {
+    try {
+      const record = await this.db.preferences.get('user');
+      return record ? Object.freeze(structuredClone(record)) : null;
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      throw new RepositoryError({
+        code: 'unavailable',
+        message: 'Failed to load preferences from database',
+        issues: [createIssue('structural-rule', String(err), [], 'preferences')],
+      });
+    }
+  }
+
+  /**
    * Saves user preferences with own compare-and-set on preference revision.
    * Independent of and never touches workingRevision.
    */

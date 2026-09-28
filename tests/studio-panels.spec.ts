@@ -75,6 +75,30 @@ async function newElementId(page: Page, before: string[]): Promise<string> {
   return added[0];
 }
 
+async function waitForPanelPreferenceSave(page: Page, minimumRevision = 1) {
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('system-studio-local-v1');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        try {
+          return await new Promise<number>((resolve, reject) => {
+            const transaction = database.transaction('preferences', 'readonly');
+            const request = transaction.objectStore('preferences').get('user');
+            request.onsuccess = () => resolve(request.result?.revision ?? 0);
+            request.onerror = () => reject(request.error);
+          });
+        } finally {
+          database.close();
+        }
+      }),
+    )
+    .toBeGreaterThanOrEqual(minimumRevision);
+}
+
 test.describe('RV-12h: History and Library panels', () => {
   test('opens History from the top bar and the ladder renders for an S05 project', async ({ page }) => {
     await openS05Project(page);
@@ -170,5 +194,31 @@ test.describe('RV-12h: History and Library panels', () => {
 
     await expect(page.getByTestId('history-ladder')).toBeVisible();
     await expect(page.locator('[data-slot="rail-item-button"][data-panel-id="history"]')).toHaveCount(0);
+  });
+
+  test('restores the saved panel layout after a reload', async ({ page }) => {
+    await openS05Project(page);
+    await page.getByTestId('topbar-history-btn').click();
+    const historyPanel = page.locator('[data-panel-id="history"]');
+    await expect(historyPanel).toBeVisible();
+    await historyPanel.locator('[data-slot="panel-menu-trigger"]').click();
+    await page.locator('[data-slot="menu-item-collapse"]').click();
+    await expect(page.locator('[data-slot="rail-item-button"][data-panel-id="history"]')).toBeVisible();
+    await waitForPanelPreferenceSave(page, 2);
+    await expect(page.getByTestId('workspace-root')).toHaveAttribute(
+      'data-panel-preference-state',
+      'ready',
+    );
+
+    await page.reload();
+    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+    const project = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]').first();
+    await expect(project).toBeVisible();
+    await project.getByRole('button', { name: /^Open / }).first().click();
+
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await waitForIdle(page);
+    await expect(page.locator('[data-slot="rail-item-button"][data-panel-id="history"]')).toBeVisible();
+    await expect(page.getByTestId('history-ladder')).toHaveCount(0);
   });
 });

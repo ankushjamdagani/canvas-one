@@ -717,6 +717,9 @@ export interface StudioRepository {
   execute(command: AuthoredCommand): Promise<AuthoredResult | UnsupportedResult>;
 
   /** Preferences have their own compare-and-set and schema studio-preferences/1. */
+  loadPreferences(): Promise<Readonly<PreferenceRecord> | null>;
+
+  /** Preferences have their own compare-and-set and schema studio-preferences/1. */
   savePreferences(expectedRevision: number, value: unknown): Promise<SavePreferencesResult>;
 
   /** CAS deletion by expected main branch head commit ID. Missing/already-absent on retry. */
@@ -908,4 +911,3 @@ export type PruneUnreferencedResult =
   | MissingResult
   | { readonly status: 'failed'; readonly code: 'referenced-artifact'; readonly issues: readonly Issue[] }
   | FailedResult;
-
