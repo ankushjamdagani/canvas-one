@@ -38,13 +38,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Trash2 } from 'lucide-react';
 import type { InspectorTargetKind } from '../inspector';
 import { LibraryPicker } from '../library';
 import { CATALOG_ENTRY_MIME_TYPE } from '../library/types';
 import { getEntry } from '../catalog/catalog';
 import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
+import { SelectionToolbar, type CanvasCommandExecutor } from './SelectionToolbar';
+import type { CommandContext } from './commands/registry';
 
 export type CanvasSelectionRequest = {
   readonly kind: InspectorTargetKind;
@@ -105,6 +106,9 @@ export interface CanvasViewProps {
    * destructive on screen and let the user retry (commands.md "busy").
    */
   onApplyChanges: (changes: readonly RecordChange[], label: string) => Promise<boolean>;
+  /** Registry context and executor supplied by Workspace; toolbar/dock never mutate locally. */
+  commandContext: CommandContext;
+  onExecuteCommand: CanvasCommandExecutor;
   /**
    * RV-12h: called when the compact picker's "Browse full library" link is
    * clicked -- the caller (Workspace) opens the docked Library panel.
@@ -120,6 +124,7 @@ export interface CanvasViewProps {
  */
 export interface CanvasViewHandle {
   placeAtCentre: (entryId: string) => Promise<void>;
+  getVisibleCentre: () => { readonly x: number; readonly y: number };
 }
 
 /** Rebuilds canvas nodes from the projection, keeping each existing node's
@@ -151,6 +156,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onRequestClearSelection,
   mintId,
   onApplyChanges,
+  commandContext,
+  onExecuteCommand,
   onOpenFullLibrary,
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
@@ -374,18 +381,22 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     [document, projection.activeView, isSaving, mintId, onApplyChanges, onRequestSelection],
   );
 
+  const getVisibleCentre = React.useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const centreScreen = rect
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    return reactFlow.screenToFlowPosition(centreScreen);
+  }, [reactFlow]);
+
   // Enter / "Place": places the focused entry at the viewport centre.
   const handlePlaceAtCentre = React.useCallback(
     async (entryId: string) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      const centreScreen = rect
-        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-        : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-      const centreFlow = reactFlow.screenToFlowPosition(centreScreen);
+      const centreFlow = getVisibleCentre();
       setComponentPickerOpen(false);
       await applyPlacement(entryId, centreFlow);
     },
-    [reactFlow, applyPlacement],
+    [getVisibleCentre, applyPlacement],
   );
 
   // RV-12h: the docked Library panel places through this same imperative
@@ -395,15 +406,11 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     ref,
     () => ({
       placeAtCentre: async (entryId: string) => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        const centreScreen = rect
-          ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-          : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-        const centreFlow = reactFlow.screenToFlowPosition(centreScreen);
-        await applyPlacement(entryId, centreFlow);
+        await applyPlacement(entryId, getVisibleCentre());
       },
+      getVisibleCentre,
     }),
-    [reactFlow, applyPlacement],
+    [getVisibleCentre, applyPlacement],
   );
 
   // Dragging a picker card onto the canvas places it at the drop point.
@@ -704,25 +711,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         </div>
       )}
 
-      {/* 16D "Selection-scoped actions" -- delete only, per this task's scope */}
+      {/* 16D selection-scoped actions. */}
       {hasSelection && (
-        <div
-          data-testid="selection-toolbar"
-          className="absolute top-3 right-3 z-10 flex items-center gap-1 px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
-        >
-          <Button
-            data-testid="selection-delete-btn"
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 text-destructive hover:text-destructive"
-            aria-label="Delete selection"
-            disabled={isSaving}
-            onClick={handleDeleteSelection}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
+        <SelectionToolbar
+          context={commandContext}
+          executeCommand={onExecuteCommand}
+          onDelete={handleDeleteSelection}
+        />
       )}
 
       <ReactFlow
@@ -885,6 +880,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         zoom={zoom}
         onToggleComponentPicker={() => setComponentPickerOpen((v) => !v)}
         componentPickerOpen={componentPickerOpen}
+        onAddNote={async (text) => {
+          const result = await onExecuteCommand('canvas.add-note', { text });
+          if (result.status === 'disabled') return { ok: false, message: result.reason };
+          if (result.value && typeof result.value === 'object' && 'ok' in result.value) {
+            return result.value as { readonly ok: true } | { readonly ok: false; readonly message: string };
+          }
+          return { ok: true };
+        }}
         disabled={isSaving}
       />
 

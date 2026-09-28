@@ -17,7 +17,7 @@
  *
  * Not here (design-revalidation.md §2 / commands.md §1): ⌘K/⌘R/⌘H/⌘B/⌘L,
  * single-letter shortcuts, Duplicate project, Project settings, New branch.
- * Commands the app doesn't wire yet (parts, selection, canvas tools, dock
+ * Commands the app doesn't wire yet (parts, remaining canvas tools, dock
  * configuration, branch create/reopen) are absent rather than fake entries.
  */
 
@@ -47,6 +47,11 @@ export const COMMAND_IDS = [
   'export.mermaid',
   'edit.undo',
   'edit.redo',
+  'selection.group',
+  'selection.ungroup',
+  'selection.align',
+  'selection.distribute',
+  'canvas.add-note',
 ] as const;
 
 export type CommandId = (typeof COMMAND_IDS)[number];
@@ -74,9 +79,16 @@ export interface CommandPayloads {
   'export.mermaid': Empty;
   'edit.undo': Empty;
   'edit.redo': Empty;
+  'selection.group': { readonly label: string };
+  'selection.ungroup': { readonly groupIds: readonly Id[] };
+  'selection.align': {
+    readonly edge: 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
+  };
+  'selection.distribute': { readonly axis: 'x' | 'y' };
+  'canvas.add-note': { readonly text: string };
 }
 
-export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'edit';
+export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
 
 export const COMMAND_GROUP_LABELS: Readonly<Record<CommandGroup, string>> = {
   project: 'Project',
@@ -84,6 +96,7 @@ export const COMMAND_GROUP_LABELS: Readonly<Record<CommandGroup, string>> = {
   run: 'Run',
   review: 'Review',
   export: 'Export',
+  selection: 'Selection',
   edit: 'Edit',
 };
 
@@ -106,7 +119,12 @@ export type CommandIconKey =
   | 'table'
   | 'diagram'
   | 'undo'
-  | 'redo';
+  | 'redo'
+  | 'group'
+  | 'ungroup'
+  | 'align'
+  | 'distribute'
+  | 'note';
 
 export interface Shortcut {
   readonly key: string;
@@ -129,7 +147,10 @@ export type AvailabilityCode =
   | 'not-ready'
   | 'nothing-to-undo'
   | 'nothing-to-redo'
-  | 'export-unavailable';
+  | 'export-unavailable'
+  | 'no-view'
+  | 'invalid-selection'
+  | 'limit';
 
 // ============================================================================
 // Context (read-only; built by the workspace from its state, never the DOM)
@@ -148,10 +169,18 @@ export interface CommandContext {
   readonly projectId: Id | null;
   readonly projectTitle: string | null;
   readonly branchId: Id | null;
+  readonly activeViewId: Id | null;
   readonly branches: readonly CommandBranch[];
   readonly storageState: 'ready' | 'saving' | 'failed';
   readonly canUndo: boolean;
   readonly canRedo: boolean;
+  readonly selectedElementIds: readonly Id[];
+  readonly selectedConnectionIds: readonly Id[];
+  /** Exact presentation groups represented by the current element selection. */
+  readonly selectedGroupIds: readonly Id[];
+  readonly selectionWhollyUngrouped: boolean;
+  readonly activeViewGroupCount: number;
+  readonly activeViewNoteCount: number;
   /** Session-level reason Run is blocked (dirty draft, busy, reload needed). */
   readonly runBlockedReason: string | null;
   readonly runPhase: CommandRunPhase;
@@ -194,6 +223,10 @@ function requireProject(ctx: CommandContext): Availability | null {
 
 function requireIdle(ctx: CommandContext): Availability | null {
   return ctx.storageState === 'saving' ? disabled('busy', 'Saving…') : null;
+}
+
+function requireActiveView(ctx: CommandContext): Availability | null {
+  return ctx.activeViewId ? null : disabled('no-view', 'No canvas view is open');
 }
 
 function isExecutionActive(phase: CommandRunPhase): boolean {
@@ -405,6 +438,86 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) =>
       requireIdle(ctx) ?? (ctx.canRedo ? ENABLED : disabled('nothing-to-redo', 'Nothing to redo')),
   },
+  'selection.group': {
+    id: 'selection.group',
+    label: 'Group…',
+    keywords: ['group', 'selection', 'parts'],
+    group: 'selection',
+    iconKey: 'group',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      if (ctx.selectedElementIds.length === 0) {
+        return disabled('invalid-selection', 'Select at least 1 component to group');
+      }
+      if (!ctx.selectionWhollyUngrouped) {
+        return disabled('invalid-selection', 'Select only ungrouped components');
+      }
+      if (ctx.activeViewGroupCount >= 50) return disabled('limit', 'This view already has 50 groups');
+      return ENABLED;
+    },
+  },
+  'selection.ungroup': {
+    id: 'selection.ungroup',
+    label: 'Ungroup',
+    keywords: ['ungroup', 'selection', 'parts'],
+    group: 'selection',
+    iconKey: 'ungroup',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedGroupIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select all parts in one group to ungroup');
+    },
+  },
+  'selection.align': {
+    id: 'selection.align',
+    label: 'Align',
+    keywords: ['align', 'selection', 'position'],
+    group: 'selection',
+    iconKey: 'align',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length >= 2
+        ? ENABLED
+        : disabled('invalid-selection', 'Select at least 2 components to align');
+    },
+  },
+  'selection.distribute': {
+    id: 'selection.distribute',
+    label: 'Distribute',
+    keywords: ['distribute', 'space', 'selection', 'position'],
+    group: 'selection',
+    iconKey: 'distribute',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length >= 3
+        ? ENABLED
+        : disabled('invalid-selection', 'Select at least 3 components to distribute');
+    },
+  },
+  'canvas.add-note': {
+    id: 'canvas.add-note',
+    label: 'Add note…',
+    keywords: ['note', 'canvas', 'annotation'],
+    group: 'edit',
+    iconKey: 'note',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.activeViewNoteCount >= 50
+        ? disabled('limit', 'This view already has 50 notes')
+        : ENABLED;
+    },
+  },
 };
 
 // ============================================================================
@@ -413,7 +526,7 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
 
 /** Exhaustive over CommandId: the caller wires every command or the build fails. */
 export type CommandHandlers = {
-  readonly [K in CommandId]: (payload: CommandPayloads[K]) => void | Promise<unknown>;
+  readonly [K in CommandId]: (payload: CommandPayloads[K]) => unknown | Promise<unknown>;
 };
 
 export type ExecuteResult =
@@ -442,7 +555,7 @@ export async function executeCommand<K extends CommandId>(
   if (!availability.enabled) {
     return { status: 'disabled', reason: availability.reason, code: availability.code };
   }
-  const handler = handlers[id] as (payload: CommandPayloads[K]) => void | Promise<unknown>;
+  const handler = handlers[id] as (payload: CommandPayloads[K]) => unknown | Promise<unknown>;
   const value = await handler(payload);
   return { status: 'done', value };
 }
@@ -583,7 +696,7 @@ function option<K extends CommandId>(
 }
 
 /**
- * The 14A list: Project, Switch branch, Run, Review, Export, Edit. The current
+ * The 14A list plus contracted canvas actions. The current
  * branch comes first in its group, then main, then the rest by label. Run pause/
  * resume/reset appear only while they apply, so the list isn't padded with
  * rows that are nearly always disabled.
@@ -640,7 +753,30 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
     option('export.mermaid', {}, ctx),
   ];
 
-  const edit: QuickOption[] = [option('edit.undo', {}, ctx), option('edit.redo', {}, ctx)];
+  const hasSelection =
+    ctx.selectedElementIds.length > 0 ||
+    ctx.selectedConnectionIds.length > 0 ||
+    ctx.selectedGroupIds.length > 0;
+  const selection: QuickOption[] = hasSelection
+    ? [
+        option('selection.group', { label: '' }, ctx),
+        option('selection.ungroup', { groupIds: ctx.selectedGroupIds }, ctx),
+        option('selection.align', { edge: 'left' }, ctx, { key: 'selection.align:left', label: 'Align left' }),
+        option('selection.align', { edge: 'center-x' }, ctx, { key: 'selection.align:center-x', label: 'Align center horizontally' }),
+        option('selection.align', { edge: 'right' }, ctx, { key: 'selection.align:right', label: 'Align right' }),
+        option('selection.align', { edge: 'top' }, ctx, { key: 'selection.align:top', label: 'Align top' }),
+        option('selection.align', { edge: 'center-y' }, ctx, { key: 'selection.align:center-y', label: 'Align center vertically' }),
+        option('selection.align', { edge: 'bottom' }, ctx, { key: 'selection.align:bottom', label: 'Align bottom' }),
+        option('selection.distribute', { axis: 'x' }, ctx, { key: 'selection.distribute:x', label: 'Distribute horizontally' }),
+        option('selection.distribute', { axis: 'y' }, ctx, { key: 'selection.distribute:y', label: 'Distribute vertically' }),
+      ]
+    : [];
+
+  const edit: QuickOption[] = [
+    option('canvas.add-note', { text: '' }, ctx),
+    option('edit.undo', {}, ctx),
+    option('edit.redo', {}, ctx),
+  ];
 
   const groups: QuickOptionGroup[] = [
     { group: 'project', label: COMMAND_GROUP_LABELS.project, options: project },
@@ -648,6 +784,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
     { group: 'run', label: COMMAND_GROUP_LABELS.run, options: run },
     { group: 'review', label: COMMAND_GROUP_LABELS.review, options: review },
     { group: 'export', label: COMMAND_GROUP_LABELS.export, options: exportGroup },
+    { group: 'selection', label: COMMAND_GROUP_LABELS.selection, options: selection },
     { group: 'edit', label: COMMAND_GROUP_LABELS.edit, options: edit },
   ];
   return groups.filter((g) => g.options.length > 0);

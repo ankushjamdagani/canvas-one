@@ -89,6 +89,15 @@ import {
 import { QuickOptionsDialog, type RenameOutcome } from './QuickOptions';
 import { findRunAllDisabledReason } from '../runs';
 import type { SessionRenameResult } from '../session/types';
+import {
+  planAddNote,
+  planAlign,
+  planDistribute,
+  planGroup,
+  planUngroup,
+  type SelectionPlan,
+} from './selectionPlans';
+import type { CanvasCommandExecutor } from './SelectionToolbar';
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -408,6 +417,25 @@ export function Workspace({
     () => new Set(draft && draft.target.kind === 'connection' ? draft.target.ids : []),
     [draft],
   );
+  const activeView = React.useMemo(
+    () => document?.views.find((view) => view.id === activeViewId) ?? null,
+    [document, activeViewId],
+  );
+  const selectedGroupIds = React.useMemo(() => {
+    if (!activeView || selectedElementIds.size === 0) return [];
+    return activeView.groups
+      .filter(
+        (group) =>
+          group.elementIds.length === selectedElementIds.size &&
+          group.elementIds.every((elementId) => selectedElementIds.has(elementId)),
+      )
+      .map((group) => group.id);
+  }, [activeView, selectedElementIds]);
+  const selectionWhollyUngrouped = React.useMemo(() => {
+    if (!activeView || selectedElementIds.size === 0) return false;
+    const grouped = new Set(activeView.groups.flatMap((group) => group.elementIds));
+    return Array.from(selectedElementIds).every((elementId) => !grouped.has(elementId));
+  }, [activeView, selectedElementIds]);
 
   // ==========================================================================
   // RV-12d: run lane wiring
@@ -1295,6 +1323,7 @@ export function Workspace({
       projectId: sessionState.projectId,
       projectTitle: projectRecord?.title ?? null,
       branchId: sessionState.branchId,
+      activeViewId,
       branches: branches.map((branch) => ({
         id: branch.id,
         label: branch.id === mainId ? 'main' : branch.label,
@@ -1304,6 +1333,12 @@ export function Workspace({
       storageState: isSaving ? 'saving' : hasError ? 'failed' : 'ready',
       canUndo: sessionState.canUndo && sessionState.status === 'ready',
       canRedo: sessionState.canRedo && sessionState.status === 'ready',
+      selectedElementIds: Array.from(selectedElementIds),
+      selectedConnectionIds: Array.from(selectedConnectionIds),
+      selectedGroupIds,
+      selectionWhollyUngrouped,
+      activeViewGroupCount: activeView?.groups.length ?? 0,
+      activeViewNoteCount: activeView?.notes.length ?? 0,
       runBlockedReason: sessionRunDisabledReason,
       runPhase: runControllerState?.phase ?? 'idle',
       hasRunDisplay: Boolean(runControllerState?.current),
@@ -1329,12 +1364,18 @@ export function Workspace({
     };
   }, [
     branches,
+    activeView,
+    activeViewId,
     hasError,
     isSaving,
     projectRecord,
     runControllerState,
     scenarioEntries,
     selectedScenarioId,
+    selectedConnectionIds,
+    selectedElementIds,
+    selectedGroupIds,
+    selectionWhollyUngrouped,
     sessionRunDisabledReason,
     sessionState.branchId,
     sessionState.canRedo,
@@ -1343,6 +1384,15 @@ export function Workspace({
     sessionState.status,
     transferActions,
   ]);
+
+  const applySelectionPlan = React.useCallback(
+    async (plan: SelectionPlan): Promise<RenameOutcome> => {
+      if (!plan.ok) return { ok: false, message: plan.reason };
+      const applied = await handleApplyChanges(plan.changes, plan.label);
+      return applied ? { ok: true } : { ok: false, message: 'Could not save this canvas change' };
+    },
+    [handleApplyChanges],
+  );
 
   // Exhaustive over CommandId: keyboard and Quick options share these.
   const commandHandlers: CommandHandlers = React.useMemo(
@@ -1365,6 +1415,28 @@ export function Workspace({
       'export.mermaid': () => transferActions.exportMermaid(),
       'edit.undo': () => handleUndo(),
       'edit.redo': () => handleRedo(),
+      'selection.group': ({ label }) =>
+        document && activeViewId
+          ? applySelectionPlan(planGroup(document, activeViewId, commandContext.selectedElementIds, mintId(), label))
+          : { ok: false, message: 'No canvas view is open' },
+      'selection.ungroup': ({ groupIds }) =>
+        document && activeViewId
+          ? applySelectionPlan(planUngroup(document, activeViewId, groupIds))
+          : { ok: false, message: 'No canvas view is open' },
+      'selection.align': ({ edge }) =>
+        document && activeViewId
+          ? applySelectionPlan(planAlign(document, activeViewId, commandContext.selectedElementIds, edge))
+          : { ok: false, message: 'No canvas view is open' },
+      'selection.distribute': ({ axis }) =>
+        document && activeViewId
+          ? applySelectionPlan(planDistribute(document, activeViewId, commandContext.selectedElementIds, axis))
+          : { ok: false, message: 'No canvas view is open' },
+      'canvas.add-note': ({ text }) => {
+        const point = canvasViewRef.current?.getVisibleCentre();
+        return document && activeViewId && point
+          ? applySelectionPlan(planAddNote(document, activeViewId, mintId(), text, point))
+          : { ok: false, message: 'No canvas view is open' };
+      },
     }),
     [
       handleBackToProjects,
@@ -1375,11 +1447,21 @@ export function Workspace({
       handleRunScenario,
       handleSwitchBranch,
       handleUndo,
+      activeViewId,
+      applySelectionPlan,
+      commandContext.selectedElementIds,
+      document,
+      mintId,
       openHistoryPanel,
       openLibraryPanel,
       runController,
       transferActions,
     ],
+  );
+
+  const executeCanvasCommand = React.useCallback<CanvasCommandExecutor>(
+    (id, payload) => executeCommand(id, payload, commandContext, commandHandlers),
+    [commandContext, commandHandlers],
   );
 
   const quickOptionGroups = React.useMemo(
@@ -1399,6 +1481,19 @@ export function Workspace({
       const result = await executeCommand('project.rename', { title }, commandContext, commandHandlers);
       if (result.status === 'disabled') return { ok: false, message: result.reason };
       const outcome = renameOutcome(result.value as SessionRenameResult);
+      if (outcome.ok) setQuickOptionsOpen(false);
+      return outcome;
+    },
+    [commandContext, commandHandlers],
+  );
+
+  const handleQuickTextCommand = React.useCallback(
+    async (kind: 'group' | 'note', value: string): Promise<RenameOutcome> => {
+      const result = kind === 'group'
+        ? await executeCommand('selection.group', { label: value }, commandContext, commandHandlers)
+        : await executeCommand('canvas.add-note', { text: value }, commandContext, commandHandlers);
+      if (result.status === 'disabled') return { ok: false, message: result.reason };
+      const outcome = result.value as RenameOutcome;
       if (outcome.ok) setQuickOptionsOpen(false);
       return outcome;
     },
@@ -1531,6 +1626,8 @@ export function Workspace({
                     onRequestClearSelection={handleRequestClearSelection}
                     mintId={mintId}
                     onApplyChanges={handleApplyChanges}
+                    commandContext={commandContext}
+                    onExecuteCommand={executeCanvasCommand}
                     onOpenFullLibrary={openLibraryPanel}
                   />
 
@@ -1697,6 +1794,7 @@ export function Workspace({
         isMac={IS_MAC}
         onRun={handleQuickOption}
         onRename={handleQuickRename}
+        onTextCommand={handleQuickTextCommand}
       />
 
       <NavigationGuardDialog

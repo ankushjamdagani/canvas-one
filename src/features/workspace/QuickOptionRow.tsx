@@ -8,6 +8,7 @@ import {
   Command as CommandIcon,
   FileCode,
   FolderOpen,
+  Group,
   GitBranch,
   History as HistoryIcon,
   Home,
@@ -17,10 +18,13 @@ import {
   Pause,
   Pencil,
   Play,
+  Rows3,
   Redo2,
   RotateCcw,
+  StickyNote,
   Table2,
   Undo2,
+  Ungroup,
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
@@ -50,6 +54,11 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   diagram: Workflow,
   undo: Undo2,
   redo: Redo2,
+  group: Group,
+  ungroup: Ungroup,
+  align: Rows3,
+  distribute: Workflow,
+  note: StickyNote,
 };
 
 const BADGE_TEXT: Readonly<Record<NonNullable<QuickOption['badge']>, string>> = {
