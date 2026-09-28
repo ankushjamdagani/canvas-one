@@ -1338,3 +1338,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: 1274 unit; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5196, two workers, no retries: 27 passed / 4 skipped; `git diff --check` clean; preview screenshots of the list and rename states checked against 14A.
 - **Limitations**: selection.*, canvas tools, dock.* customization, parts and branch create/reopen are not in the registry yet; canvas Delete keeps its own handler. The long CSV disabled reason truncates in the row (full text in the tooltip). A temporary `rv-03q` preview entry was added to the uncommitted `.claude/launch.json`.
 
+### RV-04e 16D selection actions and dock Note
+
+- **Outcome**: `520f372` merged on the UI line @ `46ed3dc`. Selection toolbar (part count, Group with typed label, Ungroup, Align/Distribute menu, Delete) and dock Note (typed text, visible centre), all through registry commands with selection-aware availability; Quick options gains a Selection group. Pure view planners; one change = one undo.
+- **Files**: new `selectionPlans.ts` (+ test), `SelectionToolbar.tsx`, `QuickOptionsTextStep.tsx`, `tests/studio-selection-actions.spec.ts`; registry, Quick options, CanvasView, FloatingDock, Workspace, projection (shared card-height constant).
+- **Platform**: `/delegate`, one Codex executor (gpt-5.6-sol, high effort, workspace-write sandbox); self critique/review by the Claude lead. Review fix: dock wrapped to two rows on desktop after Note was added (`sm:flex-nowrap sm:w-max`). Codex's ACTION_LOG edit in the task worktree was dropped. No push.
+- **Verification**: 1317 unit; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5197: 28 passed / 4 skipped (new spec passed first run); `git diff --check` clean; preview checked at 1280px.
+- **Limitations**: selection.duplicate, 16C dock customization (shelf items uncontracted) and parts remain out. The toolbar sits top-right of the canvas rather than above the selection. The task worktree lacked the screen PNGs, so Codex worked from the written brief.
+
