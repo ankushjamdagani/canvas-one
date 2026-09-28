@@ -76,8 +76,41 @@ import {
   type DraftTarget,
 } from '../inspector';
 import { buildTransferSessionState, createScenarioDraftSession } from './integrationState';
+import {
+  buildQuickOptions,
+  COMMAND_DEFINITIONS,
+  executeCommand,
+  formatShortcut,
+  runGlobalShortcut,
+  type CommandContext,
+  type CommandHandlers,
+  type QuickOption,
+} from './commands/registry';
+import { QuickOptionsDialog, type RenameOutcome } from './QuickOptions';
+import { findRunAllDisabledReason } from '../runs';
+import type { SessionRenameResult } from '../session/types';
 
 const MOBILE_BREAKPOINT_PX = 768;
+
+const IS_MAC =
+  typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+
+/** RV-03q: the nested Quick options rename reports the session's own reason. */
+function renameOutcome(result: SessionRenameResult): RenameOutcome {
+  switch (result.status) {
+    case 'applied':
+      return { ok: true };
+    case 'busy':
+    case 'unsupported':
+      return { ok: false, message: result.message };
+    case 'invalid':
+      return { ok: false, message: result.issues[0]?.message ?? 'That name is not valid' };
+    case 'stale':
+      return { ok: false, message: 'This project changed elsewhere. Reopen it and try again.' };
+    default:
+      return { ok: false, message: 'Rename failed. Try again.' };
+  }
+}
 
 function useViewportWidth(): number {
   const [width, setWidth] = React.useState<number>(() =>
@@ -876,49 +909,6 @@ export function Workspace({
     [document, activeViewId, isSaving, session],
   );
 
-  // Keyboard shortcuts: Mod+Z / Mod+Shift+Z per commands.md §1
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore during IME composition
-      if (e.isComposing) return;
-
-      // Ignore in editable fields
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-
-      const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
-      const modKey = isMac ? e.metaKey : e.ctrlKey;
-
-      if (!modKey) return;
-
-      if (e.key.toLowerCase() === 'z') {
-        if (e.shiftKey) {
-          // Mod+Shift+Z -> Redo
-          if (sessionState.canRedo && sessionState.status === 'ready') {
-            e.preventDefault();
-            void session.redo();
-          }
-        } else {
-          // Mod+Z -> Undo
-          if (sessionState.canUndo && sessionState.status === 'ready') {
-            e.preventDefault();
-            void session.undo();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [session, sessionState.canUndo, sessionState.canRedo, sessionState.status]);
-
   // ==========================================================================
   // RV-12h: History and Library panels
   // ==========================================================================
@@ -1285,6 +1275,173 @@ export function Workspace({
     runGuarded(onBackToProjects);
   }, [runGuarded, onBackToProjects]);
 
+  // ==========================================================================
+  // RV-03q: command registry + 14A Quick options (commands.md §1)
+  // ==========================================================================
+
+  const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
+
+  const openHistoryPanel = React.useCallback(() => {
+    panelDispatch({ type: 'OPEN', panel: 'history' });
+    refreshBehindMainCheck();
+  }, [panelDispatch, refreshBehindMainCheck]);
+
+  // Read-only context for availability; built from workspace state, never the DOM.
+  const commandContext: CommandContext = React.useMemo(() => {
+    const mainId = projectRecord?.mainBranchId ?? null;
+    const selectedEntry =
+      scenarioEntries.find((entry) => entry.id === selectedScenarioId) ?? scenarioEntries[0] ?? null;
+    return {
+      projectId: sessionState.projectId,
+      projectTitle: projectRecord?.title ?? null,
+      branchId: sessionState.branchId,
+      branches: branches.map((branch) => ({
+        id: branch.id,
+        label: branch.id === mainId ? 'main' : branch.label,
+        isMain: branch.id === mainId,
+        closed: branch.state === 'closed',
+      })),
+      storageState: isSaving ? 'saving' : hasError ? 'failed' : 'ready',
+      canUndo: sessionState.canUndo && sessionState.status === 'ready',
+      canRedo: sessionState.canRedo && sessionState.status === 'ready',
+      runBlockedReason: sessionRunDisabledReason,
+      runPhase: runControllerState?.phase ?? 'idle',
+      hasRunDisplay: Boolean(runControllerState?.current),
+      scenarioCount: scenarioEntries.length,
+      selectedScenario: selectedEntry
+        ? {
+            id: selectedEntry.id,
+            label: selectedEntry.label,
+            notReadyReason:
+              selectedEntry.status.kind === 'not-ready'
+                ? (selectedEntry.status.issues[0]?.message ?? "Can't run this scenario")
+                : null,
+          }
+        : null,
+      runAllBlockedReason: findRunAllDisabledReason(scenarioEntries),
+      exportDisabledReasons: {
+        png: transferActions.getDisabledReason('png'),
+        svg: transferActions.getDisabledReason('svg'),
+        json: transferActions.getDisabledReason('json'),
+        csv: transferActions.getDisabledReason('csv'),
+        mermaid: transferActions.getDisabledReason('mermaid'),
+      },
+    };
+  }, [
+    branches,
+    hasError,
+    isSaving,
+    projectRecord,
+    runControllerState,
+    scenarioEntries,
+    selectedScenarioId,
+    sessionRunDisabledReason,
+    sessionState.branchId,
+    sessionState.canRedo,
+    sessionState.canUndo,
+    sessionState.projectId,
+    sessionState.status,
+    transferActions,
+  ]);
+
+  // Exhaustive over CommandId: keyboard and Quick options share these.
+  const commandHandlers: CommandHandlers = React.useMemo(
+    () => ({
+      'commands.open': () => setQuickOptionsOpen(true),
+      'project.rename': ({ title }) => handleRenameProject(title),
+      'project.switch': () => handleBackToProjects(),
+      'branch.switch': ({ branchId }) => handleSwitchBranch(branchId),
+      'run.start': ({ scenarioId }) => handleRunScenario(scenarioId),
+      'run.start-all': () => handleRunAll(),
+      'run.pause': () => runController?.pause(),
+      'run.resume': () => runController?.resume(),
+      'run.reset': () => handleResetRun(),
+      'history.open': () => openHistoryPanel(),
+      'library.open': () => openLibraryPanel(),
+      'export.png': () => transferActions.exportPng(),
+      'export.svg': () => transferActions.exportSvg(),
+      'project.export-json': () => transferActions.exportJson(),
+      'export.csv': () => transferActions.exportCsv(),
+      'export.mermaid': () => transferActions.exportMermaid(),
+      'edit.undo': () => handleUndo(),
+      'edit.redo': () => handleRedo(),
+    }),
+    [
+      handleBackToProjects,
+      handleRedo,
+      handleRenameProject,
+      handleResetRun,
+      handleRunAll,
+      handleRunScenario,
+      handleSwitchBranch,
+      handleUndo,
+      openHistoryPanel,
+      openLibraryPanel,
+      runController,
+      transferActions,
+    ],
+  );
+
+  const quickOptionGroups = React.useMemo(
+    () => (quickOptionsOpen ? buildQuickOptions(commandContext) : []),
+    [quickOptionsOpen, commandContext],
+  );
+
+  const handleQuickOption = React.useCallback(
+    (option: QuickOption) => {
+      void executeCommand(option.id, option.payload as never, commandContext, commandHandlers);
+    },
+    [commandContext, commandHandlers],
+  );
+
+  const handleQuickRename = React.useCallback(
+    async (title: string): Promise<RenameOutcome> => {
+      const result = await executeCommand('project.rename', { title }, commandContext, commandHandlers);
+      if (result.status === 'disabled') return { ok: false, message: result.reason };
+      const outcome = renameOutcome(result.value as SessionRenameResult);
+      if (outcome.ok) setQuickOptionsOpen(false);
+      return outcome;
+    },
+    [commandContext, commandHandlers],
+  );
+
+  // Global shortcuts (Mod+Z, Mod+Shift+Z, F2) come from the registry; ignored
+  // during IME composition, in editable fields and nested dialogs, and
+  // preventDefault fires only after an enabled match (commands.md §1).
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const matched = runGlobalShortcut(
+        {
+          key: e.key,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          isComposing: e.isComposing,
+          inEditableField: Boolean(
+            target &&
+              (target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.tagName === 'SELECT' ||
+                target.isContentEditable),
+          ),
+          inDialog: Boolean(target?.closest('[role="dialog"], [role="alertdialog"]')),
+        },
+        IS_MAC,
+        commandContext,
+        commandHandlers,
+      );
+      if (matched) e.preventDefault();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [commandContext, commandHandlers]);
+
+  const quickOptionsShortcut = formatShortcut(COMMAND_DEFINITIONS['commands.open'].shortcut!, IS_MAC);
+  const currentBranchLabel =
+    commandContext.branches.find((branch) => branch.id === commandContext.branchId)?.label ?? '';
+
   // Escape closes an overlay first, never a dirty draft directly (commands.md §6).
   // The guard dialog is itself a shadcn Dialog and handles its own Escape (-> Stay).
   // With no overlay open, Escape on a clean inspector closes it; a dirty draft is
@@ -1292,7 +1449,7 @@ export function Workspace({
   React.useEffect(() => {
     if (!draft && !scenarioDraft) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || guardOpen) return;
+      if (e.key !== 'Escape' || guardOpen || quickOptionsOpen) return;
       if (!draft?.dirty && !scenarioDraft?.dirty && !scenarioDraft?.isNew) {
         e.preventDefault();
         closeInspector();
@@ -1300,7 +1457,7 @@ export function Workspace({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [draft, scenarioDraft, guardOpen, closeInspector]);
+  }, [draft, scenarioDraft, guardOpen, quickOptionsOpen, closeInspector]);
 
   return (
     <div
@@ -1322,11 +1479,11 @@ export function Workspace({
           hasError={hasError}
           runControl={runControl ?? runControlSlot}
           transferActions={transferActions}
-          onOpenHistory={() => {
-            panelDispatch({ type: 'OPEN', panel: 'history' });
-            refreshBehindMainCheck();
-          }}
+          onOpenHistory={openHistoryPanel}
           historyActive={panelState.panels.history.open}
+          onOpenQuickOptions={() => void executeCommand('commands.open', {}, commandContext, commandHandlers)}
+          quickOptionsShortcut={quickOptionsShortcut}
+          quickOptionsActive={quickOptionsOpen}
         />
       ) : (
         <header
@@ -1529,6 +1686,17 @@ export function Workspace({
         remainingCount={Math.max((document?.scenarios.length ?? 0) - 1, 0)}
         onConfirm={() => void handleConfirmDeleteScenario()}
         confirming={deletingScenario}
+      />
+
+      <QuickOptionsDialog
+        open={quickOptionsOpen}
+        onOpenChange={setQuickOptionsOpen}
+        groups={quickOptionGroups}
+        projectTitle={projectRecord?.title ?? ''}
+        branchLabel={currentBranchLabel}
+        isMac={IS_MAC}
+        onRun={handleQuickOption}
+        onRename={handleQuickRename}
       />
 
       <NavigationGuardDialog
