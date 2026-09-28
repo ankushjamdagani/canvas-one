@@ -1321,3 +1321,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Codex lead implementation and self-review. The configured Agy review was blocked because repository egress was not authorized. No push.
 - **Verification**: 1246 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5187: 26 passed / 4 skipped; `git diff --check` clean.
 - **Limitations**: none known in this scoped debt closure.
+
+### RV-11a semantic warning-token debt
+
+- **Outcome**: `57cfe4b` merged on the UI line @ `0d54aef`. Added warning color roles from the repository's existing amber palette and moved History modified/needs-rerun states plus Badge/Alert warning variants off raw Tailwind amber classes. Canvas-note warning values now share the same central roles.
+- **Files**: design tokens, Badge/Alert primitives and specimen, History commit/publish views, focused render tests.
+- **Platform**: Codex lead implementation and self-review. Review caught a `.test.tsx` suffix excluded by this Vitest configuration; the test was converted to a discovered `.test.ts` before the final gate. No push.
+- **Verification**: 1250 unit tests across 111 files; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5188: 26 passed / 4 skipped; compiled CSS contains all four warning utilities; no raw Tailwind amber classes remain under `src`; `git diff --check` clean.
+- **Limitations**: legacy `--amber` / `--amber-soft` aliases remain for older stylesheet consumers, but resolve to the new semantic warning roles.
