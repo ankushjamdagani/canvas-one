@@ -151,6 +151,13 @@ describe('availability', () => {
   });
 
   it('enforces selection counts, grouping facts, limits and saving state', () => {
+    expect(getAvailability('selection.duplicate', makeContext(), {})).toMatchObject({
+      enabled: false,
+      reason: 'Select at least 1 component to duplicate',
+    });
+    expect(
+      getAvailability('selection.duplicate', makeContext({ selectedElementIds: ['a'] }), {}),
+    ).toEqual({ enabled: true });
     expect(getAvailability('selection.group', makeContext(), { label: '' })).toMatchObject({
       enabled: false,
       reason: 'Select at least 1 component to group',
@@ -305,6 +312,7 @@ describe('buildQuickOptions', () => {
       }),
     ).find((group) => group.group === 'selection')!;
     expect(selection.options.map((entry) => entry.key)).toEqual([
+      'selection.duplicate',
       'selection.group',
       'selection.ungroup',
       'selection.align:left',

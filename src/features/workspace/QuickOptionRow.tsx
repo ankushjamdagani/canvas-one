@@ -6,6 +6,7 @@
 import {
   Braces,
   Command as CommandIcon,
+  Copy,
   FileCode,
   FolderOpen,
   Group,
@@ -54,6 +55,7 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   diagram: Workflow,
   undo: Undo2,
   redo: Redo2,
+  duplicate: Copy,
   group: Group,
   ungroup: Ungroup,
   align: Rows3,
