@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultsLine, libraryCaption } from './caption';
-import { getEntry } from './catalog';
+import { CATALOG_ENTRIES, getEntry } from './catalog';
 
 describe('caption.ts', () => {
   describe('libraryCaption', () => {
@@ -39,50 +39,58 @@ describe('caption.ts', () => {
 
     it('formats processor defaults line', () => {
       const service = getEntry('service')!;
-      expect(defaultsLine(service)).toBe('DEFAULTS · capacity 2000/s, concurrency 1, queueLimit 500');
+      expect(defaultsLine(service)).toBe('DEFAULTS · Capacity per slot 2000/s, Concurrency 1, Queue limit 500');
 
       const worker = getEntry('worker')!;
       expect(defaultsLine(worker)).toBe(
-        'DEFAULTS · capacity 100/s, concurrency 2, queueLimit 0, maxRetries 2',
+        'DEFAULTS · Capacity per slot 100/s, Concurrency 2, Queue limit 0, Max retries 2',
       );
     });
 
     it('formats storage defaults line', () => {
       const db = getEntry('database')!;
       expect(defaultsLine(db)).toBe(
-        'DEFAULTS · capacity 500/s, writeCapacity 500/s, queueLimit 500',
+        'DEFAULTS · Capacity per slot 500/s, Write capacity 500/s, Queue limit 500',
       );
 
       const nosql = getEntry('nosql')!;
       expect(defaultsLine(nosql)).toBe(
-        'DEFAULTS · capacity 2000/s, writeCapacity 2000/s, queueLimit 500',
+        'DEFAULTS · Capacity per slot 2000/s, Write capacity 2000/s, Queue limit 500',
       );
     });
 
     it('formats router defaults line', () => {
       const gateway = getEntry('gateway')!;
       expect(defaultsLine(gateway)).toBe(
-        'DEFAULTS · strategy round-robin, capacity 2000/s, queueLimit 500',
+        'DEFAULTS · Strategy Round robin, Capacity per slot 2000/s, Queue limit 500',
       );
     });
 
     it('formats cache defaults line', () => {
       const dns = getEntry('dns')!;
       expect(defaultsLine(dns)).toBe(
-        'DEFAULTS · mode fixed, hitRate 80%, entries 100, ttl 10000ms, capacity 5000/s',
+        'DEFAULTS · Mode Fixed, Hit rate 80%, Entries 100, TTL 10000ms, Capacity per slot 5000/s',
       );
     });
 
     it('formats broker defaults line', () => {
       const queue = getEntry('queue')!;
       expect(defaultsLine(queue)).toBe(
-        'DEFAULTS · delivery competing, capacity 2000/s, queueLimit 500',
+        'DEFAULTS · Delivery Competing, Capacity per slot 2000/s, Queue limit 500',
       );
 
       const pubsub = getEntry('pubsub')!;
       expect(defaultsLine(pubsub)).toBe(
-        'DEFAULTS · delivery broadcast, capacity 2000/s, queueLimit 500',
+        'DEFAULTS · Delivery Broadcast, Capacity per slot 2000/s, Queue limit 500',
       );
+    });
+
+    it('never exposes resource config storage keys', () => {
+      for (const entry of CATALOG_ENTRIES) {
+        expect(defaultsLine(entry)).not.toMatch(
+          /\b(?:queueLimit|writeCapacity|hitRate|maxRetries|retryDelayMs|ttlMs)\b/,
+        );
+      }
     });
   });
 });
