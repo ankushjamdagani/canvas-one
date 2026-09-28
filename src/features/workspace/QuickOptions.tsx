@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { QuickOption, QuickOptionGroup } from './commands/registry';
 import { QuickOptionRow } from './QuickOptionRow';
 import { QuickOptionsRename, type RenameOutcome } from './QuickOptionsRename';
+import { QuickOptionsTextStep, type TextStepOutcome } from './QuickOptionsTextStep';
 
 export type { RenameOutcome } from './QuickOptionsRename';
 
@@ -30,9 +31,10 @@ export interface QuickOptionsContentProps {
   readonly projectTitle: string;
   readonly branchLabel: string;
   readonly isMac: boolean;
-  readonly mode: 'list' | 'rename';
+  readonly mode: 'list' | 'rename' | 'group' | 'note';
   readonly onRun: (option: QuickOption) => void;
   readonly onRename: (title: string) => Promise<RenameOutcome>;
+  readonly onTextCommand: (kind: 'group' | 'note', value: string) => Promise<TextStepOutcome>;
   readonly onBack: () => void;
 }
 
@@ -50,10 +52,14 @@ export function QuickOptionsContent({
   mode,
   onRun,
   onRename,
+  onTextCommand,
   onBack,
 }: QuickOptionsContentProps) {
   if (mode === 'rename') {
     return <QuickOptionsRename projectTitle={projectTitle} onRename={onRename} onBack={onBack} />;
+  }
+  if (mode === 'group' || mode === 'note') {
+    return <QuickOptionsTextStep kind={mode} onSubmit={(value) => onTextCommand(mode, value)} onBack={onBack} />;
   }
   // Disabled rows stay visible with their reason; cmdk skips them for
   // keyboard selection, so the first enabled row starts highlighted.
@@ -122,7 +128,7 @@ export interface QuickOptionsDialogProps extends Omit<QuickOptionsContentProps, 
 }
 
 export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: QuickOptionsDialogProps) {
-  const [mode, setMode] = React.useState<'list' | 'rename'>('list');
+  const [mode, setMode] = React.useState<'list' | 'rename' | 'group' | 'note'>('list');
 
   React.useEffect(() => {
     if (open) setMode('list');
@@ -134,8 +140,8 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
         data-testid="quick-options"
         hideClose
         onEscapeKeyDown={(e) => {
-          // Escape inside the nested rename goes back to the list first.
-          if (mode === 'rename') {
+          // Escape inside a nested text step goes back to the list first.
+          if (mode !== 'list') {
             e.preventDefault();
             setMode('list');
           }
@@ -156,6 +162,14 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
           onRun={(option) => {
             if (option.id === 'project.rename') {
               setMode('rename');
+              return;
+            }
+            if (option.id === 'selection.group') {
+              setMode('group');
+              return;
+            }
+            if (option.id === 'canvas.add-note') {
+              setMode('note');
               return;
             }
             onOpenChange(false);

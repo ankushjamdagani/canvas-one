@@ -177,7 +177,12 @@ export type ProjectionResult = {
   readonly empty: boolean;
 };
 
-const ESTIMATED_NODE_HEIGHT = 76;
+/**
+ * Placements persist their width but not their height. Group bounds and the
+ * selection geometry planners therefore share this fixed rendered-card
+ * estimate (commands.md §4 bounding-box alignment).
+ */
+export const ESTIMATED_ELEMENT_NODE_HEIGHT = 76;
 const GROUP_PADDING_X = 24;
 const GROUP_PADDING_Y_TOP = 36;
 const GROUP_PADDING_Y_BOTTOM = 24;
@@ -275,7 +280,7 @@ export function projectDocumentToCanvas(
       minX = Math.min(minX, p.x);
       minY = Math.min(minY, p.y);
       maxX = Math.max(maxX, p.x + p.width);
-      maxY = Math.max(maxY, p.y + ESTIMATED_NODE_HEIGHT);
+      maxY = Math.max(maxY, p.y + ESTIMATED_ELEMENT_NODE_HEIGHT);
     }
 
     const boxX = minX - GROUP_PADDING_X;

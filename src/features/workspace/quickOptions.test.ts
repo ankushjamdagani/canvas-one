@@ -16,6 +16,7 @@ const context: CommandContext = {
   projectId: 'a0000000-0000-4000-8000-000000000001',
   projectTitle: 'Checkout path',
   branchId: DRAFT,
+  activeViewId: 'd0000000-0000-4000-8000-000000000001',
   branches: [
     { id: MAIN, label: 'main', isMain: true, closed: false },
     { id: DRAFT, label: 'async-fulfilment', isMain: false, closed: false },
@@ -23,6 +24,12 @@ const context: CommandContext = {
   storageState: 'ready',
   canUndo: false,
   canRedo: false,
+  selectedElementIds: [],
+  selectedConnectionIds: [],
+  selectedGroupIds: [],
+  selectionWhollyUngrouped: false,
+  activeViewGroupCount: 0,
+  activeViewNoteCount: 0,
   runBlockedReason: null,
   runPhase: 'idle',
   hasRunDisplay: false,
@@ -32,7 +39,7 @@ const context: CommandContext = {
   exportDisabledReasons: { png: null, svg: null, json: null, csv: 'Run a scenario to export results', mermaid: null },
 };
 
-function render(mode: 'list' | 'rename'): string {
+function render(mode: 'list' | 'rename' | 'group' | 'note'): string {
   return renderToStaticMarkup(
     React.createElement(QuickOptionsContent, {
       groups: buildQuickOptions(context),
@@ -42,6 +49,7 @@ function render(mode: 'list' | 'rename'): string {
       mode,
       onRun: () => {},
       onRename: async () => ({ ok: true }) as const,
+      onTextCommand: async () => ({ ok: true }) as const,
       onBack: () => {},
     }),
   );
@@ -99,5 +107,17 @@ describe('QuickOptionsContent (14A)', () => {
     expect(html).toContain('Branches, checkpoints and saved runs stay the same');
     expect(html).not.toContain('Platform team');
     expect(html).not.toContain('URL');
+  });
+
+  it('renders reusable nested text steps for Group and Note', () => {
+    const group = render('group');
+    expect(group).toContain('Group selection');
+    expect(group).toContain('data-testid="quick-options-group-input"');
+    expect(group).toContain('Enter a group name');
+
+    const note = render('note');
+    expect(note).toContain('Add note');
+    expect(note).toContain('data-testid="quick-options-note-input"');
+    expect(note).toContain('Enter note text');
   });
 });

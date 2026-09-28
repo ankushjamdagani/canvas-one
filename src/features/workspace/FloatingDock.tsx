@@ -9,8 +9,11 @@ import {
   Maximize2,
   Component as ComponentIcon,
   Cable,
+  StickyNote,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
@@ -35,6 +38,8 @@ export interface FloatingDockProps {
   /** library.open (D38 "Component"): toggles the 16E picker anchored above the dock. */
   onToggleComponentPicker: () => void;
   componentPickerOpen: boolean;
+  /** canvas.add-note through Workspace's command registry executor. */
+  onAddNote: (text: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
   /** True while the session is saving -- placing/connecting is disabled, not silently dropped. */
   disabled?: boolean;
 }
@@ -45,9 +50,9 @@ export interface FloatingDockProps {
  * D38 dock inventory is: undo, redo, Select, Pan, Component, Connect, Note,
  * More, zoom out, zoom %, zoom in, fit. Component (library.open) and Connect
  * (canvas.connect-tool) are wired here per RV-12e now that D39/D42's standard
- * catalog contract has landed. Note and the "More" overflow (16B) stay out --
- * there is still nothing real behind them (absent, not fake). Run/History/the
- * "…" menu live only in the top bar (22A) per D38, not in this dock.
+ * catalog contract has landed. Note routes through canvas.add-note. The
+ * uncontracted "More" overflow stays absent. Run/History live only in the top
+ * bar (22A) per D38, not in this dock.
  */
 export function FloatingDock({
   dragMode,
@@ -62,9 +67,26 @@ export function FloatingDock({
   zoom,
   onToggleComponentPicker,
   componentPickerOpen,
+  onAddNote,
   disabled,
 }: FloatingDockProps) {
   const zoomPercent = Math.round(zoom * 100);
+  const [noteOpen, setNoteOpen] = React.useState(false);
+  const [noteText, setNoteText] = React.useState('');
+  const [noteError, setNoteError] = React.useState<string | null>(null);
+
+  async function submitNote() {
+    const text = noteText.trim();
+    if (!text || disabled) return;
+    setNoteError(null);
+    const outcome = await onAddNote(text);
+    if (outcome.ok) {
+      setNoteOpen(false);
+      setNoteText('');
+    } else {
+      setNoteError(outcome.message);
+    }
+  }
 
   return (
     <TooltipProvider delayDuration={250}>
@@ -73,7 +95,7 @@ export function FloatingDock({
         className={cn(
           'absolute bottom-3 sm:bottom-6 z-dock',
           'left-1/2 -translate-x-1/2',
-          'flex flex-wrap justify-center items-center gap-1 max-w-[calc(100vw-32px)] sm:max-w-none',
+          'flex flex-wrap sm:flex-nowrap sm:w-max justify-center items-center gap-1 max-w-[calc(100vw-32px)] sm:max-w-none',
           'rounded-dock border border-border bg-panel px-1.5 py-1',
           'shadow-floating',
           'select-none pointer-events-auto',
@@ -224,6 +246,70 @@ export function FloatingDock({
             </TooltipTrigger>
             <TooltipContent side="top">Connect tool</TooltipContent>
           </Tooltip>
+
+          <Popover
+            open={noteOpen}
+            onOpenChange={(open) => {
+              setNoteOpen(open);
+              if (!open) setNoteError(null);
+            }}
+          >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    data-testid="dock-note-btn"
+                    type="button"
+                    variant={noteOpen ? 'tint' : 'ghost'}
+                    size="sm"
+                    className={cn(
+                      'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
+                      noteOpen ? 'text-primary' : 'text-body hover:text-foreground',
+                    )}
+                    aria-label="Note"
+                    aria-pressed={noteOpen}
+                    disabled={disabled}
+                  >
+                    <StickyNote className="size-4 stroke-current" />
+                    <span className="hidden sm:inline">Note</span>
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">Add a note</TooltipContent>
+            </Tooltip>
+            <PopoverContent side="top" align="center" className="w-72 p-3">
+              <form
+                data-testid="dock-note-popover"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitNote();
+                }}
+              >
+                <label htmlFor="dock-note-text" className="block text-xs font-medium text-ink mb-1.5">
+                  Note text
+                </label>
+                <Input
+                  id="dock-note-text"
+                  data-testid="dock-note-input"
+                  autoFocus
+                  value={noteText}
+                  placeholder="Write a note…"
+                  disabled={disabled}
+                  onChange={(event) => {
+                    setNoteText(event.target.value);
+                    setNoteError(null);
+                  }}
+                />
+                {noteError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{noteError}</p>}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] text-secondary-text">↵ add · esc cancel</span>
+                  <Button type="submit" size="sm" variant="tint" disabled={!noteText.trim() || disabled}>
+                    Add note
+                  </Button>
+                </div>
+              </form>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />

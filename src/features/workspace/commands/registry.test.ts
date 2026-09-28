@@ -28,6 +28,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     projectId: 'a0000000-0000-4000-8000-000000000001',
     projectTitle: 'Checkout path',
     branchId: DRAFT,
+    activeViewId: 'd0000000-0000-4000-8000-000000000001',
     branches: [
       { id: MAIN, label: 'main', isMain: true, closed: false },
       { id: OTHER, label: 'retry-envelope', isMain: false, closed: true },
@@ -36,6 +37,12 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     storageState: 'ready',
     canUndo: true,
     canRedo: false,
+    selectedElementIds: [],
+    selectedConnectionIds: [],
+    selectedGroupIds: [],
+    selectionWhollyUngrouped: false,
+    activeViewGroupCount: 0,
+    activeViewNoteCount: 0,
     runBlockedReason: null,
     runPhase: 'idle',
     hasRunDisplay: false,
@@ -142,6 +149,47 @@ describe('availability', () => {
     });
     expect(getAvailability('export.png', makeContext(), {})).toEqual({ enabled: true });
   });
+
+  it('enforces selection counts, grouping facts, limits and saving state', () => {
+    expect(getAvailability('selection.group', makeContext(), { label: '' })).toMatchObject({
+      enabled: false,
+      reason: 'Select at least 1 component to group',
+    });
+    expect(
+      getAvailability(
+        'selection.group',
+        makeContext({ selectedElementIds: ['a'], selectionWhollyUngrouped: false }),
+        { label: '' },
+      ),
+    ).toMatchObject({ enabled: false, reason: 'Select only ungrouped components' });
+    expect(
+      getAvailability(
+        'selection.group',
+        makeContext({ selectedElementIds: ['a'], selectionWhollyUngrouped: true }),
+        { label: '' },
+      ),
+    ).toEqual({ enabled: true });
+    expect(
+      getAvailability('selection.ungroup', makeContext({ selectedGroupIds: ['g'] }), { groupIds: ['g'] }),
+    ).toEqual({ enabled: true });
+    expect(getAvailability('selection.align', makeContext({ selectedElementIds: ['a'] }), { edge: 'left' }))
+      .toMatchObject({ enabled: false, reason: 'Select at least 2 components to align' });
+    expect(
+      getAvailability('selection.align', makeContext({ selectedElementIds: ['a', 'b'] }), { edge: 'left' }),
+    ).toEqual({ enabled: true });
+    expect(
+      getAvailability('selection.distribute', makeContext({ selectedElementIds: ['a', 'b'] }), { axis: 'x' }),
+    ).toMatchObject({ enabled: false, reason: 'Select at least 3 components to distribute' });
+    expect(getAvailability('canvas.add-note', makeContext({ activeViewNoteCount: 50 }), { text: '' }))
+      .toMatchObject({ enabled: false, code: 'limit' });
+    expect(
+      getAvailability(
+        'selection.align',
+        makeContext({ selectedElementIds: ['a', 'b'], storageState: 'saving' }),
+        { edge: 'left' },
+      ),
+    ).toMatchObject({ enabled: false, code: 'busy' });
+  });
 });
 
 describe('executeCommand', () => {
@@ -245,6 +293,32 @@ describe('buildQuickOptions', () => {
     )!;
     expect(run.options.map((o) => o.id)).toEqual(['run.start-all']);
     expect(run.options[0].availability).toMatchObject({ enabled: false, reason: 'Add a scenario to run' });
+  });
+
+  it('shows selection actions only for a selection and binds every variant', () => {
+    expect(buildQuickOptions(makeContext()).some((group) => group.group === 'selection')).toBe(false);
+    const selection = buildQuickOptions(
+      makeContext({
+        selectedElementIds: ['a', 'b', 'c'],
+        selectedGroupIds: ['g'],
+        selectionWhollyUngrouped: false,
+      }),
+    ).find((group) => group.group === 'selection')!;
+    expect(selection.options.map((entry) => entry.key)).toEqual([
+      'selection.group',
+      'selection.ungroup',
+      'selection.align:left',
+      'selection.align:center-x',
+      'selection.align:right',
+      'selection.align:top',
+      'selection.align:center-y',
+      'selection.align:bottom',
+      'selection.distribute:x',
+      'selection.distribute:y',
+    ]);
+    expect(selection.options.find((entry) => entry.id === 'selection.ungroup')?.payload).toEqual({
+      groupIds: ['g'],
+    });
   });
 });
 
