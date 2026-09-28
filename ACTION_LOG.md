@@ -1329,3 +1329,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Codex lead implementation and self-review. Review caught a `.test.tsx` suffix excluded by this Vitest configuration; the test was converted to a discovered `.test.ts` before the final gate. No push.
 - **Verification**: 1250 unit tests across 111 files; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5188: 26 passed / 4 skipped; compiled CSS contains all four warning utilities; no raw Tailwind amber classes remain under `src`; `git diff --check` clean.
 - **Limitations**: legacy `--amber` / `--amber-soft` aliases remain for older stylesheet consumers, but resolve to the new semantic warning roles.
+
+### RV-03q command registry and Quick options (14A)
+
+- **Outcome**: `9a285f3` merged on the UI line @ `247ce0d`. Command registry per commands.md §1 for the wired commands (typed closed payloads, availability with reasons, exhaustive handler table); Mod+Z / Mod+Shift+Z / F2 route through it. Quick options dialog (14A) opens from a top-bar button or F2: grouped search over project, branch, run, review, export and edit commands, with disabled reasons and nested project rename. §2 exclusions honoured.
+- **Files**: new `src/features/workspace/commands/registry.ts` (+ test), `QuickOptions.tsx`, `QuickOptionRow.tsx`, `QuickOptionsRename.tsx`, `quickOptions.test.ts`, `tests/studio-quick-options.spec.ts`; `TopBar.tsx` and `Workspace.tsx` wiring.
+- **Platform**: Claude lead, implemented inline (no subagents), self-reviewed. No push.
+- **Verification**: 1274 unit; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5196, two workers, no retries: 27 passed / 4 skipped; `git diff --check` clean; preview screenshots of the list and rename states checked against 14A.
+- **Limitations**: selection.*, canvas tools, dock.* customization, parts and branch create/reopen are not in the registry yet; canvas Delete keeps its own handler. The long CSV disabled reason truncates in the row (full text in the tooltip). A temporary `rv-03q` preview entry was added to the uncommitted `.claude/launch.json`.
+
