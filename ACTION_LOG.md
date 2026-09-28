@@ -1305,3 +1305,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Gemini executor unavailable (quota); fallback Codex executor stopped after recursive delegation; Codex lead implementation. Independent Codex review passed after two fix rounds. Claude CLI review was attempted but unavailable because it was not authenticated. No push.
 - **Verification**: 1240 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5199 with two workers/no retries: 25 passed / 4 skipped; `git diff --check` clean.
 - **Limitations**: existing RV-05c gaps remain (Guard builder, nested assertion paths, boundary payload bindings, step drag-reorder).
+
+### RV-05d scenario authoring completeness
+
+- **Outcome**: `2e2e9d3` merged on the UI line @ `751d4c3`. Logical scenarios can author real scope-crossing replies with recursive Guard/Value conditions and request→response payload bindings; assertion paths cover nested records and explicit list indices; ordered inputs support drag, Arrow keys and move buttons. Required reply choices are never defaulted, and an incomplete edit to an existing guard blocks Apply.
+- **Files**: scenario editor sections plus new `GuardBuilder`, `SchemaPathPicker`, focused render/unit coverage and production workspace e2e.
+- **Platform**: Codex lead implementation and self-review. Gemini preflight returned no usable output; the independent Codex critic hit its usage cap; Claude CLI was not authenticated. Review fixed invalid-guard Apply and adjacent downward drag ordering. No push.
+- **Verification**: 1245 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright with two workers/no retries: 26 passed / 4 skipped; `git diff --check` clean.
+- **Limitations**: no known RV-05c authoring gaps remain.
