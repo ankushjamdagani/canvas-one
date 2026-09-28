@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { ChevronDown, GitBranch, History as HistoryIcon } from 'lucide-react';
+import { ChevronDown, Command as CommandIcon, GitBranch, History as HistoryIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Kbd } from '@/components/ui/kbd';
 import { cn } from '@/lib/utils';
 import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
 import { ProjectMenu } from './ProjectMenu';
@@ -32,15 +33,23 @@ export interface TopBarProps {
   onOpenHistory?: () => void;
   /** Highlights the History button while the History panel is open/focused. */
   historyActive?: boolean;
+  /**
+   * RV-03q (14A): opens Quick options (registry commands.open). The visible
+   * button covers the case where the OS captures F2.
+   */
+  onOpenQuickOptions?: () => void;
+  /** Key hint from the registry (commands.open), e.g. "F2". */
+  quickOptionsShortcut?: string;
+  quickOptionsActive?: boolean;
   transferActions: TransferActions;
 }
 
 /**
  * 22A "nav live" top bar.
  *
- * Per D38/brief: Quick options (no command registry yet) and the "…" menu
- * (nothing real to put in it) are absent, not fake. Undo/redo moved to the
- * canvas dock (16A). History (RV-12h) opens the History panel.
+ * Quick options (RV-03q, 14A) opens the registry-driven command dialog; the
+ * "…" menu (nothing real to put in it) stays absent, not fake. Undo/redo moved
+ * to the canvas dock (16A). History (RV-12h) opens the History panel.
  */
 export function TopBar({
   project,
@@ -55,6 +64,9 @@ export function TopBar({
   runControl,
   onOpenHistory,
   historyActive,
+  onOpenQuickOptions,
+  quickOptionsShortcut,
+  quickOptionsActive,
   transferActions,
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
@@ -227,6 +239,24 @@ export function TopBar({
 
       {/* D38: Run + scenario switcher slot, owned by the runs lane */}
       <div data-slot="run-control" className="flex items-center gap-2 shrink-0">
+        {onOpenQuickOptions && (
+          <Button
+            type="button"
+            data-testid="topbar-quick-options-btn"
+            variant={quickOptionsActive ? 'tint' : 'outline'}
+            size="sm"
+            className="h-7 px-2.5 text-xs font-medium"
+            aria-label="Quick options"
+            aria-keyshortcuts={quickOptionsShortcut}
+            onClick={onOpenQuickOptions}
+          >
+            <CommandIcon className="size-3.5 sm:mr-1" aria-hidden="true" />
+            <span className="hidden sm:inline">Quick options</span>
+            {quickOptionsShortcut && (
+              <Kbd className="hidden lg:inline-flex ml-1.5 h-4 text-[10px]">{quickOptionsShortcut}</Kbd>
+            )}
+          </Button>
+        )}
         {onOpenHistory && (
           <Button
             type="button"
