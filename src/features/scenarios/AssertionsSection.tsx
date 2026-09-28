@@ -9,24 +9,14 @@
  * JSON": a small kind selector (number / text / true / false) plus the matching typed
  * input produces the Json value, instead of a free-text JSON box.
  *
- * Review round: a new `output`/`context` subject's `path` starts unset (`null`), not a
- * silent `[]`. The path picker always offers "Whole value" as an explicit option
- * (mapping to `[]` only once chosen) plus, when the relevant schema is a record shape,
- * one option per top-level field key (pickers.ts's `pathOptionsForSchema`) -- nothing
- * is preselected, and draft.ts's `draftCompletenessIssues` blocks Apply while `path` is
- * still `null`.
+ * A new `output`/`context` subject's `path` starts unset (`null`), not a silent `[]`.
+ * The schema path picker covers nested record fields and explicit list indices;
+ * nothing is preselected, and draft.ts blocks Apply while `path` is still `null`.
  */
 
 import * as React from 'react';
 import { Check, Plus, Trash2, X } from 'lucide-react';
-import type {
-  AssertionSubject,
-  CountSubjectOutcome,
-  CountSubjectScope,
-  Document,
-  Json,
-  MetricSubjectKey,
-} from '../../domain/studio/model';
+import type { AssertionSubject, CountSubjectOutcome, CountSubjectScope, Document, Json, MetricSubjectKey } from '../../domain/studio/model';
 import {
   ASSERTION_OPERATORS,
   ASSERTION_SUBJECT_KINDS,
@@ -38,9 +28,10 @@ import type { CheckResult } from '../../domain/studio/runner/types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
-import { allElementOptions, inboundEndpointOptions, outboundEndpointOptions, pathOptionsForSchema } from './pickers';
+import { allElementOptions, inboundEndpointOptions, outboundEndpointOptions } from './pickers';
 import type { DraftAssertion, DraftAssertionSubject, DraftScenario } from './draftScenario';
 import type { MintId } from './types';
+import { SchemaPathPicker } from './SchemaPathPicker';
 
 export interface AssertionsSectionProps {
   readonly document: Document;
@@ -60,15 +51,17 @@ function expectedKindOf(value: Json): ExpectedKind {
 }
 
 function defaultSubject(): DraftAssertionSubject {
-  return { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' };
+  return {
+    kind: 'count',
+    scope: 'root',
+    elementId: null,
+    outcome: 'succeeded',
+  };
 }
 
 export function AssertionsSection({ document, scenario, onChange, mintId, lastRunChecks }: AssertionsSectionProps) {
   const elements = React.useMemo(() => allElementOptions(document), [document]);
-  const outputPorts = React.useMemo(
-    () => [...inboundEndpointOptions(document), ...outboundEndpointOptions(document)],
-    [document],
-  );
+  const outputPorts = React.useMemo(() => [...inboundEndpointOptions(document), ...outboundEndpointOptions(document)], [document]);
 
   const addAssertion = () => {
     const assertion: DraftAssertion = {
@@ -82,20 +75,24 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
   };
 
   const updateAssertion = (id: string, patch: (a: DraftAssertion) => DraftAssertion) => {
-    onChange((s) => ({ ...s, assertions: s.assertions.map((a) => (a.id === id ? patch(a) : a)) }));
+    onChange((s) => ({
+      ...s,
+      assertions: s.assertions.map((a) => (a.id === id ? patch(a) : a)),
+    }));
   };
 
   const removeAssertion = (id: string) => {
-    onChange((s) => ({ ...s, assertions: s.assertions.filter((a) => a.id !== id) }));
+    onChange((s) => ({
+      ...s,
+      assertions: s.assertions.filter((a) => a.id !== id),
+    }));
   };
 
   return (
     <section data-testid="scenario-section-assertions" className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
-            What should be true
-          </div>
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">What should be true</div>
           <div className="text-[11px] text-secondary-text">The run passes only if every check passes.</div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={addAssertion}>
@@ -119,7 +116,12 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
                 <Input
                   className="h-7 text-xs font-semibold"
                   value={assertion.label}
-                  onChange={(e) => updateAssertion(assertion.id, (a) => ({ ...a, label: e.target.value }))}
+                  onChange={(e) =>
+                    updateAssertion(assertion.id, (a) => ({
+                      ...a,
+                      label: e.target.value,
+                    }))
+                  }
                   aria-label="Check label"
                 />
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -183,7 +185,10 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
                     onChange={(e) => {
                       const kind = e.target.value as ExpectedKind;
                       const expected: Json = kind === 'number' ? 0 : kind === 'true' ? true : kind === 'false' ? false : '';
-                      updateAssertion(assertion.id, (a) => ({ ...a, expected }));
+                      updateAssertion(assertion.id, (a) => ({
+                        ...a,
+                        expected,
+                      }));
                     }}
                     aria-label="Expected value type"
                   >
@@ -203,7 +208,10 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
                       onChange={(e) => {
                         const raw = e.target.value;
                         const expected: Json = expectedKind === 'number' ? (raw === '' ? 0 : Number(raw)) : raw;
-                        updateAssertion(assertion.id, (a) => ({ ...a, expected }));
+                        updateAssertion(assertion.id, (a) => ({
+                          ...a,
+                          expected,
+                        }));
                       }}
                       aria-label="Expected value"
                     />
@@ -224,8 +232,6 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
   );
 }
 
-const UNSET_PATH_VALUE = '__unset__';
-
 function SubjectEditor({
   document,
   elements,
@@ -234,8 +240,15 @@ function SubjectEditor({
   onChange,
 }: {
   readonly document: Document;
-  readonly elements: readonly { readonly elementId: string; readonly label: string }[];
-  readonly outputPorts: readonly { readonly elementId: string; readonly portId: string; readonly label: string }[];
+  readonly elements: readonly {
+    readonly elementId: string;
+    readonly label: string;
+  }[];
+  readonly outputPorts: readonly {
+    readonly elementId: string;
+    readonly portId: string;
+    readonly label: string;
+  }[];
   readonly subject: DraftAssertionSubject;
   readonly onChange: (subject: DraftAssertionSubject) => void;
 }) {
@@ -260,19 +273,31 @@ function SubjectEditor({
                 onChange({
                   kind,
                   port: outputPorts[0]
-                    ? { elementId: outputPorts[0].elementId, portId: outputPorts[0].portId }
+                    ? {
+                        elementId: outputPorts[0].elementId,
+                        portId: outputPorts[0].portId,
+                      }
                     : { elementId: firstElementId, portId: '' },
                   path: null,
                 });
                 break;
               case 'count':
-                onChange({ kind, scope: 'root', elementId: null, outcome: 'succeeded' });
+                onChange({
+                  kind,
+                  scope: 'root',
+                  elementId: null,
+                  outcome: 'succeeded',
+                });
                 break;
               case 'trace-count':
                 onChange({ kind, elementId: firstElementId, code: '' });
                 break;
               case 'metric':
-                onChange({ kind, elementId: firstElementId, key: 'throughput' });
+                onChange({
+                  kind,
+                  elementId: firstElementId,
+                  key: 'throughput',
+                });
                 break;
             }
           }}
@@ -309,7 +334,12 @@ function SubjectEditor({
             Scope
             <NativeSelect
               value={subject.scope}
-              onChange={(e) => onChange({ ...subject, scope: e.target.value as CountSubjectScope })}
+              onChange={(e) =>
+                onChange({
+                  ...subject,
+                  scope: e.target.value as CountSubjectScope,
+                })
+              }
               aria-label="Count scope"
             >
               {COUNT_SUBJECT_SCOPES.map((s) => (
@@ -323,7 +353,12 @@ function SubjectEditor({
             Outcome
             <NativeSelect
               value={subject.outcome}
-              onChange={(e) => onChange({ ...subject, outcome: e.target.value as CountSubjectOutcome })}
+              onChange={(e) =>
+                onChange({
+                  ...subject,
+                  outcome: e.target.value as CountSubjectOutcome,
+                })
+              }
               aria-label="Count outcome"
             >
               {COUNT_SUBJECT_OUTCOMES.map((o) => (
@@ -377,7 +412,11 @@ function SubjectEditor({
               value={`${subject.port.elementId}:${subject.port.portId}`}
               onChange={(e) => {
                 const [elementId, portId] = e.target.value.split(':');
-                onChange({ ...subject, port: { elementId, portId }, path: null });
+                onChange({
+                  ...subject,
+                  port: { elementId, portId },
+                  path: null,
+                });
               }}
               aria-label="Output port"
             >
@@ -388,36 +427,35 @@ function SubjectEditor({
               ))}
             </NativeSelect>
           </label>
-          <PathPicker
+          <SchemaPathPicker
             className="col-span-2"
-            options={pathOptionsForSchema(
-              document,
-              document.elements.find((e) => e.id === subject.port.elementId)?.ports.find((p) => p.id === subject.port.portId)
-                ?.schemaId ?? null,
-            )}
+            document={document}
+            schemaId={
+              document.elements.find((e) => e.id === subject.port.elementId)?.ports.find((p) => p.id === subject.port.portId)?.schemaId ??
+              null
+            }
             path={subject.path}
             onChange={(path) => onChange({ ...subject, path })}
+            label="Which part of the value"
           />
         </>
       )}
 
       {subject.kind === 'context' && (
-        <PathPicker
+        <SchemaPathPicker
           className="col-span-2"
-          options={pathOptionsForSchema(document, contextSchemaId(document, subject.elementId))}
+          document={document}
+          schemaId={contextSchemaId(document, subject.elementId)}
           path={subject.path}
           onChange={(path) => onChange({ ...subject, path })}
+          label="Which part of the value"
         />
       )}
 
       {subject.kind === 'trace-count' && (
         <label className="space-y-1 text-[11px] text-secondary-text">
           Trace code
-          <Input
-            value={subject.code}
-            onChange={(e) => onChange({ ...subject, code: e.target.value })}
-            aria-label="Trace code"
-          />
+          <Input value={subject.code} onChange={(e) => onChange({ ...subject, code: e.target.value })} aria-label="Trace code" />
         </label>
       )}
     </div>
@@ -427,45 +465,4 @@ function SubjectEditor({
 function contextSchemaId(document: Document, elementId: string): string | null {
   const element = document.elements.find((e) => e.id === elementId);
   return element && element.behavior.kind === 'machine' ? element.behavior.contextSchemaId : null;
-}
-
-function PathPicker({
-  options,
-  path,
-  onChange,
-  className,
-}: {
-  readonly options: ReturnType<typeof pathOptionsForSchema>;
-  readonly path: readonly (string | number)[] | null;
-  readonly onChange: (path: readonly (string | number)[]) => void;
-  readonly className?: string;
-}) {
-  const selectedKey = path === null ? UNSET_PATH_VALUE : path.length === 0 ? '' : String(path[0]);
-
-  return (
-    <label className={`space-y-1 text-[11px] text-secondary-text ${className ?? ''}`}>
-      Which part of the value
-      <NativeSelect
-        value={selectedKey}
-        onChange={(e) => {
-          if (e.target.value === UNSET_PATH_VALUE) return;
-          const option = options.find((o) => o.key === e.target.value);
-          if (option) onChange(option.path);
-        }}
-        aria-label="Which part of the value"
-        aria-invalid={path === null}
-      >
-        {path === null && (
-          <NativeSelectOption value={UNSET_PATH_VALUE} disabled>
-            Choose…
-          </NativeSelectOption>
-        )}
-        {options.map((o) => (
-          <NativeSelectOption key={o.key} value={o.key}>
-            {o.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-    </label>
-  );
 }
