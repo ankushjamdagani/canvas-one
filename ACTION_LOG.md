@@ -1346,3 +1346,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: 1317 unit; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5197: 28 passed / 4 skipped (new spec passed first run); `git diff --check` clean; preview checked at 1280px.
 - **Limitations**: selection.duplicate, 16C dock customization (shelf items uncontracted) and parts remain out. The toolbar sits top-right of the canvas rather than above the selection. The task worktree lacked the screen PNGs, so Codex worked from the written brief.
 
+### RV-09a parts copy engine and selection.duplicate
+
+- **Outcome**: `ab23b0b` merged on the UI line @ `dd68c11`. New pure `src/domain/parts/` (capture with dependency closure and preview, typed ID remap, validated one-batch placement) and selection.duplicate in the 16D toolbar and Quick options, with a confirmation dialog listing external wiring, partial groups and notes left behind.
+- **Files**: `src/domain/parts/{types,capture,remap,place}.ts` + tests; registry, SelectionToolbar, QuickOptionRow, Workspace; `tests/studio-duplicate.spec.ts`.
+- **Platform**: `/delegate`, one Codex executor (gpt-5.6-sol, high). Codex hit its usage limit (resets 10:28 PM) while polishing issue messages and exited 1 without a final report; the lead confirmed the partial state was complete and passing. Two launch attempts were blocked earlier by the auto-mode safety classifier outage.
+- **Verification**: 1328 unit; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5199: 29 passed / 4 skipped; `git diff --check` clean; preview check of the confirmation dialog and the +24/+24 copy.
+- **Limitations**: request-class IDs on copied resource calls are remapped (detached copies), so a duplicate doesn't share the original's request class with existing scenarios. Saved-part repository, Library save, part files and Replace part remain.
+
