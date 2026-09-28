@@ -121,6 +121,7 @@ const badgeVariantsList = [
   "accent",
   "branch",
   "risk",
+  "warning",
   "solid",
   "count",
   "default",

@@ -13,6 +13,7 @@ const badgeVariants = cva(
         accent: "border-selected-edge bg-accent text-primary",
         branch: "border-branch-edge bg-branch-tint text-branch",
         risk: "border-risk-edge bg-risk-tint text-risk-text",
+        warning: "border-warning-edge bg-warning-tint text-warning-text",
         solid: "border-transparent bg-foreground text-shell",
         count:
           "rounded-full border-transparent bg-primary px-2 py-0.5 font-sans text-xs font-semibold normal-case tracking-normal text-primary-foreground",
@@ -22,8 +23,7 @@ const badgeVariants = cva(
         secondary: "border-border bg-sunken text-body",
         destructive: "border-risk-edge bg-risk-tint text-risk-text",
         outline: "border-border bg-transparent text-foreground",
-        amber:
-          "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20",
+        amber: "border-warning-edge bg-warning-tint text-warning-text",
       },
     },
     defaultVariants: {

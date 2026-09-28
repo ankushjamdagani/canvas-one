@@ -47,6 +47,10 @@
   --color-risk: var(--risk);
   --color-risk-text: var(--risk-text);
   --color-risk-tint: var(--risk-tint);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-warning-tint: var(--warning-tint);
+  --color-warning-edge: var(--warning-edge);
   --color-control-border: var(--control-border);
   --color-control-border-strong: var(--control-border-strong);
   --color-hover-border: var(--hover-border);
@@ -219,6 +223,10 @@
   --risk: #B4674A;
   --risk-text: #A15B40;
   --risk-tint: #FBF1EA;
+  --warning: #A76108;
+  --warning-text: #80500D;
+  --warning-tint: #FFF3DF;
+  --warning-edge: #DBC9A9;
   --control-border: #DCD7CD;
   --hover-border: #C6C0B4;
   --border-pressed: #B8B1A3;
@@ -248,8 +256,8 @@
   --muted: #677773;
   --teal: #087f84;
   --teal-soft: #e4f3f0;
-  --amber: #a76108;
-  --amber-soft: #fff3df;
+  --amber: var(--warning);
+  --amber-soft: var(--warning-tint);
   --shadow: 0 12px 35px #203d3521;
 }
 
@@ -278,14 +286,14 @@
   --input: #27272a;
   --ring: #d4d4d8;
 }
-.canvas-note { width: 240px; padding: 12px 16px 16px; border: 1px solid #dbc9a9; border-radius: 9px; background: var(--amber-soft); color: var(--ink); }
+.canvas-note { width: 240px; padding: 12px 16px 16px; border: 1px solid var(--warning-edge); border-radius: 9px; background: var(--amber-soft); color: var(--ink); }
 .canvas-note.selected { border-color: var(--teal); }
 .canvas-note-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
-.canvas-note-heading > span { display: flex; gap: 6px; align-items: center; color: #80500d; font-size: 11px; font-weight: 600; }
+.canvas-note-heading > span { display: flex; gap: 6px; align-items: center; color: var(--warning-text); font-size: 11px; font-weight: 600; }
 .canvas-note-heading button { min-width: 44px; min-height: 44px; padding: 0; margin: -8px -10px -4px 0; border: 0; background: transparent; }
 .canvas-note > strong { display: block; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .canvas-note > p { margin: 10px 0; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
-.canvas-note-link { display: block; color: #80500d; font-size: 10px; overflow-wrap: anywhere; }
+.canvas-note-link { display: block; color: var(--warning-text); font-size: 10px; overflow-wrap: anywhere; }
 .canvas-organization-entry .add-canvas-note,
 .note-fields .add-canvas-note {
   width: 100%;
