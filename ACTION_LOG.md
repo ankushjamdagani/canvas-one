@@ -1313,3 +1313,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Codex lead implementation and self-review. Gemini preflight returned no usable output; the independent Codex critic hit its usage cap; Claude CLI was not authenticated. Review fixed invalid-guard Apply and adjacent downward drag ordering. No push.
 - **Verification**: 1245 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright with two workers/no retries: 26 passed / 4 skipped; `git diff --check` clean.
 - **Limitations**: no known RV-05c authoring gaps remain.
+
+### RV-06b Library DEFAULTS copy debt
+
+- **Outcome**: `a388433` merged on the UI line @ `12f3cb9`. Library footer/detail DEFAULTS summaries now use the same human-readable resource field labels, units and option names as the inspector; raw keys such as `queueLimit`, `writeCapacity` and `maxRetries` no longer appear.
+- **Files**: shared resource-config copy, catalog caption formatter/tests and inspector field definitions.
+- **Platform**: Codex lead implementation and self-review. The configured Agy review was blocked because repository egress was not authorized. No push.
+- **Verification**: 1246 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5187: 26 passed / 4 skipped; `git diff --check` clean.
+- **Limitations**: none known in this scoped debt closure.
