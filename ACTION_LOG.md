@@ -1297,3 +1297,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Codex delegate produced the initial patch; Codex lead completed it and performed one review round. No push.
 - **Verification**: 1231 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5198 with two workers/no retries: 24 passed / 4 skipped; `git diff --check` clean.
 - **Limitations**: panel preferences remain in memory; existing RV-05c gaps remain (Guard builder, nested assertion paths, boundary payload bindings, step drag-reorder).
+
+### RV-12j panel preference persistence
+
+- **Outcome**: `1529f49` merged on the UI line @ `e51dc09`. Library/History placement, collapse and widths now reload from the browser-local preference record and save through serialized CAS. Stale cross-tab writes display the durable layout and discard pre-display requests; failures roll back only the latest request. Unrelated preference fields are preserved, and floating panels clamp to the current viewport without changing saved desktop geometry.
+- **Files**: workspace panel-preference store/integration/tests; repository preference read API/tests; PanelHost render clamp/test; production panel reload E2E.
+- **Platform**: Gemini executor unavailable (quota); fallback Codex executor stopped after recursive delegation; Codex lead implementation. Independent Codex review passed after two fix rounds. Claude CLI review was attempted but unavailable because it was not authenticated. No push.
+- **Verification**: 1240 unit tests; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5199 with two workers/no retries: 25 passed / 4 skipped; `git diff --check` clean.
+- **Limitations**: existing RV-05c gaps remain (Guard builder, nested assertion paths, boundary payload bindings, step drag-reorder).
