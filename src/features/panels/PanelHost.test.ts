@@ -97,6 +97,27 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(html).not.toContain('data-slot="panel-rail"');
     });
 
+    it('keeps a saved floating panel inside a smaller current viewport without mutating preferences', () => {
+      const state = createState23C();
+      state.panels.history.floatRect = { x: 1200, y: 700, width: 900, height: 700 };
+      const savedRect = structuredClone(state.panels.history.floatRect);
+      const html = renderToStaticMarkup(
+        React.createElement(PanelHost, {
+          state,
+          viewport: { width: 1200, height: 700 },
+          dispatch: vi.fn(),
+          renderPanel: renderDummyPanel,
+          canvas: dummyCanvas,
+        }),
+      );
+
+      expect(html).toContain('left:284px');
+      expect(html).toContain('top:54px');
+      expect(html).toContain('width:900px');
+      expect(html).toContain('height:630px');
+      expect(state.panels.history.floatRect).toEqual(savedRect);
+    });
+
     it('23D: renders dragging to dock state with drop targets on both edges and ghost panel', () => {
       const state = createState23D();
       const html = renderToStaticMarkup(

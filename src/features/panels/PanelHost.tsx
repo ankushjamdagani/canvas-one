@@ -7,6 +7,7 @@ import { DropTargets } from './DropTargets';
 import { PanelHeader } from './PanelHeader';
 import { computeDropTarget } from './geometry';
 import {
+  clampFloatRect,
   effectiveLayout,
   type PanelId,
   type WorkspacePanelState,
@@ -274,7 +275,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
             panelId={id}
             title={getTitle(id)}
             badge={panelBadges[id]}
-            floatRect={pref.floatRect}
+            floatRect={clampFloatRect(pref.floatRect, currentViewport)}
             viewport={currentViewport}
             isFocused={state.focusedPanel === id}
             dispatch={dispatch}

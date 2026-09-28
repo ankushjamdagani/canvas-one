@@ -11,6 +11,12 @@ import {
   type WorkspacePanelState,
   type WorkspacePanelAction,
 } from './panels';
+import {
+  hydratePanelState,
+  isLatestPanelPreferenceRequest,
+  panelPreferencesFromState,
+  WorkspacePanelPreferenceStore,
+} from './panelPreferences';
 import { PanelHost } from '../panels';
 import {
   HistoryController,
@@ -953,13 +959,8 @@ export function Workspace({
     publishController.getState,
   );
 
-  // Panel placement/collapse/width preferences (commands.md §7): the panel
-  // reducer's own contract defines `save` effects meant for
-  // StudioRepository.savePreferences, but the public StudioRepository
-  // surface (persistence/studio/types.ts) exposes `savePreferences` with no
-  // matching `loadPreferences` to read a prior value back on the next
-  // session -- and persistence/studio isn't in this task's allowed files.
-  // Preferences are kept in memory only for this task; see the final report.
+  // Panel placement/collapse/width preferences (commands.md §7) use their own
+  // repository revision, outside project content and workingRevision.
   const [panelState, setPanelState] = React.useState<WorkspacePanelState>(() =>
     createInitialPanelState(
       typeof window === 'undefined'
@@ -967,16 +968,152 @@ export function Workspace({
         : { viewport: { width: window.innerWidth, height: window.innerHeight } },
     ),
   );
+  const panelStateRef = React.useRef(panelState);
+  const initialPanelPreferencesRef = React.useRef(panelPreferencesFromState(panelState));
+  const durablePanelPreferencesRef = React.useRef(initialPanelPreferencesRef.current);
+  const panelPreferencesLoadedRef = React.useRef(false);
+  const queuedPanelActionsRef = React.useRef<WorkspacePanelAction[]>([]);
+  const panelPreferenceMountedRef = React.useRef(true);
+  const pendingPanelPreferenceSavesRef = React.useRef(0);
+  const latestPanelPreferenceRequestRef = React.useRef(0);
+  const panelPreferenceFailedRef = React.useRef(false);
+  const [panelPreferenceState, setPanelPreferenceState] = React.useState<
+    'loading' | 'ready' | 'saving' | 'failed'
+  >('loading');
+  const [panelPreferenceStore] = React.useState(
+    () => new WorkspacePanelPreferenceStore(repository),
+  );
 
-  const panelDispatch = React.useCallback((action: WorkspacePanelAction) => {
-    setPanelState((prev) => {
-      const { state: next } = panelReducer(prev, action);
-      // 'save' effects have nowhere to persist to (see note above) and
-      // 'announce' effects have no accessible live-region sink wired into
-      // this shell yet -- both are dropped rather than invented.
-      return next;
-    });
-  }, []);
+  const persistPanelState = React.useCallback(
+    (state: WorkspacePanelState) => {
+      const requested = panelPreferencesFromState(state);
+      const requestSequence = ++latestPanelPreferenceRequestRef.current;
+      pendingPanelPreferenceSavesRef.current += 1;
+      panelPreferenceFailedRef.current = false;
+      setPanelPreferenceState('saving');
+      void panelPreferenceStore
+        .save(requested)
+        .then((result) => {
+          if (!panelPreferenceMountedRef.current) return;
+          if (result.status === 'applied') {
+            durablePanelPreferencesRef.current = requested;
+            panelPreferenceFailedRef.current = false;
+          } else if (result.status === 'stale') {
+            const durable = result.preferences ?? initialPanelPreferencesRef.current;
+            durablePanelPreferencesRef.current = durable;
+            const hydrated = hydratePanelState(panelStateRef.current, durable);
+            panelStateRef.current = hydrated;
+            setPanelState(hydrated);
+            panelPreferenceStore.acknowledgeCurrentDisplayed();
+            panelPreferenceFailedRef.current = false;
+          } else if (result.status === 'failed' || result.status === 'invalid-stored-value') {
+            if (
+              !isLatestPanelPreferenceRequest(
+                requestSequence,
+                latestPanelPreferenceRequestRef.current,
+              )
+            ) {
+              return;
+            }
+            const durable =
+              result.status === 'failed' && result.preferences
+                ? result.preferences
+                : durablePanelPreferencesRef.current;
+            const hydrated = hydratePanelState(panelStateRef.current, durable);
+            panelStateRef.current = hydrated;
+            setPanelState(hydrated);
+            panelPreferenceFailedRef.current = true;
+          }
+        })
+        .catch((error: unknown) => {
+          if (!panelPreferenceMountedRef.current) return;
+          console.error('Failed to save panel preferences:', error);
+          if (
+            !isLatestPanelPreferenceRequest(
+              requestSequence,
+              latestPanelPreferenceRequestRef.current,
+            )
+          ) {
+            return;
+          }
+          const hydrated = hydratePanelState(
+            panelStateRef.current,
+            durablePanelPreferencesRef.current,
+          );
+          panelStateRef.current = hydrated;
+          setPanelState(hydrated);
+          panelPreferenceFailedRef.current = true;
+        })
+        .finally(() => {
+          pendingPanelPreferenceSavesRef.current = Math.max(
+            0,
+            pendingPanelPreferenceSavesRef.current - 1,
+          );
+          if (!panelPreferenceMountedRef.current || pendingPanelPreferenceSavesRef.current > 0) {
+            return;
+          }
+          setPanelPreferenceState(panelPreferenceFailedRef.current ? 'failed' : 'ready');
+        });
+    },
+    [panelPreferenceStore],
+  );
+
+  const applyPanelAction = React.useCallback(
+    (action: WorkspacePanelAction) => {
+      const { state: next, effects } = panelReducer(panelStateRef.current, action);
+      panelStateRef.current = next;
+      setPanelState(next);
+      if (effects.some((effect) => effect.type === 'save')) {
+        persistPanelState(next);
+      }
+    },
+    [persistPanelState],
+  );
+
+  const panelDispatch = React.useCallback(
+    (action: WorkspacePanelAction) => {
+      if (!panelPreferencesLoadedRef.current) {
+        queuedPanelActionsRef.current.push(action);
+        return;
+      }
+      applyPanelAction(action);
+    },
+    [applyPanelAction],
+  );
+
+  React.useEffect(() => {
+    panelPreferenceMountedRef.current = true;
+    let cancelled = false;
+    void panelPreferenceStore
+      .load()
+      .then((loaded) => {
+        if (cancelled) return;
+        if (loaded.preferences) {
+          durablePanelPreferencesRef.current = loaded.preferences;
+          const hydrated = hydratePanelState(panelStateRef.current, loaded.preferences);
+          panelStateRef.current = hydrated;
+          setPanelState(hydrated);
+        }
+        setPanelPreferenceState('ready');
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        panelPreferenceFailedRef.current = true;
+        setPanelPreferenceState('failed');
+        console.error('Failed to load panel preferences:', error);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        panelPreferencesLoadedRef.current = true;
+        const queued = queuedPanelActionsRef.current;
+        queuedPanelActionsRef.current = [];
+        queued.forEach(applyPanelAction);
+      });
+    return () => {
+      cancelled = true;
+      panelPreferenceMountedRef.current = false;
+    };
+  }, [applyPanelAction, panelPreferenceStore]);
 
   React.useEffect(() => {
     const syncViewport = () => {
@@ -1168,6 +1305,7 @@ export function Workspace({
   return (
     <div
       data-testid="workspace-root"
+      data-panel-preference-state={panelPreferenceState}
       className="flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none"
     >
       {/* Top Bar (22A nav live) */}
