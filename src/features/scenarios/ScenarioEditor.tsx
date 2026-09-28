@@ -45,6 +45,11 @@ function sectionErrorCount(handle: ScenarioDraftHandle, section: ScenarioSection
 
 export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, onClose = onCancel, mintId, lastRunChecks, focusName = false }: ScenarioEditorProps) {
   const scenario = handle.scenario;
+  const [boundaryGuardsComplete, setBoundaryGuardsComplete] = React.useState(true);
+
+  React.useEffect(() => {
+    setBoundaryGuardsComplete(true);
+  }, [scenario?.id]);
 
   if (!scenario) {
     return (
@@ -61,23 +66,19 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
 
   const modeLabel = scenario.mode === 'timed' ? 'Traffic over time' : 'Step by step';
   const modeSubtitle =
-    scenario.mode === 'timed'
-      ? 'Traffic over time — measures latency, throughput and failures.'
-      : 'Step by step — checks states and outputs; no timing.';
+    scenario.mode === 'timed' ? 'Traffic over time — measures latency, throughput and failures.' : 'Step by step — checks states and outputs; no timing.';
 
   const headerErrors = sectionErrorCount(handle, 'header');
   const runSettingsErrors = sectionErrorCount(handle, 'runSettings');
   const generalErrors = sectionErrorCount(handle, 'general');
 
   const isSaving = handle.status === 'saving';
-  const canApply = !isSaving && (handle.dirty || handle.isNew);
+  const canApply = !isSaving && boundaryGuardsComplete && (handle.dirty || handle.isNew);
 
   return (
     <div data-testid="scenario-editor" className="flex flex-col h-full text-xs">
       <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
-        <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
-          Scenario
-        </span>
+        <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Scenario</span>
         <button type="button" onClick={onClose} aria-label="Close editor" className="text-secondary-text hover:text-foreground">
           <X className="size-4" aria-hidden="true" />
         </button>
@@ -95,16 +96,10 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
             className="font-semibold"
           />
           <div className="flex items-center gap-1.5 text-secondary-text">
-            {scenario.mode === 'timed' ? (
-              <Activity className="size-3.5" aria-hidden="true" />
-            ) : (
-              <GitCommitHorizontal className="size-3.5" aria-hidden="true" />
-            )}
+            {scenario.mode === 'timed' ? <Activity className="size-3.5" aria-hidden="true" /> : <GitCommitHorizontal className="size-3.5" aria-hidden="true" />}
             <span>{modeSubtitle}</span>
           </div>
-          {headerErrors > 0 && (
-            <IssueList issues={handle.issuesBySection.header} />
-          )}
+          {headerErrors > 0 && <IssueList issues={handle.issuesBySection.header} />}
         </section>
 
         {scenario.mode === 'timed' ? (
@@ -119,26 +114,18 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
         {scenario.mode === 'timed' ? (
           <FaultsSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} />
         ) : (
-          <BoundariesSection document={document} scenario={scenario} onChange={onChange} />
+          <BoundariesSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} onGuardValidityChange={setBoundaryGuardsComplete} />
         )}
         {handle.issuesBySection[scenario.mode === 'timed' ? 'faults' : 'boundaries'].length > 0 && (
           <IssueList issues={handle.issuesBySection[scenario.mode === 'timed' ? 'faults' : 'boundaries']} />
         )}
 
-        <AssertionsSection
-          document={document}
-          scenario={scenario}
-          onChange={onChange}
-          mintId={mintId}
-          lastRunChecks={lastRunChecks}
-        />
+        <AssertionsSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} lastRunChecks={lastRunChecks} />
         {handle.issuesBySection.assertions.length > 0 && <IssueList issues={handle.issuesBySection.assertions} />}
 
         {/* Run settings */}
         <section data-testid="scenario-section-run-settings" className="space-y-2">
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
-            Run settings
-          </div>
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Run settings</div>
 
           {scenario.mode === 'timed' ? (
             <div className="space-y-2">
@@ -155,7 +142,11 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                         value === 'horizon'
                           ? { kind: 'horizon', horizonMs: null }
                           : value === 'drain'
-                            ? { kind: 'drain', arrivalHorizonMs: null, deadlineMs: null }
+                            ? {
+                                kind: 'drain',
+                                arrivalHorizonMs: null,
+                                deadlineMs: null,
+                              }
                             : { kind: null },
                     }));
                   }}
@@ -183,7 +174,10 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                       const v = raw === '' ? null : Number(raw);
                       onChange((s) =>
                         s.completion.kind === 'horizon' && (v === null || Number.isFinite(v))
-                          ? { ...s, completion: { kind: 'horizon', horizonMs: v } }
+                          ? {
+                              ...s,
+                              completion: { kind: 'horizon', horizonMs: v },
+                            }
                           : s,
                       );
                     }}
@@ -205,7 +199,13 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                         const v = raw === '' ? null : Number(raw);
                         onChange((s) =>
                           s.completion.kind === 'drain' && (v === null || Number.isFinite(v))
-                            ? { ...s, completion: { ...s.completion, arrivalHorizonMs: v } }
+                            ? {
+                                ...s,
+                                completion: {
+                                  ...s.completion,
+                                  arrivalHorizonMs: v,
+                                },
+                              }
                             : s,
                         );
                       }}
@@ -224,7 +224,10 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                         const v = raw === '' ? null : Number(raw);
                         onChange((s) =>
                           s.completion.kind === 'drain' && (v === null || Number.isFinite(v))
-                            ? { ...s, completion: { ...s.completion, deadlineMs: v } }
+                            ? {
+                                ...s,
+                                completion: { ...s.completion, deadlineMs: v },
+                              }
                             : s,
                         );
                       }}
@@ -252,9 +255,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
             />
           </label>
 
-          {(runSettingsErrors > 0 || generalErrors > 0) && (
-            <IssueList issues={[...handle.issuesBySection.runSettings, ...handle.issuesBySection.general]} />
-          )}
+          {(runSettingsErrors > 0 || generalErrors > 0) && <IssueList issues={[...handle.issuesBySection.runSettings, ...handle.issuesBySection.general]} />}
         </section>
       </div>
 
@@ -263,18 +264,19 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
   );
 }
 
-function IssueList({ issues }: { readonly issues: readonly { readonly message: string; readonly severity: string }[] }) {
+function IssueList({
+  issues,
+}: {
+  readonly issues: readonly {
+    readonly message: string;
+    readonly severity: string;
+  }[];
+}) {
   if (issues.length === 0) return null;
   return (
     <ul className="space-y-0.5">
       {issues.map((issue, i) => (
-        <li
-          key={i}
-          className={cn(
-            'flex items-start gap-1 text-[11px]',
-            issue.severity === 'error' ? 'text-risk-text' : 'text-[#8A6A1F]',
-          )}
-        >
+        <li key={i} className={cn('flex items-start gap-1 text-[11px]', issue.severity === 'error' ? 'text-risk-text' : 'text-[#8A6A1F]')}>
           <AlertCircle className="size-3 mt-0.5 shrink-0" aria-hidden="true" />
           <span>{issue.message}</span>
         </li>
@@ -309,10 +311,7 @@ function ScenarioEditorFooter({
     <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-divider bg-panel">
       <span
         data-testid="scenario-editor-status"
-        className={cn(
-          'text-[11px]',
-          handle.status === 'invalid' || handle.status === 'stale' ? 'text-risk-text' : 'text-[#8A6A1F]',
-        )}
+        className={cn('text-[11px]', handle.status === 'invalid' || handle.status === 'stale' ? 'text-risk-text' : 'text-[#8A6A1F]')}
       >
         {statusText}
       </span>

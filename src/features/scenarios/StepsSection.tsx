@@ -13,7 +13,7 @@
  */
 
 import * as React from 'react';
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from 'lucide-react';
 import type { Document, Input } from '../../domain/studio/model';
 import type { DraftScenario } from './draftScenario';
 import { Button } from '../../components/ui/button';
@@ -33,7 +33,19 @@ function portSchemaId(document: Document, elementId: string, portId: string): st
   return document.elements.find((e) => e.id === elementId)?.ports.find((p) => p.id === portId)?.schemaId ?? null;
 }
 
+export function reorderInputs(inputs: readonly Input[], sourceId: string, targetId: string): readonly Input[] {
+  if (sourceId === targetId) return inputs;
+  const sourceIndex = inputs.findIndex((input) => input.id === sourceId);
+  const targetIndex = inputs.findIndex((input) => input.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return inputs;
+  const reordered = [...inputs];
+  const [moved] = reordered.splice(sourceIndex, 1);
+  reordered.splice(targetIndex, 0, moved);
+  return reordered;
+}
+
 export function StepsSection({ document, scenario, onChange, mintId }: StepsSectionProps) {
+  const [draggedStepId, setDraggedStepId] = React.useState<string | null>(null);
   const entryOptions = React.useMemo(() => inboundEndpointOptions(document), [document]);
 
   const entriesWithFixtures = React.useMemo(
@@ -65,7 +77,10 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
   };
 
   const updateStep = (id: string, patch: (i: Input) => Input) => {
-    onChange((s) => ({ ...s, inputs: s.inputs.map((i) => (i.id === id ? patch(i) : i)) }));
+    onChange((s) => ({
+      ...s,
+      inputs: s.inputs.map((i) => (i.id === id ? patch(i) : i)),
+    }));
   };
 
   const removeStep = (id: string) => {
@@ -83,13 +98,19 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
     });
   };
 
+  const moveStepBefore = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    onChange((s) => {
+      const inputs = reorderInputs(s.inputs, sourceId, targetId);
+      return inputs === s.inputs ? s : { ...s, inputs };
+    });
+  };
+
   return (
     <section data-testid="scenario-section-steps" className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
-            Steps, in order
-          </div>
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Steps, in order</div>
           <div className="text-[11px] text-secondary-text">Each step waits until the previous one settles.</div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={addStep} disabled={entriesWithFixtures.length === 0}>
@@ -99,9 +120,7 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
       </div>
 
       {entriesWithFixtures.length === 0 && (
-        <p className="text-[11px] text-secondary-text">
-          No inbound port has a matching fixture in this document yet.
-        </p>
+        <p className="text-[11px] text-secondary-text">No inbound port has a matching fixture in this document yet.</p>
       )}
 
       <div className="space-y-2">
@@ -115,12 +134,47 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
             <div
               key={input.id}
               data-testid={`step-row-${input.id}`}
-              className="rounded-control border border-control-border bg-panel p-3 space-y-2"
+              className={`rounded-control border bg-panel p-3 space-y-2 ${
+                draggedStepId === input.id ? 'border-primary opacity-70' : 'border-control-border'
+              }`}
+              onDragOver={(event) => {
+                if (draggedStepId !== null && draggedStepId !== input.id) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (draggedStepId !== null) moveStepBefore(draggedStepId, input.id);
+                setDraggedStepId(null);
+              }}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">
-                  {index + 1}. {endpointLabel(document, input.entry)}
-                </span>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    draggable
+                    className="cursor-grab text-secondary-text active:cursor-grabbing"
+                    aria-label={`Drag step ${index + 1}; use arrow keys to reorder`}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', input.id);
+                      setDraggedStepId(input.id);
+                    }}
+                    onDragEnd={() => setDraggedStepId(null)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowUp' && index > 0) {
+                        event.preventDefault();
+                        moveStep(index, -1);
+                      } else if (event.key === 'ArrowDown' && index < scenario.inputs.length - 1) {
+                        event.preventDefault();
+                        moveStep(index, 1);
+                      }
+                    }}
+                  >
+                    <GripVertical className="size-3.5" aria-hidden="true" />
+                  </button>
+                  <span className="truncate text-xs font-semibold text-foreground">
+                    {index + 1}. {endpointLabel(document, input.entry)}
+                  </span>
+                </div>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -180,7 +234,12 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
                   Payload
                   <NativeSelect
                     value={input.fixtureId}
-                    onChange={(e) => updateStep(input.id, (i) => ({ ...i, fixtureId: e.target.value }))}
+                    onChange={(e) =>
+                      updateStep(input.id, (i) => ({
+                        ...i,
+                        fixtureId: e.target.value,
+                      }))
+                    }
                     aria-label="Step payload fixture"
                   >
                     {fixtures.map((f) => (
@@ -210,9 +269,7 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
           );
         })}
 
-        {scenario.inputs.length === 0 && (
-          <p className="text-[11px] text-secondary-text">No steps yet. Add a step to send something in.</p>
-        )}
+        {scenario.inputs.length === 0 && <p className="text-[11px] text-secondary-text">No steps yet. Add a step to send something in.</p>}
       </div>
 
       <StartingStateSection document={document} scenario={scenario} onChange={onChange} />
@@ -223,10 +280,7 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
 type StartingStateSectionProps = Omit<StepsSectionProps, 'mintId'>;
 
 function StartingStateSection({ document, scenario, onChange }: StartingStateSectionProps) {
-  const machineElements = React.useMemo(
-    () => document.elements.filter((e) => e.behavior.kind === 'machine'),
-    [document],
-  );
+  const machineElements = React.useMemo(() => document.elements.filter((e) => e.behavior.kind === 'machine'), [document]);
 
   const addOverride = () => {
     const available = machineElements.find((e) => !scenario.initialContexts.some((ic) => ic.elementId === e.id));
@@ -240,7 +294,10 @@ function StartingStateSection({ document, scenario, onChange }: StartingStateSec
   };
 
   const removeOverride = (elementId: string) => {
-    onChange((s) => ({ ...s, initialContexts: s.initialContexts.filter((ic) => ic.elementId !== elementId) }));
+    onChange((s) => ({
+      ...s,
+      initialContexts: s.initialContexts.filter((ic) => ic.elementId !== elementId),
+    }));
   };
 
   const updateOverride = (elementId: string, fixtureId: string) => {
@@ -255,22 +312,16 @@ function StartingStateSection({ document, scenario, onChange }: StartingStateSec
   return (
     <div className="space-y-1.5 pt-2">
       <div className="flex items-center justify-between">
-        <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
-          Starting state
-        </div>
+        <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Starting state</div>
         <button type="button" className="text-[11px] text-primary hover:text-primary-hover" onClick={addOverride}>
           + Add override
         </button>
       </div>
-      {scenario.initialContexts.length === 0 && (
-        <p className="text-[11px] text-secondary-text">Uses each machine's own initial state.</p>
-      )}
+      {scenario.initialContexts.length === 0 && <p className="text-[11px] text-secondary-text">Uses each machine's own initial state.</p>}
       {scenario.initialContexts.map((ic) => {
         const element = document.elements.find((e) => e.id === ic.elementId);
         const fixtures =
-          element && element.behavior.kind === 'machine'
-            ? fixtureOptionsForSchema(document, element.behavior.contextSchemaId)
-            : [];
+          element && element.behavior.kind === 'machine' ? fixtureOptionsForSchema(document, element.behavior.contextSchemaId) : [];
         return (
           <div key={ic.elementId} className="flex items-center gap-1.5 text-[11px]">
             <span className="text-foreground font-medium min-w-0 truncate">{element?.label ?? 'Deleted element'}</span>
