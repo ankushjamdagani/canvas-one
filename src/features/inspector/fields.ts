@@ -24,6 +24,7 @@ import type {
   ResourceConfig,
 } from '../../domain/studio/model';
 import type { FieldOption, FieldParseResult, FieldSpec } from './types';
+import { RESOURCE_CONFIG_COPY } from '../catalog/resourceConfigCopy';
 
 // ============================================================================
 // Generic field builders
@@ -193,8 +194,8 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
   const common: FieldSpec<Element>[] = [
     numberField<Element>({
       id: 'config.capacity',
-      label: 'Capacity per slot',
-      unit: '/s',
+      label: RESOURCE_CONFIG_COPY.capacity.label,
+      unit: RESOURCE_CONFIG_COPY.capacity.unit,
       min: 1,
       max: 100000,
       get: (el) => (el.behavior.kind === 'resource' ? el.behavior.config.capacity : 0),
@@ -202,7 +203,7 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     }),
     numberField<Element>({
       id: 'config.concurrency',
-      label: 'Concurrency',
+      label: RESOURCE_CONFIG_COPY.concurrency.label,
       min: 1,
       max: 16,
       integer: true,
@@ -211,7 +212,7 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     }),
     numberField<Element>({
       id: 'config.queueLimit',
-      label: 'Queue limit',
+      label: RESOURCE_CONFIG_COPY.queueLimit.label,
       min: 0,
       max: 10000,
       integer: true,
@@ -220,8 +221,8 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     }),
     numberField<Element>({
       id: 'config.failureRate',
-      label: 'Failure rate',
-      unit: '%',
+      label: RESOURCE_CONFIG_COPY.failureRate.label,
+      unit: RESOURCE_CONFIG_COPY.failureRate.unit,
       min: 0,
       max: 100,
       get: (el) => (el.behavior.kind === 'resource' ? el.behavior.config.failureRate : 0),
@@ -229,7 +230,7 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     }),
     numberField<Element>({
       id: 'config.maxRetries',
-      label: 'Max retries',
+      label: RESOURCE_CONFIG_COPY.maxRetries.label,
       min: 0,
       max: 5,
       integer: true,
@@ -238,8 +239,8 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     }),
     numberField<Element>({
       id: 'config.retryDelayMs',
-      label: 'Retry delay',
-      unit: 'ms',
+      label: RESOURCE_CONFIG_COPY.retryDelayMs.label,
+      unit: RESOURCE_CONFIG_COPY.retryDelayMs.unit,
       min: 0,
       max: 10000,
       get: (el) => (el.behavior.kind === 'resource' ? el.behavior.config.retryDelayMs : 0),
@@ -254,8 +255,8 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     variant.push(
       numberField<Element>({
         id: 'config.writeCapacity',
-        label: 'Write capacity',
-        unit: '/s',
+        label: RESOURCE_CONFIG_COPY.writeCapacity.label,
+        unit: RESOURCE_CONFIG_COPY.writeCapacity.unit,
         min: 1,
         max: 100000,
         get: (el) => (el.behavior.kind === 'resource' && el.behavior.config.type === 'storage' ? el.behavior.config.writeCapacity : 0),
@@ -267,11 +268,11 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     variant.push(
       selectField<Element>({
         id: 'config.strategy',
-        label: 'Strategy',
+        label: RESOURCE_CONFIG_COPY.strategy.label,
         options: [
-          { value: 'round-robin', label: 'Round robin' },
-          { value: 'weighted', label: 'Weighted' },
-          { value: 'conditional', label: 'Conditional' },
+          { value: 'round-robin', label: RESOURCE_CONFIG_COPY.strategy.options['round-robin'] },
+          { value: 'weighted', label: RESOURCE_CONFIG_COPY.strategy.options.weighted },
+          { value: 'conditional', label: RESOURCE_CONFIG_COPY.strategy.options.conditional },
         ],
         get: (el) => (el.behavior.kind === 'resource' && el.behavior.config.type === 'router' ? el.behavior.config.strategy : 'round-robin'),
         set: (el, value) =>
@@ -284,18 +285,18 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     variant.push(
       selectField<Element>({
         id: 'config.mode',
-        label: 'Mode',
+        label: RESOURCE_CONFIG_COPY.mode.label,
         options: [
-          { value: 'fixed', label: 'Fixed' },
-          { value: 'lru', label: 'LRU' },
+          { value: 'fixed', label: RESOURCE_CONFIG_COPY.mode.options.fixed },
+          { value: 'lru', label: RESOURCE_CONFIG_COPY.mode.options.lru },
         ],
         get: (el) => (el.behavior.kind === 'resource' && el.behavior.config.type === 'cache' ? el.behavior.config.mode : 'fixed'),
         set: (el, value) => withConfig(el, (c) => (c.type === 'cache' ? { ...c, mode: value as 'fixed' | 'lru' } : c)),
       }),
       numberField<Element>({
         id: 'config.hitRate',
-        label: 'Hit rate',
-        unit: '%',
+        label: RESOURCE_CONFIG_COPY.hitRate.label,
+        unit: RESOURCE_CONFIG_COPY.hitRate.unit,
         min: 0,
         max: 100,
         get: (el) => (el.behavior.kind === 'resource' && el.behavior.config.type === 'cache' ? el.behavior.config.hitRate : 0),
@@ -303,7 +304,7 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
       }),
       numberField<Element>({
         id: 'config.entries',
-        label: 'Entries',
+        label: RESOURCE_CONFIG_COPY.entries.label,
         min: 1,
         max: 100000,
         integer: true,
@@ -312,8 +313,8 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
       }),
       numberField<Element>({
         id: 'config.ttlMs',
-        label: 'TTL',
-        unit: 'ms',
+        label: RESOURCE_CONFIG_COPY.ttlMs.label,
+        unit: RESOURCE_CONFIG_COPY.ttlMs.unit,
         min: 1,
         max: 3600000,
         get: (el) => (el.behavior.kind === 'resource' && el.behavior.config.type === 'cache' ? el.behavior.config.ttlMs : 0),
@@ -324,10 +325,10 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
     variant.push(
       selectField<Element>({
         id: 'config.delivery',
-        label: 'Delivery',
+        label: RESOURCE_CONFIG_COPY.delivery.label,
         options: [
-          { value: 'competing', label: 'Competing' },
-          { value: 'broadcast', label: 'Broadcast' },
+          { value: 'competing', label: RESOURCE_CONFIG_COPY.delivery.options.competing },
+          { value: 'broadcast', label: RESOURCE_CONFIG_COPY.delivery.options.broadcast },
         ],
         get: (el) => (el.behavior.kind === 'resource' && el.behavior.config.type === 'broker' ? el.behavior.config.delivery : 'competing'),
         set: (el, value) =>
