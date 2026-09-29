@@ -1366,12 +1366,24 @@ export function Workspace({
       // through this session's own publish, which already reloads the
       // session onto main -- reaching this branch. Nothing to prepare while
       // sitting on main itself.
-      publishController.reset();
-      setPublishOpen(false);
+      //
+      // 22D: this session's own publish reloads the session onto main while the
+      // controller is still 'publishing' (it turns 'published' right after);
+      // keep the controller and overlay so PublishedNotice shows until the user
+      // dismisses it or navigates to another branch.
+      const publishStatus = publishController.getState().status;
+      if (publishStatus !== 'publishing' && publishStatus !== 'published') {
+        publishController.reset();
+        setPublishOpen(false);
+      }
       setBehindMainBannerDismissed(false);
       return;
     }
-    // Opened/switched to a draft branch.
+    // Opened/switched to a draft branch: a previous publish's notice is over.
+    if (publishController.getState().status === 'published') {
+      publishController.reset();
+      setPublishOpen(false);
+    }
     refreshBehindMainCheck();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionState.projectId, sessionState.branchId, mainBranchId]);
@@ -1840,6 +1852,22 @@ export function Workspace({
   const captureBlockedReason = reasonOf(getPayloadFreeAvailability('part.capture', commandContext));
 
   const [historyNotice, setHistoryNotice] = React.useState<string | null>(null);
+  // D40: main never holds edits. "Start a new draft" / "Edit main directly" on
+  // published main both create a draft through branch.create (the same guarded
+  // path as the branch popover) and switch to it. Main's working content is its
+  // head, so 'head' and 'working' copy the same document; "Edit main directly"
+  // uses 'working' to match the auto-draft-on-first-edit rule.
+  const startDraftFromMain = React.useCallback(
+    async (source: 'working' | 'head') => {
+      setHistoryNotice(null);
+      const taken = new Set(branches.map((branch) => branch.label));
+      let label = 'Draft from main';
+      for (let n = 2; taken.has(label); n += 1) label = `Draft from main ${n}`;
+      const outcome = await runGuardedBranchCommand('branch.create', { label, source });
+      if (outcome.status === 'failed') setHistoryNotice(outcome.message);
+    },
+    [branches, runGuardedBranchCommand],
+  );
   const openPublishFlow = React.useCallback(async () => {
     setHistoryNotice(null);
     const result = await runCommand('history.prepare-publish', {});
@@ -1854,6 +1882,7 @@ export function Workspace({
             <CommitPanel
               hosted
               controller={routedHistoryController}
+              refreshToken={statusRefreshToken}
               onCancel={() => setHistoryView('ladder')}
               onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
               onRunAll={() => void handleRunAll()}
@@ -1881,6 +1910,8 @@ export function Workspace({
                 : null
             }
             onReviewAndResolve={() => void openPublishFlow()}
+            onStartDraft={() => void startDraftFromMain('head')}
+            onEditMain={() => void startDraftFromMain('working')}
             onClose={() => void runCommand('history.close', {})}
           />
         );
@@ -1906,9 +1937,11 @@ export function Workspace({
     [
       historyView,
       routedHistoryController,
+      statusRefreshToken,
       commitBlockedReason,
       publishBlockedReason,
       openPublishFlow,
+      startDraftFromMain,
       partsBlockedReason,
       captureBlockedReason,
       behindMainInfo,
@@ -2180,10 +2213,28 @@ export function Workspace({
           {publishOpen && (
             <div
               data-testid="publish-flow-overlay"
-              className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4"
+              // 22D published is a non-modal notice (the canvas and History stay
+              // usable); every other publish state is the modal review.
+              className={
+                publishControllerState.status === 'published'
+                  ? 'pointer-events-none fixed inset-x-0 top-14 z-modal flex justify-center p-4'
+                  : 'fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4'
+              }
             >
-              <div className="w-full max-w-2xl max-h-[85vh] overflow-hidden">
-                <PublishFlow controller={routedPublishController} onClose={() => setPublishOpen(false)} />
+              <div
+                className={
+                  publishControllerState.status === 'published'
+                    ? 'pointer-events-auto w-full max-w-md rounded-panel border border-border bg-card p-3 shadow-lg'
+                    : 'w-full max-w-2xl max-h-[85vh] overflow-hidden'
+                }
+              >
+                <PublishFlow
+                  controller={routedPublishController}
+                  onClose={() => {
+                    setPublishOpen(false);
+                    if (publishController.getState().status === 'published') publishController.reset();
+                  }}
+                />
               </div>
             </div>
           )}
