@@ -104,16 +104,16 @@ export function TopBar({
     <header
       data-testid="workspace-topbar"
       className={cn(
-        'relative shrink-0 flex items-center justify-between px-3 sm:px-4 h-[52px] min-h-[52px]',
-        'border-b border-border bg-shell select-none z-chrome w-full max-w-full overflow-hidden gap-2',
+        'relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-[52px] min-h-[52px]',
+        'border-b border-border bg-shell select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2',
       )}
       role="banner"
     >
-      <div className="flex items-center gap-2.5 min-w-0 shrink">
+      <div className="flex items-center gap-2.5 min-w-0 max-sm:min-w-min shrink">
         {/* Brand mark */}
         <div
           data-testid="brand"
-          className="flex items-center gap-2 font-semibold text-[14px] tracking-[-0.01em] text-foreground shrink-0 select-none"
+          className="flex items-center gap-2 font-semibold text-[14px] tracking-[-0.01em] text-foreground shrink-0 select-none max-sm:pointer-coarse:hidden"
         >
           <svg
             className="size-5 shrink-0"
@@ -136,7 +136,7 @@ export function TopBar({
         {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] */}
         <div
           data-testid="breadcrumb-chip"
-          className="flex items-center gap-1 sm:gap-1.5 min-w-0 rounded-control border border-control-border bg-panel pl-2 pr-1.5 h-7 overflow-hidden"
+          className="flex items-center gap-1 sm:gap-1.5 min-w-0 max-sm:min-w-min rounded-control border border-control-border bg-panel pl-2 pr-1.5 h-7 pointer-coarse:h-12 overflow-hidden"
         >
           {isRenaming ? (
             <Input
@@ -175,7 +175,7 @@ export function TopBar({
                 // without it, this flex child could shrink past its truncate ellipsis
                 // down to a single character as the branch chip and badge (both
                 // shrink-0) claimed the rest of the breadcrumb's width.
-                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate min-w-[6ch] max-w-[120px] sm:max-w-[220px] shrink"
+                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11"
                 title={project.title}
               >
                 {project.title}
@@ -203,7 +203,7 @@ export function TopBar({
             <button
               type="button"
               data-testid="breadcrumb-branch-btn"
-              className="flex items-center gap-1 min-w-0 shrink-0"
+              className="flex items-center justify-center gap-1 min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11"
               title={branchLabel}
             >
               <GitBranch size={12} className="text-branch shrink-0" />
@@ -248,14 +248,14 @@ export function TopBar({
       </div>
 
       {/* D38: Run + scenario switcher slot, owned by the runs lane */}
-      <div data-slot="run-control" className="flex items-center gap-2 shrink-0">
+      <div data-slot="run-control" className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink">
         {onOpenQuickOptions && (
           <Button
             type="button"
             data-testid="topbar-quick-options-btn"
             variant={quickOptionsActive ? 'tint' : 'outline'}
             size="sm"
-            className="h-7 px-2.5 text-xs font-medium"
+            className="h-7 px-2.5 text-xs font-medium shrink-0 pointer-coarse:min-w-11"
             aria-label="Quick options"
             aria-keyshortcuts={quickOptionsShortcut}
             onClick={onOpenQuickOptions}
@@ -273,11 +273,12 @@ export function TopBar({
             data-testid="topbar-history-btn"
             variant={historyActive ? 'tint' : 'outline'}
             size="sm"
-            className="h-7 px-2.5 text-xs font-medium"
+            className="h-7 px-2.5 text-xs font-medium shrink-0 pointer-coarse:min-w-11"
+            aria-label="History"
             onClick={onOpenHistory}
           >
-            <HistoryIcon className="size-3.5 mr-1" />
-            History
+            <HistoryIcon className="size-3.5 sm:mr-1" aria-hidden="true" />
+            <span className="hidden sm:inline">History</span>
           </Button>
         )}
         {runControl ?? null}

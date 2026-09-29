@@ -699,7 +699,7 @@ export function HistoryLadder({
             }
             onClick={onOpenPublish}
             className={cn(
-              'w-full text-xs text-center py-1 block select-none',
+              'w-full text-xs text-center py-1 pointer-coarse:min-h-11 block select-none',
               isMain || commits.length === 0 || !onOpenPublish || publishBlockedReason
                 ? 'text-muted-foreground cursor-not-allowed opacity-60'
                 : 'text-primary hover:underline font-medium',

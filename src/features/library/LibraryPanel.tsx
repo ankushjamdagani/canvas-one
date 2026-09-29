@@ -257,7 +257,7 @@ export function LibraryPanel({
             }}
             placeholder="Search parts, tags, models..."
             aria-label="Search components"
-            className="w-full h-8 pl-8 pr-18 text-xs rounded-md bg-[var(--color-sunken,#F2EFE9)] border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-[var(--color-secondary-text,#626D68)] focus:border-[var(--color-control-border-strong,#948D80)] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
+            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-18 text-xs rounded-md bg-[var(--color-sunken,#F2EFE9)] border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-[var(--color-secondary-text,#626D68)] focus:border-[var(--color-control-border-strong,#948D80)] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
           />
           {searchQuery.trim().length > 0 && (
             <div className="absolute right-2.5 flex items-center gap-1.5 text-[11px] font-mono text-[var(--color-secondary-text,#626D68)]">
@@ -299,7 +299,7 @@ export function LibraryPanel({
             onClick={() => onViewChange('list')}
             aria-label="List view"
             aria-pressed={view === 'list'}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
               view === 'list'
                 ? 'bg-white text-[var(--color-foreground,#16201D)] shadow-sm'
                 : 'text-[var(--color-secondary-text,#626D68)] hover:text-[var(--color-foreground,#16201D)]'
@@ -313,7 +313,7 @@ export function LibraryPanel({
             onClick={() => onViewChange('grid')}
             aria-label="Grid view"
             aria-pressed={view === 'grid'}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
               view === 'grid'
                 ? 'bg-white text-[var(--color-foreground,#16201D)] shadow-sm'
                 : 'text-[var(--color-secondary-text,#626D68)] hover:text-[var(--color-foreground,#16201D)]'
@@ -535,7 +535,7 @@ export function LibraryPanel({
               type="button"
               onClick={() => onPlace(selectedEntry.entryId)}
               aria-label={`Place ${selectedEntry.label} on canvas`}
-              className="px-3 py-1.5 rounded-md bg-[var(--color-primary,#0B5C54)] hover:bg-[var(--color-primary-hover,#0A4E47)] text-white text-xs font-medium shadow-xs transition-colors flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:ring-offset-1 focus-visible:outline-none flex items-center gap-1.5"
+              className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-[var(--color-primary,#0B5C54)] hover:bg-[var(--color-primary-hover,#0A4E47)] text-white text-xs font-medium shadow-xs transition-colors flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:ring-offset-1 focus-visible:outline-none flex items-center gap-1.5"
             >
               <span>Place on canvas</span>
               <CornerDownLeft className="w-3 h-3 opacity-70" />

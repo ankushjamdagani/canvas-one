@@ -174,12 +174,13 @@ export function ResultsRegion({
       {/* ================================================================== */}
       {/* Compact Resting Footer Strip (7A screen look)                      */}
       {/* ================================================================== */}
-      <div className="h-12 px-4 flex items-center justify-between text-xs overflow-x-auto gap-4">
-        {/* Left Side: Status Dot + Run Badge */}
-        <div className="flex items-center gap-3 shrink-0">
+      <div className="h-12 px-4 flex items-center justify-between text-xs gap-4">
+        {/* Left Side: Status Dot + Run Badge. Only this side scrolls on narrow screens,
+            so the save status and Details stay reachable. */}
+        <div className="flex items-center gap-3 min-w-0 overflow-x-auto">
           <div
             data-testid="results-status-badge"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 shrink-0"
             aria-live="polite"
             aria-atomic="true"
           >
@@ -187,7 +188,7 @@ export function ResultsRegion({
               className={cn('size-2 rounded-full shrink-0', statusBadge.dotClass)}
               aria-hidden="true"
             />
-            <span className="font-semibold text-foreground text-xs">
+            <span className="font-semibold text-foreground text-xs whitespace-nowrap">
               {statusBadge.text}
             </span>
             {terminal && !isMeasured && terminal.reason && (
@@ -208,9 +209,9 @@ export function ResultsRegion({
           {/* Metric Columns: only show when running or measured terminal */}
           {(!terminal || isMeasured) && (
             <>
-              <Separator orientation="vertical" className="h-4 bg-control-border" />
+              <Separator orientation="vertical" className="h-4 shrink-0 bg-control-border" />
 
-              <div className="flex items-center gap-4 text-xs font-mono">
+              <div className="flex items-center gap-4 text-xs font-mono shrink-0">
                 {/* CHECKS */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
                   <span className="text-[10px] text-secondary-text uppercase tracking-wider font-sans">
@@ -290,7 +291,7 @@ export function ResultsRegion({
             type="button"
             data-testid="results-details-toggle"
             onClick={toggleExpanded}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-control border border-control-border bg-background hover:bg-sunken text-xs font-medium cursor-pointer transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1 pointer-coarse:min-h-11 rounded-control border border-control-border bg-background hover:bg-sunken text-xs font-medium cursor-pointer transition-colors"
             aria-expanded={isExpanded}
             aria-controls="results-details-panel"
           >
@@ -310,7 +311,7 @@ export function ResultsRegion({
       {isExpanded && (
         <div
           id="results-details-panel"
-          className="border-t border-divider bg-panel max-h-[380px] overflow-y-auto flex flex-col"
+          className="border-t border-divider bg-panel max-h-[min(380px,40vh)] overflow-y-auto flex flex-col"
         >
           {terminal && !isMeasured ? (
             <div className="p-4 space-y-2">
@@ -334,7 +335,7 @@ export function ResultsRegion({
                     type="button"
                     onClick={() => setActiveTab('general')}
                     className={cn(
-                      'py-2 border-b-2 transition-colors cursor-pointer',
+                      'py-2 pointer-coarse:min-h-11 border-b-2 transition-colors cursor-pointer',
                       activeTab === 'general'
                         ? 'border-primary text-primary font-semibold'
                         : 'border-transparent text-secondary-text hover:text-foreground',
@@ -346,7 +347,7 @@ export function ResultsRegion({
                     type="button"
                     onClick={() => setActiveTab('components')}
                     className={cn(
-                      'py-2 border-b-2 transition-colors cursor-pointer',
+                      'py-2 pointer-coarse:min-h-11 border-b-2 transition-colors cursor-pointer',
                       activeTab === 'components'
                         ? 'border-primary text-primary font-semibold'
                         : 'border-transparent text-secondary-text hover:text-foreground',

@@ -265,7 +265,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8"
+        className="size-8 pointer-coarse:size-11 shrink-0"
         aria-label="Duplicate selection"
         disabled={!duplicateAvailability.enabled}
         title={duplicateAvailability.enabled ? undefined : duplicateAvailability.reason}
@@ -279,7 +279,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 text-destructive hover:text-destructive"
+        className="size-8 pointer-coarse:size-11 shrink-0 text-destructive hover:text-destructive"
         aria-label="Delete selection"
         disabled={!deleteAvailability.enabled}
         title={deleteAvailability.enabled ? undefined : deleteAvailability.reason}

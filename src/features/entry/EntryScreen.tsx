@@ -383,7 +383,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                       value={blankProjectName}
                       onChange={(e) => setBlankProjectName(e.target.value)}
                       maxLength={80}
-                      className="h-9 px-3 text-xs bg-canvas border-control-border flex-1"
+                      className="h-9 pointer-coarse:h-11 px-3 text-xs bg-canvas border-control-border sm:flex-1"
                       disabled={isSubmitting}
                     />
                     <Button

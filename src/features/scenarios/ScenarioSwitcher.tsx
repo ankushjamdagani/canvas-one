@@ -145,7 +145,7 @@ export function ScenarioSwitcher({
   return (
     <div
       data-testid="scenario-switcher"
-      className="inline-flex items-center h-8 rounded-control border border-control-border bg-background shadow-xs overflow-hidden select-none"
+      className="inline-flex items-center h-8 pointer-coarse:h-12 min-w-0 rounded-control border border-control-border bg-background shadow-xs overflow-hidden select-none"
       role="group"
       aria-label="Scenario and simulation run controls"
     >
@@ -155,7 +155,7 @@ export function ScenarioSwitcher({
             type="button"
             data-testid="scenario-switcher-trigger"
             className={cn(
-              'h-full px-2.5 flex items-center gap-1.5 text-xs font-medium transition-colors hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring focus-visible:z-10 cursor-pointer',
+              'h-full min-w-0 pointer-coarse:min-w-11 px-2 sm:px-2.5 flex items-center gap-1.5 text-xs font-medium transition-colors hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring focus-visible:z-10 cursor-pointer',
               !selectedScenario && 'text-secondary-text',
             )}
             aria-label={
@@ -169,18 +169,18 @@ export function ScenarioSwitcher({
                   aria-hidden="true"
                 />
                 {selectedScenario.mode === 'timed' ? (
-                  <Activity className="size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
+                  <Activity className="hidden sm:block size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
                 ) : (
-                  <GitCommitHorizontal className="size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
+                  <GitCommitHorizontal className="hidden sm:block size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
                 )}
-                <span className="font-semibold text-foreground max-w-[130px] truncate text-xs">
+                <span className="font-semibold text-foreground min-w-[3ch] max-w-[130px] truncate text-xs">
                   {selectedScenario.label}
                 </span>
               </>
             ) : (
               <span className="text-secondary-text text-xs">No scenario</span>
             )}
-            <ChevronDown className="size-3 text-secondary-text shrink-0 ml-0.5" aria-hidden="true" />
+            <ChevronDown className="hidden sm:block size-3 text-secondary-text shrink-0 ml-0.5" aria-hidden="true" />
           </button>
         </PopoverTrigger>
 
@@ -364,22 +364,22 @@ export function ScenarioSwitcher({
               type="button"
               data-testid="scenario-pause-btn"
               onClick={onPause}
-              className="h-full px-2.5 flex items-center gap-1 text-xs font-semibold bg-[#8A6A1F] text-white hover:opacity-90 active:opacity-100 transition-colors cursor-pointer"
+              className="h-full shrink-0 px-2.5 pointer-coarse:min-w-11 justify-center flex items-center gap-1 text-xs font-semibold bg-[#8A6A1F] text-white hover:opacity-90 active:opacity-100 transition-colors cursor-pointer"
               aria-label="Pause execution"
             >
               <Pause className="size-3.5 fill-current" aria-hidden="true" />
-              <span>Pause</span>
+              <span className="hidden sm:inline">Pause</span>
             </button>
           ) : (
             <button
               type="button"
               data-testid="scenario-resume-btn"
               onClick={onResume}
-              className="h-full px-2.5 flex items-center gap-1 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed transition-colors cursor-pointer"
+              className="h-full shrink-0 px-2.5 pointer-coarse:min-w-11 justify-center flex items-center gap-1 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed transition-colors cursor-pointer"
               aria-label="Resume execution"
             >
               <Play className="size-3.5 fill-current" aria-hidden="true" />
-              <span>Resume</span>
+              <span className="hidden sm:inline">Resume</span>
             </button>
           )}
 
@@ -389,12 +389,12 @@ export function ScenarioSwitcher({
             type="button"
             data-testid="scenario-reset-btn"
             onClick={onReset}
-            className="h-full px-2 flex items-center gap-1 text-xs font-medium text-body hover:bg-sunken hover:text-foreground transition-colors cursor-pointer"
+            className="h-full shrink-0 px-2 pointer-coarse:min-w-11 justify-center flex items-center gap-1 text-xs font-medium text-body hover:bg-sunken hover:text-foreground transition-colors cursor-pointer"
             aria-label="Reset simulation"
             title="Reset simulation"
           >
             <RotateCcw className="size-3" aria-hidden="true" />
-            <span>Reset</span>
+            <span className="hidden sm:inline">Reset</span>
           </button>
         </div>
       ) : (
@@ -410,14 +410,14 @@ export function ScenarioSwitcher({
                     if (selectedScenario) onRun(selectedScenario.id);
                   }}
                   className={cn(
-                    'h-full px-3 flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer',
+                    'h-full shrink-0 px-2.5 sm:px-3 pointer-coarse:min-w-11 justify-center flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer',
                     'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
                     'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text',
                   )}
                   aria-label="Run scenario simulation"
                 >
                   <Play className="size-3.5 fill-current" aria-hidden="true" />
-                  <span>Run</span>
+                  <span className="hidden sm:inline">Run</span>
                 </button>
               </span>
             </TooltipTrigger>
