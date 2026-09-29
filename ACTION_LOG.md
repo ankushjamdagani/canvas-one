@@ -1536,4 +1536,4 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude lead, no subagents.
 - **Verification**: axe no violations; focus-return probe all ok; 320 px reflow 9/9 states; 1,429 unit tests; `npx tsc -b`; production build; isolated production Playwright 79 passed / 4 skipped (new 320 px test); responsive sweep 45/45; touch audit 0 targets under 44 px; `git diff --check` clean.
 - **Limitations**: no screen-reader session, keyboard-only canvas editing, text-spacing or forced-colours check; 200 % zoom simulated by viewport. Below 390 px History is reached through Quick options only.
-- **Lesson:** axe passing said nothing about the overlay panels: they had no dialog role, so no rule fired. Keyboard probes (open with Enter, close with Escape, read `activeElement`) found five of the six real defects.
+- **Lesson:** axe passing said nothing about the overlay panels: they had no dialog role, so no rule fired. axe found 2 of the 6 defects; keyboard probes (open with Enter, close with Escape, read `activeElement`) and a 320 px reflow probe found the other 4.
