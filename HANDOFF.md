@@ -1,5 +1,12 @@
 # Development handoff
 
+## Project invariants
+
+Preserve in all work touching architecture, simulation, persistence, exports or canvas behavior:
+- **Simulation accounting** — strict separation between configured architecture and observed results; exact per-attempt latency, FIFO queuing, retry draws.
+- **Model/view separation** — canvas metadata must not pollute executable simulation models.
+- **Portable persistence** — versioned export format and read-only archive semantics per the persistence and compatibility policy below.
+
 ## Active initiative — System Studio design revamp (21 September 2026)
 
 **Current (2026-09-29, RV-17 accepted; specs synced):** `specs/` is identical on both branches (UI line synced from this ledger branch; RV-13/RV-15 reports mirrored here). RV-17 ACCEPTED by the user. UI line `claude/rv-01a-tokens` @ `0858b7b` (+ spec sync commit). RV-17 design conformance: legacy colours/aliases replaced by Evergreen tokens, four colour utilities that generated no CSS (`text-ink` in 14 files, `bg-canvas`, `bg-selected-tint`, `border-divider`) now defined, selected edge action green, `.dark` removed (D24), primary button text shell colour (board), warning tokens for Pause/warnings, toast layer token, asChild loading spinner. Verification: 1,416 unit, `npx tsc -b`, build (CSS 115.59 kB / 21.00 kB gzip), production Chromium 77 passed / 4 skipped, before/after journeys structurally identical (colour-only diffs, reviewed), responsive sweep 45/45, touch audit 0 under 44 px. Open: "filled field placeholder" residual needs the Design System board (not on this machine). Nothing is pushed.

@@ -1,0 +1,7 @@
+{
+  "critic": {"cli": "agy", "model": "gemini-3.1-pro-high"},
+  "reviewer": {"cli": "claude", "model": "claude-sonnet-4-6", "timeout_sec": 600},
+  "executor_targets": [
+    {"cli": "agy", "model": "gemini-3.8-flash-low", "args": ["--mode", "accept-edits"]}
+  ]
+}
