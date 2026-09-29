@@ -124,11 +124,11 @@ All operations preserve row provenance. Filtered and duplicate rows are explicit
   - Direct finite call/resource inputs create one user root.
   - An external event/data input is a control invocation. It becomes a user root only if it emits a call; the first call promotes it, and later synchronous calls share that root. Events that emit no call (duplicate submit, timeout) add no request count.
   - Internal response events never create roots.
-  - Each message emission creates its own message root, linked to its parent; resource continuations don't duplicate it.
+  - Each message emission creates its own message root, linked to its parent; resource continuations don't duplicate it. Through a `broadcast` broker, each delivered consumer copy is its own message root linked to the same parent (D36).
   - A user root settles when all its synchronous frames settle. Outcome precedence: expired > failed > rejected > succeeded. Async message outcomes don't change the user root.
   - Malformed external input is an explicit rejected root. Control roots still get trace IDs for causality even when they're excluded from transport counters. The UI labels counts "Requests", not "User interactions".
   - Pure data runs (S03) can pass with zero transport roots.
-- **Readiness rejects:** unbound call responses; effect lists that could reply twice; mismatched schemas; missing pipeline outputs. Path-dependent double settlement and budget-exhausting message cycles fail or end incomplete at runtime.
+- **Readiness rejects:** unbound call responses; effect lists that could reply twice; mismatched schemas; missing pipeline outputs (an output/error port that doesn't resolve; unconnected outputs are legal, D34). Mode coherence of inputs, completion and boundaries is also a readiness rule, never a save blocker (D32). Path-dependent double settlement and budget-exhausting message cycles fail or end incomplete at runtime.
 
 ## 6. Scenarios
 
@@ -141,7 +141,7 @@ All operations preserve row provenance. Filtered and duplicate rows are explicit
 - `Input={id,entry:Endpoint,fixtureId,journeyId:Id,atMs:number|null,payloadBindings:InputBinding[],resource:ResourceMetadata|null}`. Array order is semantic.
 - `InputBinding={targetPath:Path,source:{port:Endpoint,journeyId:Id,occurrence:number,path:Path}}` reads an earlier emission (zero-based occurrence at that port/journey, in scheduler order). The source must already exist; forward or missing references are modeled errors. Bindings replace non-overlapping existing paths in a cloned schema-valid fixture, then the whole payload is validated.
 - `ResourceMetadata={requestClassId:Id,operation:'read'|'write',key:string|null,tags:string[],deadlineMs:number}`, where `deadlineMs` is an absolute modeled time after the input. It is required when a finite input targets a resource directly, and null otherwise.
-- Call/message edges from non-resource behavior into a resource need `ResourceCallMetadata={requestClassId:Id,operation:'read'|'write',key:string|null,tags:string[],deadlineDurationMs:number}` (positive, ≤600000), with the absolute deadline computed at admission. Resource→resource and →non-resource edges carry null (metadata is inherited). Class, key and tags are never inferred from payload property names. `requestClassId` in both metadata types is a scenario-local classification token, not a required reference to a workload class. Workload admission uses its own declared class/operation/key/tags/deadline rules, never finite-input metadata.
+- Call/message edges from non-resource behavior into a resource need `ResourceCallMetadata={requestClassId:Id,operation:'read'|'write',key:string|null,tags:string[],deadlineDurationMs:number}` (positive, ≤600000), with the absolute deadline computed at admission. Resource→resource and →non-resource edges carry null (metadata is inherited). Class, key and tags are never inferred from payload property names. `requestClassId` in both metadata types is a scenario-local classification token, not a required reference to a workload class. `ResourceCallMetadata` also carries `requestClassLabel:string` (1–60 code points, D43): presentation only — excluded from the execution manifest and fingerprint like other labels; the UI reuses an existing (id, label) pair from the document or mints a new id for a new label. Workload admission uses its own declared class/operation/key/tags/deadline rules, never finite-input metadata.
 - Logical mode: `atMs` is null. External inputs are consumed in declared order, one at a time after the causal queue drains; internal events run FIFO. A composition uses the timed scheduler only if every time-dependent effect declares a duration; otherwise it runs logically, with no latency metrics. Timed mode: `atMs` ≥ 0, one shared scheduler. Logical scenarios that reach resources reject readiness.
 - Workloads keep the current `WorkloadDefinition`/RequestClass fields, with profile normalized to `{kind:'steady'}`, interval to `null`, `entryNodeId` replaced by `entry:Endpoint`, and UUID workload/class IDs. They can target only resource entry ports. Pure logical scenarios need empty workloads and faults. Timed scenarios need at least one finite input or enabled workload. Arrivals at the horizon are included (retained kernel behavior).
 
@@ -174,7 +174,7 @@ Logical completion needs all inputs consumed, the queue drained and all frames s
 
 **Refinement.**
 - `Refinement={id,ownerElementId,memberElementIds:Id[],portMappings:[{id,outer:Endpoint,inner:Endpoint}]}` and `Selection={refinementId,mode:'aggregate'|'refined'}`.
-- Same-document only in v1; the candidate snapshot pins content, with no live external fetch. Each member has at most one owner, and recursive ownership is rejected. Every crossing port has exactly one compatible mapping.
+- Same-document only in v1; the candidate snapshot pins content, with no live external fetch. Each member has at most one owner, and recursive ownership is rejected as a storable structural error (D33). Every crossing port has exactly one compatible mapping.
 - Aggregate runs the owner and excludes members; refined runs the members and excludes the owner. Nesting is allowed within expansion budgets.
 - Unselected visible elements stay uncovered. View expand/collapse never changes execution.
 

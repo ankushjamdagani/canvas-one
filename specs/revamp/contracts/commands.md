@@ -88,6 +88,7 @@ The applied result is stored with its receipt. `undo.entryId` resolves only in i
 | history.restore | `{snapshotId, checkpointId, label}` | artifact. Checkpoints current work first, then replaces it in the same transaction. Not on main. |
 | run.start | `{projectId, target:{kind:'branch', branchId, expectedWorkingRevision}\|{kind:'candidate', candidateId}, scenarioId, runId}` | run. Pinned immutable target, clean draft, readiness, fresh start token. |
 | run.pause / resume / cancel / reset | `{runId}` | none. Stale IDs are rejected. Reset waits for cancel, then clears the display; saved evidence stays. |
+| run.start-all | `{projectId, target:{kind:'branch', branchId, expectedWorkingRevision}, scenarioIds, runIds}` | run. D41. Runs every listed scenario one after another in document order against the same pinned target, each with its own start token and saved result. A failing scenario doesn't stop the rest; pause/reset act on the whole sequence. `scenarioIds` must equal the document's scenario set at start. |
 | edit.undo / redo | `{entryId}` | none. Live-session ownership; ordinary reversible authored edits only; blocked while a save is pending. |
 
 **Candidates** are immutable, controller-owned revisions.
@@ -131,6 +132,28 @@ Domain intents (add component, connect, edit settings, scenarios, notes, views, 
 | canvas.select-tool / pan-tool | `Empty` | Transient mode |
 | canvas.zoom-in / zoom-out / fit | `{view:ViewRef}` | Preferences only. Factor 1.2 / its reciprocal, clamped 0.1–2, center-anchored. Fit covers all placements and notes with 32 px padding. |
 
+### Scenarios (D41)
+
+Screens: `screens/scenario_*.png` (approved proposal). A scenario is a named test setup for the one system document ([model-and-runner.md §6](model-and-runner.md#6-scenarios)); the UI calls `mode:'timed'` **Traffic over time** and `mode:'logical'` **Step by step**.
+
+| Action | Payload | Rules |
+|---|---|---|
+| scenario.select | `{projectId, branchId, scenarioId}` | Controller; per-browser preference keyed by project + branch. Missing or deleted selection falls back to the first scenario in document order; none → no selection. Never an authored change. |
+| scenario.new | `{projectId, branchId, expectedWorkingRevision, mode:'timed'\|'logical', from:{kind:'empty'}\|{kind:'copy', scenarioId}, label}` | draft. Opens the scenario editor on an unsaved draft; nothing is stored until Apply, which inserts the scenario as one `model.apply-records` command and one undo. Cancel stores nothing. A copy remaps every nested ID (workloads, classes, inputs, faults, boundaries, assertions, assumptions) with fresh UUIDs; `mode` must equal the copied scenario's mode. |
+| scenario.duplicate | `{projectId, branchId, expectedWorkingRevision, scenarioId}` | = `scenario.new` with `from:{kind:'copy'}`, label "Copy of <label>". |
+| scenario.delete | `{projectId, branchId, expectedWorkingRevision, scenarioId}` | Confirmation first (screen `scenario_delete_scenario`): its saved runs stay; the commit gate then covers the remaining scenarios. One `model.apply-records` remove; one undo. |
+| scenario.edit | `{projectId, branchId, scenarioId, expectedWorkingRevision}` | = `inspector.open` with `DraftTarget{kind:'scenario', ids:[scenarioId]}`. Rename happens in the editor header. |
+
+**Empty drafts invent nothing.** An empty draft starts with no workloads, inputs, faults, boundaries or assertions and scope = every element in the document at draft time. Fields the record requires but the user hasn't given yet (timed `completion`, anything readiness needs) block Apply with linked field errors. The only prefilled values are the contracted budget defaults (storage.md §6), `completion:{kind:'quiescent'}` for step-by-step (the only legal value), and a seed drawn at random when the draft opens, shown and editable.
+
+**Editor sections** (inspector dock, Apply/Cancel per §6): header (name, mode shown, not editable after creation); *What goes in* (timed: workloads with entry, rate and request mix; logical: ordered steps = inputs, with initial states); *What happens during the run* (timed only: faults; logical: replies from outside = boundaries); *What should be true* (assertions; last-run pass/fail marks per check); *Run settings* (timed: horizon or drain, seed; logical: fixed note, no timing). A scenario with no checks shows "Completed · no checks" after a run and never passes (§6 of model-and-runner).
+
+**Switcher** (screen `scenario_switcher`): a segmented control beside Run in the 22A top bar (D38) — scenario name with status dot and mode icon, then the green Run. Its list shows every scenario with status (Passed on this version · Needs a rerun (ran on an earlier version) · Failed n of m checks · Not run yet), "Run all n", the commit line ("Commit needs all n passing · k passing now"), and New / Duplicate / Edit. Per-row menu: Rename, Duplicate, Delete…. No scenario → the control reads "No scenario" and Run is disabled with the reason "Add a scenario to run" (screen `scenario_blank_project`).
+
+**Status** is derived, never stored: *Passed* = a saved qualifying run exists for the scenario's current fingerprint ([run-identity.md §5](run-identity.md#5-eligibility)); *Needs a rerun* = the latest saved run's fingerprint differs from the current one; *Failed* = the latest saved run for the current fingerprint didn't qualify; *Not run yet* = no saved run; *Can't run · n issues* (`not-ready`) = the scenario's current manifest can't be built (validation or readiness issues) — Run is disabled for it with the first issue as the reason, and Run all is disabled while any scenario is not-ready (lead reading, 2026-09-25).
+
+**Commit panel** (screen `scenario_commit_gate`) lists every scenario's status on the exact working version with a Run action per non-passing scenario and "Run the n remaining"; Commit stays disabled until all pass (D27/D28).
+
 ## 5. Inspector, panels, parts and exports
 
 `PanelId = 'library' | 'history'`. The inspector and results are separate contextual regions, never floating panels. `DraftTarget={kind:'element'|'connection'|'scenario'|'workload'|'selection', ids}`.
@@ -157,7 +180,7 @@ Domain intents (add component, connect, edit settings, scenarios, notes, views, 
 | export.csv | `{projectId, runId}` | download. Saved terminal run only. |
 
 - **Part revisions** must equal `expectedLatestRevision + 1` (or 1 when null). A mismatch is `invalid` at `payload.revision`, and concurrent edits return `stale`.
-- **Dock inventory** (`DockCommandId`), in order: canvas.select-tool, canvas.pan-tool, library.open, canvas.add-note, selection.group, edit.undo, edit.redo, canvas.zoom-out, canvas.zoom-in, canvas.fit, history.open, results.open, run.start, run.pause, run.resume, run.reset.
+- **Dock inventory** (`DockCommandId`, D38 / screen 16A), in order: edit.undo, edit.redo, canvas.select-tool, canvas.pan-tool, library.open ("Component"), canvas.connect-tool ("Connect"; enabled once connection defaults are contracted, D39), canvas.add-note, selection.group, canvas.zoom-out, canvas.zoom-in, canvas.fit. The zoom level shows between zoom out and in. Run, scenario choice and History are top-bar commands (22A, D41), never dock items.
   - The first ten are visible by default, and visible + hidden partition the list.
   - Parameterized actions take the current context or open their form; payloads are never stored in preferences.
   - Rearranging uses move-left/right buttons or the keyboard. On narrow widths, select/pan/Library stay and the rest go into an accessible overflow menu. Hidden actions remain in the command dialog.
