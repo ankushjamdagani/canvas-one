@@ -1419,3 +1419,8 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude lead, no subagents. Adapter probes, responsive sweep and touch-target scripts in the session scratchpad (not committed; probe test deleted).
 - **Verification**: 1,415 unit tests; `npx tsc -b`; production build; isolated production Playwright (port 5213, 2 workers, no retries) 73 passed / 4 skipped; responsive sweep 40/40 states across five viewports; iPhone 13 touch audit 0 visible controls under 44 px (excluding a 1×1 hidden file input); `git diff --check` clean.
 - **Limitations**: sign-off and three decisions remain with the user (16E picker, `entryPorts` ordering, design debt). Router + bridge execution stays unimplemented (now rejected by readiness). Not verified: design-board visual fidelity, browser text-only zoom (approximated by page zoom), screen readers, AI-seam/local-adapter matrix rows beyond unit suites. Pre-existing `artifacts/*.png` changes untouched. Nothing pushed.
+
+### RV-13 accepted
+
+- **Outcome**: user accepted RV-13 release acceptance on 2026-09-29 at UI line `cfcda15`. Ledger and HANDOFF updated. Push/deploy not requested and not done.
+- **Open**: 16E LibraryPicker mounting, RV-02 `entryPorts` set vs ordered, design-debt ownership.
