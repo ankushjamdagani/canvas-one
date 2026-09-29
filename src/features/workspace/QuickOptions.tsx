@@ -64,7 +64,7 @@ export function QuickOptionsContent({
   // Disabled rows stay visible with their reason; cmdk skips them for
   // keyboard selection, so the first enabled row starts highlighted.
   return (
-    <CommandPrimitive label="Quick options" loop className="flex flex-col">
+    <CommandPrimitive label="Quick options" loop className="flex flex-col min-w-0">
       <div className="flex items-center gap-3 px-4 h-14 border-b border-border bg-shell">
         <CommandIcon className="size-4 text-secondary-text shrink-0" aria-hidden="true" />
         <CommandPrimitive.Input
@@ -129,6 +129,15 @@ export interface QuickOptionsDialogProps extends Omit<QuickOptionsContentProps, 
 
 export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: QuickOptionsDialogProps) {
   const [mode, setMode] = React.useState<'list' | 'rename' | TextStepKind>('list');
+  // The dialog is controlled with no trigger (⌘K or the top-bar button), so Radix has
+  // nothing to return focus to. Remember what had focus when it opened, during render,
+  // because the dialog's own autofocus runs before this component's effects.
+  const returnFocusTo = React.useRef<HTMLElement | null>(null);
+  const wasOpen = React.useRef(false);
+  if (open && !wasOpen.current && typeof document !== 'undefined') {
+    returnFocusTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  wasOpen.current = open;
 
   React.useEffect(() => {
     if (open) setMode('list');
@@ -139,6 +148,16 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
       <DialogContent
         data-testid="quick-options"
         hideClose
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          // A command may have moved focus on purpose (a panel opening); keep that.
+          const active = document.activeElement;
+          if (active && active !== document.body) return;
+          const target = returnFocusTo.current?.isConnected
+            ? returnFocusTo.current
+            : document.querySelector<HTMLElement>('[data-testid="topbar-quick-options-btn"]');
+          target?.focus();
+        }}
         onEscapeKeyDown={(e) => {
           // Escape inside a nested text step goes back to the list first.
           if (mode !== 'list') {

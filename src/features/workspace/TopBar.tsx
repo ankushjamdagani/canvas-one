@@ -175,7 +175,7 @@ export function TopBar({
                 // without it, this flex child could shrink past its truncate ellipsis
                 // down to a single character as the branch chip and badge (both
                 // shrink-0) claimed the rest of the breadcrumb's width.
-                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11"
+                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11"
                 title={project.title}
               >
                 {project.title}
@@ -273,7 +273,9 @@ export function TopBar({
             data-testid="topbar-history-btn"
             variant={historyActive ? 'tint' : 'outline'}
             size="sm"
-            className="h-7 px-2.5 text-xs font-medium shrink-0 pointer-coarse:min-w-11"
+            // Below 390 px the bar can't hold every control at 320 px (WCAG 1.4.10), so
+            // History steps back to Quick options, where it is always listed.
+            className="h-7 px-2.5 text-xs font-medium shrink-0 pointer-coarse:min-w-11 max-[389px]:hidden"
             aria-label="History"
             onClick={onOpenHistory}
           >

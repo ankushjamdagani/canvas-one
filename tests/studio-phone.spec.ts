@@ -84,3 +84,30 @@ test('390×844 touch: the 16E picker fits and places the selected entry with its
   await expect(picker).toHaveCount(0);
   await expect(page.locator('.component-node')).toHaveCount(1);
 });
+
+test('320×640 touch (WCAG 1.4.10 reflow): the top bar fits and History opens from Quick options as a modal that Escape closes', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto('/');
+  await page.getByTestId('create-example-s05').click();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  for (const id of ['breadcrumb-project-btn', 'breadcrumb-branch-btn', 'topbar-quick-options-btn', 'scenario-switcher-trigger', 'scenario-run-btn']) {
+    const box = (await page.getByTestId(id).boundingBox())!;
+    expect(box.x, `${id} left edge`).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, `${id} right edge`).toBeLessThanOrEqual(320);
+  }
+  // History's top-bar button steps back below 390 px; Quick options still lists it.
+  await expect(page.getByTestId('topbar-history-btn')).toBeHidden();
+  await page.getByTestId('topbar-quick-options-btn').tap();
+  await page.getByTestId('quick-options-input').fill('history');
+  await page.getByRole('option', { name: /Open history/ }).first().tap();
+
+  const dialog = page.getByRole('dialog', { name: 'History' });
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('[data-slot="panel-modal-overlay"] [data-slot="panel-header"]')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('topbar-quick-options-btn')).toBeFocused();
+});

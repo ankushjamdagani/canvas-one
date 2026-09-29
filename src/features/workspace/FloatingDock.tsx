@@ -260,6 +260,14 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
         <PopoverContent side="top" align="center" sideOffset={8}
           className="w-[min(640px,calc(100vw-24px))] p-0 border-0 bg-transparent shadow-none"
           data-testid="dock-library-picker-popover"
+          onCloseAutoFocus={(e) => {
+            // Anchored, not triggered: return focus to the dock's Component button
+            // unless placing or opening the full library moved it somewhere on purpose.
+            e.preventDefault();
+            const active = document.activeElement;
+            if (active && active !== document.body) return;
+            document.querySelector<HTMLElement>('[data-testid="dock-component-btn"]')?.focus();
+          }}
           onDragEnd={() => setPickerOpen(false)}>
           <LibraryPicker
             onPlace={(entryId) => { setPickerOpen(false); onPlaceEntry(entryId); }}

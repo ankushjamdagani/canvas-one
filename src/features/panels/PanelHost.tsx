@@ -1,4 +1,5 @@
 import * as React from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { DockColumn, type DockedPanelItem } from './DockColumn';
 import { FloatingPanel } from './FloatingPanel';
@@ -38,6 +39,12 @@ export interface PanelHostProps {
   activeDropTargetPreview?: 'left' | 'right' | null;
   activePeekPanelPreview?: PanelId | null;
 }
+
+/** Where focus goes when an overlay panel closes: the control that opens that panel. */
+const OVERLAY_RETURN_FOCUS: Record<PanelId, string> = {
+  history: 'topbar-history-btn',
+  library: 'dock-component-btn',
+};
 
 const DEFAULT_TITLES: Record<PanelId, string> = {
   history: 'History',
@@ -294,16 +301,40 @@ export const PanelHost: React.FC<PanelHostProps> = ({
       })}
 
       {/* 7. Modal Overlay Panels for Mobile / Narrow screens (< 768px / 768-1199px) */}
+      {/* A modal dialog: focus is trapped inside, Escape and a press on the backdrop close
+          it, and focus returns to the control that opens the panel (design.md overlays). */}
       {overlayPanelIds.map((id) => (
-        <div
+        <DialogPrimitive.Root
           key={`overlay-${id}`}
+          open
+          onOpenChange={(open) => { if (!open) dispatch({ type: 'CLOSE', panel: id }); }}
+        >
+        <div
           data-slot="panel-modal-overlay"
           data-panel-id={id}
           className="fixed inset-0 z-modal flex flex-col justify-end bg-black/40 backdrop-blur-xs animate-in fade-in-0 sm:justify-center sm:items-center"
         >
-          <div
-            className="w-full sm:w-[480px] max-h-[85vh] bg-panel border border-border rounded-t-2xl sm:rounded-2xl shadow-floating flex flex-col overflow-hidden"
+          <DialogPrimitive.Content
+            aria-describedby={undefined}
+            onOpenAutoFocus={(e) => {
+              // Land on the panel header (its landmark), not the first control inside.
+              e.preventDefault();
+              document.querySelector<HTMLElement>(`[data-slot="panel-modal-overlay"][data-panel-id="${id}"] [data-slot="panel-header"]`)?.focus();
+            }}
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
+              const active = document.activeElement;
+              if (active && active !== document.body) return;
+              const opener = document.querySelector<HTMLElement>(`[data-testid="${OVERLAY_RETURN_FOCUS[id]}"]`);
+              // History's top-bar button is hidden on the narrowest phones; Quick options opens it there.
+              const target = opener?.getClientRects().length
+                ? opener
+                : document.querySelector<HTMLElement>('[data-testid="topbar-quick-options-btn"]');
+              target?.focus();
+            }}
+            className="w-full sm:w-[480px] max-h-[85vh] bg-panel border border-border rounded-t-2xl sm:rounded-2xl shadow-floating flex flex-col overflow-hidden outline-none"
           >
+            <DialogPrimitive.Title className="sr-only">{getTitle(id)}</DialogPrimitive.Title>
             <PanelHeader
               panelId={id}
               title={getTitle(id)}
@@ -316,8 +347,9 @@ export const PanelHost: React.FC<PanelHostProps> = ({
             <div className="flex-1 overflow-y-auto p-4 text-ui">
               {renderPanel(id)}
             </div>
-          </div>
+          </DialogPrimitive.Content>
         </div>
+        </DialogPrimitive.Root>
       ))}
 
       {/* 8. Dragging Ghost Preview (23D) */}

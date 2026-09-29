@@ -1248,6 +1248,19 @@ export function Workspace({
       if (effects.some((effect) => effect.type === 'save')) {
         persistPanelState(next);
       }
+      // commands.md: opening a panel "expands and focuses" it. Only OPEN/EXPAND move focus,
+      // and never away from something already inside that panel (clicks there emit FOCUS too).
+      if (action.type === 'OPEN' || action.type === 'EXPAND') {
+        for (const effect of effects) {
+          if (effect.type !== 'focus') continue;
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            const header = window.document.querySelector<HTMLElement>(`[data-slot="panel-header"][data-panel-id="${effect.target}"]`);
+            const region = header?.parentElement;
+            if (!header || (region && region.contains(window.document.activeElement))) return;
+            header.focus();
+          }));
+        }
+      }
     },
     [persistPanelState],
   );

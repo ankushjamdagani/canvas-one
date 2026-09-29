@@ -177,7 +177,7 @@ export function ResultsRegion({
       <div className="h-12 px-4 flex items-center justify-between text-xs gap-4">
         {/* Left Side: Status Dot + Run Badge. Only this side scrolls on narrow screens,
             so the save status and Details stay reachable. */}
-        <div className="flex items-center gap-3 min-w-0 overflow-x-auto">
+        <div className="flex items-center gap-3 min-w-0 overflow-x-auto" tabIndex={0} role="region" aria-label="Run summary">
           <div
             data-testid="results-status-badge"
             className="flex items-center gap-2 shrink-0"
@@ -311,6 +311,9 @@ export function ResultsRegion({
       {isExpanded && (
         <div
           id="results-details-panel"
+          tabIndex={0}
+          role="region"
+          aria-label="Run details"
           className="border-t border-divider bg-panel max-h-[min(380px,40vh)] overflow-y-auto flex flex-col"
         >
           {terminal && !isMeasured ? (
@@ -451,7 +454,7 @@ export function ResultsRegion({
                         <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
                           CHECKS {isMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
                         </span>
-                        <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                        <div className="space-y-1.5 max-h-44 overflow-y-auto" tabIndex={0} role="region" aria-label="Checks">
                           {isMeasured &&
                             terminal?.checks.map((check) => (
                               <div
@@ -498,7 +501,7 @@ export function ResultsRegion({
                       <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold mb-2">
                         EVENT LOG ({events.length})
                       </span>
-                      <div className="flex-1 overflow-y-auto space-y-1 text-xs font-mono">
+                      <div className="flex-1 overflow-y-auto space-y-1 text-xs font-mono" tabIndex={0} role="region" aria-label="Event log">
                         {events.map((evt) => {
                           const timeStr =
                             evt.atMs != null

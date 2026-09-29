@@ -217,21 +217,18 @@ export function ScenarioSwitcher({
                   key={s.id}
                   data-testid={`scenario-row-${s.id}`}
                   className={cn(
-                    'group flex items-start justify-between rounded-control p-2 transition-colors cursor-pointer border',
+                    'group flex items-start justify-between rounded-control transition-colors border',
                     isSelected ? 'bg-selected-tint/40 border-selected-edge' : 'border-transparent hover:bg-sunken',
                   )}
-                  onClick={() => onSelect(s.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onSelect(s.id);
-                    }
-                  }}
-                  aria-pressed={isSelected}
                 >
-                  <div className="flex items-start gap-2 min-w-0">
+                  {/* The select action is its own button beside the row menu; nesting the menu
+                      inside a clickable row made two interactive controls share one target. */}
+                  <button
+                    type="button"
+                    className="flex flex-1 items-start gap-2 min-w-0 p-2 text-left rounded-control"
+                    onClick={() => onSelect(s.id)}
+                    aria-pressed={isSelected}
+                  >
                     <span className={cn('size-2 rounded-full shrink-0 mt-1', statusToken.dotClass)} aria-hidden="true" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -249,16 +246,16 @@ export function ScenarioSwitcher({
                         {statusToken.label}
                       </div>
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="flex items-center gap-1 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1 shrink-0 p-2 pl-0">
                     {isSelected && <Check className="size-4 text-primary shrink-0 mr-1" aria-hidden="true" />}
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="size-6 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors"
+                          className="size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors"
                           aria-label={`Actions for scenario ${s.label}`}
                         >
                           <MoreHorizontal className="size-3.5" />

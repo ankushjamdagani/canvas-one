@@ -123,7 +123,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
   return (
     <div
       data-testid="selection-toolbar"
-      className="absolute top-3 right-3 z-10 flex items-center gap-1 px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
+      className="absolute top-3 right-3 z-10 flex flex-wrap justify-end items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
     >
       <span
         data-testid="selection-count"

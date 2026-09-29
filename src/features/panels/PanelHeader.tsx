@@ -163,8 +163,10 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
     <div
       data-slot="panel-header"
       data-panel-id={panelId}
+      tabIndex={-1}
+      aria-label={`${title} panel`}
       className={cn(
-        'group/header relative flex items-center justify-between px-3 py-2 border-b border-border bg-panel text-foreground select-none shrink-0',
+        'group/header relative flex items-center justify-between px-3 py-2 border-b border-border bg-panel text-foreground select-none shrink-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
         onDragStart && 'cursor-grab active:cursor-grabbing',
         className
       )}
