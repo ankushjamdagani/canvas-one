@@ -1448,3 +1448,9 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude lead, no subagents.
 - **Verification**: UI line 1,416 unit tests and production build pass after the sync (specs feed fixture/contract tests).
 - **Limitations**: the two branches will drift again unless spec edits land on one branch and are mirrored; `HANDOFF.md`/`ACTION_LOG.md` stay on this branch only by convention. Nothing pushed.
+
+### Branch and worktree cleanup
+
+- **Outcome**: removed 26 worktrees (17 `.claude/worktrees`, 9 `~/.codex/worktrees`) and deleted 69 local branches. Each was an ancestor of `claude/rv-01a-tokens` or had every commit already there in rebased form (`git cherry`, and `git range-diff` for the two superseded Codex drafts, which differed only in context or a code comment). Ten worktrees held only regenerable `artifacts/rv-12e/` e2e screenshots and were force-removed. Remaining: `codex/canvas-first-workspace` (ledger), `claude/rv-01a-tokens` (UI line, worktree `.claude/worktrees/rv-01a`), `master`, and two branches with unique commits kept for a user decision: `claude/learning-loop` (LESSONS.md learning loop) and `claude/nifty-bardeen-7e9c50` (/delegate hardening, with its worktree).
+- **Recovery**: `.git/branch-backup-2026-09-29.txt` and `.git/worktree-backup-2026-09-29.txt` list every former branch head (`git branch <name> <sha>` restores one).
+- **Platform/subagents**: Claude lead. No remote exists; nothing pushed.
