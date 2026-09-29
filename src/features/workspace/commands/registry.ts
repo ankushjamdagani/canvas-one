@@ -63,11 +63,19 @@ export const COMMAND_IDS = [
   'selection.align',
   'selection.distribute',
   'canvas.add-note',
+  'canvas.expand',
+  'canvas.collapse',
 ] as const;
 
 export type CommandId = (typeof COMMAND_IDS)[number];
 
 type Empty = Record<string, never>;
+
+/** Presentation only (commands.md §4): flips Placement.expanded / Group.collapsed. */
+export interface CanvasExpansionPayload {
+  readonly viewId: Id;
+  readonly target: { readonly kind: 'placement' | 'group'; readonly id: Id };
+}
 
 /** Closed payload per command (commands.md §2: never JSON patches). */
 export interface CommandPayloads {
@@ -108,6 +116,8 @@ export interface CommandPayloads {
   };
   'selection.distribute': { readonly axis: 'x' | 'y' };
   'canvas.add-note': { readonly text: string };
+  'canvas.expand': CanvasExpansionPayload;
+  'canvas.collapse': CanvasExpansionPayload;
 }
 
 export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
@@ -212,6 +222,10 @@ export interface CommandContext {
   readonly selectionWhollyUngrouped: boolean;
   readonly activeViewGroupCount: number;
   readonly activeViewNoteCount: number;
+  /** Active view's expanded flag per placement id / group id (groups: not collapsed). */
+  readonly expansionState?: Readonly<Record<Id, boolean>>;
+  /** Placement ids of the current element selection (for the single-placement toggle). */
+  readonly selectedPlacementIds?: readonly Id[];
   /** Session-level reason Run is blocked (dirty draft, busy, reload needed). */
   readonly runBlockedReason: string | null;
   readonly runPhase: CommandRunPhase;
@@ -268,6 +282,20 @@ function exportAvailability(kind: TransferExportKind) {
   return (ctx: CommandContext): Availability => {
     const reason = ctx.exportDisabledReasons[kind];
     return reason ? disabled('export-unavailable', reason) : ENABLED;
+  };
+}
+
+function expansionAvailability(mode: 'expand' | 'collapse') {
+  return (ctx: CommandContext, payload: CanvasExpansionPayload): Availability => {
+    const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+    if (blocked) return blocked;
+    const expanded = payload.viewId === ctx.activeViewId ? ctx.expansionState?.[payload.target.id] : undefined;
+    if (expanded === undefined) {
+      return disabled('invalid-selection', 'Select one group or component to expand or collapse');
+    }
+    if (mode === 'expand' && expanded) return disabled('current', 'Already expanded');
+    if (mode === 'collapse' && !expanded) return disabled('current', 'Already collapsed');
+    return ENABLED;
   };
 }
 
@@ -644,6 +672,24 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
         ? disabled('limit', 'This view already has 50 notes')
         : ENABLED;
     },
+  },
+  'canvas.expand': {
+    id: 'canvas.expand',
+    label: 'Expand',
+    keywords: ['expand', 'canvas', 'group', 'component'],
+    group: 'edit',
+    iconKey: 'group',
+    shortcut: null,
+    availability: expansionAvailability('expand'),
+  },
+  'canvas.collapse': {
+    id: 'canvas.collapse',
+    label: 'Collapse',
+    keywords: ['collapse', 'canvas', 'group', 'component'],
+    group: 'edit',
+    iconKey: 'group',
+    shortcut: null,
+    availability: expansionAvailability('collapse'),
   },
 };
 
