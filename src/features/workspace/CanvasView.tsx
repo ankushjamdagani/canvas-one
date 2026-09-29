@@ -217,13 +217,26 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     () =>
       nodes.map((n) => {
         const data = n.data;
+        if (data.kind === 'group') {
+          const viewId = projection.activeView?.id;
+          if (!viewId) return n;
+          const payload = { viewId, target: { kind: 'group', id: data.group.id } } as const;
+          return {
+            ...n,
+            data: {
+              ...data,
+              onToggleCollapsed: () =>
+                void onExecuteCommand(data.collapsed ? 'canvas.expand' : 'canvas.collapse', payload),
+            },
+          };
+        }
         if (data.kind !== 'element') return n;
         const selected = Boolean(selectedElementIds?.has(data.element.id));
         const connectable = dragMode !== 'pan';
         if (selected === n.selected && connectable === data.connectable) return n;
         return { ...n, selected, data: { ...data, connectable } };
       }),
-    [nodes, selectedElementIds, dragMode],
+    [nodes, selectedElementIds, dragMode, projection.activeView, onExecuteCommand],
   );
 
   const displayEdges = React.useMemo(
@@ -250,6 +263,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     (event, edge) => {
       const data = edge.data as { connection?: { id: string } } | undefined;
       if (!data?.connection?.id) return;
+      // A rerouted edge is a visual stand-in for hidden members' connections.
+      if ((edge.data as { rerouted?: boolean }).rerouted) return;
       onRequestSelection?.({ kind: 'connection', id: data.connection.id, additive: event.shiftKey });
     },
     [onRequestSelection],
@@ -273,12 +288,27 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       const elementNodes = nodesToProcess.filter(
         (n) => n.type === 'elementNode',
       );
-      if (elementNodes.length === 0) return;
 
       const movedList = elementNodes.map((n) => ({
         id: n.id, // placement.id
         position: { x: n.position.x, y: n.position.y },
       }));
+
+      // A dragged collapsed group moves every hidden member by the same delta,
+      // in the same single move batch (one undo entry).
+      for (const n of nodesToProcess) {
+        if (n.type !== 'groupNode' || n.data.kind !== 'group' || !n.data.collapsed) continue;
+        const origin = projection.nodes.find((p) => p.id === n.id)?.position;
+        if (!origin) continue;
+        const dx = n.position.x - origin.x;
+        const dy = n.position.y - origin.y;
+        for (const placement of projection.activeView.placements) {
+          if (!n.data.group.elementIds.includes(placement.elementId)) continue;
+          if (movedList.some((m) => m.id === placement.id)) continue;
+          movedList.push({ id: placement.id, position: { x: placement.x + dx, y: placement.y + dy } });
+        }
+      }
+      if (movedList.length === 0) return;
 
       const success = await onMoveNodes(movedList);
       if (!success) {

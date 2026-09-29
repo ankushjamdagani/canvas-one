@@ -1,7 +1,7 @@
 /** 16D selection-scoped actions, routed through the command registry. */
 
 import * as React from 'react';
-import { ChevronDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -26,7 +26,9 @@ export type CanvasAuthoringCommandId =
   | 'selection.ungroup'
   | 'selection.align'
   | 'selection.distribute'
-  | 'canvas.add-note';
+  | 'canvas.add-note'
+  | 'canvas.expand'
+  | 'canvas.collapse';
 
 export type CanvasCommandExecutor = <K extends CanvasAuthoringCommandId>(
   id: K,
@@ -66,6 +68,22 @@ export function SelectionToolbar({ context, executeCommand, onDelete }: Selectio
   });
   const duplicateAvailability = getAvailability('selection.duplicate', context, {});
   const count = context.selectedElementIds.length;
+  // One group (preferred) or one component: toggles its presentation state.
+  const expansionTarget = !context.activeViewId
+    ? null
+    : context.selectedGroupIds.length === 1
+      ? ({ kind: 'group', id: context.selectedGroupIds[0] } as const)
+      : context.selectedPlacementIds?.length === 1 && context.selectedElementIds.length === 1
+        ? ({ kind: 'placement', id: context.selectedPlacementIds[0] } as const)
+        : null;
+  const targetExpanded = expansionTarget ? (context.expansionState?.[expansionTarget.id] ?? true) : true;
+  const expansionCommand = targetExpanded ? 'canvas.collapse' : 'canvas.expand';
+  const expansionPayload = expansionTarget && context.activeViewId
+    ? { viewId: context.activeViewId, target: expansionTarget }
+    : null;
+  const expansionAvailability = expansionPayload
+    ? getAvailability(expansionCommand, context, expansionPayload)
+    : null;
 
   async function submitGroup() {
     const label = groupLabel.trim();
@@ -177,6 +195,22 @@ export function SelectionToolbar({ context, executeCommand, onDelete }: Selectio
           onClick={() => void executeCommand('selection.ungroup', { groupIds: context.selectedGroupIds })}
         >
           <Ungroup className="size-3.5" /> Ungroup
+        </Button>
+      )}
+
+      {expansionPayload && expansionAvailability && (
+        <Button
+          data-testid="selection-expansion-btn"
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 pointer-coarse:h-11 gap-1.5 text-xs"
+          disabled={!expansionAvailability.enabled}
+          title={expansionAvailability.enabled ? undefined : expansionAvailability.reason}
+          onClick={() => void executeCommand(expansionCommand, expansionPayload)}
+        >
+          {targetExpanded ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}
+          {targetExpanded ? 'Collapse' : 'Expand'}
         </Button>
       )}
 
