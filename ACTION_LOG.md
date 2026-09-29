@@ -1513,3 +1513,7 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 ### Final branch cleanup
 
 - **Outcome**: at the user's request, discarded the old uncommitted `artifacts/*.png` screenshot changes and removed the `.claude/worktrees/rv-01a` worktree and the fully merged `claude/rv-01a-tokens` branch (ancestor of `master`, verified). `master` is now the only branch and the main checkout the only worktree.
+
+### Retro (Claude)
+- **Range**: 2026-09-23 → 2026-09-29, 57 entries
+- **Changed**: LESSONS.md +6 ~4 -0 (now 23 rules); merged the two browser-suite rules into one isolated-port rule, replaced the obsolete large-chunk-warning rule, moved the two code rules into a new "Code" section. The proposal miscounted the starting total as 16; it was 18.

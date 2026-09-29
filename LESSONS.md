@@ -17,14 +17,17 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **Don't retry `agy` in a restricted sandbox.** It needs localhost binding and writes under `~/.gemini/antigravity-cli/`; request elevated permissions once or record the task as blocked. Why: 2026-09-10, three failed retries.
 - **Don't rely on `timeout` or `agy --print-timeout` on macOS.** Use `perl -e 'alarm N; exec @ARGV' <cmd>`. Why: 2026-09-23, 25s timeout ran 79s.
 - **`.claude/skills` and `.codex/skills` are symlinks into `.agents/skills`.** Check with `ls -l`; `diff -rq` follows the links and misleads. Why: 2026-09-16 wrong duplication finding.
-- **Production e2e needs localhost binding.** In a sandbox, ask for elevation up front; if denied, report the browser check as blocked. Why: 2026-09-10 and 2026-09-12.
+- **Production e2e needs localhost binding, and Codex's sandbox can't run Chromium.** Ask for elevation up front or keep browser checks with the lead; if denied, report the browser check as blocked. Why: 2026-09-10, 2026-09-12, 2026-09-27 RV-12f/RV-12g.
+- **Unit timeouts on a busy machine aren't failures until rerun.** Check `uptime`; rerun the timed-out files alone and record both results. Why: 2026-09-24 RV-08a, 2026-09-26 RV-11a, 2026-09-27 RV-12e (load average 16–25, different files each run).
 
 ## Verification
 
-- **Run the full browser suite before calling UI work done.** Fixing the named selectors is not enough; removed modes, selection side effects and overlays broke other suites. Why: 2026-09-14 status correction.
-- **After any stylesheet or app-shell change, run `TEST_PRODUCTION=1 npm run test:e2e`.** The desktop export journey regressed from CSS alone. Why: 2026-09-15.
+- **Before calling UI, CSS or app-shell work done, run the full production browser suite on an isolated port.** `playwright.config.ts` reuses any server on 5174 (possibly a stale build); use a throwaway config with its own port, `reuseExistingServer: false`, 2 workers and no retries. Fixing the named selectors isn't enough; CSS alone broke the export journey. Why: 2026-09-14, 2026-09-15, 2026-09-27 onward.
 - **One passing run doesn't prove a flaky test is fixed.** Say so in the log. Why: 2026-09-10.
-- **The large-chunk build warning predates this work.** Don't chase it; do report any new warning. Why: recurring since 2026-09-10.
+- **Keep every build chunk under Vite's 500 kB warning; a new size warning is a regression.** Check with `npm run build`. Why: 2026-09-29 bundle split removed the long-standing warning.
+- **Custom colour utilities (`text-ink`, `bg-canvas`) only work if `--color-<name>` is defined in `src/styles.css` `@theme`.** After using a new token class, grep `dist/assets/*.css` for it. Why: 2026-09-29 RV-17 (four classes generated no CSS) and bundle split (`bg-riskTint` camelCase).
+- **Unit tests must be `src/**/*.test.ts`; `.tsx` test files never run.** Render components with `React.createElement` + `renderToStaticMarkup`. Why: 2026-09-28 RV-11a review caught a `.test.tsx` file.
+- **E2E screenshots and files go to `test.info().outputPath(...)`, never repo or absolute paths.** Why: 2026-09-29 RV-13 and debt cleanup (scratchpad paths from an old session, `artifacts/rv-12e/`).
 
 ## Delegation and review
 
@@ -32,11 +35,16 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **Verify reviewer claims before applying them.** Reviewers have cited wrong callers and stale decisions. Why: 2026-09-22.
 - **Self-reviewed corrections don't close a review.** Closure needs an independent reviewer (fresh session or subagent). Why: 2026-09-23 S05.
 - **Smoke-test an executor with a no-edit prompt before dispatching real lanes.** Why: 2026-09-23 preflight caught a blocked executor cheaply.
+- **Reject invented defaults in delegate code.** Grep delegate diffs for fallbacks such as `?? 'unknown'`, `|| 'main'`, success inferred from a missing outcome, zero-filled counts, placeholder labels and `as unknown as` casts; the contract needs an explicit value or a typed rejection. Why: review rounds on 2026-09-24 (RV-14d/e/f, RV-08c/e, RV-16b), 2026-09-26 (RV-11a), 2026-09-28 (RV-05c).
+- **Run each executor lane in its own git worktree and commit partial work.** Quota and rate-limit hits interrupted Gemini, Sonnet and Codex lanes about 10 times; intact worktrees let another executor resume. Why: 2026-09-24 → 2026-09-29.
 
 ## Workflow
 
 - **On long tasks, record status in `ACTION_LOG.md`/`HANDOFF.md` as you go, not only at the end.** A session that runs out of tokens leaves work unrecorded. Why: 2026-09-23 Codex round.
 - **Before deleting a branch, prove it is merged into the intended target with `git merge-base --is-ancestor <branch> <target>` (or `git cherry` for rebased work).** `git branch -d` only checks the current checkout, and this repo has no remote, so a deleted unmerged branch is gone. Why: 2026-09-29 cleanup.
 - **In zsh, unquoted `$VAR` holding several paths is one word; loop over them explicitly.** A multi-file `cp`/`checkout` silently did nothing. Why: 2026-09-29 RV-17 before/after build.
+
+## Code
+
 - **Don't split with `React.lazy`/Suspense on user-facing paths; use `src/lib/lazyComponent.tsx`, and time the affected interaction against a baseline build.** React 19 throttles Suspense reveals ~300 ms even for cached chunks. Why: 2026-09-29 bundle split made project open 830 ms.
 - **Before deleting superseded code, port its tests to the replacement.** The ported budget tests exposed a status bug in the production runner. Why: 2026-09-29 logical runner retirement.
