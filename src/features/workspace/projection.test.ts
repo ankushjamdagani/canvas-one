@@ -225,6 +225,17 @@ describe('projectDocumentToCanvas', () => {
     }
   });
 
+  it('sizes group frames from measured member heights when the canvas has them', () => {
+    const doc = makeTestDocument();
+    const estimated = projectDocumentToCanvas(doc, 'v1').nodes.find((n) => n.id === 'g1')!;
+    const heights = new Map(doc.views[0].placements.map((p) => [p.id, 300]));
+    const measured = projectDocumentToCanvas(doc, 'v1', heights).nodes.find((n) => n.id === 'g1')!;
+    if (estimated.data.kind !== 'group' || measured.data.kind !== 'group') throw new Error('expected group nodes');
+    // Every member is 300px tall instead of the 76px estimate, so the frame grows by the difference.
+    expect(measured.data.height).toBe(estimated.data.height + (300 - 76));
+    expect(measured.data.width).toBe(estimated.data.width);
+  });
+
   it('projects notes with note.id as node id (no prefix) and exact width', () => {
     const doc = makeTestDocument();
     const res = projectDocumentToCanvas(doc, 'v1');

@@ -8,7 +8,7 @@
 
 import type { Document, Group, Id, Note, Placement, View } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio/types';
-import { ESTIMATED_ELEMENT_NODE_HEIGHT } from './projection';
+import { placementHeight, type MeasuredHeights } from './projection';
 
 export type AlignEdge = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
 export type DistributeAxis = 'x' | 'y';
@@ -130,6 +130,7 @@ export function planAlign(
   viewId: Id,
   elementIds: readonly Id[],
   edge: AlignEdge,
+  heights?: MeasuredHeights,
 ): SelectionPlan {
   const view = findView(document, viewId);
   if (!view) return reject('The active view no longer exists');
@@ -140,7 +141,7 @@ export function planAlign(
   const minX = Math.min(...placements.map((placement) => placement.x));
   const maxX = Math.max(...placements.map((placement) => placement.x + placement.width));
   const minY = Math.min(...placements.map((placement) => placement.y));
-  const maxY = Math.max(...placements.map((placement) => placement.y + ESTIMATED_ELEMENT_NODE_HEIGHT));
+  const maxY = Math.max(...placements.map((placement) => placement.y + placementHeight(placement, heights)));
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
   const replacements = new Map<Id, Placement>();
@@ -153,8 +154,8 @@ export function planAlign(
       case 'center-x': x = centerX - placement.width / 2; break;
       case 'right': x = maxX - placement.width; break;
       case 'top': y = minY; break;
-      case 'center-y': y = centerY - ESTIMATED_ELEMENT_NODE_HEIGHT / 2; break;
-      case 'bottom': y = maxY - ESTIMATED_ELEMENT_NODE_HEIGHT; break;
+      case 'center-y': y = centerY - placementHeight(placement, heights) / 2; break;
+      case 'bottom': y = maxY - placementHeight(placement, heights); break;
     }
     replacements.set(placement.id, { ...placement, x, y });
   }
@@ -176,6 +177,7 @@ export function planDistribute(
   viewId: Id,
   elementIds: readonly Id[],
   axis: DistributeAxis,
+  heights?: MeasuredHeights,
 ): SelectionPlan {
   const view = findView(document, viewId);
   if (!view) return reject('The active view no longer exists');
@@ -187,7 +189,7 @@ export function planDistribute(
     const delta = axis === 'x' ? a.x - b.x : a.y - b.y;
     return delta || a.elementId.localeCompare(b.elementId);
   });
-  const size = (placement: Placement) => axis === 'x' ? placement.width : ESTIMATED_ELEMENT_NODE_HEIGHT;
+  const size = (placement: Placement) => axis === 'x' ? placement.width : placementHeight(placement, heights);
   const first = ordered[0];
   const last = ordered[ordered.length - 1];
   const start = axis === 'x' ? first.x : first.y;

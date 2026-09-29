@@ -144,6 +144,17 @@ describe('planAlign', () => {
   });
 });
 
+describe('planAlign with measured heights', () => {
+  const heights = new Map([['p-a', 50], ['p-b', 120]]);
+  it.each([
+    ['center-y', [[10, 95], [200, 60]]],
+    ['bottom', [[10, 170], [200, 100]]],
+  ] as const)('uses measured card heights for %s', (edge, expected) => {
+    const plan = planAlign(makeDocument(), VIEW_ID, ['a', 'b'], edge, heights);
+    expect(coordinates(plannedView(plan), ['a', 'b'])).toEqual(expected);
+  });
+});
+
 describe('planDistribute', () => {
   it('distributes horizontally with fixed endpoints and exact equal bounding-box gaps', () => {
     const placements: Placement[] = [
@@ -153,6 +164,17 @@ describe('planDistribute', () => {
     ];
     const plan = planDistribute(makeDocument({ placements }), VIEW_ID, ['a', 'b', 'c'], 'x');
     expect(coordinates(plannedView(plan), ['a', 'b', 'c'])).toEqual([[0, 5], [65, 10], [140, 15]]);
+  });
+
+  it('distributes vertically using measured card heights when given', () => {
+    const placements: Placement[] = [
+      { id: 'p-a', elementId: 'a', x: 5, y: 0, width: 20, expanded: false },
+      { id: 'p-b', elementId: 'b', x: 10, y: 100, width: 30, expanded: false },
+      { id: 'p-c', elementId: 'c', x: 15, y: 200, width: 40, expanded: false },
+    ];
+    const heights = new Map([['p-a', 10], ['p-b', 20], ['p-c', 30]]);
+    const plan = planDistribute(makeDocument({ placements }), VIEW_ID, ['a', 'b', 'c'], 'y', heights);
+    expect(coordinates(plannedView(plan), ['a', 'b', 'c'])).toEqual([[5, 0], [10, 95], [15, 200]]);
   });
 
   it('distributes vertically using the shared 76px card height', () => {

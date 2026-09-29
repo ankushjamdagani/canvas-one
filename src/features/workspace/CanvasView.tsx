@@ -27,6 +27,7 @@ import { FloatingDock } from './FloatingDock';
 import {
   projectDocumentToCanvas,
   type ProjectedNodeData,
+  type MeasuredHeights,
 } from './projection';
 import { planDelete, type DeletePlan } from './deletePlan';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -129,6 +130,8 @@ export interface CanvasViewProps {
 export interface CanvasViewHandle {
   placeAtCentre: (entryId: string) => Promise<void>;
   getVisibleCentre: () => { readonly x: number; readonly y: number };
+  /** Measured card heights by placement id, for bounding-box planners (align/distribute). */
+  getMeasuredHeights: () => MeasuredHeights;
   /** selection.delete handler: dependency preview, scenario confirmation, one undoable apply. */
   deleteSelection: () => void;
   setToolMode: (mode: 'select' | 'pan') => void;
@@ -180,13 +183,29 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const nodesInitialized = useNodesInitialized();
   const containerRef = React.useRef<HTMLDivElement>(null);
 
+  // Measured card heights (placement id -> px) let group frames and align/distribute
+  // use real sizes instead of the fixed estimate (e.g. for expanded cards). Held in state
+  // and updated only when a measured element height actually changes, so the projection
+  // below doesn't loop through its own group-node measurements.
+  const [measuredHeights, setMeasuredHeights] = React.useState<MeasuredHeights>(() => new Map());
   const projection = React.useMemo(() => {
-    return projectDocumentToCanvas(document, activeViewId);
-  }, [document, activeViewId]);
+    return projectDocumentToCanvas(document, activeViewId, measuredHeights);
+  }, [document, activeViewId, measuredHeights]);
 
   const [nodes, setNodes, onNodesChangeRaw] = useNodesState<Node<ProjectedNodeData>>(
     projection.nodes as Node<ProjectedNodeData>[],
   );
+
+  React.useEffect(() => {
+    const next = new Map<string, number>();
+    for (const node of nodes) {
+      if (node.type === 'elementNode' && node.measured?.height) next.set(node.id, Math.round(node.measured.height));
+    }
+    setMeasuredHeights((previous) => {
+      if (previous.size === next.size && [...next].every(([id, height]) => previous.get(id) === height)) return previous;
+      return next;
+    });
+  }, [nodes]);
   const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>(
     projection.edges as unknown as Edge[],
   );
@@ -720,13 +739,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         await applyPlacement(entryId, getVisibleCentre());
       },
       getVisibleCentre,
+      getMeasuredHeights: () => measuredHeights,
       deleteSelection: handleDeleteSelection,
       setToolMode: setDragMode,
       zoomIn: handleZoomIn,
       zoomOut: handleZoomOut,
       fitView: handleFitView,
     }),
-    [getVisibleCentre, applyPlacement, handleZoomIn, handleZoomOut, handleFitView, handleDeleteSelection],
+    [getVisibleCentre, applyPlacement, handleZoomIn, handleZoomOut, handleFitView, handleDeleteSelection, measuredHeights],
   );
 
   if (projection.empty) {

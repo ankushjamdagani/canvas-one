@@ -90,4 +90,42 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     await waitForIdle(page);
     await expect(ports).toHaveCount(0);
   });
+
+  test('a group frame grows to contain an expanded member (measured heights, not the 76px estimate)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s05').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await waitForIdle(page);
+
+    const nodes = page.locator('.component-node');
+    await nodes.nth(0).click();
+    await nodes.nth(1).click({ modifiers: ['Shift'] });
+    await page.getByTestId('selection-group-btn').click();
+    await page.getByTestId('selection-group-input').fill('Measured pair');
+    await page.getByTestId('selection-group-input').press('Enter');
+    await waitForIdle(page);
+    const boundary = page.locator('.group-boundary', { hasText: 'Measured pair' });
+    await expect(boundary).toBeVisible();
+
+    const member = nodes.nth(0);
+    await member.click();
+    await page.getByTestId('selection-expansion-btn').click();
+    await waitForIdle(page);
+    await expect(member.locator('[data-testid^="node-ports-"]')).toHaveCount(1);
+
+    // The expanded card is taller than the estimate, and the frame still encloses it.
+    const zoom = await page.evaluate(() => {
+      const viewport = document.querySelector('.react-flow__viewport') as HTMLElement | null;
+      return viewport ? new DOMMatrix(getComputedStyle(viewport).transform).a : 1;
+    });
+    const cardHeight = (await member.boundingBox())!.height / zoom;
+    expect(cardHeight).toBeGreaterThan(76);
+    await expect
+      .poll(async () => {
+        const frame = (await boundary.boundingBox())!;
+        const card = (await member.boundingBox())!;
+        return frame.y + frame.height - (card.y + card.height);
+      })
+      .toBeGreaterThan(0);
+  });
 });

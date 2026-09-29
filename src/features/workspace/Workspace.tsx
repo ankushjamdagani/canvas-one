@@ -1736,11 +1736,11 @@ export function Workspace({
           : { ok: false, message: 'No canvas view is open' },
       'selection.align': ({ edge }) =>
         document && activeViewId
-          ? applySelectionPlan(planAlign(document, activeViewId, commandContext.selectedElementIds, edge))
+          ? applySelectionPlan(planAlign(document, activeViewId, commandContext.selectedElementIds, edge, canvasViewRef.current?.getMeasuredHeights()))
           : { ok: false, message: 'No canvas view is open' },
       'selection.distribute': ({ axis }) =>
         document && activeViewId
-          ? applySelectionPlan(planDistribute(document, activeViewId, commandContext.selectedElementIds, axis))
+          ? applySelectionPlan(planDistribute(document, activeViewId, commandContext.selectedElementIds, axis, canvasViewRef.current?.getMeasuredHeights()))
           : { ok: false, message: 'No canvas view is open' },
       'canvas.expand': ({ viewId, target }) =>
         document

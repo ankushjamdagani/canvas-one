@@ -193,10 +193,18 @@ export type ProjectionResult = {
 
 /**
  * Placements persist their width but not their height. Group bounds and the
- * selection geometry planners therefore share this fixed rendered-card
- * estimate (commands.md §4 bounding-box alignment).
+ * selection geometry planners (commands.md §4 bounding-box alignment) use the
+ * canvas's measured card heights when available, and this rendered-card
+ * estimate for cards that haven't been measured yet.
  */
 export const ESTIMATED_ELEMENT_NODE_HEIGHT = 76;
+
+/** Measured rendered height per placement id (presentation only; never persisted). */
+export type MeasuredHeights = ReadonlyMap<Id, number>;
+
+export function placementHeight(placement: Placement, heights?: MeasuredHeights): number {
+  return heights?.get(placement.id) ?? ESTIMATED_ELEMENT_NODE_HEIGHT;
+}
 const GROUP_PADDING_X = 24;
 const GROUP_PADDING_Y_TOP = 36;
 const GROUP_PADDING_Y_BOTTOM = 24;
@@ -220,6 +228,7 @@ export const COLLAPSED_GROUP_HEIGHT = 44;
 export function projectDocumentToCanvas(
   document: Document | null,
   activeViewId: string | null,
+  measuredHeights?: MeasuredHeights,
 ): ProjectionResult {
   if (!document || !document.views || document.views.length === 0) {
     return {
@@ -306,7 +315,7 @@ export function projectDocumentToCanvas(
       minX = Math.min(minX, p.x);
       minY = Math.min(minY, p.y);
       maxX = Math.max(maxX, p.x + p.width);
-      maxY = Math.max(maxY, p.y + ESTIMATED_ELEMENT_NODE_HEIGHT);
+      maxY = Math.max(maxY, p.y + placementHeight(p, measuredHeights));
     }
 
     const boxX = minX - GROUP_PADDING_X;
