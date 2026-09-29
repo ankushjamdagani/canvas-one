@@ -32,9 +32,8 @@
  * - Path-dependent double settlement (runtime-only concern; model-and-runner.md §5:
  *   "Path-dependent double settlement and budget-exhausting message cycles fail or end
  *   incomplete at runtime").
- * - Static type inference of Value/Guard expressions beyond the trivial, statically
- *   knowable checks implemented here (port/shape compatibility). Guard/Value expression
- *   type-checking against payload shapes is not implemented.
+ * - Value-dependent errors (optional/missing reads, nullable values, scalar unions),
+ *   and response schemas of replies whose initiating frame is not locally knowable.
  * - The trace envelope (model-and-runner.md §8/§9 TraceEvent, RunUpdate, etc).
  */
 
@@ -51,6 +50,10 @@ import type {
   DecisionBehavior,
   ResourceBehavior,
   Effect,
+  Value,
+  Guard,
+  Path,
+  ScalarType,
 } from './model';
 import type { Issue } from './validate';
 import { canonicalJson } from './canonical';
@@ -113,6 +116,8 @@ export const READINESS_ISSUE_CODES = [
   'missing-pipeline-output',
   /** §4 Behaviors: "unmodeled: reachable in a runnable scenario only behind a boundary fixture". */
   'unmodeled-element',
+  /** §4: "A statically knowable type error rejects readiness". */
+  'expression-type-error',
 ] as const;
 
 export type ReadinessIssueCode = (typeof READINESS_ISSUE_CODES)[number];
@@ -234,6 +239,266 @@ function issue(
   message: string,
 ): ReadinessIssue {
   return { code, path, entityId, severity: 'error', message };
+}
+
+// Possible value types, not a new authored union grammar. Constructed list items
+// are kept separately; mixed runtime scalar data is never coerced or narrowed.
+type StaticValue =
+  | { kind: 'unknown' | 'missing' | 'null' }
+  | { kind: 'scalar'; types: readonly ScalarType[]; nullable: boolean; number?: number }
+  | { kind: 'record'; nullable: boolean; fields: ReadonlyMap<string, { value: StaticValue; optional: boolean }> }
+  | { kind: 'list'; nullable: boolean; items: readonly StaticValue[]; length?: number };
+type ExpressionScope = { input: StaticValue; context: StaticValue };
+const UNKNOWN: StaticValue = { kind: 'unknown' };
+const MISSING: StaticValue = { kind: 'missing' };
+const EMPTY_CONTEXT: StaticValue = { kind: 'record', nullable: false, fields: new Map() };
+const STRING_VALUE: StaticValue = { kind: 'scalar', types: ['string'], nullable: false };
+
+function schemaValue(shape: Shape | undefined): StaticValue {
+  if (!shape) return UNKNOWN;
+  if (shape.type === 'record') return {
+    kind: 'record', nullable: shape.nullable,
+    fields: new Map(shape.fields.map((f) => [f.key, { value: schemaValue(f.shape), optional: f.optional }])),
+  };
+  if (shape.type === 'list') return { kind: 'list', nullable: shape.nullable, items: [schemaValue(shape.items)] };
+  return { kind: 'scalar', types: shape.type === 'scalar-union' ? shape.types : [shape.type], nullable: shape.nullable };
+}
+
+function literalValue(value: Json): StaticValue {
+  if (value === null) return { kind: 'null' };
+  if (Array.isArray(value)) return { kind: 'list', nullable: false, items: value.map(literalValue), length: value.length };
+  if (typeof value === 'object') return {
+    kind: 'record', nullable: false,
+    fields: new Map(Object.entries(value).map(([key, v]) => [key, { value: literalValue(v), optional: false }])),
+  };
+  if (typeof value === 'number') return {
+    kind: 'scalar', nullable: false, types: [Number.isSafeInteger(value) ? 'integer' : 'number'], number: value,
+  };
+  return { kind: 'scalar', nullable: false, types: [typeof value as 'string' | 'boolean'] };
+}
+
+function readStatic(root: StaticValue, path: Path): StaticValue {
+  let current = root;
+  for (const step of path) {
+    if (current.kind === 'unknown') return UNKNOWN;
+    if (current.kind === 'record' && typeof step === 'string') {
+      current = current.fields.get(step)?.value ?? MISSING;
+    } else if (current.kind === 'list' && typeof step === 'number') {
+      current = current.length === undefined ? current.items[0] ?? UNKNOWN : current.items[step] ?? MISSING;
+    } else return MISSING;
+  }
+  return current;
+}
+
+// Preserve effect order: context writes can change the type read by later effects.
+// A schema-derived list has unknown length; writing one index does not change the
+// types of every item. Such writes deliberately make that list unknown here.
+function writeStatic(root: StaticValue, path: Path, value: StaticValue): StaticValue {
+  if (path.length === 0) return value;
+  const [step, ...rest] = path;
+  if (root.kind === 'record' && typeof step === 'string') {
+    const fields = new Map(root.fields);
+    fields.set(step, { value: writeStatic(fields.get(step)?.value ?? UNKNOWN, rest, value), optional: false });
+    return { ...root, fields };
+  }
+  if (root.kind === 'list' && root.length !== undefined && typeof step === 'number' && step < root.length) {
+    return { ...root, items: root.items.map((item, i) => i === step ? writeStatic(item, rest, value) : item) };
+  }
+  return UNKNOWN;
+}
+
+// Only a disjoint type is a definite failure. Nullable and scalar-union reads can
+// produce valid values, and optional/missing assignments remain modeled errors (§4).
+function cannotMatch(value: StaticValue, shape: Shape): boolean {
+  if (value.kind === 'unknown' || value.kind === 'missing') return false;
+  if (value.kind === 'null') return !shape.nullable;
+  if ('nullable' in value && value.nullable && shape.nullable) return false;
+  if (shape.type === 'record') {
+    if (value.kind !== 'record') return true;
+    if ([...value.fields].some(([key, field]) => !field.optional && !shape.fields.some((f) => f.key === key))) return true;
+    return shape.fields.some((field) => {
+      const source = value.fields.get(field.key);
+      if (!source) return !field.optional;
+      return !source.optional && cannotMatch(source.value, field.shape);
+    });
+  }
+  if (shape.type === 'list') {
+    if (value.kind !== 'list') return true;
+    if (value.length !== undefined && value.length > shape.maxItems) return true;
+    // A schema-derived list may be empty even if its item type is disjoint.
+    return value.length !== undefined && value.items.some((item) => cannotMatch(item, shape.items));
+  }
+  if (value.kind !== 'scalar') return true;
+  const targets = shape.type === 'scalar-union' ? shape.types : [shape.type];
+  return !value.types.some((type) => targets.some((target) =>
+    type === target || (type === 'integer' && target === 'number') ||
+    (type === 'number' && target === 'integer' && (value.number === undefined || Number.isSafeInteger(value.number))),
+  ));
+}
+
+/** Recursion is bounded by the storable expression, path, JSON and schema budgets. */
+function checkExpressions(
+  doc: Document, scenario: Scenario, included: ReadonlySet<Id>, schemas: ReadonlyMap<Id, Shape>, issues: ReadinessIssue[],
+): void {
+  const fail = (path: Path, entityId: Id, message: string) => {
+    issues.push(issue('expression-type-error', path, entityId, message));
+  };
+  const checkTarget = (value: StaticValue, shape: Shape | undefined, path: Path, id: Id) => {
+    if (shape && cannotMatch(value, shape)) fail(path, id, 'Expression cannot satisfy the target payload schema');
+  };
+  const infer = (value: Value, scope: ExpressionScope, path: Path, id: Id): StaticValue => {
+    switch (value.kind) {
+      case 'literal': return literalValue(value.value);
+      case 'read': return readStatic(scope[value.source], value.path);
+      case 'outcome': return { kind: 'scalar', types: ['string'], nullable: true };
+      case 'record': {
+        const fields = new Map<string, { value: StaticValue; optional: boolean }>();
+        value.fields.forEach((field, i) => {
+          const fieldPath = [...path, 'fields', i, 'value'];
+          const type = infer(field.value, scope, fieldPath, id);
+          if (type.kind === 'missing') fail(fieldPath, id, 'A record constructor cannot contain a missing value');
+          fields.set(field.key, { value: type, optional: false });
+        });
+        return { kind: 'record', nullable: false, fields };
+      }
+      case 'list': return {
+        kind: 'list', nullable: false, length: value.items.length,
+        items: value.items.map((item, i) => {
+          const type = infer(item, scope, [...path, 'items', i], id);
+          if (type.kind === 'missing') fail([...path, 'items', i], id, 'A list constructor cannot contain a missing value');
+          return type;
+        }),
+      };
+    }
+  };
+  const checkGuard = (guard: Guard, scope: ExpressionScope, path: Path, id: Id): void => {
+    if (guard.op === 'all' || guard.op === 'any') {
+      guard.guards.forEach((child, i) => checkGuard(child, scope, [...path, 'guards', i], id));
+      return;
+    }
+    if (guard.op === 'equals' || guard.op === 'notEquals') {
+      for (const side of ['left', 'right'] as const) {
+        if (infer(guard[side], scope, [...path, side], id).kind === 'missing') {
+          fail([...path, side], id, 'Only exists can test a missing read');
+        }
+      }
+      // Unlike port compatibility, JSON equality between different types is legal.
+      return;
+    }
+    if (!('value' in guard)) return;
+    const value = infer(guard.value, scope, [...path, 'value'], id);
+    if (guard.op === 'exists' || value.kind === 'unknown') return;
+    const valid = guard.op === 'every' ? value.kind === 'list'
+      : guard.op === 'nonEmpty' ? value.kind === 'record' || value.kind === 'list' ||
+        (value.kind === 'scalar' && value.types.includes('string'))
+      : value.kind === 'scalar' && value.types.some((t) => t === 'integer' || t === 'number') &&
+        (value.number === undefined || Number.isSafeInteger(value.number));
+    if (!valid) {
+      fail([...path, 'value'], id, value.kind === 'missing' ? 'Only exists can test a missing read' : `Invalid value type for ${guard.op}`);
+      return;
+    }
+    if (guard.op === 'every' && value.kind === 'list') {
+      value.items.forEach((item) => checkGuard(guard.itemGuard, { ...scope, input: item }, [...path, 'itemGuard'], id));
+    }
+  };
+  const shapeAt = (shape: Shape | undefined, path: Path): Shape | undefined => {
+    for (const step of path) {
+      if (shape?.type === 'record' && typeof step === 'string') shape = shape.fields.find((f) => f.key === step)?.shape;
+      else if (shape?.type === 'list' && typeof step === 'number') shape = shape.items;
+      else return undefined;
+    }
+    return shape;
+  };
+  const portShape = (element: Element, portId: Id) => schemas.get(element.ports.find((p) => p.id === portId)?.schemaId ?? '');
+  doc.elements.forEach((element, index) => {
+    if (!included.has(element.id)) return;
+    const behavior = element.behavior;
+    const path: Path = ['elements', index, 'behavior'];
+    if (behavior.kind === 'machine') {
+      const contextShape = schemas.get(behavior.contextSchemaId);
+      behavior.transitions.forEach((transition, ti) => {
+        const scope = { input: schemaValue(portShape(element, transition.eventPortId)), context: schemaValue(contextShape) };
+        const tp = [...path, 'transitions', ti];
+        if (transition.guard) checkGuard(transition.guard, scope, [...tp, 'guard'], transition.id);
+        transition.effects.forEach((effect, ei) => {
+          const ep = [...tp, 'effects', ei];
+          if (effect.kind === 'trace') return;
+          if (effect.kind === 'request-id') {
+            scope.context = writeStatic(scope.context, effect.path, STRING_VALUE);
+            return;
+          }
+          const type = infer(effect.value, scope, [...ep, 'value'], effect.id);
+          if (effect.kind === 'assign') scope.context = writeStatic(scope.context, effect.path, type);
+          if (effect.kind === 'emit' || effect.kind === 'schedule-event') {
+            checkTarget(type, portShape(element, effect.kind === 'emit' ? effect.portId : effect.eventPortId), [...ep, 'value'], effect.id);
+          }
+          if (effect.kind === 'emit' && effect.correlation.kind === 'context-request') {
+            checkTarget(readStatic(scope.context, effect.correlation.path), { type: 'string', nullable: false }, [...ep, 'correlation'], effect.id);
+          }
+          if (effect.kind === 'reply') {
+            const entry = element.ports.find((p) => p.id === transition.eventPortId);
+            // Data descendants inherit a call frame whose response type need not
+            // match their local input type. Leave those replies to the runner.
+            checkTarget(type, schemas.get(entry?.responseSchemaId ?? ''), [...ep, 'value'], effect.id);
+          }
+        });
+        // Context is validated atomically after the ordered effects, not after
+        // each assignment: a temporarily invalid value can be overwritten.
+        checkTarget(scope.context, contextShape, [...tp, 'effects'], transition.id);
+      });
+    } else if (behavior.kind === 'decision') {
+      const scope = { input: schemaValue(schemas.get(behavior.inputSchemaId)), context: EMPTY_CONTEXT };
+      behavior.cases.forEach((entry, ci) => {
+        const cp = [...path, 'cases', ci];
+        checkGuard(entry.guard, scope, [...cp, 'guard'], entry.id);
+        checkTarget(infer(entry.value, scope, [...cp, 'value'], entry.id), portShape(element, entry.outputPortId), [...cp, 'value'], entry.id);
+      });
+      const fp = [...path, 'fallback', 'value'];
+      checkTarget(infer(behavior.fallback.value, scope, fp, element.id), portShape(element, behavior.fallback.outputPortId), fp, element.id);
+    } else if (behavior.kind === 'pipeline') {
+      const input = schemas.get(behavior.inputSchemaId);
+      let row = schemaValue(input?.type === 'list' ? input.items : undefined);
+      let constructsRows = false;
+      behavior.operations.forEach((operation, oi) => {
+        const op = [...path, 'operations', oi];
+        const scope = { input: row, context: EMPTY_CONTEXT };
+        if (operation.kind === 'validate') row = schemaValue(schemas.get(operation.schemaId));
+        if (operation.kind === 'filter') checkGuard(operation.guard, scope, [...op, 'guard'], operation.id);
+        if (operation.kind === 'map') {
+          constructsRows = true;
+          row = infer({ kind: 'record', fields: operation.fields.map((field) => ({ key: field.targetKey, value: field.value })) }, scope, op, operation.id);
+        }
+        if (operation.kind === 'group-sum') {
+          constructsRows = true;
+          row = {
+            kind: 'record', nullable: false,
+            fields: new Map([
+              [operation.keyName, { value: STRING_VALUE, optional: false }],
+              [operation.sumName, { value: { kind: 'scalar', types: ['integer'], nullable: false } as StaticValue, optional: false }],
+            ]),
+          };
+        }
+      });
+      const output = schemas.get(behavior.outputSchemaId);
+      // Authored constructors must be capable of emitting the declared row type.
+      // Original error rows, row counts and runtime branch selection stay dynamic.
+      if (constructsRows && output?.type === 'list') {
+        checkTarget(row, output.items, [...path, 'outputSchemaId'], element.id);
+      }
+    }
+  });
+  const si = doc.scenarios.indexOf(scenario);
+  scenario.boundaries.forEach((boundary, bi) => {
+    const source = doc.elements.find((el) => el.id === boundary.source.elementId)?.ports.find((p) => p.id === boundary.source.portId);
+    const scope = { input: schemaValue(schemas.get(source?.schemaId ?? '')), context: EMPTY_CONTEXT };
+    boundary.responses.forEach((response, ri) => {
+      const path = ['scenarios', si, 'boundaries', bi, 'responses', ri];
+      checkGuard(response.match, scope, [...path, 'match'], response.id);
+      response.payloadBindings.forEach((binding, i) => {
+        checkTarget(readStatic(scope.input, binding.requestPath), shapeAt(schemas.get(boundary.schemaId), binding.targetPath), [...path, 'payloadBindings', i], response.id);
+      });
+    });
+  });
 }
 
 /**
@@ -910,6 +1175,8 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
       );
     }
   }
+
+  checkExpressions(doc, scenario, includedElementSet, schemaShapeMap, issues);
 
   if (issues.length > 0) {
     return { ready: false, issues };

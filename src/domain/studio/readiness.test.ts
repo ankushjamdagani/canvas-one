@@ -15,8 +15,12 @@ import type {
   ResourceBehavior,
   Transition,
   MachineResponseBinding,
+  Guard,
+  Value,
+  Effect,
 } from './model';
 import { checkReadiness, normalizeShape, shapesCompatible } from './readiness';
+import { validateDocument } from './validate';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 
@@ -645,6 +649,199 @@ function decisionElement(
   };
 }
 
+describe('static expression readiness', () => {
+  const string: Shape = { type: 'string', nullable: false };
+  const integer: Shape = { type: 'integer', nullable: false };
+  const record = (fields: Record<string, Shape>): Shape => ({
+    type: 'record', nullable: false,
+    fields: Object.entries(fields).map(([key, shape]) => ({ id: `field-${key}`, key, optional: false, shape })),
+  });
+  const read = (path: (string | number)[], source: 'input' | 'context' = 'input'): Value => ({ kind: 'read', source, path });
+  const literal = (value: string | number | boolean | null): Value => ({ kind: 'literal', value });
+  const inputShape = record({ name: string, count: integer, rows: { type: 'list', nullable: false, maxItems: 10, items: record({ count: integer }) } });
+  const contextShape = record({ count: integer, name: string });
+  function expressionDoc(guard: Guard | null = null, effects: readonly Effect[] = []): Document {
+    const base = logicalHappyDoc();
+    const machine = machineElement('m1', [port('p1', 'in', 'data', 'input'), port('out', 'out', 'data', 'output'), port('timer', 'in', 'event', 'output')], [
+      { id: 'transition', fromStateId: 'st1', toStateId: 'st1', eventPortId: 'p1', guard, effects },
+    ]);
+    return {
+      ...base,
+      schemas: [...base.schemas, { id: 'input', label: '', shape: inputShape }, { id: 'output', label: '', shape: integer }, { id: 'context', label: '', shape: contextShape }],
+      elements: [{ ...machine, behavior: { ...(machine.behavior as MachineBehavior), contextSchemaId: 'context' } }],
+    };
+  }
+  function errors(doc: Document) {
+    const result = checkReadiness(doc, doc.scenarios[0].id);
+    return result.ready ? [] : result.issues.filter((i) => i.code === 'expression-type-error');
+  }
+
+  it.each<Guard>([
+    { op: 'positiveInteger', value: read(['name']) },
+    { op: 'positiveInteger', value: literal(1.5) },
+    { op: 'nonEmpty', value: read(['count']) },
+    { op: 'every', value: read(['name']), itemGuard: { op: 'exists', value: read([]) } },
+    { op: 'equals', left: read(['absent']), right: literal(null) },
+    { op: 'notEquals', left: literal(null), right: read(['rows', 'count']) },
+    { op: 'any', guards: [{ op: 'all', guards: [{ op: 'nonEmpty', value: literal(false) }] }] },
+  ])('rejects a provable guard error: %j', (guard) => {
+    const found = errors(expressionDoc(guard));
+    expect(found.length).toBeGreaterThan(0);
+    expect(found[0].entityId).toBe('transition');
+    expect(found[0].path.slice(0, 6)).toEqual(['elements', 0, 'behavior', 'transitions', 0, 'guard']);
+  });
+
+  it('keeps exists/missing and cross-type canonical equality legal', () => {
+    expect(errors(expressionDoc({ op: 'all', guards: [
+      { op: 'exists', value: read(['absent']) },
+      { op: 'equals', left: literal(1), right: literal('1') },
+      { op: 'nonEmpty', value: { kind: 'literal', value: {} } },
+    ] }))).toEqual([]);
+  });
+
+  it('uses the item schema in every while retaining machine context', () => {
+    const good: Guard = { op: 'every', value: read(['rows']), itemGuard: { op: 'all', guards: [
+      { op: 'positiveInteger', value: read(['count']) },
+      { op: 'nonEmpty', value: read(['name'], 'context') },
+    ] } };
+    expect(errors(expressionDoc(good))).toEqual([]);
+    expect(errors(expressionDoc({ ...good, itemGuard: { op: 'nonEmpty', value: read(['count']) } }))).toHaveLength(1);
+  });
+
+  it('does not reject optional, nullable, union, or numeric reads that can work at runtime', () => {
+    const doc = expressionDoc({ op: 'positiveInteger', value: read(['count']) });
+    for (const shape of [
+      { type: 'integer', nullable: true },
+      { type: 'number', nullable: false },
+      { type: 'scalar-union', nullable: false, types: ['integer', 'string'] },
+    ] as const) {
+      const flexible: Shape = { type: 'record', nullable: false, fields: [{ id: 'field', key: 'count', optional: true, shape }] };
+      expect(errors({ ...doc, schemas: doc.schemas.map((s) => s.id === 'input' ? { ...s, shape: flexible } : s) })).toEqual([]);
+    }
+  });
+
+  it.each<Value>([
+    literal('wrong'), literal(null), literal(1.5),
+    { kind: 'record', fields: [{ key: 'extra', value: literal(1) }] },
+    { kind: 'list', items: [literal(1)] },
+  ])('checks emitted and scheduled values against their target schema: %j', (value) => {
+    expect(errors(expressionDoc(null, [
+      { id: 'emit', kind: 'emit', portId: 'out', value, correlation: { kind: 'current' } },
+      { id: 'timer-effect', kind: 'schedule-event', eventPortId: 'timer', delayMs: 1, value },
+    ]))).toHaveLength(2);
+  });
+
+  it('validates nested constructors, closed records and bounded lists', () => {
+    const output = record({ rows: { type: 'list', nullable: false, maxItems: 1, items: record({ count: integer }) } });
+    const value: Value = { kind: 'record', fields: [{ key: 'rows', value: { kind: 'list', items: [
+      { kind: 'record', fields: [{ key: 'count', value: literal('wrong') }] },
+    ] } }] };
+    const doc = expressionDoc(null, [{ id: 'emit', kind: 'emit', portId: 'out', value, correlation: { kind: 'current' } }]);
+    expect(errors({ ...doc, schemas: doc.schemas.map((s) => s.id === 'output' ? { ...s, shape: output } : s) })).toHaveLength(1);
+    const list = { type: 'list', nullable: false, maxItems: 1, items: integer } as const;
+    for (const constructed of [
+      { kind: 'list', items: [literal(1), literal(2)] },
+      { kind: 'list', items: [literal('bad')] },
+    ] as Value[]) {
+      const candidate = expressionDoc(null, [{ id: 'emit', kind: 'emit', portId: 'out', value: constructed, correlation: { kind: 'current' } }]);
+      expect(errors({ ...candidate, schemas: candidate.schemas.map((s) => s.id === 'output' ? { ...s, shape: list } : s) })).toHaveLength(1);
+    }
+  });
+
+  it('rejects missing constructor members but leaves missing assignment errors modeled', () => {
+    expect(errors(expressionDoc(null, [{ id: 'assign', kind: 'assign', path: ['count'], value: read(['absent']) }]))).toEqual([]);
+    expect(errors(expressionDoc({ op: 'exists', value: { kind: 'record', fields: [{ key: 'x', value: read(['absent']) }] } }))).toHaveLength(1);
+    expect(errors(expressionDoc({ op: 'exists', value: { kind: 'list', items: [read(['absent'])] } }))).toHaveLength(1);
+  });
+
+  it('checks final context atomically, and reads prior effect assignments in order', () => {
+    const assign: Effect = { id: 'assign', kind: 'assign', path: ['count'], value: literal('temporary') };
+    const repair: Effect = { id: 'repair', kind: 'assign', path: ['count'], value: literal(2) };
+    expect(errors(expressionDoc(null, [assign]))).toHaveLength(1);
+    expect(errors(expressionDoc(null, [assign, repair]))).toEqual([]);
+    expect(errors(expressionDoc(null, [assign, { id: 'emit', kind: 'emit', portId: 'out', value: read(['count'], 'context'), correlation: { kind: 'current' } }, repair]))).toHaveLength(1);
+    expect(errors(expressionDoc(null, [{ id: 'request', kind: 'request-id', path: ['count'] }]))).toHaveLength(1);
+  });
+
+  it('checks locally known reply schemas and leaves descendant frame types unknown', () => {
+    const doc = expressionDoc(null, [{ id: 'reply', kind: 'reply', value: literal('wrong'), outcome: 'succeeded' }]);
+    expect(errors(doc)).toEqual([]);
+    const callDoc = { ...doc, elements: doc.elements.map((el) => ({ ...el, ports: el.ports.map((p) => p.id === 'p1' ? { ...p, channel: 'call' as const, responseSchemaId: 'output' } : p) })) };
+    expect(errors(callDoc)).toHaveLength(1);
+  });
+
+  it('checks request correlation after prior effects and treats outcome as nullable string', () => {
+    const emit: Effect = { id: 'emit', kind: 'emit', portId: 'out', value: literal(1), correlation: { kind: 'context-request', path: ['name'] } };
+    const assign: Effect = { id: 'assign', kind: 'assign', path: ['name'], value: literal(1) };
+    const repair: Effect = { id: 'repair', kind: 'request-id', path: ['name'] };
+    expect(errors(expressionDoc(null, [assign, emit, repair]))).toHaveLength(1);
+    expect(errors(expressionDoc(null, [assign, repair, emit]))).toEqual([]);
+    expect(errors(expressionDoc({ op: 'equals', left: { kind: 'outcome' }, right: literal(null) }))).toEqual([]);
+    expect(errors(expressionDoc({ op: 'positiveInteger', value: { kind: 'outcome' } }))).toHaveLength(1);
+  });
+
+  it('checks decision cases and fallback values in empty context', () => {
+    const doc = logicalHappyDoc();
+    const decision = decisionElement('m1', 'p1', 'out', 'fallback');
+    const behavior = decision.behavior as DecisionBehavior;
+    const changed = { ...decision, behavior: {
+      ...behavior,
+      cases: behavior.cases.map((c) => ({ ...c, guard: { op: 'positiveInteger', value: literal(false) } as Guard, value: literal(1) })),
+      fallback: { ...behavior.fallback, value: literal('bad') },
+    } };
+    expect(errors({ ...doc, elements: [changed] })).toHaveLength(3);
+  });
+
+  it('tracks pipeline row types after validate and map, with empty context', () => {
+    const doc = expressionDoc();
+    const pipeline = pipelineElement('m1', 'p1', 'out', 'err', 'rows', 'rows', 'rows');
+    const behavior = pipeline.behavior as PipelineBehavior;
+    const candidate: Document = {
+      ...doc,
+      schemas: [...doc.schemas, { id: 'rows', label: '', shape: { type: 'list', nullable: false, maxItems: 10, items: inputShape } }],
+      elements: [{ ...pipeline, behavior: { ...behavior, operations: [
+        { id: 'validate', kind: 'validate', schemaId: 'input' },
+        { id: 'map', kind: 'map', fields: [{ id: 'map-field', targetKey: 'count', value: read(['name']) }] },
+        { id: 'filter', kind: 'filter', guard: { op: 'positiveInteger', value: read(['count']) } },
+      ] } }],
+    };
+    const found = errors(candidate);
+    expect(found.filter((i) => i.entityId === 'filter')).toHaveLength(1);
+    // The mapped record also cannot satisfy the declared final row schema.
+    expect(found.filter((i) => i.path.at(-1) === 'outputSchemaId')).toHaveLength(1);
+    const grouped: Document = { ...candidate, elements: [{ ...pipeline, behavior: { ...behavior, operations: [
+      { id: 'group', kind: 'group-sum', keyPath: ['name'], valuePath: ['count'], keyName: 'region', sumName: 'total' },
+      { id: 'filter-group', kind: 'filter', guard: { op: 'nonEmpty', value: read(['total']) } },
+    ] } }] };
+    expect(errors(grouped).filter((i) => i.entityId === 'filter-group')).toHaveLength(1);
+    expect(errors(grouped).filter((i) => i.path.at(-1) === 'outputSchemaId')).toHaveLength(1);
+  });
+
+  it('checks boundary match guards and request-to-response binding types', () => {
+    const doc = loadFixture('s01.json');
+    const scenario = doc.scenarios.find((s) => s.boundaries.some((b) => b.responses.length))!;
+    const boundary = scenario.boundaries.find((b) => b.responses.length)!;
+    const response = boundary.responses[0];
+    const modified: Document = { ...doc, scenarios: [{ ...scenario, boundaries: scenario.boundaries.map((b) => b.id === boundary.id ? {
+      ...b, responses: [{ ...response, match: { op: 'positiveInteger', value: { kind: 'literal', value: false } }, payloadBindings: [{ targetPath: ['requestId'], requestPath: [] }] }],
+    } : b) }] };
+    expect(errors(modified).some((i) => i.path.includes('match'))).toBe(true);
+    // A whole request record cannot be bound into the string requestId field.
+    expect(errors(modified).some((i) => i.path.includes('payloadBindings'))).toBe(true);
+  });
+
+  it('keeps invalid expression types storable, and ignores excluded incomplete elements', () => {
+    const doc = loadFixture('s01.json');
+    const edited: Document = { ...doc, elements: doc.elements.map((el) => el.behavior.kind === 'machine' ? {
+      ...el, behavior: { ...el.behavior, transitions: el.behavior.transitions.map((t, i) => i === 0 ? { ...t, guard: { op: 'nonEmpty', value: { kind: 'literal', value: false } } } : t) },
+    } : el) };
+    expect(validateDocument(edited).ok).toBe(true);
+    expect(errors(edited).length).toBeGreaterThan(0);
+    const excluded = expressionDoc({ op: 'nonEmpty', value: literal(false) }).elements[0];
+    expect(errors({ ...doc, elements: [...doc.elements, excluded] })).toEqual([]);
+  });
+});
+
 function unmodeledElement(id: string, ports: Port[] = []): Element {
   return {
     id,
@@ -1190,4 +1387,3 @@ describe('RV-02f runnable-readiness rejects', () => {
     });
   });
 });
-
