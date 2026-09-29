@@ -5,7 +5,9 @@ export interface TextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, ...props }, ref) => {
+  ({ className, placeholder = ' ', ...props }, ref) => {
+    // placeholder=' ' lets the :placeholder-shown fill rule (shell at rest, white once filled)
+    // work on fields that have no visible placeholder.
     return (
       <textarea
         data-slot="textarea"
@@ -14,6 +16,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           className
         )}
         ref={ref}
+        placeholder={placeholder}
         {...props}
       />
     );

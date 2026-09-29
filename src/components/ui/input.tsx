@@ -5,7 +5,9 @@ export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, placeholder = ' ', ...props }, ref) => {
+    // placeholder=' ' lets the :placeholder-shown fill rule (shell at rest, white once filled)
+    // work on fields that have no visible placeholder.
     return (
       <input
         type={type}
@@ -15,6 +17,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           className
         )}
         ref={ref}
+        placeholder={placeholder}
         {...props}
       />
     );

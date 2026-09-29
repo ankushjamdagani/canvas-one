@@ -143,7 +143,7 @@ export function TopBar({
               autoFocus
               data-testid="project-title-input"
               aria-label="Project title"
-              className="h-6 px-1.5 text-xs w-28 sm:w-40 bg-canvas border-control-border"
+              className="h-6 px-1.5 text-xs w-28 sm:w-40"
               value={titleDraft}
               maxLength={80}
               onChange={(e) => setTitleDraft(e.target.value)}

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Input } from '@/components/ui/input';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -788,7 +789,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             data-testid="view-selector"
             value={projection.activeView?.id ?? ''}
             onChange={(e) => onSelectView(e.target.value)}
-            className="h-6 text-xs bg-canvas px-2 rounded-tag border-control-border"
+            className="h-6 text-xs px-2 rounded-tag"
           >
             {projection.views.map((v) => (
               <option key={v.id} value={v.id}>
@@ -894,7 +895,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
           <label className="block mb-2">
             <span className="block text-secondary-text mb-0.5">Request class</span>
-            <input
+            <Input
               data-testid="connect-form-request-class"
               list={requestClassListId}
               placeholder="Choose or name a class"
@@ -902,7 +903,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               type="text"
               value={resourceForm.requestClass}
               onChange={(e) => setResourceForm({ ...resourceForm, requestClass: e.target.value, error: null })}
-              className="w-full h-7 px-2 rounded-tag border border-control-border bg-canvas text-ink"
+              className="h-8 text-xs"
             />
             <datalist id={requestClassListId}>
               {requestClasses.map((entry) => (
@@ -939,13 +940,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
           <label className="block mb-2">
             <span className="block text-secondary-text mb-0.5">Deadline (ms)</span>
-            <input
+            <Input
               data-testid="connect-form-deadline"
               type="number"
               min={1}
               value={resourceForm.deadlineMs}
               onChange={(e) => setResourceForm({ ...resourceForm, deadlineMs: e.target.value, error: null })}
-              className="w-full h-7 px-2 rounded-tag border border-control-border bg-canvas text-ink"
+              className="h-8 text-xs"
             />
           </label>
 
