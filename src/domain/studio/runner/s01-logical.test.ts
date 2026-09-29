@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runLogicalScenario } from './logical';
+import { runScenario } from './scenario-runner';
 import type { Document } from '../model';
 import { canonicalJson } from '../canonical';
 
@@ -11,14 +11,19 @@ function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
 }
 
-describe('logical runner: S01 reference fixture', () => {
+/**
+ * S01 logical-mode facts through the production runner (runScenario). Migrated from the
+ * RV-14b logical interpreter's tests when that interpreter was retired: authored
+ * assertions, §11 trace facts, determinism and budget exhaustion.
+ */
+describe('logical mode: S01 reference fixture through runScenario', () => {
   const s01Doc = loadFixture('s01.json');
 
   it('runs scenario 1 (Invalid cart): passes all authored assertions', async () => {
     const scenarioId = '63096c28-fb95-589b-ac92-178597be9c0d';
     const runId = '00000000-0000-0000-0000-000000000001';
 
-    const result = await runLogicalScenario(s01Doc, scenarioId, runId);
+    const result = await runScenario(s01Doc, scenarioId, runId);
 
     expect(result.status).toBe('completed');
     expect(result.reason).toBeNull();
@@ -44,7 +49,7 @@ describe('logical runner: S01 reference fixture', () => {
     const scenarioId = '425ec755-23cd-56f9-ab2f-1b1ae8ab18d6';
     const runId = '00000000-0000-0000-0000-000000000002';
 
-    const result = await runLogicalScenario(s01Doc, scenarioId, runId);
+    const result = await runScenario(s01Doc, scenarioId, runId);
 
     expect(result.status).toBe('completed');
     expect(result.reason).toBeNull();
@@ -79,7 +84,7 @@ describe('logical runner: S01 reference fixture', () => {
     const scenarioId = 'c90abfe5-387e-556c-85cc-a246dd3aeec4';
     const runId = '00000000-0000-0000-0000-000000000003';
 
-    const result = await runLogicalScenario(s01Doc, scenarioId, runId);
+    const result = await runScenario(s01Doc, scenarioId, runId);
 
     expect(result.status).toBe('completed');
     expect(result.reason).toBeNull();
@@ -120,8 +125,8 @@ describe('logical runner: S01 reference fixture', () => {
     const scenarioId = 'c90abfe5-387e-556c-85cc-a246dd3aeec4';
     const runId = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
-    const run1 = await runLogicalScenario(s01Doc, scenarioId, runId);
-    const run2 = await runLogicalScenario(s01Doc, scenarioId, runId);
+    const run1 = await runScenario(s01Doc, scenarioId, runId);
+    const run2 = await runScenario(s01Doc, scenarioId, runId);
 
     const canonEvents1 = canonicalJson(run1.events);
     const canonEvents2 = canonicalJson(run2.events);
@@ -140,43 +145,6 @@ describe('logical runner: S01 reference fixture', () => {
     }
   });
 
-  it('rejects unsupported behavior kinds in scope with unsupported-behavior-rv14b', async () => {
-    const invalidDoc: Document = {
-      ...s01Doc,
-      elements: [
-        ...s01Doc.elements,
-        {
-          id: 'pipe-1',
-          label: 'Pipeline',
-          description: '',
-          visualKind: 'data-pipeline',
-          ports: [],
-          behavior: {
-            kind: 'pipeline',
-            version: 1,
-            inputSchemaId: 's1',
-            outputSchemaId: 's2',
-            errorSchemaId: 's3',
-            inputPortId: 'p1',
-            outputPortId: 'p2',
-            errorPortId: 'p3',
-            operations: [],
-          },
-        },
-      ],
-      scenarios: [
-        {
-          ...s01Doc.scenarios[0],
-          id: 'sc-pipe',
-          scopeElementIds: ['pipe-1'],
-        },
-      ],
-    };
-
-    const res = await runLogicalScenario(invalidDoc, 'sc-pipe', 'run-test');
-    expect(res.status).toBe('invalid');
-    expect(res.reason).toContain('unsupported-behavior-rv14b');
-  });
 
   it('honours maxEvents budget and returns incomplete', async () => {
     const budgetDoc: Document = {
@@ -193,7 +161,7 @@ describe('logical runner: S01 reference fixture', () => {
       ],
     };
 
-    const res = await runLogicalScenario(budgetDoc, 'sc-budget', 'run-budget');
+    const res = await runScenario(budgetDoc, 'sc-budget', 'run-budget');
     expect(res.status).toBe('incomplete');
     expect(res.reason).toContain('Budget exhausted');
   });
@@ -213,7 +181,7 @@ describe('logical runner: S01 reference fixture', () => {
       ],
     };
 
-    const res = await runLogicalScenario(budgetDoc, 'sc-rows-budget', 'run-rows-budget');
+    const res = await runScenario(budgetDoc, 'sc-rows-budget', 'run-rows-budget');
     expect(res.status).toBe('incomplete');
     expect(res.reason).toContain('Budget exhausted');
   });

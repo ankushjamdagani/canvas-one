@@ -431,6 +431,9 @@ export class ScenarioRunner {
   private isFinished = false;
   private terminalStatus: TerminalStatus = 'incomplete';
   private failureReason: string | null = null;
+  // First budget stop (storage.md §6, run-identity.md: an exhausted step/trace budget ends
+  // the run 'incomplete'). Errors that cascade from that stop must not turn it into 'failed'.
+  private budgetStop: string | null = null;
   private readonly signal?: AbortSignal;
 
   constructor(document: Document, scenarioId: Id, runId: string, options: ScenarioRunnerOptions = {}) {
@@ -872,6 +875,15 @@ export class ScenarioRunner {
    * ever letting an unresolved journey surface as 'unknown'. Returns true when the run was
    * just ended so the caller can return immediately.
    */
+  /** A trace row/byte cap refused an append: stop the run 'incomplete' (storage.md §6). */
+  private recorderCapHit(): { readonly ok: false; readonly error: string } {
+    this.budgetStop ??= `Budget exhausted: ${this.recorder.stopReason ?? 'trace limit reached'}`;
+    this.terminalStatus = 'incomplete';
+    this.failureReason = this.budgetStop;
+    this.isFinished = true;
+    return { ok: false, error: this.budgetStop };
+  }
+
   private failOnUnresolvedJourney(): boolean {
     const failure = this.adapter?.takeJourneyFailure() ?? null;
     if (!failure) return false;
@@ -997,7 +1009,7 @@ export class ScenarioRunner {
         this.processedEvents++;
         if (this.processedEvents > this.scenario.budgets.maxEvents) {
           this.terminalStatus = 'incomplete';
-          this.failureReason = 'Budget exhausted: maxEvents limit reached';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: maxEvents limit reached';
           this.isFinished = true;
           return { ok: false, error: this.failureReason };
         }
@@ -1016,7 +1028,7 @@ export class ScenarioRunner {
           atMs,
           outcome: null,
         });
-        if (!appendRes.ok) return { ok: false, error: 'Recorder limit reached' };
+        if (!appendRes.ok) return this.recorderCapHit();
 
         const nextCtx: InvocationContext = {
           ...context,
@@ -1043,7 +1055,7 @@ export class ScenarioRunner {
       this.processedEvents++;
       if (this.processedEvents > this.scenario.budgets.maxEvents) {
         this.terminalStatus = 'incomplete';
-        this.failureReason = 'Budget exhausted: maxEvents limit reached';
+        this.failureReason = this.budgetStop ??= 'Budget exhausted: maxEvents limit reached';
         this.isFinished = true;
         return { ok: false, error: this.failureReason };
       }
@@ -1062,7 +1074,7 @@ export class ScenarioRunner {
         atMs,
         outcome: null,
       });
-      if (!appendRes.ok) return { ok: false, error: 'Recorder limit reached' };
+      if (!appendRes.ok) return this.recorderCapHit();
 
       const nextCtx: InvocationContext = {
         ...context,
@@ -1142,7 +1154,7 @@ export class ScenarioRunner {
       this.processedEvents++;
       if (this.processedEvents > this.scenario.budgets.maxEvents) {
         this.terminalStatus = 'incomplete';
-        this.failureReason = 'Budget exhausted: maxEvents limit reached';
+        this.failureReason = this.budgetStop ??= 'Budget exhausted: maxEvents limit reached';
         this.isFinished = true;
         return { ok: false, error: this.failureReason };
       }
@@ -1158,7 +1170,7 @@ export class ScenarioRunner {
         atMs,
         outcome: null,
       });
-      if (!appendRes.ok) return { ok: false, error: 'Recorder limit reached' };
+      if (!appendRes.ok) return this.recorderCapHit();
     }
 
     // Process emissions
@@ -1166,7 +1178,7 @@ export class ScenarioRunner {
       this.processedEvents++;
       if (this.processedEvents > this.scenario.budgets.maxEvents) {
         this.terminalStatus = 'incomplete';
-        this.failureReason = 'Budget exhausted: maxEvents limit reached';
+        this.failureReason = this.budgetStop ??= 'Budget exhausted: maxEvents limit reached';
         this.isFinished = true;
         return { ok: false, error: this.failureReason };
       }
@@ -1185,7 +1197,7 @@ export class ScenarioRunner {
         atMs,
         outcome: null,
       });
-      if (!appendRes.ok) return { ok: false, error: 'Recorder limit reached' };
+      if (!appendRes.ok) return this.recorderCapHit();
 
       const emitContext: InvocationContext = {
         ...context,
@@ -1380,7 +1392,7 @@ export class ScenarioRunner {
         atMs,
         outcome: reply.outcome,
       });
-      if (!appendRes.ok) return { ok: false, error: 'Recorder limit reached' };
+      if (!appendRes.ok) return this.recorderCapHit();
     }
 
     return { ok: true };
@@ -1454,14 +1466,14 @@ export class ScenarioRunner {
     // Check budget limits
     if (this.recorder.stopped) {
       this.terminalStatus = 'incomplete';
-      this.failureReason = `Budget exhausted: ${this.recorder.stopReason}`;
+      this.failureReason = this.budgetStop ??= `Budget exhausted: ${this.recorder.stopReason}`;
       this.isFinished = true;
       return false;
     }
 
     if (this.processedEvents >= this.scenario.budgets.maxEvents) {
       this.terminalStatus = 'incomplete';
-      this.failureReason = 'Budget exhausted: maxEvents limit reached';
+      this.failureReason = this.budgetStop ??= 'Budget exhausted: maxEvents limit reached';
       this.isFinished = true;
       return false;
     }
@@ -1469,7 +1481,7 @@ export class ScenarioRunner {
     const liveRoots = this.rootCounts.inFlight + this.messageCounts.inFlight;
     if (liveRoots > this.scenario.budgets.maxLiveRoots) {
       this.terminalStatus = 'incomplete';
-      this.failureReason = 'Budget exhausted: maxLiveRoots limit reached';
+      this.failureReason = this.budgetStop ??= 'Budget exhausted: maxLiveRoots limit reached';
       this.isFinished = true;
       return false;
     }
@@ -1506,7 +1518,7 @@ export class ScenarioRunner {
         });
         if (!appendRes.ok) {
           this.terminalStatus = 'incomplete';
-          this.failureReason = 'Budget exhausted: recorder cap hit';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
           this.isFinished = true;
           return false;
         }
@@ -1566,7 +1578,7 @@ export class ScenarioRunner {
         });
         if (!inputAppend.ok) {
           this.terminalStatus = 'incomplete';
-          this.failureReason = 'Budget exhausted: recorder cap hit';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
           this.isFinished = true;
           return false;
         }
@@ -1733,7 +1745,7 @@ export class ScenarioRunner {
         });
         if (!appendRes.ok) {
           this.terminalStatus = 'incomplete';
-          this.failureReason = 'Budget exhausted: recorder cap hit';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
           this.isFinished = true;
           return false;
         }
@@ -1859,7 +1871,7 @@ export class ScenarioRunner {
         });
         if (!inputAppend.ok) {
           this.terminalStatus = 'incomplete';
-          this.failureReason = 'Budget exhausted: recorder cap hit';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
           this.isFinished = true;
           return false;
         }
@@ -1914,7 +1926,7 @@ export class ScenarioRunner {
             });
             if (!appendRes.ok) {
               this.terminalStatus = 'incomplete';
-              this.failureReason = 'Budget exhausted: recorder cap hit';
+              this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
               this.isFinished = true;
               return false;
             }
@@ -1986,7 +1998,7 @@ export class ScenarioRunner {
           });
           if (!appendRes.ok) {
             this.terminalStatus = 'incomplete';
-            this.failureReason = 'Budget exhausted: recorder cap hit';
+            this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
             this.isFinished = true;
             return false;
           }
@@ -2051,7 +2063,7 @@ export class ScenarioRunner {
           });
           if (!appendRes.ok) {
             this.terminalStatus = 'incomplete';
-            this.failureReason = 'Budget exhausted: recorder cap hit';
+            this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
             this.isFinished = true;
             return false;
           }
@@ -2116,7 +2128,7 @@ export class ScenarioRunner {
         });
         if (!appendRes.ok) {
           this.terminalStatus = 'incomplete';
-          this.failureReason = 'Budget exhausted: recorder cap hit';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
           this.isFinished = true;
           return false;
         }
@@ -2217,11 +2229,11 @@ export class ScenarioRunner {
     const checks = evaluateAssertions(this.scenario.assertions, summary, this.recorder.events);
 
     return {
-      status: this.terminalStatus,
+      status: this.budgetStop !== null && this.terminalStatus === 'failed' ? 'incomplete' : this.terminalStatus,
       events: this.recorder.events,
       summary,
       checks,
-      reason: this.failureReason,
+      reason: this.budgetStop !== null && this.terminalStatus === 'failed' ? this.budgetStop : this.failureReason,
       issues: this.issues,
     };
   }
