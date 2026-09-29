@@ -4,6 +4,16 @@ async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
 }
 
+async function expectHeaderBelowTopBar(page: Page, name: string) {
+  await expect
+    .poll(async () => {
+      const bar = await page.getByTestId('workspace-topbar').boundingBox();
+      const toggle = await page.getByRole('button', { name }).boundingBox();
+      return bar && toggle ? toggle.y - (bar.y + bar.height) : -Infinity;
+    })
+    .toBeGreaterThanOrEqual(0);
+}
+
 test.describe('Studio canvas collapse and expand (RV-04g)', () => {
   test('collapses a group, undoes, redoes and persists across reload', async ({ page }) => {
     await page.goto('/');
@@ -23,9 +33,9 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     const boundary = page.locator('.group-boundary', { hasText: 'Entry pair' });
     await expect(boundary).toBeVisible();
 
-    // Boundary header toggle collapses the group (fit first: the header sits above the members).
-    await page.getByTestId('dock-fit-view-btn').click();
-    await page.waitForTimeout(300);
+    // Boundary header toggle collapses the group. RV-13a: the header must sit below the top bar
+    // without any fit gesture first.
+    await expectHeaderBelowTopBar(page, 'Collapse group Entry pair');
     await page.getByRole('button', { name: 'Collapse group Entry pair' }).click();
     await waitForIdle(page);
     await expect(nodes).toHaveCount(total - 2);
@@ -55,9 +65,8 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     const reloaded = page.locator('.group-boundary', { hasText: 'Entry pair' });
     await expect(reloaded).toHaveAttribute('data-collapsed', 'true');
 
-    // Expand again from the boundary toggle.
-    await page.getByTestId('dock-fit-view-btn').click();
-    await page.waitForTimeout(300);
+    // Expand again from the boundary toggle (also reachable straight after reload).
+    await expectHeaderBelowTopBar(page, 'Expand group Entry pair');
     await page.getByRole('button', { name: 'Expand group Entry pair' }).click();
     await waitForIdle(page);
     await expect(page.locator('.component-node')).toHaveCount(total);

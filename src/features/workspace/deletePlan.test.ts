@@ -4,6 +4,7 @@ import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import type { RecordChange } from '../../persistence/studio/types';
 import { placeEntry } from '../catalog/place';
 import { planConnection } from '../catalog/connect';
+import s05 from '../../../specs/revamp/fixtures/s05.json';
 import { planDelete } from './deletePlan';
 
 function createMintId(): () => Id {
@@ -173,8 +174,8 @@ describe('planDelete', () => {
           initialContexts: [],
           assertions: [],
           seed: 1,
-          budgets: { maxEvents: 10000, maxSimMs: 60000, maxWallMs: 5000 } as any,
-          completion: { kind: 'quiescent' } as any,
+          budgets: { maxEvents: 10000, maxTraceRows: 1000, maxTraceBytes: 1000000, maxScheduledEvents: 10000, maxLiveRoots: 1000 },
+          completion: { kind: 'quiescent' },
           assumptions: [],
         },
       ],
@@ -209,8 +210,8 @@ describe('planDelete', () => {
           initialContexts: [],
           assertions: [],
           seed: 1,
-          budgets: { maxEvents: 10000, maxSimMs: 60000, maxWallMs: 5000 } as any,
-          completion: { kind: 'quiescent' } as any,
+          budgets: { maxEvents: 10000, maxTraceRows: 1000, maxTraceBytes: 1000000, maxScheduledEvents: 10000, maxLiveRoots: 1000 },
+          completion: { kind: 'quiescent' },
           assumptions: [],
         },
       ],
@@ -246,5 +247,39 @@ describe('planDelete', () => {
       connectionIds: [plan1.connectionId],
     });
     expect(plan.removedConnectionIds).toEqual([plan1.connectionId]);
+  });
+
+  it('RV-13a: every S05 element is deletable; scenario references are repaired in one valid batch', () => {
+    const doc = s05 as unknown as Document;
+    const view = doc.views[0];
+    for (const element of doc.elements) {
+      const plan = planDelete(doc, view.id, { elementIds: [element.id], connectionIds: [] });
+      expect(plan.blockedReason, element.label).toBeNull();
+      const res = applyRecordChanges(doc, plan.changes);
+      expect(res.ok, element.label).toBe(true);
+      if (!res.ok) continue;
+      expect(res.document.elements.some((e) => e.id === element.id)).toBe(false);
+      const json = JSON.stringify(res.document.scenarios);
+      expect(json.includes(element.id), element.label).toBe(false);
+    }
+  });
+
+  it('RV-13a: previews scenario repairs and requires confirmation for a scenario-referenced node', () => {
+    const doc = s05 as unknown as Document;
+    const checkout = doc.elements.find((e) => e.label === 'Checkout')!;
+    const plan = planDelete(doc, doc.views[0].id, { elementIds: [checkout.id], connectionIds: [] });
+    expect(plan.requiresConfirmation).toBe(true);
+    expect(plan.affectedScenarioLabels).toContain('Accepted and fulfilled');
+    expect(plan.scenarioRepairSummaries[0]).toMatch(/Accepted and fulfilled: .*input/);
+  });
+
+  it('RV-13a: blocks (does not offer a doomed confirm) when repairs cannot validate', () => {
+    const doc = s05 as unknown as Document;
+    // A fixture-referencing schema cannot be repaired by this plan: corrupt the doc so validation fails regardless.
+    const broken: Document = { ...doc, views: doc.views.map((v) => ({ ...v, connectionIds: [...v.connectionIds, 'ghost'] })) };
+    const el = doc.elements[0];
+    const plan = planDelete(broken, doc.views[0].id, { elementIds: [el.id], connectionIds: [] });
+    expect(plan.blockedReason).not.toBeNull();
+    expect(plan.requiresConfirmation).toBe(true);
   });
 });

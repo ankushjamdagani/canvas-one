@@ -7,6 +7,7 @@ import {
   useEdgesState,
   useReactFlow,
   useViewport,
+  useNodesInitialized,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -176,6 +177,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
   const { zoom } = useViewport();
+  const nodesInitialized = useNodesInitialized();
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   const projection = React.useMemo(() => {
@@ -364,25 +366,76 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   // full 0.1–2 contract clamp.
   const lastFittedKeyRef = React.useRef<string | null>(null);
 
+  // RV-13a: the fit must wait until the view's nodes are measured. A fixed 50 ms
+  // timer could fire before ReactFlow had the nodes (after a reload), leaving the
+  // default viewport so content -- notably a group header above its members --
+  // sat outside the canvas.
   React.useEffect(() => {
     const docId = document?.id;
     const viewId = projection.activeView?.id;
     if (!docId || !viewId) return;
 
     const key = `${docId}:${viewId}`;
-    if (lastFittedKeyRef.current !== key) {
+    if (lastFittedKeyRef.current === key) return;
+    if (projection.nodes.length === 0) {
+      // Empty view: nothing to fit, and the first placement must not move the camera.
       lastFittedKeyRef.current = key;
-      const timer = setTimeout(() => {
-        reactFlow.fitView({
-          padding: '32px',
-          minZoom: 0.1,
-          maxZoom: 1,
-          duration: 0,
-        });
-      }, 50);
-      return () => clearTimeout(timer);
+      return;
     }
-  }, [document?.id, projection.activeView?.id, reactFlow]);
+    if (!nodesInitialized || nodes.length === 0) return;
+    lastFittedKeyRef.current = key;
+    void reactFlow.fitView({
+      padding: '32px',
+      minZoom: 0.1,
+      maxZoom: 1,
+      duration: 0,
+    });
+  }, [document?.id, projection.activeView?.id, projection.nodes.length, nodesInitialized, nodes.length, reactFlow]);
+
+  // RV-13a: creating a group draws its boundary GROUP_PADDING_Y_TOP above the
+  // members, which can leave the header (and its collapse chevron) outside the
+  // visible canvas -- under the top bar -- because the open-time fit only knew
+  // about the members. When a group appears in the active view, pan (never
+  // zoom) just enough to bring its box inside the canvas with a 32 px margin.
+  const seenGroupsRef = React.useRef<{ key: string; ids: ReadonlySet<string> } | null>(null);
+  React.useEffect(() => {
+    const docId = document?.id;
+    const viewId = projection.activeView?.id;
+    if (!docId || !viewId) return;
+    const key = `${docId}:${viewId}`;
+    const groupNodes = projection.nodes.filter((n) => n.type === 'groupNode');
+    const ids = new Set(groupNodes.map((n) => n.id));
+    const previous = seenGroupsRef.current;
+    seenGroupsRef.current = { key, ids };
+    if (!previous || previous.key !== key) return;
+    const created = groupNodes.filter((n) => !previous.ids.has(n.id));
+    if (created.length === 0) return;
+    const frame = requestAnimationFrame(() => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const viewport = reactFlow.getViewport();
+      const margin = 32;
+      let dx = 0;
+      let dy = 0;
+      for (const node of created) {
+        const data = node.data as { width: number; height: number };
+        const left = node.position.x * viewport.zoom + viewport.x;
+        const top = node.position.y * viewport.zoom + viewport.y;
+        const right = left + data.width * viewport.zoom;
+        const bottom = top + data.height * viewport.zoom;
+        if (top + dy < margin) dy = margin - top;
+        else if (bottom + dy > rect.height - margin) dy = Math.min(dy, rect.height - margin - bottom);
+        if (left + dx < margin) dx = margin - left;
+        else if (right + dx > rect.width - margin) dx = Math.min(dx, rect.width - margin - right);
+      }
+      if (dx === 0 && dy === 0) return;
+      void reactFlow.setViewport(
+        { x: viewport.x + dx, y: viewport.y + dy, zoom: viewport.zoom },
+        { duration: 150 },
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [document?.id, projection, reactFlow]);
 
   const applyPlacement = React.useCallback(
     async (entryId: string, anchor: { x: number; y: number }) => {
@@ -584,6 +637,9 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   // ==========================================================================
 
   const [deleteConfirm, setDeleteConfirm] = React.useState<DeletePlan | null>(null);
+  // Failures must never be silent: a rejected delete keeps the dialog open with the reason.
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+  const DELETE_FAILED_MESSAGE = 'Could not delete the selection. Nothing was changed.';
 
   const currentSelection = React.useMemo(
     () => ({
@@ -598,11 +654,17 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     (plan: DeletePlan) => {
       if (plan.changes.length === 0) return;
       if (plan.requiresConfirmation) {
+        setDeleteError(null);
         setDeleteConfirm(plan);
         return;
       }
       void onApplyChanges(plan.changes, 'Delete').then((applied) => {
-        if (applied) onRequestClearSelection?.();
+        if (applied) {
+          onRequestClearSelection?.();
+          return;
+        }
+        setDeleteError(DELETE_FAILED_MESSAGE);
+        setDeleteConfirm(plan);
       });
     },
     [onApplyChanges, onRequestClearSelection],
@@ -615,10 +677,15 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   }, [document, projection.activeView, isSaving, hasSelection, currentSelection, runDeletePlan]);
 
   const confirmDelete = React.useCallback(async () => {
-    if (!deleteConfirm) return;
+    if (!deleteConfirm || deleteConfirm.blockedReason) return;
     const applied = await onApplyChanges(deleteConfirm.changes, 'Delete');
-    setDeleteConfirm(null);
-    if (applied) onRequestClearSelection?.();
+    if (applied) {
+      setDeleteConfirm(null);
+      setDeleteError(null);
+      onRequestClearSelection?.();
+    } else {
+      setDeleteError(DELETE_FAILED_MESSAGE);
+    }
   }, [deleteConfirm, onApplyChanges, onRequestClearSelection]);
 
   const handleCanvasKeyDown = React.useCallback(
@@ -920,32 +987,54 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         }}
       />
 
-      {/* Delete confirmation when a scenario references what would be removed */}
-      <Dialog open={deleteConfirm !== null} onOpenChange={(next) => { if (!next) setDeleteConfirm(null); }}>
+      {/* Delete dependency preview: removals, scenario repairs, or why it cannot be applied */}
+      <Dialog open={deleteConfirm !== null} onOpenChange={(next) => { if (!next) { setDeleteConfirm(null); setDeleteError(null); } }}>
         <DialogContent data-testid="delete-confirm-dialog" className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete will affect scenarios</DialogTitle>
+            <DialogTitle>
+              {deleteConfirm?.blockedReason || (deleteError && deleteConfirm?.affectedScenarioLabels.length === 0)
+                ? "Can't delete this selection"
+                : 'Delete will affect scenarios'}
+            </DialogTitle>
             <DialogDescription>
-              {deleteConfirm && (
+              {deleteConfirm && !deleteConfirm.blockedReason && deleteConfirm.affectedScenarioLabels.length > 0 && (
                 <>
-                  These scenarios reference what you're deleting and will need attention:{' '}
-                  <strong>{deleteConfirm.affectedScenarioLabels.join(', ')}</strong>.
+                  Deleting removes {deleteConfirm.removedElementIds.length} element
+                  {deleteConfirm.removedElementIds.length === 1 ? '' : 's'} and{' '}
+                  {deleteConfirm.removedConnectionIds.length} connection
+                  {deleteConfirm.removedConnectionIds.length === 1 ? '' : 's'}. These scenarios reference
+                  them and will be repaired:
                 </>
               )}
+              {deleteConfirm?.blockedReason && <>The project would be invalid afterwards: {deleteConfirm.blockedReason}</>}
             </DialogDescription>
           </DialogHeader>
+          {deleteConfirm && !deleteConfirm.blockedReason && deleteConfirm.scenarioRepairSummaries.length > 0 && (
+            <ul data-testid="delete-confirm-repairs" className="list-disc space-y-1 pl-5 text-sm text-secondary-text">
+              {deleteConfirm.scenarioRepairSummaries.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+          {deleteError && (
+            <p role="alert" data-testid="delete-error" className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
           <DialogFooter className="flex-row justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirm(null)}>
-              Cancel
+            <Button type="button" variant="ghost" onClick={() => { setDeleteConfirm(null); setDeleteError(null); }}>
+              {deleteConfirm?.blockedReason ? 'Close' : 'Cancel'}
             </Button>
-            <Button
-              data-testid="delete-confirm-btn"
-              type="button"
-              variant="destructive"
-              onClick={() => void confirmDelete()}
-            >
-              Delete
-            </Button>
+            {deleteConfirm && !deleteConfirm.blockedReason && deleteConfirm.affectedScenarioLabels.length > 0 && (
+              <Button
+                data-testid="delete-confirm-btn"
+                type="button"
+                variant="destructive"
+                onClick={() => void confirmDelete()}
+              >
+                Delete
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
