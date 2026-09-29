@@ -262,7 +262,12 @@ export function BranchPopover({
                   <button
                     type="button"
                     data-testid={`branch-switch-${b.id}`}
-                    className={cn('flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-2 rounded-control text-left')}
+                    disabled={b.state === 'closed'}
+                    title={b.state === 'closed' ? 'Reopen this branch before switching to it' : undefined}
+                    className={cn(
+                      'flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-2 rounded-control text-left',
+                      b.state === 'closed' && 'cursor-default',
+                    )}
                     onClick={() => {
                       setOpen(false);
                       onSwitchBranch(b.id);

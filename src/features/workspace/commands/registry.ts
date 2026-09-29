@@ -289,6 +289,10 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
       if (payload.branchId === ctx.branchId) {
         return disabled('current', "You're on this branch");
       }
+      const target = ctx.branches.find((branch) => branch.id === payload.branchId);
+      if (target?.closed) {
+        return disabled('invalid-branch', 'Reopen this branch before switching to it');
+      }
       return ENABLED;
     },
   },

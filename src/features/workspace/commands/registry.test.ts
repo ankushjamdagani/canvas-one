@@ -118,6 +118,11 @@ describe('availability', () => {
       code: 'current',
     });
     expect(getAvailability('branch.switch', ctx, { branchId: MAIN })).toEqual({ enabled: true });
+    expect(getAvailability('branch.switch', ctx, { branchId: OTHER })).toMatchObject({
+      enabled: false,
+      code: 'invalid-branch',
+      reason: 'Reopen this branch before switching to it',
+    });
   });
 
   it('gives run.start the session reason first, then scenario readiness', () => {
