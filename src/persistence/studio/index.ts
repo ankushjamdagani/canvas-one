@@ -13,4 +13,4 @@ export * from './apply-records';
 export * from './recovery';
 export * from './switch-branch';
 export * from './candidates';
-
+export * from './parts';

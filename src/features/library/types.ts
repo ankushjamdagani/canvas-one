@@ -39,6 +39,7 @@ export interface LibraryPanelProps {
   className?: string;
   /** PanelHost already supplies the panel title, controls, and outer chrome. */
   hosted?: boolean;
+  renderSavedParts?: (searchQuery: string, view: LibraryView) => import('react').ReactNode;
 }
 
 /**

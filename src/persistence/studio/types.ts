@@ -698,6 +698,10 @@ export type SaveFailureRecoveryInfo = {
  * All nine methods specified in the contract.
  */
 export interface StudioRepository {
+  /** Detached parts belong only to this project's Library. */
+  previewPart(source: import('./parts').PartCaptureSource): Promise<import('./parts').PartCapturePreview | AuthoredResult>;
+  listParts(projectId: Id): Promise<readonly PartRecord[]>;
+  exportPart(projectId: Id, partId: Id, revision: number): Promise<ExportProjectResult>;
   /** Queries return cloned, read-only project record or null if not found. */
   loadProject(projectId: Id): Promise<Readonly<ProjectRecord> | null>;
 

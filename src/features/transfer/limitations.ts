@@ -8,7 +8,7 @@
 import type { ExportFormat } from './types';
 
 export const JSON_EXPORT_LIMITATIONS =
-  'Lossless for authored content, history, checkpoints, and run summaries. Transient preferences, undo history, and bulk trace chunks are excluded. Exported evidence is marked imported-unverified upon reimport.';
+  'Lossless for authored content, history, checkpoints, and run summaries. Transient preferences, undo history, and bulk trace chunks are excluded. Exported evidence is marked imported-unverified upon reimport. Move saved Library parts using standalone part files; project import does not add them to the new Library.';
 
 export const SVG_EXPORT_LIMITATIONS =
   'Vector rendition of the active view. Excludes execution traces, scenarios, and unpublished branch history. Measurements and configurations export only when intentionally visible in this view.';

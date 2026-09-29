@@ -35,6 +35,7 @@ import { validateDocument, type Issue, type IssueCode } from '../../domain/studi
 import type { Document, Id } from '../../domain/studio/model';
 import { computeSnapshotId } from './primitives';
 import { validateActor } from './primitives';
+import { validateSavedPart } from '../../domain/parts/validate';
 import {
   computePinClosure,
   type PinClosureState,
@@ -714,6 +715,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   });
 
   const parts: BundlePartRecord[] = [];
+  const partRevisionKeys = new Set<string>();
   rawParts.forEach((raw, i) => {
     const p = ['project', 'parts', i];
     if (!isPlainObject(raw)) {
@@ -727,7 +729,12 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const description = requireString(raw, 'description', p, issues);
     const createdAtPart = requireNumber(raw, 'createdAt', p, issues);
     if (pid !== null && revision !== null && label !== null && description !== null && createdAtPart !== null) {
-      parts.push({ id: pid, revision, label, description, content: raw.content, createdAt: createdAtPart });
+      const key = `${pid}:${revision}`;
+      if (partRevisionKeys.has(key)) issues.push(issue('duplicate-id', 'Duplicate part revision.', p));
+      partRevisionKeys.add(key);
+      const validated = validateSavedPart({ id: pid, revision, label, description, content: raw.content });
+      if (!validated.ok) issues.push(...validated.issues.map((entry) => ({ ...entry, path: [...p, ...entry.path] })));
+      else parts.push({ ...validated.value, createdAt: createdAtPart });
     }
   });
 

@@ -32,6 +32,7 @@ import { applyRecordChanges } from './apply-records';
 import { validateRunStartToken } from './token';
 import { validatePublishTicket } from './publish-ticket';
 import { FileTokenRegistry } from './file-tokens';
+import { PartRepository, type PartCaptureCommand, type PartCaptureSource, type PartImportCommand } from './parts';
 import { validatePortableBundle } from './bundle-validate';
 import { computePinClosure } from '../../domain/versioning/pin-closure';
 import {
@@ -157,6 +158,7 @@ export class LocalRepository implements StudioRepository {
    */
   private readonly mintId: (() => Id) | undefined;
   readonly fileTokens: FileTokenRegistry;
+  private readonly partRepository: PartRepository;
 
   constructor(
     db?: StudioDatabase,
@@ -177,7 +179,12 @@ export class LocalRepository implements StudioRepository {
       this.fileTokens =
         (options as LocalRepositoryOptions | undefined)?.fileTokens ?? new FileTokenRegistry();
     }
+    this.partRepository = new PartRepository(this.db, this.fileTokens, this.mintId);
   }
+
+  previewPart(source: PartCaptureSource) { return this.partRepository.preview(source); }
+  listParts(projectId: Id) { return this.partRepository.list(projectId); }
+  exportPart(projectId: Id, partId: Id, revision: number) { return this.partRepository.export(projectId, partId, revision); }
 
   /**
    * Loads a project by ID. Returns a cloned, read-only record or null if not found.
@@ -423,6 +430,9 @@ export class LocalRepository implements StudioRepository {
    */
   async execute(command: AuthoredCommand): Promise<AuthoredResult | UnsupportedResult> {
     switch (command.commandId) {
+      case 'part.capture':
+      case 'part.import':
+        return this.partRepository.execute(command as PartCaptureCommand | PartImportCommand);
       case 'project.create':
         return this.handleProjectCreate(command as ProjectCreateCommand);
       case 'project.rename':
@@ -4443,7 +4453,9 @@ export class LocalRepository implements StudioRepository {
       provenance: 'imported-unverified' as const,
       traceState: 'not-saved' as const,
     }));
-    const partRows: PartRecord[] = bundle.parts.map((p) => ({ ...p, projectId: newProjectId }));
+    // Parts remain in the backup for fidelity, but enter another Library only
+    // through a standalone part import with a fresh identity (storage.md §4).
+    const partRows: PartRecord[] = [];
 
     const changedIds: Id[] = [
       newProjectId,

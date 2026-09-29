@@ -22,6 +22,8 @@ import {
   type RecordChange,
   type SnapshotRecord,
   type StudioRepository,
+  type PartCaptureCommand,
+  type PartImportCommand,
 } from '../../persistence/studio';
 import { computeInverseChanges } from './inverse';
 import type {
@@ -447,6 +449,30 @@ export class SessionController {
     } finally {
       this.isInFlight = false;
     }
+  }
+
+  /** Part artifacts advance project revision without changing content or undo history. */
+  async savePart(command: PartCaptureCommand | PartImportCommand): Promise<SessionApplyResult> {
+    if (this.isInFlight) return { status: 'busy', message: 'An operation is currently in flight' };
+    if (this.state.status !== 'ready' || this.state.needsReload || command.projectId !== this.state.projectId) {
+      return { status: 'invalid', issues: [createIssue('structural-rule', 'Open the source project before saving a part.', [])] };
+    }
+    if (command.commandId === 'part.capture' && command.branchId !== this.state.branchId) {
+      return { status: 'invalid', issues: [createIssue('structural-rule', 'The source branch changed. Review the selection again.', [])] };
+    }
+    this.isInFlight = true;
+    this.updateState({ status: 'saving' });
+    try {
+      const result = await this.repository.execute(command);
+      this.updateState(result.status === 'applied'
+        ? { status: 'ready', projectRevision: result.projectRevision, lastError: null }
+        : { status: 'ready', lastError: result });
+      return result;
+    } catch (error) {
+      const result = mapErrorToFailedResult(error);
+      this.updateState({ status: 'ready', lastError: result });
+      return result;
+    } finally { this.isInFlight = false; }
   }
 
   /**

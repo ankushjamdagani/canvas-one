@@ -50,6 +50,7 @@ export function LibraryPanel({
   initialSearchQuery = '',
   className,
   hosted = false,
+  renderSavedParts,
 }: LibraryPanelProps) {
   const [searchQuery, setSearchQuery] = React.useState(initialSearchQuery);
   const [internalSelectedId, setInternalSelectedId] = React.useState<string | null>(
@@ -261,7 +262,7 @@ export function LibraryPanel({
           {searchQuery.trim().length > 0 && (
             <div className="absolute right-2.5 flex items-center gap-1.5 text-[11px] font-mono text-[var(--color-secondary-text,#626D68)]">
               <span>
-                {filteredEntries.length} {filteredEntries.length === 1 ? 'match' : 'matches'}
+                {renderSavedParts ? 'Search active' : `${filteredEntries.length} ${filteredEntries.length === 1 ? 'match' : 'matches'}`}
               </span>
               <button
                 type="button"
@@ -325,12 +326,14 @@ export function LibraryPanel({
       </div>
 
       {/* 4. Entries Scroll Area */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+      {renderSavedParts?.(searchQuery, view)}
       <div
         ref={listContainerRef}
         role="listbox"
         aria-label="Component catalog entries"
         tabIndex={0}
-        className="flex-1 overflow-y-auto p-3 space-y-4 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary,#0B5C54)]"
+        className="p-3 space-y-4 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary,#0B5C54)]"
       >
         {filteredEntries.length === 0 ? (
           /* Empty state: clear search way out */
@@ -495,6 +498,7 @@ export function LibraryPanel({
       </div>
 
       {/* Floating Hover/Focus Detail Popover (Screen 12C) */}
+      </div>
       {activeDetailEntry && (
         <div
           className="hidden md:block absolute right-[102%] z-50 pointer-events-none"

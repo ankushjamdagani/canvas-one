@@ -27,6 +27,7 @@ import {
   DraftBehindMainBanner,
 } from '../history';
 import { LibraryPanel, type LibraryView } from '../library';
+import { SavedParts } from '../library/SavedParts';
 import type {
   BranchRecord,
   ProjectRecord,
@@ -1289,8 +1290,18 @@ export function Workspace({
   const canvasViewRef = React.useRef<CanvasViewHandle>(null);
 
   const openLibraryPanel = React.useCallback(() => {
-    panelDispatch({ type: 'OPEN', panel: 'library' });
-  }, [panelDispatch]);
+    runGuarded(() => panelDispatch({ type: 'OPEN', panel: 'library' }));
+  }, [panelDispatch, runGuarded]);
+
+  const placeSavedPart = React.useCallback(async (content: PartContent, label: string) => {
+    const live = session.getState().document;
+    if (!live || !activeViewId || !canvasViewRef.current) return false;
+    const plan = planPlacement(live, activeViewId, content, canvasViewRef.current.getVisibleCentre(), mintId);
+    if (!plan.ok) throw { status: 'invalid', issues: plan.issues };
+    const applied = await handleApplyChanges(plan.changes, `Place ${label}`);
+    if (applied) openInspectorFor({ kind: 'element', ids: [...plan.newElementIds] });
+    return applied;
+  }, [session, activeViewId, mintId, handleApplyChanges, openInspectorFor]);
 
   const renderPanel = React.useCallback(
     (panelId: PanelId): React.ReactNode => {
@@ -1340,6 +1351,12 @@ export function Workspace({
           hosted
           view={libraryView}
           onViewChange={setLibraryView}
+          renderSavedParts={(searchQuery, view) => <SavedParts
+            repository={repository} session={session} actor={actor} mintId={mintId}
+            viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[]}
+            blockedReason={draft?.dirty || scenarioDraft?.dirty || scenarioDraft?.isNew ? 'Apply or Cancel configuration changes before using saved parts.' : null}
+            onPlace={placeSavedPart} searchQuery={searchQuery} view={view}
+          />}
           onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
           onClose={() => panelDispatch({ type: 'CLOSE', panel: 'library' })}
         />
@@ -1356,6 +1373,8 @@ export function Workspace({
       sessionState.canUndo,
       sessionState.canRedo,
       sessionState.status,
+      repository, session, actor, mintId, activeViewId, selectedElementIds,
+      draft?.dirty, scenarioDraft?.dirty, scenarioDraft?.isNew, placeSavedPart,
     ],
   );
 
@@ -1875,7 +1894,7 @@ export function Workspace({
         ) : null}
       </div>
 
-      {draft && isMobileInspector ? (
+      {draft && isMobileInspector && panelState.activeOverlay !== 'library' && panelState.activeOverlay !== 'history' ? (
         <div
           data-testid="inspector-sheet-overlay"
           // RV-05b review round 1: an explicit h-[70vh] (not just max-h) gives the
@@ -1900,7 +1919,7 @@ export function Workspace({
         </div>
       ) : null}
 
-      {scenarioDraft && document && isMobileInspector ? (
+      {scenarioDraft && document && isMobileInspector && panelState.activeOverlay !== 'library' && panelState.activeOverlay !== 'history' ? (
         <div
           data-testid="scenario-inspector-sheet-overlay"
           className="fixed inset-x-0 bottom-0 z-modal h-[70vh] max-h-[70vh] overflow-hidden shadow-md rounded-t-lg border-t border-control-border bg-panel"
