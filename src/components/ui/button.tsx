@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Slot, Slottable } from "@radix-ui/react-slot";
 import { Loader2 } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
@@ -72,13 +72,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           : { disabled: isDisabled })}
         {...props}
       >
-        {loading && !asChild && (
+        {loading && (
           <Loader2
             aria-hidden="true"
             className="animate-spin motion-reduce:animate-none"
           />
         )}
-        {children}
+        {/* Slottable lets the spinner render inside an asChild element too. */}
+        {asChild ? <Slottable>{children}</Slottable> : children}
       </Comp>
     );
   }

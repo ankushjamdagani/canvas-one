@@ -443,7 +443,7 @@ export function ScenarioRunControl({
               type="button"
               data-testid="scenario-pause-btn"
               onClick={onPause}
-              className="h-full px-2.5 flex items-center gap-1 text-xs font-semibold bg-[#8A6A1F] text-white hover:opacity-90 active:opacity-100 transition-colors cursor-pointer"
+              className="h-full px-2.5 flex items-center gap-1 text-xs font-semibold bg-warning-text text-primary-foreground hover:opacity-90 active:opacity-100 transition-colors cursor-pointer"
               aria-label="Pause execution"
             >
               <Pause className="size-3.5 fill-current" aria-hidden="true" />

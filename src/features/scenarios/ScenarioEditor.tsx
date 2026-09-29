@@ -276,7 +276,7 @@ function IssueList({
   return (
     <ul className="space-y-0.5">
       {issues.map((issue, i) => (
-        <li key={i} className={cn('flex items-start gap-1 text-[11px]', issue.severity === 'error' ? 'text-risk-text' : 'text-[#8A6A1F]')}>
+        <li key={i} className={cn('flex items-start gap-1 text-[11px]', issue.severity === 'error' ? 'text-risk-text' : 'text-warning-text')}>
           <AlertCircle className="size-3 mt-0.5 shrink-0" aria-hidden="true" />
           <span>{issue.message}</span>
         </li>
@@ -311,7 +311,7 @@ function ScenarioEditorFooter({
     <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-divider bg-panel">
       <span
         data-testid="scenario-editor-status"
-        className={cn('text-[11px]', handle.status === 'invalid' || handle.status === 'stale' ? 'text-risk-text' : 'text-[#8A6A1F]')}
+        className={cn('text-[11px]', handle.status === 'invalid' || handle.status === 'stale' ? 'text-risk-text' : 'text-warning-text')}
       >
         {statusText}
       </span>

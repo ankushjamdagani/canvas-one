@@ -465,7 +465,7 @@ export function ResultsRegion({
                                   <XCircle className="size-3.5 text-risk-text shrink-0 mt-0.5" aria-hidden="true" />
                                 )}
                                 {(check.status === 'unevaluated' || check.status === 'error') && (
-                                  <AlertCircle className="size-3.5 text-[#8A6A1F] shrink-0 mt-0.5" aria-hidden="true" />
+                                  <AlertCircle className="size-3.5 text-warning-text shrink-0 mt-0.5" aria-hidden="true" />
                                 )}
                                 <div className="min-w-0">
                                   <div className="font-medium text-foreground truncate">
@@ -529,7 +529,7 @@ export function ResultsRegion({
                                     evt.outcome === 'succeeded' && 'bg-primary/10 text-primary',
                                     (evt.outcome === 'failed' || evt.outcome === 'rejected') &&
                                       'bg-risk-tint text-risk-text',
-                                    evt.outcome === 'expired' && 'bg-[#8A6A1F]/15 text-[#8A6A1F]',
+                                    evt.outcome === 'expired' && 'bg-warning-tint text-warning-text',
                                   )}
                                 >
                                   {evt.outcome}

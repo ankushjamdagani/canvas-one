@@ -67,6 +67,11 @@
   --color-tint-pressed: var(--tint-pressed);
   --color-risk-edge: var(--risk-edge);
   --color-branch-edge: var(--branch-edge);
+  /* Aliases for utilities already used in components (design.md Evergreen roles). */
+  --color-ink: var(--foreground);
+  --color-canvas: var(--canvas);
+  --color-selected-tint: var(--accent);
+  --color-divider: var(--border);
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -122,6 +127,7 @@
   --z-index-modal: 60;
   --z-index-popover: 70;
   --z-index-tooltip: 80;
+  --z-index-toast: 80;
 
   /* Elevation tokens from /private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/design.k81I/tokens/shape.css */
   --shadow-raised: 0 1px 2px rgba(22, 32, 29, 0.08);
@@ -192,7 +198,7 @@
   --popover: #FFFFFF;
   --popover-foreground: #16201D;
   --primary: #0B5C54;
-  --primary-foreground: #FFFFFF;
+  --primary-foreground: #FBFAF7;
   --secondary: #F2EFE9;
   --secondary-foreground: #16201D;
   --shadcn-muted: #F2EFE9;
@@ -242,40 +248,15 @@
   --tint-pressed: #D3E0DB;
   --risk-edge: #E0C9B6;
   --branch-edge: #C9B9E4;
-
+  --canvas: #FFFFFF;
 
   font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-  color: #243b41;
-  background: #f9faf8;
+  color: var(--foreground);
+  background: var(--shell);
   font-synthesis: none;
   font-size: 13px;
-  --line: #e1e7e3;
-  --ink: #243b41;
-  --teal: #087f84;
-  --shadow: 0 12px 35px #203d3521;
 }
 
-.dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #09090b;
-  --card-foreground: #fafafa;
-  --popover: #09090b;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #18181b;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --shadcn-muted: #27272a;
-  --shadcn-muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #fafafa;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #d4d4d8;
-}
 * {
   box-sizing: border-box;
 }
@@ -300,10 +281,10 @@ body {
     align-items: center;
     justify-content: center;
     gap: 7px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--control-border);
     border-radius: 6px;
-    background: #fff;
-    color: var(--ink);
+    background: var(--background);
+    color: var(--foreground);
     padding: 9px 11px;
     cursor: pointer;
     font-weight: 500;
@@ -313,8 +294,8 @@ body {
       border-color 0.15s;
   }
   button:not([data-slot]):hover:not(:disabled):not([role="switch"]):not([data-state]) {
-    background: #f0f5f2;
-    border-color: #bdceca;
+    background: var(--sunken);
+    border-color: var(--hover-border);
   }
   button:not([data-slot]):disabled {
     opacity: 0.4;
@@ -334,23 +315,23 @@ body {
   input:not([data-slot]) {
     width: 100%;
     min-width: 0;
-    border: 1px solid #dbe3df;
+    border: 1px solid var(--input);
     border-radius: 6px;
-    background: white;
+    background: var(--background);
     padding: 10px 11px;
-    color: var(--ink);
-    caret-color: var(--teal);
+    color: var(--foreground);
+    caret-color: var(--primary);
   }
   textarea:not([data-slot]) {
     width: 100%;
     resize: vertical;
-    border: 1px solid #dbe3df;
+    border: 1px solid var(--input);
     border-radius: 6px;
-    background: white;
+    background: var(--background);
     padding: 10px 11px;
-    color: var(--ink);
+    color: var(--foreground);
     line-height: 1.55;
-    caret-color: var(--teal);
+    caret-color: var(--primary);
   }
   textarea:not([data-slot]):focus-visible {
     outline: 2px solid var(--ring);
@@ -361,15 +342,15 @@ body {
   }
 }
 ::selection {
-  background: #c8e9e3;
-  color: #173c3c;
+  background: var(--selected-edge);
+  color: var(--foreground);
 }
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #c6d2cd;
+  background: var(--hover-border);
   border-radius: 8px;
 }
 h1,
@@ -390,37 +371,18 @@ h3 {
 p {
   font-size: 12px;
   line-height: 1.7;
-  color: #5f716c;
-}
-.react-flow__controls {
-  box-shadow: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  overflow: hidden;
-  display: flex;
-  margin: 18px 25px;
-}
-.react-flow__controls-button {
-  border: 0;
-  border-radius: 0;
-  border-right: 1px solid var(--line);
-  width: 31px;
-  height: 31px;
-  background: white;
-  fill: #5f716a;
-}
-.react-flow__controls-button:last-child {
-  border: 0;
+  color: var(--secondary-text);
 }
 .react-flow__handle {
   height: 7px;
   width: 7px;
-  border: 1px solid white;
-  background: #32969a;
+  border: 1px solid var(--background);
+  background: var(--primary);
 }
+/* Selection is action green plus a heavier stroke, never colour alone (design.md). */
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #c48212 !important;
-  stroke-width: 3 !important;
+  stroke: var(--primary) !important;
+  stroke-width: 2.5 !important;
 }
 
 .react-flow__edges,
@@ -489,7 +451,7 @@ select {
   font: inherit;
   color: var(--foreground);
   background-color: var(--card);
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23626D68' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   background-position: right 0.6rem center;
   background-repeat: no-repeat;
   background-size: 1.25em 1.25em;
@@ -504,12 +466,12 @@ select {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 select:hover:not(:disabled) {
-  border-color: var(--ring, var(--teal));
+  border-color: var(--ring);
 }
 select:focus-visible {
   outline: none;
-  border-color: var(--ring, var(--teal));
-  box-shadow: 0 0 0 1px var(--ring, var(--teal));
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px var(--ring);
 }
 select:disabled {
   opacity: 0.5;

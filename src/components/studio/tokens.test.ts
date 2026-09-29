@@ -42,7 +42,9 @@ describe("Evergreen tokens and styles.css single source check", () => {
 
     // Primary action role
     expect(rootVars["--primary"]).toBe(evergreen.primary);
-    expect(rootVars["--primary-foreground"]).toBe(evergreen.canvas);
+    // Directions board: text on action green is the shell colour (RV-17).
+    expect(rootVars["--primary-foreground"]).toBe(evergreen.shell);
+    expect(rootVars["--canvas"]).toBe(evergreen.canvas);
 
     // Secondary & muted roles
     expect(rootVars["--secondary"]).toBe(evergreen.sunken);
