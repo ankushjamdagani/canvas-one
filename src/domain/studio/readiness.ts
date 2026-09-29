@@ -118,6 +118,10 @@ export const READINESS_ISSUE_CODES = [
   'unmodeled-element',
   /** §4: "A statically knowable type error rejects readiness". */
   'expression-type-error',
+  /** §8 Bridge call frames: "a non-router resource with a bridge call continuation may have no other selectable call continuation". */
+  'bridge-continuation-conflict',
+  /** §8 Bridge call frames: routers may select a bridge route, but the runner doesn't implement it yet (RV-14f), so it is rejected instead of silently skipped. */
+  'router-bridge-unsupported',
 ] as const;
 
 export type ReadinessIssueCode = (typeof READINESS_ISSUE_CODES)[number];
@@ -1069,6 +1073,46 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           ['elements', elIdx, 'behavior', 'entryPortId'],
           rb.entryPortId,
           `Resource entryPortId '${rb.entryPortId}' must be an inbound call or message port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+        ),
+      );
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // §8 Bridge call frames: a call continuation from a resource to a non-resource target.
+  // "A non-router resource with a bridge call continuation may have no other selectable
+  // call continuation (routers select exactly one route)." The runner does not select
+  // bridge routes on routers yet, so a router with one is rejected rather than run with
+  // that route silently skipped.
+  // --------------------------------------------------------------------------
+  for (const elId of closure.includedElementIds) {
+    const el = elementsMap.get(elId);
+    if (!el || el.behavior.kind !== 'resource') continue;
+    const rb = el.behavior as ResourceBehavior;
+    const elIdx = doc.elements.findIndex((e) => e.id === elId);
+
+    const calls = doc.connections.filter(
+      (c) => c.kind === 'call' && c.source.elementId === elId && includedElementSet.has(c.target.elementId),
+    );
+    const bridges = calls.filter((c) => elementsMap.get(c.target.elementId)?.behavior.kind !== 'resource');
+    if (bridges.length === 0) continue;
+
+    if (rb.config.type === 'router') {
+      issues.push(
+        issue(
+          'router-bridge-unsupported',
+          ['elements', elIdx, 'behavior', 'config', 'type'],
+          el.id,
+          `Router '${el.label}' routes to '${elementsMap.get(bridges[0].target.elementId)?.label ?? bridges[0].target.elementId}', which is not a resource; routing from a router to a non-resource element isn't supported yet (specs/revamp/contracts/model-and-runner.md §8)`,
+        ),
+      );
+    } else if (calls.length > 1) {
+      issues.push(
+        issue(
+          'bridge-continuation-conflict',
+          ['elements', elIdx, 'behavior'],
+          el.id,
+          `Resource '${el.label}' calls non-resource '${elementsMap.get(bridges[0].target.elementId)?.label ?? bridges[0].target.elementId}' and has another call continuation; a resource with a bridge call may have no other call continuation (specs/revamp/contracts/model-and-runner.md §8)`,
         ),
       );
     }

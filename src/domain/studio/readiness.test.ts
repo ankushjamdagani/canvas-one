@@ -1387,3 +1387,67 @@ describe('RV-02f runnable-readiness rejects', () => {
     });
   });
 });
+
+describe('bridge call continuations (model-and-runner.md §8 Readiness)', () => {
+  function bridgeDoc(sourceType: 'router' | 'processor', targets: ('resource' | 'machine')[]): Document {
+    const doc = timedHappyDoc();
+    const r1 = doc.elements[0] as Element & { behavior: ResourceBehavior };
+    const source: Element = {
+      ...r1,
+      ports: [...r1.ports, port('ro1', 'out', 'call', S_ID, S_ID)],
+      behavior: {
+        ...r1.behavior,
+        config: sourceType === 'router'
+          ? { ...r1.behavior.config, type: 'router', strategy: 'round-robin' }
+          : r1.behavior.config,
+      },
+    } as Element;
+    const elements: Element[] = [source];
+    const connections: Connection[] = [];
+    targets.forEach((kind, i) => {
+      const id = `t${i}`;
+      elements.push(
+        kind === 'resource'
+          ? resourceElement(id, `${id}-in`, [port(`${id}-in`, 'in', 'call', S_ID, S_ID)])
+          : machineElement(id, [port(`${id}-in`, 'in', 'call', S_ID, S_ID)]),
+      );
+      connections.push({
+        id: `c${i}`,
+        label: `c${i}`,
+        kind: 'call',
+        source: { elementId: 'r1', portId: 'ro1' },
+        target: { elementId: id, portId: `${id}-in` },
+        config: callConfig,
+      } as Connection);
+    });
+    return {
+      ...doc,
+      elements,
+      connections,
+      scenarios: [{ ...doc.scenarios[0], scopeElementIds: elements.map((e) => e.id) }],
+    };
+  }
+  const codes = (doc: Document) => {
+    const result = checkReadiness(doc, 'scn-timed');
+    return result.ready ? [] : result.issues.map((i) => i.code);
+  };
+
+  it('accepts a non-router resource whose only call continuation is a bridge', () => {
+    expect(codes(bridgeDoc('processor', ['machine']))).not.toContain('bridge-continuation-conflict');
+  });
+
+  it('rejects a non-router resource with a bridge and another call continuation', () => {
+    expect(codes(bridgeDoc('processor', ['machine', 'resource']))).toContain('bridge-continuation-conflict');
+  });
+
+  it('rejects a router with a bridge route, which the runner cannot select yet', () => {
+    expect(codes(bridgeDoc('router', ['machine']))).toContain('router-bridge-unsupported');
+    expect(codes(bridgeDoc('router', ['machine', 'resource']))).toContain('router-bridge-unsupported');
+  });
+
+  it('accepts a router whose routes all reach resources', () => {
+    const found = codes(bridgeDoc('router', ['resource', 'resource']));
+    expect(found).not.toContain('router-bridge-unsupported');
+    expect(found).not.toContain('bridge-continuation-conflict');
+  });
+});
