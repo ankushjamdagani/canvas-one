@@ -307,7 +307,7 @@ export function HistoryLadder({
 
         {/* 3. NOW · NOT COMMITTED block */}
         {!publishedMain && (!behindMain || workingEdits.length > 0) && <section aria-labelledby="now-not-committed-header" className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
             <span id="now-not-committed-header" className="font-semibold text-risk-text">
               NOW · NOT COMMITTED
             </span>
@@ -389,7 +389,7 @@ export function HistoryLadder({
 
         {/* 4. CHECKPOINTS Section & Save checkpoint inline form */}
         {!publishedMain && (!behindMain || checkpoints.length > 0) && <section aria-labelledby="checkpoints-header" className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
             <span id="checkpoints-header">CHECKPOINTS ({checkpoints.length})</span>
           </div>
 
@@ -494,7 +494,7 @@ export function HistoryLadder({
 
         {/* 5. COMMITS Section */}
         {!publishedMain && <section aria-labelledby="commits-header" className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
             <span id="commits-header">COMMITS ({commits.length})</span>
           </div>
 
@@ -621,7 +621,7 @@ export function HistoryLadder({
         {/* 6. PUBLISHED ON MAIN Section */}
         {publications.length > 0 && (
           <section aria-labelledby="published-on-main-header" className="space-y-2">
-            <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            <div className="text-meta font-mono font-medium uppercase text-secondary-text">
               <span id="published-on-main-header">PUBLISHED ON MAIN</span>
             </div>
             <div className="space-y-2">

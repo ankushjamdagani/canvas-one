@@ -294,13 +294,13 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
               </div>
 
               {loadingProjects ? (
-                <div className="p-6 text-center text-xs text-secondary-text bg-panel rounded-card border border-control-border">
+                <div className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border">
                   Loading projects…
                 </div>
               ) : projectRows.length === 0 ? (
                 <div
                   data-testid="no-projects-notice"
-                  className="p-8 text-center text-xs text-secondary-text bg-panel rounded-card border border-control-border shadow-raised"
+                  className="p-8 text-center text-xs text-secondary-text bg-background rounded-card border border-border"
                 >
                   <FolderOpen size={24} className="mx-auto text-secondary-text/70 mb-2" />
                   <p className="font-medium text-ink">No saved projects yet</p>
@@ -312,7 +312,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                     <div
                       key={row.project.id}
                       data-testid={`project-item-${row.project.id}`}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-card border border-control-border bg-panel hover:border-hover-border transition-colors shadow-raised gap-3"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-card border border-border bg-background hover:border-hover-border transition-colors gap-3"
                     >
                       <div className="min-w-0 pr-3">
                         <h3 className="text-sm font-semibold text-ink truncate">
@@ -373,7 +373,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
               <h2 id="blank-canvas-heading" className="text-base font-semibold text-ink mb-3">
                 Open an empty canvas
               </h2>
-              <Card className="border border-control-border bg-panel shadow-raised">
+              <Card className="border border-border bg-background shadow-none">
                 <CardContent className="p-4 sm:p-5">
                   <form onSubmit={handleCreateBlankProject} className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
                     <Input
@@ -407,7 +407,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
               <h2 id="import-project-heading" className="text-base font-semibold text-ink mb-3">
                 Import a project
               </h2>
-              <Card className="border border-control-border bg-panel shadow-raised">
+              <Card className="border border-border bg-background shadow-none">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
                     <p className="flex-1 text-xs text-secondary-text">
@@ -451,7 +451,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                   <div
                     key={example.id}
                     data-testid={`template-row-${example.id}`}
-                    className="flex items-center justify-between gap-3 p-3.5 rounded-card border border-control-border bg-panel hover:border-hover-border transition-colors shadow-raised"
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-card border border-border bg-background hover:border-hover-border transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {/*
@@ -470,7 +470,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                             {example.title}
                           </span>
                         </div>
-                        <p className="text-xs text-secondary-text mt-0.5">
+                        <p className="font-mono text-[10px] text-secondary-text mt-0.5">
                           {pluralize(example.componentCount, 'component')} ·{' '}
                           {pluralize(example.scenarioCount, 'scenario')}
                         </p>

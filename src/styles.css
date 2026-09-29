@@ -72,6 +72,7 @@
   --color-canvas: var(--canvas);
   --color-selected-tint: var(--accent);
   --color-divider: var(--border);
+  --color-hairline-soft: var(--hairline-soft);
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -176,6 +177,10 @@
   --text-subtitle--line-height: calc(1.75 / 1.125);
   --text-ui: 13px;
   --text-ui--line-height: 1.55;
+  /* Mono metadata labels (design system: uppercase Plex Mono 9–10px, 0.08–0.14em tracking). */
+  --text-meta: 10px;
+  --text-meta--line-height: 1.4;
+  --text-meta--letter-spacing: 0.1em;
 
   /* Evergreen node-kind stripe colours (specs/revamp/design.md "Canvas objects":
      stripe colour is the node kind, never derived from node names). Keyed by the
@@ -249,6 +254,7 @@
   --risk-edge: #E0C9B6;
   --branch-edge: #C9B9E4;
   --canvas: #FFFFFF;
+  --hairline-soft: #EFEBE3;
 
   font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   color: var(--foreground);
@@ -276,41 +282,18 @@ body {
   textarea {
     font: inherit;
   }
+  /* Raw buttons get behaviour only; their look comes from their own classes or the Button
+     primitive. (A legacy box style here made every text link, tab and menu row outlined.) */
   button:not([data-slot]) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    border: 1px solid var(--control-border);
-    border-radius: 6px;
-    background: var(--background);
-    color: var(--foreground);
-    padding: 9px 11px;
     cursor: pointer;
-    font-weight: 500;
-    white-space: nowrap;
-    transition:
-      background 0.15s,
-      border-color 0.15s;
-  }
-  button:not([data-slot]):hover:not(:disabled):not([role="switch"]):not([data-state]) {
-    background: var(--sunken);
-    border-color: var(--hover-border);
   }
   button:not([data-slot]):disabled {
-    opacity: 0.4;
     cursor: not-allowed;
   }
   button:not([data-slot]):focus-visible,
   input:not([data-slot]):focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 3px;
-  }
-  button:not([data-slot])[role="switch"] {
-    display: inline-flex;
-    padding: 0;
-    border: 2px solid transparent;
-    background: transparent;
   }
   input:not([data-slot]) {
     width: 100%;
@@ -352,26 +335,6 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--hover-border);
   border-radius: 8px;
-}
-h1,
-h2,
-h3,
-p {
-  margin: 0;
-}
-h2 {
-  font-size: 14px;
-  font-weight: 600;
-}
-h3 {
-  font-size: 12px;
-  font-weight: 650;
-  margin: 25px 0 9px;
-}
-p {
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--secondary-text);
 }
 .react-flow__handle {
   height: 7px;
@@ -447,33 +410,59 @@ p {
 .react-flow__edgelabel-renderer {
   z-index: 5;
 }
-select {
-  font: inherit;
-  color: var(--foreground);
-  background-color: var(--card);
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23626D68' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.6rem center;
-  background-repeat: no-repeat;
-  background-size: 1.25em 1.25em;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 7px 28px 7px 10px;
-  width: 100%;
-  min-width: 0;
-  font-size: 12px;
-  line-height: 1.4;
-  appearance: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-select:hover:not(:disabled) {
-  border-color: var(--ring);
-}
-select:focus-visible {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 1px var(--ring);
-}
-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+/* Element defaults. They live in the base layer so utility classes on the element win;
+   unlayered, they overrode every text colour, size and margin set on <p>, <h2>, <h3> and
+   <select> (error text in a <p> rendered grey instead of clay). */
+@layer base {
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+  h2 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 12px;
+    font-weight: 650;
+    margin: 25px 0 9px;
+  }
+  p {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--secondary-text);
+  }
+  select {
+    font: inherit;
+    color: var(--foreground);
+    background-color: var(--card);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23626D68' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.6rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 28px 7px 10px;
+    width: 100%;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    appearance: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  select:hover:not(:disabled) {
+    border-color: var(--ring);
+  }
+  select:focus-visible {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 1px var(--ring);
+  }
+  select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }

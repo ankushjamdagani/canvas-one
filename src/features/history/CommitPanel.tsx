@@ -213,7 +213,7 @@ export function CommitPanel({
       <form onSubmit={handleCommit} className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
         {/* 2. CHANGES Block */}
         <section aria-labelledby="commit-changes-header" className="space-y-2">
-          <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          <div className="text-meta font-mono font-medium uppercase text-secondary-text">
             <span id="commit-changes-header">CHANGES</span>
           </div>
 
@@ -288,7 +288,7 @@ export function CommitPanel({
 
         {/* 4. EVERY SCENARIO MUST PASS ON THIS VERSION (Gate) */}
         <section aria-labelledby="scenario-gate-header" className="space-y-2">
-          <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          <div className="text-meta font-mono font-medium uppercase text-secondary-text">
             <span id="scenario-gate-header">EVERY SCENARIO MUST PASS ON THIS VERSION</span>
           </div>
 

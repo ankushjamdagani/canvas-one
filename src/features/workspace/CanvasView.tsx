@@ -858,7 +858,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         className="system-canvas bg-canvas"
       >
         {/* Dotted canvas background from design token CSS variable */}
-        <Background color="var(--control-border)" gap={16} size={1} />
+        {/* Design system canvas texture: #EFEBE3 dots on a 26px grid. */}
+        <Background color="var(--hairline-soft)" gap={26} size={1} />
       </ReactFlow>
 
       {/* Connect: rejected -- small inline message near the pointer/edge */}

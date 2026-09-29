@@ -41,6 +41,7 @@ export const evergreen = Object.freeze({
 
   // Lines & borders
   divider: '#E7E3DB',
+  hairlineSoft: '#EFEBE3', // internal dividers and the canvas dot grid
   controlBorder: '#DCD7CD',
   hoverBorder: '#C6C0B4',
   controlBorderStrong: '#948D80', // Darker step of the theme's warm border family; >=3:1 on canvas 3.29, shell 3.15, panel 3.02

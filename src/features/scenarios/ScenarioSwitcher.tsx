@@ -185,7 +185,7 @@ export function ScenarioSwitcher({
           sideOffset={4}
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-divider bg-panel">
-            <span className="font-mono text-[11px] font-medium tracking-wider text-secondary-text uppercase">
+            <span className="font-mono text-meta font-medium text-secondary-text uppercase">
               SCENARIOS · {totalScenarios}
             </span>
             {totalScenarios > 0 && (

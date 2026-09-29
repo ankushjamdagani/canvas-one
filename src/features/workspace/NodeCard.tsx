@@ -28,8 +28,7 @@ export function NodeCard({ data, selected }: NodeProps) {
       data-placement-id={placement.id}
       data-element-id={element.id}
       className={cn(
-        'component-node relative block rounded-node border bg-panel transition-colors select-none',
-        'shadow-raised',
+        'component-node relative block rounded-node border bg-background transition-colors select-none',
         selected
           ? 'selected border-2 border-primary ring-2 ring-selected-edge ring-offset-1 shadow-none'
           : 'border-control-border hover:border-hover-border',
@@ -83,7 +82,7 @@ export function NodeCard({ data, selected }: NodeProps) {
               can run longer than the old bare visualKind text, so this wraps
               rather than clipping (the card has no fixed height). */}
           <span
-            className="text-[11px] font-mono text-secondary-text leading-snug break-words"
+            className="text-[10px] font-mono text-secondary-text leading-snug break-words"
             data-testid={`node-caption-${element.id}`}
           >
             {caption}
