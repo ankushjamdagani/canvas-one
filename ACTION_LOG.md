@@ -1403,3 +1403,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude lead, no subagents. Auto-mode classifier outages blocked test runs mid-task; completed after leaving auto mode. No push.
 - **Verification**: 1,411 unit tests across 122 files; `npx tsc -b`; production build (emitted assets identical, existing large-chunk warning); boundary guard fails on a probe import of `../domain/model` (probe removed); isolated production Playwright on port 5213, two workers, no retries: 69 passed / 4 skipped; `git diff --check` clean.
 - **Limitations**: RV-15 stylesheet selector audit with visual verification still open. Pre-existing artifact screenshot changes in the worktree remain untouched.
+
+### RV-15 slice 3: stylesheet audit (RV-15 complete)
+
+- **Outcome**: UI line advanced to `5ba97bd`. Of 201 class selectors in `src/styles.css`, only `component-node`, `selected` and ReactFlow runtime classes are still applied; 570 selectors naming any other class were removed, with three keyframes and six custom properties only they used. 2,833 → 517 lines; built CSS 153.73 kB → 114.93 kB (gzip 28.93 → 21.05 kB). Tokens, base element rules and unscoped `react-flow__*` overrides kept.
+- **Files**: `src/styles.css`, `specs/revamp/rv15-retirement.md`.
+- **Platform/subagents**: Claude lead, no subagents. PostCSS prune script and a Playwright before/after comparison driver in the session scratchpad (not committed).
+- **Verification**: before/after builds over 14 journey states (entry, S05, inspector, Library, History, project menu, S04 results with Details; 1512×982 and 390×844): every element's computed style and box identical, full-page screenshots byte-identical. 1,411 unit tests; `npx tsc -b`; production build; isolated production Playwright on port 5213, two workers, no retries: 69 passed / 4 skipped; `git diff --check` clean.
+- **Limitations**: the comparison did not exercise a selected edge, connect form or dialogs individually; their rules are untouched unless they named a dead class. Design debt left for a design package: legacy `--line`/`--ink`/`--teal` values in base button/input rules, selected-edge stroke `#c48212`, and the never-applied `.dark` token block (RV-01 owner).
