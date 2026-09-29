@@ -983,6 +983,12 @@ export function Workspace({
 
   const isSaving = sessionState.status === 'saving';
   const hasError = Boolean(sessionState.lastError);
+  // Only repository write failures block history/part commands; a rejected
+  // edit (invalid, stale, ineligible) also lands in lastError but isn't storage.
+  const storageFailed = (() => {
+    const error = sessionState.lastError as { status?: unknown; code?: unknown } | null;
+    return error?.status === 'failed' && (error.code === 'quota' || error.code === 'unavailable');
+  })();
 
   // Compute save status text without raw exception text
   const saveStatusText = React.useMemo(() => {
@@ -1464,7 +1470,7 @@ export function Workspace({
         isMain: branch.id === mainId,
         closed: branch.state === 'closed',
       })),
-      storageState: isSaving ? 'saving' : hasError ? 'failed' : 'ready',
+      storageState: isSaving ? 'saving' : storageFailed ? 'failed' : 'ready',
       draftState: draftContext.state,
       draftId: draftContext.id,
       panels: {
