@@ -372,7 +372,15 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     return {
       ok: false,
       kind: 'unsupported-version',
-      issues: [issue('invalid-literal', `Unsupported portable format '${String(format)}'`, ['format'])],
+      issues: [
+        issue(
+          'invalid-literal',
+          typeof format === 'string'
+            ? `Unsupported portable format '${format}'`
+            : "This file isn't a System Studio project export.",
+          ['format'],
+        ),
+      ],
     };
   }
   if (version === 7 || version === 8 || version !== PORTABLE_VERSION) {
