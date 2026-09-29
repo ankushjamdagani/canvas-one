@@ -93,7 +93,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
     expect(measuredText).not.toMatch(/TIGHTEST LINK|HEADROOM|p99/i);
 
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv05b-desktop-inspector.png',
+      path: test.info().outputPath('rv05b-desktop-inspector.png'),
     });
   });
 
@@ -121,7 +121,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
     expect(hasHorizontalScroll).toBe(false);
 
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv05b-mobile-sheet.png',
+      path: test.info().outputPath('rv05b-mobile-sheet.png'),
     });
   });
 });

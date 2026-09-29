@@ -98,7 +98,7 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     await switcherTrigger.click();
     await expect(popover).toBeVisible();
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv12d-desktop-switcher.png',
+      path: test.info().outputPath('rv12d-desktop-switcher.png'),
     });
     await page.keyboard.press('Escape');
 
@@ -119,7 +119,7 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     expect(Number(eventsRecordedMatch?.[1] ?? '0')).toBeGreaterThan(0);
 
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv12d-desktop-details.png',
+      path: test.info().outputPath('rv12d-desktop-details.png'),
     });
   });
 
@@ -216,7 +216,7 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     await expect(switcherTrigger).toContainText('No scenario');
 
     await page.screenshot({
-      path: '/private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/rv12d-mobile-blank.png',
+      path: test.info().outputPath('rv12d-mobile-blank.png'),
     });
   });
 });
