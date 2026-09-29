@@ -62,6 +62,6 @@ Accepted limitations (by design, not debt): router + bridge routes rejected by r
 
 ## Resume
 
-1. Work on `master` in the main checkout. `claude/rv-01a-tokens` (worktree `.claude/worktrees/rv-01a`) is fully merged; it is kept only because that worktree holds old uncommitted `artifacts/*.png` screenshot changes. Delete both once those are no longer wanted.
+1. Work on `master` in the main checkout; it is the only branch and there are no extra worktrees.
 2. Read the invariants above, then the relevant `specs/revamp/` contract before changing domain, runner, persistence or canvas behavior.
 3. Run checks proportional to the change and record the task in `ACTION_LOG.md` (with a `Lesson:` line when something surprised you).

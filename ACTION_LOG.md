@@ -1509,3 +1509,7 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude lead, no subagents.
 - **Verification**: 1,420 unit tests; `npx tsc -b`; production build (no size warning); isolated production Playwright 78 passed / 4 skipped in ~32 s (matches the pre-split baseline measured on a temporary worktree: 34 s); project-open timing ~120 ms vs ~130 ms before; responsive sweep 45/45; touch audit 0 under 44 px; `git diff --check` clean. One authoring e2e failure seen once did not reproduce in 40 repeats.
 - **Lesson:** React 19 throttles Suspense reveals (~300 ms) even when a lazy chunk is cached — a first `React.lazy` split doubled e2e time and made project open ~830 ms; measure open latency against a baseline build after code-splitting. Porting a retired module's tests onto its replacement before deleting it found a contract bug the replacement's own tests missed.
+
+### Final branch cleanup
+
+- **Outcome**: at the user's request, discarded the old uncommitted `artifacts/*.png` screenshot changes and removed the `.claude/worktrees/rv-01a` worktree and the fully merged `claude/rv-01a-tokens` branch (ancestor of `master`, verified). `master` is now the only branch and the main checkout the only worktree.
