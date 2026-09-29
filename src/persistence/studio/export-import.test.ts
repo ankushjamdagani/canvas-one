@@ -381,6 +381,19 @@ describe('Export/import round trip and rejections (RV-16b, storage.md §4/§9)',
       expect(projectCount).toBe(0);
     });
 
+    it('rejects a JSON object without a string format with a plain message and typed code', async () => {
+      for (const body of [{ hello: 'world' }, { format: 3 }]) {
+        const { res, projectCount } = await importBytes(new TextEncoder().encode(JSON.stringify(body)));
+        expect(res.status).toBe('failed');
+        if (res.status === 'failed') {
+          expect(res.code).toBe('unsupported-version');
+          expect(JSON.stringify(res)).not.toContain('undefined');
+          expect(JSON.stringify(res)).toContain("isn't a System Studio project export");
+        }
+        expect(projectCount).toBe(0);
+      }
+    });
+
     it('rejects a file over 64 MiB, checked before parse', async () => {
       // A crude but valid JSON payload padded past the 64 MiB cap.
       const padding = 'x'.repeat(65 * 1024 * 1024);

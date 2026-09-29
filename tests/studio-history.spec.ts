@@ -149,11 +149,7 @@ test.describe('RV-13b: History panel', () => {
     await expect(page.getByTestId('history-ladder').getByText('COMMITS (1)')).toBeVisible();
   });
 
-  // Known defect (RV-13b, reported to the lead): the Commit panel does not
-  // refresh its scenario statuses while it stays open, so "Run the 3 remaining"
-  // completes real runs but the panel keeps showing "0 of 3 passing" until it
-  // is closed and reopened.
-  test.fixme('Run remaining inside the Commit panel updates its passing count live', async ({ page }) => {
+  test('Run remaining inside the Commit panel updates its passing count live', async ({ page }) => {
     await openS04(page);
     const ladder = await openHistory(page);
     await ladder.getByRole('button', { name: /^Commit/ }).click();
@@ -173,6 +169,7 @@ test.describe('RV-13b: History panel', () => {
     await page.getByTestId('open-publish-button').click();
     const dialog = page.getByTestId('publish-review-dialog');
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/1 commit → main/)).toHaveCount(1);
     await expect(dialog.getByText('No conflicts with main.')).toBeVisible();
     await expect(dialog.getByText('Passed on exactly this version')).toHaveCount(3);
     // Nothing chosen yet: publishing is blocked and says why.
@@ -199,25 +196,22 @@ test.describe('RV-13b: History panel', () => {
     await expect(page.getByTestId('publish-review-dialog')).toHaveCount(0);
   });
 
-  // Known gap (RV-13b, reported to the lead): Workspace never passes
-  // onStartDraft / onEditMain to HistoryLadder, so on freshly published main
-  // "Start a new draft from 1.0.0" and "Edit main directly" stay disabled.
-  test.fixme('published main offers a working "Start a new draft" action', async ({ page }) => {
+  test('published main offers a working "Start a new draft" action', async ({ page }) => {
     await openS04(page);
     await openHistory(page);
     await runAllScenarios(page);
     await commitWith(page, 'First commit');
     await publishMajor(page, 'First');
-    await expect(
-      page.getByTestId('history-ladder').getByRole('button', { name: /Start a new draft from 1\.0\.0/ }),
-    ).toBeEnabled();
+    const start = page.getByTestId('history-ladder').getByRole('button', { name: /Start a new draft from 1\.0\.0/ });
+    await expect(start).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Edit main directly' })).toBeEnabled();
+    await start.click();
+    // D40: main never holds edits; the action creates and opens a draft.
+    await expect(page.getByTestId('breadcrumb-branch-btn')).toContainText('Draft from main');
+    await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('MAIN');
   });
 
-  // Known defect (RV-13b, reported to the lead): PublishedNotice (22D "1.0.0
-  // published - you are now on main") is never shown. Reaching main resets the
-  // publish controller and closes the overlay in the same tick, so the notice
-  // never mounts.
-  test.fixme('22D: the published notice names the version after publishing', async ({ page }) => {
+  test('22D: the published notice names the version after publishing', async ({ page }) => {
     await openS04(page);
     await openHistory(page);
     await runAllScenarios(page);

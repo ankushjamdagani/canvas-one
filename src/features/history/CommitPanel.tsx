@@ -37,6 +37,11 @@ export interface CommitPanelProps {
   readonly className?: string;
   /** PanelHost already supplies the History title, controls, and outer chrome. */
   readonly hosted?: boolean;
+  /**
+   * Bumped by the host whenever a run is saved, so the open panel reloads its
+   * scenario statuses without being closed and reopened.
+   */
+  readonly refreshToken?: number;
 }
 
 function getScenarioStatusLabel(status: ScenarioStatus): string {
@@ -68,6 +73,7 @@ export function CommitPanel({
   isCommitting: propIsCommitting,
   className,
   hosted = false,
+  refreshToken = 0,
 }: CommitPanelProps): React.JSX.Element {
   // Controller state subscription
   const controllerState = React.useSyncExternalStore(
@@ -118,7 +124,7 @@ export function CommitPanel({
     return () => {
       isMounted = false;
     };
-  }, [controller, propWorkingDoc, propBaseDoc, propScenariosWithStatus]);
+  }, [controller, propWorkingDoc, propBaseDoc, propScenariosWithStatus, refreshToken]);
 
   // Use props if provided, otherwise derived
   const workingDocument = propWorkingDoc ?? localWorkingDoc;

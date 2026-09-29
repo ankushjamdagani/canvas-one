@@ -111,10 +111,7 @@ test.describe('RV-13b: Entry screen', () => {
     await expect(page.getByTestId('existing-projects-list')).toHaveCount(0);
   });
 
-  // Known defect (RV-13b, reported to the lead): a JSON object that is not a
-  // portable bundle is rejected with "Unsupported portable format 'undefined'",
-  // a raw interpolation leak rather than a plain-language message.
-  test.fixme('rejects a JSON file that is not a portable bundle without leaking "undefined"', async ({ page }) => {
+  test('rejects a JSON file that is not a portable bundle without leaking "undefined"', async ({ page }) => {
     await openEntry(page);
     await page.getByTestId('import-project-file-input').setInputFiles(
       writeImportFile('wrong-shape.system-studio.json', JSON.stringify({ hello: 'world' })),

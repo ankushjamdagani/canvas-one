@@ -167,11 +167,6 @@ export function PublishReviewBody({
 
   return (
     <div data-testid="publish-review-body" className={cn('space-y-5', className)}>
-      <p className="text-xs text-muted-foreground font-mono">
-        {sourceBranchLabel} · {commitsSinceFork.length} commit{commitsSinceFork.length === 1 ? '' : 's'} →{' '}
-        {mainBranchLabel}
-      </p>
-
       {/* 1. What goes onto main */}
       <section aria-labelledby="review-commits-header" className="space-y-2">
         <div className="flex items-center justify-between text-sm font-semibold text-foreground">
@@ -512,7 +507,7 @@ export function PublishReviewDialog({ open, onOpenChange, ...bodyProps }: Publis
         <DialogHeader>
           <DialogTitle>Publish this draft</DialogTitle>
           <DialogDescription>
-            {bodyProps.sourceBranchLabel} · {bodyProps.commitsSinceFork.length} commits → {bodyProps.mainBranchLabel}
+            {bodyProps.sourceBranchLabel} · {bodyProps.commitsSinceFork.length} commit{bodyProps.commitsSinceFork.length === 1 ? '' : 's'} → {bodyProps.mainBranchLabel}
           </DialogDescription>
         </DialogHeader>
         <PublishReviewBody {...bodyProps} />
