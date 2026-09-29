@@ -39,11 +39,11 @@ import {
 } from '../../domain/studio/runner/types';
 import type { PrepareIssue } from '../../domain/studio/runner/compile';
 import type { RunTransport } from './transport';
-import {
-  createEmptySummary,
-  type CompileResultMessage,
-  type HostMessage,
-  type RunUpdateMessage,
+import { createEmptySummary } from './summary';
+import type {
+  CompileResultMessage,
+  HostMessage,
+  RunUpdateMessage,
 } from './protocol';
 
 // ============================================================================

@@ -103,38 +103,8 @@ export type HostMessage = CompileResultMessage | RunUpdateMessage;
 // Helper: Empty Summary for Non-Normal Terminals
 // ============================================================================
 
-export function createEmptySummary(mode: 'logical' | 'timed' = 'logical'): RunSummary {
-  return {
-    mode,
-    consumedInputs: 0,
-    rootCounts: {
-      generated: 0,
-      succeeded: 0,
-      rejected: 0,
-      failed: 0,
-      expired: 0,
-      inFlight: 0,
-    },
-    messageCounts: {
-      generated: 0,
-      succeeded: 0,
-      rejected: 0,
-      failed: 0,
-      expired: 0,
-      inFlight: 0,
-    },
-    elementMetrics: [],
-    finalStates: [],
-    outputs: [],
-    coverage: {
-      includedElementIds: [],
-      excludedElementIds: [],
-    },
-    processedEvents: 0,
-    elapsedMs: null,
-    rowOutcomes: [],
-  };
-}
+import { createEmptySummary } from './summary';
+export { createEmptySummary };
 
 // ============================================================================
 // Internal Types for Protocol Handler

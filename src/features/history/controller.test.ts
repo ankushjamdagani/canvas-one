@@ -7,7 +7,7 @@ import { createStudioDatabase } from '../../persistence/studio/db';
 import { LocalRepository } from '../../persistence/studio/repository';
 import type { Actor } from '../../persistence/studio/types';
 import { SessionController } from '../session/controller';
-import { InProcessTransport } from '../runs/transport';
+import { InProcessTransport } from '../runs/inProcessTransport';
 import { RunController } from '../runs/RunController';
 import { HistoryController } from './controller';
 

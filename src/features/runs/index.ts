@@ -2,7 +2,8 @@
  * Public API for System Studio Runs feature (RV-12c4).
  */
 
-export * from './protocol';
+export type * from './protocol';
+export { createEmptySummary } from './summary';
 export * from './transport';
 export * from './RunController';
 export * from './scenarioStatus';

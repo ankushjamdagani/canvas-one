@@ -19,14 +19,11 @@ import {
   WorkspacePanelPreferenceStore,
 } from './panelPreferences';
 import { PanelHost, type PanelCommandRoutes } from '../panels';
-import {
-  HistoryController,
-  HistoryLadder,
-  CommitPanel,
-  PublishController,
-  PublishFlow,
-  DraftBehindMainBanner,
-} from '../history';
+import { HistoryController } from '../history/controller';
+import { PublishController } from '../history/publishController';
+import { DraftBehindMainBanner } from '../history/DraftBehindMainBanner';
+import { HistoryLadder, CommitPanel, PublishFlow, ScenarioEditor, preloadLazyViews } from './lazyViews';
+import { whenIdle } from '@/lib/lazyComponent';
 import { LibraryPanel, type LibraryView } from '../library';
 import { downloadSavedPart, SavedParts } from '../library/SavedParts';
 import type {
@@ -50,15 +47,12 @@ import {
   applyScenarioDraft,
   changeScenarioDraft,
   deleteScenario,
-  DeleteScenarioDialog,
-  NewScenarioDialog,
   openScenarioDraft,
-  ScenarioEditor,
-  ScenarioSwitcher,
-  type NewScenarioDialogProps,
-  type ScenarioDraftHandle,
-  type ScenarioSwitcherEntry,
-} from '../scenarios';
+} from '../scenarios/draft';
+import { DeleteScenarioDialog } from '../scenarios/DeleteScenarioDialog';
+import { NewScenarioDialog, type NewScenarioDialogProps } from '../scenarios/NewScenarioDialog';
+import { ScenarioSwitcher, type ScenarioSwitcherEntry } from '../scenarios/ScenarioSwitcher';
+import type { ScenarioDraftHandle } from '../scenarios/types';
 import { createBrowserDownloadSink, useTransferActions } from '../transfer';
 import {
   computeSessionRunDisabledReason,
@@ -255,6 +249,9 @@ export function Workspace({
   // Document.
   const [projectRecord, setProjectRecord] = React.useState<ProjectRecord | null>(null);
   const [branches, setBranches] = React.useState<readonly BranchRecord[]>([]);
+
+  // History, Commit, Publish and the scenario editor load on demand; warm them once idle.
+  React.useEffect(() => whenIdle(preloadLazyViews), []);
 
   React.useEffect(() => {
     let cancelled = false;

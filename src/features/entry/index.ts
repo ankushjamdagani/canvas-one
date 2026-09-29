@@ -1,2 +1,2 @@
 export * from './EntryScreen';
-export * from './fixtures';
+export * from './exampleCatalog';

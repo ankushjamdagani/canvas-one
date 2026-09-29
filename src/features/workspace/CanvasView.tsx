@@ -803,7 +803,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       {projection.issues.length > 0 && (
         <div
           data-testid="canvas-issues-notice"
-          className="absolute bottom-3 left-3 z-10 max-w-sm pointer-events-auto p-2.5 rounded-card border border-riskEdge bg-riskTint text-destructive text-xs shadow-raised"
+          className="absolute bottom-3 left-3 z-10 max-w-sm pointer-events-auto p-2.5 rounded-card border border-risk-edge bg-risk-tint text-destructive text-xs shadow-raised"
           role="status"
         >
           <div className="font-semibold mb-1">

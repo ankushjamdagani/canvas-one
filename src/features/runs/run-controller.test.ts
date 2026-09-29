@@ -8,7 +8,7 @@ import { LocalRepository } from '../../persistence/studio/repository';
 import { RepositoryError } from '../../persistence/studio/errors';
 import { computeSnapshotId } from '../../persistence/studio/primitives';
 import type { Actor, ProjectCreateCommand } from '../../persistence/studio/types';
-import { InProcessTransport } from './transport';
+import { InProcessTransport } from './inProcessTransport';
 import { RunController } from './RunController';
 
 const s01Doc = JSON.parse(

@@ -14,7 +14,7 @@ function pluralize(count: number, singular: string, plural = `${singular}s`): st
 }
 import type { Actor, StudioRepository, ProjectRecord } from '../../persistence/studio/types';
 import type { Document, Id } from '../../domain/studio/model';
-import { REFERENCE_EXAMPLES } from './fixtures';
+import { EXAMPLE_CATALOG, type ExampleCatalogEntry } from './exampleCatalog';
 
 export interface EntryScreenProps {
   session: SessionController;
@@ -155,13 +155,14 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
   };
 
   // Template creator
-  const handleCreateExample = async (fixture: Document) => {
+  const handleCreateExample = async (example: ExampleCatalogEntry) => {
     if (isSubmitting) return;
 
     setIsSubmitting(true);
     setErrorMessage(null);
 
     try {
+      const fixture = await example.load();
       const res = await session.createProject({
         title: fixture.title,
         initialDocument: fixture,
@@ -446,7 +447,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                 Start from a template
               </h2>
               <div data-testid="templates-list" className="flex flex-col gap-2">
-                {REFERENCE_EXAMPLES.map((example) => (
+                {EXAMPLE_CATALOG.map((example) => (
                   <div
                     key={example.id}
                     data-testid={`template-row-${example.id}`}
@@ -470,8 +471,8 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                           </span>
                         </div>
                         <p className="text-xs text-secondary-text mt-0.5">
-                          {pluralize(example.fixture.elements.length, 'component')} ·{' '}
-                          {pluralize(example.fixture.scenarios.length, 'scenario')}
+                          {pluralize(example.componentCount, 'component')} ·{' '}
+                          {pluralize(example.scenarioCount, 'scenario')}
                         </p>
                       </div>
                     </div>
@@ -482,7 +483,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                       size="sm"
                       className="h-8 px-3 text-xs font-medium flex items-center justify-center gap-1.5 shrink-0"
                       disabled={isSubmitting}
-                      onClick={() => handleCreateExample(example.fixture)}
+                      onClick={() => handleCreateExample(example)}
                     >
                       <span>Create</span>
                       <ArrowRight size={13} />

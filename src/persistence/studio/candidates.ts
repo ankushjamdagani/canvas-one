@@ -41,11 +41,9 @@ import {
   type CandidateScenario,
   type EvaluateCandidateResult,
 } from '../../domain/versioning';
-import { prepareScenario } from '../../domain/studio/runner/compile';
-import {
-  runScenario,
-  type ScenarioRunnerOptions,
-  type ScenarioRunResult,
+import type {
+  ScenarioRunnerOptions,
+  ScenarioRunResult,
 } from '../../domain/studio/runner/scenario-runner';
 import { mintRunStartToken } from './token';
 import { mintPublishTicket } from './publish-ticket';
@@ -719,6 +717,12 @@ export class CandidateController {
     const versions = options?.versions ?? DEFAULT_BUILD_VERSIONS;
     const signal = options?.signal ?? new AbortController().signal;
 
+    // Candidate runs happen only while publishing: load the compiler and runner on demand
+    // so they stay out of the app's initial bundle.
+    const [{ prepareScenario }, { runScenario }] = await Promise.all([
+      import('../../domain/studio/runner/compile'),
+      import('../../domain/studio/runner/scenario-runner'),
+    ]);
     const prepRes = await prepareScenario(
       { id: cand.snapshotId, document: cand.mergeState.document },
       params.scenarioId,

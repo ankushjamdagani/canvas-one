@@ -5,7 +5,19 @@ import {
 } from './features/session';
 import type { Actor, StudioRepository } from './persistence/studio';
 import { EntryScreen } from './features/entry';
-import { Workspace } from './features/workspace';
+import { lazyComponent, whenIdle } from '@/lib/lazyComponent';
+
+// The workspace (canvas, panels, history, runs) is its own chunk: the entry screen renders
+// without it, and it is prefetched once the browser is idle so opening a project stays fast.
+const Workspace = lazyComponent<React.ComponentProps<typeof import('./features/workspace/Workspace').Workspace>>(
+  () => import('./features/workspace/Workspace').then((module) => module.Workspace),
+  <div
+    data-testid="workspace-loading-screen"
+    className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
+  >
+    Opening project…
+  </div>,
+);
 import { Button } from '@/components/ui/button';
 
 // Exported so the workspace can mint the same kind of id for its RunController
@@ -41,7 +53,6 @@ type BootState =
 
 export default function App() {
   const [bootState, setBootState] = React.useState<BootState>({ status: 'booting' });
-  const [activeScreen, setActiveScreen] = React.useState<'entry' | 'workspace'>('entry');
 
   const runBoot = React.useCallback(async () => {
     setBootState({ status: 'booting' });
@@ -102,7 +113,7 @@ export default function App() {
         data-testid="boot-error-screen"
         className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-shell text-ink"
       >
-        <div className="max-w-md w-full p-6 rounded-card border border-riskEdge bg-riskTint text-center shadow-raised">
+        <div className="max-w-md w-full p-6 rounded-card border border-risk-edge bg-risk-tint text-center shadow-raised">
           <h1
             data-testid="boot-error-title"
             className="text-lg font-bold text-destructive"
@@ -161,6 +172,8 @@ function StudioShell({
     session.getState,
   );
   const [activeScreen, setActiveScreen] = React.useState<'entry' | 'workspace'>('entry');
+
+  React.useEffect(() => whenIdle(() => void Workspace.preload()), []);
 
   // If a project is loaded and activeScreen is 'workspace', show Workspace
   if (activeScreen === 'workspace' && sessionState.projectId) {
