@@ -920,32 +920,54 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         }}
       />
 
-      {/* Delete confirmation when a scenario references what would be removed */}
-      <Dialog open={deleteConfirm !== null} onOpenChange={(next) => { if (!next) setDeleteConfirm(null); }}>
+      {/* Delete dependency preview: removals, scenario repairs, or why it cannot be applied */}
+      <Dialog open={deleteConfirm !== null} onOpenChange={(next) => { if (!next) { setDeleteConfirm(null); setDeleteError(null); } }}>
         <DialogContent data-testid="delete-confirm-dialog" className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete will affect scenarios</DialogTitle>
+            <DialogTitle>
+              {deleteConfirm?.blockedReason || (deleteError && deleteConfirm?.affectedScenarioLabels.length === 0)
+                ? "Can't delete this selection"
+                : 'Delete will affect scenarios'}
+            </DialogTitle>
             <DialogDescription>
-              {deleteConfirm && (
+              {deleteConfirm && !deleteConfirm.blockedReason && deleteConfirm.affectedScenarioLabels.length > 0 && (
                 <>
-                  These scenarios reference what you're deleting and will need attention:{' '}
-                  <strong>{deleteConfirm.affectedScenarioLabels.join(', ')}</strong>.
+                  Deleting removes {deleteConfirm.removedElementIds.length} element
+                  {deleteConfirm.removedElementIds.length === 1 ? '' : 's'} and{' '}
+                  {deleteConfirm.removedConnectionIds.length} connection
+                  {deleteConfirm.removedConnectionIds.length === 1 ? '' : 's'}. These scenarios reference
+                  them and will be repaired:
                 </>
               )}
+              {deleteConfirm?.blockedReason && <>The project would be invalid afterwards: {deleteConfirm.blockedReason}</>}
             </DialogDescription>
           </DialogHeader>
+          {deleteConfirm && !deleteConfirm.blockedReason && deleteConfirm.scenarioRepairSummaries.length > 0 && (
+            <ul data-testid="delete-confirm-repairs" className="list-disc space-y-1 pl-5 text-sm text-secondary-text">
+              {deleteConfirm.scenarioRepairSummaries.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+          {deleteError && (
+            <p role="alert" data-testid="delete-error" className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
           <DialogFooter className="flex-row justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirm(null)}>
-              Cancel
+            <Button type="button" variant="ghost" onClick={() => { setDeleteConfirm(null); setDeleteError(null); }}>
+              {deleteConfirm?.blockedReason ? 'Close' : 'Cancel'}
             </Button>
-            <Button
-              data-testid="delete-confirm-btn"
-              type="button"
-              variant="destructive"
-              onClick={() => void confirmDelete()}
-            >
-              Delete
-            </Button>
+            {deleteConfirm && !deleteConfirm.blockedReason && deleteConfirm.affectedScenarioLabels.length > 0 && (
+              <Button
+                data-testid="delete-confirm-btn"
+                type="button"
+                variant="destructive"
+                onClick={() => void confirmDelete()}
+              >
+                Delete
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

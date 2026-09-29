@@ -241,6 +241,19 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.locator('.component-node', { hasText: 'Checkout' })).toBeVisible();
   });
 
+  test('RV-13a: confirming the delete preview removes a scenario-referenced node; undo restores it', async ({ page }) => {
+    await openS05Project(page);
+    const checkout = page.locator('.component-node', { hasText: 'Checkout' });
+    await checkout.click();
+    await page.getByTestId('selection-delete-btn').click();
+    await expect(page.getByTestId('delete-confirm-repairs')).toContainText('Accepted and fulfilled');
+    await page.getByTestId('delete-confirm-btn').click();
+    await expect(page.getByTestId('delete-confirm-dialog')).toHaveCount(0);
+    await expect(checkout).toHaveCount(0);
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(checkout).toHaveCount(1);
+  });
+
   test('place at centre shows the caption; undo and redo', async ({ page }) => {
     await openBlankProject(page, 'Place and undo');
     const before = await elementIds(page);
