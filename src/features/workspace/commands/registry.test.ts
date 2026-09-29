@@ -94,7 +94,7 @@ describe('registry shape', () => {
 
   it('includes no excluded or uncontracted entries', () => {
     const labels = COMMAND_IDS.map((id) => COMMAND_DEFINITIONS[id].label.toLowerCase());
-    for (const excluded of ['duplicate project', 'project settings', 'new branch', 'share']) {
+    for (const excluded of ['duplicate project', 'project settings', 'share']) {
       expect(labels.some((label) => label.includes(excluded))).toBe(false);
     }
   });
@@ -197,6 +197,31 @@ describe('availability', () => {
       ),
     ).toMatchObject({ enabled: false, code: 'busy' });
   });
+
+  it('allows branch creation from an open current branch and reopening only closed drafts', () => {
+    expect(getAvailability('branch.create', makeContext(), { label: 'retry', source: 'working' }))
+      .toEqual({ enabled: true });
+    expect(
+      getAvailability(
+        'branch.create',
+        makeContext({ branches: makeContext().branches.map((branch) => ({ ...branch, closed: branch.id === DRAFT })) }),
+        { label: 'retry', source: 'working' },
+      ),
+    ).toMatchObject({ enabled: false, code: 'invalid-branch' });
+    const fullProjectBranches = Array.from({ length: 100 }, (_, i) => ({
+      id: `branch-${i}`, label: `branch ${i}`, isMain: i === 0, closed: false,
+    }));
+    expect(getAvailability('branch.create', makeContext({
+      branchId: 'branch-1',
+      branches: fullProjectBranches,
+    }), { label: 'retry', source: 'head' })).toMatchObject({ enabled: false, code: 'limit' });
+
+    expect(getAvailability('branch.reopen', makeContext(), { branchId: OTHER })).toEqual({ enabled: true });
+    expect(getAvailability('branch.reopen', makeContext(), { branchId: MAIN }))
+      .toMatchObject({ enabled: false, code: 'invalid-branch' });
+    expect(getAvailability('branch.reopen', makeContext(), { branchId: DRAFT }))
+      .toMatchObject({ enabled: false, code: 'invalid-branch' });
+  });
 });
 
 describe('executeCommand', () => {
@@ -205,6 +230,18 @@ describe('executeCommand', () => {
     const result = await executeCommand('branch.switch', { branchId: MAIN }, makeContext(), handlers);
     expect(result).toEqual({ status: 'done', value: undefined });
     expect(handlers['branch.switch']).toHaveBeenCalledWith({ branchId: MAIN });
+  });
+
+  it('routes create and reopen payloads through their typed handlers', async () => {
+    const handlers = makeHandlers();
+    const createPayload = { label: 'cache experiment', source: 'head' as const };
+    const reopenPayload = { branchId: OTHER };
+    expect(await executeCommand('branch.create', createPayload, makeContext(), handlers))
+      .toEqual({ status: 'done', value: undefined });
+    expect(await executeCommand('branch.reopen', reopenPayload, makeContext(), handlers))
+      .toEqual({ status: 'done', value: undefined });
+    expect(handlers['branch.create']).toHaveBeenCalledWith(createPayload);
+    expect(handlers['branch.reopen']).toHaveBeenCalledWith(reopenPayload);
   });
 
   it('re-checks availability and never calls a disabled handler', async () => {

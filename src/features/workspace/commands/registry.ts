@@ -16,9 +16,9 @@
  *   canvas until selection commands join the registry.
  *
  * Not here (design-revalidation.md §2 / commands.md §1): ⌘K/⌘R/⌘H/⌘B/⌘L,
- * single-letter shortcuts, Duplicate project, Project settings, New branch.
- * Commands the app doesn't wire yet (parts, remaining canvas tools, dock
- * configuration, branch create/reopen) are absent rather than fake entries.
+ * single-letter shortcuts, Duplicate project and Project settings.
+ * Commands the app doesn't wire yet (parts, remaining canvas tools and dock
+ * configuration) are absent rather than fake entries.
  */
 
 import type { Id } from '../../../domain/studio/model';
@@ -33,6 +33,8 @@ export const COMMAND_IDS = [
   'project.rename',
   'project.switch',
   'branch.switch',
+  'branch.create',
+  'branch.reopen',
   'run.start',
   'run.start-all',
   'run.pause',
@@ -66,6 +68,8 @@ export interface CommandPayloads {
   /** "All projects": leaves for the entry screen, where the project is chosen. */
   'project.switch': Empty;
   'branch.switch': { readonly branchId: Id };
+  'branch.create': { readonly label: string; readonly source: 'working' | 'head' };
+  'branch.reopen': { readonly branchId: Id };
   'run.start': { readonly scenarioId: Id };
   'run.start-all': Empty;
   'run.pause': Empty;
@@ -143,6 +147,7 @@ export type AvailabilityCode =
   | 'busy'
   | 'no-project'
   | 'current'
+  | 'invalid-branch'
   | 'run-active'
   | 'not-running'
   | 'not-paused'
@@ -283,6 +288,42 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
       if (blocked) return blocked;
       if (payload.branchId === ctx.branchId) {
         return disabled('current', "You're on this branch");
+      }
+      return ENABLED;
+    },
+  },
+  'branch.create': {
+    id: 'branch.create',
+    label: 'Create branch',
+    keywords: ['new branch', 'fork', 'draft', 'working copy'],
+    group: 'branch',
+    iconKey: 'branch',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      const current = ctx.branches.find((branch) => branch.id === ctx.branchId);
+      if (!current || current.closed) {
+        return disabled('invalid-branch', 'Reopen this branch before creating another branch');
+      }
+      return ctx.branches.length >= 100
+        ? disabled('limit', 'This project already has 100 branches')
+        : ENABLED;
+    },
+  },
+  'branch.reopen': {
+    id: 'branch.reopen',
+    label: 'Reopen branch',
+    keywords: ['closed', 'draft', 'continue'],
+    group: 'branch',
+    iconKey: 'branch',
+    shortcut: null,
+    availability: (ctx, payload) => {
+      const blocked = requireProject(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      const branch = ctx.branches.find((candidate) => candidate.id === payload.branchId);
+      if (!branch || branch.isMain || !branch.closed) {
+        return disabled('invalid-branch', 'Only a closed draft branch can be reopened');
       }
       return ENABLED;
     },

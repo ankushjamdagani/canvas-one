@@ -13,7 +13,9 @@ import {
   createIssue,
   mapErrorToFailedResult,
   type Actor,
+  type AuthoredResult,
   type BranchCreateCommand,
+  type BranchReopenCommand,
   type BranchRecord,
   type MissingResult,
   type ModelApplyRecordsCommand,
@@ -24,6 +26,7 @@ import {
   type StudioRepository,
   type PartCaptureCommand,
   type PartImportCommand,
+  type UnsupportedResult,
 } from '../../persistence/studio';
 import { computeInverseChanges } from './inverse';
 import type {
@@ -31,6 +34,7 @@ import type {
   CreateProjectResult,
   OpenProjectResult,
   SessionApplyResult,
+  BusyResult,
   SessionControllerOptions,
   SessionRedoResult,
   SessionRenameResult,
@@ -354,6 +358,135 @@ export class SessionController {
       };
     }
     return this.openProject(this.state.projectId, branchId);
+  }
+
+  /**
+   * Creates a branch from the current autosaved working copy or its head, then
+   * opens it. The repository checks both the live working revision and head
+   * supplied here, so an interleaving edit or publication can't be copied
+   * silently.
+   */
+  async createBranch(
+    label: string,
+    source: 'working' | 'head',
+  ): Promise<AuthoredResult | BusyResult | UnsupportedResult | OpenProjectResult> {
+    if (this.isInFlight) {
+      return { status: 'busy', message: 'An operation is currently in flight' };
+    }
+    const state = this.state;
+    if (!state.projectId || !state.branchId || state.workingRevision === null) {
+      return {
+        status: 'invalid',
+        issues: [createIssue('structural-rule', 'No project branch is open in session', [])],
+      };
+    }
+
+    const projectId = state.projectId;
+    const sourceBranchId = state.branchId;
+    const newBranchId = this.mintId();
+    const command: BranchCreateCommand = {
+      commandId: 'branch.create',
+      operationId: this.mintId(),
+      projectId,
+      branchId: sourceBranchId,
+      expectedWorkingRevision: state.workingRevision,
+      actor: this.actor,
+      payload: {
+        newBranchId,
+        label,
+        source,
+        expectedHeadId: null,
+      },
+    };
+
+    this.isInFlight = true;
+    this.updateState({ status: 'saving' });
+    let result: AuthoredResult | UnsupportedResult;
+    try {
+      const sourceBranch = await this.repository.loadBranch(projectId, sourceBranchId);
+      if (!sourceBranch) {
+        result = { status: 'missing', ids: [sourceBranchId] };
+      } else {
+        // Use the head read with the source branch. The working revision in the
+        // session is still the CAS token for the autosaved working snapshot.
+        const commandWithHead: BranchCreateCommand = {
+          ...command,
+          payload: { ...command.payload, expectedHeadId: sourceBranch.headCommitId },
+        };
+        result = await this.repository.execute(commandWithHead);
+      }
+    } catch (err) {
+      result = mapErrorToFailedResult(err);
+    } finally {
+      this.isInFlight = false;
+    }
+
+    if (result.status !== 'applied') {
+      this.updateState({
+        status: state.projectId ? 'ready' : 'empty',
+        lastError: result,
+      });
+      return result;
+    }
+
+    this.updateState({ status: 'ready', projectRevision: result.projectRevision, lastError: null });
+    const opened = await this.openProject(projectId, newBranchId);
+    return opened.status === 'ready' ? result : opened;
+  }
+
+  /**
+   * Reopens a closed non-main branch with its current persisted head/revision,
+   * then switches to it. Reopening changes branch state only; it never rewinds
+   * or edits its work/history.
+   */
+  async reopenBranch(
+    branchId: Id,
+  ): Promise<AuthoredResult | BusyResult | UnsupportedResult | OpenProjectResult> {
+    if (this.isInFlight) {
+      return { status: 'busy', message: 'An operation is currently in flight' };
+    }
+    const projectId = this.state.projectId;
+    if (!projectId) {
+      return {
+        status: 'invalid',
+        issues: [createIssue('structural-rule', 'No project is open in session', [])],
+      };
+    }
+
+    this.isInFlight = true;
+    this.updateState({ status: 'saving' });
+    let result: AuthoredResult | UnsupportedResult;
+    try {
+      const project = await this.repository.loadProject(projectId);
+      const branch = await this.repository.loadBranch(projectId, branchId);
+      if (!project || !branch) {
+        result = { status: 'missing', ids: [!project ? projectId : branchId] };
+      } else {
+        const command: BranchReopenCommand = {
+          commandId: 'branch.reopen',
+          operationId: this.mintId(),
+          projectId,
+          branchId,
+          expectedWorkingRevision: branch.workingRevision,
+          actor: this.actor,
+          payload: { expectedHeadId: branch.headCommitId },
+        };
+        result = await this.repository.execute(command);
+      }
+    } catch (err) {
+      result = mapErrorToFailedResult(err);
+    } finally {
+      this.isInFlight = false;
+    }
+
+    if (result.status !== 'applied') {
+      this.updateState({ status: 'ready', lastError: result });
+      return result;
+    }
+
+    this.updateState({ status: 'ready', projectRevision: result.projectRevision, lastError: null });
+    const opened = await this.openProject(projectId, branchId);
+    return opened.status === 'ready' ? result : opened;
   }
 
   /**

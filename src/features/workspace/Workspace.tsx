@@ -2,6 +2,7 @@ import * as React from 'react';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
 import { TopBar } from './TopBar';
+import type { BranchActionOutcome } from './BranchPopover';
 import { CanvasView, type CanvasSelectionRequest, type CanvasViewHandle } from './CanvasView';
 import { buildMoveChange } from './projection';
 import {
@@ -293,7 +294,10 @@ export function Workspace({
   const [focusFieldId, setFocusFieldId] = React.useState<string | null>(null);
   const [guardOpen, setGuardOpen] = React.useState(false);
   const [guardApplying, setGuardApplying] = React.useState(false);
-  const pendingActionRef = React.useRef<(() => void) | null>(null);
+  const pendingActionRef = React.useRef<{
+    readonly run: () => void;
+    readonly cancel?: () => void;
+  } | null>(null);
 
   const draftSession: DraftSession = React.useMemo(
     () => ({
@@ -322,8 +326,11 @@ export function Workspace({
    * inspector close routes through this before touching anything.
    */
   const runGuarded = React.useCallback(
-    (action: () => void) => {
-      if (scenarioDraft?.status === 'saving') return;
+    (action: () => void, onCancel?: () => void) => {
+      if (scenarioDraft?.status === 'saving') {
+        onCancel?.();
+        return;
+      }
       const hasUnsavedScenarioDraft = Boolean(
         scenarioDraft && (scenarioDraft.dirty || scenarioDraft.isNew),
       );
@@ -331,7 +338,7 @@ export function Workspace({
         action();
         return;
       }
-      pendingActionRef.current = action;
+      pendingActionRef.current = { run: action, cancel: onCancel };
       setGuardOpen(true);
     },
     [draft, scenarioDraft],
@@ -423,6 +430,7 @@ export function Workspace({
   }, [runGuarded, closeInspector]);
 
   const handleGuardStay = React.useCallback(() => {
+    pendingActionRef.current?.cancel?.();
     pendingActionRef.current = null;
     setGuardOpen(false);
   }, []);
@@ -434,7 +442,7 @@ export function Workspace({
     setDraft(null);
     setScenarioDraft(null);
     setFocusFieldId(null);
-    action?.();
+    action?.run();
   }, []);
 
   const handleGuardApply = React.useCallback(async () => {
@@ -450,7 +458,7 @@ export function Workspace({
         pendingActionRef.current = null;
         setGuardOpen(false);
         setScenarioDraft(null);
-        action?.();
+        action?.run();
       } else {
         setGuardOpen(false);
         setScenarioDraft(next);
@@ -470,7 +478,7 @@ export function Workspace({
       setGuardOpen(false);
       setDraft(null);
       setFocusFieldId(null);
-      action?.();
+      action?.run();
     } else {
       // Apply failed: stay on the inspector with the error surfaced, per
       // commands.md §6 ("Apply proceeds only on success").
@@ -1571,6 +1579,8 @@ export function Workspace({
       'project.rename': ({ title }) => handleRenameProject(title),
       'project.switch': () => handleBackToProjects(),
       'branch.switch': ({ branchId }) => handleSwitchBranch(branchId),
+      'branch.create': ({ label, source }) => session.createBranch(label, source),
+      'branch.reopen': ({ branchId }) => session.reopenBranch(branchId),
       'run.start': ({ scenarioId }) => handleRunScenario(scenarioId),
       'run.start-all': () => handleRunAll(),
       'run.pause': () => runController?.pause(),
@@ -1611,6 +1621,7 @@ export function Workspace({
     }),
     [
       handleBackToProjects,
+      session,
       handleRedo,
       handleDuplicateSelection,
       handleRenameProject,
@@ -1630,6 +1641,48 @@ export function Workspace({
       transferActions,
     ],
   );
+
+  const runGuardedBranchCommand = React.useCallback(
+    <K extends 'branch.create' | 'branch.reopen'>(
+      id: K,
+      payload: CommandHandlers[K] extends (arg: infer P) => unknown ? P : never,
+    ): Promise<BranchActionOutcome> =>
+      new Promise((resolve) => {
+        const run = async () => {
+          try {
+            const result = await executeCommand(id, payload as never, commandContext, commandHandlers);
+            if (result.status === 'disabled') {
+              resolve({ status: 'failed', message: result.reason });
+              return;
+            }
+            const value = result.value as { readonly status?: string } | null;
+            if (value?.status === 'applied') {
+              resolve({ status: 'done' });
+            } else {
+              resolve({
+                status: 'failed',
+                message: formatStudioError(value, id === 'branch.create' ? 'Could not create this branch' : 'Could not reopen this branch'),
+              });
+            }
+          } catch {
+            resolve({ status: 'failed', message: id === 'branch.create' ? 'Could not create this branch' : 'Could not reopen this branch' });
+          }
+        };
+        runGuarded(
+          () => void run(),
+          () => resolve({ status: 'cancelled' }),
+        );
+      }),
+    [commandContext, commandHandlers, runGuarded],
+  );
+
+  const createBranchDisabledReason = React.useMemo(() => {
+    const availability = COMMAND_DEFINITIONS['branch.create'].availability(commandContext, {
+      label: 'Branch',
+      source: 'working',
+    });
+    return availability.enabled ? null : availability.reason;
+  }, [commandContext]);
 
   const executeCanvasCommand = React.useCallback<CanvasCommandExecutor>(
     (id, payload) => executeCommand(id, payload, commandContext, commandHandlers),
@@ -1740,6 +1793,13 @@ export function Workspace({
           branchId={sessionState.branchId ?? projectRecord.mainBranchId}
           onRenameProject={handleRenameProject}
           onSwitchBranch={handleSwitchBranch}
+          onCreateBranch={(label, source) =>
+            runGuardedBranchCommand('branch.create', { label, source })
+          }
+          onReopenBranch={(branchId) =>
+            runGuardedBranchCommand('branch.reopen', { branchId })
+          }
+          createBranchDisabledReason={createBranchDisabledReason}
           onAllProjects={handleBackToProjects}
           saveStatusText={saveStatusText}
           isSaving={isSaving}

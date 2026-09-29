@@ -7,7 +7,7 @@ import { Kbd } from '@/components/ui/kbd';
 import { cn } from '@/lib/utils';
 import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
 import { ProjectMenu } from './ProjectMenu';
-import { BranchPopover } from './BranchPopover';
+import { BranchPopover, type BranchActionOutcome } from './BranchPopover';
 import type { TransferActions } from '../transfer';
 
 export interface TopBarProps {
@@ -16,6 +16,9 @@ export interface TopBarProps {
   branchId: string;
   onRenameProject: (title: string) => Promise<unknown>;
   onSwitchBranch: (branchId: string) => void;
+  onCreateBranch: (label: string, source: 'working' | 'head') => Promise<BranchActionOutcome>;
+  onReopenBranch: (branchId: string) => Promise<BranchActionOutcome>;
+  createBranchDisabledReason?: string | null;
   onAllProjects: () => void;
   saveStatusText: string;
   isSaving: boolean;
@@ -57,6 +60,9 @@ export function TopBar({
   branchId,
   onRenameProject,
   onSwitchBranch,
+  onCreateBranch,
+  onReopenBranch,
+  createBranchDisabledReason,
   onAllProjects,
   saveStatusText,
   isSaving,
@@ -189,6 +195,10 @@ export function TopBar({
             branches={branches}
             currentBranchId={branchId}
             onSwitchBranch={onSwitchBranch}
+            onCreateBranch={onCreateBranch}
+            onReopenBranch={onReopenBranch}
+            createDisabledReason={createBranchDisabledReason}
+            isSaving={isSaving}
           >
             <button
               type="button"

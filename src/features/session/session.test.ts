@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Document, Element, Id } from '../../domain/studio/model';
 import {
   StudioDatabase,
+  LocalRepository,
   type Actor,
   type BranchCreateCommand,
   type RecordChange,
@@ -61,6 +62,49 @@ function createTestDocument(id: Id, title = 'Untitled'): Document {
 }
 
 describe('Session Layer (RV-12c1)', () => {
+  it('creates from saved work or the branch head and reopens with a fresh revision before switching', async () => {
+    const db = new StudioDatabase(`test-branch-controls-${Date.now()}-${idCounter++}`);
+    await db.open();
+    const repository = new LocalRepository(db);
+    const mintId = createMintId();
+    const controller = new SessionController({ repository, mintId, actor: testActor });
+
+    await controller.createProject({
+      title: 'Branch controls',
+      initialDocument: createTestDocument(mintId(), 'Branch controls'),
+    });
+    const sourceBranchId = controller.getState().branchId!;
+    const projectId = controller.getState().projectId!;
+    const element = makeElement(mintId(), 'Saved work');
+    expect((await controller.apply(
+      [{ kind: 'insert', value: { recordKind: 'element', record: element } }],
+      'Add element',
+    )).status).toBe('applied');
+
+    const working = await controller.createBranch('From working copy', 'working');
+    expect(working.status).toBe('applied');
+    const workingBranchId = controller.getState().branchId!;
+    expect(workingBranchId).not.toBe(sourceBranchId);
+    expect(controller.getState().document?.elements.map((item) => item.id)).toEqual([element.id]);
+
+    await db.branches.update([projectId, workingBranchId], { state: 'closed' });
+    const reopened = await controller.reopenBranch(workingBranchId);
+    expect(reopened.status).toBe('applied');
+    expect(controller.getState().branchId).toBe(workingBranchId);
+    expect(controller.getState().workingRevision).toBe(1);
+    const reopenedBranch = await repository.loadBranch(projectId, workingBranchId);
+    expect(reopenedBranch?.state).toBe('open');
+    expect(reopenedBranch?.workingSnapshotId).toBe(controller.getState().workingSnapshotId);
+
+    const fromHead = await controller.createBranch('From committed head', 'head');
+    expect(fromHead.status).toBe('applied');
+    expect(controller.getState().document?.elements).toEqual([]);
+    const headBranch = await repository.loadBranch(projectId, controller.getState().branchId!);
+    expect(headBranch?.headCommitId).toBe(reopenedBranch?.headCommitId);
+
+    db.close();
+  });
+
   it('constructor validation: requires repository, mintId, actor; no defaults or randomUUID fallback', () => {
     const mintId = createMintId();
     // @ts-expect-error testing missing repository
