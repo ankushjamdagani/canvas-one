@@ -668,7 +668,7 @@ export type AssignEffect = {
 /**
  * Contract §4: {id,kind:'request-id',path:Path}
  * ID derived from the run-local root ID plus a monotonic counter (no clock or RNG).
- * TODO: run-identity.md §1/§2 (run-local root ID derivation and invocation identity)
+ * The runner derives it in runner/machine.ts (run-identity.md §1/§2).
  */
 export type RequestIdEffect = {
   readonly id: Id;
@@ -918,7 +918,7 @@ export type ScenarioMode = 'logical' | 'timed';
 /**
  * Contract §6: Scenario Budgets
  * budgets={maxEvents,maxTraceRows,maxTraceBytes,maxScheduledEvents,maxLiveRoots}
- * TODO: storage.md §6 limits (events 100k/1M, trace rows 10k/100k, trace+payload bytes 4/16 MiB, live scheduled events 100k, simultaneous roots 10k)
+ * storage.md §6 bounds are enforced by validate.ts; runner defaults are in runner/types.ts.
  */
 export type ScenarioBudgets = {
   readonly maxEvents: number;

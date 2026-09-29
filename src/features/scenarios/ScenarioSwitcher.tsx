@@ -9,15 +9,9 @@
  * the reason 'Add a scenario to run'." Screens: scenario_switcher.png,
  * scenario_blank_project.png.
  *
- * This is a close structural relative of src/features/runs/ScenarioRunControl.tsx (RV-
- * 12c4), which renders the same layout but leaves New/Duplicate/Edit/Rename/Delete
- * disabled with "Scenario editing arrives with the inspector" (the editor didn't exist
- * yet). Task RV-05c builds that editor in this module, so here those actions are wired
- * to real callbacks -- this component is not wired into the shell (Workspace.tsx/
- * TopBar.tsx are owned by another lane); see ScenariosPreview.tsx for standalone
- * verification. "Rename" opens the same editor as "Edit", focused on the header name
- * field -- the screens show no separate rename-only surface, and the editor's header
- * name input already *is* the rename control (a lead reading, reported).
+ * It replaced the RV-12c4 run control in the top bar (RV-12i), with New/Duplicate/Edit/
+ * Rename/Delete wired to the scenario editor. "Rename" opens the same editor as "Edit",
+ * focused on the header name field -- the screens show no separate rename-only surface.
  *
  * "Run itself is passed in; no runner here" (brief) -- onRun/onRunAll/onPause/onResume/
  * onReset are opaque callbacks; this component owns no run state.
@@ -73,7 +67,7 @@ export interface ScenarioSwitcherEntry {
   readonly status: ScenarioStatus;
 }
 
-/** Matches src/features/runs/ScenarioRunControl.tsx's RunPhase shape without importing it (kept decoupled per the brief's "self-contained module"). */
+/** The run phases the switcher renders; a subset of RunController's RunPhase (no 'done'). */
 export type ScenarioSwitcherRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving';
 
 export interface ScenarioSwitcherProps {

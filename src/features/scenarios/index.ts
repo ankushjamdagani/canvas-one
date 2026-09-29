@@ -1,12 +1,8 @@
 /**
- * Public surface of the scenarios feature module (RV-05c).
- *
- * Self-contained: not wired into Workspace.tsx/TopBar.tsx (another lane owns the
- * shell). See ScenariosPreview.tsx for a standalone visual harness.
+ * Public surface of the scenarios feature module (RV-05c; mounted by Workspace since RV-12i).
  *
  * `mockDocument.ts` (a deterministic counter-based UUID minter + a small sample
- * Document) is intentionally NOT exported here -- review round: it exists strictly for
- * `draft.test.ts` and `ScenariosPreview.tsx` (both import it directly by file path),
+ * Document) is intentionally NOT exported here: it exists only for `draft.test.ts`,
  * never for production code.
  */
 

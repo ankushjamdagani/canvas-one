@@ -7,8 +7,8 @@
  * 3. Numbers must be finite, serialized with JSON.stringify, with -0 -> 0.
  *    Rejects NaN, Infinity, BigInt, undefined, functions, symbols, sparse arrays, and non-plain objects.
  *
- * TODO: Manifest entity-set sorting (run-identity.md §2.4, §3) and default materialization
- * (run-identity.md §2.5, §3) belong to the future manifest builder.
+ * Manifest entity-set sorting and default materialization (run-identity.md §2.4–§2.5, §3)
+ * live in manifest.ts.
  */
 
 import type { Issue } from './validate';

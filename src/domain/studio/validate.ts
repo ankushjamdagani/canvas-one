@@ -6,8 +6,8 @@
  *
  * SCOPE: STORABLE validation only (§1: "types, bounds, IDs and references are correct").
  *
- * TODO: runnable readiness (model-and-runner.md §1, §2, §3, §5, §6: port compatibility for execution, complete scope, completion policy fit, sync call cycle rejection, boundary/crossing rules)
- * TODO: trace envelope (model-and-runner.md §8)
+ * Runnable readiness (model-and-runner.md §1–§3, §5, §6) is readiness.ts; the trace envelope
+ * (§8) is runner/trace.ts.
  */
 
 import { canonicalJson } from './canonical';
