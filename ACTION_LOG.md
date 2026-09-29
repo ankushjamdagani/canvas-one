@@ -1424,3 +1424,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 
 - **Outcome**: user accepted RV-13 release acceptance on 2026-09-29 at UI line `cfcda15`. Ledger and HANDOFF updated. Push/deploy not requested and not done.
 - **Open**: 16E LibraryPicker mounting, RV-02 `entryPorts` set vs ordered, design-debt ownership.
+
+### Post-RV-13 decisions: 16E picker, entryPorts set, RV-17
+
+- **Outcome**: UI line advanced to `f73649a`. D30 amended (both decision logs): dock Component button opens the 16E compact picker while the Library panel is closed and focuses the panel while it is open; the picker places via Enter/double-click/drag or a touch-only Place button (one undo) and links to the full panel. `entryPorts` are sorted as a set in the run manifest (`ad3bd89`; model-and-runner §7 updated in both copies), closing the RV-02 open gap; S01's two-entry-port scenario fingerprint changes once. Design debt opened as ledger row RV-17 (READY).
+- **Files**: `FloatingDock.tsx`, `CanvasView.tsx`, `LibraryPicker.tsx`, `manifest.ts` (+ test), five e2e specs, `decisions.md`, `model-and-runner.md`, ledger.
+- **Platform/subagents**: Claude lead, no subagents.
+- **Verification**: 1,416 unit tests; `npx tsc -b`; production build; isolated production Playwright 77 passed / 4 skipped (4 new picker tests incl. phone); coarse-pointer audit 0 controls under 44 px including the picker; `git diff --check` clean.
+- **Limitations**: the picker is catalog-only (saved parts stay in the full panel). Earlier saved runs for S01 scenario `c90abfe5` will show as run on an earlier version. Nothing pushed.

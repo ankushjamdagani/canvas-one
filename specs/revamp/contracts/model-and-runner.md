@@ -200,7 +200,7 @@ Normative for every nested field. Implementation uses closed schema descriptors,
 | Element / Port | label, description, visualKind / label | everything else |
 | Connection / Relation | label; descriptive relations entirely | executable fields; `contains` when used by refinement/fault resolution; `deployed-on` when resource/fault scope uses placement |
 | PayloadSchema / fields | label | everything else, including IDs |
-| Scenario | label | everything else. Scope lists are sorted as sets; inputs, faults, operations and transitions stay ordered. |
+| Scenario | label | everything else. Scope lists and `entryPorts` are sorted as sets (`entryPorts` by elementId, then portId); inputs, faults, operations and transitions stay ordered. |
 | Assertion / Assumption | label / description | everything else |
 | Fixture / Refinement / Behavior | — | all fields recursively, including context, paths, effect order, nulls/defaults, and every §4 wiring field |
 | Workload / RequestClass | class name | everything else, including enablement, tags and class order |

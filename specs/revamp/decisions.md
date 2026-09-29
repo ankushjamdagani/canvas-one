@@ -33,7 +33,7 @@ Only a user answer or an identified lead decision settles a row. To change one, 
 | D27 | User (2026-09-22) | Commits and publications need completed runs with passing checks. A failed check requires changing the system or the check and rerunning. No override or waiver. |
 | D28 | User (2026-09-22) | Every configured scenario must pass (at least one scenario). No required-subset selector. |
 | D29 | User (2026-09-22) | Close the source branch by default after publishing. It can be reopened; reopening doesn't undo anything. |
-| D30 | User (2026-09-22) | Library entry points focus/expand the single existing Library instance. |
+| D30 | User (2026-09-22; amended 2026-09-29) | Library entry points focus/expand the single existing Library instance. Amendment: while the Library panel is closed, the dock's Component button opens the compact 16E picker (catalog only, with "Browse full library"); while the panel is open it focuses the panel, so the picker and panel are never open together (R07). |
 | D31 | User (2026-09-23) | Execution manifest v1 is a projection of the scope closure with every presentation (A) field removed; shape in [run-identity.md §3](contracts/run-identity.md#3-execution-manifest-v1). |
 | D32 | User (2026-09-23) | Mode coherence (input `atMs`, completion kind, boundary `delayMs`/`afterInputId` vs scenario mode) is a readiness rule, not a storable one; the storable validator checks only per-field types and bounds. Supersedes the storable checks in RV-02b. |
 | D33 | User (2026-09-23) | Recursive refinement ownership is a storable structural error (like a `contains` cycle), rejected at save time for the whole document. |
