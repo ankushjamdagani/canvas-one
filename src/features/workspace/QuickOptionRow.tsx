@@ -5,6 +5,7 @@
 
 import {
   Braces,
+  CircleX,
   Command as CommandIcon,
   Copy,
   FileCode,
@@ -30,6 +31,7 @@ import {
   Redo2,
   RotateCcw,
   StickyNote,
+  Trash2,
   Table2,
   Undo2,
   Ungroup,
@@ -52,6 +54,7 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   'run-all': ListChecks,
   pause: Pause,
   resume: Play,
+  cancel: CircleX,
   reset: RotateCcw,
   history: HistoryIcon,
   library: Library,
@@ -63,6 +66,7 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   undo: Undo2,
   redo: Redo2,
   duplicate: Copy,
+  delete: Trash2,
   group: Group,
   ungroup: Ungroup,
   align: Rows3,

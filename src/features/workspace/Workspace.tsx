@@ -86,12 +86,14 @@ import {
   COMMAND_DEFINITIONS,
   executeCommand,
   formatShortcut,
+  runCanvasShortcut,
   runGlobalShortcut,
   type CommandContext,
   type CommandHandlers,
   type CommandId,
   type CommandPayloads,
   type QuickOption,
+  type ShortcutEvent,
 } from './commands/registry';
 import { QuickOptionsDialog, type RenameOutcome } from './QuickOptions';
 import { DEFAULT_DOCK_CONFIG, type DockConfig } from './dockConfig';
@@ -1632,6 +1634,7 @@ export function Workspace({
       'run.start-all': () => handleRunAll(),
       'run.pause': () => runController?.pause(),
       'run.resume': () => runController?.resume(),
+      'run.cancel': () => runController?.cancel(),
       'run.reset': () => handleResetRun(),
       'history.open': () => openHistoryPanel(),
       'library.open': () => openLibraryPanel(),
@@ -1654,6 +1657,7 @@ export function Workspace({
       'edit.undo': () => handleUndo(),
       'edit.redo': () => handleRedo(),
       'selection.duplicate': () => handleDuplicateSelection(),
+      'selection.delete': () => canvasViewRef.current?.deleteSelection(),
       'selection.group': ({ label }) =>
         document && activeViewId
           ? applySelectionPlan(planGroup(document, activeViewId, commandContext.selectedElementIds, mintId(), label))
@@ -1817,6 +1821,14 @@ export function Workspace({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [commandContext, commandHandlers]);
 
+  // Canvas-scope shortcut (Delete/Backspace): CanvasView forwards key events
+  // from canvas focus only; true means an enabled command matched.
+  const handleCanvasShortcut = React.useCallback(
+    (event: ShortcutEvent) =>
+      runCanvasShortcut(event, IS_MAC, commandContext, commandHandlers) !== null,
+    [commandContext, commandHandlers],
+  );
+
   const quickOptionsShortcut = formatShortcut(COMMAND_DEFINITIONS['commands.open'].shortcut!, IS_MAC);
   const currentBranchLabel =
     commandContext.branches.find((branch) => branch.id === commandContext.branchId)?.label ?? '';
@@ -1920,6 +1932,7 @@ export function Workspace({
                     onApplyChanges={handleApplyChanges}
                     commandContext={commandContext}
                     onExecuteCommand={executeCanvasCommand}
+                    onCanvasShortcut={handleCanvasShortcut}
                     dockConfig={dockConfig}
                     dockPreferenceState={dockPreferenceState}
                     onConfigureDock={(config) => void executeCommand('dock.configure', config, commandContext, commandHandlers)}

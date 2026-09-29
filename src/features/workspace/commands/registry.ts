@@ -39,6 +39,7 @@ export const COMMAND_IDS = [
   'run.start-all',
   'run.pause',
   'run.resume',
+  'run.cancel',
   'run.reset',
   'history.open',
   'library.open',
@@ -58,6 +59,7 @@ export const COMMAND_IDS = [
   'edit.undo',
   'edit.redo',
   'selection.duplicate',
+  'selection.delete',
   'selection.group',
   'selection.ungroup',
   'selection.align',
@@ -82,6 +84,7 @@ export interface CommandPayloads {
   'run.start-all': Empty;
   'run.pause': Empty;
   'run.resume': Empty;
+  'run.cancel': Empty;
   'run.reset': Empty;
   'history.open': Empty;
   'library.open': Empty;
@@ -101,6 +104,8 @@ export interface CommandPayloads {
   'edit.undo': Empty;
   'edit.redo': Empty;
   'selection.duplicate': Empty;
+  /** Current selection; the handler shows the dependency preview/confirmation (deletePlan.ts). */
+  'selection.delete': Empty;
   'selection.group': { readonly label: string };
   'selection.ungroup': { readonly groupIds: readonly Id[] };
   'selection.align': {
@@ -133,6 +138,7 @@ export type CommandIconKey =
   | 'pause'
   | 'resume'
   | 'reset'
+  | 'cancel'
   | 'history'
   | 'library'
   | 'image'
@@ -143,6 +149,7 @@ export type CommandIconKey =
   | 'undo'
   | 'redo'
   | 'duplicate'
+  | 'delete'
   | 'group'
   | 'ungroup'
   | 'align'
@@ -158,6 +165,8 @@ export type CommandIconKey =
 
 export interface Shortcut {
   readonly key: string;
+  /** Extra keys that trigger the same command (Delete also accepts Backspace). */
+  readonly aliases?: readonly string[];
   readonly modifiers: readonly ('Mod' | 'Shift' | 'Alt')[];
   readonly scope: 'global' | 'canvas';
 }
@@ -414,6 +423,18 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) =>
       ctx.runPhase === 'paused' ? ENABLED : disabled('not-paused', 'No run is paused'),
   },
+  'run.cancel': {
+    id: 'run.cancel',
+    label: 'Cancel run',
+    keywords: ['cancel', 'abort', 'stop'],
+    group: 'run',
+    iconKey: 'cancel',
+    shortcut: null,
+    availability: (ctx) =>
+      ctx.runPhase === 'running' || ctx.runPhase === 'paused'
+        ? ENABLED
+        : disabled('not-running', 'No run is in progress'),
+  },
   'run.reset': {
     id: 'run.reset',
     label: 'Reset run',
@@ -565,6 +586,22 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
         : disabled('invalid-selection', 'Select at least 1 component to duplicate');
     },
   },
+  'selection.delete': {
+    id: 'selection.delete',
+    label: 'Delete selection',
+    keywords: ['delete', 'remove', 'selection', 'parts'],
+    group: 'selection',
+    iconKey: 'delete',
+    // Canvas focus only (commands.md §1): matched by the canvas key handler.
+    shortcut: { key: 'Delete', aliases: ['Backspace'], modifiers: [], scope: 'canvas' },
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0 || ctx.selectedConnectionIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select a component or connection to delete');
+    },
+  },
   'selection.group': {
     id: 'selection.group',
     label: 'Group…',
@@ -713,7 +750,17 @@ function matches(shortcut: Shortcut, event: ShortcutEvent, isMac: boolean): bool
   const otherMod = isMac ? event.ctrlKey : event.metaKey;
   if (mod !== wantsMod || otherMod) return false;
   if (event.shiftKey !== wantsShift || event.altKey !== wantsAlt) return false;
-  return event.key.toLowerCase() === shortcut.key.toLowerCase();
+  const key = event.key.toLowerCase();
+  return key === shortcut.key.toLowerCase() || (shortcut.aliases ?? []).some((alias) => alias.toLowerCase() === key);
+}
+
+function matchShortcut(scope: Shortcut['scope'], event: ShortcutEvent, isMac: boolean): CommandId | null {
+  if (event.isComposing || event.inEditableField || event.inDialog) return null;
+  for (const id of COMMAND_IDS) {
+    const shortcut = COMMAND_DEFINITIONS[id].shortcut;
+    if (shortcut && shortcut.scope === scope && matches(shortcut, event, isMac)) return id;
+  }
+  return null;
 }
 
 /**
@@ -722,16 +769,28 @@ function matches(shortcut: Shortcut, event: ShortcutEvent, isMac: boolean): bool
  * native) and inside nested dialogs.
  */
 export function matchGlobalShortcut(event: ShortcutEvent, isMac: boolean): CommandId | null {
-  if (event.isComposing || event.inEditableField || event.inDialog) return null;
-  for (const id of COMMAND_IDS) {
-    const shortcut = COMMAND_DEFINITIONS[id].shortcut;
-    if (shortcut && shortcut.scope === 'global' && matches(shortcut, event, isMac)) return id;
-  }
-  return null;
+  return matchShortcut('global', event, isMac);
+}
+
+/** Canvas-scope match (Delete/Backspace); the caller only feeds canvas-focused key events. */
+export function matchCanvasShortcut(event: ShortcutEvent, isMac: boolean): CommandId | null {
+  return matchShortcut('canvas', event, isMac);
 }
 
 /** Commands that carry a shortcut; each takes the Empty payload. */
-export type ShortcutCommandId = 'commands.open' | 'edit.undo' | 'edit.redo';
+export type ShortcutCommandId = 'commands.open' | 'edit.undo' | 'edit.redo' | 'selection.delete';
+
+function runShortcutCommand(
+  id: CommandId | null,
+  ctx: CommandContext,
+  handlers: CommandHandlers,
+): CommandId | null {
+  if (!id) return null;
+  const shortcutId = id as ShortcutCommandId;
+  if (!getAvailability(shortcutId, ctx, {}).enabled) return null;
+  void executeCommand(shortcutId, {}, ctx, handlers);
+  return id;
+}
 
 /**
  * Keyboard entry point: matches the event, checks availability synchronously
@@ -744,11 +803,17 @@ export function runGlobalShortcut(
   ctx: CommandContext,
   handlers: CommandHandlers,
 ): CommandId | null {
-  const id = matchGlobalShortcut(event, isMac) as ShortcutCommandId | null;
-  if (!id) return null;
-  if (!getAvailability(id, ctx, {}).enabled) return null;
-  void executeCommand(id, {}, ctx, handlers);
-  return id;
+  return runShortcutCommand(matchGlobalShortcut(event, isMac), ctx, handlers);
+}
+
+/** Same contract for canvas-scoped shortcuts, fed by the canvas key handler. */
+export function runCanvasShortcut(
+  event: ShortcutEvent,
+  isMac: boolean,
+  ctx: CommandContext,
+  handlers: CommandHandlers,
+): CommandId | null {
+  return runShortcutCommand(matchCanvasShortcut(event, isMac), ctx, handlers);
 }
 
 /** Key hint from the registry, e.g. "⌘Z" / "Ctrl+Z", "⇧⌘Z" / "Ctrl+Shift+Z", "F2". */
@@ -868,6 +933,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   );
   if (ctx.runPhase === 'running') run.push(option('run.pause', {}, ctx));
   if (ctx.runPhase === 'paused') run.push(option('run.resume', {}, ctx));
+  if (ctx.runPhase === 'running' || ctx.runPhase === 'paused') run.push(option('run.cancel', {}, ctx));
   if (ctx.hasRunDisplay || isExecutionActive(ctx.runPhase)) run.push(option('run.reset', {}, ctx));
 
   const review: QuickOption[] = [option('history.open', {}, ctx), option('library.open', {}, ctx), option('results.open', {}, ctx)];
@@ -887,6 +953,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   const selection: QuickOption[] = hasSelection
     ? [
         option('selection.duplicate', {}, ctx),
+        option('selection.delete', {}, ctx),
         option('selection.group', { label: '' }, ctx),
         option('selection.ungroup', { groupIds: ctx.selectedGroupIds }, ctx),
         option('selection.align', { edge: 'left' }, ctx, { key: 'selection.align:left', label: 'Align left' }),

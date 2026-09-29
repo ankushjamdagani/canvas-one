@@ -11,7 +11,9 @@ import {
   executeCommand,
   formatShortcut,
   getAvailability,
+  matchCanvasShortcut,
   matchGlobalShortcut,
+  runCanvasShortcut,
   runGlobalShortcut,
   type CommandContext,
   type CommandHandlers,
@@ -91,11 +93,13 @@ describe('registry shape', () => {
 
   it('has only the contracted shortcuts, unique per scope, no single letters', () => {
     const withShortcut = COMMAND_IDS.filter((id) => COMMAND_DEFINITIONS[id].shortcut);
-    expect(withShortcut.sort()).toEqual(['commands.open', 'edit.redo', 'edit.undo']);
+    expect(withShortcut.sort()).toEqual(['commands.open', 'edit.redo', 'edit.undo', 'selection.delete']);
     const signatures = withShortcut.map((id) => {
       const s = COMMAND_DEFINITIONS[id].shortcut!;
-      return `${s.scope}:${[...s.modifiers].sort().join('+')}:${s.key.toLowerCase()}`;
-    });
+      return [s.key, ...(s.aliases ?? [])].map(
+        (key) => `${s.scope}:${[...s.modifiers].sort().join('+')}:${key.toLowerCase()}`,
+      );
+    }).flat();
     expect(new Set(signatures).size).toBe(signatures.length);
     for (const id of withShortcut) {
       const s = COMMAND_DEFINITIONS[id].shortcut!;
@@ -240,6 +244,63 @@ describe('availability', () => {
   });
 });
 
+describe('run.cancel and selection.delete availability', () => {
+  it('cancels only while a run is running or paused', () => {
+    expect(getAvailability('run.cancel', makeContext(), {})).toMatchObject({ enabled: false, code: 'not-running' });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'compiling' }), {})).toMatchObject({ enabled: false });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'running' }), {})).toEqual({ enabled: true });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'paused' }), {})).toEqual({ enabled: true });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'done' }), {})).toMatchObject({ enabled: false });
+  });
+
+  it('deletes only a non-empty selection and never while saving', () => {
+    expect(getAvailability('selection.delete', makeContext(), {})).toMatchObject({
+      enabled: false,
+      code: 'invalid-selection',
+      reason: 'Select a component or connection to delete',
+    });
+    expect(getAvailability('selection.delete', makeContext({ selectedElementIds: ['a'] }), {})).toEqual({ enabled: true });
+    expect(getAvailability('selection.delete', makeContext({ selectedConnectionIds: ['c'] }), {})).toEqual({ enabled: true });
+    expect(
+      getAvailability('selection.delete', makeContext({ selectedElementIds: ['a'], storageState: 'saving' }), {}),
+    ).toMatchObject({ enabled: false, code: 'busy' });
+    expect(
+      getAvailability('selection.delete', makeContext({ selectedElementIds: ['a'], activeViewId: null }), {}),
+    ).toMatchObject({ enabled: false, code: 'no-view' });
+  });
+});
+
+describe('canvas shortcuts (selection.delete)', () => {
+  const selected = () => makeContext({ selectedElementIds: ['a'] });
+
+  it('matches Delete and Backspace in canvas scope only', () => {
+    expect(matchCanvasShortcut(keyEvent({ key: 'Delete' }), true)).toBe('selection.delete');
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace' }), false)).toBe('selection.delete');
+    expect(matchGlobalShortcut(keyEvent({ key: 'Delete' }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Delete', metaKey: true }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace', shiftKey: true }), true)).toBeNull();
+  });
+
+  it('ignores IME composition, editable fields and nested dialogs', () => {
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace', isComposing: true }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace', inEditableField: true }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Delete', inDialog: true }), true)).toBeNull();
+  });
+
+  it('runs and reports only an enabled match so preventDefault follows a real command', () => {
+    const handlers = makeHandlers();
+    expect(runCanvasShortcut(keyEvent({ key: 'Delete' }), true, selected(), handlers)).toBe('selection.delete');
+    expect(handlers['selection.delete']).toHaveBeenCalledTimes(1);
+    expect(runCanvasShortcut(keyEvent({ key: 'Backspace' }), true, makeContext(), handlers)).toBeNull();
+    expect(runCanvasShortcut(keyEvent({ key: 'Delete' }), true, makeContext({ selectedElementIds: ['a'], storageState: 'saving' }), handlers)).toBeNull();
+    expect(handlers['selection.delete']).toHaveBeenCalledTimes(1);
+  });
+
+  it('formats the key hint from the registry', () => {
+    expect(formatShortcut(COMMAND_DEFINITIONS['selection.delete'].shortcut!, true)).toBe('Delete');
+  });
+});
+
 describe('executeCommand', () => {
   it('runs the handler with its payload when enabled', async () => {
     const handlers = makeHandlers();
@@ -342,7 +403,7 @@ describe('buildQuickOptions', () => {
     const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'run')!;
     expect(idle.options.map((o) => o.id)).toEqual(['run.start', 'run.start-all']);
     const running = buildQuickOptions(makeContext({ runPhase: 'running' })).find((g) => g.group === 'run')!;
-    expect(running.options.map((o) => o.id)).toEqual(['run.start', 'run.start-all', 'run.pause', 'run.reset']);
+    expect(running.options.map((o) => o.id)).toEqual(['run.start', 'run.start-all', 'run.pause', 'run.cancel', 'run.reset']);
     const paused = buildQuickOptions(makeContext({ runPhase: 'paused' })).find((g) => g.group === 'run')!;
     expect(paused.options.map((o) => o.id)).toContain('run.resume');
   });
@@ -366,6 +427,7 @@ describe('buildQuickOptions', () => {
     ).find((group) => group.group === 'selection')!;
     expect(selection.options.map((entry) => entry.key)).toEqual([
       'selection.duplicate',
+      'selection.delete',
       'selection.group',
       'selection.ungroup',
       'selection.align:left',
