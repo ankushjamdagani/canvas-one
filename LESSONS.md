@@ -27,6 +27,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **Keep every build chunk under Vite's 500 kB warning; a new size warning is a regression.** Check with `npm run build`. Why: 2026-09-29 bundle split removed the long-standing warning.
 - **Custom colour utilities (`text-ink`, `bg-canvas`) only work if `--color-<name>` is defined in `src/styles.css` `@theme`.** After using a new token class, grep `dist/assets/*.css` for it. Why: 2026-09-29 RV-17 (four classes generated no CSS) and bundle split (`bg-riskTint` camelCase).
 - **Unit tests must be `src/**/*.test.ts`; `.tsx` test files never run.** Render components with `React.createElement` + `renderToStaticMarkup`. Why: 2026-09-28 RV-11a review caught a `.test.tsx` file.
+- **An axe-clean run isn't an accessibility pass; also probe keyboard focus and 320 px reflow.** Open each overlay with Enter, close it with Escape and read `document.activeElement`; check `scrollWidth` and clipped controls at 320×640. axe can't flag an overlay that lacks a dialog role. Why: 2026-09-29 accessibility pass (axe found 2 of 6 defects).
 - **E2E screenshots and files go to `test.info().outputPath(...)`, never repo or absolute paths.** Why: 2026-09-29 RV-13 and debt cleanup (scratchpad paths from an old session, `artifacts/rv-12e/`).
 
 ## Delegation and review
@@ -47,4 +48,5 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 ## Code
 
 - **Don't split with `React.lazy`/Suspense on user-facing paths; use `src/lib/lazyComponent.tsx`, and time the affected interaction against a baseline build.** React 19 throttles Suspense reveals ~300 ms even for cached chunks. Why: 2026-09-29 bundle split made project open 830 ms.
+- **Put element-level defaults in `src/styles.css` inside `@layer base`.** An unlayered `p`/`h3`/`select`/`button` rule beats every Tailwind utility on that element, so the classes silently do nothing. Why: 2026-09-29 board comparison (error text grey, all `p`/`h3` forced to 12 px, menu rows boxed).
 - **Before deleting superseded code, port its tests to the replacement.** The ported budget tests exposed a status bug in the production runner. Why: 2026-09-29 logical runner retirement.
