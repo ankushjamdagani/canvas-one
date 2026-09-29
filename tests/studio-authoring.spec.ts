@@ -1,7 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { SnapshotRecord } from '../src/persistence/studio/types';
 
-const SCREENSHOT_DIR = new URL('../artifacts/rv-12e/', import.meta.url).pathname;
 
 /** Waits until no authored command is in flight. Canvas gestures are ignored
  * while a save is pending (`nodesConnectable={!isSaving}`), so every gesture
@@ -230,7 +229,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await page.locator('.component-node', { hasText: 'Checkout' }).click();
     await page.getByTestId('selection-delete-btn').click();
     await expect(page.getByTestId('delete-confirm-dialog')).toBeVisible();
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-delete-preview.png` });
+    await page.screenshot({ path: test.info().outputPath('rv12e-delete-preview.png') });
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('delete-confirm-dialog')).toHaveCount(0);
     await expect(page.locator('.component-node', { hasText: 'Checkout' })).toHaveCount(1);
@@ -262,7 +261,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await openBlankProject(page, 'Place and undo');
     const before = await elementIds(page);
     await openLibrary(page);
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-library-open.png` });
+    await page.screenshot({ path: test.info().outputPath('rv12e-library-open.png') });
     const panel = page.getByTestId('library-panel');
     const card = panel.locator('[data-entry-id="service"]');
     await card.click();
@@ -305,7 +304,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     const serviceId = await placeAtFraction(page, 'service', 0.1, 0.3);
     const databaseId = await placeAtFraction(page, 'database', 0.4, 0.3);
     expect(await dragConnect(page, serviceId, databaseId)).toBe('form');
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-metadata-form.png` });
+    await page.screenshot({ path: test.info().outputPath('rv12e-metadata-form.png') });
 
     // No contracted default for operation or deadline (catalog.md resolution 8).
     const confirm = page.getByTestId('connect-form-confirm');
@@ -327,7 +326,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await confirm.click();
     await expect(page.getByTestId('connect-resource-form')).toHaveCount(0);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-after-connecting.png` });
+    await page.screenshot({ path: test.info().outputPath('rv12e-after-connecting.png') });
   });
 
   test('a gateway connected to two targets keeps both connections (route ports)', async ({ page }) => {
@@ -387,7 +386,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await searchInput.fill('service');
     const serviceCard = library.locator('[data-entry-id="service"]');
     await expect(serviceCard).toBeVisible();
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-mobile-library.png` });
+    await page.screenshot({ path: test.info().outputPath('rv12e-mobile-library.png') });
 
     await serviceCard.click();
     await library.getByRole('button', { name: /Place .* on canvas/ }).click();
