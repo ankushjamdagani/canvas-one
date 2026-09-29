@@ -1,6 +1,10 @@
-import type { ComponentKind } from './model';
 import type { TrafficProfile } from './workload';
-export type { ComponentKind } from './model';
+
+export type ComponentKind =
+  "traffic" | "client" | "mobile" | "device" | "dns" | "cdn" | "firewall" | "gateway" |
+  "balancer" | "service" | "function" | "container" | "worker" | "scheduler" | "database" |
+  "nosql" | "cache" | "objectstore" | "search" | "warehouse" | "queue" | "stream" |
+  "pubsub" | "email" | "monitoring" | "analytics" | "secrets" | "thirdparty" | "custom";
 
 export interface ResourceConfig {
   capacity: number;

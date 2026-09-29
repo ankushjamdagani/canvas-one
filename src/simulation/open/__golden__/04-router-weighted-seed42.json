@@ -1,0 +1,170 @@
+{
+  "edges": {
+    "e-rtr-w1": {
+      "admitted": 1,
+      "rejected": 0,
+      "responses": 1,
+      "sent": 1
+    },
+    "e-rtr-w2": {
+      "admitted": 5,
+      "rejected": 0,
+      "responses": 5,
+      "sent": 5
+    },
+    "e-rtr-w3": {
+      "admitted": 13,
+      "rejected": 0,
+      "responses": 13,
+      "sent": 13
+    },
+    "e-src-rtr": {
+      "admitted": 20,
+      "rejected": 0,
+      "responses": 19,
+      "sent": 20
+    }
+  },
+  "finished": true,
+  "history": [
+    {
+      "completed": 9,
+      "generated": 10,
+      "latency": 11.00000000000001,
+      "queue": 0,
+      "time": 1
+    },
+    {
+      "completed": 19,
+      "generated": 20,
+      "latency": 10.999999999999948,
+      "queue": 0,
+      "time": 2
+    }
+  ],
+  "messages": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 0,
+    "inFlight": 0,
+    "meanLatency": 0,
+    "p95Latency": 0,
+    "rejected": 0,
+    "succeeded": 0,
+    "throughput": 0
+  },
+  "nodes": {
+    "rtr": {
+      "activeWorkers": 1,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 20,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.10449999999999954,
+      "processing": 1,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.009499999999999453,
+      "waiting": 0
+    },
+    "src": {
+      "activeWorkers": 0,
+      "admitted": 20,
+      "arrived": 20,
+      "attempts": 0,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 19,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0,
+      "waiting": 1
+    },
+    "w1": {
+      "activeWorkers": 0,
+      "admitted": 1,
+      "arrived": 1,
+      "attempts": 1,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 1,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.0050000000000000044,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.0050000000000000044,
+      "waiting": 0
+    },
+    "w2": {
+      "activeWorkers": 0,
+      "admitted": 5,
+      "arrived": 5,
+      "attempts": 5,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 5,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.025000000000000022,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.025000000000000022,
+      "waiting": 0
+    },
+    "w3": {
+      "activeWorkers": 0,
+      "admitted": 13,
+      "arrived": 13,
+      "attempts": 13,
+      "cancelled": 0,
+      "cleanupProcessing": 0,
+      "completed": 13,
+      "expired": 0,
+      "failed": 0,
+      "occupancy": 0.06500000000000006,
+      "processing": 0,
+      "queued": 0,
+      "rejected": 0,
+      "reserved": 0,
+      "retries": 0,
+      "retrying": 0,
+      "utilization": 0.06500000000000006,
+      "waiting": 0
+    }
+  },
+  "roots": {
+    "expired": 0,
+    "failed": 0,
+    "generated": 20,
+    "inFlight": 1,
+    "meanLatency": 10.999999999999948,
+    "p95Latency": 11.00000000000001,
+    "rejected": 0,
+    "succeeded": 19,
+    "throughput": 9.5
+  },
+  "time": 2
+}

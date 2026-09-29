@@ -14,6 +14,93 @@ import { randomGenerator } from '../primitives';
 
 export type Outcome = 'succeeded' | 'rejected' | 'failed' | 'expired';
 
+export type SimLifecycleFactKind =
+  | 'admitted'
+  | 'rejected'
+  | 'queued'
+  | 'started'
+  | 'attempt_settled'
+  | 'unit_settled'
+  | 'message_created'
+  | 'route_selected'
+  | 'host_down'
+  | 'host_up'
+  | 'failure_detected'
+  | 'recovery_detected'
+  | 'bridge_dispatch';
+
+export interface SimLifecycleFact {
+  kind: SimLifecycleFactKind;
+  time: number;
+  nodeId: string;
+  unitIdentity: string;
+  attempt: number;
+  path: string;
+  outcome?: Outcome;
+  parentIdentity?: string;
+  edgeId?: string;
+  /** Bridge call frames (RV-14f, model-and-runner.md §8): the system frame ID a
+   * 'bridge_dispatch' fact carries, correlating it to the eventual settleCall(). */
+  frameId?: string;
+  /** Set only when a 'unit_settled' fact resolves through a bridge child's adopted
+   * outcome/payload (§8 "the parent adopts the child's outcome and returns the child's
+   * payload"). Absent for ordinary (non-bridge) settlement, where the original admitted
+   * payload still applies. */
+  payloadRef?: string;
+  /** The emitting unit's actual category (RV-14f review, §8: "No success is inferred" —
+   * extended to "no root/message distinction is inferred either"). Set on 'admitted',
+   * 'rejected' and 'unit_settled' facts so a consumer never has to guess root-vs-message
+   * from the shape of `unitIdentity`. */
+  category?: 'root' | 'message';
+}
+
+export type SimTraceHook = (fact: SimLifecycleFact) => void;
+
+export interface KernelFaultConfig {
+  id: string;
+  hostId: string;
+  downAtMs: number;
+  upAtMs: number;
+  detectionDelayMs: number;
+  recoveryDetectionDelayMs: number;
+  activePolicy: 'fail';
+  queuedPolicy: 'reject';
+  routeReset: 'first-healthy';
+}
+
+/**
+ * Bridge call frames (RV-14f, model-and-runner.md §8): declares that `nodeId` (a
+ * resource with no other selectable call continuation, per readiness) dispatches its
+ * call continuation to an external, non-resource target. The kernel keeps the parent op
+ * waiting (as in a retained call chain) instead of completing it locally, and applies
+ * `returnLatencyMs` when the external caller eventually resolves the frame via
+ * `settleCall`.
+ */
+export interface KernelBridgeConfig {
+  nodeId: string;
+  returnLatencyMs: number;
+}
+
+export interface OpenSimulationOptions {
+  traceHook?: SimTraceHook;
+  disabledWorkloadIds?: Iterable<string>;
+  requireRunnable?: boolean;
+  hostPlacement?: Map<string, string> | Record<string, string>;
+  faults?: readonly KernelFaultConfig[];
+  bridges?: readonly KernelBridgeConfig[];
+}
+
+export interface KernelResourceInput {
+  entryNodeId: string;
+  identity: string;
+  time: number;
+  deadline: number;
+  requestClass: RequestClass;
+  key?: string | null;
+  workloadId?: string;
+  ordinal?: number;
+}
+
 export interface FlowCounts {
   generated: number;
   succeeded: number;
@@ -188,7 +275,7 @@ export interface Unit {
   born: number;
   deadline: number;
   requestClass: RequestClass;
-  key: string;
+  key?: string | null;
   done: boolean;
   rootOp?: Op;
   ops: Set<Op>;
@@ -206,13 +293,16 @@ export interface Op {
   released?: boolean;
   attempt: number;
   children: Set<Op>;
-  onDone?: (outcome: Outcome) => void;
+  onDone?: (outcome: Outcome, payloadRef?: string) => void;
   arrived: number;
   pendingChildren?: number;
   failedChild?: boolean;
   cacheAction?: 'fill' | 'invalidate';
   subscription?: string;
   publicationOnly?: boolean;
+  cancelled?: boolean;
+  /** Bridge call frames (RV-14f): set while this op waits on an external settleCall. */
+  bridgeFrameId?: string;
 }
 
 export interface NodeRuntime {
@@ -298,6 +388,9 @@ export class OpenSimulation {
   protected workloadRngs = new Map<string, () => number>();
   protected workloadNextOrdinal = new Map<string, number>();
 
+  protected traceHook?: SimTraceHook;
+  protected disabledWorkloads = new Set<string>();
+
   protected history: Array<{
     time: number;
     generated: number;
@@ -307,8 +400,30 @@ export class OpenSimulation {
   }> = [];
   protected nextSampleTime = 1;
 
-  constructor(graph: ExecutionGraph) {
-    const compiled = compileExecution(graph, true);
+  protected hostPlacement = new Map<string, string>();
+  protected hostState = new Map<string, boolean>();
+  protected routerDetectedHostState = new Map<string, boolean>();
+  protected roundRobinCursors = new Map<string, number>();
+  protected faults: KernelFaultConfig[] = [];
+  protected pendingCompletionCancels = new Map<Op, () => void>();
+
+  // Bridge call frames (RV-14f, §8): nodes with an external (non-resource) call
+  // continuation, and the ops currently waiting on an external settleCall.
+  protected bridgeByNode = new Map<string, KernelBridgeConfig>();
+  protected bridgePendingOps = new Map<string, Op>();
+  protected bridgeFrameCounter = 0;
+
+  constructor(graph: ExecutionGraph, options?: OpenSimulationOptions) {
+    if (options?.traceHook) {
+      this.traceHook = options.traceHook;
+    }
+    if (options?.disabledWorkloadIds) {
+      for (const id of options.disabledWorkloadIds) {
+        this.disabledWorkloads.add(id);
+      }
+    }
+    const requireRunnable = options?.requireRunnable ?? true;
+    const compiled = compileExecution(graph, requireRunnable);
     if (!compiled.plan) {
       const errMsgs = compiled.issues
         .filter(i => i.severity === 'error')
@@ -365,7 +480,7 @@ export class OpenSimulation {
     }
 
     for (const wl of this.plan.graph.workloads) {
-      if (!wl.enabled) continue;
+      if (!wl.enabled || this.disabledWorkloads.has(wl.id)) continue;
       const wlSeed = (this.seed ^ hashString(wl.id)) >>> 0;
       this.workloadRngs.set(wl.id, makeRng(wlSeed));
       this.workloadNextOrdinal.set(wl.id, 0);
@@ -373,6 +488,198 @@ export class OpenSimulation {
     }
 
     this.scheduleSample(1);
+
+    if (options?.hostPlacement) {
+      if (options.hostPlacement instanceof Map) {
+        this.hostPlacement = new Map(options.hostPlacement);
+      } else {
+        this.hostPlacement = new Map(Object.entries(options.hostPlacement));
+      }
+    }
+
+    if (options?.faults && options.faults.length > 0) {
+      this.faults = [...options.faults];
+      for (const fault of this.faults) {
+        this.hostState.set(fault.hostId, true);
+        this.routerDetectedHostState.set(fault.hostId, true);
+
+        const downSec = fault.downAtMs / 1000;
+        const failDetectSec = (fault.downAtMs + fault.detectionDelayMs) / 1000;
+        const upSec = fault.upAtMs / 1000;
+        const recDetectSec = (fault.upAtMs + fault.recoveryDetectionDelayMs) / 1000;
+
+        // Phase 0: host-down event (priority -2)
+        this.scheduleEvent(downSec, -2, () => {
+          this.interruptHost(fault.hostId, downSec);
+        });
+
+        // Phase 0: failure-detection event (priority -1)
+        this.scheduleEvent(failDetectSec, -1, () => {
+          this.failureDetected(fault.hostId, failDetectSec);
+        });
+
+        // Phase 0: host-up event (priority -2)
+        this.scheduleEvent(upSec, -2, () => {
+          this.hostUp(fault.hostId, upSec);
+        });
+
+        // Phase 0: recovery-detection event (priority -1)
+        this.scheduleEvent(recDetectSec, -1, () => {
+          this.recoveryDetected(fault.hostId, recDetectSec);
+        });
+      }
+    }
+
+    if (options?.bridges) {
+      for (const bridge of options.bridges) {
+        this.bridgeByNode.set(bridge.nodeId, bridge);
+      }
+    }
+  }
+
+  public getHostState(hostId: string): boolean | undefined {
+    return this.hostState.get(hostId);
+  }
+
+  public getRouterDetectedHostState(hostId: string): boolean | undefined {
+    return this.routerDetectedHostState.get(hostId);
+  }
+
+  public interruptHost(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.hostState.set(hostId, false);
+    this.emitFact({
+      kind: 'host_down',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
+
+    for (const [nodeId, placedHostId] of this.hostPlacement.entries()) {
+      if (placedHostId !== hostId) continue;
+      const nr = this.nodesRuntime.get(nodeId);
+      if (!nr) continue;
+
+      // 1. Active work on this host fails once
+      const activeOps = Array.from(nr.active);
+      nr.active.clear();
+      for (const op of activeOps) {
+        if (op.done) continue;
+        op.cancelled = true;
+        const cancelCb = this.pendingCompletionCancels.get(op);
+        if (cancelCb) {
+          cancelCb();
+          this.pendingCompletionCancels.delete(op);
+        }
+
+        nr.counters.failed++;
+        op.phase = 'settled';
+        op.done = true;
+        this.emitFact({
+          kind: 'attempt_settled',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+          outcome: 'failed',
+        });
+        this.finishOp(op, 'failed');
+        this.releaseOp(op);
+      }
+
+      // 2. Queued work on this host is rejected once
+      const queuedOps = Array.from(nr.queue);
+      nr.queue = [];
+      for (const op of queuedOps) {
+        if (op.done) continue;
+        op.cancelled = true;
+        nr.counters.rejected++;
+        op.phase = 'settled';
+        op.done = true;
+        if (op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'rejected',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            category: op.unit.category,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
+        this.finishOp(op, 'rejected');
+        this.releaseOp(op);
+      }
+
+      // Retrying work is left alone: activePolicy/queuedPolicy apply only to active and
+      // queued work present when the outage fires (§6 Faults). When a pending retry's timer
+      // later re-admits it, normal admission applies: rejected as unavailable if the host is
+      // still down, admitted normally if it has recovered.
+    }
+  }
+
+  public hostUp(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.hostState.set(hostId, true);
+    this.emitFact({
+      kind: 'host_up',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
+  }
+
+  public failureDetected(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.routerDetectedHostState.set(hostId, false);
+    for (const [nodeId, node] of this.plan.nodes.entries()) {
+      if (node.behavior.type === 'router' && node.behavior.strategy === 'round-robin') {
+        this.roundRobinCursors.set(nodeId, 0);
+      }
+    }
+    this.emitFact({
+      kind: 'failure_detected',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
+  }
+
+  public recoveryDetected(hostId: string, timeSeconds?: number): void {
+    if (timeSeconds !== undefined && timeSeconds > this.currentTime) {
+      this.updateIntegrals(timeSeconds);
+      this.currentTime = timeSeconds;
+    }
+    this.routerDetectedHostState.set(hostId, true);
+    for (const [nodeId, node] of this.plan.nodes.entries()) {
+      if (node.behavior.type === 'router' && node.behavior.strategy === 'round-robin') {
+        this.roundRobinCursors.set(nodeId, 0);
+      }
+    }
+    this.emitFact({
+      kind: 'recovery_detected',
+      time: this.currentTime,
+      nodeId: hostId,
+      unitIdentity: '',
+      attempt: 0,
+      path: '',
+    });
   }
 
   protected scheduleEvent(time: number, priority: number, run: () => void): void {
@@ -454,7 +761,12 @@ export class OpenSimulation {
     return { reqClass: chosen, key: `k-${keyIdx}` };
   }
 
+  protected emitFact(fact: SimLifecycleFact): void {
+    this.traceHook?.(fact);
+  }
+
   protected scheduleNextArrival(wl: WorkloadDefinition, afterTime: number): void {
+    if (this.disabledWorkloads.has(wl.id)) return;
     const ordinal = this.workloadNextOrdinal.get(wl.id)!;
     this.workloadNextOrdinal.set(wl.id, ordinal + 1);
 
@@ -480,6 +792,7 @@ export class OpenSimulation {
     if (!Number.isFinite(arrTime) || arrTime > this.duration) return;
 
     this.scheduleEvent(arrTime, 2, () => {
+      if (this.disabledWorkloads.has(wl.id)) return;
       this.handleArrival(wl, ordinal, arrTime);
       this.scheduleNextArrival(wl, arrTime);
     });
@@ -556,8 +869,8 @@ export class OpenSimulation {
       attempt: 0,
       children: new Set(),
       arrived: arrTime,
-      onDone: (outcome) => {
-        this.finishUnit(unit, outcome);
+      onDone: (outcome, payloadRef) => {
+        this.finishUnit(unit, outcome, payloadRef);
         const affectedNodes = new Set<string>();
         for (const op of unit.ops) {
           if (op !== rootOp && !op.done) {
@@ -589,8 +902,8 @@ export class OpenSimulation {
       children: new Set(),
       arrived: arrTime,
       pendingChildren: 1,
-      onDone: (outcome) => {
-        this.finishUnit(unit, outcome);
+      onDone: (outcome, payloadRef) => {
+        this.finishUnit(unit, outcome, payloadRef);
         const affectedNodes = new Set<string>();
         for (const op of unit.ops) {
           if (op !== rootOp && !op.done) {
@@ -622,9 +935,20 @@ export class OpenSimulation {
     this.publishMessage(rootOp, syntheticEdge);
   }
 
-  protected finishUnit(unit: Unit, outcome: Outcome): void {
+  protected finishUnit(unit: Unit, outcome: Outcome, payloadRef?: string): void {
     if (unit.done) return;
     unit.done = true;
+    this.emitFact({
+      kind: 'unit_settled',
+      time: this.currentTime,
+      nodeId: unit.rootOp?.nodeId ?? '',
+      unitIdentity: unit.identity,
+      category: unit.category,
+      attempt: unit.rootOp?.attempt ?? 0,
+      path: unit.rootOp?.path ?? '',
+      outcome,
+      ...(payloadRef !== undefined ? { payloadRef } : {}),
+    });
     const elapsedMs = (this.currentTime - unit.born) * 1000;
     if (unit.category === 'root') {
       this.rootsInFlight--;
@@ -657,12 +981,47 @@ export class OpenSimulation {
     const nr = this.nodesRuntime.get(op.nodeId)!;
     const node = this.plan.nodes.get(op.nodeId)!;
 
+    const hostId = this.hostPlacement.get(op.nodeId);
+    if (hostId !== undefined && this.hostState.get(hostId) === false) {
+      // Admission to a host that is actually down is rejected immediately as unavailable,
+      // whatever the router knows and regardless of whether this is a first attempt or a
+      // retry landing during the outage (§6 Faults).
+      nr.counters.rejected++;
+      op.phase = 'settled';
+      op.done = true;
+      if (op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'rejected',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          category: op.unit.category,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
+      this.finishOp(op, 'rejected');
+      this.releaseOp(op);
+      return false;
+    }
+
     if (!isRetry) {
       nr.counters.arrived++;
     }
 
     if (node.behavior.type === 'source') {
       nr.counters.admitted++;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'admitted',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          category: op.unit.category,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.startSourceProcessing(op);
       return true;
     }
@@ -682,6 +1041,17 @@ export class OpenSimulation {
       const candidates = this.getReadyBrokerConsumers(op.nodeId, sub);
       if (matchingQueueCount === 0 && candidates.length > 0) {
         nr.counters.admitted++;
+        if (!isRetry && op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'admitted',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            category: op.unit.category,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
         const chosenEdge = candidates[0];
         this.reserveBrokerConsumer(op, chosenEdge);
         return true;
@@ -689,14 +1059,44 @@ export class OpenSimulation {
 
       if (matchingQueueCount < qLimit) {
         nr.counters.admitted++;
+        if (!isRetry && op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'admitted',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            category: op.unit.category,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
         op.phase = 'queued';
         nr.queue.push(op);
+        this.emitFact({
+          kind: 'queued',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+        });
         return true;
       }
 
       nr.counters.rejected++;
       op.phase = 'settled';
       op.done = true;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'rejected',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          category: op.unit.category,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
       return false;
@@ -704,14 +1104,44 @@ export class OpenSimulation {
 
     if (nr.active.size < node.behavior.concurrency) {
       if (!isRetry) nr.counters.admitted++;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'admitted',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          category: op.unit.category,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.startProcessing(op);
       return true;
     }
 
     if (nr.queue.length < node.behavior.queueLimit) {
       if (!isRetry) nr.counters.admitted++;
+      if (!isRetry && op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'admitted',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          category: op.unit.category,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       op.phase = 'queued';
       nr.queue.push(op);
+      this.emitFact({
+        kind: 'queued',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: op.attempt,
+        path: op.path,
+      });
       return true;
     }
 
@@ -719,6 +1149,17 @@ export class OpenSimulation {
       nr.counters.rejected++;
       op.phase = 'settled';
       op.done = true;
+      if (op === op.unit.rootOp) {
+        this.emitFact({
+          kind: 'rejected',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          category: op.unit.category,
+          attempt: op.attempt,
+          path: op.path,
+        });
+      }
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
     } else {
@@ -734,6 +1175,14 @@ export class OpenSimulation {
   protected startSourceProcessing(op: Op): void {
     const nr = this.nodesRuntime.get(op.nodeId)!;
     nr.waitingSources.add(op);
+    this.emitFact({
+      kind: 'started',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+    });
     this.dispatchDownstream(op);
   }
 
@@ -746,6 +1195,15 @@ export class OpenSimulation {
     op.attempt++;
     nr.counters.attempts++;
 
+    this.emitFact({
+      kind: 'started',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+    });
+
     let procTime: number;
     if (node.behavior.type === 'storage') {
       const isWrite = op.unit.requestClass.operation === 'write';
@@ -756,7 +1214,15 @@ export class OpenSimulation {
     }
 
     const completeTime = this.currentTime + procTime;
+    let cancelled = false;
+    this.pendingCompletionCancels.set(op, () => {
+      cancelled = true;
+    });
     this.scheduleEvent(completeTime, 1, () => {
+      this.pendingCompletionCancels.delete(op);
+      if (cancelled || op.cancelled) {
+        return;
+      }
       this.handleProcessingCompletion(op);
     });
   }
@@ -783,6 +1249,15 @@ export class OpenSimulation {
     const failed = failRng() * 100 < node.behavior.failureRate;
 
     if (failed) {
+      this.emitFact({
+        kind: 'attempt_settled',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: op.attempt,
+        path: op.path,
+        outcome: 'failed',
+      });
       nr.active.delete(op);
       this.pumpQueue(op.nodeId);
 
@@ -815,7 +1290,9 @@ export class OpenSimulation {
       const isWrite = op.unit.requestClass.operation === 'write';
       if (isWrite) {
         cs.writes++;
-        op.cacheAction = 'invalidate';
+        if (node.behavior.mode !== 'lru' || op.unit.key != null) {
+          op.cacheAction = 'invalidate';
+        }
       } else {
         let hit = false;
         if (node.behavior.mode === 'fixed') {
@@ -823,20 +1300,43 @@ export class OpenSimulation {
             (this.seed ^ hashString(`${op.unit.identity}:${op.path}:cache`)) >>> 0
           );
           hit = draw() * 100 < node.behavior.hitRate;
-        } else {
+        } else if (op.unit.key != null) {
           hit = cs.runtime!.get(op.unit.key, this.currentTime);
+        } else {
+          hit = false;
         }
 
         if (hit) {
           cs.hits++;
+          this.emitFact({
+            kind: 'attempt_settled',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            attempt: op.attempt,
+            path: op.path,
+            outcome: 'succeeded',
+          });
           this.completeLocalOp(op);
           return;
         }
 
         cs.misses++;
-        op.cacheAction = 'fill';
+        if (node.behavior.mode !== 'lru' || op.unit.key != null) {
+          op.cacheAction = 'fill';
+        }
       }
     }
+
+    this.emitFact({
+      kind: 'attempt_settled',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+      outcome: 'succeeded',
+    });
 
     this.dispatchDownstream(op);
   }
@@ -844,16 +1344,89 @@ export class OpenSimulation {
   protected selectOutgoing(op: Op, outgoing: ExecutionEdge[]): ExecutionEdge[] {
     const node = this.plan.nodes.get(op.nodeId)!;
     if (node.behavior.type === 'router') {
-      const draw = makeRng(
-        (this.seed ^ hashString(`${op.unit.identity}:${op.path}:route`)) >>> 0
-      );
-      const selected = this.routeSelector.select(
-        node,
-        outgoing,
-        op.unit.requestClass,
-        draw
-      );
-      return [selected];
+      if (this.faults.length === 0) {
+        const draw = makeRng(
+          (this.seed ^ hashString(`${op.unit.identity}:${op.path}:route`)) >>> 0
+        );
+        const selected = this.routeSelector.select(
+          node,
+          outgoing,
+          op.unit.requestClass,
+          draw
+        );
+        return [selected];
+      }
+
+      // Fault-enabled router logic: filter outgoing edges by routerDetectedHostState
+      const eligible = outgoing.filter((edge) => {
+        const targetHost = this.hostPlacement.get(edge.target);
+        if (targetHost === undefined) return true;
+        return this.routerDetectedHostState.get(targetHost) !== false;
+      });
+
+      if (eligible.length === 0) {
+        // Advance round robin cursor even on rejected selection per S04
+        if (node.behavior.strategy === 'round-robin') {
+          const cursor = this.roundRobinCursors.get(node.id) ?? 0;
+          this.roundRobinCursors.set(node.id, cursor + 1);
+        }
+        return [];
+      }
+
+      const strategy = node.behavior.strategy;
+      if (strategy === 'round-robin') {
+        const cursor = this.roundRobinCursors.get(node.id) ?? 0;
+        const selected = eligible[cursor % eligible.length];
+        this.roundRobinCursors.set(node.id, cursor + 1);
+        return [selected];
+      }
+
+      if (strategy === 'weighted') {
+        const draw = makeRng(
+          (this.seed ^ hashString(`${op.unit.identity}:${op.path}:route`)) >>> 0
+        );
+        let maxWeight = 0;
+        for (const edge of eligible) {
+          if (edge.weight > maxWeight) maxWeight = edge.weight;
+        }
+        const safeMax = maxWeight > 0 ? maxWeight : 1;
+        let totalNormalizedWeight = 0;
+        for (const edge of eligible) {
+          totalNormalizedWeight += edge.weight / safeMax;
+        }
+        let roll = draw() * totalNormalizedWeight;
+        for (const edge of eligible) {
+          const w = edge.weight / safeMax;
+          if (roll <= w) return [edge];
+          roll -= w;
+        }
+        return [eligible[eligible.length - 1]];
+      }
+
+      if (strategy === 'conditional') {
+        let fallbackEdge: ExecutionEdge | undefined;
+        for (const edge of eligible) {
+          if (edge.fallback) {
+            fallbackEdge = edge;
+            continue;
+          }
+          const condition = edge.condition;
+          if (!condition) continue;
+          let matched = false;
+          if (condition.field === 'class') {
+            matched = op.unit.requestClass.name === condition.value;
+          } else if (condition.field === 'operation') {
+            matched = op.unit.requestClass.operation === condition.value;
+          } else if (condition.field === 'tag') {
+            matched = op.unit.requestClass.tags.includes(condition.value);
+          }
+          if (matched) return [edge];
+        }
+        if (fallbackEdge) return [fallbackEdge];
+        return [];
+      }
+
+      return [eligible[0]];
     }
     return outgoing;
   }
@@ -861,12 +1434,61 @@ export class OpenSimulation {
   protected dispatchDownstream(op: Op): void {
     const allOutgoing = this.plan.outgoing.get(op.nodeId) || [];
     if (allOutgoing.length === 0) {
+      // Bridge call frames (RV-14f, §8): a non-router resource with no in-kernel
+      // outgoing edge but a declared bridge continuation waits, exactly like a retained
+      // call chain, for an external settleCall() instead of completing locally. Routers
+      // always select exactly one route themselves (never reach this branch with zero
+      // real edges when a bridge is configured), so bridging is narrowed here to
+      // non-router resources per the readiness note in §8.
+      const node = this.plan.nodes.get(op.nodeId)!;
+      const bridge = node.behavior.type !== 'router' ? this.bridgeByNode.get(op.nodeId) : undefined;
+      if (bridge) {
+        op.phase = 'waiting';
+        op.pendingChildren = 1;
+        op.failedChild = false;
+        const frameId = `bridge:${op.unit.identity}:${++this.bridgeFrameCounter}`;
+        op.bridgeFrameId = frameId;
+        this.bridgePendingOps.set(frameId, op);
+        this.emitFact({
+          kind: 'bridge_dispatch',
+          time: this.currentTime,
+          nodeId: op.nodeId,
+          unitIdentity: op.unit.identity,
+          attempt: op.attempt,
+          path: op.path,
+          frameId,
+        });
+        return;
+      }
       this.completeLocalOp(op);
       return;
     }
 
     const selectedOutgoing = this.selectOutgoing(op, allOutgoing);
     if (selectedOutgoing.length === 0) {
+      const node = this.plan.nodes.get(op.nodeId)!;
+      if (node.behavior.type === 'router') {
+        const nr = this.nodesRuntime.get(op.nodeId)!;
+        nr.active.delete(op);
+        this.pumpQueue(op.nodeId);
+        nr.counters.rejected++;
+        op.phase = 'settled';
+        op.done = true;
+        if (op === op.unit.rootOp) {
+          this.emitFact({
+            kind: 'rejected',
+            time: this.currentTime,
+            nodeId: op.nodeId,
+            unitIdentity: op.unit.identity,
+            category: op.unit.category,
+            attempt: op.attempt,
+            path: op.path,
+          });
+        }
+        this.finishOp(op, 'rejected');
+        this.releaseOp(op);
+        return;
+      }
       this.completeLocalOp(op);
       return;
     }
@@ -876,6 +1498,16 @@ export class OpenSimulation {
     op.failedChild = false;
 
     for (const edge of selectedOutgoing) {
+      this.emitFact({
+        kind: 'route_selected',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: op.attempt,
+        path: op.path,
+        edgeId: edge.id,
+      });
+
       if (edge.transport === 'message') {
         this.publishMessage(op, edge);
         continue;
@@ -955,6 +1587,17 @@ export class OpenSimulation {
     const deadline = Math.min(edgeDeadline, parentUnit.lineageDeadline);
     const lineageDeadline = deadline;
     const identity = `${parentUnit.identity}:${parentOp.path}:${edge.id}:${subscription ?? ''}`;
+
+    this.emitFact({
+      kind: 'message_created',
+      time: this.currentTime,
+      nodeId: edge.target,
+      unitIdentity: identity,
+      attempt: 0,
+      path: `${parentOp.path}>${edge.id}`,
+      parentIdentity: parentUnit.identity,
+      edgeId: edge.id,
+    });
 
     const messageUnit: Unit = {
       category: 'message',
@@ -1079,11 +1722,19 @@ export class OpenSimulation {
           nr.active.delete(parentOp);
           this.pumpQueue(parentOp.nodeId);
         }
-        nr.counters.failed++;
-        parentOp.phase = 'settled';
-        parentOp.done = true;
-        this.finishOp(parentOp, 'failed');
-        this.releaseOp(parentOp);
+        if (node.behavior.type === 'router' && outcome === 'rejected') {
+          nr.counters.rejected++;
+          parentOp.phase = 'settled';
+          parentOp.done = true;
+          this.finishOp(parentOp, 'rejected');
+          this.releaseOp(parentOp);
+        } else {
+          nr.counters.failed++;
+          parentOp.phase = 'settled';
+          parentOp.done = true;
+          this.finishOp(parentOp, 'failed');
+          this.releaseOp(parentOp);
+        }
       }
       return;
     }
@@ -1103,7 +1754,7 @@ export class OpenSimulation {
     const node = this.plan.nodes.get(op.nodeId)!;
 
     if (node.behavior.type === 'cache' && nr.cacheState && op.cacheAction) {
-      if (nr.cacheState.runtime) {
+      if (nr.cacheState.runtime && op.unit.key != null) {
         if (op.cacheAction === 'fill') {
           nr.cacheState.runtime.put(op.unit.key, this.currentTime);
         } else if (op.cacheAction === 'invalidate') {
@@ -1135,12 +1786,83 @@ export class OpenSimulation {
     this.releaseOp(op);
   }
 
-  protected finishOp(op: Op, outcome: Outcome): void {
+  /**
+   * Bridge call frames (RV-14f, §8): completes the resource op that was waiting on an
+   * external settleCall(), adopting the bridge child's exact outcome (not collapsed to
+   * 'failed' the way a retained in-kernel child's non-succeeded outcome is) and its
+   * payload. This is deliberately a separate path from handleChildResponse: §8 requires
+   * "the parent adopts the child's outcome and returns the child's payload" for bridge
+   * frames specifically, whereas handleChildResponse's generic non-router rule collapses
+   * every non-succeeded child outcome to 'failed'. Resource -> resource -> bridge chains
+   * are unaffected: the outer resource's own childOp still resolves via the retained
+   * handleChildResponse path (per §8 "the outer resource keeps retained handling").
+   */
+  protected completeBridgeChild(op: Op, outcome: Outcome, payloadRef?: string): void {
+    if (op.done || op.unit.done) return;
+    const nr = this.nodesRuntime.get(op.nodeId)!;
+    nr.active.delete(op);
+    this.pumpQueue(op.nodeId);
+    if (outcome === 'succeeded') {
+      nr.counters.completed++;
+    } else {
+      nr.counters.failed++;
+    }
+    op.phase = 'settled';
+    op.done = true;
+    this.finishOp(op, outcome, payloadRef);
+    this.releaseOp(op);
+  }
+
+  /**
+   * Bridge call frames (RV-14f, §8): settles a still-open bridge frame from outside the
+   * kernel. `returnLatencyMs` (declared for this node via `OpenSimulationOptions.bridges`)
+   * is applied before the parent op resolves, matching a retained child's response delay.
+   *
+   * - A second settlement of a frame (already resolved by an earlier settleCall) fails
+   *   the run — the caller receives a thrown error, matching "fails the run" for the
+   *   deliberate double-settlement case (frameId no longer tracked in bridgePendingOps).
+   * - If the parent op was already force-settled by an outage or deadline expiry while
+   *   the frame was open, the frame is simply cleared here: "the later settleCall is
+   *   ignored (not a second settlement) but still counts toward root settlement and
+   *   drain" — the op was already released (and the unit already finished) by that
+   *   earlier path, so there is nothing further to apply.
+   */
+  public settleCall(input: { frameId: string; outcome: Outcome; payloadRef?: string; atMs?: number }): void {
+    const op = this.bridgePendingOps.get(input.frameId);
+    if (!op) {
+      throw new Error(`settleCall: unknown or already-settled bridge frame '${input.frameId}'`);
+    }
+    this.bridgePendingOps.delete(input.frameId);
+
+    if (input.atMs !== undefined) {
+      const atSec = input.atMs / 1000;
+      if (atSec > this.currentTime) {
+        this.updateIntegrals(atSec);
+        this.currentTime = atSec;
+      }
+    }
+
+    if (op.done) {
+      // Parent already settled elsewhere (outage/expiry) while the frame was open.
+      return;
+    }
+
+    const bridge = this.bridgeByNode.get(op.nodeId);
+    const returnLatencySec = (bridge?.returnLatencyMs ?? 0) / 1000;
+    const respArrivalTime = this.currentTime + returnLatencySec;
+    const { outcome, payloadRef } = input;
+    this.scheduleEvent(respArrivalTime, 1, () => {
+      if (op.done || op.unit.done) return;
+      this.completeBridgeChild(op, outcome, payloadRef);
+    });
+  }
+
+  protected finishOp(op: Op, outcome: Outcome, payloadRef?: string): void {
     op.done = true;
     if (op.notified) return;
     op.notified = true;
     if (op.onDone) {
-      op.onDone(outcome);
+      op.onDone(outcome, payloadRef);
     }
   }
 
@@ -1536,5 +2258,183 @@ export class OpenSimulation {
       edges: edgeMetricsCopy,
       history: structuredClone(this.history),
     };
+  }
+
+  public peekNextEvent(): { time: number; priority: number; seq: number } | null {
+    if (this.events.size === 0) return null;
+    const evt = this.events.peek()!;
+    return { time: evt.time, priority: evt.priority, seq: evt.seq };
+  }
+
+  public stepEvent(): boolean {
+    if (this.events.size === 0) return false;
+    if (this.totalEventsProcessed >= 1000000 || this.liveOpsCount >= 100000) {
+      this.incompleteReason = 'resource limit';
+      this.finished = false;
+      return false;
+    }
+    const nextEvt = this.events.pop()!;
+    this.updateIntegrals(nextEvt.time);
+    this.currentTime = nextEvt.time;
+    this.totalEventsProcessed++;
+    nextEvt.run();
+
+    if (this.currentTime >= this.duration) {
+      this.finished = true;
+    }
+    return true;
+  }
+
+  public get currentTimeSeconds(): number {
+    return this.currentTime;
+  }
+
+  public get pendingEventsCount(): number {
+    return this.events.size;
+  }
+
+  public get planRef(): CompiledPlan {
+    return this.plan;
+  }
+
+  public get liveRootsCount(): number {
+    return this.rootsInFlight;
+  }
+
+  public setTraceHook(hook?: SimTraceHook): void {
+    this.traceHook = hook;
+  }
+
+  public disableWorkload(workloadId: string): void {
+    this.disabledWorkloads.add(workloadId);
+  }
+
+  public isWorkloadDisabled(workloadId: string): boolean {
+    return this.disabledWorkloads.has(workloadId);
+  }
+
+  public injectInput(input: KernelResourceInput): boolean {
+    if (input.time < this.currentTime - 1e-9) {
+      throw new Error(
+        `Cannot inject input at time ${input.time}s: earlier than current simulation time ${this.currentTime}s`
+      );
+    }
+
+    const nextEvt = this.peekNextEvent();
+    if (nextEvt && nextEvt.time <= input.time + 1e-9) {
+      throw new Error(
+        `Cannot inject input at time ${input.time}s: pending kernel event exists at time ${nextEvt.time}s (outer scheduler must step pending events first)`
+      );
+    }
+
+    if (input.time > this.currentTime) {
+      this.updateIntegrals(input.time);
+      this.currentTime = input.time;
+    }
+
+    const entryNode = this.plan.nodes.get(input.entryNodeId);
+    if (!entryNode) {
+      throw new Error(`Entry node not found: ${input.entryNodeId}`);
+    }
+
+    this.rootsGenerated++;
+    this.rootsInFlight++;
+
+    const unit: Unit = {
+      category: 'root',
+      hops: 0,
+      lineageDeadline: Infinity,
+      identity: input.identity,
+      workloadId: input.workloadId ?? input.entryNodeId,
+      ordinal: input.ordinal ?? this.rootsGenerated,
+      born: input.time,
+      deadline: input.deadline,
+      requestClass: input.requestClass,
+      key: input.key ?? null,
+      done: false,
+      ops: new Set(),
+    };
+
+    this.scheduleEvent(input.deadline, 0, () => {
+      if (!unit.done) {
+        this.expireUnit(unit);
+      }
+    });
+
+    if (entryNode.behavior.type === 'broker') {
+      const rootOp: Op = {
+        unit,
+        nodeId: input.entryNodeId,
+        path: input.entryNodeId,
+        phase: 'waiting',
+        publicationOnly: true,
+        done: false,
+        attempt: 0,
+        children: new Set(),
+        arrived: input.time,
+        pendingChildren: 1,
+        onDone: (outcome) => {
+          this.finishUnit(unit, outcome);
+          const affectedNodes = new Set<string>();
+          for (const op of unit.ops) {
+            if (op !== rootOp && !op.done) {
+              this.cancelOp(op, affectedNodes);
+            }
+          }
+          for (const nid of affectedNodes) {
+            this.pumpQueue(nid);
+          }
+        },
+      };
+
+      unit.rootOp = rootOp;
+      unit.ops.add(rootOp);
+      this.liveOpsCount++;
+
+      const syntheticEdge: ExecutionEdge = {
+        id: `__entry:${input.entryNodeId}`,
+        source: input.entryNodeId,
+        target: input.entryNodeId,
+        transport: 'message',
+        latencyMs: 0,
+        returnLatencyMs: 0,
+        ackDelayMs: 8,
+        messageTtlMs: Math.max(1, (input.deadline - input.time) * 1000),
+        weight: 1,
+      };
+
+      this.publishMessage(rootOp, syntheticEdge);
+      return true;
+    }
+
+    const rootOp: Op = {
+      unit,
+      nodeId: input.entryNodeId,
+      path: input.entryNodeId,
+      phase: 'transit',
+      done: false,
+      attempt: 0,
+      children: new Set(),
+      arrived: input.time,
+      onDone: (outcome, payloadRef) => {
+        this.finishUnit(unit, outcome, payloadRef);
+        const affectedNodes = new Set<string>();
+        for (const op of unit.ops) {
+          if (op !== rootOp && !op.done) {
+            this.cancelOp(op, affectedNodes);
+          }
+        }
+        for (const nid of affectedNodes) {
+          this.pumpQueue(nid);
+        }
+      },
+    };
+
+    unit.rootOp = rootOp;
+    unit.ops.add(rootOp);
+    this.liveOpsCount++;
+
+    const accepted = this.admitOp(rootOp, false);
+    return accepted;
   }
 }
