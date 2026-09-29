@@ -17,13 +17,13 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import type { Document } from '../../domain/studio/model';
 import type { ScenarioStatus, ScenarioWithStatus } from '../runs/scenarioStatus';
-import type { HistoryController } from './controller';
+import type { HistoryControllerLike } from './controller';
 import { computeChangesList } from './diffSummary';
 import type { RecordChangeItem } from './types';
 import { requireResultMessage, ResultMessageContractError } from './resultMessage';
 
 export interface CommitPanelProps {
-  readonly controller?: HistoryController;
+  readonly controller?: HistoryControllerLike;
   readonly workingDocument?: Document | null;
   readonly baseDocument?: Document | null;
   readonly changes?: readonly RecordChangeItem[];

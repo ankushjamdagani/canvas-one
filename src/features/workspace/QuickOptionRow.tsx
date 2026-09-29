@@ -4,6 +4,9 @@
  */
 
 import {
+  ArchiveRestore,
+  Bookmark,
+  Boxes,
   Braces,
   Check,
   CircleX,
@@ -13,6 +16,8 @@ import {
   FolderOpen,
   Group,
   GitBranch,
+  GitCommitHorizontal,
+  GitMerge,
   History as HistoryIcon,
   Home,
   Image as ImageIcon,
@@ -61,6 +66,11 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   apply: Check,
   close: X,
   panel: PanelRight,
+  checkpoint: Bookmark,
+  commit: GitCommitHorizontal,
+  restore: ArchiveRestore,
+  publish: GitMerge,
+  part: Boxes,
   reset: RotateCcw,
   history: HistoryIcon,
   library: Library,

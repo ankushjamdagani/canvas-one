@@ -11,6 +11,7 @@ import {
   executeCommand,
   formatShortcut,
   getAvailability,
+  getPayloadFreeAvailability,
   matchCanvasShortcut,
   matchGlobalShortcut,
   runCanvasShortcut,
@@ -42,6 +43,8 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     draftId: null,
     panels: { library: { open: false, collapsed: false }, history: { open: false, collapsed: false } },
     resultsVisible: false,
+    commitCount: 2,
+    publish: { status: 'idle', eligible: false, conflictCount: 0 },
     canUndo: true,
     canRedo: false,
     selectedElementIds: [],
@@ -359,11 +362,133 @@ describe('panel, results and inspector availability', () => {
 
   it('lists close rows in Quick options only while their surface is open', () => {
     const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'review')!;
-    expect(idle.options.map((o) => o.id)).toEqual(['history.open', 'library.open', 'results.open']);
+    const base = ['history.open', 'history.checkpoint', 'history.commit', 'history.prepare-publish', 'library.open', 'results.open'];
+    expect(idle.options.map((o) => o.id)).toEqual(base);
     const open = buildQuickOptions(makeContext({ panels: OPEN_PANELS, resultsVisible: true })).find((g) => g.group === 'review')!;
-    expect(open.options.map((o) => o.id)).toEqual([
-      'history.open', 'library.open', 'results.open', 'history.close', 'library.close', 'results.close',
-    ]);
+    expect(open.options.map((o) => o.id)).toEqual([...base, 'history.close', 'library.close', 'results.close']);
+  });
+});
+
+const PARTS_DRAFT_REASON = 'Apply or Cancel configuration changes before using saved parts.';
+
+describe('history command availability', () => {
+  const onMain = () => makeContext({ branchId: MAIN });
+
+  it('lets a clean draft branch checkpoint, commit, restore and prepare a publish', () => {
+    const ctx = makeContext();
+    expect(getAvailability('history.checkpoint', ctx, { label: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.commit', ctx, { message: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.restore', ctx, { targetId: 'cp', label: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.prepare-publish', ctx, {})).toEqual({ enabled: true });
+  });
+
+  it('keeps main free of commits, restores and publishes but allows checkpoints', () => {
+    expect(getAvailability('history.checkpoint', onMain(), { label: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.commit', onMain(), { message: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'main-branch',
+      reason: 'Main never holds edits (D40): edit main directly to create a draft',
+    });
+    expect(getAvailability('history.restore', onMain(), { targetId: 'cp', label: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'main-branch',
+    });
+    expect(getAvailability('history.prepare-publish', onMain(), {})).toMatchObject({ enabled: false, code: 'main-branch' });
+  });
+
+  it('blocks on an open draft, a closed branch and failing storage, each with its reason', () => {
+    const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(getAvailability('history.commit', dirty, { message: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'draft-open',
+      reason: 'Apply or Cancel configuration changes before committing.',
+    });
+    expect(getAvailability('history.checkpoint', dirty, { label: 'x' })).toMatchObject({
+      reason: 'Apply or Cancel configuration changes before saving a checkpoint.',
+    });
+    const closed = makeContext({
+      branches: makeContext().branches.map((branch) => ({ ...branch, closed: branch.id === DRAFT })),
+    });
+    expect(getAvailability('history.commit', closed, { message: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'invalid-branch',
+      reason: 'Reopen this branch before committing.',
+    });
+    expect(getAvailability('history.restore', makeContext({ storageState: 'failed' }), { targetId: 'cp', label: 'x' }))
+      .toMatchObject({ enabled: false, code: 'storage-failed' });
+    expect(getAvailability('history.commit', makeContext({ storageState: 'saving' }), { message: 'x' }))
+      .toMatchObject({ enabled: false, code: 'busy' });
+  });
+
+  it('needs a commit before preparing a publish', () => {
+    expect(getAvailability('history.prepare-publish', makeContext({ commitCount: 0 }), {})).toMatchObject({
+      enabled: false,
+      code: 'no-commits',
+      reason: 'Commit at least once before publishing',
+    });
+  });
+
+  it('gates conflict resolution and publish on the prepared candidate', () => {
+    const review = (conflictCount: number, eligible: boolean) =>
+      makeContext({ publish: { status: 'review', eligible, conflictCount } });
+    const resolution = { kind: 'ours' } as const;
+    const metadata = { version: '1.0.0', title: 't', rationale: '', ticketUrl: null } as never;
+    expect(getAvailability('history.resolve-conflict', makeContext(), { conflictId: 'c', resolution }))
+      .toMatchObject({ enabled: false, reason: 'Prepare the publish review first' });
+    expect(getAvailability('history.resolve-conflict', review(0, true), { conflictId: 'c', resolution }))
+      .toMatchObject({ enabled: false, code: 'no-conflicts' });
+    expect(getAvailability('history.resolve-conflict', review(2, false), { conflictId: 'c', resolution }))
+      .toEqual({ enabled: true });
+    expect(getAvailability('history.publish', review(2, true), { metadata, keepSourceOpen: false }))
+      .toMatchObject({ enabled: false, reason: 'Resolve all conflicts before publishing' });
+    expect(getAvailability('history.publish', review(0, false), { metadata, keepSourceOpen: false }))
+      .toMatchObject({ enabled: false, reason: 'Every scenario must pass on this version before publishing' });
+    expect(getAvailability('history.publish', review(0, true), { metadata, keepSourceOpen: false }))
+      .toEqual({ enabled: true });
+    expect(getAvailability('history.publish', makeContext({ publish: { status: 'publishing', eligible: true, conflictCount: 0 } }), { metadata, keepSourceOpen: false }))
+      .toMatchObject({ enabled: false, code: 'busy' });
+  });
+
+  it('runs the typed handler payloads through executeCommand', async () => {
+    const handlers = makeHandlers();
+    expect(await executeCommand('history.checkpoint', { label: 'Before retries' }, makeContext(), handlers))
+      .toEqual({ status: 'done', value: undefined });
+    expect(handlers['history.checkpoint']).toHaveBeenCalledWith({ label: 'Before retries' });
+    const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(await executeCommand('history.commit', { message: 'Ship' }, dirty, handlers)).toMatchObject({
+      status: 'disabled',
+      code: 'draft-open',
+    });
+    expect(handlers['history.commit']).not.toHaveBeenCalled();
+  });
+});
+
+describe('saved part command availability', () => {
+  const partCommand = {} as never;
+
+  it('requires a clean draft, idle storage and, for capture, a component selection', () => {
+    expect(getAvailability('part.capture', makeContext(), { command: partCommand })).toMatchObject({
+      enabled: false,
+      code: 'invalid-selection',
+      reason: 'Select one or more components first',
+    });
+    expect(getAvailability('part.capture', makeContext({ selectedElementIds: ['a'] }), { command: partCommand }))
+      .toEqual({ enabled: true });
+    const dirty = makeContext({ selectedElementIds: ['a'], draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(getAvailability('part.capture', dirty, { command: partCommand })).toMatchObject({ enabled: false, reason: PARTS_DRAFT_REASON });
+    expect(getAvailability('part.place', dirty, { content: {} as never, label: 'x' })).toMatchObject({ reason: PARTS_DRAFT_REASON });
+    expect(getAvailability('part.import', dirty, { command: partCommand })).toMatchObject({ reason: PARTS_DRAFT_REASON });
+    expect(getAvailability('part.place', makeContext({ storageState: 'saving' }), { content: {} as never, label: 'x' }))
+      .toMatchObject({ enabled: false, code: 'busy' });
+    expect(getAvailability('part.place', makeContext({ activeViewId: null }), { content: {} as never, label: 'x' }))
+      .toMatchObject({ enabled: false, code: 'no-view' });
+  });
+
+  it('exports regardless of an open draft and exposes payload-free availability for buttons', () => {
+    const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(getAvailability('part.export', dirty, { partId: 'p', revision: 1, label: 'x' })).toEqual({ enabled: true });
+    expect(getPayloadFreeAvailability('part.import', dirty)).toMatchObject({ enabled: false, reason: PARTS_DRAFT_REASON });
+    expect(getPayloadFreeAvailability('part.capture', makeContext({ selectedElementIds: ['a'] }))).toEqual({ enabled: true });
   });
 });
 

@@ -798,3 +798,19 @@ export class HistoryController {
     }
   }
 }
+
+/**
+ * The public surface HistoryLadder and CommitPanel depend on. A `Pick` of the
+ * controller's own members so the workspace can hand them a facade whose
+ * actions execute the registry's history commands (RV-03s).
+ */
+export type HistoryControllerLike = Pick<
+  HistoryController,
+  | 'getState'
+  | 'subscribe'
+  | 'saveCheckpoint'
+  | 'restore'
+  | 'commit'
+  | 'loadCommitPreview'
+  | 'getCommitDiffSummary'
+>;

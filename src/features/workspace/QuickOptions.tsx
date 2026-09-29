@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import type { QuickOption, QuickOptionGroup } from './commands/registry';
 import { QuickOptionRow } from './QuickOptionRow';
 import { QuickOptionsRename, type RenameOutcome } from './QuickOptionsRename';
-import { QuickOptionsTextStep, type TextStepOutcome } from './QuickOptionsTextStep';
+import { QuickOptionsTextStep, type TextStepKind, type TextStepOutcome } from './QuickOptionsTextStep';
 
 export type { RenameOutcome } from './QuickOptionsRename';
 
@@ -31,10 +31,10 @@ export interface QuickOptionsContentProps {
   readonly projectTitle: string;
   readonly branchLabel: string;
   readonly isMac: boolean;
-  readonly mode: 'list' | 'rename' | 'group' | 'note';
+  readonly mode: 'list' | 'rename' | TextStepKind;
   readonly onRun: (option: QuickOption) => void;
   readonly onRename: (title: string) => Promise<RenameOutcome>;
-  readonly onTextCommand: (kind: 'group' | 'note', value: string) => Promise<TextStepOutcome>;
+  readonly onTextCommand: (kind: TextStepKind, value: string) => Promise<TextStepOutcome>;
   readonly onBack: () => void;
 }
 
@@ -58,7 +58,7 @@ export function QuickOptionsContent({
   if (mode === 'rename') {
     return <QuickOptionsRename projectTitle={projectTitle} onRename={onRename} onBack={onBack} />;
   }
-  if (mode === 'group' || mode === 'note') {
+  if (mode !== 'list') {
     return <QuickOptionsTextStep kind={mode} onSubmit={(value) => onTextCommand(mode, value)} onBack={onBack} />;
   }
   // Disabled rows stay visible with their reason; cmdk skips them for
@@ -128,7 +128,7 @@ export interface QuickOptionsDialogProps extends Omit<QuickOptionsContentProps, 
 }
 
 export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: QuickOptionsDialogProps) {
-  const [mode, setMode] = React.useState<'list' | 'rename' | 'group' | 'note'>('list');
+  const [mode, setMode] = React.useState<'list' | 'rename' | TextStepKind>('list');
 
   React.useEffect(() => {
     if (open) setMode('list');
@@ -170,6 +170,14 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
             }
             if (option.id === 'canvas.add-note') {
               setMode('note');
+              return;
+            }
+            if (option.id === 'history.checkpoint') {
+              setMode('checkpoint');
+              return;
+            }
+            if (option.id === 'history.commit') {
+              setMode('commit');
               return;
             }
             onOpenChange(false);

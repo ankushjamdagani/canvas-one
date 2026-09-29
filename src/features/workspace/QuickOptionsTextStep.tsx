@@ -1,14 +1,16 @@
 /** Generic nested text-entry step for parameterized Quick options commands. */
 
 import * as React from 'react';
-import { Group, StickyNote } from 'lucide-react';
+import { Bookmark, GitCommitHorizontal, Group, StickyNote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+
+export type TextStepKind = 'group' | 'note' | 'checkpoint' | 'commit';
 
 export type TextStepOutcome = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 export interface QuickOptionsTextStepProps {
-  readonly kind: 'group' | 'note';
+  readonly kind: TextStepKind;
   readonly onSubmit: (value: string) => Promise<TextStepOutcome>;
   readonly onBack: () => void;
 }
@@ -22,6 +24,7 @@ const DETAILS = {
     emptyReason: 'Enter a group name',
     verb: 'group',
     Icon: Group,
+    hint: 'Creates one presentation group',
   },
   note: {
     label: 'Add note',
@@ -31,6 +34,27 @@ const DETAILS = {
     emptyReason: 'Enter note text',
     verb: 'add',
     Icon: StickyNote,
+    hint: 'Places the note at the canvas centre',
+  },
+  checkpoint: {
+    label: 'Save checkpoint',
+    inputLabel: 'Checkpoint name',
+    placeholder: 'Name this checkpoint…',
+    maxLength: 80,
+    emptyReason: 'Enter a checkpoint name',
+    verb: 'save',
+    Icon: Bookmark,
+    hint: 'Saves the current work as a checkpoint on this branch',
+  },
+  commit: {
+    label: 'Commit changes',
+    inputLabel: 'Commit message',
+    placeholder: 'Describe this commit…',
+    maxLength: 4000,
+    emptyReason: 'Enter a commit message',
+    verb: 'commit',
+    Icon: GitCommitHorizontal,
+    hint: 'Every scenario must pass on this version to commit',
   },
 } as const;
 
@@ -92,7 +116,7 @@ export function QuickOptionsTextStep({ kind, onSubmit, onBack }: QuickOptionsTex
           role={error ? 'alert' : undefined}
           className={cn((error || (reason && value.length > 0)) && 'text-risk-text')}
         >
-          {error ?? reason ?? (kind === 'group' ? 'Creates one presentation group' : 'Places the note at the canvas centre')}
+          {error ?? reason ?? details.hint}
         </span>
       </div>
       <button type="button" className="sr-only" onClick={onBack}>Back to quick options</button>

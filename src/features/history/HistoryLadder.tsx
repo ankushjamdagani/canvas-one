@@ -17,7 +17,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
 import type { CheckpointRecord, CommitRecord, PublicationRecord } from '../../persistence/studio';
-import type { HistoryController } from './controller';
+import type { HistoryControllerLike } from './controller';
 import {
   computeEvidenceSummary,
   formatCommitTime,
@@ -27,7 +27,7 @@ import type { AheadOfVersionInfo } from './types';
 import { requireResultMessage, ResultMessageContractError } from './resultMessage';
 
 export interface HistoryLadderProps {
-  readonly controller?: HistoryController;
+  readonly controller?: HistoryControllerLike;
   readonly branchName?: string;
   readonly isMain?: boolean;
   readonly aheadOfVersion?: AheadOfVersionInfo | null;
@@ -44,6 +44,9 @@ export interface HistoryLadderProps {
   readonly onRestore?: (snapshotIdOrCheckpointId: string, label: string) => Promise<unknown> | void;
   readonly onOpenCommit?: () => void;
   readonly onOpenPublish?: () => void;
+  /** Registry availability reasons (draft open, closed branch, storage failing…). */
+  readonly commitBlockedReason?: string | null;
+  readonly publishBlockedReason?: string | null;
   /** Set once a real prepare-publish has run and found the draft behind main
    * (22E) — never invented; omitted/null shows the plain Publish affordance. */
   readonly behindMain?: { readonly conflictCount: number; readonly versionsPublishedSinceFork: number } | null;
@@ -75,6 +78,8 @@ export function HistoryLadder({
   onRestore: propOnRestore,
   onOpenCommit,
   onOpenPublish,
+  commitBlockedReason,
+  publishBlockedReason,
   behindMain,
   onReviewAndResolve,
   onStartDraft,
@@ -657,8 +662,8 @@ export function HistoryLadder({
         {!behindMain && <Button
           type="button"
           className="w-full bg-primary hover:bg-primary-hover text-primary-foreground font-semibold"
-          disabled={isMain}
-          title={isMain ? mainCommitDisabledReason : undefined}
+          disabled={isMain || Boolean(commitBlockedReason)}
+          title={isMain ? mainCommitDisabledReason : (commitBlockedReason ?? undefined)}
           onClick={onOpenCommit}
         >
           Commit
@@ -683,19 +688,19 @@ export function HistoryLadder({
           <button
             type="button"
             data-testid="open-publish-button"
-            disabled={isMain || commits.length === 0 || !onOpenPublish}
-            aria-disabled={isMain || commits.length === 0 || !onOpenPublish}
+            disabled={isMain || commits.length === 0 || !onOpenPublish || Boolean(publishBlockedReason)}
+            aria-disabled={isMain || commits.length === 0 || !onOpenPublish || Boolean(publishBlockedReason)}
             title={
               isMain
                 ? mainCommitDisabledReason
                 : commits.length === 0
                   ? 'Commit at least once before publishing'
-                  : undefined
+                  : (publishBlockedReason ?? undefined)
             }
             onClick={onOpenPublish}
             className={cn(
               'w-full text-xs text-center py-1 block select-none',
-              isMain || commits.length === 0 || !onOpenPublish
+              isMain || commits.length === 0 || !onOpenPublish || publishBlockedReason
                 ? 'text-muted-foreground cursor-not-allowed opacity-60'
                 : 'text-primary hover:underline font-medium',
             )}
