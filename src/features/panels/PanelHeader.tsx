@@ -26,6 +26,7 @@ import type {
   PanelMode,
   WorkspacePanelAction,
 } from '@/features/workspace/panels';
+import { usePanelCommands, type PanelCommandRoutes } from './panelCommands';
 
 export type PanelMenuActionType =
   | 'dock-right'
@@ -36,14 +37,40 @@ export type PanelMenuActionType =
   | 'close';
 
 /**
- * Pure dispatcher for panel header menu actions.
+ * Pure dispatcher for panel header menu actions. With `routes` (supplied by
+ * the workspace) each action runs as its registry command; without them it
+ * falls back to the raw reducer event (standalone previews and tests).
  */
 export function dispatchPanelMenuAction(
   actionType: PanelMenuActionType,
   panelId: PanelId,
   placement: Placement,
-  dispatch: (action: WorkspacePanelAction) => void
+  dispatch: (action: WorkspacePanelAction) => void,
+  routes?: PanelCommandRoutes | null
 ): void {
+  if (routes) {
+    switch (actionType) {
+      case 'dock-right':
+        routes.place(panelId, 'right');
+        break;
+      case 'dock-left':
+        routes.place(panelId, 'left');
+        break;
+      case 'float':
+        routes.place(panelId, 'floating');
+        break;
+      case 'collapse':
+        routes.collapse(panelId);
+        break;
+      case 'reset-width':
+        routes.resetWidth(panelId);
+        break;
+      case 'close':
+        routes.close(panelId);
+        break;
+    }
+    return;
+  }
   switch (actionType) {
     case 'dock-right':
       dispatch({ type: 'PLACE', panel: panelId, placement: 'right', index: 0 });
@@ -103,32 +130,33 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
   onMenuOpenChange,
   renderMenuInline = false,
 }) => {
+  const routes = usePanelCommands();
   const isDockedRight = mode === 'docked-right' || (placement === 'right' && mode !== 'floating' && mode !== 'collapsed');
   const isDockedLeft = mode === 'docked-left' || (placement === 'left' && mode !== 'floating' && mode !== 'collapsed');
   const isFloat = mode === 'floating' || placement === 'floating';
 
   const handleDockRight = () => {
-    dispatchPanelMenuAction('dock-right', panelId, placement, dispatch);
+    dispatchPanelMenuAction('dock-right', panelId, placement, dispatch, routes);
   };
 
   const handleDockLeft = () => {
-    dispatchPanelMenuAction('dock-left', panelId, placement, dispatch);
+    dispatchPanelMenuAction('dock-left', panelId, placement, dispatch, routes);
   };
 
   const handleFloat = () => {
-    dispatchPanelMenuAction('float', panelId, placement, dispatch);
+    dispatchPanelMenuAction('float', panelId, placement, dispatch, routes);
   };
 
   const handleCollapse = () => {
-    dispatchPanelMenuAction('collapse', panelId, placement, dispatch);
+    dispatchPanelMenuAction('collapse', panelId, placement, dispatch, routes);
   };
 
   const handleResetWidth = () => {
-    dispatchPanelMenuAction('reset-width', panelId, placement, dispatch);
+    dispatchPanelMenuAction('reset-width', panelId, placement, dispatch, routes);
   };
 
   const handleClose = () => {
-    dispatchPanelMenuAction('close', panelId, placement, dispatch);
+    dispatchPanelMenuAction('close', panelId, placement, dispatch, routes);
   };
 
   return (

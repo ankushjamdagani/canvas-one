@@ -10,6 +10,7 @@ import type {
   PanelId,
   WorkspacePanelAction,
 } from '@/features/workspace/panels';
+import { usePanelCommands } from './panelCommands';
 
 export interface PanelRailItemConfig {
   id: PanelId;
@@ -44,6 +45,8 @@ export const PanelRail: React.FC<PanelRailProps> = ({
 }) => {
   const [hoveredPanel, setHoveredPanel] = React.useState<PanelId | null>(null);
   const [focusedPanel, setFocusedPanel] = React.useState<PanelId | null>(null);
+  const routes = usePanelCommands();
+  const expand = (panel: PanelId) => (routes ? routes.expand(panel) : dispatch({ type: 'EXPAND', panel }));
 
   if (collapsedPanels.length === 0) {
     return null;
@@ -89,7 +92,7 @@ export const PanelRail: React.FC<PanelRailProps> = ({
                   data-panel-id={item.id}
                   aria-label={`Expand ${item.title} panel`}
                   onClick={() => {
-                    dispatch({ type: 'EXPAND', panel: item.id });
+                    expand(item.id);
                     onPeekChange?.(null);
                   }}
                   onFocus={() => {
@@ -132,7 +135,7 @@ export const PanelRail: React.FC<PanelRailProps> = ({
                   <div
                     data-slot="panel-peek-flyout"
                     data-panel-id={item.id}
-                    onClick={() => dispatch({ type: 'EXPAND', panel: item.id })}
+                    onClick={() => expand(item.id)}
                     className={cn(
                       'absolute top-0 w-72 max-h-[calc(100vh-100px)] rounded-xl border border-border bg-panel shadow-floating z-floating p-3 flex flex-col gap-2 cursor-pointer animate-in fade-in-0 zoom-in-95',
                       side === 'left' ? 'left-12' : 'right-12'
@@ -165,7 +168,7 @@ export const PanelRail: React.FC<PanelRailProps> = ({
           aria-label={side === 'left' ? 'Expand left panels' : 'Expand right panels'}
           onClick={() => {
             if (collapsedPanels.length > 0) {
-              dispatch({ type: 'EXPAND', panel: collapsedPanels[0].id });
+              expand(collapsedPanels[0].id);
             }
           }}
           className="p-1.5 rounded text-secondary-text hover:text-foreground hover:bg-sunken transition-colors cursor-pointer"

@@ -21,6 +21,7 @@
  */
 
 import type { Id } from '../../../domain/studio/model';
+import type { PanelId, Placement } from '../panels';
 import type { TransferExportKind } from '../../transfer';
 import { readDockConfig, type DockConfig } from '../dockConfig';
 
@@ -42,8 +43,18 @@ export const COMMAND_IDS = [
   'run.cancel',
   'run.reset',
   'history.open',
+  'history.close',
   'library.open',
+  'library.close',
   'results.open',
+  'results.close',
+  'panel.place',
+  'panel.collapse',
+  'panel.expand',
+  'panel.reset-width',
+  'inspector.apply',
+  'inspector.cancel',
+  'inspector.close',
   'canvas.select-tool',
   'canvas.pan-tool',
   'canvas.zoom-out',
@@ -87,8 +98,19 @@ export interface CommandPayloads {
   'run.cancel': Empty;
   'run.reset': Empty;
   'history.open': Empty;
+  'history.close': Empty;
   'library.open': Empty;
+  'library.close': Empty;
   'results.open': Empty;
+  'results.close': Empty;
+  'panel.place': { readonly panelId: PanelId; readonly placement: Placement; readonly index: 0 | 1 };
+  'panel.collapse': { readonly panelId: PanelId };
+  'panel.expand': { readonly panelId: PanelId };
+  'panel.reset-width': { readonly panelId: PanelId };
+  'inspector.apply': { readonly draftId: Id };
+  'inspector.cancel': { readonly draftId: Id };
+  /** `null` = the inspector is already closed. */
+  'inspector.close': { readonly draftId: Id | null };
   'canvas.select-tool': Empty;
   'canvas.pan-tool': Empty;
   'canvas.zoom-out': Empty;
@@ -139,6 +161,9 @@ export type CommandIconKey =
   | 'resume'
   | 'reset'
   | 'cancel'
+  | 'apply'
+  | 'close'
+  | 'panel'
   | 'history'
   | 'library'
   | 'image'
@@ -190,6 +215,9 @@ export type AvailabilityCode =
   | 'export-unavailable'
   | 'no-view'
   | 'invalid-selection'
+  | 'not-open'
+  | 'no-draft'
+  | 'draft-open'
   | 'limit';
 
 // ============================================================================
@@ -197,6 +225,14 @@ export type AvailabilityCode =
 // ============================================================================
 
 export type CommandRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving' | 'done';
+
+/** Open configuration draft state (commands.md §1 `draftState`). */
+export type CommandDraftState = 'clean' | 'dirty' | 'validating' | 'saving' | 'invalid' | 'stale';
+
+export interface CommandPanelState {
+  readonly open: boolean;
+  readonly collapsed: boolean;
+}
 
 export interface CommandBranch {
   readonly id: Id;
@@ -212,6 +248,13 @@ export interface CommandContext {
   readonly activeViewId: Id | null;
   readonly branches: readonly CommandBranch[];
   readonly storageState: 'ready' | 'saving' | 'failed';
+  /** The open inspector/scenario draft, or `clean`/null when none is dirty or open. */
+  readonly draftState: CommandDraftState;
+  readonly draftId: Id | null;
+  /** Library/History preference state (commands.md §7). */
+  readonly panels: Readonly<Record<PanelId, CommandPanelState>>;
+  /** True while the results region is on screen (a scenario is selected or results.open ran). */
+  readonly resultsVisible: boolean;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly selectedElementIds: readonly Id[];
@@ -267,6 +310,16 @@ function requireIdle(ctx: CommandContext): Availability | null {
 
 function requireActiveView(ctx: CommandContext): Availability | null {
   return ctx.activeViewId ? null : disabled('no-view', 'No canvas view is open');
+}
+
+function requirePanelOpen(ctx: CommandContext, panelId: PanelId): Availability | null {
+  return ctx.panels[panelId].open ? null : disabled('not-open', 'Open the panel first');
+}
+
+function requireDraft(ctx: CommandContext, draftId: Id): Availability | null {
+  return ctx.draftId !== null && ctx.draftId === draftId
+    ? null
+    : disabled('no-draft', 'No configuration is open');
 }
 
 function isExecutionActive(phase: CommandRunPhase): boolean {
@@ -456,6 +509,15 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
   },
+  'history.close': {
+    id: 'history.close',
+    label: 'Close history',
+    keywords: ['history', 'close', 'hide'],
+    group: 'review',
+    iconKey: 'history',
+    shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requirePanelOpen(ctx, 'history') ?? ENABLED,
+  },
   'library.open': {
     id: 'library.open',
     label: 'Open library',
@@ -465,10 +527,78 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
   },
+  'library.close': {
+    id: 'library.close',
+    label: 'Close library',
+    keywords: ['library', 'close', 'hide'],
+    group: 'review',
+    iconKey: 'library',
+    shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requirePanelOpen(ctx, 'library') ?? ENABLED,
+  },
   'results.open': {
     id: 'results.open', label: 'Open results', keywords: ['results', 'run', 'output'],
     group: 'review', iconKey: 'results', shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
+  },
+  'results.close': {
+    id: 'results.close', label: 'Close results', keywords: ['results', 'close', 'hide'],
+    group: 'review', iconKey: 'results', shortcut: null,
+    availability: (ctx) =>
+      requireProject(ctx) ?? (ctx.resultsVisible ? ENABLED : disabled('not-open', 'Results are not open')),
+  },
+  'panel.place': {
+    id: 'panel.place', label: 'Move panel', keywords: ['panel', 'dock', 'float', 'left', 'right'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) => requirePanelOpen(ctx, payload.panelId) ?? ENABLED,
+  },
+  'panel.collapse': {
+    id: 'panel.collapse', label: 'Collapse panel', keywords: ['panel', 'collapse', 'rail'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) =>
+      requirePanelOpen(ctx, payload.panelId) ??
+      (ctx.panels[payload.panelId].collapsed ? disabled('current', 'Panel is already collapsed') : ENABLED),
+  },
+  // Enabled for any open panel: layout-driven auto-collapse leaves the stored
+  // `collapsed` flag false, and the rail still needs to expand it.
+  'panel.expand': {
+    id: 'panel.expand', label: 'Expand panel', keywords: ['panel', 'expand', 'rail'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) => requirePanelOpen(ctx, payload.panelId) ?? ENABLED,
+  },
+  'panel.reset-width': {
+    id: 'panel.reset-width', label: 'Reset panel width', keywords: ['panel', 'width', 'reset'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) => requirePanelOpen(ctx, payload.panelId) ?? ENABLED,
+  },
+  'inspector.apply': {
+    id: 'inspector.apply', label: 'Apply configuration', keywords: ['inspector', 'apply', 'save'],
+    group: 'edit', iconKey: 'apply', shortcut: null,
+    availability: (ctx, payload) => {
+      const open = requireDraft(ctx, payload.draftId);
+      if (open) return open;
+      switch (ctx.draftState) {
+        case 'clean': return disabled('no-draft', 'There are no changes to apply');
+        case 'saving': return disabled('busy', 'Applying…');
+        case 'invalid': return disabled('not-ready', 'Fix the highlighted fields before applying');
+        case 'stale': return disabled('not-ready', 'This item changed elsewhere. Reload before applying');
+        default: return ENABLED;
+      }
+    },
+  },
+  'inspector.cancel': {
+    id: 'inspector.cancel', label: 'Cancel configuration changes', keywords: ['inspector', 'cancel', 'discard'],
+    group: 'edit', iconKey: 'cancel', shortcut: null,
+    availability: (ctx, payload) =>
+      requireDraft(ctx, payload.draftId) ??
+      (ctx.draftState === 'saving' ? disabled('busy', 'Applying…') : ENABLED),
+  },
+  'inspector.close': {
+    id: 'inspector.close', label: 'Close inspector', keywords: ['inspector', 'close'],
+    group: 'edit', iconKey: 'close', shortcut: null,
+    // The navigation guard resolves a dirty draft (Apply / Discard / Stay) before closing.
+    availability: (ctx, payload) =>
+      payload.draftId === null ? ENABLED : (requireDraft(ctx, payload.draftId) ?? ENABLED),
   },
   'canvas.select-tool': {
     id: 'canvas.select-tool', label: 'Select tool', keywords: ['select', 'canvas'],
@@ -937,6 +1067,9 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   if (ctx.hasRunDisplay || isExecutionActive(ctx.runPhase)) run.push(option('run.reset', {}, ctx));
 
   const review: QuickOption[] = [option('history.open', {}, ctx), option('library.open', {}, ctx), option('results.open', {}, ctx)];
+  if (ctx.panels.history.open) review.push(option('history.close', {}, ctx));
+  if (ctx.panels.library.open) review.push(option('library.close', {}, ctx));
+  if (ctx.resultsVisible) review.push(option('results.close', {}, ctx));
 
   const exportGroup: QuickOption[] = [
     option('export.png', {}, ctx),

@@ -18,4 +18,5 @@ export {
   screenStateFactories,
   screenLabels,
 } from './PanelsPreview';
+export { PanelCommandsContext, usePanelCommands, type PanelCommandRoutes } from './panelCommands';
 export * from './geometry';

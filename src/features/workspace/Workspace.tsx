@@ -18,7 +18,7 @@ import {
   panelPreferencesFromState,
   WorkspacePanelPreferenceStore,
 } from './panelPreferences';
-import { PanelHost } from '../panels';
+import { PanelHost, type PanelCommandRoutes } from '../panels';
 import {
   HistoryController,
   HistoryLadder,
@@ -89,9 +89,11 @@ import {
   runCanvasShortcut,
   runGlobalShortcut,
   type CommandContext,
+  type CommandDraftState,
   type CommandHandlers,
   type CommandId,
   type CommandPayloads,
+  type ExecuteResult,
   type QuickOption,
   type ShortcutEvent,
 } from './commands/registry';
@@ -322,6 +324,19 @@ export function Workspace({
   const scenarioDraftSession = React.useMemo(
     () => createScenarioDraftSession(session),
     [session],
+  );
+
+  // Stable handle on the registry executor (defined further down with the
+  // handler table) so panel/inspector callbacks built earlier route through it.
+  const commandRunnerRef = React.useRef<
+    (<K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>) | null
+  >(null);
+  const runCommand = React.useCallback(
+    <K extends CommandId>(id: K, payload: CommandPayloads[K]): Promise<ExecuteResult> =>
+      commandRunnerRef.current
+        ? commandRunnerRef.current(id, payload)
+        : Promise.resolve({ status: 'disabled', reason: 'The workspace is still loading', code: 'busy' }),
+    [],
   );
 
   /**
@@ -946,8 +961,14 @@ export function Workspace({
   // Results are normally contextual to a scenario. The explicit results.open
   // command can also reveal an honest empty state in a blank project.
   const [resultsRequested, setResultsRequested] = React.useState(false);
+  // results.close hides the region until results.open or the next run starts.
+  const [resultsDismissed, setResultsDismissed] = React.useState(false);
   const resultsRegionRef = React.useRef<HTMLDivElement>(null);
-  const showResultsRegion = runningOrSelectedScenario !== null || resultsRequested;
+  const showResultsRegion = !resultsDismissed && (runningOrSelectedScenario !== null || resultsRequested);
+  const runPhaseForResults = runControllerState?.phase ?? 'idle';
+  React.useEffect(() => {
+    if (runPhaseForResults === 'compiling' || runPhaseForResults === 'running') setResultsDismissed(false);
+  }, [runPhaseForResults]);
 
   const staleRun = Boolean(
     runControllerState?.current?.terminal &&
@@ -1399,7 +1420,7 @@ export function Workspace({
               refreshBehindMainCheck();
               setPublishOpen(true);
             }}
-            onClose={() => panelDispatch({ type: 'CLOSE', panel: 'history' })}
+            onClose={() => void runCommand('history.close', {})}
           />
         );
       }
@@ -1415,7 +1436,7 @@ export function Workspace({
             onPlace={placeSavedPart} searchQuery={searchQuery} view={view}
           />}
           onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
-          onClose={() => panelDispatch({ type: 'CLOSE', panel: 'library' })}
+          onClose={() => void runCommand('library.close', {})}
         />
       );
     },
@@ -1426,6 +1447,7 @@ export function Workspace({
       behindMainInfo,
       libraryView,
       panelDispatch,
+      runCommand,
       refreshBehindMainCheck,
       sessionState.canUndo,
       sessionState.canRedo,
@@ -1462,6 +1484,31 @@ export function Workspace({
     refreshBehindMainCheck();
   }, [panelDispatch, refreshBehindMainCheck]);
 
+  // Open inspector / scenario draft as the registry sees it (commands.md §1).
+  const draftContext = React.useMemo((): { readonly id: Id | null; readonly state: CommandDraftState } => {
+    if (scenarioDraft) {
+      const state: CommandDraftState =
+        scenarioDraft.status === 'saving'
+          ? 'saving'
+          : scenarioDraft.status === 'stale' || scenarioDraft.status === 'missing'
+            ? 'stale'
+            : scenarioDraft.dirty || scenarioDraft.isNew
+              ? 'dirty'
+              : 'clean';
+      return { id: scenarioDraft.draftId, state };
+    }
+    if (draft) {
+      const state: CommandDraftState =
+        draft.status === 'saving' || draft.status === 'invalid' || draft.status === 'stale' || draft.status === 'validating'
+          ? draft.status
+          : draft.dirty
+            ? 'dirty'
+            : 'clean';
+      return { id: draft.draftId, state };
+    }
+    return { id: null, state: 'clean' };
+  }, [draft, scenarioDraft]);
+
   // Read-only context for availability; built from workspace state, never the DOM.
   const commandContext: CommandContext = React.useMemo(() => {
     const mainId = projectRecord?.mainBranchId ?? null;
@@ -1479,6 +1526,19 @@ export function Workspace({
         closed: branch.state === 'closed',
       })),
       storageState: isSaving ? 'saving' : hasError ? 'failed' : 'ready',
+      draftState: draftContext.state,
+      draftId: draftContext.id,
+      panels: {
+        library: {
+          open: panelState.panels.library.open,
+          collapsed: panelState.panels.library.collapsed,
+        },
+        history: {
+          open: panelState.panels.history.open,
+          collapsed: panelState.panels.history.collapsed,
+        },
+      },
+      resultsVisible: showResultsRegion,
       canUndo: sessionState.canUndo && sessionState.status === 'ready',
       canRedo: sessionState.canRedo && sessionState.status === 'ready',
       selectedElementIds: Array.from(selectedElementIds),
@@ -1514,6 +1574,9 @@ export function Workspace({
     branches,
     activeView,
     activeViewId,
+    draftContext,
+    panelState.panels,
+    showResultsRegion,
     hasError,
     isSaving,
     projectRecord,
@@ -1637,11 +1700,31 @@ export function Workspace({
       'run.cancel': () => runController?.cancel(),
       'run.reset': () => handleResetRun(),
       'history.open': () => openHistoryPanel(),
+      'history.close': () => panelDispatch({ type: 'CLOSE', panel: 'history' }),
       'library.open': () => openLibraryPanel(),
+      'library.close': () => panelDispatch({ type: 'CLOSE', panel: 'library' }),
       'results.open': () => {
+        setResultsDismissed(false);
         setResultsRequested(true);
         requestAnimationFrame(() => resultsRegionRef.current?.focus());
       },
+      'results.close': () => setResultsDismissed(true),
+      'panel.place': ({ panelId, placement, index }) =>
+        panelDispatch({ type: 'PLACE', panel: panelId, placement, index }),
+      'panel.collapse': ({ panelId }) => panelDispatch({ type: 'COLLAPSE', panel: panelId }),
+      'panel.expand': ({ panelId }) => panelDispatch({ type: 'EXPAND', panel: panelId }),
+      // A docked panel resets its own side's shared width; a floating one keeps
+      // the header menu's existing behaviour (right side).
+      'panel.reset-width': ({ panelId }) =>
+        panelDispatch({
+          type: 'RESET_SIDE',
+          side: panelStateRef.current.panels[panelId].placement === 'left' ? 'left' : 'right',
+        }),
+      'inspector.apply': ({ draftId }) =>
+        scenarioDraft?.draftId === draftId ? handleApplyScenarioDraft() : handleApplyDraft(),
+      'inspector.cancel': ({ draftId }) =>
+        scenarioDraft?.draftId === draftId ? handleCancelScenarioDraft() : handleCancelDraft(),
+      'inspector.close': () => handleCloseInspector(),
       'canvas.select-tool': () => canvasViewRef.current?.setToolMode('select'),
       'canvas.pan-tool': () => canvasViewRef.current?.setToolMode('pan'),
       'canvas.zoom-out': () => canvasViewRef.current?.zoomOut(),
@@ -1699,6 +1782,13 @@ export function Workspace({
       mintId,
       openHistoryPanel,
       openLibraryPanel,
+      panelDispatch,
+      handleApplyDraft,
+      handleApplyScenarioDraft,
+      handleCancelDraft,
+      handleCancelScenarioDraft,
+      handleCloseInspector,
+      scenarioDraft?.draftId,
       persistDockConfig,
       runController,
       transferActions,
@@ -1750,6 +1840,21 @@ export function Workspace({
   const executeCanvasCommand = React.useCallback(
     <K extends CommandId>(id: K, payload: CommandPayloads[K]) => executeCommand(id, payload, commandContext, commandHandlers),
     [commandContext, commandHandlers],
+  );
+
+  React.useLayoutEffect(() => {
+    commandRunnerRef.current = executeCanvasCommand;
+  }, [executeCanvasCommand]);
+
+  const panelCommandRoutes: PanelCommandRoutes = React.useMemo(
+    () => ({
+      place: (panelId, placement) => void runCommand('panel.place', { panelId, placement, index: 0 }),
+      collapse: (panelId) => void runCommand('panel.collapse', { panelId }),
+      expand: (panelId) => void runCommand('panel.expand', { panelId }),
+      resetWidth: (panelId) => void runCommand('panel.reset-width', { panelId }),
+      close: (panelId) => void runCommand(panelId === 'history' ? 'history.close' : 'library.close', {}),
+    }),
+    [runCommand],
   );
 
   const quickOptionGroups = React.useMemo(
@@ -1829,6 +1934,17 @@ export function Workspace({
     [commandContext, commandHandlers],
   );
 
+  // Inspector / scenario editor buttons run the registry commands for the open draft.
+  const inspectorApply = React.useCallback(() => {
+    if (draftContext.id) void runCommand('inspector.apply', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+  const inspectorCancel = React.useCallback(() => {
+    if (draftContext.id) void runCommand('inspector.cancel', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+  const inspectorClose = React.useCallback(() => {
+    void runCommand('inspector.close', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+
   const quickOptionsShortcut = formatShortcut(COMMAND_DEFINITIONS['commands.open'].shortcut!, IS_MAC);
   const currentBranchLabel =
     commandContext.branches.find((branch) => branch.id === commandContext.branchId)?.label ?? '';
@@ -1843,12 +1959,12 @@ export function Workspace({
       if (e.key !== 'Escape' || guardOpen || quickOptionsOpen) return;
       if (!draft?.dirty && !scenarioDraft?.dirty && !scenarioDraft?.isNew) {
         e.preventDefault();
-        closeInspector();
+        void runCommand('inspector.close', { draftId: draftContext.id });
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [draft, scenarioDraft, guardOpen, quickOptionsOpen, closeInspector]);
+  }, [draft, scenarioDraft, guardOpen, quickOptionsOpen, runCommand, draftContext.id]);
 
   return (
     <div
@@ -1904,6 +2020,7 @@ export function Workspace({
             <PanelHost
               state={panelState}
               dispatch={panelDispatch}
+              commands={panelCommandRoutes}
               renderPanel={renderPanel}
               panelBadges={{
                 history:
@@ -2003,9 +2120,9 @@ export function Workspace({
             draft={draft}
             measured={measuredSection}
             onChangeField={handleChangeField}
-            onApply={() => void handleApplyDraft()}
-            onCancel={handleCancelDraft}
-            onClose={handleCloseInspector}
+            onApply={inspectorApply}
+            onCancel={inspectorCancel}
+            onClose={inspectorClose}
             saving={draft.status === 'saving'}
             focusFieldId={focusFieldId}
             variant="dock"
@@ -2021,9 +2138,9 @@ export function Workspace({
               document={document}
               handle={scenarioDraft}
               onChange={handleChangeScenarioDraft}
-              onApply={() => void handleApplyScenarioDraft()}
-              onCancel={handleCancelScenarioDraft}
-              onClose={handleCloseInspector}
+              onApply={inspectorApply}
+              onCancel={inspectorCancel}
+              onClose={inspectorClose}
               mintId={mintId}
               lastRunChecks={scenarioEditorChecks}
               focusName={scenarioEditorFocusName}
@@ -2047,9 +2164,9 @@ export function Workspace({
             draft={draft}
             measured={measuredSection}
             onChangeField={handleChangeField}
-            onApply={() => void handleApplyDraft()}
-            onCancel={handleCancelDraft}
-            onClose={handleCloseInspector}
+            onApply={inspectorApply}
+            onCancel={inspectorCancel}
+            onClose={inspectorClose}
             saving={draft.status === 'saving'}
             focusFieldId={focusFieldId}
             variant="sheet"
@@ -2066,9 +2183,9 @@ export function Workspace({
             document={document}
             handle={scenarioDraft}
             onChange={handleChangeScenarioDraft}
-            onApply={() => void handleApplyScenarioDraft()}
-            onCancel={handleCancelScenarioDraft}
-            onClose={handleCloseInspector}
+            onApply={inspectorApply}
+            onCancel={inspectorCancel}
+            onClose={inspectorClose}
             mintId={mintId}
             lastRunChecks={scenarioEditorChecks}
             focusName={scenarioEditorFocusName}

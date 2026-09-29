@@ -38,6 +38,10 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       { id: DRAFT, label: 'async-fulfilment', isMain: false, closed: false },
     ],
     storageState: 'ready',
+    draftState: 'clean',
+    draftId: null,
+    panels: { library: { open: false, collapsed: false }, history: { open: false, collapsed: false } },
+    resultsVisible: false,
     canUndo: true,
     canRedo: false,
     selectedElementIds: [],
@@ -298,6 +302,68 @@ describe('canvas shortcuts (selection.delete)', () => {
 
   it('formats the key hint from the registry', () => {
     expect(formatShortcut(COMMAND_DEFINITIONS['selection.delete'].shortcut!, true)).toBe('Delete');
+  });
+});
+
+const OPEN_PANELS = {
+  library: { open: true, collapsed: false },
+  history: { open: true, collapsed: true },
+} as const;
+
+describe('panel, results and inspector availability', () => {
+  it('closes and places only open panels', () => {
+    expect(getAvailability('library.close', makeContext(), {})).toMatchObject({ enabled: false, code: 'not-open' });
+    expect(getAvailability('history.close', makeContext({ panels: OPEN_PANELS }), {})).toEqual({ enabled: true });
+    expect(getAvailability('panel.place', makeContext(), { panelId: 'library', placement: 'floating', index: 0 }))
+      .toMatchObject({ enabled: false, reason: 'Open the panel first' });
+    expect(getAvailability('panel.place', makeContext({ panels: OPEN_PANELS }), { panelId: 'library', placement: 'left', index: 0 }))
+      .toEqual({ enabled: true });
+    expect(getAvailability('panel.reset-width', makeContext({ panels: OPEN_PANELS }), { panelId: 'history' }))
+      .toEqual({ enabled: true });
+  });
+
+  it('collapses only expanded panels but expands any open panel (auto-collapse is layout-only)', () => {
+    const ctx = makeContext({ panels: OPEN_PANELS });
+    expect(getAvailability('panel.collapse', ctx, { panelId: 'library' })).toEqual({ enabled: true });
+    expect(getAvailability('panel.collapse', ctx, { panelId: 'history' })).toMatchObject({ enabled: false, reason: 'Panel is already collapsed' });
+    expect(getAvailability('panel.expand', ctx, { panelId: 'history' })).toEqual({ enabled: true });
+    expect(getAvailability('panel.expand', makeContext(), { panelId: 'history' })).toMatchObject({ enabled: false, code: 'not-open' });
+  });
+
+  it('closes results only while they are visible', () => {
+    expect(getAvailability('results.close', makeContext(), {})).toMatchObject({ enabled: false, reason: 'Results are not open' });
+    expect(getAvailability('results.close', makeContext({ resultsVisible: true }), {})).toEqual({ enabled: true });
+  });
+
+  it('mirrors the inspector draft state for apply, cancel and close', () => {
+    const draftId = 'e0000000-0000-4000-8000-000000000001';
+    const at = (draftState: CommandContext['draftState'], id: string | null = draftId) =>
+      makeContext({ draftState, draftId: id });
+    expect(getAvailability('inspector.apply', at('dirty'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.apply', at('validating'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.apply', at('clean'), { draftId })).toMatchObject({ enabled: false, code: 'no-draft' });
+    expect(getAvailability('inspector.apply', at('saving'), { draftId })).toMatchObject({ enabled: false, code: 'busy' });
+    expect(getAvailability('inspector.apply', at('invalid'), { draftId })).toMatchObject({
+      enabled: false,
+      reason: 'Fix the highlighted fields before applying',
+    });
+    expect(getAvailability('inspector.apply', at('stale'), { draftId })).toMatchObject({ enabled: false, code: 'not-ready' });
+    expect(getAvailability('inspector.apply', at('dirty', null), { draftId })).toMatchObject({ enabled: false, reason: 'No configuration is open' });
+    expect(getAvailability('inspector.apply', at('dirty'), { draftId: 'other' })).toMatchObject({ enabled: false, code: 'no-draft' });
+    expect(getAvailability('inspector.cancel', at('dirty'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.cancel', at('saving'), { draftId })).toMatchObject({ enabled: false, code: 'busy' });
+    expect(getAvailability('inspector.close', at('dirty'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.close', at('clean', null), { draftId: null })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.close', at('clean', null), { draftId })).toMatchObject({ enabled: false, code: 'no-draft' });
+  });
+
+  it('lists close rows in Quick options only while their surface is open', () => {
+    const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'review')!;
+    expect(idle.options.map((o) => o.id)).toEqual(['history.open', 'library.open', 'results.open']);
+    const open = buildQuickOptions(makeContext({ panels: OPEN_PANELS, resultsVisible: true })).find((g) => g.group === 'review')!;
+    expect(open.options.map((o) => o.id)).toEqual([
+      'history.open', 'library.open', 'results.open', 'history.close', 'library.close', 'results.close',
+    ]);
   });
 });
 

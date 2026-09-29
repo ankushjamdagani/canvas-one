@@ -5,6 +5,7 @@
 
 import {
   Braces,
+  Check,
   CircleX,
   Command as CommandIcon,
   Copy,
@@ -24,6 +25,7 @@ import {
   Maximize2,
   ChartNoAxesCombined,
   Settings2,
+  PanelRight,
   Pause,
   Pencil,
   Play,
@@ -34,6 +36,7 @@ import {
   Trash2,
   Table2,
   Undo2,
+  X,
   Ungroup,
   Workflow,
   type LucideIcon,
@@ -55,6 +58,9 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   pause: Pause,
   resume: Play,
   cancel: CircleX,
+  apply: Check,
+  close: X,
+  panel: PanelRight,
   reset: RotateCcw,
   history: HistoryIcon,
   library: Library,
