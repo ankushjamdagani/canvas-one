@@ -225,6 +225,22 @@ describe('availability', () => {
     ).toMatchObject({ enabled: false, code: 'busy' });
   });
 
+  it('gates canvas.expand / canvas.collapse on the target state (RV-04g)', () => {
+    const ctx = makeContext({ activeViewId: 'v', expansionState: { g: true, p: false } });
+    const group = { viewId: 'v', target: { kind: 'group', id: 'g' } } as const;
+    const placement = { viewId: 'v', target: { kind: 'placement', id: 'p' } } as const;
+    expect(getAvailability('canvas.collapse', ctx, group)).toEqual({ enabled: true });
+    expect(getAvailability('canvas.expand', ctx, group)).toMatchObject({ enabled: false, code: 'current' });
+    expect(getAvailability('canvas.expand', ctx, placement)).toEqual({ enabled: true });
+    expect(getAvailability('canvas.collapse', ctx, placement)).toMatchObject({ enabled: false, code: 'current' });
+    expect(getAvailability('canvas.collapse', ctx, { viewId: 'v', target: { kind: 'group', id: 'x' } }))
+      .toMatchObject({ enabled: false, code: 'invalid-selection' });
+    expect(getAvailability('canvas.collapse', ctx, { ...group, viewId: 'other' }))
+      .toMatchObject({ enabled: false, code: 'invalid-selection' });
+    expect(getAvailability('canvas.collapse', makeContext({ activeViewId: null }), group))
+      .toMatchObject({ enabled: false, code: 'no-view' });
+  });
+
   it('allows branch creation from an open current branch and reopening only closed drafts', () => {
     expect(getAvailability('branch.create', makeContext(), { label: 'retry', source: 'working' }))
       .toEqual({ enabled: true });

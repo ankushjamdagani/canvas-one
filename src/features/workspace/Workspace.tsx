@@ -113,6 +113,7 @@ import {
   planUngroup,
   type SelectionPlan,
 } from './selectionPlans';
+import { expansionStateOf, planExpansion } from './expandPlans';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -1498,6 +1499,10 @@ export function Workspace({
       selectionWhollyUngrouped,
       activeViewGroupCount: activeView?.groups.length ?? 0,
       activeViewNoteCount: activeView?.notes.length ?? 0,
+      expansionState: activeView ? expansionStateOf(activeView) : {},
+      selectedPlacementIds: activeView
+        ? activeView.placements.filter((p) => selectedElementIds.has(p.elementId)).map((p) => p.id)
+        : [],
       runBlockedReason: sessionRunDisabledReason,
       runPhase: runControllerState?.phase ?? 'idle',
       hasRunDisplay: Boolean(runControllerState?.current),
@@ -1724,6 +1729,14 @@ export function Workspace({
       'selection.distribute': ({ axis }) =>
         document && activeViewId
           ? applySelectionPlan(planDistribute(document, activeViewId, commandContext.selectedElementIds, axis))
+          : { ok: false, message: 'No canvas view is open' },
+      'canvas.expand': ({ viewId, target }) =>
+        document
+          ? applySelectionPlan(planExpansion(document, viewId, target, 'expand'))
+          : { ok: false, message: 'No canvas view is open' },
+      'canvas.collapse': ({ viewId, target }) =>
+        document
+          ? applySelectionPlan(planExpansion(document, viewId, target, 'collapse'))
           : { ok: false, message: 'No canvas view is open' },
       'canvas.add-note': ({ text }) => {
         const point = canvasViewRef.current?.getVisibleCentre();

@@ -13,6 +13,12 @@ export function NodeCard({ data, selected }: NodeProps) {
   // wider placements render as authored rather than truncating fields).
   const Icon = getNodeIcon(element.visualKind);
   const caption = getNodeCaption(element);
+  const portSummary = ['in', 'out']
+    .map((direction) => {
+      const labels = element.ports.filter((p) => p.direction === direction).map((p) => p.label);
+      return `${direction}: ${labels.length > 0 ? labels.join(', ') : 'none'}`;
+    })
+    .join(' · ');
   const hasOutPort = element.ports.some((p) => p.direction === 'out' && p.channel !== 'event');
   const hasInPort = element.ports.some((p) => p.direction === 'in' && p.channel !== 'event');
 
@@ -83,6 +89,18 @@ export function NodeCard({ data, selected }: NodeProps) {
             {caption}
           </span>
         </div>
+
+        {/* RV-04g: Placement.expanded adds a port summary under the caption.
+            Fresh placements are expanded:false (catalog.md resolution 4), so
+            the default card is unchanged. */}
+        {placement.expanded ? (
+          <div
+            data-testid={`node-ports-${element.id}`}
+            className="mt-0.5 pt-1 border-t border-control-border text-[10px] font-mono text-secondary-text leading-snug break-words"
+          >
+            {portSummary}
+          </div>
+        ) : null}
       </div>
 
       <Handle

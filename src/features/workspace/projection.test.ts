@@ -361,3 +361,70 @@ describe('buildMoveChange', () => {
     }
   });
 });
+
+describe('collapsed groups (RV-04g)', () => {
+  function collapsedDoc(): Document {
+    const doc = makeTestDocument();
+    const view = doc.views[0];
+    return {
+      ...doc,
+      // c1 (e1 -> e2) and a second e1 -> e3 message must dedupe onto one edge per kind.
+      connections: [
+        ...doc.connections,
+        {
+          id: 'c5',
+          label: '',
+          kind: 'call',
+          source: { elementId: 'e1', portId: 'p1_out' },
+          target: { elementId: 'e3', portId: 'p3_msg_in' },
+          config: { latencyMs: 1, returnLatencyMs: 1, weight: 1, condition: null, fallback: false, resource: null },
+        },
+      ],
+      views: [
+        {
+          ...view,
+          connectionIds: [...view.connectionIds, 'c5'],
+          groups: [{ ...view.groups[0], collapsed: true }],
+        },
+      ],
+    };
+  }
+
+  it('hides members and renders one compact node with the member count', () => {
+    const res = projectDocumentToCanvas(collapsedDoc(), 'v1');
+    expect(res.nodes.filter((n) => n.type === 'elementNode').map((n) => n.id)).toEqual(['pl1']);
+    const group = res.nodes.find((n) => n.id === 'g1');
+    expect(group?.data).toMatchObject({ kind: 'group', collapsed: true, memberCount: 2, width: 184, height: 44 });
+    // Bounding-box origin: min member x/y minus the boundary padding.
+    expect(group?.position).toEqual({ x: 376, y: 114 });
+    expect(group?.draggable).toBe(true);
+  });
+
+  it('reroutes edges to the group, dedupes them and drops internal ones', () => {
+    const res = projectDocumentToCanvas(collapsedDoc(), 'v1');
+    // c1 and c5 (both call, pl1 -> group) collapse into one; c2 (e2 -> e3) is internal.
+    expect(res.edges.map((e) => [e.source, e.target, e.data.kind, e.data.rerouted])).toEqual([
+      ['pl1', 'g1', 'call', true],
+    ]);
+  });
+
+  it('keeps expanded groups and untouched edges as before', () => {
+    const res = projectDocumentToCanvas(makeTestDocument(), 'v1');
+    expect(res.nodes.filter((n) => n.type === 'elementNode')).toHaveLength(3);
+    expect(res.nodes.find((n) => n.id === 'g1')?.data).toMatchObject({ collapsed: false, memberCount: 2 });
+    expect(res.nodes.find((n) => n.id === 'g1')?.draggable).toBe(false);
+    expect(res.edges.map((e) => e.id)).toEqual(['c1', 'c2']);
+    expect(res.edges.some((e) => e.data.rerouted)).toBe(false);
+  });
+
+  it('passes Placement.expanded through on the node data for the compact/detail card', () => {
+    const doc = makeTestDocument();
+    const view = doc.views[0];
+    const res = projectDocumentToCanvas(
+      { ...doc, views: [{ ...view, placements: view.placements.map((p) => ({ ...p, expanded: p.id === 'pl2' })) }] },
+      'v1',
+    );
+    const flags = res.nodes.filter((n) => n.data.kind === 'element').map((n) => n.data.kind === 'element' && n.data.placement.expanded);
+    expect(flags).toEqual([false, true, false]);
+  });
+});

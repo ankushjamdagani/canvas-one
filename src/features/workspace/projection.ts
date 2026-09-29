@@ -119,6 +119,14 @@ export type ProjectedNodeData =
       readonly label: string;
       readonly width: number;
       readonly height: number;
+      /** RV-04g: collapsed groups render as one compact node (Group.collapsed). */
+      readonly collapsed: boolean;
+      readonly memberCount: number;
+      /**
+       * Set by CanvasView (like `connectable`): routes the header toggle
+       * through canvas.expand / canvas.collapse. Not part of the projection.
+       */
+      readonly onToggleCollapsed?: () => void;
     }
   | {
       readonly kind: 'note';
@@ -158,6 +166,12 @@ export type ProjectedEdge = {
   readonly data: {
     readonly connection: Connection;
     readonly kind: 'call' | 'message' | 'data';
+    /**
+     * RV-04g: a visual-only edge standing in for connections whose endpoint is
+     * a collapsed group's hidden member. `connection` is the first one; the
+     * edge is not a selectable/editable connection.
+     */
+    readonly rerouted?: boolean;
   };
 };
 
@@ -186,6 +200,9 @@ export const ESTIMATED_ELEMENT_NODE_HEIGHT = 76;
 const GROUP_PADDING_X = 24;
 const GROUP_PADDING_Y_TOP = 36;
 const GROUP_PADDING_Y_BOTTOM = 24;
+/** Compact boundary node a collapsed group renders as (RV-04g). */
+export const COLLAPSED_GROUP_WIDTH = 184;
+export const COLLAPSED_GROUP_HEIGHT = 44;
 
 /**
  * Pure projection from Document + activeViewId into ReactFlow nodes and edges.
@@ -230,6 +247,14 @@ export function projectDocumentToCanvas(
   const nodes: ProjectedNode[] = [];
   const issues: ProjectionIssue[] = [];
 
+  // Members of collapsed groups are hidden and their edges reroute to the
+  // group node (RV-04g, presentation only).
+  const collapsedGroupByElementId = new Map<Id, Group>();
+  for (const group of activeView.groups) {
+    if (!group.collapsed) continue;
+    for (const elementId of group.elementIds) collapsedGroupByElementId.set(elementId, group);
+  }
+
   // 1. Element nodes from placements
   for (const placement of activeView.placements) {
     const element = elementById.get(placement.elementId);
@@ -244,6 +269,7 @@ export function projectDocumentToCanvas(
 
     placedElementIds.add(element.id);
     placementByElementId.set(element.id, placement);
+    if (collapsedGroupByElementId.has(element.id)) continue;
 
     const layer = getCatalogLayer(element.visualKind);
     const stripeColor = layer ? CATALOG_LAYER_COLORS[layer] : null;
@@ -288,6 +314,11 @@ export function projectDocumentToCanvas(
     const boxWidth = maxX - minX + GROUP_PADDING_X * 2;
     const boxHeight = maxY - minY + GROUP_PADDING_Y_TOP + GROUP_PADDING_Y_BOTTOM;
 
+    // Collapsed: one compact node at the bounding-box origin; it is draggable
+    // (CanvasView moves every member by the same delta in one undo).
+    const collapsed = group.collapsed;
+    const width = collapsed ? COLLAPSED_GROUP_WIDTH : boxWidth;
+    const height = collapsed ? COLLAPSED_GROUP_HEIGHT : boxHeight;
     nodes.push({
       id: group.id, // group.id as ReactFlow node id (no prefix)
       type: 'groupNode',
@@ -296,13 +327,15 @@ export function projectDocumentToCanvas(
         kind: 'group',
         group,
         label: group.label,
-        width: boxWidth,
-        height: boxHeight,
+        width,
+        height,
+        collapsed,
+        memberCount: memberPlacements.length,
       },
       selectable: false,
-      draggable: false,
-      zIndex: 0,
-      style: { width: boxWidth, height: boxHeight },
+      draggable: collapsed,
+      zIndex: collapsed ? 1 : 0,
+      style: { width, height },
     });
   }
 
@@ -332,6 +365,7 @@ export function projectDocumentToCanvas(
   );
 
   const edges: ProjectedEdge[] = [];
+  const reroutedEdges = new Map<string, ProjectedEdge>();
   const activeConnectionIds = new Set(activeView.connectionIds);
 
   for (const connId of activeConnectionIds) {
@@ -349,6 +383,11 @@ export function projectDocumentToCanvas(
     const targetPlacement = placementByElementId.get(conn.target.elementId);
     if (!sourcePlacement || !targetPlacement) continue;
 
+    const sourceGroup = collapsedGroupByElementId.get(conn.source.elementId);
+    const targetGroup = collapsedGroupByElementId.get(conn.target.elementId);
+    // Both ends inside one collapsed group: internal, hidden with the members.
+    if (sourceGroup && sourceGroup === targetGroup) continue;
+
     // Stroke dash styling:
     // call: solid, message: dashed, data: dotted
     let strokeDasharray: string | undefined;
@@ -358,10 +397,17 @@ export function projectDocumentToCanvas(
       strokeDasharray = '2,3';
     }
 
-    edges.push({
-      id: conn.id,
-      source: sourcePlacement.id,
-      target: targetPlacement.id,
+    const source = sourceGroup ? sourceGroup.id : sourcePlacement.id;
+    const target = targetGroup ? targetGroup.id : targetPlacement.id;
+    const rerouted = Boolean(sourceGroup || targetGroup);
+    // One visual edge per (source, target, kind) once rerouted.
+    const reroutedKey = `${source}\u0000${target}\u0000${conn.kind}`;
+    if (rerouted && reroutedEdges.has(reroutedKey)) continue;
+
+    const edge: ProjectedEdge = {
+      id: rerouted ? `rerouted:${conn.id}` : conn.id,
+      source,
+      target,
       // Custom edge (TrafficEdge): smoothstep routing + an HTML label chip
       // rendered above the node layer, instead of the default bezier/SVG label.
       type: 'traffic',
@@ -388,8 +434,11 @@ export function projectDocumentToCanvas(
       data: {
         connection: conn,
         kind: conn.kind,
+        ...(rerouted ? { rerouted: true } : {}),
       },
-    });
+    };
+    if (rerouted) reroutedEdges.set(reroutedKey, edge);
+    edges.push(edge);
   }
 
   return {
