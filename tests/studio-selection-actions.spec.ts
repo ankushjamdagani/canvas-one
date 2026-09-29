@@ -44,4 +44,46 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await waitForIdle(page);
     await expect(page.locator('.note-card', { hasText: 'Watch the payment retry budget' })).toBeVisible();
   });
+
+  test('Delete key and Quick options delete the selection through the registry', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s05').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await waitForIdle(page);
+
+    // "Checkout" is referenced by S05's scenarios, so every delete path shows
+    // the dependency confirmation first (deletePlan.ts).
+    const checkout = page.locator('.component-node', { hasText: 'Checkout' });
+    await checkout.click();
+    await expect(page.getByTestId('selection-count')).toHaveText('1 PART');
+
+    // Quick options lists the registry command with its key hint and runs it.
+    await page.getByTestId('topbar-quick-options-btn').click();
+    const row = page.getByTestId('quick-option-selection.delete');
+    await expect(row).toContainText('Delete selection');
+    await expect(row).toContainText('Delete');
+    await row.click();
+    await expect(page.getByTestId('delete-confirm-dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('delete-confirm-dialog')).toHaveCount(0);
+    await expect(checkout).toHaveCount(1);
+
+    // Delete and Backspace on canvas focus take the same command.
+    for (const key of ['Delete', 'Backspace']) {
+      await checkout.click();
+      await page.keyboard.press(key);
+      await expect(page.getByTestId('delete-confirm-dialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('delete-confirm-dialog')).toHaveCount(0);
+      await expect(checkout).toHaveCount(1);
+    }
+
+    // Editable fields never delete: typing Backspace in the note input is native.
+    await page.getByTestId('dock-note-btn').click();
+    const noteInput = page.getByTestId('dock-note-input');
+    await noteInput.fill('abc');
+    await noteInput.press('Backspace');
+    await expect(noteInput).toHaveValue('ab');
+    await expect(page.getByTestId('delete-confirm-dialog')).toHaveCount(0);
+  });
 });

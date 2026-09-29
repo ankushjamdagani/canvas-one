@@ -11,7 +11,10 @@ import {
   executeCommand,
   formatShortcut,
   getAvailability,
+  getPayloadFreeAvailability,
+  matchCanvasShortcut,
   matchGlobalShortcut,
+  runCanvasShortcut,
   runGlobalShortcut,
   type CommandContext,
   type CommandHandlers,
@@ -36,6 +39,12 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
       { id: DRAFT, label: 'async-fulfilment', isMain: false, closed: false },
     ],
     storageState: 'ready',
+    draftState: 'clean',
+    draftId: null,
+    panels: { library: { open: false, collapsed: false }, history: { open: false, collapsed: false } },
+    resultsVisible: false,
+    commitCount: 2,
+    publish: { status: 'idle', eligible: false, conflictCount: 0 },
     canUndo: true,
     canRedo: false,
     selectedElementIds: [],
@@ -91,11 +100,13 @@ describe('registry shape', () => {
 
   it('has only the contracted shortcuts, unique per scope, no single letters', () => {
     const withShortcut = COMMAND_IDS.filter((id) => COMMAND_DEFINITIONS[id].shortcut);
-    expect(withShortcut.sort()).toEqual(['commands.open', 'edit.redo', 'edit.undo']);
+    expect(withShortcut.sort()).toEqual(['commands.open', 'edit.redo', 'edit.undo', 'selection.delete']);
     const signatures = withShortcut.map((id) => {
       const s = COMMAND_DEFINITIONS[id].shortcut!;
-      return `${s.scope}:${[...s.modifiers].sort().join('+')}:${s.key.toLowerCase()}`;
-    });
+      return [s.key, ...(s.aliases ?? [])].map(
+        (key) => `${s.scope}:${[...s.modifiers].sort().join('+')}:${key.toLowerCase()}`,
+      );
+    }).flat();
     expect(new Set(signatures).size).toBe(signatures.length);
     for (const id of withShortcut) {
       const s = COMMAND_DEFINITIONS[id].shortcut!;
@@ -240,6 +251,247 @@ describe('availability', () => {
   });
 });
 
+describe('run.cancel and selection.delete availability', () => {
+  it('cancels only while a run is running or paused', () => {
+    expect(getAvailability('run.cancel', makeContext(), {})).toMatchObject({ enabled: false, code: 'not-running' });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'compiling' }), {})).toMatchObject({ enabled: false });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'running' }), {})).toEqual({ enabled: true });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'paused' }), {})).toEqual({ enabled: true });
+    expect(getAvailability('run.cancel', makeContext({ runPhase: 'done' }), {})).toMatchObject({ enabled: false });
+  });
+
+  it('deletes only a non-empty selection and never while saving', () => {
+    expect(getAvailability('selection.delete', makeContext(), {})).toMatchObject({
+      enabled: false,
+      code: 'invalid-selection',
+      reason: 'Select a component or connection to delete',
+    });
+    expect(getAvailability('selection.delete', makeContext({ selectedElementIds: ['a'] }), {})).toEqual({ enabled: true });
+    expect(getAvailability('selection.delete', makeContext({ selectedConnectionIds: ['c'] }), {})).toEqual({ enabled: true });
+    expect(
+      getAvailability('selection.delete', makeContext({ selectedElementIds: ['a'], storageState: 'saving' }), {}),
+    ).toMatchObject({ enabled: false, code: 'busy' });
+    expect(
+      getAvailability('selection.delete', makeContext({ selectedElementIds: ['a'], activeViewId: null }), {}),
+    ).toMatchObject({ enabled: false, code: 'no-view' });
+  });
+});
+
+describe('canvas shortcuts (selection.delete)', () => {
+  const selected = () => makeContext({ selectedElementIds: ['a'] });
+
+  it('matches Delete and Backspace in canvas scope only', () => {
+    expect(matchCanvasShortcut(keyEvent({ key: 'Delete' }), true)).toBe('selection.delete');
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace' }), false)).toBe('selection.delete');
+    expect(matchGlobalShortcut(keyEvent({ key: 'Delete' }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Delete', metaKey: true }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace', shiftKey: true }), true)).toBeNull();
+  });
+
+  it('ignores IME composition, editable fields and nested dialogs', () => {
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace', isComposing: true }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Backspace', inEditableField: true }), true)).toBeNull();
+    expect(matchCanvasShortcut(keyEvent({ key: 'Delete', inDialog: true }), true)).toBeNull();
+  });
+
+  it('runs and reports only an enabled match so preventDefault follows a real command', () => {
+    const handlers = makeHandlers();
+    expect(runCanvasShortcut(keyEvent({ key: 'Delete' }), true, selected(), handlers)).toBe('selection.delete');
+    expect(handlers['selection.delete']).toHaveBeenCalledTimes(1);
+    expect(runCanvasShortcut(keyEvent({ key: 'Backspace' }), true, makeContext(), handlers)).toBeNull();
+    expect(runCanvasShortcut(keyEvent({ key: 'Delete' }), true, makeContext({ selectedElementIds: ['a'], storageState: 'saving' }), handlers)).toBeNull();
+    expect(handlers['selection.delete']).toHaveBeenCalledTimes(1);
+  });
+
+  it('formats the key hint from the registry', () => {
+    expect(formatShortcut(COMMAND_DEFINITIONS['selection.delete'].shortcut!, true)).toBe('Delete');
+  });
+});
+
+const OPEN_PANELS = {
+  library: { open: true, collapsed: false },
+  history: { open: true, collapsed: true },
+} as const;
+
+describe('panel, results and inspector availability', () => {
+  it('closes and places only open panels', () => {
+    expect(getAvailability('library.close', makeContext(), {})).toMatchObject({ enabled: false, code: 'not-open' });
+    expect(getAvailability('history.close', makeContext({ panels: OPEN_PANELS }), {})).toEqual({ enabled: true });
+    expect(getAvailability('panel.place', makeContext(), { panelId: 'library', placement: 'floating', index: 0 }))
+      .toMatchObject({ enabled: false, reason: 'Open the panel first' });
+    expect(getAvailability('panel.place', makeContext({ panels: OPEN_PANELS }), { panelId: 'library', placement: 'left', index: 0 }))
+      .toEqual({ enabled: true });
+    expect(getAvailability('panel.reset-width', makeContext({ panels: OPEN_PANELS }), { panelId: 'history' }))
+      .toEqual({ enabled: true });
+  });
+
+  it('collapses only expanded panels but expands any open panel (auto-collapse is layout-only)', () => {
+    const ctx = makeContext({ panels: OPEN_PANELS });
+    expect(getAvailability('panel.collapse', ctx, { panelId: 'library' })).toEqual({ enabled: true });
+    expect(getAvailability('panel.collapse', ctx, { panelId: 'history' })).toMatchObject({ enabled: false, reason: 'Panel is already collapsed' });
+    expect(getAvailability('panel.expand', ctx, { panelId: 'history' })).toEqual({ enabled: true });
+    expect(getAvailability('panel.expand', makeContext(), { panelId: 'history' })).toMatchObject({ enabled: false, code: 'not-open' });
+  });
+
+  it('closes results only while they are visible', () => {
+    expect(getAvailability('results.close', makeContext(), {})).toMatchObject({ enabled: false, reason: 'Results are not open' });
+    expect(getAvailability('results.close', makeContext({ resultsVisible: true }), {})).toEqual({ enabled: true });
+  });
+
+  it('mirrors the inspector draft state for apply, cancel and close', () => {
+    const draftId = 'e0000000-0000-4000-8000-000000000001';
+    const at = (draftState: CommandContext['draftState'], id: string | null = draftId) =>
+      makeContext({ draftState, draftId: id });
+    expect(getAvailability('inspector.apply', at('dirty'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.apply', at('validating'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.apply', at('clean'), { draftId })).toMatchObject({ enabled: false, code: 'no-draft' });
+    expect(getAvailability('inspector.apply', at('saving'), { draftId })).toMatchObject({ enabled: false, code: 'busy' });
+    expect(getAvailability('inspector.apply', at('invalid'), { draftId })).toMatchObject({
+      enabled: false,
+      reason: 'Fix the highlighted fields before applying',
+    });
+    expect(getAvailability('inspector.apply', at('stale'), { draftId })).toMatchObject({ enabled: false, code: 'not-ready' });
+    expect(getAvailability('inspector.apply', at('dirty', null), { draftId })).toMatchObject({ enabled: false, reason: 'No configuration is open' });
+    expect(getAvailability('inspector.apply', at('dirty'), { draftId: 'other' })).toMatchObject({ enabled: false, code: 'no-draft' });
+    expect(getAvailability('inspector.cancel', at('dirty'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.cancel', at('saving'), { draftId })).toMatchObject({ enabled: false, code: 'busy' });
+    expect(getAvailability('inspector.close', at('dirty'), { draftId })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.close', at('clean', null), { draftId: null })).toEqual({ enabled: true });
+    expect(getAvailability('inspector.close', at('clean', null), { draftId })).toMatchObject({ enabled: false, code: 'no-draft' });
+  });
+
+  it('lists close rows in Quick options only while their surface is open', () => {
+    const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'review')!;
+    const base = ['history.open', 'history.checkpoint', 'history.commit', 'history.prepare-publish', 'library.open', 'results.open'];
+    expect(idle.options.map((o) => o.id)).toEqual(base);
+    const open = buildQuickOptions(makeContext({ panels: OPEN_PANELS, resultsVisible: true })).find((g) => g.group === 'review')!;
+    expect(open.options.map((o) => o.id)).toEqual([...base, 'history.close', 'library.close', 'results.close']);
+  });
+});
+
+const PARTS_DRAFT_REASON = 'Apply or Cancel configuration changes before using saved parts.';
+
+describe('history command availability', () => {
+  const onMain = () => makeContext({ branchId: MAIN });
+
+  it('lets a clean draft branch checkpoint, commit, restore and prepare a publish', () => {
+    const ctx = makeContext();
+    expect(getAvailability('history.checkpoint', ctx, { label: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.commit', ctx, { message: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.restore', ctx, { targetId: 'cp', label: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.prepare-publish', ctx, {})).toEqual({ enabled: true });
+  });
+
+  it('keeps main free of commits, restores and publishes but allows checkpoints', () => {
+    expect(getAvailability('history.checkpoint', onMain(), { label: 'x' })).toEqual({ enabled: true });
+    expect(getAvailability('history.commit', onMain(), { message: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'main-branch',
+      reason: 'Main never holds edits (D40): edit main directly to create a draft',
+    });
+    expect(getAvailability('history.restore', onMain(), { targetId: 'cp', label: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'main-branch',
+    });
+    expect(getAvailability('history.prepare-publish', onMain(), {})).toMatchObject({ enabled: false, code: 'main-branch' });
+  });
+
+  it('blocks on an open draft, a closed branch and failing storage, each with its reason', () => {
+    const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(getAvailability('history.commit', dirty, { message: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'draft-open',
+      reason: 'Apply or Cancel configuration changes before committing.',
+    });
+    expect(getAvailability('history.checkpoint', dirty, { label: 'x' })).toMatchObject({
+      reason: 'Apply or Cancel configuration changes before saving a checkpoint.',
+    });
+    const closed = makeContext({
+      branches: makeContext().branches.map((branch) => ({ ...branch, closed: branch.id === DRAFT })),
+    });
+    expect(getAvailability('history.commit', closed, { message: 'x' })).toMatchObject({
+      enabled: false,
+      code: 'invalid-branch',
+      reason: 'Reopen this branch before committing.',
+    });
+    expect(getAvailability('history.restore', makeContext({ storageState: 'failed' }), { targetId: 'cp', label: 'x' }))
+      .toMatchObject({ enabled: false, code: 'storage-failed' });
+    expect(getAvailability('history.commit', makeContext({ storageState: 'saving' }), { message: 'x' }))
+      .toMatchObject({ enabled: false, code: 'busy' });
+  });
+
+  it('needs a commit before preparing a publish', () => {
+    expect(getAvailability('history.prepare-publish', makeContext({ commitCount: 0 }), {})).toMatchObject({
+      enabled: false,
+      code: 'no-commits',
+      reason: 'Commit at least once before publishing',
+    });
+  });
+
+  it('gates conflict resolution and publish on the prepared candidate', () => {
+    const review = (conflictCount: number, eligible: boolean) =>
+      makeContext({ publish: { status: 'review', eligible, conflictCount } });
+    const resolution = { kind: 'ours' } as const;
+    const metadata = { version: '1.0.0', title: 't', rationale: '', ticketUrl: null } as never;
+    expect(getAvailability('history.resolve-conflict', makeContext(), { conflictId: 'c', resolution }))
+      .toMatchObject({ enabled: false, reason: 'Prepare the publish review first' });
+    expect(getAvailability('history.resolve-conflict', review(0, true), { conflictId: 'c', resolution }))
+      .toMatchObject({ enabled: false, code: 'no-conflicts' });
+    expect(getAvailability('history.resolve-conflict', review(2, false), { conflictId: 'c', resolution }))
+      .toEqual({ enabled: true });
+    expect(getAvailability('history.publish', review(2, true), { metadata, keepSourceOpen: false }))
+      .toMatchObject({ enabled: false, reason: 'Resolve all conflicts before publishing' });
+    expect(getAvailability('history.publish', review(0, false), { metadata, keepSourceOpen: false }))
+      .toMatchObject({ enabled: false, reason: 'Every scenario must pass on this version before publishing' });
+    expect(getAvailability('history.publish', review(0, true), { metadata, keepSourceOpen: false }))
+      .toEqual({ enabled: true });
+    expect(getAvailability('history.publish', makeContext({ publish: { status: 'publishing', eligible: true, conflictCount: 0 } }), { metadata, keepSourceOpen: false }))
+      .toMatchObject({ enabled: false, code: 'busy' });
+  });
+
+  it('runs the typed handler payloads through executeCommand', async () => {
+    const handlers = makeHandlers();
+    expect(await executeCommand('history.checkpoint', { label: 'Before retries' }, makeContext(), handlers))
+      .toEqual({ status: 'done', value: undefined });
+    expect(handlers['history.checkpoint']).toHaveBeenCalledWith({ label: 'Before retries' });
+    const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(await executeCommand('history.commit', { message: 'Ship' }, dirty, handlers)).toMatchObject({
+      status: 'disabled',
+      code: 'draft-open',
+    });
+    expect(handlers['history.commit']).not.toHaveBeenCalled();
+  });
+});
+
+describe('saved part command availability', () => {
+  const partCommand = {} as never;
+
+  it('requires a clean draft, idle storage and, for capture, a component selection', () => {
+    expect(getAvailability('part.capture', makeContext(), { command: partCommand })).toMatchObject({
+      enabled: false,
+      code: 'invalid-selection',
+      reason: 'Select one or more components first',
+    });
+    expect(getAvailability('part.capture', makeContext({ selectedElementIds: ['a'] }), { command: partCommand }))
+      .toEqual({ enabled: true });
+    const dirty = makeContext({ selectedElementIds: ['a'], draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(getAvailability('part.capture', dirty, { command: partCommand })).toMatchObject({ enabled: false, reason: PARTS_DRAFT_REASON });
+    expect(getAvailability('part.place', dirty, { content: {} as never, label: 'x' })).toMatchObject({ reason: PARTS_DRAFT_REASON });
+    expect(getAvailability('part.import', dirty, { command: partCommand })).toMatchObject({ reason: PARTS_DRAFT_REASON });
+    expect(getAvailability('part.place', makeContext({ storageState: 'saving' }), { content: {} as never, label: 'x' }))
+      .toMatchObject({ enabled: false, code: 'busy' });
+    expect(getAvailability('part.place', makeContext({ activeViewId: null }), { content: {} as never, label: 'x' }))
+      .toMatchObject({ enabled: false, code: 'no-view' });
+  });
+
+  it('exports regardless of an open draft and exposes payload-free availability for buttons', () => {
+    const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
+    expect(getAvailability('part.export', dirty, { partId: 'p', revision: 1, label: 'x' })).toEqual({ enabled: true });
+    expect(getPayloadFreeAvailability('part.import', dirty)).toMatchObject({ enabled: false, reason: PARTS_DRAFT_REASON });
+    expect(getPayloadFreeAvailability('part.capture', makeContext({ selectedElementIds: ['a'] }))).toEqual({ enabled: true });
+  });
+});
+
 describe('executeCommand', () => {
   it('runs the handler with its payload when enabled', async () => {
     const handlers = makeHandlers();
@@ -342,7 +594,7 @@ describe('buildQuickOptions', () => {
     const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'run')!;
     expect(idle.options.map((o) => o.id)).toEqual(['run.start', 'run.start-all']);
     const running = buildQuickOptions(makeContext({ runPhase: 'running' })).find((g) => g.group === 'run')!;
-    expect(running.options.map((o) => o.id)).toEqual(['run.start', 'run.start-all', 'run.pause', 'run.reset']);
+    expect(running.options.map((o) => o.id)).toEqual(['run.start', 'run.start-all', 'run.pause', 'run.cancel', 'run.reset']);
     const paused = buildQuickOptions(makeContext({ runPhase: 'paused' })).find((g) => g.group === 'run')!;
     expect(paused.options.map((o) => o.id)).toContain('run.resume');
   });
@@ -366,6 +618,7 @@ describe('buildQuickOptions', () => {
     ).find((group) => group.group === 'selection')!;
     expect(selection.options.map((entry) => entry.key)).toEqual([
       'selection.duplicate',
+      'selection.delete',
       'selection.group',
       'selection.ungroup',
       'selection.align:left',

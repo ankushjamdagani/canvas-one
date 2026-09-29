@@ -1,5 +1,5 @@
 /**
- * Workspace command registry (RV-03q).
+ * Workspace command registry (RV-03q, completed in RV-03s).
  *
  * Implements specs/revamp/contracts/commands.md §1 ("Registry", "Shortcuts") for
  * the commands the new app already wires, and the 14A Quick options list
@@ -8,19 +8,57 @@
  * - Every entry is `{id, label, keywords, group, iconKey, shortcut, availability}`
  *   and the definition table is exhaustive over `CommandId` (a mapped type), as
  *   is the handler table the caller supplies: keyboard, the Quick options dialog
- *   and any menu route through `executeCommand`, never menu-local handlers.
+ *   and every menu or button route through `executeCommand`, never menu-local
+ *   handlers.
  * - Availability is `{enabled:true}` or `{enabled:false, reason, code}`; disabled
  *   commands show their reason.
- * - Shortcuts: only edit.undo Mod+Z, edit.redo Mod+Shift+Z and commands.open F2
- *   are global. selection.delete (Delete/Backspace, canvas scope) stays with the
- *   canvas until selection commands join the registry.
+ * - Shortcuts: edit.undo Mod+Z, edit.redo Mod+Shift+Z and commands.open F2 are
+ *   global; selection.delete (Delete/Backspace) is canvas-scope, fed only by the
+ *   canvas key handler. Both scopes ignore IME composition, editable fields and
+ *   nested dialogs, and `preventDefault` follows an enabled match only.
  *
- * Not here (design-revalidation.md §2 / commands.md §1): ⌘K/⌘R/⌘H/⌘B/⌘L,
+ * Registered here (each with a closed payload and shared availability):
+ * - Selection and canvas: selection.delete/duplicate/group/ungroup/align/
+ *   distribute, canvas.add-note, tools and zoom.
+ * - Run: run.start/start-all/pause/resume/cancel/reset. run.cancel has no button
+ *   of its own (the switcher offers Reset), so it is registry + Quick options.
+ * - Panels and surfaces: library.open/close, history.open/close, results.open/
+ *   close and panel.place/collapse/expand/reset-width (header menus, rail and
+ *   close buttons execute these). panel.resize and panel.move-floating stay
+ *   direct reducer gestures (RESIZE_SIDE/RESIZE_FLOAT, only COMMIT persists):
+ *   routing every pointer or arrow-key step through the registry buys nothing,
+ *   and no numeric-positioning menu exists yet to carry a menu variant.
+ * - Inspector: inspector.apply/cancel/close for both the element inspector and
+ *   the scenario editor; availability mirrors the open draft. inspector.open is
+ *   not registered: it is a consequence of a guarded selection change (target
+ *   and revision come from the canvas), not a user-invoked command.
+ * - History: history.checkpoint/commit/restore/prepare-publish/resolve-conflict/
+ *   publish. HistoryLadder, CommitPanel and PublishFlow receive controller
+ *   facades (historyRouting.ts), so their existing buttons run these commands.
+ *   Quick options lists checkpoint and commit (nested form), and publish review;
+ *   restore and conflict resolution need a chosen target, so they live in the
+ *   History panel. Payloads carry user input only; ids are minted by the
+ *   controllers, as with branch.create.
+ * - Saved parts: part.capture/place/export/import, executed by the Library's
+ *   SavedParts. Their payloads wrap the bound branch/project command, so a retry
+ *   reuses one operation id. They are not in Quick options (parts stay out of
+ *   14A search).
+ *
+ * Not here: project.create and project.import (reachable only from the entry
+ * screen, before any workspace exists), inspector.open, panel.resize,
+ * panel.move-floating, canvas.expand/collapse (separate task), ⌘K/⌘R/⌘H/⌘B/⌘L,
  * single-letter shortcuts, Duplicate project and Project settings.
- * Saved-part artifact actions stay scoped to the Library workflow.
  */
 
 import type { Id } from '../../../domain/studio/model';
+import type { PanelId, Placement } from '../panels';
+import type { ConflictResolution } from '../../../domain/versioning/resolve';
+import type { PartContent } from '../../../domain/parts/types';
+import type {
+  PartCaptureCommand,
+  PartImportCommand,
+  PublicationMetadata,
+} from '../../../persistence/studio';
 import type { TransferExportKind } from '../../transfer';
 import { readDockConfig, type DockConfig } from '../dockConfig';
 
@@ -39,10 +77,27 @@ export const COMMAND_IDS = [
   'run.start-all',
   'run.pause',
   'run.resume',
+  'run.cancel',
   'run.reset',
   'history.open',
+  'history.close',
+  'history.checkpoint',
+  'history.commit',
+  'history.restore',
+  'history.prepare-publish',
+  'history.resolve-conflict',
+  'history.publish',
   'library.open',
+  'library.close',
   'results.open',
+  'results.close',
+  'panel.place',
+  'panel.collapse',
+  'panel.expand',
+  'panel.reset-width',
+  'inspector.apply',
+  'inspector.cancel',
+  'inspector.close',
   'canvas.select-tool',
   'canvas.pan-tool',
   'canvas.zoom-out',
@@ -58,11 +113,16 @@ export const COMMAND_IDS = [
   'edit.undo',
   'edit.redo',
   'selection.duplicate',
+  'selection.delete',
   'selection.group',
   'selection.ungroup',
   'selection.align',
   'selection.distribute',
   'canvas.add-note',
+  'part.capture',
+  'part.place',
+  'part.export',
+  'part.import',
 ] as const;
 
 export type CommandId = (typeof COMMAND_IDS)[number];
@@ -82,10 +142,30 @@ export interface CommandPayloads {
   'run.start-all': Empty;
   'run.pause': Empty;
   'run.resume': Empty;
+  'run.cancel': Empty;
   'run.reset': Empty;
   'history.open': Empty;
+  'history.close': Empty;
+  /** Ids are minted by the history controller; the payload carries only the user's input. */
+  'history.checkpoint': { readonly label: string };
+  'history.commit': { readonly message: string };
+  /** `targetId` is a checkpoint or snapshot id; `label` names the pre-restore checkpoint. */
+  'history.restore': { readonly targetId: string; readonly label: string };
+  'history.prepare-publish': Empty;
+  'history.resolve-conflict': { readonly conflictId: Id; readonly resolution: ConflictResolution };
+  'history.publish': { readonly metadata: PublicationMetadata; readonly keepSourceOpen: boolean };
   'library.open': Empty;
+  'library.close': Empty;
   'results.open': Empty;
+  'results.close': Empty;
+  'panel.place': { readonly panelId: PanelId; readonly placement: Placement; readonly index: 0 | 1 };
+  'panel.collapse': { readonly panelId: PanelId };
+  'panel.expand': { readonly panelId: PanelId };
+  'panel.reset-width': { readonly panelId: PanelId };
+  'inspector.apply': { readonly draftId: Id };
+  'inspector.cancel': { readonly draftId: Id };
+  /** `null` = the inspector is already closed. */
+  'inspector.close': { readonly draftId: Id | null };
   'canvas.select-tool': Empty;
   'canvas.pan-tool': Empty;
   'canvas.zoom-out': Empty;
@@ -101,6 +181,8 @@ export interface CommandPayloads {
   'edit.undo': Empty;
   'edit.redo': Empty;
   'selection.duplicate': Empty;
+  /** Current selection; the handler shows the dependency preview/confirmation (deletePlan.ts). */
+  'selection.delete': Empty;
   'selection.group': { readonly label: string };
   'selection.ungroup': { readonly groupIds: readonly Id[] };
   'selection.align': {
@@ -108,6 +190,11 @@ export interface CommandPayloads {
   };
   'selection.distribute': { readonly axis: 'x' | 'y' };
   'canvas.add-note': { readonly text: string };
+  /** The bound branch envelope keeps the operation id, so a retry stays idempotent (§2). */
+  'part.capture': { readonly command: PartCaptureCommand };
+  'part.place': { readonly content: PartContent; readonly label: string };
+  'part.export': { readonly partId: Id; readonly revision: number; readonly label: string };
+  'part.import': { readonly command: PartImportCommand };
 }
 
 export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
@@ -133,6 +220,15 @@ export type CommandIconKey =
   | 'pause'
   | 'resume'
   | 'reset'
+  | 'cancel'
+  | 'apply'
+  | 'close'
+  | 'panel'
+  | 'checkpoint'
+  | 'commit'
+  | 'restore'
+  | 'publish'
+  | 'part'
   | 'history'
   | 'library'
   | 'image'
@@ -143,6 +239,7 @@ export type CommandIconKey =
   | 'undo'
   | 'redo'
   | 'duplicate'
+  | 'delete'
   | 'group'
   | 'ungroup'
   | 'align'
@@ -158,6 +255,8 @@ export type CommandIconKey =
 
 export interface Shortcut {
   readonly key: string;
+  /** Extra keys that trigger the same command (Delete also accepts Backspace). */
+  readonly aliases?: readonly string[];
   readonly modifiers: readonly ('Mod' | 'Shift' | 'Alt')[];
   readonly scope: 'global' | 'canvas';
 }
@@ -181,6 +280,13 @@ export type AvailabilityCode =
   | 'export-unavailable'
   | 'no-view'
   | 'invalid-selection'
+  | 'not-open'
+  | 'no-draft'
+  | 'draft-open'
+  | 'storage-failed'
+  | 'main-branch'
+  | 'no-commits'
+  | 'no-conflicts'
   | 'limit';
 
 // ============================================================================
@@ -188,6 +294,30 @@ export type AvailabilityCode =
 // ============================================================================
 
 export type CommandRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving' | 'done';
+
+/** Open configuration draft state (commands.md §1 `draftState`). */
+export type CommandDraftState = 'clean' | 'dirty' | 'validating' | 'saving' | 'invalid' | 'stale';
+
+export interface CommandPanelState {
+  readonly open: boolean;
+  readonly collapsed: boolean;
+}
+
+export type CommandPublishStatus =
+  | 'idle'
+  | 'preparing'
+  | 'behind-main'
+  | 'blocked'
+  | 'review'
+  | 'publishing'
+  | 'published'
+  | 'error';
+
+export interface CommandPublishState {
+  readonly status: CommandPublishStatus;
+  readonly eligible: boolean;
+  readonly conflictCount: number;
+}
 
 export interface CommandBranch {
   readonly id: Id;
@@ -203,6 +333,17 @@ export interface CommandContext {
   readonly activeViewId: Id | null;
   readonly branches: readonly CommandBranch[];
   readonly storageState: 'ready' | 'saving' | 'failed';
+  /** The open inspector/scenario draft, or `clean`/null when none is dirty or open. */
+  readonly draftState: CommandDraftState;
+  readonly draftId: Id | null;
+  /** Library/History preference state (commands.md §7). */
+  readonly panels: Readonly<Record<PanelId, CommandPanelState>>;
+  /** True while the results region is on screen (a scenario is selected or results.open ran). */
+  readonly resultsVisible: boolean;
+  /** Commits on the current branch (prepare-publish needs a committed head). */
+  readonly commitCount: number;
+  /** The proactively prepared / open publish candidate. */
+  readonly publish: CommandPublishState;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly selectedElementIds: readonly Id[];
@@ -258,6 +399,49 @@ function requireIdle(ctx: CommandContext): Availability | null {
 
 function requireActiveView(ctx: CommandContext): Availability | null {
   return ctx.activeViewId ? null : disabled('no-view', 'No canvas view is open');
+}
+
+function requirePanelOpen(ctx: CommandContext, panelId: PanelId): Availability | null {
+  return ctx.panels[panelId].open ? null : disabled('not-open', 'Open the panel first');
+}
+
+function requireDraft(ctx: CommandContext, draftId: Id): Availability | null {
+  return ctx.draftId !== null && ctx.draftId === draftId
+    ? null
+    : disabled('no-draft', 'No configuration is open');
+}
+
+function currentBranch(ctx: CommandContext): CommandBranch | undefined {
+  return ctx.branches.find((branch) => branch.id === ctx.branchId);
+}
+
+function requireCleanDraft(ctx: CommandContext, action: string): Availability | null {
+  return ctx.draftState === 'clean'
+    ? null
+    : disabled('draft-open', `Apply or Cancel configuration changes before ${action}.`);
+}
+
+function requirePartsDraft(ctx: CommandContext): Availability | null {
+  return requireCleanDraft(ctx, 'using saved parts');
+}
+
+function requireStorageHealthy(ctx: CommandContext, action: string): Availability | null {
+  return ctx.storageState === 'failed'
+    ? disabled('storage-failed', `Changes could not be saved. Resolve the storage error before ${action}.`)
+    : null;
+}
+
+function requireOpenBranch(ctx: CommandContext, action: string): Availability | null {
+  return currentBranch(ctx)?.closed
+    ? disabled('invalid-branch', `Reopen this branch before ${action}.`)
+    : null;
+}
+
+const MAIN_COMMIT_REASON = 'Main never holds edits (D40): edit main directly to create a draft';
+const MAIN_RESTORE_REASON = 'Direct restore on main branch is rejected; main is changed only by publication';
+
+function requireDraftBranch(ctx: CommandContext, reason: string): Availability | null {
+  return currentBranch(ctx)?.isMain ? disabled('main-branch', reason) : null;
 }
 
 function isExecutionActive(phase: CommandRunPhase): boolean {
@@ -414,6 +598,18 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) =>
       ctx.runPhase === 'paused' ? ENABLED : disabled('not-paused', 'No run is paused'),
   },
+  'run.cancel': {
+    id: 'run.cancel',
+    label: 'Cancel run',
+    keywords: ['cancel', 'abort', 'stop'],
+    group: 'run',
+    iconKey: 'cancel',
+    shortcut: null,
+    availability: (ctx) =>
+      ctx.runPhase === 'running' || ctx.runPhase === 'paused'
+        ? ENABLED
+        : disabled('not-running', 'No run is in progress'),
+  },
   'run.reset': {
     id: 'run.reset',
     label: 'Reset run',
@@ -435,6 +631,111 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
   },
+  'history.checkpoint': {
+    id: 'history.checkpoint',
+    label: 'Save checkpoint…',
+    keywords: ['checkpoint', 'save', 'history', 'version'],
+    group: 'review',
+    iconKey: 'checkpoint',
+    shortcut: null,
+    availability: (ctx) =>
+      requireProject(ctx) ?? requireIdle(ctx) ??
+      requireStorageHealthy(ctx, 'saving a checkpoint') ??
+      requireOpenBranch(ctx, 'saving a checkpoint') ??
+      requireCleanDraft(ctx, 'saving a checkpoint') ?? ENABLED,
+  },
+  'history.commit': {
+    id: 'history.commit',
+    label: 'Commit changes…',
+    keywords: ['commit', 'history', 'evidence'],
+    group: 'review',
+    iconKey: 'commit',
+    shortcut: null,
+    availability: (ctx) =>
+      requireProject(ctx) ?? requireDraftBranch(ctx, MAIN_COMMIT_REASON) ?? requireIdle(ctx) ??
+      requireStorageHealthy(ctx, 'committing') ??
+      requireOpenBranch(ctx, 'committing') ??
+      requireCleanDraft(ctx, 'committing') ?? ENABLED,
+  },
+  'history.restore': {
+    id: 'history.restore',
+    label: 'Restore version',
+    keywords: ['restore', 'revert', 'checkpoint', 'history'],
+    group: 'review',
+    iconKey: 'restore',
+    shortcut: null,
+    availability: (ctx) =>
+      requireProject(ctx) ?? requireDraftBranch(ctx, MAIN_RESTORE_REASON) ?? requireIdle(ctx) ??
+      requireStorageHealthy(ctx, 'restoring') ??
+      requireOpenBranch(ctx, 'restoring') ??
+      requireCleanDraft(ctx, 'restoring') ?? ENABLED,
+  },
+  'history.prepare-publish': {
+    id: 'history.prepare-publish',
+    label: 'Publish to main…',
+    keywords: ['publish', 'merge', 'main', 'review', 'history'],
+    group: 'review',
+    iconKey: 'publish',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked =
+        requireProject(ctx) ?? requireDraftBranch(ctx, MAIN_COMMIT_REASON) ?? requireIdle(ctx) ??
+        requireStorageHealthy(ctx, 'publishing') ??
+        requireOpenBranch(ctx, 'publishing') ??
+        requireCleanDraft(ctx, 'publishing');
+      if (blocked) return blocked;
+      return ctx.commitCount > 0
+        ? ENABLED
+        : disabled('no-commits', 'Commit at least once before publishing');
+    },
+  },
+  'history.resolve-conflict': {
+    id: 'history.resolve-conflict',
+    label: 'Resolve conflict',
+    keywords: ['conflict', 'resolve', 'merge', 'publish'],
+    group: 'review',
+    iconKey: 'publish',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireIdle(ctx) ?? requireStorageHealthy(ctx, 'resolving conflicts');
+      if (blocked) return blocked;
+      if (ctx.publish.status !== 'review') {
+        return disabled('not-ready', 'Prepare the publish review first');
+      }
+      return ctx.publish.conflictCount > 0
+        ? ENABLED
+        : disabled('no-conflicts', 'There are no conflicts to resolve');
+    },
+  },
+  'history.publish': {
+    id: 'history.publish',
+    label: 'Publish',
+    keywords: ['publish', 'main', 'release'],
+    group: 'review',
+    iconKey: 'publish',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireIdle(ctx) ?? requireStorageHealthy(ctx, 'publishing');
+      if (blocked) return blocked;
+      if (ctx.publish.status === 'publishing') return disabled('busy', 'Publishing…');
+      if (ctx.publish.status !== 'review') return disabled('not-ready', 'Prepare the publish review first');
+      if (ctx.publish.conflictCount > 0) {
+        return disabled('not-ready', 'Resolve all conflicts before publishing');
+      }
+      return ctx.publish.eligible
+        ? ENABLED
+        : disabled('not-ready', 'Every scenario must pass on this version before publishing');
+    },
+  },
+  'history.close': {
+    id: 'history.close',
+    label: 'Close history',
+    keywords: ['history', 'close', 'hide'],
+    group: 'review',
+    iconKey: 'history',
+    shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requirePanelOpen(ctx, 'history') ?? ENABLED,
+  },
   'library.open': {
     id: 'library.open',
     label: 'Open library',
@@ -444,10 +745,78 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
   },
+  'library.close': {
+    id: 'library.close',
+    label: 'Close library',
+    keywords: ['library', 'close', 'hide'],
+    group: 'review',
+    iconKey: 'library',
+    shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requirePanelOpen(ctx, 'library') ?? ENABLED,
+  },
   'results.open': {
     id: 'results.open', label: 'Open results', keywords: ['results', 'run', 'output'],
     group: 'review', iconKey: 'results', shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
+  },
+  'results.close': {
+    id: 'results.close', label: 'Close results', keywords: ['results', 'close', 'hide'],
+    group: 'review', iconKey: 'results', shortcut: null,
+    availability: (ctx) =>
+      requireProject(ctx) ?? (ctx.resultsVisible ? ENABLED : disabled('not-open', 'Results are not open')),
+  },
+  'panel.place': {
+    id: 'panel.place', label: 'Move panel', keywords: ['panel', 'dock', 'float', 'left', 'right'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) => requirePanelOpen(ctx, payload.panelId) ?? ENABLED,
+  },
+  'panel.collapse': {
+    id: 'panel.collapse', label: 'Collapse panel', keywords: ['panel', 'collapse', 'rail'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) =>
+      requirePanelOpen(ctx, payload.panelId) ??
+      (ctx.panels[payload.panelId].collapsed ? disabled('current', 'Panel is already collapsed') : ENABLED),
+  },
+  // Enabled for any open panel: layout-driven auto-collapse leaves the stored
+  // `collapsed` flag false, and the rail still needs to expand it.
+  'panel.expand': {
+    id: 'panel.expand', label: 'Expand panel', keywords: ['panel', 'expand', 'rail'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) => requirePanelOpen(ctx, payload.panelId) ?? ENABLED,
+  },
+  'panel.reset-width': {
+    id: 'panel.reset-width', label: 'Reset panel width', keywords: ['panel', 'width', 'reset'],
+    group: 'review', iconKey: 'panel', shortcut: null,
+    availability: (ctx, payload) => requirePanelOpen(ctx, payload.panelId) ?? ENABLED,
+  },
+  'inspector.apply': {
+    id: 'inspector.apply', label: 'Apply configuration', keywords: ['inspector', 'apply', 'save'],
+    group: 'edit', iconKey: 'apply', shortcut: null,
+    availability: (ctx, payload) => {
+      const open = requireDraft(ctx, payload.draftId);
+      if (open) return open;
+      switch (ctx.draftState) {
+        case 'clean': return disabled('no-draft', 'There are no changes to apply');
+        case 'saving': return disabled('busy', 'Applying…');
+        case 'invalid': return disabled('not-ready', 'Fix the highlighted fields before applying');
+        case 'stale': return disabled('not-ready', 'This item changed elsewhere. Reload before applying');
+        default: return ENABLED;
+      }
+    },
+  },
+  'inspector.cancel': {
+    id: 'inspector.cancel', label: 'Cancel configuration changes', keywords: ['inspector', 'cancel', 'discard'],
+    group: 'edit', iconKey: 'cancel', shortcut: null,
+    availability: (ctx, payload) =>
+      requireDraft(ctx, payload.draftId) ??
+      (ctx.draftState === 'saving' ? disabled('busy', 'Applying…') : ENABLED),
+  },
+  'inspector.close': {
+    id: 'inspector.close', label: 'Close inspector', keywords: ['inspector', 'close'],
+    group: 'edit', iconKey: 'close', shortcut: null,
+    // The navigation guard resolves a dirty draft (Apply / Discard / Stay) before closing.
+    availability: (ctx, payload) =>
+      payload.draftId === null ? ENABLED : (requireDraft(ctx, payload.draftId) ?? ENABLED),
   },
   'canvas.select-tool': {
     id: 'canvas.select-tool', label: 'Select tool', keywords: ['select', 'canvas'],
@@ -565,6 +934,22 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
         : disabled('invalid-selection', 'Select at least 1 component to duplicate');
     },
   },
+  'selection.delete': {
+    id: 'selection.delete',
+    label: 'Delete selection',
+    keywords: ['delete', 'remove', 'selection', 'parts'],
+    group: 'selection',
+    iconKey: 'delete',
+    // Canvas focus only (commands.md §1): matched by the canvas key handler.
+    shortcut: { key: 'Delete', aliases: ['Backspace'], modifiers: [], scope: 'canvas' },
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0 || ctx.selectedConnectionIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select a component or connection to delete');
+    },
+  },
   'selection.group': {
     id: 'selection.group',
     label: 'Group…',
@@ -645,6 +1030,49 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
         : ENABLED;
     },
   },
+  'part.capture': {
+    id: 'part.capture',
+    label: 'Save as component',
+    keywords: ['part', 'component', 'library', 'capture', 'save'],
+    group: 'selection',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
+  'part.place': {
+    id: 'part.place',
+    label: 'Place saved component',
+    keywords: ['part', 'component', 'library', 'place'],
+    group: 'edit',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) =>
+      requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx) ?? ENABLED,
+  },
+  'part.export': {
+    id: 'part.export',
+    label: 'Export saved component',
+    keywords: ['part', 'component', 'library', 'export', 'download'],
+    group: 'export',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? ENABLED,
+  },
+  'part.import': {
+    id: 'part.import',
+    label: 'Import saved component',
+    keywords: ['part', 'component', 'library', 'import', 'upload'],
+    group: 'edit',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx) ?? ENABLED,
+  },
 };
 
 // ============================================================================
@@ -666,6 +1094,17 @@ export function getAvailability<K extends CommandId>(
   payload: CommandPayloads[K],
 ): Availability {
   return COMMAND_DEFINITIONS[id].availability(ctx, payload);
+}
+
+/**
+ * Availability for commands whose payload only exists at submit time (the
+ * saved-part buttons); these ignore their payload when deciding.
+ */
+export function getPayloadFreeAvailability(
+  id: 'part.capture' | 'part.place' | 'part.import',
+  ctx: CommandContext,
+): Availability {
+  return (COMMAND_DEFINITIONS[id].availability as (ctx: CommandContext) => Availability)(ctx);
 }
 
 /**
@@ -713,7 +1152,17 @@ function matches(shortcut: Shortcut, event: ShortcutEvent, isMac: boolean): bool
   const otherMod = isMac ? event.ctrlKey : event.metaKey;
   if (mod !== wantsMod || otherMod) return false;
   if (event.shiftKey !== wantsShift || event.altKey !== wantsAlt) return false;
-  return event.key.toLowerCase() === shortcut.key.toLowerCase();
+  const key = event.key.toLowerCase();
+  return key === shortcut.key.toLowerCase() || (shortcut.aliases ?? []).some((alias) => alias.toLowerCase() === key);
+}
+
+function matchShortcut(scope: Shortcut['scope'], event: ShortcutEvent, isMac: boolean): CommandId | null {
+  if (event.isComposing || event.inEditableField || event.inDialog) return null;
+  for (const id of COMMAND_IDS) {
+    const shortcut = COMMAND_DEFINITIONS[id].shortcut;
+    if (shortcut && shortcut.scope === scope && matches(shortcut, event, isMac)) return id;
+  }
+  return null;
 }
 
 /**
@@ -722,16 +1171,28 @@ function matches(shortcut: Shortcut, event: ShortcutEvent, isMac: boolean): bool
  * native) and inside nested dialogs.
  */
 export function matchGlobalShortcut(event: ShortcutEvent, isMac: boolean): CommandId | null {
-  if (event.isComposing || event.inEditableField || event.inDialog) return null;
-  for (const id of COMMAND_IDS) {
-    const shortcut = COMMAND_DEFINITIONS[id].shortcut;
-    if (shortcut && shortcut.scope === 'global' && matches(shortcut, event, isMac)) return id;
-  }
-  return null;
+  return matchShortcut('global', event, isMac);
+}
+
+/** Canvas-scope match (Delete/Backspace); the caller only feeds canvas-focused key events. */
+export function matchCanvasShortcut(event: ShortcutEvent, isMac: boolean): CommandId | null {
+  return matchShortcut('canvas', event, isMac);
 }
 
 /** Commands that carry a shortcut; each takes the Empty payload. */
-export type ShortcutCommandId = 'commands.open' | 'edit.undo' | 'edit.redo';
+export type ShortcutCommandId = 'commands.open' | 'edit.undo' | 'edit.redo' | 'selection.delete';
+
+function runShortcutCommand(
+  id: CommandId | null,
+  ctx: CommandContext,
+  handlers: CommandHandlers,
+): CommandId | null {
+  if (!id) return null;
+  const shortcutId = id as ShortcutCommandId;
+  if (!getAvailability(shortcutId, ctx, {}).enabled) return null;
+  void executeCommand(shortcutId, {}, ctx, handlers);
+  return id;
+}
 
 /**
  * Keyboard entry point: matches the event, checks availability synchronously
@@ -744,11 +1205,17 @@ export function runGlobalShortcut(
   ctx: CommandContext,
   handlers: CommandHandlers,
 ): CommandId | null {
-  const id = matchGlobalShortcut(event, isMac) as ShortcutCommandId | null;
-  if (!id) return null;
-  if (!getAvailability(id, ctx, {}).enabled) return null;
-  void executeCommand(id, {}, ctx, handlers);
-  return id;
+  return runShortcutCommand(matchGlobalShortcut(event, isMac), ctx, handlers);
+}
+
+/** Same contract for canvas-scoped shortcuts, fed by the canvas key handler. */
+export function runCanvasShortcut(
+  event: ShortcutEvent,
+  isMac: boolean,
+  ctx: CommandContext,
+  handlers: CommandHandlers,
+): CommandId | null {
+  return runShortcutCommand(matchCanvasShortcut(event, isMac), ctx, handlers);
 }
 
 /** Key hint from the registry, e.g. "⌘Z" / "Ctrl+Z", "⇧⌘Z" / "Ctrl+Shift+Z", "F2". */
@@ -868,9 +1335,23 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   );
   if (ctx.runPhase === 'running') run.push(option('run.pause', {}, ctx));
   if (ctx.runPhase === 'paused') run.push(option('run.resume', {}, ctx));
+  if (ctx.runPhase === 'running' || ctx.runPhase === 'paused') run.push(option('run.cancel', {}, ctx));
   if (ctx.hasRunDisplay || isExecutionActive(ctx.runPhase)) run.push(option('run.reset', {}, ctx));
 
-  const review: QuickOption[] = [option('history.open', {}, ctx), option('library.open', {}, ctx), option('results.open', {}, ctx)];
+  // Parameterized history actions open their nested form (checkpoint name, commit
+  // message) or the publish review; restore and conflict resolution need a chosen
+  // target, so they stay in the History panel.
+  const review: QuickOption[] = [
+    option('history.open', {}, ctx),
+    option('history.checkpoint', { label: '' }, ctx),
+    option('history.commit', { message: '' }, ctx),
+    option('history.prepare-publish', {}, ctx),
+    option('library.open', {}, ctx),
+    option('results.open', {}, ctx),
+  ];
+  if (ctx.panels.history.open) review.push(option('history.close', {}, ctx));
+  if (ctx.panels.library.open) review.push(option('library.close', {}, ctx));
+  if (ctx.resultsVisible) review.push(option('results.close', {}, ctx));
 
   const exportGroup: QuickOption[] = [
     option('export.png', {}, ctx),
@@ -887,6 +1368,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   const selection: QuickOption[] = hasSelection
     ? [
         option('selection.duplicate', {}, ctx),
+        option('selection.delete', {}, ctx),
         option('selection.group', { label: '' }, ctx),
         option('selection.ungroup', { groupIds: ctx.selectedGroupIds }, ctx),
         option('selection.align', { edge: 'left' }, ctx, { key: 'selection.align:left', label: 'Align left' }),

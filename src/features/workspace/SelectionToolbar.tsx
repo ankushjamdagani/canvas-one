@@ -22,6 +22,7 @@ import {
 
 export type CanvasAuthoringCommandId =
   | 'selection.duplicate'
+  | 'selection.delete'
   | 'selection.group'
   | 'selection.ungroup'
   | 'selection.align'
@@ -36,7 +37,6 @@ export type CanvasCommandExecutor = <K extends CanvasAuthoringCommandId>(
 export interface SelectionToolbarProps {
   readonly context: CommandContext;
   readonly executeCommand: CanvasCommandExecutor;
-  readonly onDelete: () => void;
 }
 
 function commandSucceeded(result: ExecuteResult): boolean {
@@ -56,7 +56,7 @@ function commandError(result: ExecuteResult): string | null {
   return null;
 }
 
-export function SelectionToolbar({ context, executeCommand, onDelete }: SelectionToolbarProps) {
+export function SelectionToolbar({ context, executeCommand }: SelectionToolbarProps) {
   const [groupOpen, setGroupOpen] = React.useState(false);
   const [groupLabel, setGroupLabel] = React.useState('');
   const [groupError, setGroupError] = React.useState<string | null>(null);
@@ -65,6 +65,7 @@ export function SelectionToolbar({ context, executeCommand, onDelete }: Selectio
     groupIds: context.selectedGroupIds,
   });
   const duplicateAvailability = getAvailability('selection.duplicate', context, {});
+  const deleteAvailability = getAvailability('selection.delete', context, {});
   const count = context.selectedElementIds.length;
 
   async function submitGroup() {
@@ -246,8 +247,9 @@ export function SelectionToolbar({ context, executeCommand, onDelete }: Selectio
         size="icon"
         className="size-8 text-destructive hover:text-destructive"
         aria-label="Delete selection"
-        disabled={context.storageState === 'saving'}
-        onClick={onDelete}
+        disabled={!deleteAvailability.enabled}
+        title={deleteAvailability.enabled ? undefined : deleteAvailability.reason}
+        onClick={() => void executeCommand('selection.delete', {})}
       >
         <Trash2 className="size-4" />
       </Button>

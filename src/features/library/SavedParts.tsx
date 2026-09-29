@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import type { PartContent } from "../../domain/parts/types";
 import {
   PART_FILE_BYTES,
   validatePartContent,
@@ -21,6 +20,34 @@ import { formatStudioError } from "../session/formatError";
 import { sanitizeFilenameStem } from "../transfer/filename";
 import { createBrowserDownloadSink } from "../transfer/ui/download-sink";
 import type { LibraryView } from "./types";
+import type {
+  CommandId,
+  CommandPayloads,
+  ExecuteResult,
+} from "../workspace/commands/registry";
+
+type SavePartResult = Awaited<ReturnType<SessionController["savePart"]>>;
+
+/**
+ * Executes `part.export`: reads the part's bytes and hands them to the browser
+ * download sink. The Workspace supplies this as the registry handler.
+ */
+export async function downloadSavedPart(
+  repository: StudioRepository,
+  projectId: Id,
+  part: { readonly partId: Id; readonly revision: number; readonly label: string },
+) {
+  const result = await repository.exportPart(projectId, part.partId, part.revision);
+  if (result.status === "done") {
+    createBrowserDownloadSink()(
+      new Blob([result.bytes.slice().buffer as ArrayBuffer], {
+        type: "application/json;charset=utf-8",
+      }),
+      `${sanitizeFilenameStem(part.label)}.system-studio-part.json`,
+    );
+  }
+  return result;
+}
 
 export type SavedPartsProps = {
   repository: StudioRepository;
@@ -30,8 +57,12 @@ export type SavedPartsProps = {
   viewId: Id | null;
   elementIds: readonly Id[];
   noteIds: readonly Id[];
+  /** Shared reason from the registry (draft open, saving) for place and import. */
   blockedReason: string | null;
-  onPlace: (content: PartContent, label: string) => Promise<boolean>;
+  /** Registry reason for `part.capture`, e.g. no selection. */
+  captureBlockedReason: string | null;
+  /** Runs `part.capture|place|export|import` through the command registry. */
+  execute: <K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>;
 };
 
 /** The saved collection shares the parent Library search and list/grid preference. */
@@ -44,7 +75,8 @@ export function SavedParts({
   elementIds,
   noteIds,
   blockedReason,
-  onPlace,
+  captureBlockedReason,
+  execute,
   searchQuery,
   view,
 }: SavedPartsProps & { searchQuery: string; view: LibraryView }) {
@@ -168,7 +200,12 @@ export function SavedParts({
     pendingCapture.current = command;
     setBusy(true);
     try {
-      const result = await session.savePart(command);
+      const outcome = await execute("part.capture", { command });
+      if (outcome.status === "disabled") {
+        setMessage(outcome.reason);
+        return;
+      }
+      const result = outcome.value as SavePartResult;
       if (result.status === "applied") {
         setPreview(null);
         pendingCapture.current = null;
@@ -179,7 +216,13 @@ export function SavedParts({
     }
   };
   const importCommand = async (command: PartImportCommand) => {
-    const result = await session.savePart(command);
+    const outcome = await execute("part.import", { command });
+    if (outcome.status === "disabled") {
+      setRetry(command);
+      setMessage(outcome.reason);
+      return;
+    }
+    const result = outcome.value as SavePartResult;
     if (result.status === "applied") {
       setRetry(null);
       setMessage("Part imported as a new saved component.");
@@ -226,21 +269,20 @@ export function SavedParts({
   const exportPart = async (part: PartRecord) => {
     setBusy(true);
     try {
-      const result = await repository.exportPart(
-        part.projectId,
-        part.id,
-        part.revision,
-      );
+      const outcome = await execute("part.export", {
+        partId: part.id,
+        revision: part.revision,
+        label: part.label,
+      });
+      if (outcome.status === "disabled") {
+        setMessage(outcome.reason);
+        return;
+      }
+      const result = outcome.value as Awaited<ReturnType<typeof downloadSavedPart>>;
       if (result.status !== "done") {
         setMessage(formatStudioError(result));
         return;
       }
-      createBrowserDownloadSink()(
-        new Blob([result.bytes.slice().buffer as ArrayBuffer], {
-          type: "application/json;charset=utf-8",
-        }),
-        `${sanitizeFilenameStem(part.label)}.system-studio-part.json`,
-      );
       setMessage(
         "Part exported. Placed copies are independent of this Library entry.",
       );
@@ -266,13 +308,8 @@ export function SavedParts({
         <Button
           size="sm"
           variant="outline"
-          disabled={disabled || !elementIds.length}
-          title={
-            blockedReason ??
-            (elementIds.length
-              ? undefined
-              : "Select one or more components first")
-          }
+          disabled={disabled || Boolean(captureBlockedReason)}
+          title={captureBlockedReason ?? blockedReason ?? undefined}
           onClick={() => void review()}
         >
           Save as component
@@ -423,12 +460,14 @@ export function SavedParts({
                     return;
                   }
                   setBusy(true);
-                  void onPlace(validated.value, part.label)
-                    .then((ok) =>
+                  void execute("part.place", { content: validated.value, label: part.label })
+                    .then((outcome) =>
                       setMessage(
-                        ok
-                          ? "Part placed. Connect exposed ports before running."
-                          : "Could not place the part. The canvas was not changed.",
+                        outcome.status === "disabled"
+                          ? outcome.reason
+                          : outcome.value
+                            ? "Part placed. Connect exposed ports before running."
+                            : "Could not place the part. The canvas was not changed.",
                       ),
                     )
                     .catch((error) => setMessage(formatStudioError(error)))

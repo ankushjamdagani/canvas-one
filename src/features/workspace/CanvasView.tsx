@@ -44,7 +44,7 @@ import { getEntry } from '../catalog/catalog';
 import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
 import { SelectionToolbar } from './SelectionToolbar';
-import type { CommandContext, CommandId, CommandPayloads, ExecuteResult } from './commands/registry';
+import type { CommandContext, CommandId, CommandPayloads, ExecuteResult, ShortcutEvent } from './commands/registry';
 import type { DockCommandId, DockConfig } from './dockConfig';
 
 export type CanvasSelectionRequest = {
@@ -109,6 +109,12 @@ export interface CanvasViewProps {
   /** Registry context and executor supplied by Workspace; toolbar/dock never mutate locally. */
   commandContext: CommandContext;
   onExecuteCommand: <K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>;
+  /**
+   * Canvas-scoped shortcuts (Delete/Backspace) live in the registry: Workspace
+   * matches the event and returns true only when an enabled command ran, so
+   * `preventDefault` fires after a real match (commands.md §1).
+   */
+  onCanvasShortcut: (event: ShortcutEvent) => boolean;
   dockConfig: DockConfig;
   dockPreferenceState: 'loading' | 'ready' | 'saving' | 'failed';
   onConfigureDock: (config: DockConfig) => void;
@@ -122,6 +128,8 @@ export interface CanvasViewProps {
 export interface CanvasViewHandle {
   placeAtCentre: (entryId: string) => Promise<void>;
   getVisibleCentre: () => { readonly x: number; readonly y: number };
+  /** selection.delete handler: dependency preview, scenario confirmation, one undoable apply. */
+  deleteSelection: () => void;
   setToolMode: (mode: 'select' | 'pan') => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -159,6 +167,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onApplyChanges,
   commandContext,
   onExecuteCommand,
+  onCanvasShortcut,
   dockConfig,
   dockPreferenceState,
   onConfigureDock,
@@ -372,21 +381,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   }, [reactFlow]);
 
   // The docked Library panel places at the viewport centre via this handle.
-  React.useImperativeHandle(
-    ref,
-    () => ({
-      placeAtCentre: async (entryId: string) => {
-        await applyPlacement(entryId, getVisibleCentre());
-      },
-      getVisibleCentre,
-      setToolMode: setDragMode,
-      zoomIn: handleZoomIn,
-      zoomOut: handleZoomOut,
-      fitView: handleFitView,
-    }),
-    [getVisibleCentre, applyPlacement, handleZoomIn, handleZoomOut, handleFitView],
-  );
-
   // Dragging a picker card onto the canvas places it at the drop point.
   const handleCanvasDragOver = React.useCallback((e: React.DragEvent) => {
     if (Array.from(e.dataTransfer.types).includes(CATALOG_ENTRY_MIME_TYPE)) {
@@ -600,15 +594,42 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const handleCanvasKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
-      if (!hasSelection) return;
-      e.preventDefault();
-      handleDeleteSelection();
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const matched = onCanvasShortcut({
+        key: e.key,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        isComposing: e.nativeEvent.isComposing,
+        inEditableField: Boolean(
+          target &&
+            (target.tagName === 'INPUT' ||
+              target.tagName === 'TEXTAREA' ||
+              target.tagName === 'SELECT' ||
+              target.isContentEditable),
+        ),
+        inDialog: Boolean(target?.closest('[role="dialog"], [role="alertdialog"]')),
+      });
+      if (matched) e.preventDefault();
     },
-    [hasSelection, handleDeleteSelection],
+    [onCanvasShortcut],
+  );
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      placeAtCentre: async (entryId: string) => {
+        await applyPlacement(entryId, getVisibleCentre());
+      },
+      getVisibleCentre,
+      deleteSelection: handleDeleteSelection,
+      setToolMode: setDragMode,
+      zoomIn: handleZoomIn,
+      zoomOut: handleZoomOut,
+      fitView: handleFitView,
+    }),
+    [getVisibleCentre, applyPlacement, handleZoomIn, handleZoomOut, handleFitView, handleDeleteSelection],
   );
 
   if (projection.empty) {
@@ -686,7 +707,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         <SelectionToolbar
           context={commandContext}
           executeCommand={onExecuteCommand}
-          onDelete={handleDeleteSelection}
         />
       )}
 

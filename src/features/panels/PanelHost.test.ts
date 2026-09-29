@@ -392,6 +392,34 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
     });
   });
 
+  describe('registry routes for header menu actions', () => {
+    it('sends every menu option to the supplied routes and never to the reducer', () => {
+      const dispatch = vi.fn();
+      const routes = {
+        place: vi.fn(),
+        collapse: vi.fn(),
+        expand: vi.fn(),
+        resetWidth: vi.fn(),
+        close: vi.fn(),
+      };
+      dispatchPanelMenuAction('dock-right', 'history', 'left', dispatch, routes);
+      dispatchPanelMenuAction('dock-left', 'library', 'right', dispatch, routes);
+      dispatchPanelMenuAction('float', 'history', 'right', dispatch, routes);
+      dispatchPanelMenuAction('collapse', 'library', 'left', dispatch, routes);
+      dispatchPanelMenuAction('reset-width', 'history', 'left', dispatch, routes);
+      dispatchPanelMenuAction('close', 'library', 'right', dispatch, routes);
+      expect(routes.place.mock.calls).toEqual([
+        ['history', 'right'],
+        ['library', 'left'],
+        ['history', 'floating'],
+      ]);
+      expect(routes.collapse).toHaveBeenCalledWith('library');
+      expect(routes.resetWidth).toHaveBeenCalledWith('history');
+      expect(routes.close).toHaveBeenCalledWith('library');
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+  });
+
   // ==========================================================================
   // 4. Accessible Separators & Clamps
   // ==========================================================================

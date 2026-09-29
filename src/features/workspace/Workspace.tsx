@@ -18,7 +18,7 @@ import {
   panelPreferencesFromState,
   WorkspacePanelPreferenceStore,
 } from './panelPreferences';
-import { PanelHost } from '../panels';
+import { PanelHost, type PanelCommandRoutes } from '../panels';
 import {
   HistoryController,
   HistoryLadder,
@@ -28,7 +28,7 @@ import {
   DraftBehindMainBanner,
 } from '../history';
 import { LibraryPanel, type LibraryView } from '../library';
-import { SavedParts } from '../library/SavedParts';
+import { downloadSavedPart, SavedParts } from '../library/SavedParts';
 import type {
   BranchRecord,
   ProjectRecord,
@@ -86,14 +86,22 @@ import {
   COMMAND_DEFINITIONS,
   executeCommand,
   formatShortcut,
+  getAvailability,
+  getPayloadFreeAvailability,
+  runCanvasShortcut,
   runGlobalShortcut,
   type CommandContext,
+  type CommandDraftState,
   type CommandHandlers,
   type CommandId,
   type CommandPayloads,
+  type ExecuteResult,
   type QuickOption,
+  type ShortcutEvent,
 } from './commands/registry';
 import { QuickOptionsDialog, type RenameOutcome } from './QuickOptions';
+import type { TextStepKind } from './QuickOptionsTextStep';
+import { routeHistoryController, routePublishController } from './historyRouting';
 import { DEFAULT_DOCK_CONFIG, type DockConfig } from './dockConfig';
 import { findRunAllDisabledReason } from '../runs';
 import type { SessionRenameResult } from '../session/types';
@@ -320,6 +328,19 @@ export function Workspace({
   const scenarioDraftSession = React.useMemo(
     () => createScenarioDraftSession(session),
     [session],
+  );
+
+  // Stable handle on the registry executor (defined further down with the
+  // handler table) so panel/inspector callbacks built earlier route through it.
+  const commandRunnerRef = React.useRef<
+    (<K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>) | null
+  >(null);
+  const runCommand = React.useCallback(
+    <K extends CommandId>(id: K, payload: CommandPayloads[K]): Promise<ExecuteResult> =>
+      commandRunnerRef.current
+        ? commandRunnerRef.current(id, payload)
+        : Promise.resolve({ status: 'disabled', reason: 'The workspace is still loading', code: 'busy' }),
+    [],
   );
 
   /**
@@ -944,8 +965,14 @@ export function Workspace({
   // Results are normally contextual to a scenario. The explicit results.open
   // command can also reveal an honest empty state in a blank project.
   const [resultsRequested, setResultsRequested] = React.useState(false);
+  // results.close hides the region until results.open or the next run starts.
+  const [resultsDismissed, setResultsDismissed] = React.useState(false);
   const resultsRegionRef = React.useRef<HTMLDivElement>(null);
-  const showResultsRegion = runningOrSelectedScenario !== null || resultsRequested;
+  const showResultsRegion = !resultsDismissed && (runningOrSelectedScenario !== null || resultsRequested);
+  const runPhaseForResults = runControllerState?.phase ?? 'idle';
+  React.useEffect(() => {
+    if (runPhaseForResults === 'compiling' || runPhaseForResults === 'running') setResultsDismissed(false);
+  }, [runPhaseForResults]);
 
   const staleRun = Boolean(
     runControllerState?.current?.terminal &&
@@ -956,6 +983,12 @@ export function Workspace({
 
   const isSaving = sessionState.status === 'saving';
   const hasError = Boolean(sessionState.lastError);
+  // Only repository write failures block history/part commands; a rejected
+  // edit (invalid, stale, ineligible) also lands in lastError but isn't storage.
+  const storageFailed = (() => {
+    const error = sessionState.lastError as { status?: unknown; code?: unknown } | null;
+    return error?.status === 'failed' && (error.code === 'quota' || error.code === 'unavailable');
+  })();
 
   // Compute save status text without raw exception text
   const saveStatusText = React.useMemo(() => {
@@ -1057,6 +1090,17 @@ export function Workspace({
     publishController.subscribe,
     publishController.getState,
     publishController.getState,
+  );
+
+  // The history/publish components act through these facades so each action
+  // executes its registry command (see historyRouting.ts).
+  const routedHistoryController = React.useMemo(
+    () => routeHistoryController(historyController, runCommand),
+    [historyController, runCommand],
+  );
+  const routedPublishController = React.useMemo(
+    () => routePublishController(publishController, runCommand),
+    [publishController, runCommand],
   );
 
   // Panel placement/collapse/width preferences (commands.md §7) use their own
@@ -1358,81 +1402,6 @@ export function Workspace({
     return applied;
   }, [session, activeViewId, mintId, handleApplyChanges, openInspectorFor]);
 
-  const renderPanel = React.useCallback(
-    (panelId: PanelId): React.ReactNode => {
-      if (panelId === 'history') {
-        if (historyView === 'commit') {
-          return (
-            <CommitPanel
-              hosted
-              controller={historyController}
-              onCancel={() => setHistoryView('ladder')}
-              onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
-              onRunAll={() => void handleRunAll()}
-            />
-          );
-        }
-        return (
-          <HistoryLadder
-            hosted
-            controller={historyController}
-            canUndo={sessionState.canUndo && sessionState.status === 'ready'}
-            canRedo={sessionState.canRedo && sessionState.status === 'ready'}
-            onUndo={() => void handleUndo()}
-            onRedo={() => void handleRedo()}
-            onOpenCommit={() => setHistoryView('commit')}
-            onOpenPublish={() => {
-              refreshBehindMainCheck();
-              setPublishOpen(true);
-            }}
-            behindMain={
-              behindMainInfo
-                ? {
-                    conflictCount: behindMainInfo.conflictCount,
-                    versionsPublishedSinceFork: behindMainInfo.versionsPublishedSinceFork,
-                  }
-                : null
-            }
-            onReviewAndResolve={() => {
-              refreshBehindMainCheck();
-              setPublishOpen(true);
-            }}
-            onClose={() => panelDispatch({ type: 'CLOSE', panel: 'history' })}
-          />
-        );
-      }
-      return (
-        <LibraryPanel
-          hosted
-          view={libraryView}
-          onViewChange={setLibraryView}
-          renderSavedParts={(searchQuery, view) => <SavedParts
-            repository={repository} session={session} actor={actor} mintId={mintId}
-            viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[]}
-            blockedReason={draft?.dirty || scenarioDraft?.dirty || scenarioDraft?.isNew ? 'Apply or Cancel configuration changes before using saved parts.' : null}
-            onPlace={placeSavedPart} searchQuery={searchQuery} view={view}
-          />}
-          onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
-          onClose={() => panelDispatch({ type: 'CLOSE', panel: 'library' })}
-        />
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      historyView,
-      historyController,
-      behindMainInfo,
-      libraryView,
-      panelDispatch,
-      refreshBehindMainCheck,
-      sessionState.canUndo,
-      sessionState.canRedo,
-      sessionState.status,
-      repository, session, actor, mintId, activeViewId, selectedElementIds,
-      draft?.dirty, scenarioDraft?.dirty, scenarioDraft?.isNew, placeSavedPart,
-    ],
-  );
-
   const handleSwitchBranch = React.useCallback(
     (branchId: string) => {
       if (!sessionState.projectId || isSaving) return;
@@ -1460,6 +1429,31 @@ export function Workspace({
     refreshBehindMainCheck();
   }, [panelDispatch, refreshBehindMainCheck]);
 
+  // Open inspector / scenario draft as the registry sees it (commands.md §1).
+  const draftContext = React.useMemo((): { readonly id: Id | null; readonly state: CommandDraftState } => {
+    if (scenarioDraft) {
+      const state: CommandDraftState =
+        scenarioDraft.status === 'saving'
+          ? 'saving'
+          : scenarioDraft.status === 'stale' || scenarioDraft.status === 'missing'
+            ? 'stale'
+            : scenarioDraft.dirty || scenarioDraft.isNew
+              ? 'dirty'
+              : 'clean';
+      return { id: scenarioDraft.draftId, state };
+    }
+    if (draft) {
+      const state: CommandDraftState =
+        draft.status === 'saving' || draft.status === 'invalid' || draft.status === 'stale' || draft.status === 'validating'
+          ? draft.status
+          : draft.dirty
+            ? 'dirty'
+            : 'clean';
+      return { id: draft.draftId, state };
+    }
+    return { id: null, state: 'clean' };
+  }, [draft, scenarioDraft]);
+
   // Read-only context for availability; built from workspace state, never the DOM.
   const commandContext: CommandContext = React.useMemo(() => {
     const mainId = projectRecord?.mainBranchId ?? null;
@@ -1476,7 +1470,26 @@ export function Workspace({
         isMain: branch.id === mainId,
         closed: branch.state === 'closed',
       })),
-      storageState: isSaving ? 'saving' : hasError ? 'failed' : 'ready',
+      storageState: isSaving ? 'saving' : storageFailed ? 'failed' : 'ready',
+      draftState: draftContext.state,
+      draftId: draftContext.id,
+      panels: {
+        library: {
+          open: panelState.panels.library.open,
+          collapsed: panelState.panels.library.collapsed,
+        },
+        history: {
+          open: panelState.panels.history.open,
+          collapsed: panelState.panels.history.collapsed,
+        },
+      },
+      resultsVisible: showResultsRegion,
+      commitCount: historyControllerState.commits.length,
+      publish: {
+        status: publishControllerState.status,
+        eligible: publishControllerState.eligible,
+        conflictCount: publishControllerState.conflicts.length,
+      },
       canUndo: sessionState.canUndo && sessionState.status === 'ready',
       canRedo: sessionState.canRedo && sessionState.status === 'ready',
       selectedElementIds: Array.from(selectedElementIds),
@@ -1512,6 +1525,13 @@ export function Workspace({
     branches,
     activeView,
     activeViewId,
+    draftContext,
+    panelState.panels,
+    showResultsRegion,
+    historyControllerState.commits.length,
+    publishControllerState.status,
+    publishControllerState.eligible,
+    publishControllerState.conflicts.length,
     hasError,
     isSaving,
     projectRecord,
@@ -1632,13 +1652,47 @@ export function Workspace({
       'run.start-all': () => handleRunAll(),
       'run.pause': () => runController?.pause(),
       'run.resume': () => runController?.resume(),
+      'run.cancel': () => runController?.cancel(),
       'run.reset': () => handleResetRun(),
       'history.open': () => openHistoryPanel(),
+      'history.close': () => panelDispatch({ type: 'CLOSE', panel: 'history' }),
+      'history.checkpoint': ({ label }) => historyController.saveCheckpoint(label),
+      'history.commit': ({ message }) => historyController.commit(message),
+      'history.restore': ({ targetId, label }) => historyController.restore(targetId, label),
+      // Opens the review overlay first so its "preparing" state is visible.
+      'history.prepare-publish': () => {
+        setBehindMainBannerDismissed(false);
+        setPublishOpen(true);
+        return publishController.prepare();
+      },
+      'history.resolve-conflict': ({ conflictId, resolution }) =>
+        publishController.resolveConflict(conflictId, resolution),
+      'history.publish': ({ metadata, keepSourceOpen }) =>
+        publishController.publish(metadata, keepSourceOpen),
       'library.open': () => openLibraryPanel(),
+      'library.close': () => panelDispatch({ type: 'CLOSE', panel: 'library' }),
       'results.open': () => {
+        setResultsDismissed(false);
         setResultsRequested(true);
         requestAnimationFrame(() => resultsRegionRef.current?.focus());
       },
+      'results.close': () => setResultsDismissed(true),
+      'panel.place': ({ panelId, placement, index }) =>
+        panelDispatch({ type: 'PLACE', panel: panelId, placement, index }),
+      'panel.collapse': ({ panelId }) => panelDispatch({ type: 'COLLAPSE', panel: panelId }),
+      'panel.expand': ({ panelId }) => panelDispatch({ type: 'EXPAND', panel: panelId }),
+      // A docked panel resets its own side's shared width; a floating one keeps
+      // the header menu's existing behaviour (right side).
+      'panel.reset-width': ({ panelId }) =>
+        panelDispatch({
+          type: 'RESET_SIDE',
+          side: panelStateRef.current.panels[panelId].placement === 'left' ? 'left' : 'right',
+        }),
+      'inspector.apply': ({ draftId }) =>
+        scenarioDraft?.draftId === draftId ? handleApplyScenarioDraft() : handleApplyDraft(),
+      'inspector.cancel': ({ draftId }) =>
+        scenarioDraft?.draftId === draftId ? handleCancelScenarioDraft() : handleCancelDraft(),
+      'inspector.close': () => handleCloseInspector(),
       'canvas.select-tool': () => canvasViewRef.current?.setToolMode('select'),
       'canvas.pan-tool': () => canvasViewRef.current?.setToolMode('pan'),
       'canvas.zoom-out': () => canvasViewRef.current?.zoomOut(),
@@ -1654,6 +1708,7 @@ export function Workspace({
       'edit.undo': () => handleUndo(),
       'edit.redo': () => handleRedo(),
       'selection.duplicate': () => handleDuplicateSelection(),
+      'selection.delete': () => canvasViewRef.current?.deleteSelection(),
       'selection.group': ({ label }) =>
         document && activeViewId
           ? applySelectionPlan(planGroup(document, activeViewId, commandContext.selectedElementIds, mintId(), label))
@@ -1676,6 +1731,10 @@ export function Workspace({
           ? applySelectionPlan(planAddNote(document, activeViewId, mintId(), text, point))
           : { ok: false, message: 'No canvas view is open' };
       },
+      'part.capture': ({ command }) => session.savePart(command),
+      'part.place': ({ content, label }) => placeSavedPart(content, label),
+      'part.export': (part) => downloadSavedPart(repository, session.getState().projectId as Id, part),
+      'part.import': ({ command }) => session.savePart(command),
     }),
     [
       handleBackToProjects,
@@ -1695,6 +1754,17 @@ export function Workspace({
       mintId,
       openHistoryPanel,
       openLibraryPanel,
+      historyController,
+      publishController,
+      placeSavedPart,
+      repository,
+      panelDispatch,
+      handleApplyDraft,
+      handleApplyScenarioDraft,
+      handleCancelDraft,
+      handleCancelScenarioDraft,
+      handleCloseInspector,
+      scenarioDraft?.draftId,
       persistDockConfig,
       runController,
       transferActions,
@@ -1748,6 +1818,113 @@ export function Workspace({
     [commandContext, commandHandlers],
   );
 
+  // History panel buttons show the registry's reason instead of failing on click.
+  const reasonOf = (availability: ReturnType<typeof getAvailability>) =>
+    availability.enabled ? null : availability.reason;
+  const commitBlockedReason = reasonOf(getAvailability('history.commit', commandContext, { message: '' }));
+  const publishBlockedReason = reasonOf(getAvailability('history.prepare-publish', commandContext, {}));
+  const partsBlockedReason = reasonOf(getPayloadFreeAvailability('part.import', commandContext));
+  const captureBlockedReason = reasonOf(getPayloadFreeAvailability('part.capture', commandContext));
+
+  const [historyNotice, setHistoryNotice] = React.useState<string | null>(null);
+  const openPublishFlow = React.useCallback(async () => {
+    setHistoryNotice(null);
+    const result = await runCommand('history.prepare-publish', {});
+    if (result.status === 'disabled') setHistoryNotice(result.reason);
+  }, [runCommand]);
+
+  const renderPanel = React.useCallback(
+    (panelId: PanelId): React.ReactNode => {
+      if (panelId === 'history') {
+        if (historyView === 'commit') {
+          return (
+            <CommitPanel
+              hosted
+              controller={routedHistoryController}
+              onCancel={() => setHistoryView('ladder')}
+              onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
+              onRunAll={() => void handleRunAll()}
+            />
+          );
+        }
+        return (
+          <HistoryLadder
+            hosted
+            controller={routedHistoryController}
+            canUndo={sessionState.canUndo && sessionState.status === 'ready'}
+            canRedo={sessionState.canRedo && sessionState.status === 'ready'}
+            onUndo={() => void handleUndo()}
+            onRedo={() => void handleRedo()}
+            onOpenCommit={() => setHistoryView('commit')}
+            commitBlockedReason={commitBlockedReason}
+            publishBlockedReason={publishBlockedReason}
+            onOpenPublish={() => void openPublishFlow()}
+            behindMain={
+              behindMainInfo
+                ? {
+                    conflictCount: behindMainInfo.conflictCount,
+                    versionsPublishedSinceFork: behindMainInfo.versionsPublishedSinceFork,
+                  }
+                : null
+            }
+            onReviewAndResolve={() => void openPublishFlow()}
+            onClose={() => void runCommand('history.close', {})}
+          />
+        );
+      }
+      return (
+        <LibraryPanel
+          hosted
+          view={libraryView}
+          onViewChange={setLibraryView}
+          renderSavedParts={(searchQuery, view) => <SavedParts
+            repository={repository} session={session} actor={actor} mintId={mintId}
+            viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[]}
+            blockedReason={partsBlockedReason}
+            captureBlockedReason={captureBlockedReason}
+            execute={runCommand} searchQuery={searchQuery} view={view}
+          />}
+          onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
+          onClose={() => void runCommand('library.close', {})}
+        />
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      historyView,
+      routedHistoryController,
+      commitBlockedReason,
+      publishBlockedReason,
+      openPublishFlow,
+      partsBlockedReason,
+      captureBlockedReason,
+      behindMainInfo,
+      libraryView,
+      panelDispatch,
+      runCommand,
+      refreshBehindMainCheck,
+      sessionState.canUndo,
+      sessionState.canRedo,
+      sessionState.status,
+      repository, session, actor, mintId, activeViewId, selectedElementIds,
+    ],
+  );
+
+  React.useLayoutEffect(() => {
+    commandRunnerRef.current = executeCanvasCommand;
+  }, [executeCanvasCommand]);
+
+  const panelCommandRoutes: PanelCommandRoutes = React.useMemo(
+    () => ({
+      place: (panelId, placement) => void runCommand('panel.place', { panelId, placement, index: 0 }),
+      collapse: (panelId) => void runCommand('panel.collapse', { panelId }),
+      expand: (panelId) => void runCommand('panel.expand', { panelId }),
+      resetWidth: (panelId) => void runCommand('panel.reset-width', { panelId }),
+      close: (panelId) => void runCommand(panelId === 'history' ? 'history.close' : 'library.close', {}),
+    }),
+    [runCommand],
+  );
+
   const quickOptionGroups = React.useMemo(
     () => (quickOptionsOpen ? buildQuickOptions(commandContext) : []),
     [quickOptionsOpen, commandContext],
@@ -1772,12 +1949,27 @@ export function Workspace({
   );
 
   const handleQuickTextCommand = React.useCallback(
-    async (kind: 'group' | 'note', value: string): Promise<RenameOutcome> => {
-      const result = kind === 'group'
-        ? await executeCommand('selection.group', { label: value }, commandContext, commandHandlers)
-        : await executeCommand('canvas.add-note', { text: value }, commandContext, commandHandlers);
+    async (kind: TextStepKind, value: string): Promise<RenameOutcome> => {
+      const result =
+        kind === 'group'
+          ? await executeCommand('selection.group', { label: value }, commandContext, commandHandlers)
+          : kind === 'note'
+            ? await executeCommand('canvas.add-note', { text: value }, commandContext, commandHandlers)
+            : kind === 'checkpoint'
+              ? await executeCommand('history.checkpoint', { label: value }, commandContext, commandHandlers)
+              : await executeCommand('history.commit', { message: value }, commandContext, commandHandlers);
       if (result.status === 'disabled') return { ok: false, message: result.reason };
-      const outcome = result.value as RenameOutcome;
+      let outcome: RenameOutcome;
+      if (kind === 'checkpoint' || kind === 'commit') {
+        // History commands return the controller's authored result.
+        const authored = result.value as { readonly status?: string } | null;
+        outcome =
+          authored?.status === 'applied'
+            ? { ok: true }
+            : { ok: false, message: formatStudioError(authored, kind === 'commit' ? 'Could not commit' : 'Could not save the checkpoint') };
+      } else {
+        outcome = result.value as RenameOutcome;
+      }
       if (outcome.ok) setQuickOptionsOpen(false);
       return outcome;
     },
@@ -1817,6 +2009,25 @@ export function Workspace({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [commandContext, commandHandlers]);
 
+  // Canvas-scope shortcut (Delete/Backspace): CanvasView forwards key events
+  // from canvas focus only; true means an enabled command matched.
+  const handleCanvasShortcut = React.useCallback(
+    (event: ShortcutEvent) =>
+      runCanvasShortcut(event, IS_MAC, commandContext, commandHandlers) !== null,
+    [commandContext, commandHandlers],
+  );
+
+  // Inspector / scenario editor buttons run the registry commands for the open draft.
+  const inspectorApply = React.useCallback(() => {
+    if (draftContext.id) void runCommand('inspector.apply', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+  const inspectorCancel = React.useCallback(() => {
+    if (draftContext.id) void runCommand('inspector.cancel', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+  const inspectorClose = React.useCallback(() => {
+    void runCommand('inspector.close', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+
   const quickOptionsShortcut = formatShortcut(COMMAND_DEFINITIONS['commands.open'].shortcut!, IS_MAC);
   const currentBranchLabel =
     commandContext.branches.find((branch) => branch.id === commandContext.branchId)?.label ?? '';
@@ -1831,12 +2042,12 @@ export function Workspace({
       if (e.key !== 'Escape' || guardOpen || quickOptionsOpen) return;
       if (!draft?.dirty && !scenarioDraft?.dirty && !scenarioDraft?.isNew) {
         e.preventDefault();
-        closeInspector();
+        void runCommand('inspector.close', { draftId: draftContext.id });
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [draft, scenarioDraft, guardOpen, quickOptionsOpen, closeInspector]);
+  }, [draft, scenarioDraft, guardOpen, quickOptionsOpen, runCommand, draftContext.id]);
 
   return (
     <div
@@ -1892,6 +2103,7 @@ export function Workspace({
             <PanelHost
               state={panelState}
               dispatch={panelDispatch}
+              commands={panelCommandRoutes}
               renderPanel={renderPanel}
               panelBadges={{
                 history:
@@ -1920,6 +2132,7 @@ export function Workspace({
                     onApplyChanges={handleApplyChanges}
                     commandContext={commandContext}
                     onExecuteCommand={executeCanvasCommand}
+                    onCanvasShortcut={handleCanvasShortcut}
                     dockConfig={dockConfig}
                     dockPreferenceState={dockPreferenceState}
                     onConfigureDock={(config) => void executeCommand('dock.configure', config, commandContext, commandHandlers)}
@@ -1935,12 +2148,13 @@ export function Workspace({
                         versionsPublishedSinceFork={behindMainInfo.versionsPublishedSinceFork}
                         forkVersionKey={behindMainInfo.forkVersionKey}
                         onLater={() => setBehindMainBannerDismissed(true)}
-                        onReviewAndResolve={() => {
-                          setBehindMainBannerDismissed(true);
-                          refreshBehindMainCheck();
-                          setPublishOpen(true);
-                        }}
+                        onReviewAndResolve={() => void openPublishFlow()}
                       />
+                      {historyNotice && (
+                        <p role="status" data-testid="history-command-notice" className="mt-1 rounded-control border border-control-border bg-panel px-3 py-1.5 text-xs text-secondary-text">
+                          {historyNotice}
+                        </p>
+                      )}
                     </div>
                   )}
                 </>
@@ -1956,7 +2170,7 @@ export function Workspace({
               className="fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4"
             >
               <div className="w-full max-w-2xl max-h-[85vh] overflow-hidden">
-                <PublishFlow controller={publishController} onClose={() => setPublishOpen(false)} />
+                <PublishFlow controller={routedPublishController} onClose={() => setPublishOpen(false)} />
               </div>
             </div>
           )}
@@ -1990,9 +2204,9 @@ export function Workspace({
             draft={draft}
             measured={measuredSection}
             onChangeField={handleChangeField}
-            onApply={() => void handleApplyDraft()}
-            onCancel={handleCancelDraft}
-            onClose={handleCloseInspector}
+            onApply={inspectorApply}
+            onCancel={inspectorCancel}
+            onClose={inspectorClose}
             saving={draft.status === 'saving'}
             focusFieldId={focusFieldId}
             variant="dock"
@@ -2008,9 +2222,9 @@ export function Workspace({
               document={document}
               handle={scenarioDraft}
               onChange={handleChangeScenarioDraft}
-              onApply={() => void handleApplyScenarioDraft()}
-              onCancel={handleCancelScenarioDraft}
-              onClose={handleCloseInspector}
+              onApply={inspectorApply}
+              onCancel={inspectorCancel}
+              onClose={inspectorClose}
               mintId={mintId}
               lastRunChecks={scenarioEditorChecks}
               focusName={scenarioEditorFocusName}
@@ -2034,9 +2248,9 @@ export function Workspace({
             draft={draft}
             measured={measuredSection}
             onChangeField={handleChangeField}
-            onApply={() => void handleApplyDraft()}
-            onCancel={handleCancelDraft}
-            onClose={handleCloseInspector}
+            onApply={inspectorApply}
+            onCancel={inspectorCancel}
+            onClose={inspectorClose}
             saving={draft.status === 'saving'}
             focusFieldId={focusFieldId}
             variant="sheet"
@@ -2053,9 +2267,9 @@ export function Workspace({
             document={document}
             handle={scenarioDraft}
             onChange={handleChangeScenarioDraft}
-            onApply={() => void handleApplyScenarioDraft()}
-            onCancel={handleCancelScenarioDraft}
-            onClose={handleCloseInspector}
+            onApply={inspectorApply}
+            onCancel={inspectorCancel}
+            onClose={inspectorClose}
             mintId={mintId}
             lastRunChecks={scenarioEditorChecks}
             focusName={scenarioEditorFocusName}

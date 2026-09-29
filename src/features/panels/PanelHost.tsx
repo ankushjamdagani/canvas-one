@@ -5,6 +5,7 @@ import { FloatingPanel } from './FloatingPanel';
 import { PanelRail, type PanelRailItemConfig } from './PanelRail';
 import { DropTargets } from './DropTargets';
 import { PanelHeader } from './PanelHeader';
+import { PanelCommandsContext, type PanelCommandRoutes } from './panelCommands';
 import { computeDropTarget } from './geometry';
 import {
   clampFloatRect,
@@ -18,6 +19,11 @@ import {
 export interface PanelHostProps {
   state: WorkspacePanelState;
   dispatch: (action: WorkspacePanelAction) => void;
+  /**
+   * Header-menu / rail routes into the command registry (place, collapse,
+   * expand, reset width, close). Gestures still use `dispatch` directly.
+   */
+  commands?: PanelCommandRoutes;
   renderPanel: (panelId: PanelId) => React.ReactNode;
   canvas: React.ReactNode;
   panelTitles?: Partial<Record<PanelId, string>>;
@@ -41,6 +47,7 @@ const DEFAULT_TITLES: Record<PanelId, string> = {
 export const PanelHost: React.FC<PanelHostProps> = ({
   state,
   dispatch,
+  commands,
   renderPanel,
   canvas,
   panelTitles = {},
@@ -195,6 +202,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
   }
 
   return (
+    <PanelCommandsContext.Provider value={commands ?? null}>
     <div
       data-slot="panel-host"
       className={cn(
@@ -337,5 +345,6 @@ export const PanelHost: React.FC<PanelHostProps> = ({
         </div>
       )}
     </div>
+    </PanelCommandsContext.Provider>
   );
 };

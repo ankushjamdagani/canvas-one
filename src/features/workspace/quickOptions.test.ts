@@ -22,6 +22,12 @@ const context: CommandContext = {
     { id: DRAFT, label: 'async-fulfilment', isMain: false, closed: false },
   ],
   storageState: 'ready',
+  draftState: 'clean',
+  draftId: null,
+  panels: { library: { open: false, collapsed: false }, history: { open: false, collapsed: false } },
+  resultsVisible: false,
+  commitCount: 2,
+  publish: { status: 'idle', eligible: false, conflictCount: 0 },
   canUndo: false,
   canRedo: false,
   selectedElementIds: [],
@@ -39,7 +45,7 @@ const context: CommandContext = {
   exportDisabledReasons: { png: null, svg: null, json: null, csv: 'Run a scenario to export results', mermaid: null },
 };
 
-function render(mode: 'list' | 'rename' | 'group' | 'note'): string {
+function render(mode: 'list' | 'rename' | 'group' | 'note' | 'checkpoint' | 'commit'): string {
   return renderToStaticMarkup(
     React.createElement(QuickOptionsContent, {
       groups: buildQuickOptions(context),
@@ -119,5 +125,14 @@ describe('QuickOptionsContent (14A)', () => {
     expect(note).toContain('Add note');
     expect(note).toContain('data-testid="quick-options-note-input"');
     expect(note).toContain('Enter note text');
+    const checkpoint = render('checkpoint');
+    expect(checkpoint).toContain('Save checkpoint');
+    expect(checkpoint).toContain('data-testid="quick-options-checkpoint-input"');
+    expect(checkpoint).toContain('Enter a checkpoint name');
+
+    const commit = render('commit');
+    expect(commit).toContain('Commit changes');
+    expect(commit).toContain('data-testid="quick-options-commit-input"');
+    expect(commit).toContain('Enter a commit message');
   });
 });
