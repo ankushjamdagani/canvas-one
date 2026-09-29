@@ -13,9 +13,9 @@ Preserve in all work touching architecture, simulation, persistence, exports or 
 
 ## Current state (2026-09-29)
 
-- **Branch:** `master` holds everything: app, specs, ledger and agent workflow. Merged `@ 3b4bda9` from the UI line, the ledger branch and the two workflow branches (`/retro` learning loop, `/delegate` hardening). No remote is configured; nothing has been pushed.
+- **Branch:** `master` holds everything: app, specs, ledger and agent workflow (merged `@ 3b4bda9` from the UI line, the ledger branch and the two workflow branches (`/retro` learning loop, `/delegate` hardening)). No remote is configured; nothing has been pushed.
 - **Revamp:** RV-01 to RV-17 are complete. RV-13 (release acceptance) and RV-17 (design conformance) were accepted by the user. The app runs only on the studio model and `system-studio-local-v1`. Ledger: [`specs/revamp/delivery.md`](specs/revamp/delivery.md). Reports: [`rv13-acceptance.md`](specs/revamp/rv13-acceptance.md), [`rv15-retirement.md`](specs/revamp/rv15-retirement.md).
-- **Verification baseline on master:** 1,416 unit tests (122 files); `npx tsc -b` clean; production build passes (main JS 1,643.89 kB / 442.29 kB gzip, CSS 115.71 kB, existing large-chunk warning); production Chromium 77 passed / 4 skipped (dev-only specimen).
+- **Verification baseline on master:** 1,420 unit tests (123 files); `npx tsc -b` clean; production build passes with no chunk over 500 kB (entry path 702 kB / 197 kB gzip across `react-vendor`, `storage-vendor` and `index`; workspace chunk 384 kB plus `canvas-vendor` 178 kB, prefetched on idle); production Chromium 78 passed / 4 skipped (dev-only specimen) in about 32 s.
 
 ## Code map
 
@@ -47,20 +47,21 @@ Tracked here until resolved; none blocks release.
 
 | Item | Where | Notes |
 |---|---|---|
-| Stale TODO comments (manifest sorting, request-ID derivation, storage limits, readiness, trace envelope) | `domain/studio/{canonical,model,validate}.ts` | All implemented since (manifest.ts, machine.ts, validate.ts budgets, readiness.ts, runner/trace.ts); comments mislead |
-| Superseded logical runner kept alive by its own test | `domain/studio/runner/logical.ts` + test | RV-14b interpreter; production uses the composed `scenario-runner` |
-| Replaced run control kept alive by its own test | `features/runs/ScenarioRunControl.tsx` + test | Replaced by `features/scenarios/ScenarioSwitcher.tsx` in RV-12i |
-| Unused modules | `components/ui/collapsible.tsx`, `features/scenarios/ScenariosPreview.tsx`, barrels `domain/studio/runner/index.ts`, `features/catalog/index.ts` | Not imported by the app, tests or specimen |
-| Unused dependencies | `zustand`; `@radix-ui/react-collapsible` (only the unused primitive) | `npm audit --omit=dev`: 0 vulnerabilities |
-| Group bounds use an estimated card height | `features/workspace/projection.ts` (`ESTIMATED_ELEMENT_NODE_HEIGHT`) | Expanded members can overflow their group frame |
-| Bundle size | main JS 1.64 MB | architecture.md suggests lazy-loading history, merge and results |
-| "Filled" field placeholder (RV-01 residual) | primitives | Needs the Design System board, which isn't on this machine |
+| "Filled" field placeholder (RV-01 residual) | primitives | Needs the Design System board (`System Studio Design System.dc.html`), which isn't on this machine |
 | No automated test for Button `loading` + `asChild` spinner | `components/ui/button.tsx` | Unit config excludes TSX |
+
+Resolved 2026-09-29 (see `ACTION_LOG.md`): stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
 
 Accepted limitations (by design, not debt): router + bridge routes rejected by readiness until the runner supports them; runtime refinement maps one level of ports; the 16E picker is catalog-only (saved parts live in the Library panel); Replace part has no contracted command.
 
+## Code-splitting notes
+
+- `src/lib/lazyComponent.tsx` is the split primitive. Don't use `React.lazy` + Suspense for these boundaries: React 19 throttles Suspense reveals (~300 ms) even for cached chunks, which made opening a project ~830 ms.
+- The main thread must not import the runner: take protocol types with `import type`, keep `InProcessTransport` (tests) in `features/runs/inProcessTransport.ts`, and load `compile`/`scenario-runner` dynamically (publish candidates). A barrel `export *` of a module keeps it in the graph and makes dynamic imports ineffective; the build prints `INEFFECTIVE_DYNAMIC_IMPORT` when that happens.
+- Entry examples come from `features/entry/exampleCatalog.ts` (lazy); `fixtures.ts` stays for tests.
+
 ## Resume
 
-1. Work on `master`. The main checkout was still on `codex/canvas-first-workspace` at consolidation because of an uncommitted `.claude/launch.json`; switch it to `master` once that change is committed or set aside. The old branches `codex/canvas-first-workspace` and `claude/rv-01a-tokens` are fully merged and can be deleted afterwards.
+1. Work on `master` in the main checkout. `claude/rv-01a-tokens` (worktree `.claude/worktrees/rv-01a`) is fully merged; it is kept only because that worktree holds old uncommitted `artifacts/*.png` screenshot changes. Delete both once those are no longer wanted.
 2. Read the invariants above, then the relevant `specs/revamp/` contract before changing domain, runner, persistence or canvas behavior.
 3. Run checks proportional to the change and record the task in `ACTION_LOG.md` (with a `Lesson:` line when something surprised you).

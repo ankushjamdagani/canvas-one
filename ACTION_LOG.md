@@ -1497,3 +1497,15 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: on master: `npx tsc -b`; 1,416 unit tests; production build; isolated production Playwright 77 passed / 4 skipped.
 - **Limitations**: main checkout still on `codex/canvas-first-workspace`; `codex/canvas-first-workspace` and `claude/rv-01a-tokens` kept until it switches. No remote; nothing pushed.
 - **Lesson:** `git branch -d` checks merge status against the current checkout, not the intended target; verify with `git merge-base --is-ancestor <branch> <target>` before `-D`. zsh doesn't word-split unquoted `$VAR`, so loop over `$(...)` output explicitly.
+
+### Debt cleanup, measured group heights, bundle splitting
+
+- **Outcome**: main checkout switched to `master` (`npm ci`); merged `codex/canvas-first-workspace` deleted.
+  - Items 1–4 (`ad416ea`, `6663340`): stale TODOs replaced with pointers; superseded RV-14b `runner/logical.ts` removed after porting its S01 tests to `runScenario`. The port exposed a real bug: an exhausted maxEvents/trace budget ended runs `failed` instead of `incomplete` (run-identity.md, storage.md §6), because callers overwrote the budget stop and five trace-cap sites returned bare errors; fixed. `ScenarioRunControl` removed (tests ported to `ScenarioSwitcher`); unused `collapsible`, `ScenariosPreview`, two barrels, `zustand` and `@radix-ui/react-collapsible` removed.
+  - `caae640`: authoring e2e screenshots moved out of the repo.
+  - Item 5 (`67cff44`): group frames and align/distribute use ReactFlow's measured card heights (estimate only as fallback); e2e proves an expanded member stays inside its group and fails without the fix.
+  - Item 6 (`8b31531`): lazy workspace (idle prefetch), on-demand History/Commit/Publish/scenario editor (idle preload), runner off the main thread, lazy example documents, vendor chunks. Entry path 1,644 kB/442 kB gzip → 702 kB/197 kB; no chunk over 500 kB. Also fixed camelCase classes `border-riskEdge bg-riskTint` (no CSS) on the boot-error card and canvas issues notice.
+- **Files**: runner, runs, entry, workspace, App, `lib/lazyComponent.tsx`, `vite.config.ts`, tests; HANDOFF.
+- **Platform/subagents**: Claude lead, no subagents.
+- **Verification**: 1,420 unit tests; `npx tsc -b`; production build (no size warning); isolated production Playwright 78 passed / 4 skipped in ~32 s (matches the pre-split baseline measured on a temporary worktree: 34 s); project-open timing ~120 ms vs ~130 ms before; responsive sweep 45/45; touch audit 0 under 44 px; `git diff --check` clean. One authoring e2e failure seen once did not reproduce in 40 repeats.
+- **Lesson:** React 19 throttles Suspense reveals (~300 ms) even when a lazy chunk is cached — a first `React.lazy` split doubled e2e time and made project open ~830 ms; measure open latency against a baseline build after code-splitting. Porting a retired module's tests onto its replacement before deleting it found a contract bug the replacement's own tests missed.
