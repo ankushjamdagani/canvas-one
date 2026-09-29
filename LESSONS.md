@@ -36,3 +36,5 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 ## Workflow
 
 - **On long tasks, record status in `ACTION_LOG.md`/`HANDOFF.md` as you go, not only at the end.** A session that runs out of tokens leaves work unrecorded. Why: 2026-09-23 Codex round.
+- **Before deleting a branch, prove it is merged into the intended target with `git merge-base --is-ancestor <branch> <target>` (or `git cherry` for rebased work).** `git branch -d` only checks the current checkout, and this repo has no remote, so a deleted unmerged branch is gone. Why: 2026-09-29 cleanup.
+- **In zsh, unquoted `$VAR` holding several paths is one word; loop over them explicitly.** A multi-file `cp`/`checkout` silently did nothing. Why: 2026-09-29 RV-17 before/after build.
