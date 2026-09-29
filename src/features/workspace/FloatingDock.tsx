@@ -1,384 +1,245 @@
 import * as React from 'react';
 import {
-  MousePointer,
-  Hand,
-  Undo2,
-  Redo2,
-  Minus,
-  Plus,
-  Maximize2,
-  Component as ComponentIcon,
-  Cable,
-  StickyNote,
+  MousePointer, Hand, Undo2, Redo2, Minus, Plus, Maximize2, Library,
+  StickyNote, Group, History, ChartNoAxesCombined, Play, Pause, RotateCcw,
+  MoreHorizontal, ChevronLeft, ChevronRight, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { COMMAND_DEFINITIONS, getAvailability, type Availability, type CommandContext } from './commands/registry';
+import { changeDockConfig, DEFAULT_DOCK_CONFIG, DOCK_COMMAND_IDS, insertDockCommand, type DockCommandId, type DockConfig } from './dockConfig';
+
+const DOCK_DRAG_MIME = 'application/x-system-studio-dock-command';
+
+const ICONS = {
+  'canvas.select-tool': MousePointer, 'canvas.pan-tool': Hand, 'library.open': Library,
+  'canvas.add-note': StickyNote, 'selection.group': Group, 'edit.undo': Undo2,
+  'edit.redo': Redo2, 'canvas.zoom-out': Minus, 'canvas.zoom-in': Plus,
+  'canvas.fit': Maximize2, 'history.open': History,
+  'results.open': ChartNoAxesCombined, 'run.start': Play, 'run.pause': Pause,
+  'run.resume': Play, 'run.reset': RotateCcw,
+} satisfies Record<DockCommandId, React.ComponentType<{ className?: string }>>;
+
+const TEST_IDS: Partial<Record<DockCommandId, string>> = {
+  'canvas.select-tool': 'dock-select-btn', 'canvas.pan-tool': 'dock-pan-btn',
+  'library.open': 'dock-component-btn', 'canvas.add-note': 'dock-note-btn',
+  'edit.undo': 'dock-undo-btn', 'edit.redo': 'dock-redo-btn',
+  'canvas.zoom-out': 'dock-zoom-out-btn', 'canvas.zoom-in': 'dock-zoom-in-btn',
+  'canvas.fit': 'dock-fit-view-btn',
+};
 
 export interface FloatingDockProps {
-  dragMode: 'select' | 'pan' | 'connect';
-  onSetDragMode: (mode: 'select' | 'pan' | 'connect') => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onFitView: () => void;
-  /** Live zoom factor (1 = 100%), from useViewport(). */
-  zoom: number;
-  /** library.open (D38 "Component"): toggles the 16E picker anchored above the dock. */
-  onToggleComponentPicker: () => void;
-  componentPickerOpen: boolean;
-  /** canvas.add-note through Workspace's command registry executor. */
-  onAddNote: (text: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
-  /** True while the session is saving -- placing/connecting is disabled, not silently dropped. */
-  disabled?: boolean;
+  readonly dragMode: 'select' | 'pan';
+  readonly zoom: number;
+  readonly context: CommandContext;
+  readonly config: DockConfig;
+  readonly preferenceState: 'loading' | 'ready' | 'saving' | 'failed';
+  readonly onInvoke: (id: DockCommandId) => void;
+  readonly onConfigure: (config: DockConfig) => void;
+  readonly onRestoreDefaults: () => void;
+  readonly onAddNote: (text: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
+  readonly onGroup: (label: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
 }
 
-/**
- * 16A "Resting dock" (D38).
- *
- * D38 dock inventory is: undo, redo, Select, Pan, Component, Connect, Note,
- * More, zoom out, zoom %, zoom in, fit. Component (library.open) and Connect
- * (canvas.connect-tool) are wired here per RV-12e now that D39/D42's standard
- * catalog contract has landed. Note routes through canvas.add-note. The
- * uncontracted "More" overflow stays absent. Run/History live only in the top
- * bar (22A) per D38, not in this dock.
- */
-export function FloatingDock({
-  dragMode,
-  onSetDragMode,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
-  onZoomIn,
-  onZoomOut,
-  onFitView,
-  zoom,
-  onToggleComponentPicker,
-  componentPickerOpen,
-  onAddNote,
-  disabled,
-}: FloatingDockProps) {
-  const zoomPercent = Math.round(zoom * 100);
-  const [noteOpen, setNoteOpen] = React.useState(false);
-  const [noteText, setNoteText] = React.useState('');
-  const [noteError, setNoteError] = React.useState<string | null>(null);
+function availability(id: DockCommandId, context: CommandContext): Availability {
+  if (id === 'run.start') return getAvailability(id, context, { scenarioId: context.selectedScenario?.id ?? '' });
+  if (id === 'canvas.add-note') return getAvailability(id, context, { text: '' });
+  if (id === 'selection.group') return getAvailability(id, context, { label: '' });
+  return getAvailability(id, context, {});
+}
 
-  async function submitNote() {
-    const text = noteText.trim();
-    if (!text || disabled) return;
-    setNoteError(null);
-    const outcome = await onAddNote(text);
-    if (outcome.ok) {
-      setNoteOpen(false);
-      setNoteText('');
+/** The same command view is used in the dock and its narrow-screen overflow. */
+export function FloatingDock({ dragMode, zoom, context, config, preferenceState, onInvoke,
+  onConfigure, onRestoreDefaults, onAddNote, onGroup }: FloatingDockProps) {
+  const [moreOpen, setMoreOpen] = React.useState(false);
+  const [customizing, setCustomizing] = React.useState(false);
+  const [textAction, setTextAction] = React.useState<'canvas.add-note' | 'selection.group' | null>(null);
+  const [textValue, setTextValue] = React.useState('');
+  const [textError, setTextError] = React.useState<string | null>(null);
+  const [dropTarget, setDropTarget] = React.useState<DockCommandId | 'dock' | null>(null);
+  const [narrow, setNarrow] = React.useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
+  React.useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)');
+    const sync = () => setNarrow(query.matches);
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+  const zoomPercent = Math.round(zoom * 100);
+
+  function invoke(id: DockCommandId) {
+    if (id === 'canvas.add-note' || id === 'selection.group') {
+      setMoreOpen(false);
+      setTextAction(id);
+      setTextValue('');
+      setTextError(null);
     } else {
-      setNoteError(outcome.message);
+      setMoreOpen(false);
+      onInvoke(id);
     }
   }
 
+  async function submitText() {
+    const text = textValue.trim();
+    if (!text || !textAction) return;
+    const outcome = textAction === 'canvas.add-note' ? await onAddNote(text) : await onGroup(text);
+    if (outcome.ok) {
+      setTextAction(null);
+      setTextValue('');
+      setTextError(null);
+    } else setTextError(outcome.message);
+  }
+
+  function commandButton(id: DockCommandId, compact = false) {
+    const def = COMMAND_DEFINITIONS[id];
+    const state = availability(id, context);
+    const Icon = ICONS[id];
+    const active = (id === 'canvas.select-tool' && dragMode === 'select') ||
+      (id === 'canvas.pan-tool' && dragMode === 'pan');
+    return (
+      <Button key={id} type="button" variant={active ? 'tint' : 'ghost'}
+        size={compact ? 'sm' : 'icon'}
+        data-testid={compact ? `dock-overflow-${id}` : (TEST_IDS[id] ?? `dock-${id}`)}
+        className={cn('shrink-0 gap-2', compact ? 'w-full justify-start min-h-11 h-auto py-1 text-xs' : 'size-11 md:size-8')}
+        aria-label={def.label} aria-pressed={active || undefined}
+        aria-description={state.enabled ? undefined : state.reason}
+        title={state.enabled ? def.label : state.reason}
+        disabled={!state.enabled}
+        onClick={() => invoke(id)}>
+        <Icon className="size-4" aria-hidden="true" />
+        {compact && <span className="flex flex-col items-start text-left">
+          <span>{def.label}</span>
+          {!state.enabled && <span className="text-[10px] text-secondary-text">{state.reason}</span>}
+        </span>}
+      </Button>
+    );
+  }
+
+  const pinned = new Set<DockCommandId>(['canvas.select-tool', 'canvas.pan-tool', 'library.open']);
+  const mobileVisible = config.orderedCommandIds.filter((id) => pinned.has(id));
+  const mobileOverflow = config.orderedCommandIds.filter((id) => !pinned.has(id));
+  const canEdit = preferenceState !== 'loading' && preferenceState !== 'saving';
+
+  function draggedCommand(event: React.DragEvent): DockCommandId | null {
+    const id = event.dataTransfer.getData(DOCK_DRAG_MIME);
+    return DOCK_COMMAND_IDS.find((candidate) => candidate === id) ?? null;
+  }
+
+  function acceptDrop(event: React.DragEvent, beforeId?: DockCommandId) {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropTarget(null);
+    const id = draggedCommand(event);
+    if (!canEdit || !id) return;
+    const next = insertDockCommand(config, id, beforeId);
+    if (next !== config) onConfigure(next);
+  }
+
   return (
-    <TooltipProvider delayDuration={250}>
-      <div
-        data-testid="canvas-floating-dock"
-        className={cn(
-          'absolute bottom-3 sm:bottom-6 z-dock',
-          'left-1/2 -translate-x-1/2',
-          'flex flex-wrap sm:flex-nowrap sm:w-max justify-center items-center gap-1 max-w-[calc(100vw-32px)] sm:max-w-none',
-          'rounded-dock border border-border bg-panel px-1.5 py-1',
-          'shadow-floating',
-          'select-none pointer-events-auto',
-        )}
-        role="toolbar"
-        aria-label="Canvas controls"
-      >
-        {/* Undo / Redo */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-undo-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-11 sm:size-8 text-body hover:text-foreground disabled:text-secondary-text"
-                aria-label="Undo"
-                disabled={!canUndo}
-                onClick={onUndo}
-              >
-                <Undo2 className="size-4 stroke-current" />
-                <span className="sr-only">Undo</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Undo (Mod+Z)</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-redo-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-11 sm:size-8 text-body hover:text-foreground disabled:text-secondary-text"
-                aria-label="Redo"
-                disabled={!canRedo}
-                onClick={onRedo}
-              >
-                <Redo2 className="size-4 stroke-current" />
-                <span className="sr-only">Redo</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Redo (Mod+Shift+Z)</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
-
-        {/* Select / Pan tool modes, labelled per 16A */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-select-btn"
-                type="button"
-                variant={dragMode === 'select' ? 'tint' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
-                  dragMode === 'select'
-                    ? 'text-primary'
-                    : 'text-body hover:text-foreground',
-                )}
-                aria-label="Select tool"
-                aria-pressed={dragMode === 'select'}
-                onClick={() => onSetDragMode('select')}
-              >
-                <MousePointer className="size-4 stroke-current" />
-                <span className="hidden sm:inline">Select</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Select tool</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-pan-btn"
-                type="button"
-                variant={dragMode === 'pan' ? 'tint' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
-                  dragMode === 'pan'
-                    ? 'text-primary'
-                    : 'text-body hover:text-foreground',
-                )}
-                aria-label="Pan tool"
-                aria-pressed={dragMode === 'pan'}
-                onClick={() => onSetDragMode('pan')}
-              >
-                <Hand className="size-4 stroke-current" />
-                <span className="hidden sm:inline">Pan</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Pan tool</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
-
-        {/* Component (library.open) / Connect (canvas.connect-tool), D38 order */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-component-btn"
-                type="button"
-                variant={componentPickerOpen ? 'tint' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
-                  componentPickerOpen ? 'text-primary' : 'text-body hover:text-foreground',
-                )}
-                aria-label="Component"
-                aria-pressed={componentPickerOpen}
-                disabled={disabled}
-                onClick={onToggleComponentPicker}
-              >
-                <ComponentIcon className="size-4 stroke-current" />
-                <span className="hidden sm:inline">Component</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Add a component</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-connect-btn"
-                type="button"
-                variant={dragMode === 'connect' ? 'tint' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
-                  dragMode === 'connect' ? 'text-primary' : 'text-body hover:text-foreground',
-                )}
-                aria-label="Connect tool"
-                aria-pressed={dragMode === 'connect'}
-                disabled={disabled}
-                onClick={() => onSetDragMode(dragMode === 'connect' ? 'select' : 'connect')}
-              >
-                <Cable className="size-4 stroke-current" />
-                <span className="hidden sm:inline">Connect</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Connect tool</TooltipContent>
-          </Tooltip>
-
-          <Popover
-            open={noteOpen}
-            onOpenChange={(open) => {
-              setNoteOpen(open);
-              if (!open) setNoteError(null);
-            }}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverTrigger asChild>
-                  <Button
-                    data-testid="dock-note-btn"
-                    type="button"
-                    variant={noteOpen ? 'tint' : 'ghost'}
-                    size="sm"
-                    className={cn(
-                      'h-11 sm:h-8 px-2 gap-1.5 text-xs font-medium',
-                      noteOpen ? 'text-primary' : 'text-body hover:text-foreground',
-                    )}
-                    aria-label="Note"
-                    aria-pressed={noteOpen}
-                    disabled={disabled}
-                  >
-                    <StickyNote className="size-4 stroke-current" />
-                    <span className="hidden sm:inline">Note</span>
-                  </Button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="top">Add a note</TooltipContent>
-            </Tooltip>
-            <PopoverContent side="top" align="center" className="w-72 p-3">
-              <form
-                data-testid="dock-note-popover"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void submitNote();
-                }}
-              >
-                <label htmlFor="dock-note-text" className="block text-xs font-medium text-ink mb-1.5">
-                  Note text
-                </label>
-                <Input
-                  id="dock-note-text"
-                  data-testid="dock-note-input"
-                  autoFocus
-                  value={noteText}
-                  placeholder="Write a note…"
-                  disabled={disabled}
-                  onChange={(event) => {
-                    setNoteText(event.target.value);
-                    setNoteError(null);
-                  }}
-                />
-                {noteError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{noteError}</p>}
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="font-mono text-[10px] text-secondary-text">↵ add · esc cancel</span>
-                  <Button type="submit" size="sm" variant="tint" disabled={!noteText.trim() || disabled}>
-                    Add note
-                  </Button>
-                </div>
-              </form>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <Separator orientation="vertical" className="shrink-0 h-[22px] bg-border mx-0.5" />
-
-        {/* Zoom controls: out, live %, in, fit */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-zoom-out-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-11 sm:size-8 text-body hover:text-foreground"
-                aria-label="Zoom out"
-                onClick={onZoomOut}
-              >
-                <Minus className="size-4" />
-                <span className="sr-only">Zoom out</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Zoom out (1.2x)</TooltipContent>
-          </Tooltip>
-
-          <span
-            data-testid="dock-zoom-value"
-            className="text-xs font-mono text-secondary-text w-11 text-center select-none tabular-nums"
-            aria-live="polite"
-          >
-            {zoomPercent}%
-          </span>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-zoom-in-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-11 sm:size-8 text-body hover:text-foreground"
-                aria-label="Zoom in"
-                onClick={onZoomIn}
-              >
-                <Plus className="size-4" />
-                <span className="sr-only">Zoom in</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Zoom in (1.2x)</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="dock-fit-view-btn"
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-11 sm:size-8 text-body hover:text-foreground"
-                aria-label="Fit view"
-                onClick={onFitView}
-              >
-                <Maximize2 className="size-4" />
-                <span className="sr-only">Fit view</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Fit view (padding 32px)</TooltipContent>
-          </Tooltip>
-        </div>
+    <div data-testid="canvas-floating-dock" role="toolbar" aria-label="Canvas controls"
+      className={cn('absolute bottom-3 md:bottom-6 left-1/2 -translate-x-1/2 z-dock flex items-center gap-1 max-w-[calc(100vw-24px)] rounded-dock border border-border bg-panel p-1 shadow-floating pointer-events-auto',
+        dropTarget === 'dock' && 'ring-2 ring-primary')}
+      onDragOver={(event) => {
+        if (!canEdit || !event.dataTransfer.types.includes(DOCK_DRAG_MIME)) return;
+        event.preventDefault();
+        setDropTarget('dock');
+      }}
+      onDragLeave={() => setDropTarget(null)}
+      onDrop={(event) => acceptDrop(event)}>
+      <div className="flex items-center gap-0.5 overflow-x-auto max-w-[calc(100vw-140px)]">
+        {(narrow ? mobileVisible : config.orderedCommandIds).map((id) => commandButton(id))}
       </div>
-    </TooltipProvider>
+      <span data-testid="dock-zoom-value" aria-live="polite"
+        className="inline-block w-11 text-center font-mono text-xs tabular-nums text-secondary-text">
+        {zoomPercent}%
+      </span>
+      <Popover open={moreOpen} onOpenChange={(open) => { setMoreOpen(open); if (!open) setCustomizing(false); }}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant={moreOpen ? 'tint' : 'ghost'} size="icon"
+            data-testid="dock-more-btn" aria-label="More dock actions" aria-expanded={moreOpen}
+            className="size-11 md:size-8 shrink-0"><MoreHorizontal className="size-4" /></Button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="end" className="w-[min(360px,calc(100vw-24px))] max-h-[min(70vh,560px)] overflow-y-auto p-2"
+          onCloseAutoFocus={(event) => { if (textAction) event.preventDefault(); }}>
+          {customizing ? (
+            <div data-testid="dock-customize-tray">
+              <div className="flex items-center justify-between px-1 pb-2 border-b border-border">
+                <span className="text-xs font-semibold">Customize dock</span>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setCustomizing(false)}>Done</Button>
+              </div>
+              <p className="px-1 pt-2 text-[11px] text-secondary-text">Use the controls to order or hide commands.</p>
+              <ul className="space-y-1 mt-2" aria-label="Dock commands">
+                {config.orderedCommandIds.map((id, index) => (
+                  <li key={id} draggable={canEdit} data-testid={`dock-customize-${id}`}
+                    className={cn('flex items-center gap-1 rounded-control bg-sunken px-2 py-1', dropTarget === id && 'ring-2 ring-primary')}
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(DOCK_DRAG_MIME, id); }}
+                    onDragEnd={() => setDropTarget(null)}
+                    onDragOver={(event) => {
+                      if (!canEdit || !event.dataTransfer.types.includes(DOCK_DRAG_MIME)) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setDropTarget(id);
+                    }}
+                    onDrop={(event) => acceptDrop(event, id)}>
+                    <span className="flex-1 min-w-0 truncate text-xs">{COMMAND_DEFINITIONS[id].label}</span>
+                    <Button type="button" size="icon" variant="ghost" className="size-11 md:size-8" aria-label={`Move ${COMMAND_DEFINITIONS[id].label} left`}
+                      disabled={!canEdit || index === 0} onClick={() => onConfigure(changeDockConfig(config, id, 'left'))}><ChevronLeft className="size-4" /></Button>
+                    <Button type="button" size="icon" variant="ghost" className="size-11 md:size-8" aria-label={`Move ${COMMAND_DEFINITIONS[id].label} right`}
+                      disabled={!canEdit || index === config.orderedCommandIds.length - 1} onClick={() => onConfigure(changeDockConfig(config, id, 'right'))}><ChevronRight className="size-4" /></Button>
+                    <Button type="button" size="icon" variant="ghost" className="size-11 md:size-8" aria-label={`Hide ${COMMAND_DEFINITIONS[id].label}`}
+                      disabled={!canEdit} onClick={() => onConfigure(changeDockConfig(config, id, 'hide'))}><X className="size-4" /></Button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 border-t border-border pt-2">
+                <div className="px-1 text-[11px] font-semibold text-secondary-text">Available commands</div>
+                {config.hiddenCommandIds.map((id) => (
+                  <div key={id} draggable={canEdit} className="flex items-center gap-2 px-1 py-1"
+                    data-testid={`dock-available-${id}`}
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(DOCK_DRAG_MIME, id); }}
+                    onDragEnd={() => setDropTarget(null)}>
+                    <span className="flex-1 text-xs">{COMMAND_DEFINITIONS[id].label}</span>
+                    <Button type="button" size="sm" variant="ghost" className="h-11 md:h-8" aria-label={`Show ${COMMAND_DEFINITIONS[id].label}`}
+                      disabled={!canEdit || config.orderedCommandIds.length >= 16}
+                      onClick={() => onConfigure(changeDockConfig(config, id, 'show'))}>Add</Button>
+                  </div>
+                ))}
+              </div>
+              <Button type="button" size="sm" variant="ghost" className="mt-2 w-full"
+                disabled={!canEdit || JSON.stringify(config) === JSON.stringify(DEFAULT_DOCK_CONFIG)}
+                onClick={onRestoreDefaults}>Restore defaults</Button>
+              {preferenceState === 'failed' && <p role="alert" className="text-xs text-risk-text">Dock changes could not be saved.</p>}
+            </div>
+          ) : (
+            <div data-testid="dock-more-popover">
+              <div className="hidden md:block px-2 pb-1 text-[11px] font-semibold text-secondary-text">Dock actions</div>
+              {narrow && <div className="space-y-0.5">{mobileOverflow.map((id) => commandButton(id, true))}</div>}
+              <Button type="button" variant="ghost" size="sm" className="w-full justify-start text-xs"
+                onClick={() => setCustomizing(true)}>Customize dock…</Button>
+              <Button type="button" variant="ghost" size="sm" className="w-full justify-start text-xs"
+                disabled={!canEdit}
+                onClick={() => { setMoreOpen(false); onRestoreDefaults(); }}>Restore defaults</Button>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
+      <Popover open={textAction !== null} onOpenChange={(open) => { if (!open) setTextAction(null); }}>
+        <PopoverAnchor asChild><span className="absolute left-1/2 top-0" /></PopoverAnchor>
+        <PopoverContent side="top" align="center" className="w-72 p-3" data-testid={textAction === 'canvas.add-note' ? 'dock-note-popover' : 'dock-group-popover'}>
+          <form onSubmit={(event) => { event.preventDefault(); void submitText(); }}>
+            <label htmlFor="dock-text-input" className="block text-xs font-medium mb-1.5">
+              {textAction === 'canvas.add-note' ? 'Note text' : 'Group name'}
+            </label>
+            <Input id="dock-text-input" data-testid={textAction === 'canvas.add-note' ? 'dock-note-input' : 'dock-group-input'}
+              autoFocus value={textValue} onChange={(event) => { setTextValue(event.target.value); setTextError(null); }} />
+            {textError && <p role="alert" className="mt-1 text-xs text-risk-text">{textError}</p>}
+            <div className="mt-2 flex justify-end"><Button type="submit" size="sm" disabled={!textValue.trim()}>
+              {textAction === 'canvas.add-note' ? 'Add note' : 'Group'}
+            </Button></div>
+          </form>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

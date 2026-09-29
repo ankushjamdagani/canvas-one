@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PreferenceRecord, SavePreferencesResult } from '../../persistence/studio/types';
 import { createInitialPanelState, type WorkspacePanelPreferences } from './panels';
+import { DEFAULT_DOCK_CONFIG, changeDockConfig } from './dockConfig';
 import {
   hydratePanelState,
   isLatestPanelPreferenceRequest,
@@ -34,6 +35,47 @@ function preferenceRecord(revision: number, value: unknown): PreferenceRecord {
 }
 
 describe('workspace panel preferences', () => {
+  it('serializes dock and panel writes through one revision without losing either', async () => {
+    let record: PreferenceRecord | null = preferenceRecord(1, { cameras: [] });
+    const repository = {
+      loadPreferences: async () => structuredClone(record),
+      savePreferences: async (expectedRevision: number, value: unknown): Promise<SavePreferencesResult> => {
+        expect(expectedRevision).toBe(record?.revision);
+        record = preferenceRecord(expectedRevision + 1, value);
+        return { status: 'applied', revision: expectedRevision + 1, value };
+      },
+    };
+    const store = new WorkspacePanelPreferenceStore(repository);
+    await store.load();
+    const dock = changeDockConfig(DEFAULT_DOCK_CONFIG, 'history.open', 'show');
+    const [dockResult, panelResult] = await Promise.all([store.saveDock(dock), store.save(savedPanels)]);
+    expect(dockResult.status).toBe('applied');
+    expect(panelResult.status).toBe('applied');
+    expect(record?.value).toMatchObject({ dock, panels: savedPanels.panels, sideWidths: savedPanels.sideWidths, cameras: [] });
+  });
+
+  it('adopts another tab’s dock layout on stale and discards queued changes', async () => {
+    const remoteDock = changeDockConfig(DEFAULT_DOCK_CONFIG, 'history.open', 'show');
+    let record: PreferenceRecord | null = preferenceRecord(4, { dock: DEFAULT_DOCK_CONFIG, ...savedPanels });
+    let saves = 0;
+    const repository = {
+      loadPreferences: async () => structuredClone(record),
+      savePreferences: async (): Promise<SavePreferencesResult> => {
+        saves += 1;
+        record = preferenceRecord(5, { dock: remoteDock, ...savedPanels });
+        return { status: 'stale', scope: 'preferences', expected: 4, actual: 5 };
+      },
+    };
+    const store = new WorkspacePanelPreferenceStore(repository);
+    await store.load();
+    const first = store.saveDock(changeDockConfig(DEFAULT_DOCK_CONFIG, 'canvas.add-note', 'hide'));
+    const queued = store.saveDock(changeDockConfig(DEFAULT_DOCK_CONFIG, 'canvas.fit', 'hide'));
+    await expect(first).resolves.toEqual({ status: 'stale', dock: remoteDock, preferences: savedPanels });
+    store.acknowledgeCurrentDisplayed();
+    await expect(queued).resolves.toEqual({ status: 'superseded' });
+    expect(store.currentDock()).toEqual(remoteDock);
+    expect(saves).toBe(1);
+  });
   it('accepts the contracted panel fields and rejects incomplete or out-of-range values', () => {
     expect(readWorkspacePanelPreferences(savedPanels)).toEqual(savedPanels);
     expect(readWorkspacePanelPreferences({ panels: savedPanels.panels })).toBeNull();

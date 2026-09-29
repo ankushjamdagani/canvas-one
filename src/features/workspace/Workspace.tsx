@@ -89,9 +89,12 @@ import {
   runGlobalShortcut,
   type CommandContext,
   type CommandHandlers,
+  type CommandId,
+  type CommandPayloads,
   type QuickOption,
 } from './commands/registry';
 import { QuickOptionsDialog, type RenameOutcome } from './QuickOptions';
+import { DEFAULT_DOCK_CONFIG, type DockConfig } from './dockConfig';
 import { findRunAllDisabledReason } from '../runs';
 import type { SessionRenameResult } from '../session/types';
 import {
@@ -102,7 +105,6 @@ import {
   planUngroup,
   type SelectionPlan,
 } from './selectionPlans';
-import type { CanvasCommandExecutor } from './SelectionToolbar';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -939,10 +941,11 @@ export function Workspace({
     return labels;
   }, [runningOrSelectedScenario]);
 
-  // RV-12d review round 1: with no scenario selected/running at all (blank
-  // project) there is nothing to show, so ResultsRegion isn't rendered and no
-  // placeholder mode is invented for its now-required scenarioMode prop.
-  const showResultsRegion = runningOrSelectedScenario !== null;
+  // Results are normally contextual to a scenario. The explicit results.open
+  // command can also reveal an honest empty state in a blank project.
+  const [resultsRequested, setResultsRequested] = React.useState(false);
+  const resultsRegionRef = React.useRef<HTMLDivElement>(null);
+  const showResultsRegion = runningOrSelectedScenario !== null || resultsRequested;
 
   const staleRun = Boolean(
     runControllerState?.current?.terminal &&
@@ -1080,6 +1083,44 @@ export function Workspace({
   const [panelPreferenceStore] = React.useState(
     () => new WorkspacePanelPreferenceStore(repository),
   );
+  const [dockConfig, setDockConfig] = React.useState<DockConfig>(DEFAULT_DOCK_CONFIG);
+  const durableDockRef = React.useRef<DockConfig>(DEFAULT_DOCK_CONFIG);
+  const [dockPreferenceState, setDockPreferenceState] = React.useState<'loading' | 'ready' | 'saving' | 'failed'>('loading');
+
+  const persistDockConfig = React.useCallback((requested: DockConfig) => {
+    if (!panelPreferencesLoadedRef.current) return;
+    setDockConfig(requested);
+    setDockPreferenceState('saving');
+    void panelPreferenceStore.saveDock(requested).then((result) => {
+      if (!panelPreferenceMountedRef.current) return;
+      if (result.status === 'applied') {
+        durableDockRef.current = requested;
+        setDockPreferenceState('ready');
+      } else if (result.status === 'stale') {
+        durableDockRef.current = result.dock;
+        setDockConfig(result.dock);
+        if (result.preferences) {
+          durablePanelPreferencesRef.current = result.preferences;
+          const hydrated = hydratePanelState(panelStateRef.current, result.preferences);
+          panelStateRef.current = hydrated;
+          setPanelState(hydrated);
+        }
+        panelPreferenceStore.acknowledgeCurrentDisplayed();
+        setDockPreferenceState('ready');
+      } else if (result.status === 'superseded') {
+        setDockConfig(durableDockRef.current);
+        setDockPreferenceState('ready');
+      } else {
+        setDockConfig(durableDockRef.current);
+        setDockPreferenceState('failed');
+      }
+    }).catch((error: unknown) => {
+      if (!panelPreferenceMountedRef.current) return;
+      console.error('Failed to save dock preferences:', error);
+      setDockConfig(durableDockRef.current);
+      setDockPreferenceState('failed');
+    });
+  }, [panelPreferenceStore]);
 
   const persistPanelState = React.useCallback(
     (state: WorkspacePanelState) => {
@@ -1096,6 +1137,8 @@ export function Workspace({
             durablePanelPreferencesRef.current = requested;
             panelPreferenceFailedRef.current = false;
           } else if (result.status === 'stale') {
+            durableDockRef.current = panelPreferenceStore.currentDock();
+            setDockConfig(durableDockRef.current);
             const durable = result.preferences ?? initialPanelPreferencesRef.current;
             durablePanelPreferencesRef.current = durable;
             const hydrated = hydratePanelState(panelStateRef.current, durable);
@@ -1191,12 +1234,16 @@ export function Workspace({
           panelStateRef.current = hydrated;
           setPanelState(hydrated);
         }
+        durableDockRef.current = loaded.dock;
+        setDockConfig(loaded.dock);
+        setDockPreferenceState('ready');
         setPanelPreferenceState('ready');
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         panelPreferenceFailedRef.current = true;
         setPanelPreferenceState('failed');
+        setDockPreferenceState('failed');
         console.error('Failed to load panel preferences:', error);
       })
       .finally(() => {
@@ -1588,6 +1635,17 @@ export function Workspace({
       'run.reset': () => handleResetRun(),
       'history.open': () => openHistoryPanel(),
       'library.open': () => openLibraryPanel(),
+      'results.open': () => {
+        setResultsRequested(true);
+        requestAnimationFrame(() => resultsRegionRef.current?.focus());
+      },
+      'canvas.select-tool': () => canvasViewRef.current?.setToolMode('select'),
+      'canvas.pan-tool': () => canvasViewRef.current?.setToolMode('pan'),
+      'canvas.zoom-out': () => canvasViewRef.current?.zoomOut(),
+      'canvas.zoom-in': () => canvasViewRef.current?.zoomIn(),
+      'canvas.fit': () => canvasViewRef.current?.fitView(),
+      'dock.configure': (config) => persistDockConfig(config),
+      'dock.restore-defaults': () => persistDockConfig(DEFAULT_DOCK_CONFIG),
       'export.png': () => transferActions.exportPng(),
       'export.svg': () => transferActions.exportSvg(),
       'project.export-json': () => transferActions.exportJson(),
@@ -1637,6 +1695,7 @@ export function Workspace({
       mintId,
       openHistoryPanel,
       openLibraryPanel,
+      persistDockConfig,
       runController,
       transferActions,
     ],
@@ -1684,8 +1743,8 @@ export function Workspace({
     return availability.enabled ? null : availability.reason;
   }, [commandContext]);
 
-  const executeCanvasCommand = React.useCallback<CanvasCommandExecutor>(
-    (id, payload) => executeCommand(id, payload, commandContext, commandHandlers),
+  const executeCanvasCommand = React.useCallback(
+    <K extends CommandId>(id: K, payload: CommandPayloads[K]) => executeCommand(id, payload, commandContext, commandHandlers),
     [commandContext, commandHandlers],
   );
 
@@ -1783,6 +1842,7 @@ export function Workspace({
     <div
       data-testid="workspace-root"
       data-panel-preference-state={panelPreferenceState}
+      data-dock-preference-state={dockPreferenceState}
       className="flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none"
     >
       {/* Top Bar (22A nav live) */}
@@ -1860,7 +1920,10 @@ export function Workspace({
                     onApplyChanges={handleApplyChanges}
                     commandContext={commandContext}
                     onExecuteCommand={executeCanvasCommand}
-                    onOpenFullLibrary={openLibraryPanel}
+                    dockConfig={dockConfig}
+                    dockPreferenceState={dockPreferenceState}
+                    onConfigureDock={(config) => void executeCommand('dock.configure', config, commandContext, commandHandlers)}
+                    onRestoreDockDefaults={() => void executeCommand('dock.restore-defaults', {}, commandContext, commandHandlers)}
                   />
 
                   {/* 22E draft behind main: a real conflict count from
@@ -1898,10 +1961,10 @@ export function Workspace({
             </div>
           )}
 
-          {/* Results region (RV-12d): below the canvas, not floating. Not
-              rendered at all with no scenario selected and no run (blank
-              project) -- the canvas above takes the full height instead. */}
-          {showResultsRegion && runningOrSelectedScenario && (
+          {/* Results region sits below the canvas; explicit open can show its empty state. */}
+          {showResultsRegion && (
+            <div ref={resultsRegionRef} tabIndex={-1} aria-label="Results" className="outline-none">
+            {runningOrSelectedScenario ? (
             <ResultsRegion
               scenarioName={runningOrSelectedScenario.label}
               scenarioMode={runningOrSelectedScenario.mode}
@@ -1915,6 +1978,8 @@ export function Workspace({
               assertionLabels={assertionLabels}
               staleRun={staleRun}
             />
+            ) : <section data-testid="results-empty" role="region" aria-label="Results" className="border-t border-border bg-panel p-4 text-sm text-secondary-text">No run selected yet.</section>}
+            </div>
           )}
         </main>
 

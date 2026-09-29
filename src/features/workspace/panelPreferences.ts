@@ -10,12 +10,14 @@ import {
   type WorkspacePanelPreferences,
   type WorkspacePanelState,
 } from './panels';
+import { DEFAULT_DOCK_CONFIG, readDockConfig, type DockConfig } from './dockConfig';
 
 type PreferenceValue = Readonly<Record<string, unknown>>;
 
 export type PanelPreferenceLoad = {
   readonly revision: number;
   readonly preferences: WorkspacePanelPreferences | null;
+  readonly dock: DockConfig;
 };
 
 export type PanelPreferenceSave =
@@ -28,6 +30,12 @@ export type PanelPreferenceSave =
     }
   | { readonly status: 'superseded' }
   | { readonly status: 'invalid-stored-value' };
+
+export type DockPreferenceSave =
+  | { readonly status: 'applied'; readonly revision: number }
+  | { readonly status: 'stale'; readonly dock: DockConfig; readonly preferences: WorkspacePanelPreferences | null }
+  | { readonly status: 'failed' | 'invalid-stored-value'; readonly dock: DockConfig }
+  | { readonly status: 'superseded' };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -137,6 +145,7 @@ export class WorkspacePanelPreferenceStore {
   private revision = 0;
   private value: unknown = null;
   private durablePreferences: WorkspacePanelPreferences | null = null;
+  private durableDock: DockConfig = DEFAULT_DOCK_CONFIG;
   private loaded = false;
   private loadPromise: Promise<PanelPreferenceLoad> | null = null;
   private queue: Promise<void> = Promise.resolve();
@@ -161,6 +170,43 @@ export class WorkspacePanelPreferenceStore {
     if (!this.conflictPendingDisplay) return;
     this.discardThrough = this.sequence;
     this.conflictPendingDisplay = false;
+  }
+
+  currentDock(): DockConfig { return this.durableDock; }
+
+  /** Dock and panels share one CAS queue and revision, so local edits compose. */
+  saveDock(dock: DockConfig): Promise<DockPreferenceSave> {
+    const sequence = ++this.sequence;
+    const requested = readDockConfig(dock);
+    if (!requested) return Promise.resolve({ status: 'invalid-stored-value', dock: this.durableDock });
+    const task = this.queue.then(async (): Promise<DockPreferenceSave> => {
+      const wasLoaded = this.loaded;
+      const loaded = await this.load();
+      if (!wasLoaded) {
+        this.conflictPendingDisplay = true;
+        return { status: 'stale', dock: loaded.dock, preferences: loaded.preferences };
+      }
+      if (this.conflictPendingDisplay || sequence <= this.discardThrough) return { status: 'superseded' };
+      if (this.value !== null && !isRecord(this.value)) {
+        return { status: 'invalid-stored-value', dock: this.durableDock };
+      }
+      const nextValue = { ...(this.value ?? {}), dock: structuredClone(requested) };
+      const result = await this.repository.savePreferences(this.revision, nextValue);
+      if (result.status === 'applied') {
+        this.revision = result.revision;
+        this.value = nextValue;
+        this.durableDock = requested;
+        return { status: 'applied', revision: result.revision };
+      }
+      if (result.status === 'stale') {
+        this.conflictPendingDisplay = true;
+        const current = await this.readCurrent();
+        return { status: 'stale', dock: current.dock, preferences: current.preferences };
+      }
+      return { status: 'failed', dock: this.durableDock };
+    });
+    this.queue = task.then(() => undefined, () => undefined);
+    return task;
   }
 
   save(preferences: WorkspacePanelPreferences): Promise<PanelPreferenceSave> {
@@ -210,9 +256,13 @@ export class WorkspacePanelPreferenceStore {
     this.revision = record?.revision ?? 0;
     this.value = record ? structuredClone(record.value) : null;
     this.durablePreferences = readWorkspacePanelPreferences(record?.value);
+    this.durableDock = isRecord(record?.value)
+      ? readDockConfig(record.value.dock) ?? DEFAULT_DOCK_CONFIG
+      : DEFAULT_DOCK_CONFIG;
     return {
       revision: this.revision,
       preferences: this.durablePreferences,
+      dock: this.durableDock,
     };
   }
 }

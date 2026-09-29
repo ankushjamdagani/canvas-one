@@ -39,13 +39,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { InspectorTargetKind } from '../inspector';
-import { LibraryPicker } from '../library';
 import { CATALOG_ENTRY_MIME_TYPE } from '../library/types';
 import { getEntry } from '../catalog/catalog';
 import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
-import { SelectionToolbar, type CanvasCommandExecutor } from './SelectionToolbar';
-import type { CommandContext } from './commands/registry';
+import { SelectionToolbar } from './SelectionToolbar';
+import type { CommandContext, CommandId, CommandPayloads, ExecuteResult } from './commands/registry';
+import type { DockCommandId, DockConfig } from './dockConfig';
 
 export type CanvasSelectionRequest = {
   readonly kind: InspectorTargetKind;
@@ -63,7 +63,7 @@ const edgeTypes = {
   traffic: TrafficEdge,
 };
 
-type DragMode = 'select' | 'pan' | 'connect';
+type DragMode = 'select' | 'pan';
 
 type RejectMessage = { readonly text: string; readonly x: number; readonly y: number };
 type ResourceFormState = {
@@ -108,23 +108,24 @@ export interface CanvasViewProps {
   onApplyChanges: (changes: readonly RecordChange[], label: string) => Promise<boolean>;
   /** Registry context and executor supplied by Workspace; toolbar/dock never mutate locally. */
   commandContext: CommandContext;
-  onExecuteCommand: CanvasCommandExecutor;
-  /**
-   * RV-12h: called when the compact picker's "Browse full library" link is
-   * clicked -- the caller (Workspace) opens the docked Library panel.
-   */
-  onOpenFullLibrary?: () => void;
+  onExecuteCommand: <K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>;
+  dockConfig: DockConfig;
+  dockPreferenceState: 'loading' | 'ready' | 'saving' | 'failed';
+  onConfigureDock: (config: DockConfig) => void;
+  onRestoreDockDefaults: () => void;
 }
 
 /**
- * RV-12h: imperative handle so the docked Library panel (rendered by
- * PanelHost outside this component's ReactFlowProvider tree) can place a
- * catalog entry through the exact same `applyPlacement` path the 16E picker
- * uses -- never a second, parallel placement implementation.
+ * Imperative handle so the docked Library panel (rendered by PanelHost outside
+ * this ReactFlowProvider) can place a catalog entry through applyPlacement.
  */
 export interface CanvasViewHandle {
   placeAtCentre: (entryId: string) => Promise<void>;
   getVisibleCentre: () => { readonly x: number; readonly y: number };
+  setToolMode: (mode: 'select' | 'pan') => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  fitView: () => void;
 }
 
 /** Rebuilds canvas nodes from the projection, keeping each existing node's
@@ -158,7 +159,10 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onApplyChanges,
   commandContext,
   onExecuteCommand,
-  onOpenFullLibrary,
+  dockConfig,
+  dockPreferenceState,
+  onConfigureDock,
+  onRestoreDockDefaults,
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
@@ -205,8 +209,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     setEdges(projection.edges as unknown as Edge[]);
   }, [projection, setNodes, setEdges]);
 
-  // RV-12e: handles are connectable in Connect mode, and also mid-drag from a
-  // handle while in Select mode (commands.md §4). ReactFlow only starts a
+  // Handles are connectable while in Select mode (commands.md §4). ReactFlow only starts a
   // connection gesture from a pointerdown on the handle itself, so marking
   // handles connectable in both modes is what makes "drag from a handle while
   // in Select mode" possible without hijacking ordinary node dragging/panning.
@@ -342,27 +345,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     }
   }, [document?.id, projection.activeView?.id, reactFlow]);
 
-  // ==========================================================================
-  // RV-12e: Component (library.open) -- 16E picker anchored above the dock
-  // ==========================================================================
-
-  const [componentPickerOpen, setComponentPickerOpen] = React.useState(false);
-  const pickerContainerRef = React.useRef<HTMLDivElement>(null);
-
-  const closeComponentPicker = React.useCallback(() => setComponentPickerOpen(false), []);
-
-  // Outside click closes the picker (D30: single instance, no stacked overlays).
-  React.useEffect(() => {
-    if (!componentPickerOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (pickerContainerRef.current && !pickerContainerRef.current.contains(e.target as globalThis.Node)) {
-        setComponentPickerOpen(false);
-      }
-    };
-    window.addEventListener('pointerdown', onPointerDown, true);
-    return () => window.removeEventListener('pointerdown', onPointerDown, true);
-  }, [componentPickerOpen]);
-
   const applyPlacement = React.useCallback(
     async (entryId: string, anchor: { x: number; y: number }) => {
       if (!document || !projection.activeView || isSaving) return;
@@ -389,19 +371,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     return reactFlow.screenToFlowPosition(centreScreen);
   }, [reactFlow]);
 
-  // Enter / "Place": places the focused entry at the viewport centre.
-  const handlePlaceAtCentre = React.useCallback(
-    async (entryId: string) => {
-      const centreFlow = getVisibleCentre();
-      setComponentPickerOpen(false);
-      await applyPlacement(entryId, centreFlow);
-    },
-    [getVisibleCentre, applyPlacement],
-  );
-
-  // RV-12h: the docked Library panel places through this same imperative
-  // entry point -- computed the same way as the picker's Enter/"Place"
-  // (viewport centre via containerRef), never a second placement path.
+  // The docked Library panel places at the viewport centre via this handle.
   React.useImperativeHandle(
     ref,
     () => ({
@@ -409,8 +379,12 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         await applyPlacement(entryId, getVisibleCentre());
       },
       getVisibleCentre,
+      setToolMode: setDragMode,
+      zoomIn: handleZoomIn,
+      zoomOut: handleZoomOut,
+      fitView: handleFitView,
     }),
-    [getVisibleCentre, applyPlacement],
+    [getVisibleCentre, applyPlacement, handleZoomIn, handleZoomOut, handleFitView],
   );
 
   // Dragging a picker card onto the canvas places it at the drop point.
@@ -427,17 +401,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       if (!entryId || !getEntry(entryId)) return;
       e.preventDefault();
       const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      // D30 single instance: a drag-drop placement closes the picker too (not
-      // just Enter/"Place" via handlePlaceAtCentre) -- otherwise it stays
-      // open, covering the canvas.
-      setComponentPickerOpen(false);
       await applyPlacement(entryId, flowPoint);
     },
     [reactFlow, applyPlacement],
   );
 
   // ==========================================================================
-  // RV-12e: Connect tool -- planConnection / completeConnection
+  // Handle-to-handle connection -- planConnection / completeConnection
   // ==========================================================================
 
   const [rejectMessage, setRejectMessage] = React.useState<RejectMessage | null>(null);
@@ -869,17 +839,19 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       {/* 16A Canvas Dock */}
       <FloatingDock
         dragMode={dragMode}
-        onSetDragMode={setDragMode}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={onUndo}
-        onRedo={onRedo}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onFitView={handleFitView}
         zoom={zoom}
-        onToggleComponentPicker={() => setComponentPickerOpen((v) => !v)}
-        componentPickerOpen={componentPickerOpen}
+        context={commandContext}
+        config={dockConfig}
+        preferenceState={dockPreferenceState}
+        onConfigure={onConfigureDock}
+        onRestoreDefaults={onRestoreDockDefaults}
+        onInvoke={(id: DockCommandId) => {
+          if (id === 'run.start') {
+            if (commandContext.selectedScenario) void onExecuteCommand(id, { scenarioId: commandContext.selectedScenario.id });
+          } else if (id !== 'canvas.add-note' && id !== 'selection.group') {
+            void onExecuteCommand(id, {} as never);
+          }
+        }}
         onAddNote={async (text) => {
           const result = await onExecuteCommand('canvas.add-note', { text });
           if (result.status === 'disabled') return { ok: false, message: result.reason };
@@ -888,26 +860,15 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           }
           return { ok: true };
         }}
-        disabled={isSaving}
+        onGroup={async (label) => {
+          const result = await onExecuteCommand('selection.group', { label });
+          if (result.status === 'disabled') return { ok: false, message: result.reason };
+          if (result.value && typeof result.value === 'object' && 'ok' in result.value) {
+            return result.value as { readonly ok: true } | { readonly ok: false; readonly message: string };
+          }
+          return { ok: true };
+        }}
       />
-
-      {/* 16E LibraryPicker, anchored above the dock -- D30 single instance */}
-      {componentPickerOpen && (
-        <div
-          ref={pickerContainerRef}
-          data-testid="component-picker-anchor"
-          className="absolute bottom-16 sm:bottom-20 left-1/2 -translate-x-1/2 z-dock px-4 w-full max-w-[640px]"
-        >
-          <LibraryPicker
-            onPlace={(entryId) => void handlePlaceAtCentre(entryId)}
-            onOpenFullLibrary={() => {
-              setComponentPickerOpen(false);
-              onOpenFullLibrary?.();
-            }}
-            onClose={closeComponentPicker}
-          />
-        </div>
-      )}
 
       {/* Delete confirmation when a scenario references what would be removed */}
       <Dialog open={deleteConfirm !== null} onOpenChange={(next) => { if (!next) setDeleteConfirm(null); }}>

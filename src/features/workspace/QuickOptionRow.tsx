@@ -16,6 +16,13 @@ import {
   Image as ImageIcon,
   Library,
   ListChecks,
+  MousePointer,
+  Hand,
+  Minus,
+  Plus,
+  Maximize2,
+  ChartNoAxesCombined,
+  Settings2,
   Pause,
   Pencil,
   Play,
@@ -61,6 +68,13 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   align: Rows3,
   distribute: Workflow,
   note: StickyNote,
+  results: ChartNoAxesCombined,
+  select: MousePointer,
+  pan: Hand,
+  'zoom-out': Minus,
+  'zoom-in': Plus,
+  fit: Maximize2,
+  dock: Settings2,
 };
 
 const BADGE_TEXT: Readonly<Record<NonNullable<QuickOption['badge']>, string>> = {

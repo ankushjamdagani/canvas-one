@@ -17,6 +17,7 @@ import {
   type CommandHandlers,
   type ShortcutEvent,
 } from './registry';
+import { DEFAULT_DOCK_CONFIG } from '../dockConfig';
 
 const MAIN = 'b0000000-0000-4000-8000-000000000001';
 const DRAFT = 'b0000000-0000-4000-8000-000000000002';
@@ -57,6 +58,16 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
 function makeHandlers(): CommandHandlers {
   return Object.fromEntries(COMMAND_IDS.map((id) => [id, vi.fn()])) as unknown as CommandHandlers;
 }
+
+describe('dock command availability', () => {
+  it('validates the closed configuration and selection-aware group action', () => {
+    const context = makeContext();
+    expect(getAvailability('dock.configure', context, DEFAULT_DOCK_CONFIG)).toEqual({ enabled: true });
+    expect(getAvailability('dock.configure', context, { orderedCommandIds: ['canvas.fit'], hiddenCommandIds: [] })).toMatchObject({ enabled: false });
+    expect(getAvailability('selection.group', context, { label: 'Group' })).toMatchObject({ enabled: false, code: 'invalid-selection' });
+    expect(getAvailability('canvas.zoom-in', context, {})).toEqual({ enabled: true });
+  });
+});
 
 function keyEvent(overrides: Partial<ShortcutEvent>): ShortcutEvent {
   return {

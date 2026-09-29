@@ -17,12 +17,12 @@
  *
  * Not here (design-revalidation.md §2 / commands.md §1): ⌘K/⌘R/⌘H/⌘B/⌘L,
  * single-letter shortcuts, Duplicate project and Project settings.
- * Commands the app doesn't wire yet (parts, remaining canvas tools and dock
- * configuration) are absent rather than fake entries.
+ * Saved-part artifact actions stay scoped to the Library workflow.
  */
 
 import type { Id } from '../../../domain/studio/model';
 import type { TransferExportKind } from '../../transfer';
+import { readDockConfig, type DockConfig } from '../dockConfig';
 
 // ============================================================================
 // Ids, payloads, groups
@@ -42,6 +42,14 @@ export const COMMAND_IDS = [
   'run.reset',
   'history.open',
   'library.open',
+  'results.open',
+  'canvas.select-tool',
+  'canvas.pan-tool',
+  'canvas.zoom-out',
+  'canvas.zoom-in',
+  'canvas.fit',
+  'dock.configure',
+  'dock.restore-defaults',
   'export.png',
   'export.svg',
   'project.export-json',
@@ -77,6 +85,14 @@ export interface CommandPayloads {
   'run.reset': Empty;
   'history.open': Empty;
   'library.open': Empty;
+  'results.open': Empty;
+  'canvas.select-tool': Empty;
+  'canvas.pan-tool': Empty;
+  'canvas.zoom-out': Empty;
+  'canvas.zoom-in': Empty;
+  'canvas.fit': Empty;
+  'dock.configure': DockConfig;
+  'dock.restore-defaults': Empty;
   'export.png': Empty;
   'export.svg': Empty;
   'project.export-json': Empty;
@@ -131,7 +147,14 @@ export type CommandIconKey =
   | 'ungroup'
   | 'align'
   | 'distribute'
-  | 'note';
+  | 'note'
+  | 'results'
+  | 'select'
+  | 'pan'
+  | 'zoom-out'
+  | 'zoom-in'
+  | 'fit'
+  | 'dock';
 
 export interface Shortcut {
   readonly key: string;
@@ -419,6 +442,47 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     group: 'review',
     iconKey: 'library',
     shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? ENABLED,
+  },
+  'results.open': {
+    id: 'results.open', label: 'Open results', keywords: ['results', 'run', 'output'],
+    group: 'review', iconKey: 'results', shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? ENABLED,
+  },
+  'canvas.select-tool': {
+    id: 'canvas.select-tool', label: 'Select tool', keywords: ['select', 'canvas'],
+    group: 'edit', iconKey: 'select', shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requireActiveView(ctx) ?? ENABLED,
+  },
+  'canvas.pan-tool': {
+    id: 'canvas.pan-tool', label: 'Pan tool', keywords: ['pan', 'canvas'],
+    group: 'edit', iconKey: 'pan', shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requireActiveView(ctx) ?? ENABLED,
+  },
+  'canvas.zoom-out': {
+    id: 'canvas.zoom-out', label: 'Zoom out', keywords: ['zoom', 'canvas'],
+    group: 'edit', iconKey: 'zoom-out', shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requireActiveView(ctx) ?? ENABLED,
+  },
+  'canvas.zoom-in': {
+    id: 'canvas.zoom-in', label: 'Zoom in', keywords: ['zoom', 'canvas'],
+    group: 'edit', iconKey: 'zoom-in', shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requireActiveView(ctx) ?? ENABLED,
+  },
+  'canvas.fit': {
+    id: 'canvas.fit', label: 'Fit view', keywords: ['fit', 'canvas', 'zoom'],
+    group: 'edit', iconKey: 'fit', shortcut: null,
+    availability: (ctx) => requireProject(ctx) ?? requireActiveView(ctx) ?? ENABLED,
+  },
+  'dock.configure': {
+    id: 'dock.configure', label: 'Customize dock', keywords: ['dock', 'customize', 'reorder'],
+    group: 'edit', iconKey: 'dock', shortcut: null,
+    availability: (ctx, payload) => requireProject(ctx) ??
+      (readDockConfig(payload) ? ENABLED : disabled('limit', 'Dock commands must contain the exact inventory')),
+  },
+  'dock.restore-defaults': {
+    id: 'dock.restore-defaults', label: 'Restore dock defaults', keywords: ['dock', 'reset', 'defaults'],
+    group: 'edit', iconKey: 'dock', shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
   },
   'export.png': {
@@ -806,7 +870,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   if (ctx.runPhase === 'paused') run.push(option('run.resume', {}, ctx));
   if (ctx.hasRunDisplay || isExecutionActive(ctx.runPhase)) run.push(option('run.reset', {}, ctx));
 
-  const review: QuickOption[] = [option('history.open', {}, ctx), option('library.open', {}, ctx)];
+  const review: QuickOption[] = [option('history.open', {}, ctx), option('library.open', {}, ctx), option('results.open', {}, ctx)];
 
   const exportGroup: QuickOption[] = [
     option('export.png', {}, ctx),
@@ -837,9 +901,15 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
     : [];
 
   const edit: QuickOption[] = [
+    option('canvas.select-tool', {}, ctx),
+    option('canvas.pan-tool', {}, ctx),
     option('canvas.add-note', { text: '' }, ctx),
     option('edit.undo', {}, ctx),
     option('edit.redo', {}, ctx),
+    option('canvas.zoom-out', {}, ctx),
+    option('canvas.zoom-in', {}, ctx),
+    option('canvas.fit', {}, ctx),
+    option('dock.restore-defaults', {}, ctx),
   ];
 
   const groups: QuickOptionGroup[] = [

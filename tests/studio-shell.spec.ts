@@ -209,18 +209,15 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     const captionText = (await firstCaption.textContent()) ?? '';
     expect(captionText).not.toMatch(/p99|p95|pressure|headroom/i);
 
-    // 16A dock: D38 inventory only (no Component/Connect/Note/More/run controls)
+    // The narrow dock keeps Select, Pan and Library; the rest are in More.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
 
     const dockBtnTestIds = [
-      'dock-undo-btn',
-      'dock-redo-btn',
       'dock-select-btn',
       'dock-pan-btn',
-      'dock-zoom-out-btn',
-      'dock-zoom-in-btn',
-      'dock-fit-view-btn',
+      'dock-component-btn',
+      'dock-more-btn',
     ];
 
     for (const testId of dockBtnTestIds) {
@@ -237,6 +234,10 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     }
 
     await expect(page.getByTestId('dock-zoom-value')).toBeVisible();
+    await page.getByTestId('dock-more-btn').click();
+    for (const id of ['edit.undo', 'edit.redo', 'canvas.zoom-out', 'canvas.zoom-in', 'canvas.fit']) {
+      await expect(page.getByTestId(`dock-overflow-${id}`)).toBeVisible();
+    }
     await expect(page.getByTestId('canvas-floating-dock')).toBeVisible();
   });
 

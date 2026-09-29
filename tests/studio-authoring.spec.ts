@@ -76,34 +76,33 @@ async function newElementId(page: Page, before: string[]): Promise<string> {
   return added[0];
 }
 
-async function openComponentPicker(page: Page) {
+async function openLibrary(page: Page) {
   await waitForIdle(page);
   await page.getByTestId('dock-component-btn').click();
-  await expect(page.getByTestId('component-picker-anchor')).toBeVisible();
+  await expect(page.getByTestId('library-panel')).toBeVisible();
 }
 
-/** Places a catalog entry at the viewport centre (a second tap on the
- * selected card places it, per LibraryPicker) and returns its element ID. */
+/** Places a catalog entry at the viewport centre through the singleton Library. */
 async function placeAtCentre(page: Page, entryId: string): Promise<string> {
   const before = await elementIds(page);
-  await openComponentPicker(page);
-  const card = page.locator(`[data-entry-id="${entryId}"]`);
+  await openLibrary(page);
+  const panel = page.getByTestId('library-panel');
+  const card = panel.locator(`[data-entry-id="${entryId}"]`);
   await card.click();
-  await card.click();
-  await expect(page.getByTestId('component-picker-anchor')).toHaveCount(0);
+  await panel.getByRole('button', { name: /Place .* on canvas/ }).click();
   return newElementId(page, before);
 }
 
 /**
- * Places a catalog entry by dragging its picker card to a point given as a
+ * Places a catalog entry by dragging its Library card to a point given as a
  * fraction of the canvas. Placing selects the new node, which opens the
  * 320px inspector and narrows the canvas, so callers keep `fx` <= 0.5 to
  * stay inside the visible area either way.
  */
 async function placeAtFraction(page: Page, entryId: string, fx: number, fy: number): Promise<string> {
   const before = await elementIds(page);
-  await openComponentPicker(page);
-  const card = page.locator(`[data-entry-id="${entryId}"]`);
+  await openLibrary(page);
+  const card = page.getByTestId('library-panel').locator(`[data-entry-id="${entryId}"]`);
   const canvas = page.getByTestId('canvas-container');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('canvas bounding box missing');
@@ -245,12 +244,13 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
   test('place at centre shows the caption; undo and redo', async ({ page }) => {
     await openBlankProject(page, 'Place and undo');
     const before = await elementIds(page);
-    await openComponentPicker(page);
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-picker-open.png` });
-    const card = page.locator('[data-entry-id="service"]');
+    await openLibrary(page);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-library-open.png` });
+    const panel = page.getByTestId('library-panel');
+    const card = panel.locator('[data-entry-id="service"]');
     await card.click();
-    await card.click();
-    await expect(page.getByTestId('component-picker-anchor')).toHaveCount(0);
+    await panel.getByRole('button', { name: /Place .* on canvas/ }).click();
+    await expect(page.getByTestId('library-panel')).toBeVisible();
     const serviceId = await newElementId(page, before);
     const serviceCaption = page.getByTestId(`node-caption-${serviceId}`);
     await expect(serviceCaption).toBeVisible();
@@ -265,8 +265,8 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
 
   test('connect: ready pair adds an edge; incompatible channels are rejected', async ({ page }) => {
     await openBlankProject(page, 'Connect ready and rejected');
-    // Connect tool from the dock (a drag works in Select mode too, commands.md §4).
-    await page.getByTestId('dock-connect-btn').click();
+    // Handle-to-handle dragging works in Select mode (commands.md §4).
+    await expect(page.getByTestId('dock-select-btn')).toHaveAttribute('aria-pressed', 'true');
     // Email is unmodeled, so a queue -> email message connects without the
     // resource form (catalog.md resolution 8 applies to resource targets only).
     const queueId = await placeAtFraction(page, 'queue', 0.1, 0.15);
@@ -356,24 +356,23 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   });
 
-  test('mobile 390x844: component picker is usable', async ({ page }) => {
+  test('mobile 390x844: Library remains usable', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openS05Project(page);
     const before = await elementIds(page);
 
     await page.getByTestId('dock-component-btn').click();
-    const picker = page.getByTestId('library-picker');
-    await expect(picker).toBeVisible();
-    const searchInput = picker.locator('input[type="search"]');
+    const library = page.getByTestId('library-panel');
+    await expect(library).toBeVisible();
+    const searchInput = library.locator('input[type="search"]');
     await expect(searchInput).toBeVisible();
     await searchInput.fill('service');
-    const serviceCard = picker.locator('[data-entry-id="service"]');
+    const serviceCard = library.locator('[data-entry-id="service"]');
     await expect(serviceCard).toBeVisible();
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-mobile-picker.png` });
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/rv12e-mobile-library.png` });
 
     await serviceCard.click();
-    await serviceCard.click();
-    await expect(page.getByTestId('library-picker')).toHaveCount(0);
+    await library.getByRole('button', { name: /Place .* on canvas/ }).click();
     await newElementId(page, before);
   });
 

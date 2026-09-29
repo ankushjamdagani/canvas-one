@@ -130,19 +130,13 @@ test.describe('RV-12h: History and Library panels', () => {
     await expect(ladder.getByPlaceholder('Save checkpoint label')).toHaveValue('');
   });
 
-  test('opens Library from the picker link and places a component from the panel', async ({ page }) => {
+  test('opens the singleton Library from the dock and places a component', async ({ page }) => {
     await openBlankProject(page, `RV-12h library ${Date.now()}`);
 
     await expect(page.locator('[data-panel-id="library"]')).toHaveCount(0);
 
-    // Open the compact picker from the dock, then follow its full-library link.
+    // The dock command focuses the singleton Library panel.
     await page.getByTestId('dock-component-btn').click();
-    await expect(page.getByTestId('component-picker-anchor')).toBeVisible();
-    await page.getByTestId('library-picker-full-library-btn').click();
-
-    // Following the link closes the compact picker (D30 single instance)
-    // and opens the docked Library panel instead.
-    await expect(page.getByTestId('component-picker-anchor')).toHaveCount(0);
     const libraryPanel = page.locator('[data-panel-id="library"]');
     await expect(libraryPanel).toBeVisible();
     const panel = page.getByTestId('library-panel');
