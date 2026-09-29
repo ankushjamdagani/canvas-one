@@ -1440,3 +1440,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude lead, no subagents. Before/after builds via a temporary detached git worktree (removed).
 - **Verification**: 1,416 unit tests (token parity test updated for the board's primary foreground and the new canvas role); `npx tsc -b`; production build; isolated production Playwright 77 passed / 4 skipped; 14 before/after journey states with identical structure and colour-only differences, reviewed by side-by-side captures; selected edge computed `rgb(11,92,84)` 2.5 px; responsive sweep 45/45; touch audit 0 under 44 px; `git diff --check` clean.
 - **Limitations**: the "filled field placeholder" RV-01 residual is unverified because the Design System board is not on this machine. The asChild spinner has no automated test (unit config excludes TSX). Worktree and main-checkout spec copies can drift; only the layering line was synced. Nothing pushed.
+
+### RV-17 accepted; spec copies synced
+
+- **Outcome**: user accepted RV-17 (ledger updated). `specs/` on the UI line (`claude/rv-01a-tokens`) had fallen behind this branch (ledger, contracts, decisions, design, catalog.md, design-revalidation.md, screens). Checked that every spec edit made on the UI line since the merge base was already present here, then made the UI line's `specs/` identical to this branch's, and copied the UI-only `rv13-acceptance.md` and `rv15-retirement.md` here. `diff -rq` of the two `specs/` trees is now empty.
+- **Files**: `specs/revamp/**` on both branches; ledger RV-17 row.
+- **Platform/subagents**: Claude lead, no subagents.
+- **Verification**: UI line 1,416 unit tests and production build pass after the sync (specs feed fixture/contract tests).
+- **Limitations**: the two branches will drift again unless spec edits land on one branch and are mirrored; `HANDOFF.md`/`ACTION_LOG.md` stay on this branch only by convention. Nothing pushed.
