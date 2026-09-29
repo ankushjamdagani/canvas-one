@@ -1,179 +1,66 @@
 # Development handoff
 
+Current state and how to resume. Task history is in [`ACTION_LOG.md`](ACTION_LOG.md), durable agent rules in [`LESSONS.md`](LESSONS.md), and the plan, ledger and contracts in [`specs/revamp/`](specs/revamp/README.md). Earlier handoff snapshots, including notes on the retired pre-revamp app, are in git history (this file at `3b4bda9`).
+
 ## Project invariants
 
 Preserve in all work touching architecture, simulation, persistence, exports or canvas behavior:
-- **Simulation accounting** — strict separation between configured architecture and observed results; exact per-attempt latency, FIFO queuing, retry draws.
-- **Model/view separation** — canvas metadata must not pollute executable simulation models.
-- **Portable persistence** — versioned export format and read-only archive semantics per the persistence and compatibility policy below.
+- **Simulation accounting** — strict separation between configured architecture and observed results; exact per-attempt latency, FIFO queuing, retry draws. The retained open kernel (`src/simulation/open/`) is pinned by characterization goldens; change it only in an explicit kernel step.
+- **Model/view separation** — canvas and view metadata (placements, groups, notes, labels) never enter the run manifest or executable model.
+- **Portable persistence** — only the current `system-studio` v9 bundle imports; v7/v8 and unknown versions are rejected with a typed message (D19). The retired app's `system-studio` IndexedDB database is never read, migrated or deleted.
+- **Truthful results** — nothing is reported as run, passed or measured unless it was; unsupported model shapes are rejected by readiness, not silently skipped.
+- **Scope discipline** — do not invent milestones beyond the requested task. Future directions (hosted/sync D18, AI collaboration D22) start only when the user asks.
 
-## Active initiative — System Studio design revamp (21 September 2026)
+## Current state (2026-09-29)
 
-**Current (2026-09-29, RV-17 accepted; specs synced):** `specs/` is identical on both branches (UI line synced from this ledger branch; RV-13/RV-15 reports mirrored here). RV-17 ACCEPTED by the user. UI line `claude/rv-01a-tokens` @ `0858b7b` (+ spec sync commit). RV-17 design conformance: legacy colours/aliases replaced by Evergreen tokens, four colour utilities that generated no CSS (`text-ink` in 14 files, `bg-canvas`, `bg-selected-tint`, `border-divider`) now defined, selected edge action green, `.dark` removed (D24), primary button text shell colour (board), warning tokens for Pause/warnings, toast layer token, asChild loading spinner. Verification: 1,416 unit, `npx tsc -b`, build (CSS 115.59 kB / 21.00 kB gzip), production Chromium 77 passed / 4 skipped, before/after journeys structurally identical (colour-only diffs, reviewed), responsive sweep 45/45, touch audit 0 under 44 px. Open: "filled field placeholder" residual needs the Design System board (not on this machine). Nothing is pushed.
+- **Branch:** `master` holds everything: app, specs, ledger and agent workflow. Merged `@ 3b4bda9` from the UI line, the ledger branch and the two workflow branches (`/retro` learning loop, `/delegate` hardening). No remote is configured; nothing has been pushed.
+- **Revamp:** RV-01 to RV-17 are complete. RV-13 (release acceptance) and RV-17 (design conformance) were accepted by the user. The app runs only on the studio model and `system-studio-local-v1`. Ledger: [`specs/revamp/delivery.md`](specs/revamp/delivery.md). Reports: [`rv13-acceptance.md`](specs/revamp/rv13-acceptance.md), [`rv15-retirement.md`](specs/revamp/rv15-retirement.md).
+- **Verification baseline on master:** 1,416 unit tests (122 files); `npx tsc -b` clean; production build passes (main JS 1,643.89 kB / 442.29 kB gzip, CSS 115.71 kB, existing large-chunk warning); production Chromium 77 passed / 4 skipped (dev-only specimen).
 
-**Previous (2026-09-29, post-RV-13 decisions):** UI line `claude/rv-01a-tokens` @ `f73649a`. User decisions applied: (1) D30 amended — dock Component button opens the compact 16E `LibraryPicker` popover while the Library panel is closed, focuses the panel while open (never both, R07); touch-only Place button and 44 px targets; Quick options still opens the panel (`f73649a`). (2) Scenario `entryPorts` sorted as a set in the run manifest; S01 scenario `c90abfe5` gets a new fingerprint once (`ad3bd89`; contract §7 updated). (3) Design debt → new ledger row RV-17 (READY). Verification: 1,416 unit, `npx tsc -b`, build, production Chromium 77 passed / 4 skipped, touch audit 0 under 44 px incl. picker. Nothing is pushed. Next: RV-17 when requested.
+## Code map
 
-**Previous (2026-09-29, RV-13):** UI line `claude/rv-01a-tokens` @ `cfcda15`. RV-13 ACCEPTED by the user 2026-09-29 (release gates 1–6; push/deploy remain separate actions) (report `specs/revamp/rv13-acceptance.md` on the UI line). Fixes made: `189fcb1` readiness now rejects router bridge routes and bridge-plus-other-call continuations (runner silently reported success before); `7fa24c0` e2e proving the retired `system-studio` DB stays untouched, and e2e screenshots moved to test output dirs; `d58d03d` phone-compact top bar (project menu was unreachable at 390 px), 44 px coarse-pointer targets, pinned results Details, details capped at `min(380px,40vh)`, new `tests/studio-phone.spec.ts`. Verification: 1,415 unit, `npx tsc -b`, build, production Chromium 73 passed / 4 skipped (isolated port 5213, no retries), responsive sweep 40/40 states at 1512×982/1024×768/768×1024/756×491/390×844, touch audit 0 controls under 44 px. Open decisions: 16E LibraryPicker stays unmounted, RV-02 `entryPorts` set vs ordered, design debt (legacy base colours, selected-edge `#c48212`, unused `.dark`). Not verified: design-board visual fidelity, text-only zoom, screen readers. Nothing is pushed.
+| Area | Location |
+|---|---|
+| Studio model, validation, readiness, closure, manifest | `src/domain/studio/` |
+| Scenario runner (S01–S05 families) and trace | `src/domain/studio/runner/` |
+| Versioning (branches, checkpoints, commits, merge, publish) | `src/domain/versioning/` |
+| Parts copy engine | `src/domain/parts/` |
+| Local repository (Dexie `system-studio-local-v1`), import/export, pruning | `src/persistence/studio/` |
+| Retained open kernel + goldens | `src/simulation/open/` (types in `src/domain/execution.ts`, arrivals in `workload.ts`) |
+| App shell and features | `src/App.tsx`, `src/features/{session,workspace,inspector,library,catalog,panels,history,runs,scenarios,transfer,entry}` |
+| Primitives, tokens, specimen | `src/components/ui/`, `src/components/studio/`, `src/styles.css` |
+| Reference fixtures S01–S05 | `specs/revamp/fixtures/` (also the entry-screen examples) |
 
-**Previous (2026-09-29):** UI line `claude/rv-01a-tokens` @ `5ba97bd`. RV-15 slice 3 (stylesheet audit) completes RV-15: `src/styles.css` drops every selector for classes the new app never applies (2,833 → 517 lines; built CSS 153.73 → 114.93 kB, gzip 28.93 → 21.05 kB). Tokens, base element rules and unscoped `react-flow__*` overrides stay. Before/after builds compared over 14 journey states (entry, S05, inspector, Library, History, project menu, S04 results; desktop + 390×844): identical computed styles, boxes and screenshots. Open design debt (not retirement): legacy `--line`/`--ink`/`--teal` in base button/input rules, selected-edge stroke `#c48212`, and an unused `.dark` token block. Verification: 1,411 unit, `npx tsc -b`, build, production Chromium 69 passed / 4 skipped, `git diff --check` clean. Nothing is pushed. Next: RV-13 release acceptance against `specs/revamp/verification.md#release-gates`.
+## Running and verifying
 
-**Previous (2026-09-29):** UI line `claude/rv-01a-tokens` @ `699cc82`. RV-15 slice 2 retires the legacy graph-model island: `ComponentKind` moved into `domain/execution.ts`, `domain/workload.ts` keeps only arrival math over a structural `ArrivalSettings`, and `domain/{model,results,openResults,metrics,notes,subsystems,revisions}.ts` plus `notes.test.ts` are deleted. The boundary test now rejects imports of those modules (probe-verified). Kernel and goldens unchanged. Only remaining RV-15 gate: stylesheet selector audit with visual verification (`specs/revamp/rv15-retirement.md`). Verification: 1,411 unit / 122 files, `npx tsc -b`, build (assets identical), production Chromium 69 passed / 4 skipped, `git diff --check` clean. Nothing is pushed.
+```bash
+npm run dev          # http://localhost:5173
+npm test             # unit (src/**/*.test.ts only; TSX tests need deliberate setup)
+npm run build
+```
 
-**Current (2026-09-29, latest):** UI line `claude/rv-01a-tokens` @ `3bdc2ec`. RV-15's first conservative retirement slice removes unused `gsap` / `@gsap/react`, records the live startup/worker/persistence inventory, and adds a regression test that rejects production imports of the retired editor, v7/v8 persistence and legacy simulation worker paths. No legacy source module was deleted: the old graph/results/notes island still supplies types and behavior to the retained open kernel, and `domain/revisions.ts` still has a type-only caller. Runnable readiness now rejects statically provable Guard/Value payload type errors across machines, decisions, pipelines and boundaries while leaving missing/null/union-dependent values, descendant reply schemas and original pipeline error rows to runtime validation. Fresh combined verification: 1,415 unit tests across 123 files, TypeScript + production build, production Chromium 69 passed / 4 dev-only specimen tests skipped, and `git diff --check` clean. Main JS is 1,633.27 kB / 440.04 kB gzip and the existing large-chunk warning remains. Nothing is pushed.
+Production e2e: `playwright.config.ts` reuses any server already on port 5174, which can test a stale build. For acceptance runs use a throwaway config with an isolated port, `reuseExistingServer: false`, 2 workers and no retries, then run `TEST_PRODUCTION=1 npx playwright test --config <that file>`.
 
-**Current (2026-09-29, latest):** UI line `claude/rv-01a-tokens` @ `847ada6`. RV-13a repairs scenario/relation/view references on node delete (no more silent failure) and fixes group framing under the top bar; RV-13b adds History/Library/Entry/Results production e2e; RV-13c fixes the defects those found (live Commit status, 22D published notice, start-draft/edit-main on published main, typed non-export import message). Open decision: 16E LibraryPicker stays unmounted (singleton Library, D30/R07). Baseline: 1,390 unit, TypeScript + build, production Chromium 69 passed / 4 skipped. Nothing is pushed.
+## Open debt
 
-**Current (2026-09-29, later):** UI line `claude/rv-01a-tokens` @ `ea0d645`. RV-03t completes registry routing for the §3–§5 commands that already had behaviour (selection.delete with Delete/Backspace, run.cancel, panel/close, inspector apply/cancel/close, history checkpoint/commit/restore/publish flow, saved parts); only project.create/import (entry screen), inspector.open (selection side effect) and panel.resize/move-floating (direct gestures) remain outside it. RV-04g adds view-only canvas.expand/collapse with collapsed-group rendering and edge rerouting. Baseline: 1,386 unit, TypeScript + build, production Chromium 39 passed / 4 skipped. Nothing is pushed.
+Tracked here until resolved; none blocks release.
 
-**Current (2026-09-29; supersedes the dated snapshot below):** UI line `claude/rv-01a-tokens` @ `116f078` (worktree `.claude/worktrees/rv-01a`). RV-09b now persists validated immutable saved-part revisions, shares Library search/list/grid, previews selection closure, imports/exports standalone part files with fresh imported identities, and places detached copies as one undo step. Project backups validate and retain part records, but importing a project does not populate its Library; parts transfer through standalone files. RV-03r adds typed branch create (`working` or `head`) and closed-branch reopen flows through the registry/session guards; ordinary switching to a closed branch is disabled until reopen. RV-04f completes the contracted 16-command dock, customization tray/reorder/hide/restore, responsive overflow and durable dock preferences through the shared serialized panel/dock CAS queue. Combined baseline: 1,353 unit tests, TypeScript + production build, production Chromium 34 passed / 4 specimen tests skipped, and `git diff --check` clean. Existing large-chunk warning remains. Replace part is still omitted because no precise command is contracted. Nothing is pushed.
+| Item | Where | Notes |
+|---|---|---|
+| Stale TODO comments (manifest sorting, request-ID derivation, storage limits, readiness, trace envelope) | `domain/studio/{canonical,model,validate}.ts` | All implemented since (manifest.ts, machine.ts, validate.ts budgets, readiness.ts, runner/trace.ts); comments mislead |
+| Superseded logical runner kept alive by its own test | `domain/studio/runner/logical.ts` + test | RV-14b interpreter; production uses the composed `scenario-runner` |
+| Replaced run control kept alive by its own test | `features/runs/ScenarioRunControl.tsx` + test | Replaced by `features/scenarios/ScenarioSwitcher.tsx` in RV-12i |
+| Unused modules | `components/ui/collapsible.tsx`, `features/scenarios/ScenariosPreview.tsx`, barrels `domain/studio/runner/index.ts`, `features/catalog/index.ts` | Not imported by the app, tests or specimen |
+| Unused dependencies | `zustand`; `@radix-ui/react-collapsible` (only the unused primitive) | `npm audit --omit=dev`: 0 vulnerabilities |
+| Group bounds use an estimated card height | `features/workspace/projection.ts` (`ESTIMATED_ELEMENT_NODE_HEIGHT`) | Expanded members can overflow their group frame |
+| Bundle size | main JS 1.64 MB | architecture.md suggests lazy-loading history, merge and results |
+| "Filled" field placeholder (RV-01 residual) | primitives | Needs the Design System board, which isn't on this machine |
+| No automated test for Button `loading` + `asChild` spinner | `components/ui/button.tsx` | Unit config excludes TSX |
 
-**Current (2026-09-28):** UI line `claude/rv-01a-tokens` @ `dd68c11` (worktree `.claude/worktrees/rv-01a`). The app authors on the studio model: place/connect/delete, element/connection/scenario inspector drafts, runs in a worker with results, History panel (ladder, checkpoint/restore, commit, publish review, compare & resolve, behind-main banner), Library panel via PanelHost, project import, and the 18B export submenu under the project menu. `ScenarioSwitcher` replaces `runs/ScenarioRunControl`; new/copy/edit/rename/delete use the D41 dialogs and scenario editor in the inspector dock/sheet. CSV is enabled only for the displayed run after its durable save; otherwise it keeps the exact disabled reason. Panel placement/collapse/width preferences load and save through their own repository revision with serialized CAS and durable-state conflict/failure handling. RV-05d closes the known scenario-editor gaps: logical scope crossings can author ordered replies through a recursive Guard/Value builder without hidden defaults, payload bindings use schema paths, assertions address nested records/list indices, and steps reorder by drag, Arrow keys or move buttons. Incomplete guard edits block Apply. The RV-06b Library debt is also closed: DEFAULTS summaries share the inspector's human-readable resource labels and option names instead of exposing implementation keys. RV-11a warning styling now uses semantic warning tokens in History, Badge and Alert instead of raw Tailwind amber classes. RV-03q (UI line @ `247ce0d`) adds the commands.md §1 registry (`src/features/workspace/commands/registry.ts`) for every wired command and the 14A Quick options dialog (top-bar button or F2, search, disabled reasons, nested rename); undo/redo/F2 shortcuts route through it. RV-04e (UI line @ `46ed3dc`, built by Codex via /delegate) adds 16D selection actions (group/ungroup/align/distribute) and the dock Note through the registry; RV-09a (UI line @ `dd68c11`) adds the pure parts copy engine `src/domain/parts/` (capture closure + preview, typed remap, validated placement) and selection.duplicate on top of it. Remaining: saved-part persistence/Library save/part files, dock customization (16C, shelf items uncontracted), branch create/reopen. Baseline: 1328 unit, `npx tsc -b`, build, production e2e 29 passed / 4 skipped (isolated port, no retries). Codex lead implemented and self-reviewed; review caught and corrected a test-discovery suffix before the final gate. Nothing is pushed.
+Accepted limitations (by design, not debt): router + bridge routes rejected by readiness until the runner supports them; runtime refinement maps one level of ports; the 16E picker is catalog-only (saved parts live in the Library panel); Replace part has no contracted command.
 
-HOLD LIFTED (2026-09-23). RESUME HERE: ledger = `specs/revamp/delivery.md` (task ledger rows are current). UI integration line = branch `claude/rv-01a-tokens` (worktree `.claude/worktrees/rv-01a`, head `744cb18`: foundation RV-01a–h accepted, shell RV-03b/c, dock RV-04a/b, nodes RV-04c, inspector RV-05a, layout slot RV-12a, results RV-07a, runner line merged by RV-12b, session layer RV-12c1, new app shell RV-12c2 — the legacy app is deleted (D37); the app now runs only on the studio model and `system-studio-local-v1`; next c3 import/export, c4 runs). Model line = branch `claude/rv-02g-manifest` @ `2ffa2d3` (types, validator, canonical-json-v1, closure, readiness, manifest+fingerprint). Panel reducer = `claude/rv-03a-panel-reducer` @ `e9e3b58`. Decisions D31–D35 settled 2026-09-23. Baseline on the UI line: 881 unit, production e2e 76 passed / 1 known failure (diagram.spec.ts:260, 40px Load-example target) / 4 skipped (run e2e on an isolated port with a throwaway config and TEST_PRODUCTION=1). Runner line = `claude/rv-14a-runner-start` @ `7ef2e39` (RV-14 accepted: `runScenario` runs S01–S05; RV-16a local repository `src/persistence/studio/` on Dexie `system-studio-local-v1`; RV-08a saveRun/start tokens/eligibility in `src/domain/versioning/`; RV-08b apply-records/checkpoint/restore/reopen/switch; RV-08c pure typed diff/merge/resolve/merge base in `src/domain/versioning/`; RV-08d `history.commit`, in-memory `CandidateController` (prepare/resolve/evaluate/candidate runs); RV-08e atomic publish via `CandidateController.publish` + operation-bound publish tickets, publication metadata/version helpers; RV-08f `computePinClosure`, `loadHistory`, `verifyReferenceIntegrity`, reload round trip (RV-08 accepted 2026-09-24); RV-16b export/import (v9 bundle, FileToken registry, `validatePortableBundle`), explicit `pruneUnreferenced`, recovery journeys; worktrees need `npm ci` after the `fake-indexeddb` dev dependency; merged task worktrees were removed 2026-09-24, branches kept). RV-16b accepted 2026-09-24. Next candidates: runner/storage integration into the UI line (RV-12 slots) and history UI (RV-11), RV-16b import/export/pruning (needs RV-08 history), integrating the runner into the UI line (RV-12 slot), RV-03 panel wiring, `ResultsPanel` restyle, RV-16a local adapters. Executors: Gemini `agy` (quota exhausted 2026-09-25, resets ~2026-09-30), Codex CLI (quota until 2026-09-27), or Sonnet subagents; prompts/scripts in the session scratchpad are not durable — re-derive from the ledger. Nothing is pushed.
+## Resume
 
-State (2026-09-23): planning complete. Plan passed P1–P4 reviews; every RV-02 contract finding is closed, including the S05 bridge-frame corrections. The plan was consolidated from 127 files to 24 (same substance, no product changes); raw review evidence is in git at `09d2c8b`. No revamp application code exists; the stale Gemini worktree and its empty branch `codex/revamp-foundation-a` were removed 2026-09-23 (no unique commits).
-
-Entry point: [`specs/revamp/README.md`](specs/revamp/README.md). Decisions D01–D30 supersede any conflicting history below — notably: model-based runs for all five families (S01–S05), real source execution later; commits/publication need passing runs for every scenario; publication is irreversible; old data formats dropped with the old Dexie DB left untouched; local-only now, hosted/self-hosted/sync and AI collaboration later. Roles: Codex lead/verifier, Claude reviewer, Gemini implementer via `/delegate` with the project rules in `specs/revamp/delivery.md`.
-
-Next: user reviews the consolidated plan and decides whether to lift the hold; first work then is EXEC-PREFLIGHT and RV-01/RV-02 shared types/RV-16a on disjoint files.
-
-Baseline: 233 unit tests pass; build passes (large-chunk warning); production Chromium e2e 46/51 with 5 mobile failures — see `specs/revamp/verification.md`. Earlier passing browser baselines below are historical.
-
-## Active work — canvas-first workspace (16 September 2026)
-
-The user authorized implementation of `specs/canvas-first-workspace.md` on branch `codex/canvas-first-workspace`. This scope delivers the 6-part canvas-first UI contract: compact top bar (brand, project switcher, catalog drawer trigger, workloads trigger, undo/redo, run/pause/reset), searchable 29-component catalog drawer, single contextual inspector dock (mutually exclusive node, edge, workload, and tutorial views), and compact status/results strip with expandable details and compare actions.
-
-Integrated in the worktree:
-- Canvas-first layout, shell, styling, and responsive mobile adaptation (`src/components/canvasFirst.css`, `src/App.tsx`).
-- Single contextual inspector dock replacing disparate overlays; closing the inspector or clicking empty canvas clears active selection.
-- Searchable 29-component catalog drawer (`.canvas-first-catalog-drawer`) supporting repeated component additions.
-- Compact results strip (`.canvas-first-strip`) with state, time, root throughput, p95 latency, and failures, plus expandable details and compare actions.
-- Preserved open system simulation runtime, resource bounds, discrete-event accounting, format-8 persistence, and format-7 read-only archive semantics.
-- `ResizeObserver` refit behavior in `ArchitectureCanvas.tsx` preserves user zoom and pan across width changes (such as opening/closing the inspector dock) while refitting on major height adjustments (>50px, e.g. results panel toggle).
-- Polished topbar row structure, segmented Undo/Redo pill group, 2-row mobile topbar (<560px), elevated floating dock aesthetics with transparent/hover states, and symmetrical canvas organizer alignment (`src/components/canvasFirst.css`, `src/components/canvasActions.css`, `src/components/DiagramOrganization.tsx`).
-- ReactFlow 20px grid snapping and dotted background, HTML5 drag-and-drop from component catalog onto canvas, visible-center click-to-add accounting for canvas pan and zoom, brand logo vertical alignment, and strict baseline alignment for the simulation Failures stat.
-- Zoom level and camera viewport preservation on component addition, note addition, and component deletion (`src/components/ArchitectureCanvas.tsx`), preventing unwanted `fitView` zoom jumps while preserving `fitView` for template and example loads.
-- Catalog drawer search input padding and alignment standardized to 32px height, 10px horizontal padding, 8px gap, and 24px input height for centered magnifying glass alignment and clean spacing above category headings.
-- Primary nested menu dropdown card (`.canvas-first-primary-menu`) under `.project-switch` toggle with 6 collapsible categories (`open` by default): Create project (Blank, From template [Chat, Ecommerce, Events], Tutorials/Examples), Checkpoints options, Export options (Canvas, JSON, Import), Switch project with active project checkmark, Architecture Revisions, and Saved runs & comparisons with direct restore. Topbar elevated to `z-index: 900` over backdrop (`z-index: 800`) to guarantee `.project-switch` toggle clicks are never intercepted.
-- In-place project rename input (`aria-label="Project name"`) and visible `✓ Save` button (`.canvas-first-project-save-btn`) in the topbar row, supporting instant renaming on Save click, Enter key, or blur with accessible toast feedback.
-- Zoom-adaptive canvas dot grid dynamically scaling gap (20px at zoom ≥ 0.85, 40px at 0.45–0.85, 80px below 0.45), dot radius (1.8 to 2.5), and contrast for effortless visibility at every camera distance without dot crowding or moiré patterns.
-- Left Studio Activity Bar (`.canvas-first-left-rail`) housing primary workspace activity buttons: Add Component catalog toggle (`button[aria-label="Add component"]`), Workloads inspector toggle (`button[aria-label="Workloads"]`), Architecture Revisions drawer toggle (`button[aria-label="Architecture Revisions"]`), Saved Runs trigger (`button[aria-label="Saved runs"]`), and bottom utility Export (`button[aria-label="Export options"]`) and Guide.
-- Consolidated Canvas Floating Dock (`.canvas-floating-dock`) grouping Undo, Redo, Select, Pan, Group, Add Note, Zoom In/Out, and Fit View directly at the bottom-center of the canvas.
-- Single unified Studio Menu (`.studio-menu-card`, `src/components/StudioMenu.tsx`) anchored to `.project-switch` dropdown in the topbar, integrating project switching, `+ New project`, starter templates, checkpoint creation and rollback, revisions, portable JSON export/import, and saved comparisons.
-- Floating Component Catalog panel and Architecture Revisions panel (`.canvas-first-catalog-drawer`) floating seamlessly over the canvas, preserving zoom and avoiding layout shifts.
-- Tailwind CSS v4 integration via `@tailwindcss/vite` and `@theme inline` with Zinc/Neutral shadcn design tokens in `src/styles.css`.
-- Reusable shadcn-ui component primitives in `src/components/ui/`: `Button`, `Dialog`, `DropdownMenu`, `Tooltip`, `Badge`, `Input`, `Separator`, `Tabs`.
-- Decomposed layout architecture in `src/components/layout/`: `TopBar.tsx`, `ActivityRail.tsx`, `CanvasFloatingDock.tsx`, and `ResultsStrip.tsx` extracted from monolithic `App.tsx`.
-- Form controls modernization: `NumberField`, `JobControls`, and `ServiceModelEditor` upgraded to shadcn `Input` and `Button` primitives.
-- OpenInspector modernization (`src/components/OpenInspector.tsx`): Subsystem action buttons, behavior badges, identity text inputs, and node action buttons (Generate Traffic, Duplicate Node, Delete Node) upgraded with shadcn `Button`, `Badge`, and `Input`.
-- Component catalog drawer modernization (`src/App.tsx`): Standardized search bar with shadcn `Input` and search icon, category count badges with `Badge`, and drawer close trigger with `Button`.
-- Modal overlays modernization: `ExamplesPanel.tsx` and `StudioMenu.tsx` upgraded with shadcn `Button`, `Badge`, and `Input` while strictly preserving accessible ARIA roles, labels, and keyboard navigation.
-- Secondary panels and controls modernization:
-  - `src/components/DiagramExport.tsx`: Standalone SVG and PNG export triggers modernized with shadcn `Button` (`export-svg-btn`, `export-png-btn`).
-  - `src/components/CanvasNotes.tsx`: `NoteInspector` upgraded with shadcn `Input` for note title and shadcn `Button` for Apply, Cancel, Collapse/Expand, and Delete note actions.
-  - `src/components/SubsystemsPanel.tsx`: Subsystem member counts and dormant indicator converted to shadcn `Badge`, with ungroup action upgraded to shadcn `Button`.
-  - `src/components/OpenWorkloadControls.tsx`: Add/remove workload actions, workload enabled/disabled status, and request class additions, deletions, name, and tag inputs modernized with shadcn `Button`, `Badge`, and `Input` primitives.
-  - `src/components/RevisionsPanel.tsx`: New revision trigger, draft save and cancel, finalize draft, and restore to canvas actions modernized with shadcn `Button`; revision fields modernized with shadcn `Input`.
-  - `src/components/OpenConnectionEditor.tsx`: Done/close triggers, Confirm Connection, and Delete Connection actions modernized with shadcn `Button`; connection label, protocol, and match value inputs upgraded with shadcn `Input`.
-  - `src/components/DiagramOrganization.tsx`: Selection mode toggle, clear selection, 4 directional alignment buttons, and horizontal/vertical distribution actions upgraded with shadcn `Button`.
-  - `src/components/RoutingPanel.tsx`: Add service instance action modernized with shadcn `Button`.
-  - `src/components/CanvasContextMenu.tsx`: Subsystem creation and renaming dialog inputs and actions modernized with shadcn `Input` and `Button`, with full ArrowDown/ArrowUp/Home/End keyboard accessibility.
-  - `src/components/ResultsPanel.tsx`: Close button, undo delete trigger, saved result name input, model restore, and delete result buttons upgraded with shadcn `Button` and `Input`.
-  - `src/components/ArchitectureCanvas.tsx`: Diagram connection editor delete action and label/protocol inputs modernized with shadcn `Button` and `Input`.
-  - `src/components/Inspector.tsx`: Diagram category badge, name/custom-type inputs, duplicate component button, delete component button, and inspect internals toggle modernized with shadcn `Button`, `Input`, and `Badge`.
-  - `src/App.tsx`: Tutorial guide close and dismiss actions modernized with shadcn `Button`.
-- Semantic `data-testid` test identifiers across layout chrome, activity rail, dock, and results strip, with IPv4 loopback alignment in `playwright.config.ts`.
-- E2E timing resilience: Settle wait added after subsystem collapse before capturing `collapsedViewport` in `tests/export.spec.ts`, and pause confirmation added before asserting throughput in `tests/internals.spec.ts`.
-
-Current verification baseline:
-- 233 unit tests across 36 files (`npm test`, 2.59s).
-- Passing production build (`npm run build`, 550ms).
-- 45 passing production Chromium journeys across 5 workers (`TEST_PRODUCTION=1 npm run test:e2e`, 30.0s).
-- Clean whitespace and format (`git diff --check`).
-
-Authored architecture revisions are now implemented as optional `Project.revisions` metadata. Up to 20 immutable draft/final snapshots include graph (and notes), subsystems and expanded component views, with author, timestamp, reason, explanation and optional http/https issue URL. Finalization creates a new final copy linked to the saved draft; it does not capture current canvas edits. Project controls provide comparison against current canvas or another revision and restore. Restore uses a history entry with optional view metadata so Undo/Redo restores graph and presentation together; ordinary graph edits keep the previous dormant-subsystem behavior. Project identity, camera, checkpoints and saved results remain intact. Version-7 exports/imports preserve revision IDs and links within a new project copy. Authors are self-reported; no shared accounts, team approval or cloud sync is implemented.
-
-Current architecture-component milestone: a separate diagram scenario offers 29 searchable components across six system layers, including a generic custom type, up to 100 nodes/200 connections, free directed wiring, editable names and responsibility/technology notes. Every diagram node can be duplicated as a configured, independent unconnected copy. Diagram mode is explicitly non-executable: it hides traffic-rate edge labels, disables Run/Reset, and keeps the existing exact simulations unchanged.
-
-Three architecture templates create fresh editable real-time chat, ecommerce checkout and event-processing graphs. Loading is explicit and one-step undoable; project identity, checkpoints, saved results and dormant view metadata remain intact.
-
-Diagram canvases support transient multi-selection by Shift-click or an explicit component checklist. Alignment, equal-gap distribution and selected-set dragging update positions atomically with one Undo/Redo entry. Collapsed subsystem members are excluded, expanded boundaries resize around moved members, and diagram-only collapsed groups use architecture copy instead of simulation counters.
-
-Diagram mode now exports the complete current subsystem view as standalone SVG or PNG from the bottom guidance strip. Export ignores editor viewport and selection, preserves positions and classified paths, and leaves JSON backup behavior unchanged. PNG shares the vector renderer and applies bounded raster dimensions before browser image decoding.
-
-Connection semantics now persist on diagram edges: optional 60-character relationship label, 30-character protocol, and sync/async/data classification. Selected edges open a touch-safe canvas editor and render solid/dashed/dotted paths respectively.
-
-Canvas notes are implemented as presentation metadata on diagram graphs. They support five types (decision, assumption, future scope, question and general note), 80-character titles, 1,000-character bodies and up to 100 notes. **Add canvas note** creates a note and selects it; the inspector applies or cancels edits. Notes can move, collapse, and delete through undoable history. Optional node, edge and subsystem attachments remain in place and preserve unresolved targets so undo can restore the link. Checkpoints and version-7 JSON exports preserve notes separately from the executable worker model. SVG/PNG export includes notes with compact visible text; SVG titles retain full note content.
-
-Current finite-cache semantics: keys depend on seed, request ordinal and normalized URL popularity independently of arrivals. Finite LRU begins empty, decides at cache completion and fills only on live database completion. TTL starts at fill; hits refresh recency only. Expired active work holds its slot; timeout-before-database-completion cannot fill. There is no miss coalescing, write or invalidation model. All service instances share the cache. Observed hit rate uses completed hits plus misses, excluding pre-decision rejection/expiry.
-
-Agent workflow is defined in `AGENTS.md`: use the current lead model for complex architecture, integration and review; use bounded `gpt-5.6-luna` scout, implementer and verifier children when independent work benefits from delegation; optionally use external `agy` only for bounded, low-risk proposals with parent verification. Use graphify's existing-graph fast path for code exploration and verify source before editing.
-
-## Current status — canvas notes and canvas organization implemented
-
-The user authorized all remaining concrete steps and explicitly removed backward-compatibility requirements. Completed the agreed milestones: background jobs, canvas subsystem composition, guided experiments, and typed canvas notes. No additional milestones are being pursued automatically. No push or deployment.
-
-### Checkpoints
-
-- `398de12`: previous concurrent-service-worker milestone.
-- `d690abb`: queued background-job engine, components, accounting and current portable format.
-- `94de180`: editable subsystem composition and initial guide scaffolding.
-- Final guide/verification/documentation checkpoint: `git log -1`.
-- `130b3b6`: load-balanced service instances and browser verification.
-- `e2360df`: bounded finite-cache helper with expiry and LRU boundary tests.
-- `b84834e`: completed finite-cache and URL-popularity milestone.
-- `e65cfe7`: searchable architecture component library and diagram mode.
-- `a942f8c`: editable diagram relationship labels, protocols and flow types.
-
-### What works
-
-- Three runnable paths: traffic → service → optional cache → database; traffic → round-robin load balancer → service instances → shared optional cache/database; producer → queue → worker pool.
-- Steady, burst and ramp workloads with seeded exact replay, per-worker capacities, bounded FIFO waiting and absolute deadlines.
-- Background jobs separate admission/producer acknowledgements from job completion, use seeded per-attempt failure draws, bounded fixed-delay retries and explicit permanent failure accounting.
-- Expandable component views and atomic inline service/job settings; Undo/Redo, inspector synchronization, local projects/checkpoints, portable exports and immutable saved comparisons.
-- One-level non-overlapping named subsystems wrap real components. Collapse shows aggregate waiting/active work and boundary connections; expand exposes editable children. Group dragging moves members together. Subsystems are view metadata, never a replacement engine model.
-- Six guided starters: cache pressure, worker scaling, job burst recovery, retry cost, horizontal service scaling and finite-cache warm-up.
-- `Warm a finite cache` demonstrates a cold finite cache under hot-link traffic and compares cache size using the same seeded arrivals.
-
-### Important semantics
-
-Worker capacity is per worker; total is workers × capacity. Each attempt/request takes 1 / per-worker capacity. Service/job workers support 1–16 slots. Database/cache stay serial. Utilization divides occupied processor time by workers × elapsed time. Workers are ideal independent slots, not hardware replicas.
-
-For jobs, successful admission schedules a producer acknowledgement 8 ms later, independently of the eventual outcome. Acknowledgement does not mean completion or a real durable broker. Deadline starts at original submission and includes waiting, retry backoff and attempts. Backoff uses no worker; expired active work holds its slot until processing ends. Initial queue-full admission is rejected. Full retry re-entry or exhausted retries fails permanently. No crashes or duplicate delivery.
-
-Job invariant: generated = completed + admission rejected + expired + permanently failed + in flight. Accepted = generated − admission rejected. Acknowledgements are separate and may lag at the observation boundary. Successful-job latency includes waiting/retries. Observed attempt rates include retry work.
-
-### Persistence and compatibility policy
-
-Current portable format is version 7; old portable formats are intentionally not imported. Browser-local records are not deleted or reset. Very old saved result models can remain in local records but may need rerunning before importing a current export containing them; preserve old exports as archives. Current lookup results use url-lookup/5, load-balanced lookup uses the same model with routing measurements, and jobs use background-jobs/1. Imported metrics are validated structurally, not authenticated or rerun.
-
-URL popularity is part of the workload: uniform and hot-link distributions are intentionally unmatched comparisons. Cache mode, capacity and TTL are architecture changes and remain comparable when the popularity workload matches.
-
-Subsystems belong to Project.subsystems; missing members remain dormant through model undo. Creating new groups retains groups relevant to the current model. Graph.guideId is learning metadata excluded from the worker-reset signature. Renderer measurements are retained for components and groups so worker updates do not hide/remount views. Viewport restoration accounts for canvas height and node identity, preserving manual zoom for unchanged layouts.
-
-### Verification and evidence
-
-- Fresh verification on 8 September 2026: all 96 unit tests pass across 19 files, including template factory isolation, metadata, history and project-data preservation.
-- Canvas-organization verification on 9 September 2026: 102 unit tests pass across 20 files; focused production browser coverage passes 2 journeys in 4.8 seconds, and the complete production suite passes all 35 journeys in 38.5 seconds. Production build passes at 599.82 KB / 188.55 KB gzip with the existing chunk-size warning.
-- All 33 production Chromium journeys pass, including all three editable templates, custom-component desktop/mobile flows, diagram editing, finite caches, routing, jobs, saved results, subsystems and legacy lookup workflows. Command: `TEST_PRODUCTION=1 npm run test:e2e`.
-- TypeScript and Vite build pass. Main entry 590.22 KB /186.17 KB gzip; the known chunk-size warning remains. Results UI is deferred; no mobile-device frame-rate claim.
-- Direct bounded visual QA: artifacts/background-jobs.png, background-jobs-mobile.png, subsystem-collapsed.png, subsystem-expanded.png, subsystem-mobile.png, guided-experiment.png, guided-mobile.png. No new independent visual review is claimed.
-- Full evidence and historical milestones: artifacts/VERIFICATION.md. Usage: README.md. Product/design authority: PRODUCT.md, DESIGN.md.
-
-### Resume instructions
-
-Workspace: /Users/ankushjamdagani/personal/system-design-planner. Preview: http://localhost:5173/ (npm run dev if not running). Run npm test, npm run build and TEST_PRODUCTION=1 npm run test:e2e for production verification. Preserve the light docked design, exact accounting, separation of configured/observed values, and view/model boundaries. Current finite roadmap is complete; do not invent endless extras.
-
-Latest image-export verification: 115 unit tests, production build (608.58 KB /192.18 KB gzip main entry), and all 37 production Chromium journeys pass. SVG metadata is escaped; PNG source sizing occurs before decoding. Full notes are in SVG titles, and visible text is bounded. No additional milestone is started automatically.
-
-Current canvas-notes verification (10 September 2026): all 127 unit tests across 24 files pass; TypeScript and the production build pass (617.09 KB main entry / 194.52 KB gzip). The complete production Chromium suite passes all 39 journeys with 5 workers in 38.3 seconds, including export, notes, organization, mobile containment and pause/resume. Both focused export journeys also pass. Earlier intermittent timing failures did not reproduce in this run; this does not establish that all flakiness is eliminated. SVG metadata is escaped, full note content is retained in SVG titles, and visible export text is bounded. The existing bundle-size warning remains. Verification is complete; no new milestone is started automatically.
-
-Current authored revisions verification (12 September 2026): all 133 unit tests across 25 files pass; TypeScript and the production build pass (625.74 KB main entry / 196.60 KB gzip). Playwright revision journeys pass on desktop and mobile (tests/revisions.spec.ts: 2 passed; tests/notes.spec.ts: 2 passed). Revisions provide local immutable snapshots, metadata, draft/final copies, visual comparison and undoable restore. No additional milestone is started automatically.
-
-## Product goals recorded for future work
-
-The longer-term collaboration goal is shared team architecture workspaces. Local authored revisions now provide metadata, draft/final snapshots, comparison and restore. Future collaboration scope expands this with:
-- Shared storage, authenticated authorship, team review, access control and a multi-user conflict model.
-- Scoped subsystem revisions and concurrent review cycles: dedicated UX for proposing, reviewing, and tracking changes to specific subsystems or component groups, supporting multiple in-flight revisions simultaneously with distinct canvas identification and targeted feedback threads.
-- Cross-project architecture linking and impact analysis: enabling independent teams to maintain their own system architectures and connect them via typed external links (sync RPC, async streams, shared data, schema contracts), with automated detection and impact analysis when linked external services change.
-- Collaboration with AI as a visual decision-making playground: establishing the canvas as the shared playground for architectural decision-making between developers and AI agents. Instead of blind vibe coding with untracked architectural choices made implicitly in source code, developers visually review the system implementation plan first, co-design through iterative AI revision proposals, test tradeoffs with deterministic simulations, and conclude a finalized architecture plan before writing code.
+1. Work on `master`. The main checkout was still on `codex/canvas-first-workspace` at consolidation because of an uncommitted `.claude/launch.json`; switch it to `master` once that change is committed or set aside. The old branches `codex/canvas-first-workspace` and `claude/rv-01a-tokens` are fully merged and can be deleted afterwards.
+2. Read the invariants above, then the relevant `specs/revamp/` contract before changing domain, runner, persistence or canvas behavior.
+3. Run checks proportional to the change and record the task in `ACTION_LOG.md` (with a `Lesson:` line when something surprised you).
