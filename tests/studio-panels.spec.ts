@@ -137,6 +137,7 @@ test.describe('RV-12h: History and Library panels', () => {
 
     // The dock command focuses the singleton Library panel.
     await page.getByTestId('dock-component-btn').click();
+    await page.getByTestId('library-picker-full-library-btn').click();
     const libraryPanel = page.locator('[data-panel-id="library"]');
     await expect(libraryPanel).toBeVisible();
     const panel = page.getByTestId('library-panel');

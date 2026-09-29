@@ -79,6 +79,10 @@ async function newElementId(page: Page, before: string[]): Promise<string> {
 async function openLibrary(page: Page) {
   await waitForIdle(page);
   await page.getByTestId('dock-component-btn').click();
+  // With the panel already open the dock focuses it; otherwise it opens the 16E
+  // picker, whose "Browse full library" link opens the panel (D30 amended).
+  const alreadyOpen = await page.getByTestId('library-panel').isVisible();
+  if (!alreadyOpen) await page.getByTestId('library-picker-full-library-btn').click();
   await expect(page.getByTestId('library-panel')).toBeVisible();
 }
 
@@ -375,6 +379,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     const before = await elementIds(page);
 
     await page.getByTestId('dock-component-btn').click();
+    await page.getByTestId('library-picker-full-library-btn').click();
     const library = page.getByTestId('library-panel');
     await expect(library).toBeVisible();
     const searchInput = library.locator('input[type="search"]');

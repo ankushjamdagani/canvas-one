@@ -4,10 +4,10 @@ import { test, expect, type Page } from '@playwright/test';
  * RV-13b: Library panel journeys (screens 12A list, 12B grid, 12C hover/focus
  * detail; specs/revamp/contracts/catalog.md section 5).
  *
- * Not covered: the compact 16E picker. `LibraryPicker` exists in
- * src/features/library but is not mounted anywhere in the workspace, so no
- * dock or shortcut reaches it (the dock Component button focuses the docked
- * Library panel, which is what these specs drive).
+ * The dock Component button opens the compact 16E picker while the Library
+ * panel is closed (D30 as amended 2026-09-29); these panel journeys reach the
+ * panel through the picker's "Browse full library" link. The picker itself is
+ * covered by the "16E compact picker" block below.
  */
 
 async function waitForIdle(page: Page) {
@@ -25,6 +25,7 @@ async function openBlankProject(page: Page, name: string) {
 
 async function openLibrary(page: Page) {
   await page.getByTestId('dock-component-btn').click();
+  await page.getByTestId('library-picker-full-library-btn').click();
   const panel = page.getByTestId('library-panel');
   await expect(panel).toBeVisible();
   return panel;
@@ -154,5 +155,49 @@ test.describe('RV-13b: Library panel', () => {
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );
     expect(overflows).toBe(false);
+  });
+});
+
+test.describe('16E compact picker (D30 amended 2026-09-29, R07)', () => {
+  test('the dock opens the picker, Enter places the selected entry with one undo, and the picker closes', async ({ page }) => {
+    await openBlankProject(page, `16E picker place ${Date.now()}`);
+    const dockButton = page.getByTestId('dock-component-btn');
+    await dockButton.click();
+    const picker = page.getByTestId('library-picker');
+    await expect(picker).toBeVisible();
+    await expect(dockButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('library-panel')).toHaveCount(0);
+
+    await picker.getByRole('searchbox', { name: 'Search components' }).fill('queue');
+    await picker.locator('[data-entry-id="queue"]').click();
+    await picker.locator('[data-entry-id="queue"]').press('Enter');
+    await expect(picker).toBeHidden();
+    await expect(page.locator('.component-node')).toHaveCount(1);
+    await waitForIdle(page);
+
+    await page.getByTestId('dock-undo-btn').click();
+    await expect(page.locator('.component-node')).toHaveCount(0);
+  });
+
+  test('never opens alongside the Library panel: with the panel open the dock focuses the panel', async ({ page }) => {
+    await openBlankProject(page, `16E picker singleton ${Date.now()}`);
+    await page.getByTestId('dock-component-btn').click();
+    await page.getByTestId('library-picker-full-library-btn').click();
+    await expect(page.getByTestId('library-panel')).toBeVisible();
+    await expect(page.getByTestId('library-picker')).toHaveCount(0);
+
+    await page.getByTestId('dock-component-btn').click();
+    await expect(page.getByTestId('library-panel')).toBeVisible();
+    await expect(page.getByTestId('library-picker')).toHaveCount(0);
+    await expect(page.getByTestId('dock-component-btn')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('Escape closes the picker without placing anything', async ({ page }) => {
+    await openBlankProject(page, `16E picker escape ${Date.now()}`);
+    await page.getByTestId('dock-component-btn').click();
+    await expect(page.getByTestId('library-picker')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('library-picker')).toHaveCount(0);
+    await expect(page.locator('.component-node')).toHaveCount(0);
   });
 });

@@ -61,3 +61,26 @@ test('short viewport: expanded results details leave a usable canvas', async ({ 
   const canvasHeight = await page.locator('.react-flow').evaluate((el) => el.getBoundingClientRect().height);
   expect(canvasHeight).toBeGreaterThanOrEqual(150);
 });
+
+test('390×844 touch: the 16E picker fits and places the selected entry with its Place button', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('blank-project-name-input').fill(`16E phone ${Date.now()}`);
+  await page.getByTestId('create-blank-project-btn').tap();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+
+  await page.getByTestId('dock-component-btn').tap();
+  const picker = page.getByTestId('library-picker');
+  await expect(picker).toBeVisible();
+  const box = (await picker.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+
+  await picker.locator('[data-entry-id="queue"]').tap();
+  const place = page.getByTestId('library-picker-place-btn');
+  await expect(place).toHaveText('Place Message Queue');
+  expect((await place.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await place.tap();
+  await expect(picker).toHaveCount(0);
+  await expect(page.locator('.component-node')).toHaveCount(1);
+});

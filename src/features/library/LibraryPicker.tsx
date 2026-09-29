@@ -205,14 +205,14 @@ export function LibraryPicker({
           }}
           placeholder="Search components, tags, groups..."
           aria-label="Search components"
-          className="w-full h-8 pl-8 pr-16 text-xs rounded-md bg-white border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-secondary-text focus:border-[var(--color-control-border-strong,#948D80)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
+          className="w-full h-8 pointer-coarse:h-11 pl-8 pr-16 text-xs rounded-md bg-white border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-secondary-text focus:border-[var(--color-control-border-strong,#948D80)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
         />
         {searchQuery.trim().length > 0 && (
           <button
             type="button"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search query"
-            className="absolute right-2 p-1 text-secondary-text hover:text-[var(--color-foreground,#16201D)]"
+            className="absolute right-2 p-1 pointer-coarse:size-11 pointer-coarse:right-0 inline-flex items-center justify-center text-secondary-text hover:text-[var(--color-foreground,#16201D)]"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -235,7 +235,7 @@ export function LibraryPicker({
               aria-selected={isActive}
               aria-label={`Filter by ${chip}`}
               onClick={() => setActiveGroup(chip)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none ${
+              className={`shrink-0 px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none ${
                 isActive
                   ? 'bg-[var(--color-accent,#EAEFEC)] border-[var(--color-primary,#0B5C54)] text-[var(--color-primary,#0B5C54)] font-semibold shadow-2xs'
                   : 'bg-white border-[var(--color-control-border,#DCD7CD)] text-secondary-text hover:bg-[var(--color-sunken,#F2EFE9)] hover:text-[var(--color-foreground,#16201D)]'
@@ -331,9 +331,21 @@ export function LibraryPicker({
 
       {/* Footer (16E) */}
       <div className="pt-2 border-t border-[var(--color-border,#E7E3DB)] flex items-center justify-between text-xs">
-        <div className="text-[11px] font-mono text-secondary-text">
+        <div className="text-[11px] font-mono text-secondary-text pointer-coarse:hidden">
           ↵ place at centre · drag to position
         </div>
+        {/* Touch has no Enter key or reliable double-tap, so coarse pointers get an
+            explicit Place action for the selected entry (D14). */}
+        {selectedEntry && (
+          <button
+            type="button"
+            data-testid="library-picker-place-btn"
+            onClick={() => onPlace(selectedEntry.entryId)}
+            className="hidden pointer-coarse:inline-flex items-center min-h-11 px-3 rounded-md bg-primary text-primary-foreground font-medium"
+          >
+            Place {selectedEntry.label}
+          </button>
+        )}
         {/*
           RV-12h: the docked Library panel now exists (panels.ts / PanelHost),
           so the picker's full-library link opens it via the caller-supplied
@@ -345,7 +357,7 @@ export function LibraryPicker({
           onClick={onOpenFullLibrary}
           aria-label="Browse full library"
           title="Browse full library"
-          className="flex items-center gap-1 font-medium text-primary hover:underline rounded px-1 py-0.5"
+          className="flex items-center gap-1 font-medium text-primary hover:underline rounded px-1 py-0.5 pointer-coarse:min-h-11"
         >
           <span>Browse full library</span>
           <ExternalLink className="w-3 h-3" />

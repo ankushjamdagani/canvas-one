@@ -962,6 +962,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         preferenceState={dockPreferenceState}
         onConfigure={onConfigureDock}
         onRestoreDefaults={onRestoreDockDefaults}
+        onPlaceEntry={(entryId) => void applyPlacement(entryId, getVisibleCentre())}
         onInvoke={(id: DockCommandId) => {
           if (id === 'run.start') {
             if (commandContext.selectedScenario) void onExecuteCommand(id, { scenarioId: commandContext.selectedScenario.id });

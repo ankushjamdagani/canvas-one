@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { LibraryPicker } from '../library/LibraryPicker';
 import { COMMAND_DEFINITIONS, getAvailability, type Availability, type CommandContext } from './commands/registry';
 import { changeDockConfig, DEFAULT_DOCK_CONFIG, DOCK_COMMAND_IDS, insertDockCommand, type DockCommandId, type DockConfig } from './dockConfig';
 
@@ -41,6 +42,8 @@ export interface FloatingDockProps {
   readonly onRestoreDefaults: () => void;
   readonly onAddNote: (text: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
   readonly onGroup: (label: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
+  /** 16E: places a catalog entry at the visible canvas centre from the compact picker. */
+  readonly onPlaceEntry: (entryId: string) => void;
 }
 
 function availability(id: DockCommandId, context: CommandContext): Availability {
@@ -52,12 +55,20 @@ function availability(id: DockCommandId, context: CommandContext): Availability 
 
 /** The same command view is used in the dock and its narrow-screen overflow. */
 export function FloatingDock({ dragMode, zoom, context, config, preferenceState, onInvoke,
-  onConfigure, onRestoreDefaults, onAddNote, onGroup }: FloatingDockProps) {
+  onConfigure, onRestoreDefaults, onAddNote, onGroup, onPlaceEntry }: FloatingDockProps) {
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [customizing, setCustomizing] = React.useState(false);
   const [textAction, setTextAction] = React.useState<'canvas.add-note' | 'selection.group' | null>(null);
   const [textValue, setTextValue] = React.useState('');
   const [textError, setTextError] = React.useState<string | null>(null);
+  // 16E compact picker (D30 as amended 2026-09-29): the dock's Component button opens it
+  // only while the Library panel is closed; with the panel open it focuses the panel, so
+  // the picker and the panel are never open together (R07).
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const libraryPanelOpen = context.panels.library.open;
+  React.useEffect(() => {
+    if (libraryPanelOpen) setPickerOpen(false);
+  }, [libraryPanelOpen]);
   const [dropTarget, setDropTarget] = React.useState<DockCommandId | 'dock' | null>(null);
   const [narrow, setNarrow] = React.useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
   React.useEffect(() => {
@@ -69,7 +80,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   const zoomPercent = Math.round(zoom * 100);
 
   function invoke(id: DockCommandId) {
-    if (id === 'canvas.add-note' || id === 'selection.group') {
+    if (id === 'library.open' && !libraryPanelOpen) {
+      setMoreOpen(false);
+      setPickerOpen((open) => !open);
+    } else if (id === 'canvas.add-note' || id === 'selection.group') {
       setMoreOpen(false);
       setTextAction(id);
       setTextValue('');
@@ -96,7 +110,8 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
     const state = availability(id, context);
     const Icon = ICONS[id];
     const active = (id === 'canvas.select-tool' && dragMode === 'select') ||
-      (id === 'canvas.pan-tool' && dragMode === 'pan');
+      (id === 'canvas.pan-tool' && dragMode === 'pan') ||
+      (id === 'library.open' && (pickerOpen || libraryPanelOpen));
     return (
       <Button key={id} type="button" variant={active ? 'tint' : 'ghost'}
         size={compact ? 'sm' : 'icon'}
@@ -238,6 +253,19 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
               {textAction === 'canvas.add-note' ? 'Add note' : 'Group'}
             </Button></div>
           </form>
+        </PopoverContent>
+      </Popover>
+      <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+        <PopoverAnchor asChild><span className="absolute left-1/2 top-0" /></PopoverAnchor>
+        <PopoverContent side="top" align="center" sideOffset={8}
+          className="w-[min(640px,calc(100vw-24px))] p-0 border-0 bg-transparent shadow-none"
+          data-testid="dock-library-picker-popover"
+          onDragEnd={() => setPickerOpen(false)}>
+          <LibraryPicker
+            onPlace={(entryId) => { setPickerOpen(false); onPlaceEntry(entryId); }}
+            onOpenFullLibrary={() => { setPickerOpen(false); onInvoke('library.open'); }}
+            onClose={() => setPickerOpen(false)}
+          />
         </PopoverContent>
       </Popover>
     </div>

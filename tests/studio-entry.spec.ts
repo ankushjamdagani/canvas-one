@@ -56,6 +56,7 @@ test.describe('RV-13b: Entry screen', () => {
 
     // Editable: a Library placement adds a node and autosaves.
     await page.getByTestId('dock-component-btn').click();
+    await page.getByTestId('library-picker-full-library-btn').click();
     const library = page.getByTestId('library-panel');
     await library.locator('[data-entry-id="queue"]').click();
     await library.getByRole('button', { name: 'Place Message Queue on canvas' }).click();
@@ -83,6 +84,7 @@ test.describe('RV-13b: Entry screen', () => {
       const before = await page.locator('.component-node').count();
 
       await page.getByTestId('dock-component-btn').click();
+      await page.getByTestId('library-picker-full-library-btn').click();
       const library = page.getByTestId('library-panel');
       await library.locator('[data-entry-id="queue"]').click();
       await library.getByRole('button', { name: 'Place Message Queue on canvas' }).click();
