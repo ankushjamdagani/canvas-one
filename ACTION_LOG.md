@@ -1354,3 +1354,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: 1328 unit; `npx tsc -b`; production build (existing large-chunk warning); isolated production Playwright on port 5199: 29 passed / 4 skipped; `git diff --check` clean; preview check of the confirmation dialog and the +24/+24 copy.
 - **Limitations**: request-class IDs on copied resource calls are remapped (detached copies), so a duplicate doesn't share the original's request class with existing scenarios. Saved-part repository, Library save, part files and Replace part remain.
 
+## 2026-09-29
+
+### RV-09b saved parts, RV-03r branch controls, RV-04f dock customization
+
+- **Outcome**: UI line advanced to `116f078`. Added durable validated saved parts with Library save/search/place and standalone import/export; typed branch create/reopen with dirty-draft guards and closed-branch switch protection; and the contracted 16-command customizable dock with responsive overflow and durable shared-CAS preferences.
+- **Files**: parts validation/repository/Library/session/workspace and transfer tests; branch session/registry/popover/top-bar tests; dock model, registry, workspace/canvas/dock preference integration and migrated production journeys.
+- **Platform/subagents**: `/delegate` workflow with parallel ChatGPT executors: gpt-6-astra (saved parts), gpt-6-sol (dock), gpt-6-luna (branches); Codex lead integrated, resolved shared-file conflicts and reviewed the closed-branch edge case. Executor usage windows interrupted once; work resumed from intact isolated worktrees.
+- **Verification**: combined 1,353 unit tests; TypeScript + production build; production Chromium 34 passed / 4 specimen tests skipped; `git diff --check` clean. Existing Vite large-chunk warning remains.
+- **Limitations**: Replace part remains omitted because no precise command is contracted. Project backup parts stay validated but do not populate an imported project's Library; standalone part import assigns a fresh identity. Pre-existing modified artifact screenshots in the UI worktree were preserved and not committed.
