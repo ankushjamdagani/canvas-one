@@ -456,7 +456,7 @@ export async function buildManifest(
   // --------------------------------------------------------------------------
   // scenario projection (model-and-runner.md §7 "Scenario | label | everything else.
   // Scope lists are sorted as sets; inputs, faults, operations and transitions stay
-  // ordered."). scopeElementIds is the scope list sorted as a set; entryPorts, inputs,
+  // ordered."). scopeElementIds and entryPorts are sorted as sets; inputs,
   // workloads, faults, boundaries, refinementSelections, initialContexts stay in
   // authored order.
   // --------------------------------------------------------------------------
@@ -510,7 +510,11 @@ export async function buildManifest(
     revision: scenario.revision,
     mode: scenario.mode,
     scopeElementIds: [...scenario.scopeElementIds].sort(),
-    entryPorts: scenario.entryPorts, // authored order (not a "scope list" of bare IDs)
+    // A set (user decision 2026-09-29): the runner ignores entry-port order, so reordering
+    // must not change the fingerprint. Sorted by elementId, then portId (UTF-16 code units).
+    entryPorts: [...scenario.entryPorts].sort((x, y) =>
+      x.elementId < y.elementId ? -1 : x.elementId > y.elementId ? 1 : x.portId < y.portId ? -1 : x.portId > y.portId ? 1 : 0,
+    ),
     inputs: scenario.inputs,
     workloads,
     faults: scenario.faults,

@@ -95,6 +95,26 @@ describe('buildManifest golden vectors: equal fingerprint (run-identity.md §2)'
     }
   });
 
+  it('is unaffected by reordered scenario entryPorts (a set, user decision 2026-09-29)', async () => {
+    const doc = loadFixture('s01.json');
+    const scenario = doc.scenarios.find((s: { entryPorts: unknown[] }) => s.entryPorts.length > 1);
+    expect(scenario).toBeDefined();
+    const a = await buildManifest(doc, scenario.id, VERSIONS);
+
+    const reordered = structuredClone(doc);
+    const target = reordered.scenarios.find((s: { id: string }) => s.id === scenario.id);
+    target.entryPorts = [...target.entryPorts].reverse();
+
+    const b = await buildManifest(reordered, scenario.id, VERSIONS);
+    expect(a.status).toBe('ok');
+    expect(b.status).toBe('ok');
+    if (a.status === 'ok' && b.status === 'ok') {
+      expect(b.fingerprint).toBe(a.fingerprint);
+      const endpoints = a.manifest.scenario.entryPorts.map((e) => `${e.elementId}\u0000${e.portId}`);
+      expect(endpoints).toEqual([...endpoints].sort());
+    }
+  });
+
   it('is unaffected by presentation-only changes (labels, descriptions, views/placements, visualKind)', async () => {
     const doc = loadFixture('s01.json');
     const scenarioId = doc.scenarios[0].id;
