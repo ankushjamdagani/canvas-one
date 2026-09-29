@@ -15,21 +15,8 @@ Preserve in all work touching architecture, simulation, persistence, exports or 
 
 - **Branch:** `master` holds everything: app, specs, ledger and agent workflow (merged `@ 3b4bda9` from the UI line, the ledger branch and the two workflow branches (`/retro` learning loop, `/delegate` hardening)). No remote is configured; nothing has been pushed.
 - **Revamp:** RV-01 to RV-17 are complete. RV-13 (release acceptance) and RV-17 (design conformance) were accepted by the user. The app runs only on the studio model and `system-studio-local-v1`. Ledger: [`specs/revamp/delivery.md`](specs/revamp/delivery.md). Reports: [`rv13-acceptance.md`](specs/revamp/rv13-acceptance.md), [`rv15-retirement.md`](specs/revamp/rv15-retirement.md).
-- **Verification baseline on master:** 1,420 unit tests (123 files); `npx tsc -b` clean; production build passes with no chunk over 500 kB (entry path 702 kB / 197 kB gzip across `react-vendor`, `storage-vendor` and `index`; workspace chunk 384 kB plus `canvas-vendor` 178 kB, prefetched on idle); production Chromium 78 passed / 4 skipped (dev-only specimen) in about 32 s.
-
-## Code map
-
-| Area | Location |
-|---|---|
-| Studio model, validation, readiness, closure, manifest | `src/domain/studio/` |
-| Scenario runner (S01–S05 families) and trace | `src/domain/studio/runner/` |
-| Versioning (branches, checkpoints, commits, merge, publish) | `src/domain/versioning/` |
-| Parts copy engine | `src/domain/parts/` |
-| Local repository (Dexie `system-studio-local-v1`), import/export, pruning | `src/persistence/studio/` |
-| Retained open kernel + goldens | `src/simulation/open/` (types in `src/domain/execution.ts`, arrivals in `workload.ts`) |
-| App shell and features | `src/App.tsx`, `src/features/{session,workspace,inspector,library,catalog,panels,history,runs,scenarios,transfer,entry}` |
-| Primitives, tokens, specimen | `src/components/ui/`, `src/components/studio/`, `src/styles.css` |
-| Reference fixtures S01–S05 | `specs/revamp/fixtures/` (also the entry-screen examples) |
+- **Verification baseline on master:** 1,429 unit tests (125 files); `npx tsc -b` clean; production build passes with no chunk over 500 kB (entry path 702 kB / 197 kB gzip across `react-vendor`, `storage-vendor` and `index`; workspace chunk 384 kB plus `canvas-vendor` 178 kB, prefetched on idle); production Chromium 79 passed / 4 skipped (dev-only specimen) in about 33 s; `node scripts/a11y-audit.mjs` reports no axe violations.
+- **Design and accessibility reports:** [`visual-acceptance.md`](specs/revamp/visual-acceptance.md) (screens vs the design boards; open O1–O4 need design decisions), [`accessibility.md`](specs/revamp/accessibility.md) (WCAG 2.2 AA pass). The design package lives untracked in `artifacts/design/Copy of Elegant and modern design refresh/`.
 
 ## Running and verifying
 
@@ -37,6 +24,7 @@ Preserve in all work touching architecture, simulation, persistence, exports or 
 npm run dev          # http://localhost:5173
 npm test             # unit (src/**/*.test.ts only; TSX tests need deliberate setup)
 npm run build
+node scripts/a11y-audit.mjs   # axe over 11 states at desktop and phone (after a build)
 ```
 
 Production e2e: `playwright.config.ts` reuses any server already on port 5174, which can test a stale build. For acceptance runs use a throwaway config with an isolated port, `reuseExistingServer: false`, 2 workers and no retries, then run `TEST_PRODUCTION=1 npx playwright test --config <that file>`.
@@ -47,10 +35,10 @@ Tracked here until resolved; none blocks release.
 
 | Item | Where | Notes |
 |---|---|---|
-| "Filled" field placeholder (RV-01 residual) | primitives | Needs the Design System board (`System Studio Design System.dc.html`), which isn't on this machine |
-| No automated test for Button `loading` + `asChild` spinner | `components/ui/button.tsx` | Unit config excludes TSX |
+| Visual open items O1–O4 (dock labels, anchored 16D toolbar and empty multi-select inspector, compact scenario editor rows, kind tag tone) | [`visual-acceptance.md`](specs/revamp/visual-acceptance.md) | Need a design decision, not a guess |
+| Accessibility gaps not yet assessed: screen reader, keyboard-only canvas editing, text spacing, forced colours | [`accessibility.md`](specs/revamp/accessibility.md) | Automated and keyboard probes are clean |
 
-Resolved 2026-09-29 (see `ACTION_LOG.md`): stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
+Resolved 2026-09-29 (see `ACTION_LOG.md`): the Button spinner test, the filled-field state (design package found), stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
 
 Accepted limitations (by design, not debt): router + bridge routes rejected by readiness until the runner supports them; runtime refinement maps one level of ports; the 16E picker is catalog-only (saved parts live in the Library panel); Replace part has no contracted command.
 

@@ -1517,3 +1517,23 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 ### Retro (Claude)
 - **Range**: 2026-09-23 → 2026-09-29, 57 entries
 - **Changed**: LESSONS.md +6 ~4 -0 (now 23 rules); merged the two browser-suite rules into one isolated-port rule, replaced the obsolete large-chunk-warning rule, moved the two code rules into a new "Code" section. The proposal miscounted the starting total as 16; it was 18.
+
+### Button spinner test, filled fields, board comparison (items 1–3)
+
+- **Outcome**:
+  - `8c0d87a`: unit test for the Button `loading` spinner and `aria-busy`, native and `asChild` (mutation-checked).
+  - `9ed3fb3`: the design package turned up in `artifacts/design/Copy of Elegant and modern design refresh/` (left untracked). Filled fields: primitives default to an invisible placeholder so the `:placeholder-shown` fill rule works (38 of 49 fields had none); `bg-canvas` overrides removed; connect form moved to the `Input` primitive.
+  - `0cf947b`: 15 board screens captured at board size against the app. Unlayered `p`/`h2`/`h3`/`select` rules and a legacy raw-`<button>` rule were overriding Tailwind classes app-wide; moved into `@layer base` / reduced to the cursor. One `text-meta` label token, white hairline nodes, 26 px `#EFEBE3` grid (`--hairline-soft`), white entry cards.
+  - `9b7a84a`: [`visual-acceptance.md`](specs/revamp/visual-acceptance.md): V1–V7 fixed, intentional deviations, open O1–O4 for design decisions.
+- **Platform/subagents**: Claude lead, no subagents.
+- **Verification**: 1,429 unit tests; `npx tsc -b`; production build; isolated production Playwright 78 passed / 4 skipped; responsive sweep 45/45; touch audit 0 under 44 px; computed-style probes for the fixes.
+- **Lesson:** an unlayered element rule in `styles.css` beats every Tailwind utility on that element, so a class that "does nothing" may be losing to base CSS; the fill check also read the pre-transition colour until it waited out `transition-colors`.
+
+### Accessibility pass (item 4)
+
+- **Outcome** (`cb8792b`): `scripts/a11y-audit.mjs` (axe, WCAG 2.0–2.2 A/AA, 11 states × desktop/phone, `@axe-core/playwright` dev dependency). Fixed nested-interactive scenario rows, keyboard-unreachable results scroll regions, panel open not focusing the panel, Quick options and 16E picker leaving focus on `<body>`, overlay panels (<1200 px) that weren't dialogs (no trap, Escape, backdrop close or focus return), and 320 px clipping of Run/scenario switcher (also at 360 px), selection toolbar and Quick options. Report: [`accessibility.md`](specs/revamp/accessibility.md).
+- **Files**: `PanelHost`, `PanelHeader`, `Workspace`, `QuickOptions`, `FloatingDock`, `TopBar`, `SelectionToolbar`, `ScenarioSwitcher`, `ResultsRegion`, `tests/studio-phone.spec.ts`, `scripts/a11y-audit.mjs`, package files; HANDOFF.
+- **Platform/subagents**: Claude lead, no subagents.
+- **Verification**: axe no violations; focus-return probe all ok; 320 px reflow 9/9 states; 1,429 unit tests; `npx tsc -b`; production build; isolated production Playwright 79 passed / 4 skipped (new 320 px test); responsive sweep 45/45; touch audit 0 targets under 44 px; `git diff --check` clean.
+- **Limitations**: no screen-reader session, keyboard-only canvas editing, text-spacing or forced-colours check; 200 % zoom simulated by viewport. Below 390 px History is reached through Quick options only.
+- **Lesson:** axe passing said nothing about the overlay panels: they had no dialog role, so no rule fired. Keyboard probes (open with Enter, close with Escape, read `activeElement`) found five of the six real defects.
