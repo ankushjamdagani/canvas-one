@@ -346,6 +346,10 @@ export class LatencyCollector {
     this.values.push(ms);
   }
 
+  get count(): number {
+    return this.values.length;
+  }
+
   snapshot(): { mean: number; p95: number } {
     if (this.values.length === 0) return { mean: 0, p95: 0 };
     let sum = 0;
@@ -380,6 +384,12 @@ export class OpenSimulation {
   protected rootsExpired = 0;
   protected rootsInFlight = 0;
   protected latencies = new LatencyCollector();
+  /**
+   * Per-node response time of successful operations: from arrival at the node to its
+   * success, including queueing, retries and downstream waits. Kept out of `snapshot()`
+   * so the characterization goldens are unchanged; read through `nodeLatency()`.
+   */
+  protected nodeLatencies = new Map<string, LatencyCollector>();
 
   protected messagesGenerated = 0;
   protected messagesSucceeded = 0;
@@ -1877,10 +1887,25 @@ export class OpenSimulation {
     });
   }
 
+  /** Successful-operation count and response time (ms) at one node; see `nodeLatencies`. */
+  nodeLatency(nodeId: string): { count: number; mean: number; p95: number } {
+    const collector = this.nodeLatencies.get(nodeId);
+    if (!collector) return { count: 0, mean: 0, p95: 0 };
+    return { count: collector.count, ...collector.snapshot() };
+  }
+
   protected finishOp(op: Op, outcome: Outcome, payloadRef?: string): void {
     op.done = true;
     if (op.notified) return;
     op.notified = true;
+    if (outcome === 'succeeded') {
+      let collector = this.nodeLatencies.get(op.nodeId);
+      if (!collector) {
+        collector = new LatencyCollector();
+        this.nodeLatencies.set(op.nodeId, collector);
+      }
+      collector.push((this.currentTime - op.arrived) * 1000);
+    }
     if (op.onDone) {
       op.onDone(outcome, payloadRef);
     }

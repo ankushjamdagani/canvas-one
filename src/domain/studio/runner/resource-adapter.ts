@@ -1267,7 +1267,35 @@ export class ResourceAdapter {
           windowStartMs: 0,
           windowEndMs: atMs,
         },
+        {
+          elementId: nodeId,
+          scope: 'element',
+          key: 'throughput',
+          value: atMs > 0 ? (nm.completed / atMs) * 1000 : 0,
+          unit: 'requests/s',
+          available: atMs > 0,
+          reason: atMs > 0 ? null : 'No simulated time has elapsed',
+          windowStartMs: 0,
+          windowEndMs: atMs,
+        },
       );
+
+      // Response time at this element: arrival to success, including queueing, retries
+      // and downstream waits (model-and-runner.md §9, D48).
+      const latency = this.sim.nodeLatency(nodeId);
+      for (const [key, value] of [['meanLatencyMs', latency.mean], ['p95LatencyMs', latency.p95]] as const) {
+        metrics.push({
+          elementId: nodeId,
+          scope: 'element',
+          key,
+          value: latency.count > 0 ? value : null,
+          unit: 'ms',
+          available: latency.count > 0,
+          reason: latency.count > 0 ? null : 'No successful operations at this element',
+          windowStartMs: 0,
+          windowEndMs: atMs,
+        });
+      }
 
       if (nm.cache) {
         metrics.push(

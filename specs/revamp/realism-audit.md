@@ -133,7 +133,7 @@ Legend: **F** faithful · **S** simplified, honest · **M** misleading.
 
 Each item is for the user to decide. Items that change kernel behaviour or defaults change run results; batch them into one kernel version bump (see the plan, "Consequences").
 
-**Defects B1–B5, B7, B8 and G1 are fixed (D47, 2026-09-30; runner version `studio-runner/2`, so earlier evidence is stale).** B9 (below) is open. The modelling issues below still need decisions.
+**Defects B1–B5, B7, B8 and G1 are fixed (D47, 2026-09-30; runner version `studio-runner/2`, so earlier evidence is stale).** B9 is fixed too (D48, `studio-runner/3`). The modelling issues below still need decisions.
 
 Modelling issues, updated by phase 3:
 
@@ -222,7 +222,7 @@ Predictions against results: ten of the twelve defaults predictions held. The tw
 
 ### Defects
 
-Found while building the architectures. Each has a test tagged with its ID. **Status (D47):** B1–B5, B7 and B8 fixed; B6 withdrawn; B9 open.
+Found while building the architectures. Each has a test tagged with its ID. **Status (D47):** B1–B5, B7 and B8 fixed (D47); B9 fixed (D48); B6 withdrawn.
 
 | ID | Defect | Effect | Where |
 |---|---|---|---|
@@ -234,7 +234,7 @@ Found while building the architectures. Each has a test tagged with its ID. **St
 | B6 | *(withdrawn: a test error; `hotShare` is a percentage and the editor labels it so)* | — | — |
 | B7 | The trace cap ends the run: default budgets (10,000 rows) stop any traffic run after about 1,300–1,400 requests with "Budget exhausted: recorder cap hit"; the maximum budget (100,000 rows, 16 MiB) stopped these tests' runs at about 42,000 rows, 16 MiB of trace | 50/s for 30 s can't complete on defaults. This follows storage.md §6 ("stop at the first cap"), so it's a contract decision. *Recommend:* past the trace cap, stop recording rows but keep running and counting, and mark the trace as truncated. | `scenario-runner.ts` recorder cap |
 | B8 | A traffic-driven service calling a third-party boundary fails the run: "Bridge dispatch … referenced an unresolvable payload 'payload-workload'" | "Service calls Stripe" can't run under load | `scenario-runner.ts` 1705 (payload lookup); `resource-adapter.ts` 551, 562 set `'payload-workload'`, which has no payload |
-| B9 | *(open)* Metric assertions (`{kind:'metric'}`: throughput, latency, utilization) always return `unevaluated` ("unsupported in logical mode"), in timed mode too, so a scenario with one can never qualify | Latency and throughput checks, the natural checks for load runs, can't pass | `assertions.ts` `case 'metric'` |
+| B9 | *(fixed, D48)* Metric assertions (`{kind:'metric'}`: throughput, latency, utilization) always return `unevaluated` ("unsupported in logical mode"), in timed mode too, so a scenario with one can never qualify | Latency and throughput checks, the natural checks for load runs, can't pass | `assertions.ts` `case 'metric'` |
 
 **Fixes (D47):**
 - **B1:** the kernel emits the root's `admitted` fact at a broker entry before publishing (`kernel.ts` `handleBrokerWorkloadEntry`).

@@ -216,7 +216,26 @@ describe('assertions: evaluateAssertion', () => {
       assertionId: 'a-metric',
       status: 'unevaluated',
       actual: null,
-      reason: 'Metric assertions are unsupported in logical mode (§6)',
+      reason: 'Logical runs have no timing, so metric checks are unavailable (§6)',
+    });
+  });
+
+  it('evaluates a timed metric subject from the element metrics (D48)', () => {
+    const metric = (key: 'p95LatencyMs' | 'throughput', value: number | null, available = true) => ({
+      elementId: 'el-1', scope: 'element' as const, key, value, unit: 'ms' as const, available,
+      reason: available ? null : 'No successful operations at this element', windowStartMs: 0, windowEndMs: 1000,
+    });
+    const timed: RunSummary = { ...dummySummary, mode: 'timed', elementMetrics: [metric('p95LatencyMs', 42)] };
+    const check = (key: 'p95LatencyMs' | 'throughput', expected: number, summary = timed) =>
+      evaluateAssertion({ id: 'm', label: 'm', subject: { kind: 'metric', elementId: 'el-1', key }, operator: 'at-most', expected }, summary, dummyEvents);
+
+    expect(check('p95LatencyMs', 50)).toEqual({ assertionId: 'm', status: 'passed', actual: 42, reason: null });
+    expect(check('p95LatencyMs', 40)).toMatchObject({ status: 'failed', actual: 42 });
+    // Missing or unavailable: unevaluated, never zero.
+    expect(check('throughput', 10)).toMatchObject({ status: 'unevaluated', actual: null });
+    const unavailable: RunSummary = { ...timed, elementMetrics: [metric('p95LatencyMs', null, false)] };
+    expect(check('p95LatencyMs', 50, unavailable)).toEqual({
+      assertionId: 'm', status: 'unevaluated', actual: null, reason: 'No successful operations at this element',
     });
   });
 

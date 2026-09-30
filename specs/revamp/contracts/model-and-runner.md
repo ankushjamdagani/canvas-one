@@ -189,7 +189,7 @@ Logical completion needs all inputs consumed, the queue drained and all frames s
   - `{kind:'count',scope:'root'|'message'|'element',elementId:Id|null,outcome:'generated'|'succeeded'|'rejected'|'failed'|'expired'|'inFlight'}`
   - `{kind:'trace-count',elementId,code:string}`
   - `{kind:'metric',elementId:Id,key:'throughput'|'meanLatencyMs'|'p95LatencyMs'|'utilization'}` (a null elementId is a schema error)
-- `output` values are the ordered emitted array, which `path` can index. Equality uses canonical JSON. Numeric operators apply only to numbers. A missing or unsupported metric is an unevaluated failure, never zero. Assertion subjects must be in compiled scope.
+- `output` values are the ordered emitted array, which `path` can index. Equality uses canonical JSON. Numeric operators apply only to numbers. A missing or unsupported metric is an unevaluated failure, never zero. Timed runs evaluate metric subjects from the element metrics (§9); logical runs leave them unevaluated (D48). Assertion subjects must be in compiled scope.
 - A qualifying scenario needs ≥1 assertion, ≥1 consumed input or workload root, and every assertion evaluated and passing. A zero-check diagnostic run shows "Completed · no checks" and is ineligible.
 - `Assumption={id,key,value:Json,source:'author'|'template'|'measured',description}`. `key` is unique per scenario. `value` and `source` affect identity; `description` doesn't. "Measured" is self-reported.
 
@@ -261,6 +261,7 @@ interface RunHandle { send(control: RunControl): void; events: AsyncIterable<Run
   - Invalid inputs count as consumed inputs and rejected roots. An accepted business response never counts fulfillment success twice.
 - `ElementMetric={elementId:Id|null,scope:'root'|'message'|'element',key:string,value:number|null,unit:'count'|'ms'|'requests/s'|'ratio',available:boolean,reason:string|null,windowStartMs:number|null,windowEndMs:number|null}`.
   - Closed key catalog: the six counts, `acknowledged`, `throughput`, `meanLatencyMs`, `p95LatencyMs`, `utilization`, `queued`, `active`, `cacheHits/Misses/Entries/Evictions/Expirations`.
+  - Element `throughput` is successful operations at the element per simulated second. Element `meanLatencyMs`/`p95LatencyMs` is the response time of successful operations at the element, from arrival to success, including queueing, retries and downstream waits; unavailable (not zero) when the element had no success (D48).
   - `utilization` is the share of slot-time occupied, including slots held while waiting on a downstream call or acknowledgement (D47); a blocked element reads as busy.
   - A broker's `call` route to a resource consumer (the S02/S05 shape) is a message delivery in the kernel; the TTL is set on the publishing message connection.
   - Rates and latency follow retained accounting. Utilization = occupied time ÷ (slots × window); it is unavailable for logical and non-resource elements. Queue, active and cache gauges are end-of-window values. Quantiles use successful observations only (none → unavailable, not zero). Acknowledgement ≠ completion.
