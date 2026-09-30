@@ -27,6 +27,7 @@ import { runScenario } from './scenario-runner';
 import { prepareScenario } from './compile';
 import { buildManifest, type BuildManifestVersions } from '../manifest';
 import { canonicalJson } from '../canonical';
+import { computeClosure } from '../closure';
 import type { AuthoredSnapshot } from './types';
 import type { Document, Element, Connection, Scenario, Refinement, Selection } from '../model';
 
@@ -158,6 +159,57 @@ function outputValueAt(outputs: readonly { port: { elementId: string; portId: st
   return outputs.find((o) => o.port.elementId === elementId)?.values ?? [];
 }
 
+function nestedDocument(selections: Selection[], includeThirdLevel = false): Document {
+  const elementIds = includeThirdLevel
+    ? ['caller', 'outer-owner', 'inner-owner', 'deep-owner', 'deep-member', 'sink']
+    : ['caller', 'outer-owner', 'inner-owner', 'deep-owner', 'sink'];
+  const elements = elementIds.map((id) => decisionElement(id, `${id}-in`, `${id}-out`));
+  const makeRefinement = (id: string, ownerId: string, memberId: string): Refinement => ({
+    id,
+    ownerElementId: ownerId,
+    memberElementIds: [memberId],
+    portMappings: [
+      {
+        id: `${id}-in-map`,
+        outer: { elementId: ownerId, portId: `${ownerId}-in` },
+        inner: { elementId: memberId, portId: `${memberId}-in` },
+      },
+      {
+        id: `${id}-out-map`,
+        outer: { elementId: ownerId, portId: `${ownerId}-out` },
+        inner: { elementId: memberId, portId: `${memberId}-out` },
+      },
+    ],
+  });
+  const refinements = [
+    makeRefinement('outer-refinement', 'outer-owner', 'inner-owner'),
+    makeRefinement('inner-refinement', 'inner-owner', 'deep-owner'),
+  ];
+  if (includeThirdLevel) {
+    refinements.push(makeRefinement('deep-refinement', 'deep-owner', 'deep-member'));
+  }
+  const nestedScenario: Scenario = {
+    ...scenarioFor(selections),
+    scopeElementIds: elementIds,
+  };
+  return {
+    schema: 'studio-model/1',
+    id: 'nested-refinement-document',
+    title: 'Nested refinement test',
+    elements,
+    connections: [
+      dataConnection('caller-to-outer', 'caller', 'caller-out', 'outer-owner', 'outer-owner-in'),
+      dataConnection('outer-to-sink', 'outer-owner', 'outer-owner-out', 'sink', 'sink-in'),
+    ],
+    relations: [],
+    schemas: [{ id: INT_SCHEMA_ID, label: 'int', shape: { type: 'integer', nullable: false } }],
+    fixtures: [{ id: 'fixture-1', schemaId: INT_SCHEMA_ID, value: 7 }],
+    refinements,
+    scenarios: [nestedScenario],
+    views: [],
+  };
+}
+
 describe('Refinement selection (RV-14f, §6)', () => {
   it('aggregate mode runs the owner and excludes the member: coverage and outputs reflect the owner only', async () => {
     const { document, scenario } = docWith([{ refinementId: 'refinement-1', mode: 'aggregate' }]);
@@ -218,6 +270,73 @@ describe('Refinement selection (RV-14f, §6)', () => {
 
     expect(result.status).toBe('invalid');
     expect(result.reason).toMatch(/no compatible port mapping/i);
+  });
+
+  it.each([
+    ['aggregate', 'aggregate', 'outer-owner'],
+    ['aggregate', 'refined', 'outer-owner'],
+    ['refined', 'aggregate', 'inner-owner'],
+    ['refined', 'refined', 'deep-owner'],
+  ] as const)(
+    'keeps runner execution equal to closure for outer %s and inner %s',
+    async (outerMode, innerMode, executedOwner) => {
+      const document = nestedDocument([
+        { refinementId: 'outer-refinement', mode: outerMode },
+        { refinementId: 'inner-refinement', mode: innerMode },
+      ]);
+      const closure = computeClosure(document, 'scenario-1');
+      const result = await runScenario(document, 'scenario-1', `run-${outerMode}-${innerMode}`);
+
+      expect(closure.status).toBe('ok');
+      expect(result.status).toBe('completed');
+      if (closure.status === 'ok') {
+        expect([...result.summary.coverage.includedElementIds].sort()).toEqual(closure.includedElementIds);
+      }
+      expect(outputValueAt(result.summary.outputs, executedOwner)).toEqual([7]);
+      expect(outputValueAt(result.summary.outputs, 'sink')).toEqual([7]);
+    },
+  );
+
+  it('executes the deepest member through three refinement levels and mirrors its outer-authored emission', async () => {
+    const document = nestedDocument(
+      [
+        { refinementId: 'outer-refinement', mode: 'refined' },
+        { refinementId: 'inner-refinement', mode: 'refined' },
+        { refinementId: 'deep-refinement', mode: 'refined' },
+      ],
+      true,
+    );
+    const closure = computeClosure(document, 'scenario-1');
+    const result = await runScenario(document, 'scenario-1', 'run-three-level');
+
+    expect(closure.status).toBe('ok');
+    expect(result.status).toBe('completed');
+    if (closure.status === 'ok') {
+      expect([...result.summary.coverage.includedElementIds].sort()).toEqual(closure.includedElementIds);
+    }
+    expect(outputValueAt(result.summary.outputs, 'deep-member')).toEqual([7]);
+    expect(outputValueAt(result.summary.outputs, 'sink')).toEqual([7]);
+  });
+
+  it('reports an unmapped crossing at depth two through invalid-refinement-selection', async () => {
+    const document = nestedDocument([
+      { refinementId: 'outer-refinement', mode: 'refined' },
+      { refinementId: 'inner-refinement', mode: 'refined' },
+    ]);
+    const inner = document.refinements.find((candidate) => candidate.id === 'inner-refinement')!;
+    const withoutInnerMappings: Document = {
+      ...document,
+      refinements: document.refinements.map((candidate) =>
+        candidate.id === inner.id ? { ...candidate, portMappings: [] } : candidate,
+      ),
+    };
+    const result = await runScenario(withoutInnerMappings, 'scenario-1', 'run-depth-two-unmapped');
+
+    expect(result.status).toBe('invalid');
+    expect(result.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'invalid-refinement-selection' })]),
+    );
+    expect(result.reason).toMatch(/inner-refinement.*no compatible port mapping/i);
   });
 
   it('a views-only change (expand/collapse) never changes the trace or the fingerprint', async () => {
