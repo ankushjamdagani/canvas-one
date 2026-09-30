@@ -1581,18 +1581,21 @@ export class OpenSimulation {
     const retry = edge.retry ?? null;
 
     const childPath = attemptNo === 1 ? `${op.path}>${edge.id}` : `${op.path}>${edge.id}~${attemptNo}`;
-    let settled = false;
+    // Resolved when the caller learns the attempt's outcome: its response arrives, or the
+    // attempt timeout fires first (a response still on its way back is then ignored).
+    let resolved = false;
+    const resolveAttempt = (childOutcome: Outcome) => {
+      if (resolved) return;
+      resolved = true;
+      em.responses++;
+      if (childOutcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts && !op.done && !op.unit.done) {
+        this.scheduleCallRetry(op, edge, attemptNo, retry);
+        return;
+      }
+      this.handleChildResponse(op, childOutcome);
+    };
     const settleAttempt = (childOutcome: Outcome, atCaller: number) => {
-      if (settled) return;
-      settled = true;
-      this.scheduleEvent(atCaller, 1, () => {
-        em.responses++;
-        if (childOutcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts && !op.done && !op.unit.done) {
-          this.scheduleCallRetry(op, edge, attemptNo, retry);
-          return;
-        }
-        this.handleChildResponse(op, childOutcome);
-      });
+      this.scheduleEvent(atCaller, 1, () => resolveAttempt(childOutcome));
     };
 
     const childOp: Op = {
@@ -1629,12 +1632,16 @@ export class OpenSimulation {
     if (retry && retry.attemptTimeoutMs !== null) {
       // The caller stops waiting for this attempt; the abandoned work is cancelled.
       this.scheduleEvent(this.currentTime + retry.attemptTimeoutMs / 1000, 1, () => {
-        if (settled || childOp.done || op.done || op.unit.done) return;
-        const affectedNodes = new Set<string>();
-        this.cancelOp(childOp, affectedNodes);
+        if (resolved || op.done || op.unit.done) return;
+        if (!childOp.done) {
+          // The callee isn't told the caller gave up: work already in service keeps its slot
+          // until it completes (wasted work), queued work is dropped.
+          const affectedNodes = new Set<string>();
+          this.cancelOp(childOp, affectedNodes);
+          for (const nid of affectedNodes) this.pumpQueue(nid);
+        }
         op.children.delete(childOp);
-        for (const nid of affectedNodes) this.pumpQueue(nid);
-        settleAttempt('expired', this.currentTime);
+        resolveAttempt('expired');
       });
     }
   }

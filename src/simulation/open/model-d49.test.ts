@@ -169,6 +169,28 @@ describe('D49 caller retries (H13)', () => {
     expect(m.nodes.dep.cancelled).toBe(2 * m.roots.generated);
   });
 
+  it('an attempt timeout counts until the response reaches the caller, including return latency', () => {
+    const facts: SimLifecycleFact[] = [];
+    const sim = new OpenSimulation(
+      graph(
+        [node('api', 'service', processor()), node('dep', 'service', processor({ capacity: 1000 }))],
+        [edge('api-dep', 'api', 'dep', { returnLatencyMs: 100, retry: retry({ maxAttempts: 2, attemptTimeoutMs: 50 }) })],
+        workload('api', 1, { intervalMs: 1000 }), 5, 4,
+      ),
+      { traceHook: (f) => facts.push(f), arrivalHorizonSeconds: 3.5 },
+    );
+    const m = sim.advance(4);
+    const admitted = new Map(facts.filter((f) => f.kind === 'admitted').map((f) => [f.unitIdentity, f.time]));
+    const settled = facts.filter((f) => f.kind === 'unit_settled');
+    expect(settled.length).toBe(3);
+    for (const f of settled) {
+      expect(f.outcome).toBe('failed');
+      expect((f.time - admitted.get(f.unitIdentity)!) * 1000).toBeCloseTo(0.1 + 50 + 50, 6);
+    }
+    // The callee finished both attempts in 1 ms; only their replies were too slow.
+    expect(m.nodes.dep.completed).toBe(6);
+  });
+
   it('retries against an overloaded service add load without adding goodput (retry storm)', () => {
     const runWith = (policy: CallRetryPolicy | null) =>
       new OpenSimulation(graph(

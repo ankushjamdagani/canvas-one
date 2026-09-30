@@ -1724,3 +1724,8 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Found and fixed**: the inspector kept the field list it opened with after Apply, so record-dependent fields (retry details) never appeared; `applyDraft` now rebuilds the fields from the applied record.
 - **Verification**: 1,529 unit tests pass (9 skipped); `npx tsc -b` clean; build clean, no chunk warning; isolated production e2e 89 passed / 4 skipped; axe clean. Goldens 03/04/05 regenerated; only router `occupancy` changed.
 - **Lesson:** the isolated e2e config serves whatever is in `dist` (`vite preview`); a run after source changes without `npm run build` tests the old app. The first D49 e2e failure was a stale build, not a bug.
+- **Review**: Sonnet PASS with 5 risks. Fixed: an attempt timeout now counts until the response reaches the caller, including return latency (new test). Documented as intended:
+  - abandoned in-service work keeps its callee slot (wasted work);
+  - router utilization covers only its own processing.
+- Left as-is: lowering Attempts to 1 in the same draft as edits to the detail fields drops those edits along with the policy; the fields disappear with it.
+- Final: 1,530 unit tests; tsc clean; build clean; isolated e2e 89 passed / 4 skipped; axe clean.
