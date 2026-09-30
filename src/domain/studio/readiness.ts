@@ -120,8 +120,8 @@ export const READINESS_ISSUE_CODES = [
   'expression-type-error',
   /** §8 Bridge call frames: "a non-router resource with a bridge call continuation may have no other selectable call continuation". */
   'bridge-continuation-conflict',
-  /** §8 Bridge call frames: routers may select a bridge route, but the runner doesn't implement it yet (RV-14f), so it is rejected instead of silently skipped. */
-  'router-bridge-unsupported',
+  /** §8 Bridge call frames: a router's routes must reach resources. A router shares load by capacity, and a machine, pipeline or unmodeled element has none (RV-18 dropped, 2026-09-30). */
+  'router-route-needs-resource',
 ] as const;
 
 export type ReadinessIssueCode = (typeof READINESS_ISSUE_CODES)[number];
@@ -243,6 +243,22 @@ function issue(
   message: string,
 ): ReadinessIssue {
   return { code, path, entityId, severity: 'error', message };
+}
+
+const NON_RESOURCE_NOUN: Readonly<Record<string, string>> = {
+  machine: 'a state machine',
+  pipeline: 'a data pipeline',
+  decision: 'a decision',
+  host: 'a host',
+  unmodeled: 'not simulated',
+};
+
+/** Guidance for a router route that reaches a non-resource element (§8). */
+function routerRouteMessage(routerLabel: string, target: Element | undefined, targetId: Id): string {
+  const targetLabel = target?.label ?? targetId;
+  const noun = target ? NON_RESOURCE_NOUN[target.behavior.kind] : undefined;
+  const what = noun ? ` (${noun})` : '';
+  return `Router '${routerLabel}' routes straight to '${targetLabel}'${what}, which has no capacity to share load. Put a component with capacity, such as a Service, between them: '${routerLabel}' → Service → '${targetLabel}' (specs/revamp/contracts/model-and-runner.md §8)`;
 }
 
 // Possible value types, not a new authored union grammar. Constructed list items
@@ -1081,9 +1097,9 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   // --------------------------------------------------------------------------
   // §8 Bridge call frames: a call continuation from a resource to a non-resource target.
   // "A non-router resource with a bridge call continuation may have no other selectable
-  // call continuation (routers select exactly one route)." The runner does not select
-  // bridge routes on routers yet, so a router with one is rejected rather than run with
-  // that route silently skipped.
+  // call continuation (routers select exactly one route)." A router's routes must reach
+  // resources: it shares load by capacity, and a non-resource target has none, so the
+  // modelled pattern is router -> resource (e.g. a Service) -> bridge -> machine.
   // --------------------------------------------------------------------------
   for (const elId of closure.includedElementIds) {
     const el = elementsMap.get(elId);
@@ -1100,10 +1116,10 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
     if (rb.config.type === 'router') {
       issues.push(
         issue(
-          'router-bridge-unsupported',
+          'router-route-needs-resource',
           ['elements', elIdx, 'behavior', 'config', 'type'],
           el.id,
-          `Router '${el.label}' routes to '${elementsMap.get(bridges[0].target.elementId)?.label ?? bridges[0].target.elementId}', which is not a resource; routing from a router to a non-resource element isn't supported yet (specs/revamp/contracts/model-and-runner.md §8)`,
+          routerRouteMessage(el.label, elementsMap.get(bridges[0].target.elementId), bridges[0].target.elementId),
         ),
       );
     } else if (calls.length > 1) {

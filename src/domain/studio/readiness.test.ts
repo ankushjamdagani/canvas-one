@@ -1440,14 +1440,18 @@ describe('bridge call continuations (model-and-runner.md §8 Readiness)', () => 
     expect(codes(bridgeDoc('processor', ['machine', 'resource']))).toContain('bridge-continuation-conflict');
   });
 
-  it('rejects a router with a bridge route, which the runner cannot select yet', () => {
-    expect(codes(bridgeDoc('router', ['machine']))).toContain('router-bridge-unsupported');
-    expect(codes(bridgeDoc('router', ['machine', 'resource']))).toContain('router-bridge-unsupported');
+  it('rejects a router route to a non-resource element and says what to put between them', () => {
+    expect(codes(bridgeDoc('router', ['machine']))).toContain('router-route-needs-resource');
+    expect(codes(bridgeDoc('router', ['machine', 'resource']))).toContain('router-route-needs-resource');
+    const result = checkReadiness(bridgeDoc('router', ['machine']), 'scn-timed');
+    const found = result.ready ? undefined : result.issues.find((i) => i.code === 'router-route-needs-resource');
+    expect(found?.message).toContain('(a state machine)');
+    expect(found?.message).toContain('→ Service →');
   });
 
   it('accepts a router whose routes all reach resources', () => {
     const found = codes(bridgeDoc('router', ['resource', 'resource']));
-    expect(found).not.toContain('router-bridge-unsupported');
+    expect(found).not.toContain('router-route-needs-resource');
     expect(found).not.toContain('bridge-continuation-conflict');
   });
 });

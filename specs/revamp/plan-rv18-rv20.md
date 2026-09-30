@@ -1,8 +1,10 @@
 # Plan: RV-18 router bridges, RV-19 nested refinement, RV-20 board decisions
 
-2026-09-30, `master` @ `d33b1d2`. Status: **proposed, awaiting approval** of the open questions below. Nothing here is implemented.
+2026-09-30, `master` @ `d33b1d2`. Status: approved 2026-09-30 except RV-18 (dropped, D45). RV-19 and RV-20 are in progress. Nothing here is implemented.
 
-## RV-18: routers may route to non-resource elements
+## RV-18: routers may route to non-resource elements — DROPPED (D45)
+
+> Dropped 2026-09-30. The only targets it would add are state machines and data pipelines, which have no capacity; a load-sharing router in front of them would report unlimited capacity. Replaced by readiness guidance (`router-route-needs-resource`) and a §8 contract rule. The analysis below is kept for the record.
 
 ### Today
 
