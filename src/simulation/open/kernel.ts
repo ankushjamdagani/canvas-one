@@ -1269,7 +1269,9 @@ export class OpenSimulation {
         // Lognormal with mean 1 and coefficient of variation cv: sigma^2 = ln(1 + cv^2),
         // mu = -sigma^2 / 2; the normal comes from Box-Muller over two draws.
         const u2 = Math.min(1 - 1e-12, Math.max(1e-12, draw()));
-        const sigma2 = Math.log(1 + (node.behavior.serviceTimeCv ?? 1) ** 2);
+        const cv = node.behavior.serviceTimeCv;
+        if (cv === undefined) throw new Error(`lognormal service time on '${op.nodeId}' has no serviceTimeCv`);
+        const sigma2 = Math.log(1 + cv ** 2);
         const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * u2);
         procTime *= Math.exp(-sigma2 / 2 + Math.sqrt(sigma2) * z);
       }
@@ -1584,10 +1586,12 @@ export class OpenSimulation {
    * backoff; the caller keeps waiting (and a non-router caller keeps its slot) meanwhile.
    * Only the final outcome reaches handleChildResponse.
    */
-  protected dispatchCallAttempt(op: Op, edge: ExecutionEdge, attemptNo: number): void {
+  protected dispatchCallAttempt(op: Op, edge: ExecutionEdge, attemptNo: number, policy?: CallRetryPolicy | null): void {
     const em = this.edgeMetrics.get(edge.id)!;
     em.sent++;
-    const retry = edge.retry ?? null;
+    // The first attempt's route sets the policy for the whole retry chain, even when a
+    // router retries on another route.
+    const retry = policy !== undefined ? policy : (edge.retry ?? null);
 
     const childPath = attemptNo === 1 ? `${op.path}>${edge.id}` : `${op.path}>${edge.id}~${attemptNo}`;
     // Resolved when the caller learns the attempt's outcome: its response arrives, or the
@@ -1675,13 +1679,14 @@ export class OpenSimulation {
     });
     this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
       if (op.done || op.unit.done) return;
-      this.dispatchCallAttempt(op, this.retryRoute(op, edge), attemptNo + 1);
+      this.dispatchCallAttempt(op, this.retryRoute(op, edge), attemptNo + 1, retry);
     });
   }
 
   /**
-   * D50: a router retries on another route when one qualifies (same strategy, health and
-   * conditions, without the route that just failed); otherwise on the same route.
+   * D50: a router retries on another route when one qualifies: the next healthy route for
+   * round robin, a fresh weighted draw among the others; a conditional router keeps the
+   * route its conditions chose. Otherwise the retry stays on the same route.
    */
   protected retryRoute(op: Op, failed: ExecutionEdge): ExecutionEdge {
     const node = this.plan.nodes.get(op.nodeId)!;
@@ -1692,6 +1697,8 @@ export class OpenSimulation {
     // round-robin cursor (nginx-style "next upstream").
     const others = [...routes.slice(failedAt + 1), ...routes.slice(0, Math.max(0, failedAt))];
     if (others.length === 0) return failed;
+    // A conditional router's route was chosen by the request itself; keep it.
+    if (node.behavior.strategy === 'conditional') return failed;
     let next: ExecutionEdge | undefined;
     if (node.behavior.strategy === 'round-robin') {
       next = others.find((e) => {
@@ -1979,7 +1986,8 @@ export class OpenSimulation {
     const timeoutMs = bridge.retry?.attemptTimeoutMs ?? null;
     if (timeoutMs !== null) {
       this.scheduleEvent(this.currentTime + timeoutMs / 1000, 1, () => {
-        if (this.resolvedBridgeFrames.has(frameId) || op.done || op.unit.done) return;
+        // The reply arrived first: this timer was the frame's last pending event.
+        if (this.resolvedBridgeFrames.delete(frameId) || op.done || op.unit.done) return;
         if (this.bridgePendingOps.delete(frameId)) this.abandonedBridgeFrames.add(frameId);
         this.resolveBridgeAttempt(op, bridge, frameId, 'expired');
       });
@@ -1987,10 +1995,15 @@ export class OpenSimulation {
   }
 
   protected resolveBridgeAttempt(op: Op, bridge: KernelBridgeConfig, frameId: string, outcome: Outcome, payloadRef?: string): void {
-    if (this.resolvedBridgeFrames.has(frameId)) return;
-    this.resolvedBridgeFrames.add(frameId);
+    // A reply that arrives after the attempt timed out: the frame is done.
+    if (this.resolvedBridgeFrames.delete(frameId)) return;
+    const attemptNo = this.bridgeAttempts.get(frameId);
+    if (attemptNo === undefined) throw new Error(`bridge frame '${frameId}' has no attempt number`);
+    this.bridgeAttempts.delete(frameId);
+    // Only a frame with an attempt timeout has a second event (timer or reply) still to
+    // come; remember it until then.
+    if ((bridge.retry?.attemptTimeoutMs ?? null) !== null) this.resolvedBridgeFrames.add(frameId);
     if (op.done || op.unit.done) return;
-    const attemptNo = this.bridgeAttempts.get(frameId) ?? 1;
     const retry = bridge.retry ?? null;
     if (outcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts) {
       let delayMs = Math.min(retry.maxBackoffMs, retry.backoffMs * Math.pow(retry.backoffMultiplier, attemptNo - 1));
@@ -2048,7 +2061,11 @@ export class OpenSimulation {
    *   earlier path, so there is nothing further to apply.
    */
   public settleCall(input: { frameId: string; outcome: Outcome; payloadRef?: string; atMs?: number }): void {
-    if (this.abandonedBridgeFrames.delete(input.frameId)) return; // D50: the caller gave up on this attempt
+    if (this.abandonedBridgeFrames.delete(input.frameId)) {
+      // D50: the caller gave up on this attempt; its reply is the frame's last event.
+      this.resolvedBridgeFrames.delete(input.frameId);
+      return;
+    }
     const op = this.bridgePendingOps.get(input.frameId);
     if (!op) {
       throw new Error(`settleCall: unknown or already-settled bridge frame '${input.frameId}'`);

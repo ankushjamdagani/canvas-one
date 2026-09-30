@@ -83,6 +83,25 @@ describe('D50 a router retries on another route', () => {
     expect(Math.abs(m.nodes.bad.arrived / m.roots.generated - 0.5)).toBeLessThan(0.05);
   });
 
+  it('a conditional router retries on the route its conditions chose, under that route\'s policy', () => {
+    const cls = (name: string) => ({ id: name, name, weight: 1, operation: 'read' as const, tags: [], keyDistribution: { kind: 'uniform' as const, catalogSize: 10, hotSubset: 1, hotShare: 100 } });
+    const m = new OpenSimulation(graph(
+      [
+        node('lb', 'balancer', { ...base, type: 'router', strategy: 'conditional' }),
+        node('a', 'service', processor({ failureRate: 30 })),
+        node('b', 'service', processor()),
+      ],
+      [
+        edge('lb-a', 'lb', 'a', { condition: { field: 'class', value: 'A' }, retry: retry({ maxAttempts: 3 }) }),
+        edge('lb-b', 'lb', 'b', { fallback: true }), // must not take class-A retries
+      ],
+      workload('lb', 50, { classes: [cls('A')] }), 3, 60,
+    )).advance(60);
+    expect(m.nodes.b.arrived).toBe(0);
+    expect(Math.abs(m.nodes.a.arrived / m.roots.generated - 1.39)).toBeLessThan(0.1);
+    expect(m.roots.failed / m.roots.generated).toBeLessThan(0.06);
+  });
+
   it('with a single route it retries on that route', () => {
     const m = new OpenSimulation(graph(
       [node('lb', 'balancer', { ...base, type: 'router', strategy: 'round-robin' }), node('bad', 'service', processor({ failureRate: 100 }))],
