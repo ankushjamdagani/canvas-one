@@ -54,8 +54,10 @@ export function filterHistorySteps<T extends { snapshot: Document | null, parent
   if (elementIds.length === 0) return [...steps];
   const idSet = new Set(elementIds);
   return steps.filter(step => {
-    if (!step.snapshot) return false;
-    const diffs = diffDocuments(step.parentSnapshot ?? { schema: 'studio-model/1', id: 'temp', title: '', elements: [], connections: [], relations: [], schemas: [], fixtures: [], refinements: [], scenarios: [], views: [] }, step.snapshot);
-    return diffs.some(diff => touchesElement(diff, step.parentSnapshot, step.snapshot!, idSet));
+    if (!step.snapshot || !step.parentSnapshot) return false;
+    const parent = step.parentSnapshot;
+    const child = step.snapshot;
+    const diffs = diffDocuments(parent, child);
+    return diffs.some(diff => touchesElement(diff, parent, child, idSet));
   });
 }

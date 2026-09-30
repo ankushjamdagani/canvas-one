@@ -10,7 +10,7 @@ const PL1_ID = '44444444-4444-4444-8444-444444444444' as Id;
 
 const doc: Document = {
   schema: 'studio-model/1',
-  id: 'd1' as Id,
+  id: '55555555-5555-4555-8555-555555555555' as Id,
   title: 'doc',
   elements: [
     {
@@ -22,15 +22,15 @@ const doc: Document = {
         { id: P1_ID, direction: 'out', channel: 'event', label: 'P', schemaId: SCH_ID, responseSchemaId: null },
       ],
       behavior: { kind: 'unmodeled', version: 1, reason: 'test' },
-    } as any,
+    },
   ],
   connections: [],
   relations: [],
-  schemas: [{ id: SCH_ID, label: 'Schema', shape: { type: 'string', nullable: false } } as any],
+  schemas: [{ id: SCH_ID, label: 'Schema', shape: { type: 'string', nullable: false } }],
   fixtures: [],
   refinements: [],
   scenarios: [],
-  views: [{ id: 'v1' as Id, title: 'V', components: [], groups: [], placements: [{ id: PL1_ID, elementId: E1_ID, x: 0, y: 0, width: 100, expanded: false }], notes: [], labels: [] } as any],
+  views: [{ id: '66666666-6666-4666-8666-666666666666' as Id, label: 'V', groups: [], placements: [{ id: PL1_ID, elementId: E1_ID, x: 0, y: 0, width: 100, expanded: false }], notes: [], connectionIds: [], relationIds: [] }],
 };
 
 describe('createSelectionExport', () => {
@@ -41,7 +41,7 @@ describe('createSelectionExport', () => {
       return `00000000-0000-4000-8000-${c.toString().padStart(12, '0')}` as Id;
     };
     
-    const res = createSelectionExport(doc, 'v1' as Id, [E1_ID], mintId);
+    const res = createSelectionExport(doc, doc.views[0].id, [E1_ID], [], mintId(), 'Exported Selection');
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     

@@ -1,152 +1,263 @@
-import type { Document, Id, Element, Connection, Scenario, Relation, View } from '../../domain/studio/model';
-import { placeEntry } from '../catalog/place';
 import { shapesCompatible } from '../../domain/studio/readiness';
-import { DeletePlan, planDelete } from './deletePlan';
-import { AnyRecord, RecordChange } from '../../domain/versioning/records';
+import type {
+  Assertion,
+  Boundary,
+  Connection,
+  Document,
+  Endpoint,
+  Id,
+  Input,
+  PayloadSchema,
+  Relation,
+  Scenario,
+  View,
+  Workload,
+} from '../../domain/studio/model';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
+import type { RecordChange, RecordKind } from '../../persistence/studio/types';
+import { placeEntry } from '../catalog/place';
 
-export type ReplacePlan = DeletePlan & {
+export type ReplacePlan = {
+  readonly intent: 'replace';
   readonly newElementId: Id;
   readonly newPlacementId: Id;
+  readonly movedConnectionIds: readonly Id[];
+  readonly removedConnectionIds: readonly Id[];
+  readonly affectedScenarioLabels: readonly string[];
+  readonly scenarioRepairSummaries: readonly string[];
+  readonly blockedReason: string | null;
+  readonly requiresConfirmation: boolean;
+  readonly changes: readonly RecordChange[];
 };
 
-function matchPorts(document: Document, oldElement: Element, newElement: Element): Map<Id, Id> {
-  const mapping = new Map<Id, Id>();
-  for (const oldPort of oldElement.ports) {
-    const newPort = newElement.ports.find((p) => {
-      if (p.direction !== oldPort.direction || p.channel !== oldPort.channel) return false;
-      const oldSchema = document.schemas.find((s) => s.id === oldPort.schemaId);
-      const newSchema = document.schemas.find((s) => s.id === p.schemaId);
-      if (oldSchema && newSchema && !shapesCompatible(oldSchema.shape, newSchema.shape)) return false;
-      if (oldPort.responseSchemaId || p.responseSchemaId) {
-        if (!oldPort.responseSchemaId || !p.responseSchemaId) return false;
-        const oldRes = document.schemas.find((s) => s.id === oldPort.responseSchemaId);
-        const newRes = document.schemas.find((s) => s.id === p.responseSchemaId);
-        if (oldRes && newRes && !shapesCompatible(oldRes.shape, newRes.shape)) return false;
-      }
-      return true;
-    });
-    if (newPort) mapping.set(oldPort.id, newPort.id);
-  }
-  return mapping;
+export type ReplacePlanResult =
+  | { readonly ok: true; readonly plan: ReplacePlan }
+  | { readonly ok: false; readonly reason: string };
+
+type CollectionKey = 'elements' | 'connections' | 'relations' | 'schemas' | 'fixtures' | 'refinements' | 'scenarios' | 'views';
+const COLLECTIONS: readonly { readonly key: CollectionKey; readonly kind: RecordKind }[] = [
+  { key: 'schemas', kind: 'schema' },
+  { key: 'fixtures', kind: 'fixture' },
+  { key: 'elements', kind: 'element' },
+  { key: 'connections', kind: 'connection' },
+  { key: 'relations', kind: 'relation' },
+  { key: 'refinements', kind: 'refinement' },
+  { key: 'scenarios', kind: 'scenario' },
+  { key: 'views', kind: 'view' },
+];
+
+function endpointFor(endpoint: Endpoint, oldElementId: Id, newElementId: Id, ports: ReadonlyMap<Id, Id>): Endpoint | null {
+  if (endpoint.elementId !== oldElementId) return endpoint;
+  const portId = ports.get(endpoint.portId);
+  return portId ? { elementId: newElementId, portId } : null;
 }
 
-function mapIds<T>(obj: T, oldElementId: Id, newElementId: Id, portMap: Map<Id, Id>): T {
-  if (typeof obj === 'string') return (obj === oldElementId ? newElementId : obj) as any;
-  if (Array.isArray(obj)) return obj.map((v) => mapIds(v, oldElementId, newElementId, portMap)) as any;
-  if (obj && typeof obj === 'object') {
-    if ('element' in obj && 'port' in obj && typeof obj.element === 'string' && typeof obj.port === 'string' && Object.keys(obj).length === 2) {
-      if (obj.element === oldElementId) {
-        const p = portMap.get(obj.port as Id);
-        if (p) return { element: newElementId, port: p } as any;
-        return obj as any; // unmappable, keep old ID to be deleted
-      }
-      return obj as any;
-    }
-    const res: any = {};
-    for (const key of Object.keys(obj)) {
-      res[key] = mapIds((obj as any)[key], oldElementId, newElementId, portMap);
-    }
-    return res;
+function replaceElementId(id: Id, oldElementId: Id, newElementId: Id): Id {
+  return id === oldElementId ? newElementId : id;
+}
+
+function replaceRelation(relation: Relation, oldElementId: Id, newElementId: Id): Relation {
+  switch (relation.kind) {
+    case 'contains':
+      return { ...relation, parentId: replaceElementId(relation.parentId, oldElementId, newElementId), childId: replaceElementId(relation.childId, oldElementId, newElementId) };
+    case 'deployed-on':
+      return { ...relation, elementId: replaceElementId(relation.elementId, oldElementId, newElementId), hostId: replaceElementId(relation.hostId, oldElementId, newElementId) };
+    case 'descriptive':
+      return { ...relation, sourceId: replaceElementId(relation.sourceId, oldElementId, newElementId), targetId: replaceElementId(relation.targetId, oldElementId, newElementId) };
   }
-  return obj;
+}
+
+function replaceAssertion(assertion: Assertion, oldElementId: Id, newElementId: Id, ports: ReadonlyMap<Id, Id>): Assertion | null {
+  const subject = assertion.subject;
+  if (subject.kind === 'output') {
+    const port = endpointFor(subject.port, oldElementId, newElementId, ports);
+    return port ? { ...assertion, subject: { ...subject, port } } : null;
+  }
+  if ('elementId' in subject && subject.elementId === oldElementId) {
+    return { ...assertion, subject: { ...subject, elementId: newElementId } };
+  }
+  return assertion;
+}
+
+function replaceInput(input: Input, oldElementId: Id, newElementId: Id, ports: ReadonlyMap<Id, Id>): Input | null {
+  const entry = endpointFor(input.entry, oldElementId, newElementId, ports);
+  if (!entry) return null;
+  const payloadBindings = [];
+  for (const binding of input.payloadBindings) {
+    const port = endpointFor(binding.source.port, oldElementId, newElementId, ports);
+    if (!port) return null;
+    payloadBindings.push({ ...binding, source: { ...binding.source, port } });
+  }
+  return { ...input, entry, payloadBindings };
+}
+
+function replaceWorkload(workload: Workload, oldElementId: Id, newElementId: Id, ports: ReadonlyMap<Id, Id>): Workload | null {
+  const entry = endpointFor(workload.entry, oldElementId, newElementId, ports);
+  return entry ? { ...workload, entry } : null;
+}
+
+function replaceBoundary(boundary: Boundary, oldElementId: Id, newElementId: Id, ports: ReadonlyMap<Id, Id>): Boundary | null {
+  const source = endpointFor(boundary.source, oldElementId, newElementId, ports);
+  return source ? { ...boundary, source } : null;
+}
+
+function replaceScenario(
+  scenario: Scenario,
+  oldElementId: Id,
+  newElementId: Id,
+  ports: ReadonlyMap<Id, Id>,
+): { readonly scenario: Scenario; readonly removed: readonly string[] } {
+  const removed: string[] = [];
+  const prune = <T, R>(items: readonly T[], label: string, mapper: (item: T) => R | null): R[] => {
+    const next: R[] = [];
+    for (const item of items) {
+      const mapped = mapper(item);
+      if (mapped) next.push(mapped);
+      else removed.push(label);
+    }
+    return next;
+  };
+  const entryPorts = prune(scenario.entryPorts, 'entry port', (endpoint) => endpointFor(endpoint, oldElementId, newElementId, ports));
+  const inputs = prune(scenario.inputs, 'input', (input) => replaceInput(input, oldElementId, newElementId, ports));
+  const workloads = prune(scenario.workloads, 'workload', (workload) => replaceWorkload(workload, oldElementId, newElementId, ports));
+  const boundaries = prune(scenario.boundaries, 'boundary', (boundary) => replaceBoundary(boundary, oldElementId, newElementId, ports));
+  const assertions = prune(scenario.assertions, 'check', (assertion) => replaceAssertion(assertion, oldElementId, newElementId, ports));
+  return {
+    scenario: {
+      ...scenario,
+      scopeElementIds: scenario.scopeElementIds.map((id) => replaceElementId(id, oldElementId, newElementId)),
+      entryPorts,
+      inputs,
+      workloads,
+      faults: scenario.faults.map((fault) => ({ ...fault, hostId: replaceElementId(fault.hostId, oldElementId, newElementId) })),
+      boundaries,
+      initialContexts: scenario.initialContexts.map((context) => ({ ...context, elementId: replaceElementId(context.elementId, oldElementId, newElementId) })),
+      assertions,
+    },
+    removed,
+  };
+}
+
+function recordChanges(from: Document, to: Document): RecordChange[] {
+  const changes: RecordChange[] = [];
+  for (const { key, kind } of COLLECTIONS) {
+    const before = new Map(from[key].map((record) => [record.id, record]));
+    const after = new Map(to[key].map((record) => [record.id, record]));
+    for (const record of from[key]) if (!after.has(record.id)) changes.push({ kind: 'remove', recordKind: kind, id: record.id });
+    for (const record of to[key]) {
+      const prior = before.get(record.id);
+      if (!prior) changes.push({ kind: 'insert', value: { recordKind: kind, record } } as RecordChange);
+      else if (JSON.stringify(prior) !== JSON.stringify(record)) changes.push({ kind: 'replace', value: { recordKind: kind, record } } as RecordChange);
+    }
+  }
+  return changes;
 }
 
 export function planReplacePart(
   document: Document,
   viewId: Id,
   oldElementId: Id,
-  newEntryId: string,
+  entryId: string,
   mintId: () => Id,
-): { disabledReason: string | null; plan: ReplacePlan | null } {
-  const oldElement = document.elements.find((e) => e.id === oldElementId);
-  if (!oldElement) return { disabledReason: 'element-not-found', plan: null };
-
-  const view = document.views.find((v) => v.id === viewId);
-  if (!view) return { disabledReason: 'view-not-found', plan: null };
-
-  const oldPlacement = view.placements.find((p) => p.elementId === oldElementId);
-  if (!oldPlacement) return { disabledReason: 'placement-not-found', plan: null };
-
-  if (document.refinements.some((r) => r.ownerElementId === oldElementId || r.memberElementIds.includes(oldElementId))) {
-    return { disabledReason: 'Refinement owners and members cannot be replaced. Delete them explicitly.', plan: null };
+): ReplacePlanResult {
+  const oldElement = document.elements.find((element) => element.id === oldElementId);
+  if (!oldElement) return { ok: false, reason: 'The selected component no longer exists' };
+  const view = document.views.find((candidate) => candidate.id === viewId);
+  if (!view) return { ok: false, reason: 'The active view no longer exists' };
+  const placement = view.placements.find((candidate) => candidate.elementId === oldElementId);
+  if (!placement) return { ok: false, reason: 'The selected component is not placed in the active view' };
+  if (document.refinements.some((refinement) => refinement.ownerElementId === oldElementId || refinement.memberElementIds.includes(oldElementId))) {
+    return { ok: false, reason: 'A refinement owner or member cannot be replaced' };
   }
 
-  const placeResult = placeEntry({ document, viewId, entryId: newEntryId, anchor: { x: oldPlacement.x, y: oldPlacement.y }, mintId });
-  if (!placeResult.ok) return { disabledReason: 'failed-to-instantiate-part', plan: null };
+  const placed = placeEntry({ document, viewId, entryId, anchor: { x: placement.x, y: placement.y }, mintId });
+  if (!placed.ok) {
+    const first = placed.issues[0];
+    return { ok: false, reason: first ? first.message : 'The replacement could not be created' };
+  }
+  const placedDocument = applyRecordChanges(document, placed.changes);
+  if (!placedDocument.ok) {
+    const first = placedDocument.issues[0];
+    return { ok: false, reason: first ? first.message : 'The replacement could not be validated' };
+  }
+  const generated = placedDocument.document.elements.find((element) => element.id === placed.elementId);
+  if (!generated) return { ok: false, reason: 'The replacement entry did not create a component' };
+  const replacement = { ...generated, label: oldElement.label };
+  const schemaById = new Map<Id, PayloadSchema>(placedDocument.document.schemas.map((schema) => [schema.id, schema]));
+  const portMap = new Map<Id, Id>();
+  for (const oldPort of oldElement.ports) {
+    const oldSchema = schemaById.get(oldPort.schemaId);
+    if (!oldSchema) continue;
+    const compatible = replacement.ports.find((port) => {
+      if (port.direction !== oldPort.direction || port.channel !== oldPort.channel) return false;
+      const newSchema = schemaById.get(port.schemaId);
+      if (!newSchema || !shapesCompatible(oldSchema.shape, newSchema.shape)) return false;
+      if (oldPort.responseSchemaId === null && port.responseSchemaId === null) return true;
+      if (oldPort.responseSchemaId === null || port.responseSchemaId === null) return false;
+      const oldResponse = schemaById.get(oldPort.responseSchemaId);
+      const newResponse = schemaById.get(port.responseSchemaId);
+      return Boolean(oldResponse && newResponse && shapesCompatible(oldResponse.shape, newResponse.shape));
+    });
+    if (compatible) portMap.set(oldPort.id, compatible.id);
+  }
 
-  const newElementRecord = placeResult.changes.find((c: any) => c.value?.recordKind === 'element') as any;
-  if (!newElementRecord) return { disabledReason: 'no-element-created', plan: null };
-  const newElement = newElementRecord.value.record as Element;
-  
-  const newPlacementRecord = placeResult.changes.find((c: any) => c.value?.recordKind === 'view') as any;
-  const newPlacementId = newPlacementRecord?.value?.record?.placements?.find((p: any) => p.elementId === newElement.id)?.id ?? mintId();
-
-  const portMap = matchPorts(document, oldElement, newElement);
-
-  const mappedConnections = document.connections.map((c) => {
-    if (c.source.elementId === oldElementId || c.target.elementId === oldElementId) {
-      return mapIds(c, oldElementId, newElement.id, portMap) as Connection;
+  const movedConnectionIds: Id[] = [];
+  const removedConnectionIds: Id[] = [];
+  const connections: Connection[] = [];
+  for (const connection of document.connections) {
+    const source = endpointFor(connection.source, oldElementId, replacement.id, portMap);
+    const target = endpointFor(connection.target, oldElementId, replacement.id, portMap);
+    if (!source || !target) {
+      removedConnectionIds.push(connection.id);
+      continue;
     }
-    return c;
+    if (source !== connection.source || target !== connection.target) movedConnectionIds.push(connection.id);
+    connections.push({ ...connection, source, target });
+  }
+
+  const affectedScenarioLabels: string[] = [];
+  const scenarioRepairSummaries: string[] = [];
+  const scenarios = document.scenarios.map((scenario) => {
+    const result = replaceScenario(scenario, oldElementId, replacement.id, portMap);
+    const changed = JSON.stringify(result.scenario) !== JSON.stringify(scenario);
+    if (changed) affectedScenarioLabels.push(scenario.label);
+    if (result.removed.length > 0) scenarioRepairSummaries.push(`${scenario.label}: ${result.removed.join(', ')} removed`);
+    return result.scenario;
   });
 
-  const mappedRelations = document.relations.map((r) => mapIds(r, oldElementId, newElement.id, portMap) as Relation);
-  const mappedScenarios = document.scenarios.map((s) => mapIds(s, oldElementId, newElement.id, portMap) as Scenario);
-  const mappedViews = document.views.map((v) => ({
-    ...v,
-    groups: mapIds(v.groups, oldElementId, newElement.id, portMap),
-    notes: mapIds(v.notes, oldElementId, newElement.id, portMap),
+  const relations = document.relations.map((relation) => replaceRelation(relation, oldElementId, replacement.id));
+  const removedConnectionSet = new Set(removedConnectionIds);
+  const views: View[] = placedDocument.document.views.map((candidate) => ({
+    ...candidate,
+    placements: candidate.placements.filter((item) => item.elementId !== oldElementId),
+    connectionIds: candidate.connectionIds.filter((id) => !removedConnectionSet.has(id)),
+    groups: candidate.groups.map((group) => ({ ...group, elementIds: group.elementIds.map((id) => replaceElementId(id, oldElementId, replacement.id)) })),
+    notes: candidate.notes.map((note) => ({ ...note, attachedElementIds: note.attachedElementIds.map((id) => replaceElementId(id, oldElementId, replacement.id)) })),
   }));
-
-  const intermediateDoc: Document = {
-    ...document,
-    connections: mappedConnections,
-    relations: mappedRelations,
-    scenarios: mappedScenarios,
-    views: mappedViews,
+  const candidate: Document = {
+    ...placedDocument.document,
+    elements: placedDocument.document.elements.filter((element) => element.id !== oldElementId).map((element) => element.id === replacement.id ? replacement : element),
+    connections,
+    relations,
+    scenarios,
+    views,
   };
-
-  const intermediateDocWithNewElements = applyRecordChanges(intermediateDoc, placeResult.changes);
-  if (!intermediateDocWithNewElements.ok) return { disabledReason: 'internal-error', plan: null };
-
-  const deletePlan = planDelete(intermediateDocWithNewElements.document, viewId, { elementIds: [oldElementId], connectionIds: [] });
-  
-  // Now we must construct the TRUE changes to apply to `document`!
-  // True changes = placeResult.changes + (modified connections/relations/scenarios/views) + (deletePlan.changes which removes oldElement and drops unmapped stuff).
-  
-  // Wait, if we just diff intermediateDocWithNewElements.document against document... no, applyRecordChanges takes changes.
-  // We can just emit replace records for all mapped stuff that actually changed!
-  
-  const finalChanges: RecordChange[] = [...placeResult.changes];
-  
-  for (let i = 0; i < document.connections.length; i++) {
-    if (document.connections[i] !== mappedConnections[i]) {
-      finalChanges.push({ kind: 'replace', value: { recordKind: 'connection', record: mappedConnections[i] } });
-    }
-  }
-  for (let i = 0; i < document.relations.length; i++) {
-    if (document.relations[i] !== mappedRelations[i]) {
-      finalChanges.push({ kind: 'replace', value: { recordKind: 'relation', record: mappedRelations[i] } });
-    }
-  }
-  for (let i = 0; i < document.scenarios.length; i++) {
-    if (document.scenarios[i] !== mappedScenarios[i]) {
-      finalChanges.push({ kind: 'replace', value: { recordKind: 'scenario', record: mappedScenarios[i] } });
-    }
-  }
-  for (let i = 0; i < document.views.length; i++) {
-    if (document.views[i] !== mappedViews[i]) {
-      finalChanges.push({ kind: 'replace', value: { recordKind: 'view', record: mappedViews[i] } });
-    }
-  }
-  
-  // Add delete changes (removing oldElement, unmapped connections, etc)
-  // DeletePlan generates changes relative to intermediateDoc. Those changes are valid for `document` + mapped changes!
-  // Wait, `deletePlan.changes` might replace `view` AGAIN.
-  // If `deletePlan.changes` replaces a record we already replaced, we should combine them!
-  // Better yet: just apply deletePlan.changes to intermediateDoc, then diff the FINAL doc with the ORIGINAL doc to get precise Replace/Remove/Add changes?
-  // Or just use `placeResult.changes`, then manually push replacements?
-  
-  return { disabledReason: 'not-fully-implemented', plan: null };
+  const changes = recordChanges(document, candidate);
+  const dryRun = applyRecordChanges(document, changes);
+  const blockedReason = dryRun.ok ? null : (dryRun.issues[0]?.message ?? 'The replacement would leave the project invalid');
+  return {
+    ok: true,
+    plan: {
+      intent: 'replace',
+      newElementId: replacement.id,
+      newPlacementId: placed.placementId,
+      movedConnectionIds,
+      removedConnectionIds,
+      affectedScenarioLabels,
+      scenarioRepairSummaries,
+      blockedReason,
+      requiresConfirmation: removedConnectionIds.length > 0 || scenarioRepairSummaries.length > 0 || blockedReason !== null,
+      changes,
+    },
+  };
 }

@@ -1,70 +1,76 @@
 import { describe, expect, it } from 'vitest';
+import type { Document, Id, Scenario } from '../../domain/studio/model';
+import { scenarioToDraft } from '../scenarios/draftScenario';
 import { planAddProbe } from './addProbePlan';
-import type { Document, Scenario } from '../../domain/studio/model';
 
-const doc: Document = {
-  schema: 'studio-model/1',
-  id: 'd1',
-  title: 'doc',
-  elements: [
-    {
-      id: 'e1',
-      type: 'process',
-      title: 'E1',
-      ports: [
-        { id: 'p1', direction: 'out', channel: 'event', label: '', schema: null, shape: 'square' },
-        { id: 'p2', direction: 'out', channel: 'request', label: '', schema: null, shape: 'square' },
-      ],
-      state: [],
-    },
-    {
-      id: 'e2',
-      type: 'process',
-      title: 'E2',
-      ports: [{ id: 'p1', direction: 'out', channel: 'event', label: '', schema: null, shape: 'square' }],
-      state: [],
-    },
-  ],
-  connections: [],
-  relations: [],
-  schemas: [],
-  fixtures: [],
-  refinements: [],
-  scenarios: [],
-  views: [],
+const ids = {
+  document: '00000000-0000-4000-8000-000000000001',
+  schema: '00000000-0000-4000-8000-000000000002',
+  element: '00000000-0000-4000-8000-000000000003',
+  eventPort: '00000000-0000-4000-8000-000000000004',
+  dataPort: '00000000-0000-4000-8000-000000000005',
+  scenario: '00000000-0000-4000-8000-000000000006',
+  check: '00000000-0000-4000-8000-000000000007',
+} satisfies Record<string, Id>;
+
+const document: Document = {
+  schema: 'studio-model/1', id: ids.document, title: 'Probe test',
+  elements: [{
+    id: ids.element, label: 'Worker', description: '', visualKind: 'service',
+    ports: [
+      { id: ids.eventPort, label: 'event', direction: 'out', channel: 'event', schemaId: ids.schema, responseSchemaId: null },
+      { id: ids.dataPort, label: 'data', direction: 'out', channel: 'data', schemaId: ids.schema, responseSchemaId: null },
+    ],
+    behavior: { kind: 'unmodeled', version: 1, reason: 'Test' },
+  }],
+  connections: [], relations: [],
+  schemas: [{ id: ids.schema, label: 'Payload', shape: { type: 'record', nullable: false, fields: [] } }],
+  fixtures: [], refinements: [], scenarios: [], views: [],
 };
 
+function scenario(mode: Scenario['mode'], scopeElementIds: readonly Id[] = [ids.element]): Scenario {
+  return {
+    id: ids.scenario, label: 'Flow', revision: 1, mode, scopeElementIds,
+    entryPorts: [], inputs: [], workloads: [], faults: [], boundaries: [], refinementSelections: [],
+    initialContexts: [], assertions: [], seed: 1,
+    budgets: { maxEvents: 100, maxTraceRows: 100, maxTraceBytes: 1000, maxScheduledEvents: 100, maxLiveRoots: 10 },
+    completion: mode === 'logical' ? { kind: 'quiescent' } : { kind: 'horizon', horizonMs: 1000 },
+    assumptions: [],
+  };
+}
+
 describe('planAddProbe', () => {
-  it('returns no-data-output for logical scenario on element with only event ports', () => {
-    const scn: Scenario = { id: 's1', label: '', mode: 'logical', steps: [], assertions: [] };
-    const res = planAddProbe(doc, scn, 'e2', () => 'chk');
-    expect(res.disabledReason).toBe('no-data-output');
-  });
-
-  it('adds output probe for logical scenario', () => {
-    const scn: Scenario = { id: 's1', label: '', mode: 'logical', steps: [], assertions: [] };
-    const res = planAddProbe(doc, scn, 'e1', () => 'chk');
-    expect(res.disabledReason).toBeNull();
-    expect(res.newCheckId).toBe('chk');
-    const patched = res.patch!({ assertions: [] } as any);
-    expect(patched.assertions[0]).toMatchObject({
-      id: 'chk',
-      operator: 'equals',
-      subject: { kind: 'output', port: { element: 'e1', port: 'p2' } }
+  it('rejects an element outside the scenario scope', () => {
+    expect(planAddProbe(document, scenario('logical', []), ids.element, () => ids.check)).toEqual({
+      ok: false,
+      reason: 'This component is not in the selected scenario scope',
     });
   });
 
-  it('adds throughput probe for timed scenario', () => {
-    const scn: Scenario = { id: 's1', label: '', mode: 'timed', traffic: [], assertions: [], completion: { kind: 'quiescent' } };
-    const res = planAddProbe(doc, scn, 'e1', () => 'chk');
-    expect(res.disabledReason).toBeNull();
-    expect(res.newCheckId).toBe('chk');
-    const patched = res.patch!({ assertions: [] } as any);
-    expect(patched.assertions[0]).toMatchObject({
-      id: 'chk',
-      operator: 'at-least',
-      subject: { kind: 'metric', elementId: 'e1', key: 'throughput' },
-      expected: 1,
+  it('creates a logical output check on the first non-event output', () => {
+    const source = scenario('logical');
+    const result = planAddProbe(document, source, ids.element, () => ids.check);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.check).toEqual({
+      id: ids.check, label: 'Check output', operator: 'equals', expected: null,
+      subject: { kind: 'output', port: { elementId: ids.element, portId: ids.dataPort }, path: [] },
     });
+    expect(result.patch(scenarioToDraft(source)).assertions).toEqual([result.check]);
+  });
+
+  it('creates a timed throughput at-least check with an empty expected value', () => {
+    const result = planAddProbe(document, scenario('timed'), ids.element, () => ids.check);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.check).toMatchObject({
+      id: ids.check, operator: 'at-least', expected: null,
+      subject: { kind: 'metric', elementId: ids.element, key: 'throughput' },
+    });
+  });
+
+  it('rejects a logical element with no non-event output', () => {
+    const eventOnly: Document = { ...document, elements: [{ ...document.elements[0], ports: [document.elements[0].ports[0]] }] };
+    expect(planAddProbe(eventOnly, scenario('logical'), ids.element, () => ids.check)).toMatchObject({ ok: false });
   });
 });

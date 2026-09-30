@@ -1,60 +1,42 @@
-import type { Id, Document, Scenario } from '../../domain/studio/model';
-import type { DraftScenario, DraftAssertion } from '../scenarios/types';
+import type { Document, Id, Scenario } from '../../domain/studio/model';
+import type { DraftAssertion, DraftScenario } from '../scenarios/draftScenario';
+
+export type AddProbePlan =
+  | { readonly ok: true; readonly check: DraftAssertion; readonly patch: (scenario: DraftScenario) => DraftScenario }
+  | { readonly ok: false; readonly reason: string };
 
 export function planAddProbe(
   document: Document,
   scenario: Scenario,
   elementId: Id,
   mintId: () => Id
-): {
-  readonly disabledReason: string | null;
-  readonly patch?: (s: DraftScenario) => DraftScenario;
-  readonly newCheckId?: Id;
-} {
+): AddProbePlan {
   const element = document.elements.find((e) => e.id === elementId);
-  if (!element) return { disabledReason: 'element-not-found' };
+  if (!element) return { ok: false, reason: 'The selected component no longer exists' };
+  if (!scenario.scopeElementIds.includes(elementId)) {
+    return { ok: false, reason: 'This component is not in the selected scenario scope' };
+  }
 
+  let check: DraftAssertion;
   if (scenario.mode === 'logical') {
     const outPort = element.ports.find((p) => p.direction === 'out' && p.channel !== 'event');
-    if (!outPort) return { disabledReason: 'no-data-output' };
-
-    const checkId = mintId();
-    const assertion: DraftAssertion = {
-      id: checkId,
+    if (!outPort) return { ok: false, reason: 'This component has no non-event output port to probe' };
+    check = {
+      id: mintId(),
       label: 'Check output',
-      subject: {
-        kind: 'output',
-        port: { element: elementId, port: outPort.id },
-        path: [],
-      },
+      subject: { kind: 'output', port: { elementId, portId: outPort.id }, path: [] },
       operator: 'equals',
       expected: null,
     };
-
-    return {
-      disabledReason: null,
-      newCheckId: checkId,
-      patch: (s) => ({ ...s, assertions: [...s.assertions, assertion] }),
-    };
   } else {
-    // timed
-    const checkId = mintId();
-    const assertion: DraftAssertion = {
-      id: checkId,
+    check = {
+      id: mintId(),
       label: 'Check throughput',
-      subject: {
-        kind: 'metric',
-        elementId,
-        key: 'throughput',
-      },
+      subject: { kind: 'metric', elementId, key: 'throughput' },
       operator: 'at-least',
-      expected: 1,
-    };
-
-    return {
-      disabledReason: null,
-      newCheckId: checkId,
-      patch: (s) => ({ ...s, assertions: [...s.assertions, assertion] }),
+      expected: null,
     };
   }
+
+  return { ok: true, check, patch: (draft) => ({ ...draft, assertions: [...draft.assertions, check] }) };
 }

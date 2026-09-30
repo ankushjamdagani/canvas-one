@@ -801,7 +801,8 @@ export class HistoryController {
   async getCommitsTouching(elementIds: readonly Id[]): Promise<ReadonlySet<Id>> {
     if (elementIds.length === 0) return new Set();
     const matching = new Set<Id>();
-    if (!this.lastSyncedProjectId) return matching;
+    const projectId = this.lastSyncedProjectId;
+    if (!projectId) return matching;
     
     const steps = await Promise.all(this.state.commits.map(async (commit) => {
       if (commit.parentIds.length !== 1) return null;
@@ -809,8 +810,8 @@ export class HistoryController {
       if (!parentCommit) return null;
       
       const [parentSnap, commitSnap] = await Promise.all([
-        this.repository.loadSnapshot(this.lastSyncedProjectId!, parentCommit.snapshotId),
-        this.repository.loadSnapshot(this.lastSyncedProjectId!, commit.snapshotId),
+        this.repository.loadSnapshot(projectId, parentCommit.snapshotId),
+        this.repository.loadSnapshot(projectId, commit.snapshotId),
       ]);
       
       if (!parentSnap || !commitSnap) return null;
