@@ -38,6 +38,8 @@ function findConnection(document: Document, id: Id): Connection | null {
   return document.connections.find((c) => c.id === id) ?? null;
 }
 
+import { getCatalogLayer, CATALOG_LAYER_COLORS, type CatalogLayer } from '../workspace/projection';
+
 function buildFieldsAndLabel(
   target: DraftTarget,
   document: Document,
@@ -47,21 +49,27 @@ function buildFieldsAndLabel(
   readonly label: string;
   readonly kindTag: string;
   readonly notSimulated: boolean;
+  readonly layer: CatalogLayer | null;
+  readonly stripeColor: string | null;
 } {
   if (target.kind === 'element') {
     const record = findElement(document, target.ids[0]);
-    if (!record) return { fields: [], record: null, label: '', kindTag: '', notSimulated: false };
+    if (!record) return { fields: [], record: null, label: '', kindTag: '', notSimulated: false, layer: null, stripeColor: null };
     const { tag, notSimulated } = kindTagForElement(record);
-    return { fields: fieldsForElement(record), record, label: record.label, kindTag: tag, notSimulated };
+    const layer = getCatalogLayer(record.visualKind);
+    const stripeColor = layer ? CATALOG_LAYER_COLORS[layer] : null;
+    return { fields: fieldsForElement(record), record, label: record.label, kindTag: tag, notSimulated, layer, stripeColor };
   }
   const record = findConnection(document, target.ids[0]);
-  if (!record) return { fields: [], record: null, label: '', kindTag: '', notSimulated: false };
+  if (!record) return { fields: [], record: null, label: '', kindTag: '', notSimulated: false, layer: null, stripeColor: null };
   return {
     fields: fieldsForConnection(record),
     record,
     label: record.label,
     kindTag: kindTagForConnection(record),
     notSimulated: false,
+    layer: null,
+    stripeColor: null,
   };
 }
 
@@ -102,7 +110,7 @@ export function openDraft(
     });
   }
 
-  const { fields, record, label, kindTag, notSimulated } = buildFieldsAndLabel(target, document);
+  const { fields, record, label, kindTag, notSimulated, layer, stripeColor } = buildFieldsAndLabel(target, document);
 
   if (!record) {
     return Object.freeze({
@@ -121,6 +129,8 @@ export function openDraft(
       label: 'Deleted',
       kindTag: '',
       notSimulated: false,
+      layer: null,
+      stripeColor: null,
     });
   }
 
@@ -145,6 +155,8 @@ export function openDraft(
     label,
     kindTag,
     notSimulated,
+    layer,
+    stripeColor,
   });
 }
 

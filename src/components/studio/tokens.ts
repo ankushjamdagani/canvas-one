@@ -184,3 +184,62 @@ export function contrastRatio(hexA: string, hexB: string): number {
   const darker = Math.min(lumA, lumB);
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+/**
+ * Composites a foreground color over a background color with a given alpha.
+ */
+function compositeColor(fgHex: string, bgHex: string, alpha: number): string {
+  const parseHex = (hex: string) => {
+    const clean = hex.replace(/^#/, '');
+    if (clean.length === 3) {
+      return [
+        parseInt(clean[0] + clean[0], 16),
+        parseInt(clean[1] + clean[1], 16),
+        parseInt(clean[2] + clean[2], 16),
+      ];
+    }
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ];
+  };
+
+  const fg = parseHex(fgHex);
+  const bg = parseHex(bgHex);
+  const r = Math.round(fg[0] * alpha + bg[0] * (1 - alpha));
+  const g = Math.round(fg[1] * alpha + bg[1] * (1 - alpha));
+  const b = Math.round(fg[2] * alpha + bg[2] * (1 - alpha));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
+}
+
+/**
+ * Computes an accessible text color by darkening the stripe color until it meets
+ * >= 4.5:1 contrast against the tinted background composited over the panel surface.
+ */
+export function computeTagColors(stripeColor: string) {
+  // Panel surface is #F7F5F1
+  const bgSolid = compositeColor(stripeColor, '#F7F5F1', 0.12);
+  let textSolid = stripeColor;
+  
+  for (let alpha = 1.0; alpha >= 0; alpha -= 0.01) {
+    const testColor = compositeColor(stripeColor, '#000000', alpha);
+    if (contrastRatio(testColor, bgSolid) >= 4.5) {
+      textSolid = testColor;
+      break;
+    }
+  }
+
+  // we can parse stripeColor for rgba, but returning object with css properties is easier
+  const clean = stripeColor.replace(/^#/, '');
+  const r = clean.length === 3 ? parseInt(clean[0]+clean[0], 16) : parseInt(clean.slice(0, 2), 16);
+  const g = clean.length === 3 ? parseInt(clean[1]+clean[1], 16) : parseInt(clean.slice(2, 4), 16);
+  const b = clean.length === 3 ? parseInt(clean[2]+clean[2], 16) : parseInt(clean.slice(4, 6), 16);
+
+  return {
+    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
+    borderColor: `rgba(${r}, ${g}, ${b}, 0.35)`,
+    color: textSolid,
+    '--bg-solid': bgSolid, // for testing contrast
+  };
+}

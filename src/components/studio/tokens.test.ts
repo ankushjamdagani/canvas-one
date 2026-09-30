@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { evergreen, contrastRatio, nodeKindColor } from "./tokens";
+import { evergreen, contrastRatio, nodeKindColor, computeTagColors } from "./tokens";
 
 describe("Evergreen tokens and styles.css single source check", () => {
   const cssPath = path.resolve(__dirname, "../../styles.css");
@@ -103,7 +103,8 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(rootVars["--radius-popover"]).toBeUndefined();
     expect(rootVars["--radius-card"]).toBeUndefined();
     expect(rootVars["--radius-dock"]).toBeUndefined();
-  });
+  
+});
 
   it("(b) asserts contrast >= 4.5 for required text and foreground pairs", () => {
     // Secondary #626D68 on panel, shell, canvas
@@ -249,4 +250,5 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(themeVars["--color-node-kind-messaging"]).toBe(nodeKindColor.messaging);
     expect(themeVars["--color-node-kind-operations"]).toBe(nodeKindColor.operations);
   });
+
 });

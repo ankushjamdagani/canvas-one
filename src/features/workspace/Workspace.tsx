@@ -198,7 +198,7 @@ function duplicateConfirmationItems(preview: {
   return Array.from(new Set(items));
 }
 
-function useViewportWidth(): number {
+export function useViewportWidth(): number {
   const [width, setWidth] = React.useState<number>(() =>
     typeof window === 'undefined' ? 1280 : window.innerWidth,
   );
@@ -415,7 +415,7 @@ export function Workspace({
         return; // already the open target -- keep editing, don't reopen
       }
 
-      if (nextTarget.ids.length === 0) {
+      if (nextTarget.ids.length === 0 || nextTarget.ids.length > 1) {
         runGuarded(closeInspector);
         return;
       }
