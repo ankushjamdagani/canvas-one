@@ -757,7 +757,7 @@ export class ScenarioRunner {
   ): { ok: true; response: BoundaryResponse; payload: Json } | { ok: false; error: string } {
     let matchedResponse: BoundaryResponse | null = null;
     for (const resp of boundary.responses) {
-      if (consume && this.usedBoundaryResponseIds.has(resp.id)) continue;
+      if (consume && !resp.repeat && this.usedBoundaryResponseIds.has(resp.id)) continue;
       const matchRes = defaultEvaluator.evalGuard(resp.match, { input: request, context: {}, outcome: null });
       if (matchRes.ok && matchRes.value) {
         matchedResponse = resp;
@@ -767,7 +767,8 @@ export class ScenarioRunner {
     if (!matchedResponse) {
       return { ok: false, error: `Boundary exhaustion or no matching response on port '${portId}' (§6)` };
     }
-    if (consume) this.usedBoundaryResponseIds.add(matchedResponse.id);
+    // D51: a repeating response answers every matching request.
+    if (consume && !matchedResponse.repeat) this.usedBoundaryResponseIds.add(matchedResponse.id);
 
     const fixtureVal = this.fixturesMap.get(matchedResponse.responseFixtureId);
     if (fixtureVal === undefined) {

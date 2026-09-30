@@ -3475,8 +3475,10 @@ function validateScenario(
           for (let rIdx = 0; rIdx < responses.length; rIdx++) {
             const r = responses[rIdx];
             const rPath = [...bPath, 'responses', rIdx];
-            const allowedR = ['id', 'match', 'responseFixtureId', 'payloadBindings', 'delayMs', 'afterInputId', 'outcome'];
-            if (checkRecord(r, allowedR, allowedR, rPath, bId ?? sId, issues, 'BoundaryResponse')) {
+            const allowedR = ['id', 'match', 'responseFixtureId', 'payloadBindings', 'delayMs', 'afterInputId', 'outcome', 'repeat'];
+            const requiredR = allowedR.filter((k) => k !== 'repeat');
+            if (checkRecord(r, allowedR, requiredR, rPath, bId ?? sId, issues, 'BoundaryResponse')) {
+              if (r.repeat !== undefined) validateBoolean(r.repeat, [...rPath, 'repeat'], bId ?? sId, issues, 'repeat');
               let rId: Id | null = null;
               if (validateId(r.id, [...rPath, 'id'], bId ?? sId, issues)) {
                 rId = r.id;

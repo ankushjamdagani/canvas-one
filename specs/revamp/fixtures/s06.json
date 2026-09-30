@@ -1,0 +1,1170 @@
+{
+  "schema": "studio-model/1",
+  "id": "00000000-0006-4000-8000-000000000002",
+  "title": "S06 Checkout under a traffic spike",
+  "elements": [
+    {
+      "id": "00000000-0006-4000-8000-000000000004",
+      "label": "Gateway",
+      "description": "Entry point; retries a failed call on the other replica",
+      "visualKind": "gateway",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-000000000008",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000006",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000007"
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000009",
+          "label": "out",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000006",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000007"
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000031",
+          "label": "out",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000012",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000013"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 2000,
+          "concurrency": 64,
+          "queueLimit": 500,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "router",
+          "strategy": "round-robin"
+        },
+        "entryPortId": "00000000-0006-4000-8000-000000000008"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000000a",
+      "label": "Checkout API A",
+      "description": "Takes the order: writes it, charges the card, queues fulfilment",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-00000000000e",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-00000000000c",
+          "responseSchemaId": "00000000-0006-4000-8000-00000000000d"
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000000f",
+          "label": "out",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-00000000000c",
+          "responseSchemaId": "00000000-0006-4000-8000-00000000000d"
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000035",
+          "label": "publish",
+          "direction": "out",
+          "channel": "message",
+          "schemaId": "00000000-0006-4000-8000-000000000028",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 2000,
+          "concurrency": 64,
+          "queueLimit": 500,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "processor"
+        },
+        "entryPortId": "00000000-0006-4000-8000-00000000000e"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000010",
+      "label": "Checkout API B",
+      "description": "Second replica of the checkout API",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-000000000014",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000012",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000013"
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000015",
+          "label": "out",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000012",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000013"
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000039",
+          "label": "publish",
+          "direction": "out",
+          "channel": "message",
+          "schemaId": "00000000-0006-4000-8000-000000000028",
+          "responseSchemaId": null
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 2000,
+          "concurrency": 64,
+          "queueLimit": 500,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "processor"
+        },
+        "entryPortId": "00000000-0006-4000-8000-000000000014"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000016",
+      "label": "Orders DB",
+      "description": "Order writes",
+      "visualKind": "database",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-00000000001a",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000018",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000019"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 500,
+          "concurrency": 10,
+          "queueLimit": 500,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "storage",
+          "writeCapacity": 200
+        },
+        "entryPortId": "00000000-0006-4000-8000-00000000001a"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000001b",
+      "label": "Payment service",
+      "description": "Charges the card through the card processor; 2% of calls fail",
+      "visualKind": "service",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-00000000001f",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-00000000001d",
+          "responseSchemaId": "00000000-0006-4000-8000-00000000001e"
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000020",
+          "label": "out",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-00000000001d",
+          "responseSchemaId": "00000000-0006-4000-8000-00000000001e"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 2000,
+          "concurrency": 64,
+          "queueLimit": 500,
+          "failureRate": 2,
+          "maxRetries": 0,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "processor"
+        },
+        "entryPortId": "00000000-0006-4000-8000-00000000001f"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000021",
+      "label": "Card processor",
+      "description": "External payment provider (scripted boundary)",
+      "visualKind": "thirdparty",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-000000000025",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-000000000023",
+          "responseSchemaId": "00000000-0006-4000-8000-000000000024"
+        }
+      ],
+      "behavior": {
+        "kind": "unmodeled",
+        "version": 1,
+        "reason": "Not simulated"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000026",
+      "label": "Order queue",
+      "description": "Buffers fulfilment work",
+      "visualKind": "queue",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-000000000029",
+          "label": "in",
+          "direction": "in",
+          "channel": "message",
+          "schemaId": "00000000-0006-4000-8000-000000000028",
+          "responseSchemaId": null
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000002a",
+          "label": "out",
+          "direction": "out",
+          "channel": "message",
+          "schemaId": "00000000-0006-4000-8000-000000000028",
+          "responseSchemaId": null
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000003c",
+          "label": "out",
+          "direction": "out",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-00000000002d",
+          "responseSchemaId": "00000000-0006-4000-8000-00000000002e"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 2000,
+          "concurrency": 64,
+          "queueLimit": 10000,
+          "failureRate": 0,
+          "maxRetries": 0,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "broker",
+          "delivery": "competing"
+        },
+        "entryPortId": "00000000-0006-4000-8000-000000000029"
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000002b",
+      "label": "Fulfilment worker",
+      "description": "Packs and ships; 200 orders/s",
+      "visualKind": "worker",
+      "ports": [
+        {
+          "id": "00000000-0006-4000-8000-00000000002f",
+          "label": "in",
+          "direction": "in",
+          "channel": "call",
+          "schemaId": "00000000-0006-4000-8000-00000000002d",
+          "responseSchemaId": "00000000-0006-4000-8000-00000000002e"
+        }
+      ],
+      "behavior": {
+        "kind": "resource",
+        "version": 1,
+        "config": {
+          "capacity": 100,
+          "concurrency": 2,
+          "queueLimit": 0,
+          "failureRate": 0,
+          "maxRetries": 2,
+          "retryDelayMs": 100,
+          "serviceTime": "exponential",
+          "type": "processor"
+        },
+        "entryPortId": "00000000-0006-4000-8000-00000000002f"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "00000000-0006-4000-8000-000000000030",
+      "label": "route A",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-000000000004",
+        "portId": "00000000-0006-4000-8000-000000000009"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-00000000000a",
+        "portId": "00000000-0006-4000-8000-00000000000e"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": {
+          "maxAttempts": 2,
+          "backoffMs": 0,
+          "backoffMultiplier": 2,
+          "maxBackoffMs": 1000,
+          "jitter": false,
+          "attemptTimeoutMs": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000032",
+      "label": "route B",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-000000000004",
+        "portId": "00000000-0006-4000-8000-000000000031"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-000000000010",
+        "portId": "00000000-0006-4000-8000-000000000014"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": {
+          "maxAttempts": 2,
+          "backoffMs": 0,
+          "backoffMultiplier": 2,
+          "maxBackoffMs": 1000,
+          "jitter": false,
+          "attemptTimeoutMs": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000033",
+      "label": "write order",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-00000000000a",
+        "portId": "00000000-0006-4000-8000-00000000000f"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-000000000016",
+        "portId": "00000000-0006-4000-8000-00000000001a"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": null
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000034",
+      "label": "charge",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-00000000000a",
+        "portId": "00000000-0006-4000-8000-00000000000f"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-00000000001b",
+        "portId": "00000000-0006-4000-8000-00000000001f"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": {
+          "maxAttempts": 3,
+          "backoffMs": 50,
+          "backoffMultiplier": 2,
+          "maxBackoffMs": 1000,
+          "jitter": true,
+          "attemptTimeoutMs": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000036",
+      "label": "publish order",
+      "kind": "message",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-00000000000a",
+        "portId": "00000000-0006-4000-8000-000000000035"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-000000000026",
+        "portId": "00000000-0006-4000-8000-000000000029"
+      },
+      "config": {
+        "latencyMs": 2,
+        "ackDelayMs": 0,
+        "messageTtlMs": 300000,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000037",
+      "label": "write order",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-000000000010",
+        "portId": "00000000-0006-4000-8000-000000000015"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-000000000016",
+        "portId": "00000000-0006-4000-8000-00000000001a"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": null
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000038",
+      "label": "charge",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-000000000010",
+        "portId": "00000000-0006-4000-8000-000000000015"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-00000000001b",
+        "portId": "00000000-0006-4000-8000-00000000001f"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": {
+          "maxAttempts": 3,
+          "backoffMs": 50,
+          "backoffMultiplier": 2,
+          "maxBackoffMs": 1000,
+          "jitter": true,
+          "attemptTimeoutMs": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000003a",
+      "label": "publish order",
+      "kind": "message",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-000000000010",
+        "portId": "00000000-0006-4000-8000-000000000039"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-000000000026",
+        "portId": "00000000-0006-4000-8000-000000000029"
+      },
+      "config": {
+        "latencyMs": 2,
+        "ackDelayMs": 0,
+        "messageTtlMs": 300000,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000003b",
+      "label": "card API",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-00000000001b",
+        "portId": "00000000-0006-4000-8000-000000000020"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-000000000021",
+        "portId": "00000000-0006-4000-8000-000000000025"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": null,
+        "retry": {
+          "maxAttempts": 2,
+          "backoffMs": 50,
+          "backoffMultiplier": 2,
+          "maxBackoffMs": 1000,
+          "jitter": true,
+          "attemptTimeoutMs": 1000
+        }
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000003d",
+      "label": "deliver",
+      "kind": "call",
+      "source": {
+        "elementId": "00000000-0006-4000-8000-000000000026",
+        "portId": "00000000-0006-4000-8000-00000000003c"
+      },
+      "target": {
+        "elementId": "00000000-0006-4000-8000-00000000002b",
+        "portId": "00000000-0006-4000-8000-00000000002f"
+      },
+      "config": {
+        "latencyMs": 2,
+        "returnLatencyMs": 2,
+        "weight": 1,
+        "condition": null,
+        "fallback": false,
+        "resource": {
+          "requestClassId": "00000000-0006-4000-8000-000000000003",
+          "requestClassLabel": "Order",
+          "operation": "write",
+          "key": null,
+          "tags": [],
+          "deadlineDurationMs": 5000
+        },
+        "retry": null
+      }
+    }
+  ],
+  "relations": [],
+  "schemas": [
+    {
+      "id": "00000000-0006-4000-8000-000000000006",
+      "label": "API Gateway request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000007",
+      "label": "API Gateway response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000000c",
+      "label": "Service request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000000d",
+      "label": "Service response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000012",
+      "label": "Service request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000013",
+      "label": "Service response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000018",
+      "label": "Relational Database request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000019",
+      "label": "Relational Database response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000001d",
+      "label": "Service request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000001e",
+      "label": "Service response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000023",
+      "label": "Third-Party Service request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000024",
+      "label": "Third-Party Service response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-000000000028",
+      "label": "Message Queue request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000002d",
+      "label": "Worker request",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000002e",
+      "label": "Worker response",
+      "shape": {
+        "type": "record",
+        "nullable": false,
+        "fields": []
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "00000000-0006-4000-8000-00000000003e",
+      "schemaId": "00000000-0006-4000-8000-00000000001e",
+      "value": {}
+    }
+  ],
+  "refinements": [],
+  "scenarios": [
+    {
+      "id": "00000000-0006-4000-8000-000000000044",
+      "label": "Steady traffic",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "00000000-0006-4000-8000-000000000004",
+        "00000000-0006-4000-8000-00000000000a",
+        "00000000-0006-4000-8000-000000000010",
+        "00000000-0006-4000-8000-000000000016",
+        "00000000-0006-4000-8000-00000000001b",
+        "00000000-0006-4000-8000-000000000026",
+        "00000000-0006-4000-8000-00000000002b"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "00000000-0006-4000-8000-000000000004",
+          "portId": "00000000-0006-4000-8000-000000000008"
+        }
+      ],
+      "inputs": [],
+      "workloads": [
+        {
+          "id": "00000000-0006-4000-8000-000000000042",
+          "entry": {
+            "elementId": "00000000-0006-4000-8000-000000000004",
+            "portId": "00000000-0006-4000-8000-000000000008"
+          },
+          "enabled": true,
+          "rate": 100,
+          "profile": {
+            "kind": "steady"
+          },
+          "timeoutMs": 30000,
+          "intervalMs": null,
+          "classes": [
+            {
+              "id": "00000000-0006-4000-8000-000000000043",
+              "name": "Order",
+              "weight": 1,
+              "operation": "write",
+              "tags": [],
+              "keyDistribution": {
+                "kind": "uniform",
+                "catalogSize": 10000,
+                "hotSubset": 1,
+                "hotShare": 100
+              }
+            }
+          ]
+        }
+      ],
+      "faults": [],
+      "boundaries": [
+        {
+          "id": "00000000-0006-4000-8000-000000000045",
+          "source": {
+            "elementId": "00000000-0006-4000-8000-00000000001b",
+            "portId": "00000000-0006-4000-8000-000000000020"
+          },
+          "schemaId": "00000000-0006-4000-8000-00000000001e",
+          "responses": [
+            {
+              "id": "00000000-0006-4000-8000-000000000046",
+              "match": {
+                "op": "exists",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              "responseFixtureId": "00000000-0006-4000-8000-00000000003e",
+              "payloadBindings": [],
+              "delayMs": 150,
+              "afterInputId": null,
+              "outcome": "succeeded",
+              "repeat": true
+            }
+          ]
+        }
+      ],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "00000000-0006-4000-8000-00000000003f",
+          "label": "no failed orders",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "failed"
+          },
+          "operator": "at-most",
+          "expected": 0
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000040",
+          "label": "p95 checkout under 400 ms",
+          "subject": {
+            "kind": "metric",
+            "elementId": "00000000-0006-4000-8000-000000000004",
+            "key": "p95LatencyMs"
+          },
+          "operator": "at-most",
+          "expected": 400
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000041",
+          "label": "about 100 orders/s get through",
+          "subject": {
+            "kind": "metric",
+            "elementId": "00000000-0006-4000-8000-000000000004",
+            "key": "throughput"
+          },
+          "operator": "at-least",
+          "expected": 95
+        }
+      ],
+      "seed": 6,
+      "budgets": {
+        "maxEvents": 100000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "horizon",
+        "horizonMs": 30000
+      },
+      "assumptions": []
+    },
+    {
+      "id": "00000000-0006-4000-8000-00000000004e",
+      "label": "Flash sale",
+      "revision": 0,
+      "mode": "timed",
+      "scopeElementIds": [
+        "00000000-0006-4000-8000-000000000004",
+        "00000000-0006-4000-8000-00000000000a",
+        "00000000-0006-4000-8000-000000000010",
+        "00000000-0006-4000-8000-000000000016",
+        "00000000-0006-4000-8000-00000000001b",
+        "00000000-0006-4000-8000-000000000026",
+        "00000000-0006-4000-8000-00000000002b"
+      ],
+      "entryPorts": [
+        {
+          "elementId": "00000000-0006-4000-8000-000000000004",
+          "portId": "00000000-0006-4000-8000-000000000008"
+        }
+      ],
+      "inputs": [],
+      "workloads": [
+        {
+          "id": "00000000-0006-4000-8000-00000000004c",
+          "entry": {
+            "elementId": "00000000-0006-4000-8000-000000000004",
+            "portId": "00000000-0006-4000-8000-000000000008"
+          },
+          "enabled": true,
+          "rate": 100,
+          "profile": {
+            "kind": "burst",
+            "peakRate": 600,
+            "startMs": 10000,
+            "endMs": 20000
+          },
+          "timeoutMs": 30000,
+          "intervalMs": null,
+          "classes": [
+            {
+              "id": "00000000-0006-4000-8000-00000000004d",
+              "name": "Order",
+              "weight": 1,
+              "operation": "write",
+              "tags": [],
+              "keyDistribution": {
+                "kind": "uniform",
+                "catalogSize": 10000,
+                "hotSubset": 1,
+                "hotShare": 100
+              }
+            }
+          ]
+        }
+      ],
+      "faults": [],
+      "boundaries": [
+        {
+          "id": "00000000-0006-4000-8000-00000000004f",
+          "source": {
+            "elementId": "00000000-0006-4000-8000-00000000001b",
+            "portId": "00000000-0006-4000-8000-000000000020"
+          },
+          "schemaId": "00000000-0006-4000-8000-00000000001e",
+          "responses": [
+            {
+              "id": "00000000-0006-4000-8000-000000000050",
+              "match": {
+                "op": "exists",
+                "value": {
+                  "kind": "literal",
+                  "value": true
+                }
+              },
+              "responseFixtureId": "00000000-0006-4000-8000-00000000003e",
+              "payloadBindings": [],
+              "delayMs": 150,
+              "afterInputId": null,
+              "outcome": "succeeded",
+              "repeat": true
+            }
+          ]
+        }
+      ],
+      "refinementSelections": [],
+      "initialContexts": [],
+      "assertions": [
+        {
+          "id": "00000000-0006-4000-8000-000000000047",
+          "label": "at most 1,000 orders turned away at the peak",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "rejected"
+          },
+          "operator": "at-most",
+          "expected": 1000
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000048",
+          "label": "no fulfilment message expires",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "expired"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000049",
+          "label": "the fulfilment backlog drains",
+          "subject": {
+            "kind": "count",
+            "scope": "message",
+            "elementId": null,
+            "outcome": "inFlight"
+          },
+          "operator": "equals",
+          "expected": 0
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000004a",
+          "label": "no failed orders",
+          "subject": {
+            "kind": "count",
+            "scope": "root",
+            "elementId": null,
+            "outcome": "failed"
+          },
+          "operator": "at-most",
+          "expected": 0
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000004b",
+          "label": "fulfilment keeps working through the spike",
+          "subject": {
+            "kind": "metric",
+            "elementId": "00000000-0006-4000-8000-00000000002b",
+            "key": "throughput"
+          },
+          "operator": "at-least",
+          "expected": 0
+        }
+      ],
+      "seed": 6,
+      "budgets": {
+        "maxEvents": 1000000,
+        "maxTraceRows": 10000,
+        "maxTraceBytes": 4194304,
+        "maxScheduledEvents": 100000,
+        "maxLiveRoots": 10000
+      },
+      "completion": {
+        "kind": "drain",
+        "arrivalHorizonMs": 30000,
+        "deadlineMs": 120000
+      },
+      "assumptions": []
+    }
+  ],
+  "views": [
+    {
+      "id": "00000000-0006-4000-8000-000000000001",
+      "label": "Main",
+      "placements": [
+        {
+          "id": "00000000-0006-4000-8000-000000000005",
+          "elementId": "00000000-0006-4000-8000-000000000004",
+          "x": 0,
+          "y": 200,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000000b",
+          "elementId": "00000000-0006-4000-8000-00000000000a",
+          "x": 280,
+          "y": 60,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000011",
+          "elementId": "00000000-0006-4000-8000-000000000010",
+          "x": 280,
+          "y": 380,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000017",
+          "elementId": "00000000-0006-4000-8000-000000000016",
+          "x": 760,
+          "y": 0,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000001c",
+          "elementId": "00000000-0006-4000-8000-00000000001b",
+          "x": 660,
+          "y": 220,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000022",
+          "elementId": "00000000-0006-4000-8000-000000000021",
+          "x": 1000,
+          "y": 220,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-000000000027",
+          "elementId": "00000000-0006-4000-8000-000000000026",
+          "x": 560,
+          "y": 460,
+          "width": 184,
+          "expanded": false
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000002c",
+          "elementId": "00000000-0006-4000-8000-00000000002b",
+          "x": 900,
+          "y": 460,
+          "width": 184,
+          "expanded": false
+        }
+      ],
+      "connectionIds": [
+        "00000000-0006-4000-8000-000000000030",
+        "00000000-0006-4000-8000-000000000032",
+        "00000000-0006-4000-8000-000000000033",
+        "00000000-0006-4000-8000-000000000034",
+        "00000000-0006-4000-8000-000000000036",
+        "00000000-0006-4000-8000-000000000037",
+        "00000000-0006-4000-8000-000000000038",
+        "00000000-0006-4000-8000-00000000003a",
+        "00000000-0006-4000-8000-00000000003b",
+        "00000000-0006-4000-8000-00000000003d"
+      ],
+      "relationIds": [],
+      "groups": [],
+      "notes": []
+    }
+  ]
+}

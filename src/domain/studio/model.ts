@@ -1081,6 +1081,11 @@ export type BoundaryResponse = {
   readonly payloadBindings: readonly BoundaryPayloadBinding[];
   readonly delayMs: number | null;
   readonly afterInputId: Id | null;
+  /**
+   * D51: true = this response answers every matching request instead of being used once
+   * (§6: "the first unused matching response is consumed"). Absent means once.
+   */
+  readonly repeat?: boolean;
   readonly outcome: TransportOutcome;
 };
 

@@ -456,6 +456,23 @@ function ResponseFields({
           </NativeSelect>
         </label>
         <label className="col-span-2 space-y-1 text-[11px] text-secondary-text">
+          Answers
+          <NativeSelect
+            value={response.repeat ? 'every' : 'once'}
+            aria-label="Answers"
+            data-testid="boundary-response-repeat"
+            onChange={(event) =>
+              onChange((current) => {
+                const { repeat: _omit, ...rest } = current;
+                return event.target.value === 'every' ? { ...rest, repeat: true } : rest;
+              })
+            }
+          >
+            <NativeSelectOption value="once">One matching request</NativeSelectOption>
+            <NativeSelectOption value="every">Every matching request</NativeSelectOption>
+          </NativeSelect>
+        </label>
+        <label className="col-span-2 space-y-1 text-[11px] text-secondary-text">
           Deliver after step
           <NativeSelect
             value={response.afterInputId ?? ''}
