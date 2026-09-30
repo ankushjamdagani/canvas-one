@@ -51,8 +51,10 @@ export interface LibraryPanelProps {
 export interface LibraryPickerProps {
   /** Called when the user confirms placing a catalog entry */
   onPlace: (entryId: string) => void;
-  /** Called when the user clicks "Browse full library" */
-  onOpenFullLibrary: () => void;
+  /** Called when the user clicks "Browse full library"; the link is hidden when absent. */
+  onOpenFullLibrary?: () => void;
+  /** Verb on the confirm button ("Place" by default; "Use" when choosing a replacement). */
+  actionLabel?: string;
   /** Called when the user closes the picker (e.g. Escape) */
   onClose?: () => void;
   /** Currently selected entry ID (controlled) */

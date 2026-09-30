@@ -55,6 +55,8 @@ export interface HistoryLadderProps {
   readonly onEditMain?: () => void;
   readonly onComparePublication?: (publication: Readonly<PublicationRecord>) => void;
   readonly onClose?: () => void;
+  readonly filterIds?: readonly string[];
+  readonly onClearFilter?: () => void;
   readonly className?: string;
   /** PanelHost already supplies the panel title, controls, and outer chrome. */
   readonly hosted?: boolean;
@@ -86,6 +88,8 @@ export function HistoryLadder({
   onEditMain,
   onComparePublication,
   onClose,
+  filterIds,
+  onClearFilter,
   className,
   hosted = false,
 }: HistoryLadderProps): React.JSX.Element {
@@ -110,6 +114,27 @@ export function HistoryLadder({
   const commits = propCommits ?? controllerState?.commits ?? [];
   const publications = propPublications ?? controllerState?.publications ?? [];
   const orderedPublications = [...publications].sort((a, b) => b.ordinal - a.ordinal);
+
+  const [matchingCommits, setMatchingCommits] = React.useState<ReadonlySet<string> | null>(null);
+  React.useEffect(() => {
+    if (!filterIds || filterIds.length === 0) {
+      setMatchingCommits(null);
+      return;
+    }
+    if (controller) {
+      let isMounted = true;
+      void controller.getCommitsTouching(filterIds).then((matching) => {
+        if (isMounted) setMatchingCommits(matching);
+      });
+      return () => { isMounted = false; };
+    }
+  }, [filterIds, controller]);
+
+  const displayCommits = React.useMemo(() => {
+    if (!matchingCommits) return commits;
+    return commits.filter(c => matchingCommits.has(c.id));
+  }, [commits, matchingCommits]);
+
   const currentPublication = orderedPublications[0];
   const publishedMain = isMain && currentPublication !== undefined;
 
@@ -226,7 +251,7 @@ export function HistoryLadder({
   };
 
   const visibleEdits = showAllEdits ? workingEdits : workingEdits.slice(0, 3);
-  const visibleCommits = showAllCommits ? commits : commits.slice(0, 3);
+  const visibleCommits = showAllCommits ? displayCommits : displayCommits.slice(0, 3);
 
   const mainCommitDisabledReason =
     'Main never holds edits (D40): edit main directly to create a draft';
@@ -494,11 +519,17 @@ export function HistoryLadder({
 
         {/* 5. COMMITS Section */}
         {!publishedMain && <section aria-labelledby="commits-header" className="space-y-2">
+          {filterIds && filterIds.length > 0 && (
+            <div data-testid="history-filter-chip" className="inline-flex min-h-8 items-center gap-2 rounded-full border border-control-border bg-sunken px-3 text-xs text-ink">
+              <span>{filterIds.length === 1 ? 'Changes on selected part' : `Changes on ${filterIds.length} selected parts`}</span>
+              <button type="button" className="rounded px-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label="Clear history filter" onClick={onClearFilter}>×</button>
+            </div>
+          )}
           <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
-            <span id="commits-header">COMMITS ({commits.length})</span>
+            <span id="commits-header">COMMITS ({displayCommits.length})</span>
           </div>
 
-          {commits.length === 0 ? (
+          {displayCommits.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No commits on this branch yet</p>
           ) : (
             <div className="space-y-2">
@@ -605,13 +636,13 @@ export function HistoryLadder({
                 );
               })}
 
-              {commits.length > 3 && (
+              {displayCommits.length > 3 && (
                 <button
                   type="button"
                   onClick={() => setShowAllCommits(!showAllCommits)}
                   className="text-xs text-primary hover:underline font-medium pt-1 block"
                 >
-                  {showAllCommits ? 'Show less' : `Show ${commits.length - 3} earlier commits`}
+                  {showAllCommits ? 'Show less' : `Show ${displayCommits.length - 3} earlier commits`}
                 </button>
               )}
             </div>

@@ -126,6 +126,11 @@ export const COMMAND_IDS = [
   'part.import',
   'canvas.expand',
   'canvas.collapse',
+  'selection.save-as-component',
+  'selection.replace-part',
+  'selection.add-probe',
+  'history.show-changes',
+  'selection.export',
 ] as const;
 
 export type CommandId = (typeof COMMAND_IDS)[number];
@@ -213,6 +218,15 @@ export interface CommandPayloads {
   'part.import': { readonly command: PartImportCommand };
   'canvas.expand': CanvasExpansionPayload;
   'canvas.collapse': CanvasExpansionPayload;
+  // 16D overflow (commands.md "Selection-scoped actions"): invoked for the current canvas
+  // selection like selection.duplicate/delete; handlers read the selection from context.
+  /** Opens the replace dialog; the replacement applies as one model change on confirm. */
+  /** Opens the Library's capture review for the selection, which then runs part.capture. */
+  'selection.save-as-component': Empty;
+  'selection.replace-part': Empty;
+  'selection.add-probe': Empty;
+  'history.show-changes': Empty;
+  'selection.export': Empty;
 }
 
 export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
@@ -392,6 +406,15 @@ export interface CommandContext {
   /** First not-ready scenario's reason, or null when every scenario can run. */
   readonly runAllBlockedReason: string | null;
   readonly exportDisabledReasons: Readonly<Record<TransferExportKind, string | null>>;
+  
+  /** True if the single selected element owns or belongs to a refinement. */
+  readonly selectionHasRefinement: boolean;
+  /** True if the single selected element is in the active scenario's scope. */
+  readonly selectedElementScenarioScope: boolean;
+  /** True if the single selected element has at least one out port. */
+  readonly selectedElementHasOutPort: boolean;
+  /** Mode of the selected scenario. */
+  readonly selectedScenarioMode: 'logical' | 'timed' | null;
 }
 
 // ============================================================================
@@ -1157,6 +1180,95 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: expansionAvailability('collapse'),
   },
+  'selection.save-as-component': {
+    id: 'selection.save-as-component',
+    label: 'Save as component',
+    keywords: ['save', 'component', 'part', 'library', 'capture'],
+    group: 'selection',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
+  'selection.replace-part': {
+    id: 'selection.replace-part',
+    label: 'Replace part…',
+    keywords: ['replace', 'swap', 'component', 'part'],
+    group: 'selection',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      if (ctx.selectedElementIds.length !== 1) {
+        return disabled('invalid-selection', 'Select exactly one component to replace');
+      }
+      if (ctx.selectionHasRefinement) {
+        return disabled('invalid-selection', 'Cannot replace a component that owns or belongs to a refinement');
+      }
+      return ENABLED;
+    },
+  },
+  'selection.add-probe': {
+    id: 'selection.add-probe',
+    label: 'Add flow probe',
+    keywords: ['probe', 'flow', 'check', 'assertion', 'scenario'],
+    group: 'selection',
+    iconKey: 'results',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      if (ctx.selectedElementIds.length !== 1) {
+        return disabled('invalid-selection', 'Select exactly one component to probe');
+      }
+      if (!ctx.selectedScenario || !ctx.selectedScenarioMode) {
+        return disabled('not-ready', 'Select a scenario first');
+      }
+      if (!ctx.selectedElementScenarioScope) {
+        return disabled('invalid-selection', 'This component is not in the scenario scope');
+      }
+      if (ctx.selectedScenarioMode === 'logical' && !ctx.selectedElementHasOutPort) {
+        return disabled('invalid-selection', 'This component has no output port to probe');
+      }
+      return ENABLED;
+    },
+  },
+  'history.show-changes': {
+    id: 'history.show-changes',
+    label: 'Changes on this part',
+    keywords: ['history', 'changes', 'part', 'component'],
+    group: 'review',
+    iconKey: 'history',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
+  'selection.export': {
+    id: 'selection.export',
+    label: 'Export selection',
+    keywords: ['export', 'download', 'part', 'component'],
+    group: 'export',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
 };
 
 // ============================================================================
@@ -1185,7 +1297,15 @@ export function getAvailability<K extends CommandId>(
  * saved-part buttons); these ignore their payload when deciding.
  */
 export function getPayloadFreeAvailability(
-  id: 'part.capture' | 'part.place' | 'part.import',
+  id:
+    | 'part.capture'
+    | 'part.place'
+    | 'part.import'
+    | 'selection.save-as-component'
+    | 'selection.replace-part'
+    | 'selection.add-probe'
+    | 'history.show-changes'
+    | 'selection.export',
   ctx: CommandContext,
 ): Availability {
   return (COMMAND_DEFINITIONS[id].availability as (ctx: CommandContext) => Availability)(ctx);

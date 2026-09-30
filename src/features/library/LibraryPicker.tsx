@@ -40,6 +40,7 @@ import {
 export function LibraryPicker({
   onPlace,
   onOpenFullLibrary,
+  actionLabel = 'Place',
   onClose,
   selectedEntryId: controlledSelectedEntryId,
   onSelect,
@@ -332,7 +333,7 @@ export function LibraryPicker({
       {/* Footer (16E) */}
       <div className="pt-2 border-t border-[var(--color-border,#E7E3DB)] flex items-center justify-between text-xs">
         <div className="text-[11px] font-mono text-secondary-text pointer-coarse:hidden">
-          ↵ place at centre · drag to position
+          {actionLabel === 'Place' ? '↵ place at centre · drag to position' : `↵ ${actionLabel.toLowerCase()} selected`}
         </div>
         {/* Touch has no Enter key or reliable double-tap, so coarse pointers get an
             explicit Place action for the selected entry (D14). */}
@@ -343,7 +344,7 @@ export function LibraryPicker({
             onClick={() => onPlace(selectedEntry.entryId)}
             className="hidden pointer-coarse:inline-flex items-center min-h-11 px-3 rounded-md bg-primary text-primary-foreground font-medium"
           >
-            Place {selectedEntry.label}
+            {actionLabel} {selectedEntry.label}
           </button>
         )}
         {/*
@@ -351,6 +352,7 @@ export function LibraryPicker({
           so the picker's full-library link opens it via the caller-supplied
           onOpenFullLibrary rather than rendering permanently disabled.
         */}
+        {onOpenFullLibrary ? (
         <button
           type="button"
           data-testid="library-picker-full-library-btn"
@@ -362,6 +364,7 @@ export function LibraryPicker({
           <span>Browse full library</span>
           <ExternalLink className="w-3 h-3" />
         </button>
+        ) : null}
       </div>
     </div>
   );

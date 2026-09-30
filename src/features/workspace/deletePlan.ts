@@ -38,6 +38,7 @@ export type DeleteSelection = {
 };
 
 export type DeletePlan = {
+  readonly intent: 'delete' | 'replace';
   /** Elements that will be removed (the selection, filtered to ids that exist). */
   readonly removedElementIds: readonly Id[];
   /** Placements removed as a consequence of removing their element. */
@@ -76,6 +77,7 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
   const view = document.views.find((v) => v.id === viewId);
   if (!view) {
     return {
+      intent: 'delete',
       removedElementIds: [],
       removedPlacementIds: [],
       removedConnectionIds: [],
@@ -235,6 +237,7 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
   }
 
   return {
+    intent: 'delete',
     removedElementIds,
     removedPlacementIds,
     removedConnectionIds,

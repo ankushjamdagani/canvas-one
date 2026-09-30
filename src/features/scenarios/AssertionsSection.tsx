@@ -44,6 +44,8 @@ export interface AssertionsSectionProps {
   readonly mintId: MintId;
   /** commands.md §4: "last-run pass/fail marks per check." */
   readonly lastRunChecks?: ReadonlyMap<string, CheckResult> | null;
+  /** Opens this check expanded on mount (a flow probe added from the canvas, board 16D). */
+  readonly focusAssertionId?: string | null;
 }
 
 type ExpectedKind = 'number' | 'text' | 'true' | 'false';
@@ -63,8 +65,8 @@ function defaultSubject(): DraftAssertionSubject {
   };
 }
 
-export function AssertionsSection({ document, scenario, onChange, mintId, lastRunChecks, issues = [] }: AssertionsSectionProps) {
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+export function AssertionsSection({ document, scenario, onChange, mintId, lastRunChecks, issues = [], focusAssertionId = null }: AssertionsSectionProps) {
+  const [expandedId, setExpandedId] = React.useState<string | null>(focusAssertionId);
   const elements = React.useMemo(() => allElementOptions(document), [document]);
   const outputPorts = React.useMemo(() => [...inboundEndpointOptions(document), ...outboundEndpointOptions(document)], [document]);
 

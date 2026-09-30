@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useStore } from '@xyflow/react';
-import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
+import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, MoreHorizontal, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   getAvailability,
+  getPayloadFreeAvailability,
   type CommandContext,
   type CommandPayloads,
   type ExecuteResult,
@@ -31,7 +32,12 @@ export type CanvasAuthoringCommandId =
   | 'selection.distribute'
   | 'canvas.add-note'
   | 'canvas.expand'
-  | 'canvas.collapse';
+  | 'canvas.collapse'
+  | 'selection.save-as-component'
+  | 'selection.replace-part'
+  | 'selection.add-probe'
+  | 'history.show-changes'
+  | 'selection.export';
 
 export type CanvasCommandExecutor = <K extends CanvasAuthoringCommandId>(
   id: K,
@@ -61,11 +67,32 @@ function commandError(result: ExecuteResult): string | null {
   return null;
 }
 
+type OverflowCommandId =
+  | 'selection.save-as-component'
+  | 'selection.replace-part'
+  | 'selection.add-probe'
+  | 'history.show-changes'
+  | 'selection.export';
+
+/** Board 16D overflow menu, in board order (Wrap in boundary lives on the toolbar). */
+const OVERFLOW_PRIMARY: readonly { readonly id: OverflowCommandId; readonly label: string }[] = [
+  { id: 'selection.save-as-component', label: 'Save as component' },
+  { id: 'selection.replace-part', label: 'Replace part…' },
+  { id: 'selection.add-probe', label: 'Add flow probe' },
+  { id: 'history.show-changes', label: 'Changes on this part' },
+];
+const OVERFLOW_SECONDARY: readonly { readonly id: OverflowCommandId; readonly label: string }[] = [
+  { id: 'selection.export', label: 'Export selection' },
+];
+
 export function SelectionToolbar({ context, executeCommand, mintId }: SelectionToolbarProps) {
   const [groupOpen, setGroupOpen] = React.useState(false);
   const [groupLabel, setGroupLabel] = React.useState('');
   const [groupError, setGroupError] = React.useState<string | null>(null);
   const [wrapOpen, setWrapOpen] = React.useState(false);
+  const [overflowError, setOverflowError] = React.useState<string | null>(null);
+  const selectionKey = context.selectedElementIds.join(',');
+  React.useEffect(() => setOverflowError(null), [selectionKey]);
   const [wrapLabel, setWrapLabel] = React.useState('');
   const [wrapError, setWrapError] = React.useState<string | null>(null);
   
@@ -238,11 +265,35 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
     ['y', 'Distribute vertically'],
   ] as const;
 
+  const runOverflow = async (id: OverflowCommandId) => {
+    setOverflowError(null);
+    const result = await executeCommand(id, {});
+    setOverflowError(commandError(result));
+  };
+
+  const overflowItem = ({ id, label }: { readonly id: OverflowCommandId; readonly label: string }) => {
+    const availability = getPayloadFreeAvailability(id, context);
+    return (
+      <DropdownMenuItem
+        key={id}
+        data-testid={`selection-overflow-${id.replace('.', '-')}`}
+        disabled={!availability.enabled}
+        onSelect={() => void runOverflow(id)}
+        className="flex flex-col items-start gap-0.5 text-xs pointer-coarse:min-h-11"
+      >
+        <span>{label}</span>
+        {availability.enabled ? null : (
+          <span className="text-[10px] text-secondary-text">{availability.reason}</span>
+        )}
+      </DropdownMenuItem>
+    );
+  };
+
   return (
     <div
       ref={toolbarRef}
       data-testid="selection-toolbar"
-      className="absolute z-10 flex flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
+      className="absolute z-10 flex w-max flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
       style={style}
     >
       <span
@@ -436,7 +487,7 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
         </DropdownMenuContent>
       </DropdownMenu>
 
-<Button
+      <Button
         data-testid="selection-duplicate-btn"
         type="button"
         variant="ghost"
@@ -449,7 +500,36 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
       >
         <Copy className="size-4" />
       </Button>
-      
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            data-testid="selection-overflow-btn"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 pointer-coarse:size-11 shrink-0"
+            aria-label="More selection actions"
+          >
+            <MoreHorizontal className="size-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase">Selection</DropdownMenuLabel>
+          {OVERFLOW_PRIMARY.map((item) => overflowItem(item))}
+          <DropdownMenuSeparator />
+          {OVERFLOW_SECONDARY.map((item) => overflowItem(item))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {overflowError ? (
+        <p
+          role="alert"
+          data-testid="selection-overflow-error"
+          className="absolute left-0 right-0 top-full mt-1.5 rounded-control border border-risk-edge bg-panel px-2 py-1 text-xs text-risk-text shadow-raised"
+        >
+          {overflowError}
+        </p>
+      ) : null}
 
       <div className="w-[1px] h-6 bg-divider mx-0.5" />
 
