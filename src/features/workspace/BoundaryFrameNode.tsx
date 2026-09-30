@@ -20,7 +20,7 @@ export function BoundaryFrameNode({ data, selected }: NodeProps) {
       className={`boundary-frame relative rounded-card bg-selected-tint/20 select-none ${selected ? 'border-2 border-primary ring-2 ring-selected-edge ring-offset-1' : 'border border-primary'}`}
       style={{ width: nodeData.width, height: nodeData.height }}
     >
-      <div className="nodrag nopan pointer-events-auto absolute left-2 top-1 z-10 flex h-7 items-center gap-1.5 rounded-tag border border-primary/30 bg-panel px-2 text-[11px] font-semibold text-ink shadow-xs">
+      <div className="nodrag nopan pointer-events-auto absolute left-3 top-0 -translate-y-1/2 z-10 flex h-6 items-center gap-1.5 rounded-tag border border-primary/30 bg-panel px-2 text-[11px] font-semibold text-ink shadow-xs">
         <span className="max-w-52 truncate" title={nodeData.element.label}>{nodeData.element.label}</span>
         <button
           type="button"
@@ -32,7 +32,7 @@ export function BoundaryFrameNode({ data, selected }: NodeProps) {
             event.stopPropagation();
             nodeData.onToggleCollapsed?.();
           }}
-          className="inline-flex size-7 pointer-coarse:size-11 items-center justify-center rounded-tag text-secondary-text hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-50"
+          className="inline-flex size-6 pointer-coarse:size-11 items-center justify-center rounded-tag text-secondary-text hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-50"
         >
           <ChevronsDownUp className="size-3.5" aria-hidden="true" />
         </button>
