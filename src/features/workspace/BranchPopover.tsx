@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Search, Check, GitBranch, Plus, RotateCcw } from 'lucide-react';
+import { Search, Check, GitBranch, Plus, RotateCcw, Home } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -8,14 +8,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import { cn } from '@/lib/utils';
 import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
+import { formatRelativeTime } from './timeUtils';
 
 export interface BranchPopoverProps {
   project: ProjectRecord;
   branches: readonly BranchRecord[];
   currentBranchId: string;
-  children: React.ReactNode;
+  children: React.ReactNode | ((isOpen: boolean) => React.ReactNode);
   onSwitchBranch: (branchId: string) => void;
   onCreateBranch: (
     label: string,
@@ -24,6 +26,7 @@ export interface BranchPopoverProps {
   onReopenBranch: (branchId: string) => Promise<BranchActionOutcome>;
   createDisabledReason?: string | null;
   isSaving?: boolean;
+  onOpenHistory?: () => void;
 }
 
 export type BranchActionOutcome =
@@ -38,9 +41,12 @@ function branchLabel(project: ProjectRecord, branch: BranchRecord): string {
 /**
  * 13B "Branch popover".
  *
- * Branch creation and reopening use the command registry. Switching, creating
- * and reopening are navigation actions, so the workspace resolves dirty
- * inspector/scenario drafts before the session changes branches.
+ * Implements specifications and aesthetics from Screen 13B (Branch switch):
+ * - 392px width popover with subtle border and elevation shadow
+ * - Top search bar with "Find or create a branch" and ⌘B hint
+ * - "ON THIS BRANCH" section with current branch, status badge, last edited timestamp, and checkmark
+ * - "SWITCH TO" section with branches list, last edited timestamp, and hover state
+ * - Bottom action bar with "New branch from here" and "Manage branches"
  */
 export function BranchPopover({
   project,
@@ -52,6 +58,7 @@ export function BranchPopover({
   onReopenBranch,
   createDisabledReason = null,
   isSaving = false,
+  onOpenHistory,
 }: BranchPopoverProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -68,7 +75,12 @@ export function BranchPopover({
       if (!query.trim()) return true;
       return branchLabel(project, b).toLowerCase().includes(query.trim().toLowerCase());
     })
-    .sort((a, b) => branchLabel(project, a).localeCompare(branchLabel(project, b)));
+    .sort((a, b) => {
+      // Put main first if in switch-to list, otherwise alphabetical
+      if (a.id === project.mainBranchId) return -1;
+      if (b.id === project.mainBranchId) return 1;
+      return branchLabel(project, a).localeCompare(branchLabel(project, b));
+    });
 
   return (
     <Popover
@@ -82,23 +94,26 @@ export function BranchPopover({
         }
       }}
     >
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverTrigger asChild>
+        {typeof children === 'function' ? children(open) : children}
+      </PopoverTrigger>
       <PopoverContent
         data-testid="branch-popover"
         align="start"
         sideOffset={6}
-        className="w-80 p-0 rounded-popover border-control-border bg-panel shadow-popover"
+        className="w-[392px] max-w-[calc(100vw-24px)] p-0 rounded-[10px] border border-[#DCD7CD] bg-white shadow-[0_22px_40px_-16px_rgba(22,32,29,0.30)] overflow-hidden outline-none flex flex-col"
       >
-        <div className="p-2 border-b border-border flex items-center gap-1.5">
-          <Search size={13} className="text-secondary-text shrink-0" />
+        <div className="px-3 py-2.5 border-b border-[#EFEBE3] flex items-center gap-2 bg-[#FBFAF7]">
+          <Search size={14} className="text-secondary-text shrink-0" aria-hidden="true" />
           <Input
             data-testid="branch-find-input"
             aria-label="Find a branch"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a branch"
-            className="h-7 px-1.5 text-xs border-transparent bg-transparent focus:border-ring"
+            placeholder="Find or create a branch"
+            className="h-6 px-0 text-[12.5px] border-0 shadow-none bg-transparent placeholder:text-secondary-text/70 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1 text-ink"
           />
+          <Kbd className="font-mono text-[9.5px] text-secondary-text bg-transparent border-0 p-0">⌘B</Kbd>
         </div>
 
         {creating ? (
@@ -111,14 +126,16 @@ export function BranchPopover({
               if (!trimmed || trimmed.length > 80 || actionPending || createDisabledReason) return;
               setActionPending(true);
               setActionError(null);
-              void onCreateBranch(trimmed, source).then((outcome) => {
-                if (outcome.status === 'failed') setActionError(outcome.message);
-                if (outcome.status === 'done') {
-                  setCreating(false);
-                  setLabel('');
-                  setOpen(false);
-                }
-              }).finally(() => setActionPending(false));
+              void onCreateBranch(trimmed, source)
+                .then((outcome) => {
+                  if (outcome.status === 'failed') setActionError(outcome.message);
+                  if (outcome.status === 'done') {
+                    setCreating(false);
+                    setLabel('');
+                    setOpen(false);
+                  }
+                })
+                .finally(() => setActionPending(false));
             }}
           >
             <div>
@@ -180,7 +197,16 @@ export function BranchPopover({
             )}
             {actionError && <p className="text-xs text-destructive" role="alert">{actionError}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" disabled={actionPending} onClick={() => { setCreating(false); setActionError(null); }}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={actionPending}
+                onClick={() => {
+                  setCreating(false);
+                  setActionError(null);
+                }}
+              >
                 Cancel
               </Button>
               <Button
@@ -195,116 +221,181 @@ export function BranchPopover({
             </div>
           </form>
         ) : (
-          <div className="px-3 pt-2">
-            {actionError && <p className="mb-2 text-xs text-destructive" role="alert">{actionError}</p>}
-            <Button
-              type="button"
-              data-testid="branch-create-open"
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 text-xs"
-              disabled={isSaving || Boolean(createDisabledReason)}
-              title={createDisabledReason ?? undefined}
-              onClick={() => { setCreating(true); setActionError(null); }}
-            >
-              <Plus size={13} aria-hidden="true" />
-              Create branch
-            </Button>
-          </div>
-        )}
-
-        {current && (
-          <div className="px-3 pt-2.5 pb-1.5">
-            <div className="text-[10px] font-mono uppercase tracking-wide text-secondary-text mb-1">
-              On this branch
-            </div>
-            <div
-              data-testid="branch-current-row"
-              className="flex items-center justify-between gap-2 px-2 py-2 rounded-control bg-branch-tint"
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <GitBranch size={13} className="text-branch shrink-0" />
-                <span className="text-xs font-semibold text-branch truncate">
-                  {branchLabel(project, current)}
-                </span>
-                <Badge
-                  variant="risk"
-                  className="text-[9px] px-1 py-0 h-4 normal-case"
-                >
-                  {current.id === project.mainBranchId ? 'MAIN' : 'DRAFT'}
-                </Badge>
-              </div>
-              <Check size={13} className="text-branch shrink-0" />
-            </div>
-          </div>
-        )}
-
-        <div className="px-3 pt-1 pb-2">
-          <div className="text-[10px] font-mono uppercase tracking-wide text-secondary-text mb-1">
-            Switch to
-          </div>
-          <div
-            data-testid="branch-switch-list"
-            className="flex flex-col gap-0.5 max-h-64 overflow-y-auto"
-          >
-            {others.length === 0 ? (
-              <div className="text-xs text-secondary-text px-2 py-2">
-                No other branches
-              </div>
-            ) : (
-              others.map((b) => (
-                <div
-                  key={b.id}
-                  role="group"
-                  aria-label={`Branch ${branchLabel(project, b)}`}
-                  className="flex items-center gap-1 rounded-control hover:bg-accent"
-                >
-                  <button
-                    type="button"
-                    data-testid={`branch-switch-${b.id}`}
-                    disabled={b.state === 'closed'}
-                    title={b.state === 'closed' ? 'Reopen this branch before switching to it' : undefined}
-                    className={cn(
-                      'flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-2 rounded-control text-left',
-                      b.state === 'closed' && 'cursor-default',
-                    )}
-                    onClick={() => {
-                      setOpen(false);
-                      onSwitchBranch(b.id);
-                    }}
-                  >
-                    <span className="text-xs font-medium text-ink truncate">{branchLabel(project, b)}</span>
-                    {b.state === 'closed' && (
-                      <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 shrink-0">CLOSED</Badge>
-                    )}
-                  </button>
-                  {b.state === 'closed' && (
-                    <Button
-                      type="button"
-                      data-testid={`branch-reopen-${b.id}`}
-                      aria-label={`Reopen and switch to ${branchLabel(project, b)}`}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 shrink-0 px-2 text-[11px]"
-                      disabled={isSaving || actionPending}
-                      onClick={() => {
-                        setActionPending(true);
-                        setActionError(null);
-                        void onReopenBranch(b.id).then((outcome) => {
-                          if (outcome.status === 'failed') setActionError(outcome.message);
-                          if (outcome.status === 'done') setOpen(false);
-                        }).finally(() => setActionPending(false));
-                      }}
-                    >
-                      <RotateCcw size={12} className="mr-1" aria-hidden="true" />
-                      Reopen
-                    </Button>
-                  )}
+          <>
+            {/* ON THIS BRANCH */}
+            {current && (
+              <div className="px-2 pt-2.5 pb-1.5 flex flex-col gap-1">
+                <div className="flex items-center gap-2 px-1.5 pb-1">
+                  <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
+                    On this branch
+                  </span>
+                  <span className="flex-1 h-px bg-[#EFEBE3]" />
                 </div>
-              ))
+                <div
+                  data-testid="branch-current-row"
+                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] bg-[#F7F4FC] border border-[#C9B9E4]"
+                >
+                  <GitBranch size={13} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] font-semibold text-[#7C5FC0] truncate">
+                        {branchLabel(project, current)}
+                      </span>
+                      <Badge
+                        variant={current.id === project.mainBranchId ? 'accent' : 'risk'}
+                        className="text-[9px] font-mono tracking-[0.1em] px-1 py-0 h-4 shrink-0"
+                      >
+                        {current.id === project.mainBranchId ? 'LIVE' : 'DRAFT'}
+                      </Badge>
+                    </div>
+                    <div className="font-mono text-[9.5px] text-secondary-text mt-0.5">
+                      edited {formatRelativeTime(project.updatedAt ? Math.max(current.createdAt, project.updatedAt) : current.createdAt)}
+                    </div>
+                  </div>
+                  <Check size={13} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
+                </div>
+              </div>
             )}
-          </div>
-        </div>
+
+            {/* SWITCH TO */}
+            <div className="px-2 pt-1 pb-1 flex flex-col gap-1">
+              <div className="flex items-center gap-2 px-1.5 pb-1">
+                <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
+                  Switch to
+                </span>
+                <span className="flex-1 h-px bg-[#EFEBE3]" />
+                <span className="font-mono text-[9px] text-secondary-text">{others.length}</span>
+              </div>
+
+              <div
+                data-testid="branch-switch-list"
+                className="flex flex-col gap-0.5 max-h-60 overflow-y-auto"
+              >
+                {others.length === 0 ? (
+                  <div className="text-xs text-secondary-text px-3 py-2.5 text-center">
+                    No other branches
+                  </div>
+                ) : (
+                  others.map((b) => {
+                    const isMain = b.id === project.mainBranchId;
+                    const isClosed = b.state === 'closed';
+                    return (
+                      <div
+                        key={b.id}
+                        role="group"
+                        aria-label={`Branch ${branchLabel(project, b)}`}
+                        className="flex items-center gap-1 rounded-[8px] hover:bg-[#F2EFE9] transition-colors group"
+                      >
+                        <button
+                          type="button"
+                          data-testid={`branch-switch-${b.id}`}
+                          disabled={isClosed}
+                          title={isClosed ? 'Reopen this branch before switching to it' : undefined}
+                          className={cn(
+                            'flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 rounded-[8px] text-left cursor-pointer',
+                            isClosed && 'cursor-default opacity-60',
+                          )}
+                          onClick={() => {
+                            setOpen(false);
+                            onSwitchBranch(b.id);
+                          }}
+                        >
+                          {isMain ? (
+                            <Home size={13} className="text-[#0B5C54] shrink-0" aria-hidden="true" />
+                          ) : (
+                            <GitBranch size={13} className="text-secondary-text shrink-0" aria-hidden="true" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[13px] font-semibold text-ink truncate">
+                                {branchLabel(project, b)}
+                              </span>
+                              {isMain && (
+                                <Badge
+                                  variant="accent"
+                                  className="text-[9px] font-mono tracking-[0.1em] px-1 py-0 h-4 shrink-0"
+                                >
+                                  LIVE
+                                </Badge>
+                              )}
+                              {isClosed && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[9px] font-mono tracking-[0.1em] px-1 py-0 h-4 shrink-0"
+                                >
+                                  MERGED
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="font-mono text-[9.5px] text-secondary-text mt-0.5">
+                              edited {formatRelativeTime(b.createdAt)}
+                            </div>
+                          </div>
+                          <span className="font-mono text-[9.5px] text-secondary-text opacity-0 group-hover:opacity-100 transition-opacity">
+                            ↵
+                          </span>
+                        </button>
+                        {isClosed && (
+                          <Button
+                            type="button"
+                            data-testid={`branch-reopen-${b.id}`}
+                            aria-label={`Reopen and switch to ${branchLabel(project, b)}`}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 shrink-0 px-2 text-[11px]"
+                            disabled={isSaving || actionPending}
+                            onClick={() => {
+                              setActionPending(true);
+                              setActionError(null);
+                              void onReopenBranch(b.id)
+                                .then((outcome) => {
+                                  if (outcome.status === 'failed') setActionError(outcome.message);
+                                  if (outcome.status === 'done') setOpen(false);
+                                })
+                                .finally(() => setActionPending(false));
+                            }}
+                          >
+                            <RotateCcw size={12} className="mr-1" aria-hidden="true" />
+                            Reopen
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Bottom bar */}
+            <div className="border-t border-[#EFEBE3] bg-[#FBFAF7] px-3 py-2.5 flex items-center justify-between mt-auto">
+              <button
+                type="button"
+                data-testid="branch-create-open"
+                disabled={isSaving || Boolean(createDisabledReason)}
+                title={createDisabledReason ?? undefined}
+                onClick={() => {
+                  setCreating(true);
+                  setActionError(null);
+                }}
+                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-hover disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <Plus size={13} aria-hidden="true" />
+                <span>New branch from here</span>
+              </button>
+              <button
+                type="button"
+                data-testid="branch-manage-btn"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenHistory?.();
+                }}
+                className="text-xs text-secondary-text hover:text-ink cursor-pointer"
+              >
+                Manage branches
+              </button>
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

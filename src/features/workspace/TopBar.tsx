@@ -1,7 +1,13 @@
 import * as React from 'react';
-import { ChevronDown, Command as CommandIcon, GitBranch, History as HistoryIcon } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Command as CommandIcon,
+  GitBranch,
+  History as HistoryIcon,
+  Pencil,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Kbd } from '@/components/ui/kbd';
 import { cn } from '@/lib/utils';
@@ -50,9 +56,11 @@ export interface TopBarProps {
 /**
  * 22A "nav live" top bar.
  *
- * Quick options (RV-03q, 14A) opens the registry-driven command dialog; the
- * "…" menu (nothing real to put in it) stays absent, not fake. Undo/redo moved
- * to the canvas dock (16A). History (RV-12h) opens the History panel.
+ * Implements specifications from Screen 22A / 13A / 13B:
+ * - Two targets quiet at rest: Project rename target and Branch switch target
+ * - Warm neutral on hover, teal on press for project name
+ * - Violet family with live down caret on hover and flipped up caret while menu open for branch
+ * - Inline rename with save (↵) and cancel (esc) hints
  */
 export function TopBar({
   project,
@@ -82,6 +90,26 @@ export function TopBar({
     if (!isRenaming) setTitleDraft(project.title);
   }, [project.title, isRenaming]);
 
+  // Global ⌘R / Ctrl+R shortcut to rename project (13A annotation)
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'r') {
+        const target = event.target as HTMLElement | null;
+        const isInput =
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable);
+        if (!isInput) {
+          event.preventDefault();
+          setIsRenaming(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const currentBranch = branches.find((b) => b.id === branchId) ?? null;
   const isMainBranch = branchId === project.mainBranchId;
   const branchLabel = currentBranch
@@ -109,7 +137,7 @@ export function TopBar({
       )}
       role="banner"
     >
-      <div className="flex items-center gap-2.5 min-w-0 max-sm:min-w-min shrink">
+      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 max-sm:min-w-min shrink">
         {/* Brand mark */}
         <div
           data-testid="brand"
@@ -133,17 +161,20 @@ export function TopBar({
           <span className="hidden sm:inline">System studio</span>
         </div>
 
+        {/* Vertical divider from brand mark */}
+        <div className="hidden sm:block w-px h-[22px] bg-border shrink-0 mx-0.5" aria-hidden="true" />
+
         {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] */}
         <div
           data-testid="breadcrumb-chip"
-          className="flex items-center gap-1 sm:gap-1.5 min-w-0 max-sm:min-w-min rounded-control border border-control-border bg-panel pl-2 pr-1.5 h-7 pointer-coarse:h-12 overflow-hidden"
+          className="flex items-center gap-1 sm:gap-1.5 min-w-0 max-sm:min-w-min h-7 pointer-coarse:h-12 shrink-0 pl-1 pr-1.5"
         >
           {isRenaming ? (
-            <Input
+            <input
               autoFocus
               data-testid="project-title-input"
               aria-label="Project title"
-              className="h-6 px-1.5 text-xs w-28 sm:w-40"
+              className="h-6 px-2 py-0.5 text-[13px] font-medium text-ink bg-white border border-primary rounded-[5px] shadow-[0_0_0_2px_rgba(11,92,84,0.15)] outline-none focus:outline-none w-28 sm:w-44 truncate"
               value={titleDraft}
               maxLength={80}
               onChange={(e) => setTitleDraft(e.target.value)}
@@ -167,26 +198,37 @@ export function TopBar({
               onAllProjects={onAllProjects}
               transferActions={transferActions}
             >
-              <button
-                type="button"
-                data-testid="breadcrumb-project-btn"
-                // RV-05b review round 1: min-w-[6ch] keeps at least ~6 characters of
-                // the project name visible (ellipsis included) on narrow widths --
-                // without it, this flex child could shrink past its truncate ellipsis
-                // down to a single character as the branch chip and badge (both
-                // shrink-0) claimed the rest of the breadcrumb's width.
-                className="text-xs font-semibold text-ink hover:text-primary transition-colors truncate min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11"
-                title={project.title}
-              >
-                {project.title}
-              </button>
+              {(isOpen) => (
+                <button
+                  type="button"
+                  data-testid="breadcrumb-project-btn"
+                  className={cn(
+                    'group flex items-center gap-1.5 px-2 py-1 sm:py-[5px] sm:px-[9px] rounded-[6px] border text-[13px] font-medium transition-colors truncate min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
+                    isOpen
+                      ? 'bg-[#EAEFEC] border-[#A8CBC5] text-[#0B5C54]'
+                      : 'border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]',
+                  )}
+                  title={project.title}
+                >
+                  <span className="truncate">{project.title}</span>
+                  {isOpen ? (
+                    <ChevronUp size={11} className="text-[#0B5C54] shrink-0" aria-hidden="true" />
+                  ) : (
+                    <Pencil
+                      size={11}
+                      className="text-[#8A938F] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hidden sm:inline-block"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              )}
             </ProjectMenu>
           )}
 
           {/* RV-05b review round 1: dropped below sm along with the chevron so a
               390px top bar has room for the project name, the branch icon and the
               MAIN/DRAFT badge without any of them getting clipped. */}
-          <span className="hidden sm:inline text-secondary-text text-xs select-none shrink-0" aria-hidden="true">
+          <span className="hidden sm:inline text-[#C0C6C1] text-[11px] select-none shrink-0" aria-hidden="true">
             /
           </span>
 
@@ -199,32 +241,51 @@ export function TopBar({
             onReopenBranch={onReopenBranch}
             createDisabledReason={createBranchDisabledReason}
             isSaving={isSaving}
+            onOpenHistory={onOpenHistory}
           >
-            <button
-              type="button"
-              data-testid="breadcrumb-branch-btn"
-              className="flex items-center justify-center gap-1 min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11"
-              title={branchLabel}
-            >
-              <GitBranch size={12} className="text-branch shrink-0" />
-              {/* RV-05b review round 1: the branch label text drops below sm so the
-                  project name keeps its room on a narrow top bar; the icon plus the
-                  MAIN/DRAFT badge still identify the branch. */}
-              <span className="hidden sm:inline text-xs font-semibold text-branch truncate max-w-[110px] sm:max-w-[180px]">
-                {branchLabel}
-              </span>
-            </button>
+            {(isOpen) => (
+              <button
+                type="button"
+                data-testid="breadcrumb-branch-btn"
+                className={cn(
+                  'group flex items-center gap-1.5 px-2 py-1 sm:py-[5px] sm:px-[9px] rounded-[6px] border text-[13px] font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
+                  isOpen
+                    ? 'bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]'
+                    : 'border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]',
+                )}
+                title={branchLabel}
+              >
+                <GitBranch size={12} className={cn('shrink-0', isOpen ? 'text-[#5B3E9B]' : 'text-[#7C5FC0]')} />
+                <span className="hidden sm:inline font-semibold truncate max-w-[110px] sm:max-w-[180px]">
+                  {branchLabel}
+                </span>
+                {isOpen ? (
+                  <ChevronUp size={11} className="text-[#5B3E9B] shrink-0" aria-hidden="true" />
+                ) : (
+                  <ChevronDown
+                    size={11}
+                    className="text-[#8A938F] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hidden sm:inline-block"
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+            )}
           </BranchPopover>
 
-          <Badge
-            data-testid="breadcrumb-branch-state"
-            variant="risk"
-            className="text-[9px] px-1 sm:px-1 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
-          >
-            {isMainBranch ? 'MAIN' : 'DRAFT'}
-          </Badge>
-
-          <ChevronDown size={12} className="hidden sm:block text-secondary-text shrink-0" aria-hidden="true" />
+          {isRenaming ? (
+            <div className="hidden sm:flex items-center gap-2 text-[10.5px] font-mono text-secondary-text select-none shrink-0 pl-1">
+              <span>↵ save</span>
+              <span>esc cancel</span>
+            </div>
+          ) : (
+            <Badge
+              data-testid="breadcrumb-branch-state"
+              variant={isMainBranch ? 'accent' : 'risk'}
+              className="text-[9.5px] font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
+            >
+              {isMainBranch ? 'MAIN' : 'DRAFT'}
+            </Badge>
+          )}
         </div>
 
         {/* Save Status */}

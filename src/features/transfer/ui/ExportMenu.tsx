@@ -18,7 +18,7 @@
  */
 
 import * as React from 'react';
-import { Braces, ChevronRight, FileCode, Image as ImageIcon, Table2, Workflow } from 'lucide-react';
+import { Braces, ChevronRight, Download, FileCode, Image as ImageIcon, Table2, Workflow } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import {
   DropdownMenu,
@@ -26,6 +26,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '../../../components/ui/dropdown-menu';
 import type { TransferActionResult, TransferActions } from './useTransferActions';
 import type { TransferExportKind } from './preconditions';
@@ -48,10 +51,13 @@ export interface ExportMenuProps {
   /** Trigger element (e.g. 18A's "Export..." row); defaults to a standalone "Export..." button. */
   readonly trigger?: React.ReactElement;
   readonly align?: 'start' | 'end';
+  readonly side?: 'top' | 'right' | 'bottom' | 'left';
+  readonly sideOffset?: number;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
   readonly onExported?: (kind: TransferExportKind) => void;
   readonly onExportError?: (kind: TransferExportKind, message: string) => void;
+  readonly asSubmenu?: boolean;
 }
 
 type ExportMenuItemDef = {
@@ -130,7 +136,6 @@ function ExportItem({
       data-testid={item.testId}
       disabled={!!reason}
       title={reason ?? undefined}
-      className={cn('gap-2', reason && 'cursor-not-allowed')}
       onSelect={(event) => {
         event.preventDefault();
         void handleSelect();
@@ -145,11 +150,14 @@ function ExportItem({
 export function ExportMenu({
   actions,
   trigger,
-  align = 'end',
+  align = 'start',
+  side = 'right',
+  sideOffset = 6,
   open,
   onOpenChange,
   onExported,
   onExportError,
+  asSubmenu = false,
 }: ExportMenuProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
   const isControlled = open !== undefined;
@@ -160,6 +168,46 @@ export function ExportMenu({
     onOpenChange?.(next);
   }
 
+  const items = (
+    <>
+      {PRIMARY_ITEMS.map((item) => (
+        <ExportItem
+          key={item.kind}
+          item={item}
+          actions={actions}
+          onExported={onExported}
+          onExportError={onExportError}
+        />
+      ))}
+      <DropdownMenuSeparator />
+      <ExportItem
+        item={MERMAID_ITEM}
+        actions={actions}
+        onExported={onExported}
+        onExportError={onExportError}
+      />
+    </>
+  );
+
+  if (asSubmenu) {
+    return (
+      <DropdownMenuSub open={menuOpen} onOpenChange={handleOpenChange}>
+        <DropdownMenuSubTrigger
+          data-testid="export-menu-trigger"
+        >
+          <Download className="size-3.5 text-secondary-text" aria-hidden="true" />
+          <span>Export...</span>
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent
+          data-testid="export-submenu"
+          className="w-56"
+        >
+          {items}
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    );
+  }
+
   return (
     <DropdownMenu open={menuOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -167,11 +215,11 @@ export function ExportMenu({
           <button
             type="button"
             data-testid="export-menu-trigger"
-            className="w-full flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-foreground hover:bg-sunken rounded-sm cursor-pointer"
+            className="w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-[7px] text-[13px] text-ink hover:bg-sunken transition-colors text-left cursor-pointer"
           >
-            <span className="flex items-center gap-2">
-              <span aria-hidden="true">&darr;</span>
-              Export...
+            <span className="flex items-center gap-2.5">
+              <Download className="size-3.5 text-secondary-text" aria-hidden="true" />
+              <span>Export...</span>
             </span>
             <ChevronRight className="size-3 text-secondary-text" aria-hidden="true" />
           </button>
@@ -180,24 +228,11 @@ export function ExportMenu({
       <DropdownMenuContent
         data-testid="export-submenu"
         align={align}
-        className="w-56 text-xs bg-panel border-control-border"
+        side={side}
+        sideOffset={sideOffset}
+        className="w-56"
       >
-        {PRIMARY_ITEMS.map((item) => (
-          <ExportItem
-            key={item.kind}
-            item={item}
-            actions={actions}
-            onExported={onExported}
-            onExportError={onExportError}
-          />
-        ))}
-        <DropdownMenuSeparator />
-        <ExportItem
-          item={MERMAID_ITEM}
-          actions={actions}
-          onExported={onExported}
-          onExportError={onExportError}
-        />
+        {items}
       </DropdownMenuContent>
     </DropdownMenu>
   );

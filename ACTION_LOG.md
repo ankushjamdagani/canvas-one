@@ -1782,3 +1782,59 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification:** `npm test` — 1,553 passed / 9 skipped; `npm run build` passed with no chunk above 500 kB; isolated production Chromium — 93 passed / 4 skipped; Impeccable detector findings were verified as pre-existing DESIGN.md/sidecar drift, not defects in the changed rules.
 - **Limitations:** the four composites use illustrative content and alternative theme studies; the review requires structural/style conformance, not identical data or implementation of unselected themes.
 - **Lesson:** when `agy` headless command permissions abort an editing run, keep the implementation delegated through a source-embedded patch-only retry, then apply, test and independently review the patch; do not grant blanket bypass permissions.
+
+## 2026-09-30
+
+### Topbar design and functional consistency (Screen 22A, 13A, 13B)
+
+- **Outcome**: Fixed design and interaction inconsistencies in the topbar breadcrumb, branch switcher, and project menu per design boards 22A, 13A, and 13B:
+  - **Two targets quiet at rest (22A):** Replaced the monolithic breadcrumb container with two discrete targets separated by a subtle `/` and vertical brand divider.
+  - **Branch switcher UI/UX (13B, 22A):**
+    - Toggle states: REST (violet text `#7C5FC0`, no border/bg, caret hidden), HOVER (`bg-[#F3EEFB] border-[#E0D5F2]`, live down-caret `▾` appears), PRESSED / MENU OPEN (`bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]`, flipped up-caret `▴` stays while menu is open).
+    - Dropdown: 392 px width with elevation shadow; "Find or create a branch" search input with `⌘B` hint; "ON THIS BRANCH" section with current branch, live/draft badge, last edited timestamp, and checkmark; "SWITCH TO" list with branch labels, live/merged badges, and last edited relative timestamp (`edited Xm/h/d ago` per user instruction); bottom action bar with "New branch from here" and "Manage branches".
+  - **Project name UI/UX (13A, 22A):**
+    - Toggle states: REST (`text-ink`, transparent), HOVER (`hover:bg-[#F2EFE9] hover:border-[#E7E3DB]`, pencil icon appears), PRESSED / MENU OPEN (`bg-[#EAEFEC] border-[#A8CBC5] text-[#0B5C54]`, up-caret appears).
+    - Inline rename: bordered active container with mono `↵ save` and `esc cancel` hints.
+    - Global `⌘R` / `Ctrl+R` shortcut listener when outside input fields to trigger rename.
+    - Dropdown: 268 px width popover; header with `PROJECT`, project title, and `platform team · N branches` subtitle; action items for Rename project (⌘R), Duplicate project, Move to team…, Project settings, Export..., All projects, and Archive project.
+- **Files**: [`src/features/workspace/TopBar.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/TopBar.tsx), [`src/features/workspace/BranchPopover.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/BranchPopover.tsx), [`src/features/workspace/ProjectMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/ProjectMenu.tsx), [`src/features/workspace/timeUtils.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/timeUtils.ts), [`src/features/workspace/timeUtils.test.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/timeUtils.test.ts).
+- **Platform/subagents**: agy lead, no subagents.
+- **Verification**:
+  - `npx tsc -b` clean.
+  - Unit tests: 1,559 passed (138 files), 9 skipped (`npm test`).
+  - Production build: `npm run build` clean, no chunk over 500 kB.
+  - Accessibility: `node scripts/a11y-audit.mjs` — No axe violations (all 11 desktop + phone states).
+  - Production Playwright e2e: 93 passed / 4 skipped on isolated preview port 5179 (`studio-shell`, `studio-phone`, `studio-transfer`, `studio-branch-controls`, etc.).
+- **Limitations**: Backend persistence endpoints for team sharing and server-side project archives are not contracted in local studio model; placeholders are styled to match screen 13A.
+
+### Foundation dropdown styling and Export submenu positioning (Screen 18B)
+
+- **Outcome**: Centralized dropdown and submenu styles into foundation components (`dropdown-menu.tsx`, `popover.tsx`) and resolved Export submenu opening behavior:
+  - **Foundation components**: Updated `DropdownMenuContent`, `DropdownMenuSubContent`, `DropdownMenuSubTrigger`, `DropdownMenuItem`, `DropdownMenuSeparator`, and `PopoverContent` to standardize container radius (`rounded-[10px]`), elevation shadow (`shadow-[0_22px_40px_-16px_rgba(22,32,29,0.30)]`), padding (`p-1.5`), and item typography/states (`text-[13px] font-medium`, `rounded-[7px]`, `px-2.5 py-2`, `data-[highlighted]:bg-sunken`).
+  - **Export submenu positioning (18B)**: Refactored `ExportMenu` to support native Radix `DropdownMenuSub` via `asSubmenu`. The submenu now opens to the right of the menu horizontally aligned in front of the `Export...` parent option, with smooth hover/keyboard navigation, auto-collision flip, and active parent item highlight (`bg-[#EAEFEC] text-primary`).
+  - **Project menu**: Converted `ProjectMenu` to use foundation `DropdownMenu` with `modal={false}` so consumer code remains minimal and accessible without ad-hoc button styling.
+- **Files**: [`src/components/ui/dropdown-menu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/dropdown-menu.tsx), [`src/components/ui/popover.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/popover.tsx), [`src/features/transfer/ui/ExportMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/transfer/ui/ExportMenu.tsx), [`src/features/workspace/ProjectMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/ProjectMenu.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean.
+  - Unit tests: 1,559 passed across 138 files (`npm test`).
+  - Production build: `npm run build` clean, no chunk over 500 kB.
+  - Accessibility audit: `node scripts/a11y-audit.mjs` — No axe violations (all 11 desktop + phone states).
+  - Playwright e2e: 93 passed / 4 skipped (`TEST_PRODUCTION=1 npx playwright test`).
+- **Lesson**: Submenu and popover tokens belong in the foundational UI primitives (`src/components/ui/`) rather than ad-hoc consumer styling; this guarantees layout positioning (`side="right"`, `alignOffset`), collision avoidance, and hover/active states stay uniform everywhere.
+
+### Topbar breadcrumb rename UI/UX alignment (Screen 13A)
+
+- **Outcome**: Fixed the inline project rename layout and appearance in the topbar breadcrumb:
+  - **Eliminated outline distortion**: Replaced nested `Input` wrapper with a clean native `<input>` styled with `rounded-[5px] border border-primary shadow-[0_0_0_2px_rgba(11,92,84,0.15)] outline-none focus:outline-none`, removing the double/pill border artifact.
+  - **Restored breadcrumb hierarchy**: Moved the key hints (`↵ save  esc cancel`) out of the project input container and positioned them cleanly to the right of the branch switcher (`/ branch`), replacing the branch status badge (`DRAFT`/`MAIN`) during rename mode in exact accordance with screen 13A.
+- **Files**: [`src/features/workspace/TopBar.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/TopBar.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean.
+  - Unit tests: 1,559 passed across 138 files (`npm test`).
+  - Production build: `npm run build` clean.
+  - Accessibility audit: `node scripts/a11y-audit.mjs` — No axe violations.
+  - Playwright e2e: 6 passed (`npx playwright test tests/studio-shell.spec.ts tests/studio-transfer.spec.ts`).
+  - Visual verification: Captured browser screenshot in rename mode confirming crisp single outline and proper breadcrumb key hint placement.
+
