@@ -13,6 +13,7 @@ import type {
   Id,
   Note,
   Placement,
+  Refinement,
   View,
 } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio/types';
@@ -99,6 +100,16 @@ export const CATALOG_LAYER_COLORS: Record<CatalogLayer, string> = {
 
 export type ProjectedNodeData =
   | {
+      readonly kind: 'boundary';
+      readonly element: Element;
+      readonly placement: Placement;
+      readonly refinement: Refinement;
+      readonly memberElementIds: readonly Id[];
+      readonly width: number;
+      readonly height: number;
+      readonly onToggleCollapsed?: () => void;
+    }
+  | {
       readonly kind: 'element';
       readonly element: Element;
       readonly placement: Placement;
@@ -140,7 +151,7 @@ export type ProjectedNodeData =
 
 export type ProjectedNode = {
   readonly id: string;
-  readonly type: 'elementNode' | 'groupNode' | 'noteNode';
+  readonly type: 'elementNode' | 'boundaryFrameNode' | 'groupNode' | 'noteNode';
   readonly position: { readonly x: number; readonly y: number };
   readonly data: ProjectedNodeData;
   readonly selectable?: boolean;
@@ -153,6 +164,8 @@ export type ProjectedEdge = {
   readonly id: string;
   readonly source: string;
   readonly target: string;
+  readonly sourceHandle?: string;
+  readonly targetHandle?: string;
   readonly label?: string;
   readonly type?: string;
   readonly labelStyle?: React.CSSProperties;
@@ -213,6 +226,25 @@ const GROUP_PADDING_Y_BOTTOM = 24;
 /** Compact boundary node a collapsed group renders as (RV-04g). */
 export const COLLAPSED_GROUP_WIDTH = 184;
 export const COLLAPSED_GROUP_HEIGHT = 44;
+export const BOUNDARY_FRAME_PADDING = 24;
+
+function refinementDescendants(
+  refinement: Refinement,
+  refinementsByOwner: ReadonlyMap<Id, Refinement>,
+): readonly Id[] {
+  const descendants: Id[] = [];
+  const queue = [...refinement.memberElementIds];
+  const seen = new Set<Id>();
+  while (queue.length > 0) {
+    const elementId = queue.shift();
+    if (!elementId || seen.has(elementId)) continue;
+    seen.add(elementId);
+    descendants.push(elementId);
+    const nested = refinementsByOwner.get(elementId);
+    if (nested) queue.push(...nested.memberElementIds);
+  }
+  return descendants;
+}
 
 /**
  * Pure projection from Document + activeViewId into ReactFlow nodes and edges.
@@ -258,6 +290,32 @@ export function projectDocumentToCanvas(
   const nodes: ProjectedNode[] = [];
   const issues: ProjectionIssue[] = [];
 
+  for (const placement of activeView.placements) {
+    placementByElementId.set(placement.elementId, placement);
+  }
+
+  const refinementByOwner = new Map(document.refinements.map((refinement) => [refinement.ownerElementId, refinement]));
+  const frameRefinementByOwner = new Map<Id, Refinement>();
+  for (const refinement of document.refinements) {
+    if (refinement.memberElementIds.every((elementId) => placementByElementId.has(elementId))) {
+      frameRefinementByOwner.set(refinement.ownerElementId, refinement);
+    }
+  }
+
+  const hiddenByCollapsedBoundary = new Set<Id>();
+  const expandedFrameOwnerIds = new Set<Id>();
+  for (const placement of activeView.placements) {
+    const refinement = frameRefinementByOwner.get(placement.elementId);
+    if (!refinement) continue;
+    if (placement.expanded) {
+      expandedFrameOwnerIds.add(placement.elementId);
+      continue;
+    }
+    for (const elementId of refinementDescendants(refinement, refinementByOwner)) {
+      hiddenByCollapsedBoundary.add(elementId);
+    }
+  }
+
   // Members of collapsed groups are hidden and their edges reroute to the
   // group node (RV-04g, presentation only).
   const collapsedGroupByElementId = new Map<Id, Group>();
@@ -280,7 +338,10 @@ export function projectDocumentToCanvas(
 
     placedElementIds.add(element.id);
     placementByElementId.set(element.id, placement);
-    if (collapsedGroupByElementId.has(element.id)) continue;
+    if (collapsedGroupByElementId.has(element.id) || hiddenByCollapsedBoundary.has(element.id)) continue;
+
+    const frameRefinement = frameRefinementByOwner.get(element.id);
+    if (frameRefinement && placement.expanded) continue;
 
     const layer = getCatalogLayer(element.visualKind);
     const stripeColor = layer ? CATALOG_LAYER_COLORS[layer] : null;
@@ -301,10 +362,44 @@ export function projectDocumentToCanvas(
     });
   }
 
-  // 2. Groups (presentation: boundary around placed members)
+  // 2. Expanded refinement owners render as frames around their placed members.
+  for (const placement of activeView.placements) {
+    const refinement = frameRefinementByOwner.get(placement.elementId);
+    const element = elementById.get(placement.elementId);
+    if (!refinement || !element || !placement.expanded || hiddenByCollapsedBoundary.has(element.id)) continue;
+    const memberPlacements = activeView.placements.filter((candidate) =>
+      refinement.memberElementIds.includes(candidate.elementId),
+    );
+    if (memberPlacements.length === 0) continue;
+    const minX = Math.min(...memberPlacements.map((candidate) => candidate.x));
+    const minY = Math.min(...memberPlacements.map((candidate) => candidate.y));
+    const maxX = Math.max(...memberPlacements.map((candidate) => candidate.x + candidate.width));
+    const maxY = Math.max(...memberPlacements.map((candidate) => candidate.y + placementHeight(candidate, measuredHeights)));
+    const width = maxX - minX + BOUNDARY_FRAME_PADDING * 2;
+    const height = maxY - minY + BOUNDARY_FRAME_PADDING * 2;
+    nodes.push({
+      id: placement.id,
+      type: 'boundaryFrameNode',
+      position: { x: minX - BOUNDARY_FRAME_PADDING, y: minY - BOUNDARY_FRAME_PADDING },
+      data: {
+        kind: 'boundary',
+        element,
+        placement,
+        refinement,
+        memberElementIds: refinementDescendants(refinement, refinementByOwner),
+        width,
+        height,
+      },
+      draggable: true,
+      zIndex: 0,
+      style: { width, height },
+    });
+  }
+
+  // 3. Groups (presentation: boundary around placed members)
   for (const group of activeView.groups) {
     const memberPlacements = activeView.placements.filter(
-      (p) => group.elementIds.includes(p.elementId) && placedElementIds.has(p.elementId),
+      (p) => group.elementIds.includes(p.elementId) && placedElementIds.has(p.elementId) && !hiddenByCollapsedBoundary.has(p.elementId),
     );
     if (memberPlacements.length === 0) continue;
 
@@ -350,7 +445,7 @@ export function projectDocumentToCanvas(
     });
   }
 
-  // 3. Notes (presentation: note card with text)
+  // 4. Notes (presentation: note card with text)
   for (const note of activeView.notes) {
     nodes.push({
       id: note.id, // note.id as ReactFlow node id (no prefix)
@@ -370,7 +465,7 @@ export function projectDocumentToCanvas(
     });
   }
 
-  // 4. Edges from connections in view.connectionIds whose endpoints are both placed
+  // 5. Edges from connections in view.connectionIds whose endpoints are both placed
   const connectionById = new Map<Id, Connection>(
     document.connections.map((c) => [c.id, c]),
   );
@@ -393,6 +488,7 @@ export function projectDocumentToCanvas(
     const sourcePlacement = placementByElementId.get(conn.source.elementId);
     const targetPlacement = placementByElementId.get(conn.target.elementId);
     if (!sourcePlacement || !targetPlacement) continue;
+    if (hiddenByCollapsedBoundary.has(conn.source.elementId) || hiddenByCollapsedBoundary.has(conn.target.elementId)) continue;
 
     const sourceGroup = collapsedGroupByElementId.get(conn.source.elementId);
     const targetGroup = collapsedGroupByElementId.get(conn.target.elementId);
@@ -419,6 +515,12 @@ export function projectDocumentToCanvas(
       id: rerouted ? `rerouted:${conn.id}` : conn.id,
       source,
       target,
+      ...(expandedFrameOwnerIds.has(conn.source.elementId) && source === sourcePlacement.id
+        ? { sourceHandle: conn.source.portId }
+        : {}),
+      ...(expandedFrameOwnerIds.has(conn.target.elementId) && target === targetPlacement.id
+        ? { targetHandle: conn.target.portId }
+        : {}),
       // Custom edge (TrafficEdge): smoothstep routing + an HTML label chip
       // rendered above the node layer, instead of the default bezier/SVG label.
       type: 'traffic',

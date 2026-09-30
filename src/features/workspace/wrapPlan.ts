@@ -45,7 +45,7 @@ export type WrapBoundaryRejectionCode =
   | 'scenario-closure-failed';
 
 export type WrapBoundaryPlan =
-  | { readonly ok: true; readonly changes: readonly RecordChange[]; readonly label: 'Wrap in boundary' }
+  | { readonly ok: true; readonly changes: RecordChange[]; readonly label: 'Wrap in boundary' }
   | { readonly ok: false; readonly code: WrapBoundaryRejectionCode; readonly reason: string };
 
 const FRAME_PADDING = 24;

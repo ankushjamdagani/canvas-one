@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -5,11 +6,14 @@ import type { Document, Id } from '../../domain/studio/model';
 import { checkReadiness } from '../../domain/studio/readiness';
 import { runScenario } from '../../domain/studio/runner/scenario-runner';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
+import { LocalRepository, StudioDatabase, type Actor } from '../../persistence/studio';
+import { SessionController } from '../session';
 import { planWrapInBoundary, wrapBoundaryCrossingEndpoints, type WrapBoundaryIds } from './wrapPlan';
 
 const S05_PATH = join(process.cwd(), 'specs/revamp/fixtures/s05.json');
 const QUEUE_ID = '3f495542-b8ea-5d92-90a0-3c8ec53b12d8';
 const WORKER_ID = '7453e0ab-17a6-579d-909c-0586d9144ad3';
+const TEST_ACTOR: Actor = { actorId: 'wrap-test', kind: 'local-human', displayName: 'Wrap test' };
 
 function loadS05(): Document {
   return JSON.parse(readFileSync(S05_PATH, 'utf8')) as Document;
@@ -115,5 +119,32 @@ describe('planWrapInBoundary', () => {
     );
     expect(planWrapInBoundary(wrapped, viewId, [QUEUE_ID], idsFor(wrapped, [QUEUE_ID], 80), 'Again'))
       .toMatchObject({ ok: false, code: 'already-member' });
+  });
+
+  it('restores the original document exactly with one session undo', async () => {
+    const database = new StudioDatabase(`wrap-undo-${Date.now()}`);
+    await database.open();
+    const repository = new LocalRepository(database);
+    let minted = 500;
+    const mintId = () => uuid(minted++);
+    const session = new SessionController({ repository, mintId, actor: TEST_ACTOR });
+    const original = loadS05();
+    await session.createProject({ title: original.title, initialDocument: original });
+
+    const members = [QUEUE_ID, WORKER_ID];
+    const plan = planWrapInBoundary(
+      original,
+      original.views[0].id,
+      members,
+      idsFor(original, members, 100),
+      'Undo boundary',
+    );
+    if (!plan.ok) throw new Error(plan.reason);
+    expect((await session.apply(plan.changes, plan.label)).status).toBe('applied');
+    expect(session.getState().document).not.toEqual(original);
+    expect((await session.undo()).status).toBe('applied');
+    expect(session.getState().document).toEqual(original);
+    expect(session.getState().canUndo).toBe(false);
+    database.close();
   });
 });

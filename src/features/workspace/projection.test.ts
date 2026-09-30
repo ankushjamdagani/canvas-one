@@ -373,6 +373,70 @@ describe('buildMoveChange', () => {
   });
 });
 
+describe('refinement boundary frames (D46)', () => {
+  function boundaryDocument(expanded: boolean): Document {
+    const doc = makeTestDocument();
+    const owner: Element = {
+      id: 'owner',
+      label: 'Checkout boundary',
+      description: '',
+      visualKind: 'custom',
+      ports: [
+        { id: 'owner-in', label: 'Client · out', direction: 'in', channel: 'call', schemaId: 's1', responseSchemaId: 's1' },
+      ],
+      behavior: { kind: 'unmodeled', version: 1, reason: 'Aggregate behaviour not configured' },
+    };
+    return {
+      ...doc,
+      elements: [...doc.elements, owner],
+      connections: doc.connections.map((connection) => connection.id === 'c1'
+        ? { ...connection, target: { elementId: owner.id, portId: 'owner-in' } }
+        : connection),
+      refinements: [{
+        id: 'refinement',
+        ownerElementId: owner.id,
+        memberElementIds: ['e2', 'e3'],
+        portMappings: [{
+          id: 'mapping',
+          outer: { elementId: owner.id, portId: 'owner-in' },
+          inner: { elementId: 'e2', portId: 'p2_in' },
+        }],
+      }],
+      views: [{
+        ...doc.views[0],
+        placements: [
+          ...doc.views[0].placements,
+          { id: 'owner-placement', elementId: owner.id, x: 376, y: 126, width: 524, expanded },
+        ],
+      }],
+    };
+  }
+
+  it('draws an expanded owner as a 24px frame and attaches its crossing edge to a named frame port', () => {
+    const result = projectDocumentToCanvas(boundaryDocument(true), 'v1');
+    expect(result.nodes.some((node) => node.id === 'owner-placement' && node.type === 'elementNode')).toBe(false);
+    const frame = result.nodes.find((node) => node.id === 'owner-placement');
+    expect(frame).toMatchObject({
+      type: 'boundaryFrameNode',
+      position: { x: 376, y: 126 },
+      draggable: true,
+      data: { kind: 'boundary', width: 524, height: 124, memberElementIds: ['e2', 'e3'] },
+    });
+    expect(result.edges.find((edge) => edge.id === 'c1')).toMatchObject({
+      target: 'owner-placement',
+      targetHandle: 'owner-in',
+    });
+  });
+
+  it('projects a collapsed owner as a normal node and hides its members and internal connections', () => {
+    const result = projectDocumentToCanvas(boundaryDocument(false), 'v1');
+    expect(result.nodes.find((node) => node.id === 'owner-placement')).toMatchObject({ type: 'elementNode' });
+    expect(result.nodes.some((node) => node.id === 'pl2' || node.id === 'pl3')).toBe(false);
+    expect(result.edges.map((edge) => edge.id)).toEqual(['c1']);
+    expect(result.edges[0].targetHandle).toBeUndefined();
+  });
+});
+
 describe('collapsed groups (RV-04g)', () => {
   function collapsedDoc(): Document {
     const doc = makeTestDocument();

@@ -23,6 +23,7 @@ import type { RecordChange } from '../../persistence/studio/types';
 import { NodeCard } from './NodeCard';
 import { GroupNode } from './GroupNode';
 import { NoteNode } from './NoteNode';
+import { BoundaryFrameNode } from './BoundaryFrameNode';
 import { TrafficEdge } from './TrafficEdge';
 import { FloatingDock } from './FloatingDock';
 import {
@@ -58,6 +59,7 @@ export type CanvasSelectionRequest = {
 
 const nodeTypes = {
   elementNode: NodeCard,
+  boundaryFrameNode: BoundaryFrameNode,
   groupNode: GroupNode,
   noteNode: NoteNode,
 };
@@ -267,6 +269,20 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             },
           };
         }
+        if (data.kind === 'boundary') {
+          const viewId = projection.activeView?.id;
+          if (!viewId) return n;
+          const payload = { viewId, target: { kind: 'placement', id: data.placement.id } } as const;
+          const selected = Boolean(selectedElementIds?.has(data.element.id));
+          return {
+            ...n,
+            selected,
+            data: {
+              ...data,
+              onToggleCollapsed: () => void onExecuteCommand('canvas.collapse', payload),
+            },
+          };
+        }
         if (data.kind !== 'element') return n;
         const selected = Boolean(selectedElementIds?.has(data.element.id));
         const connectable = dragMode !== 'pan';
@@ -291,7 +307,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const handleNodeClick: NodeMouseHandler<Node<ProjectedNodeData>> = React.useCallback(
     (event, node) => {
       const data = node.data;
-      if (data.kind !== 'element') return;
+      if (data.kind !== 'element' && data.kind !== 'boundary') return;
       onRequestSelection?.({ kind: 'element', id: data.element.id, additive: event.shiftKey });
     },
     [onRequestSelection],
@@ -344,6 +360,25 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           if (!n.data.group.elementIds.includes(placement.elementId)) continue;
           if (movedList.some((m) => m.id === placement.id)) continue;
           movedList.push({ id: placement.id, position: { x: placement.x + dx, y: placement.y + dy } });
+        }
+      }
+      // Moving an expanded refinement frame moves its owner placement and every
+      // descendant member placement by the same delta, as one undoable change.
+      for (const n of nodesToProcess) {
+        if (n.type !== 'boundaryFrameNode' || n.data.kind !== 'boundary') continue;
+        const origin = projection.nodes.find((projected) => projected.id === n.id)?.position;
+        if (!origin) continue;
+        const dx = n.position.x - origin.x;
+        const dy = n.position.y - origin.y;
+        const movedElementIds = new Set([n.data.element.id, ...n.data.memberElementIds]);
+        for (const placement of projection.activeView.placements) {
+          if (!movedElementIds.has(placement.elementId)) continue;
+          const current = movedList.find((moved) => moved.id === placement.id);
+          if (current) {
+            current.position = { x: placement.x + dx, y: placement.y + dy };
+          } else {
+            movedList.push({ id: placement.id, position: { x: placement.x + dx, y: placement.y + dy } });
+          }
         }
       }
       if (movedList.length === 0) return;
@@ -841,6 +876,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         <SelectionToolbar
           context={commandContext}
           executeCommand={onExecuteCommand}
+          mintId={mintId}
         />
       )}
 
