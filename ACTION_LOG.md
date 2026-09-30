@@ -1612,3 +1612,20 @@ This file is the cumulative, append-only, concise record of completed tasks in t
     - w1, Codex: Wrap in boundary, worktree `claude/wrap-boundary`.
     - a1, Gemini with skip-permissions: overflow menu and the other four actions, worktree `claude/16d-actions`.
     - o1, Codex: realism phase 2 statistical oracles, worktree `claude/realism-oracles`.
+
+### 16D actions and realism phase 2 (status)
+
+- **Merged**: realism phase 2 oracles (`a565ac6`; all 20 pass) and Wrap in boundary (Codex; Sonnet review passed; lead moved the frame label onto the edge, `f7f75af`). Realism audit updated with oracle results and per-host fault accounting (`606b26b`).
+- **a1 (overflow actions)**:
+  - Gemini hit its quota (reset in about 3 h 20 m) and Codex hit its usage limit (until 16:36), both mid-task; their partial work was committed as WIP.
+  - The lead finished it on `claude/16d-actions`:
+    - typed Empty payloads instead of `as any` with empty objects;
+    - `part.capture` restored to a required command, with a `selection.save-as-component` UI command;
+    - a Replace dialog (picker, preview, confirm) plus planner tests;
+    - a probe-focus path so the new check opens expanded;
+    - History filter wiring, including a missing `renderPanel` dependency;
+    - overflow errors surfaced instead of swallowed;
+    - a `w-max` toolbar that stops an anchored flex-wrap width oscillation which broke an existing delete test;
+    - an e2e spec covering all five actions.
+  - On the branch: 1,488 unit tests; isolated e2e 87 passed / 4 skipped; sweep 45/45; touch audit and axe clean. Sonnet review pending.
+- **Lesson:** an absolutely positioned `flex-wrap` box whose `left` is computed from its own measured width never settles, because its available width depends on `left`. Give it `w-max`. Both external executors hit quota in the same afternoon, so plan for the lead to finish a lane.
