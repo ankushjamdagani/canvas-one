@@ -1898,7 +1898,9 @@ export class OpenSimulation {
     op.done = true;
     if (op.notified) return;
     op.notified = true;
-    if (outcome === 'succeeded') {
+    // A publication-only op (a workload entering a broker) succeeds on the publish ack, not
+    // on delivery; it isn't a broker operation and doesn't count as a broker completion.
+    if (outcome === 'succeeded' && !op.publicationOnly) {
       let collector = this.nodeLatencies.get(op.nodeId);
       if (!collector) {
         collector = new LatencyCollector();

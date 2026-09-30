@@ -1271,7 +1271,7 @@ export class ResourceAdapter {
           elementId: nodeId,
           scope: 'element',
           key: 'throughput',
-          value: atMs > 0 ? (nm.completed / atMs) * 1000 : 0,
+          value: atMs > 0 ? (nm.completed / atMs) * 1000 : null,
           unit: 'requests/s',
           available: atMs > 0,
           reason: atMs > 0 ? null : 'No simulated time has elapsed',
