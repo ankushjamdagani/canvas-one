@@ -108,6 +108,7 @@ import {
   type SelectionPlan,
 } from './selectionPlans';
 import { expansionStateOf, planExpansion } from './expandPlans';
+import { planWrapInBoundary, wrapBoundaryCrossingEndpoints } from './wrapPlan';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -536,6 +537,11 @@ export function Workspace({
     const grouped = new Set(activeView.groups.flatMap((group) => group.elementIds));
     return Array.from(selectedElementIds).every((elementId) => !grouped.has(elementId));
   }, [activeView, selectedElementIds]);
+  const selectionHasRefinementMember = React.useMemo(() => {
+    if (!document || selectedElementIds.size === 0) return false;
+    const memberIds = new Set(document.refinements.flatMap((refinement) => refinement.memberElementIds));
+    return Array.from(selectedElementIds).some((elementId) => memberIds.has(elementId));
+  }, [document, selectedElementIds]);
 
   // ==========================================================================
   // RV-12d: run lane wiring
@@ -1527,6 +1533,7 @@ export function Workspace({
       selectedConnectionIds: Array.from(selectedConnectionIds),
       selectedGroupIds,
       selectionWhollyUngrouped,
+      selectionHasRefinementMember,
       activeViewGroupCount: activeView?.groups.length ?? 0,
       activeViewNoteCount: activeView?.notes.length ?? 0,
       expansionState: activeView ? expansionStateOf(activeView) : {},
@@ -1577,6 +1584,7 @@ export function Workspace({
     selectedElementIds,
     selectedGroupIds,
     selectionWhollyUngrouped,
+    selectionHasRefinementMember,
     sessionRunDisabledReason,
     sessionState.branchId,
     sessionState.canRedo,
@@ -1748,6 +1756,19 @@ export function Workspace({
         document && activeViewId
           ? applySelectionPlan(planGroup(document, activeViewId, commandContext.selectedElementIds, mintId(), label))
           : { ok: false, message: 'No canvas view is open' },
+      'selection.wrap-in-boundary': ({ viewId, elementIds, ownerElementId, refinementId, label }) => {
+        if (!document) return { ok: false, message: 'No canvas view is open' };
+        const portIds = wrapBoundaryCrossingEndpoints(document, elementIds).map(() => ({
+          ownerPortId: mintId(),
+          mappingId: mintId(),
+        }));
+        return applySelectionPlan(planWrapInBoundary(document, viewId, elementIds, {
+          ownerElementId,
+          refinementId,
+          portIds,
+          placementId: mintId(),
+        }, label));
+      },
       'selection.ungroup': ({ groupIds }) =>
         document && activeViewId
           ? applySelectionPlan(planUngroup(document, activeViewId, groupIds))

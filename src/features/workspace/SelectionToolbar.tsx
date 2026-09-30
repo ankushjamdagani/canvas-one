@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useStore } from '@xyflow/react';
-import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
+import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ export type CanvasAuthoringCommandId =
   | 'selection.duplicate'
   | 'selection.delete'
   | 'selection.group'
+  | 'selection.wrap-in-boundary'
   | 'selection.ungroup'
   | 'selection.align'
   | 'selection.distribute'
@@ -40,6 +41,7 @@ export type CanvasCommandExecutor = <K extends CanvasAuthoringCommandId>(
 export interface SelectionToolbarProps {
   readonly context: CommandContext;
   readonly executeCommand: CanvasCommandExecutor;
+  readonly mintId: () => string;
 }
 
 function commandSucceeded(result: ExecuteResult): boolean {
@@ -59,10 +61,13 @@ function commandError(result: ExecuteResult): string | null {
   return null;
 }
 
-export function SelectionToolbar({ context, executeCommand }: SelectionToolbarProps) {
+export function SelectionToolbar({ context, executeCommand, mintId }: SelectionToolbarProps) {
   const [groupOpen, setGroupOpen] = React.useState(false);
   const [groupLabel, setGroupLabel] = React.useState('');
   const [groupError, setGroupError] = React.useState<string | null>(null);
+  const [wrapOpen, setWrapOpen] = React.useState(false);
+  const [wrapLabel, setWrapLabel] = React.useState('');
+  const [wrapError, setWrapError] = React.useState<string | null>(null);
   
   const selectedIds = React.useMemo(() => [
     ...(context.selectedPlacementIds ?? []),
@@ -145,6 +150,14 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
   const ungroupAvailability = getAvailability('selection.ungroup', context, {
     groupIds: context.selectedGroupIds,
   });
+  const wrapPayloadBase = {
+    viewId: context.activeViewId ?? '',
+    elementIds: context.selectedElementIds,
+    ownerElementId: '',
+    refinementId: '',
+    label: wrapLabel,
+  };
+  const wrapAvailability = getAvailability('selection.wrap-in-boundary', context, wrapPayloadBase);
   const duplicateAvailability = getAvailability('selection.duplicate', context, {});
   const deleteAvailability = getAvailability('selection.delete', context, {});
   const count = context.selectedElementIds.length;
@@ -183,6 +196,32 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
       setGroupError(null);
     } else {
       setGroupError(commandError(result));
+    }
+  }
+
+  async function submitWrap() {
+    const label = wrapLabel.trim();
+    if (!wrapAvailability.enabled) return;
+    if (label.length === 0) {
+      setWrapError('Enter a boundary name');
+      return;
+    }
+    if (Array.from(label).length > 80) {
+      setWrapError('Use 80 characters or fewer');
+      return;
+    }
+    const result = await executeCommand('selection.wrap-in-boundary', {
+      ...wrapPayloadBase,
+      ownerElementId: mintId(),
+      refinementId: mintId(),
+      label,
+    });
+    if (commandSucceeded(result)) {
+      setWrapOpen(false);
+      setWrapLabel('');
+      setWrapError(null);
+    } else {
+      setWrapError(commandError(result));
     }
   }
 
@@ -279,6 +318,59 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
           <Ungroup className="size-3.5" /> Ungroup
         </Button>
       )}
+
+      <Popover
+        open={wrapOpen}
+        onOpenChange={(open) => {
+          setWrapOpen(open);
+          if (!open) setWrapError(null);
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            data-testid="selection-wrap-btn"
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 pointer-coarse:h-11 gap-1.5 text-xs"
+            disabled={!wrapAvailability.enabled}
+            title={wrapAvailability.enabled ? undefined : wrapAvailability.reason}
+          >
+            <BoxSelect className="size-3.5" /> Wrap in boundary
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="center" className="w-64 p-3">
+          <form
+            data-testid="selection-wrap-popover"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitWrap();
+            }}
+          >
+            <h2 className="text-sm font-semibold text-ink">Wrap in boundary</h2>
+            <label className="mt-2 block text-xs font-medium text-ink mb-1.5" htmlFor="selection-wrap-label">
+              Boundary name
+            </label>
+            <Input
+              id="selection-wrap-label"
+              data-testid="selection-wrap-input"
+              autoFocus
+              value={wrapLabel}
+              placeholder="Name this boundary…"
+              onChange={(event) => {
+                setWrapLabel(event.target.value);
+                setWrapError(null);
+              }}
+            />
+            {wrapError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{wrapError}</p>}
+            <div className="mt-2 flex justify-end">
+              <Button type="submit" size="sm" variant="tint" disabled={wrapLabel.trim().length === 0}>
+                Wrap
+              </Button>
+            </div>
+          </form>
+        </PopoverContent>
+      </Popover>
 
       {expansionPayload && expansionAvailability && (
         <Button

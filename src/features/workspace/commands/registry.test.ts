@@ -51,6 +51,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     selectedConnectionIds: [],
     selectedGroupIds: [],
     selectionWhollyUngrouped: false,
+    selectionHasRefinementMember: false,
     activeViewGroupCount: 0,
     activeViewNoteCount: 0,
     runBlockedReason: null,
@@ -203,6 +204,28 @@ describe('availability', () => {
         { label: '' },
       ),
     ).toEqual({ enabled: true });
+    const wrapPayload = {
+      viewId: 'd0000000-0000-4000-8000-000000000001',
+      elementIds: ['a'],
+      ownerElementId: 'owner',
+      refinementId: 'refinement',
+      label: 'Boundary',
+    };
+    expect(getAvailability(
+      'selection.wrap-in-boundary',
+      makeContext({ selectedElementIds: ['a'] }),
+      wrapPayload,
+    )).toEqual({ enabled: true });
+    expect(getAvailability(
+      'selection.wrap-in-boundary',
+      makeContext({ selectedElementIds: ['a'], selectionHasRefinementMember: true }),
+      wrapPayload,
+    )).toMatchObject({ enabled: false, reason: 'A selected component already belongs to a refinement boundary' });
+    expect(getAvailability(
+      'selection.wrap-in-boundary',
+      makeContext({ selectedElementIds: ['b'] }),
+      wrapPayload,
+    )).toMatchObject({ enabled: false, reason: 'The selected components changed' });
     expect(
       getAvailability('selection.ungroup', makeContext({ selectedGroupIds: ['g'] }), { groupIds: ['g'] }),
     ).toEqual({ enabled: true });
@@ -630,6 +653,7 @@ describe('buildQuickOptions', () => {
         selectedElementIds: ['a', 'b', 'c'],
         selectedGroupIds: ['g'],
         selectionWhollyUngrouped: false,
+        selectionHasRefinementMember: false,
       }),
     ).find((group) => group.group === 'selection')!;
     expect(selection.options.map((entry) => entry.key)).toEqual([
