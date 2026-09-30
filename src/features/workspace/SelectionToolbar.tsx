@@ -90,6 +90,9 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
   const [groupLabel, setGroupLabel] = React.useState('');
   const [groupError, setGroupError] = React.useState<string | null>(null);
   const [wrapOpen, setWrapOpen] = React.useState(false);
+  const [overflowError, setOverflowError] = React.useState<string | null>(null);
+  const selectionKey = context.selectedElementIds.join(',');
+  React.useEffect(() => setOverflowError(null), [selectionKey]);
   const [wrapLabel, setWrapLabel] = React.useState('');
   const [wrapError, setWrapError] = React.useState<string | null>(null);
   
@@ -262,6 +265,12 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
     ['y', 'Distribute vertically'],
   ] as const;
 
+  const runOverflow = async (id: OverflowCommandId) => {
+    setOverflowError(null);
+    const result = await executeCommand(id, {});
+    setOverflowError(commandError(result));
+  };
+
   const overflowItem = ({ id, label }: { readonly id: OverflowCommandId; readonly label: string }) => {
     const availability = getPayloadFreeAvailability(id, context);
     return (
@@ -269,7 +278,7 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
         key={id}
         data-testid={`selection-overflow-${id.replace('.', '-')}`}
         disabled={!availability.enabled}
-        onSelect={() => void executeCommand(id, {})}
+        onSelect={() => void runOverflow(id)}
         className="flex flex-col items-start gap-0.5 text-xs pointer-coarse:min-h-11"
       >
         <span>{label}</span>
@@ -284,7 +293,7 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
     <div
       ref={toolbarRef}
       data-testid="selection-toolbar"
-      className="absolute z-10 flex flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
+      className="absolute z-10 flex w-max flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
       style={style}
     >
       <span
@@ -512,6 +521,15 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
           {OVERFLOW_SECONDARY.map((item) => overflowItem(item))}
         </DropdownMenuContent>
       </DropdownMenu>
+      {overflowError ? (
+        <p
+          role="alert"
+          data-testid="selection-overflow-error"
+          className="absolute left-0 right-0 top-full mt-1.5 rounded-control border border-risk-edge bg-panel px-2 py-1 text-xs text-risk-text shadow-raised"
+        >
+          {overflowError}
+        </p>
+      ) : null}
 
       <div className="w-[1px] h-6 bg-divider mx-0.5" />
 

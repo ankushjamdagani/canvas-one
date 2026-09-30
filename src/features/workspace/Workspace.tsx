@@ -2095,6 +2095,7 @@ export function Workspace({
       sessionState.canRedo,
       sessionState.status,
       repository, session, actor, mintId, activeViewId, selectedElementIds,
+      historyFilter, captureRequested,
     ],
   );
 
