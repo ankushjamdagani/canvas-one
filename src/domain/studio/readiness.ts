@@ -58,6 +58,7 @@ import type {
 import type { Issue } from './validate';
 import { canonicalJson } from './canonical';
 import { computeClosure, type ClosureResultOk } from './closure';
+import { resolveRefinementRouting } from './refinementRouting';
 
 // ============================================================================
 // Readiness issue codes
@@ -122,6 +123,8 @@ export const READINESS_ISSUE_CODES = [
   'bridge-continuation-conflict',
   /** §8 Bridge call frames: a router's routes must reach resources. A router shares load by capacity, and a machine, pipeline or unmodeled element has none (RV-18 dropped, 2026-09-30). */
   'router-route-needs-resource',
+  /** §6 Refinement: duplicate/unknown selections and crossings without a compatible mapping are not runnable. */
+  'invalid-refinement-selection',
 ] as const;
 
 export type ReadinessIssueCode = (typeof READINESS_ISSUE_CODES)[number];
@@ -564,6 +567,29 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   const scenarioIndex = doc.scenarios.findIndex((s) => s.id === scenarioId);
   const scenario: Scenario = doc.scenarios[scenarioIndex];
   const scenarioPath: (string | number)[] = ['scenarios', scenarioIndex];
+
+  const refinementRouting = resolveRefinementRouting(doc, scenario);
+  const refinementIssues: ReadinessIssue[] = [
+    ...refinementRouting.selectionErrors.map((error) =>
+      issue(
+        'invalid-refinement-selection',
+        [...scenarioPath, 'refinementSelections'],
+        error.refinementId,
+        error.message,
+      ),
+    ),
+    ...refinementRouting.crossingViolations.map((violation) =>
+      issue(
+        'invalid-refinement-selection',
+        [...scenarioPath, 'refinementSelections'],
+        violation.refinementId,
+        violation.message,
+      ),
+    ),
+  ];
+  if (refinementIssues.length > 0) {
+    return { ready: false, issues: refinementIssues };
+  }
 
   const elementsMap = new Map<Id, Element>();
   for (const el of doc.elements) elementsMap.set(el.id, el);

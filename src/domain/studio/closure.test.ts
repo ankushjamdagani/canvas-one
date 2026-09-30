@@ -494,6 +494,70 @@ describe('Scenario Scope Closure (computeClosure)', () => {
       if (resAggregate.status === 'ok' && resRefined.status === 'ok') {
         expect(resAggregate.includedElementIds).not.toEqual(resRefined.includedElementIds);
       }
+
+      const nestedMemberId = 'eeeeeeee-5555-4555-8555-555555555555';
+      const nestedMemberPortId = 'ffffffff-6666-4666-8666-666666666666';
+      const nestedMemberElement: Element = {
+        ...memberElement,
+        id: nestedMemberId,
+        label: 'Nested worker implementation',
+        ports: [{ ...memberElement.ports[0], id: nestedMemberPortId }],
+        behavior: {
+          kind: 'resource',
+          version: 1,
+          entryPortId: nestedMemberPortId,
+          config: {
+            type: 'processor',
+            capacity: 50,
+            concurrency: 1,
+            queueLimit: 10,
+            failureRate: 0,
+            maxRetries: 0,
+            retryDelayMs: 0,
+          },
+        },
+      };
+      const nestedRefinementId = '11111111-7777-4777-8777-777777777777';
+      const nestedRefinement: Refinement = {
+        id: nestedRefinementId,
+        ownerElementId: memberId,
+        memberElementIds: [nestedMemberId],
+        portMappings: [
+          {
+            id: '22222222-8888-4888-8888-888888888888',
+            outer: { elementId: memberId, portId: memberInPortId },
+            inner: { elementId: nestedMemberId, portId: nestedMemberPortId },
+          },
+        ],
+      };
+      const inertNestedSelection: Document = {
+        ...docWithRefinement,
+        elements: [...docWithRefinement.elements, nestedMemberElement],
+        refinements: [refinement, nestedRefinement],
+        scenarios: docWithRefinement.scenarios.map((candidate) =>
+          candidate.id === scenario.id
+            ? {
+                ...candidate,
+                scopeElementIds: [...candidate.scopeElementIds, memberId, nestedMemberId],
+                refinementSelections: [
+                  { refinementId, mode: 'aggregate' },
+                  { refinementId: nestedRefinementId, mode: 'refined' },
+                ],
+              }
+            : candidate,
+        ),
+      };
+
+      const inertResult = computeClosure(inertNestedSelection, scenario.id);
+      expect(inertResult.status).toBe('ok');
+      if (inertResult.status === 'ok') {
+        expect(inertResult.includedElementIds).toContain(workerId);
+        expect(inertResult.includedElementIds).not.toContain(memberId);
+        expect(inertResult.includedElementIds).not.toContain(nestedMemberId);
+        expect(inertResult.excludedElementIds).toEqual(
+          expect.arrayContaining([memberId, nestedMemberId]),
+        );
+      }
     });
   });
 

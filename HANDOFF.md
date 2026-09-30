@@ -40,7 +40,7 @@ Tracked here until resolved; none blocks release.
 
 Resolved 2026-09-29 (see `ACTION_LOG.md`): the Button spinner test, the filled-field state (design package found), stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
 
-Accepted limitations (by design, not debt): router + bridge routes rejected by readiness until the runner supports them; runtime refinement maps one level of ports; the 16E picker is catalog-only (saved parts live in the Library panel); Replace part has no contracted command.
+Accepted limitations (by design, not debt): a router's routes must reach resources (D45; readiness explains the fix); the 16E picker is catalog-only (saved parts live in the Library panel); Replace part has no contracted command.
 
 ## Code-splitting notes
 

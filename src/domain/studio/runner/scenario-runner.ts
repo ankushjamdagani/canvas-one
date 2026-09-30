@@ -28,7 +28,6 @@ import type {
   MachineBehavior,
   PayloadSchema,
   Port,
-  Refinement,
   Scenario,
   Shape,
   TransportOutcome,
@@ -54,6 +53,7 @@ import { runDecision } from './decision';
 import { evaluateAssertions } from './assertions';
 import { ResourceAdapter, validateFaultsAndPlacements } from './resource-adapter';
 import { validateSchemaValue } from './schema-value';
+import { resolveRefinementRouting, type RefinementRouting } from '../refinementRouting';
 
 // ============================================================================
 // Types
@@ -408,6 +408,7 @@ export class ScenarioRunner {
   // choices, and the connection list with crossings routed through port mappings.
   private refinementExcludedElementIds: Set<Id> = new Set();
   private effectiveConnections: readonly Connection[] = [];
+  private refinementRouting!: RefinementRouting;
 
   // Logical mode causal queue and held responses
   private readonly logicalCausalQueue: HeldBoundaryResponse[] = [];
@@ -510,24 +511,26 @@ export class ScenarioRunner {
     // Refinement selection (§6): aggregate runs the owner and excludes members; refined
     // runs the members and excludes the owner, with crossing connections routed through
     // port mappings.
-    const refinementResult = this.resolveRefinements();
-    if (!refinementResult.ok) {
+    const refinementRouting = resolveRefinementRouting(this.document, this.scenario);
+    const refinementError = refinementRouting.selectionErrors[0] ?? refinementRouting.crossingViolations[0];
+    if (refinementError) {
       this.terminalStatus = 'invalid';
-      this.failureReason = refinementResult.message;
+      this.failureReason = refinementError.message;
       this.issues = [
         {
           code: 'invalid-refinement-selection',
           path: ['scenarios', this.scenario.id, 'refinementSelections'],
           entityId: null,
           severity: 'error',
-          message: refinementResult.message,
+          message: refinementError.message,
         },
       ];
       this.isFinished = true;
       return;
     }
-    this.refinementExcludedElementIds = refinementResult.excludedElementIds;
-    this.effectiveConnections = refinementResult.connections;
+    this.refinementRouting = refinementRouting;
+    this.refinementExcludedElementIds = new Set(refinementRouting.excludedElementIds);
+    this.effectiveConnections = refinementRouting.remapConnections(this.document.connections);
 
     // Initialize machine states & contexts
     for (const elId of this.scenario.scopeElementIds) {
@@ -615,108 +618,21 @@ export class ScenarioRunner {
     }
   }
 
-  /**
-   * Refinement selection (§6): "aggregate runs the owner and excludes members; refined
-   * runs the members and excludes the owner (port mappings route crossings)." A
-   * refinement absent from `scenario.refinementSelections` is left alone (neither
-   * aggregate nor refined applies — its owner/members are ordinary elements). Returns
-   * `ok:false` when the SAME refinement has more than one selection ("running both
-   * paths ... is invalid") or a refined selection's owner has a crossing connection with
-   * no compatible port mapping ("mismatched mappings ... is invalid").
-   *
-   * CONTRACT GAP (narrowed reading): crossing validation here only checks connections
-   * with an endpoint literally on the owner element, mirroring the common authoring
-   * pattern where all pre-refinement wiring uses the owner's ports. A connection authored
-   * directly at a member's inner port that should also fire an outer-declared connection
-   * is not mirrored back out; full closure-equivalent reachability validation belongs to
-   * `computeClosure` at compile time (not reproduced here since closure.ts is off limits
-   * for this task and the S05 fixture carries no refinements to exercise it against).
-   */
-  private resolveRefinements():
-    | { ok: true; excludedElementIds: Set<Id>; connections: Connection[] }
-    | { ok: false; message: string } {
-    const selections = this.scenario.refinementSelections;
-    if (selections.length === 0) {
-      return { ok: true, excludedElementIds: new Set(), connections: [...this.document.connections] };
+  private connectionsFromSource(sourceEndpoint: Endpoint): readonly Connection[] {
+    const sourceKeys = new Set(
+      this.refinementRouting
+        .outboundEndpoints(sourceEndpoint.elementId, sourceEndpoint.portId)
+        .map((endpoint) => `${endpoint.elementId}:${endpoint.portId}`),
+    );
+    const connections: Connection[] = [];
+    const seenConnectionIds = new Set<Id>();
+    for (const connection of this.effectiveConnections) {
+      if (!sourceKeys.has(`${connection.source.elementId}:${connection.source.portId}`)) continue;
+      if (seenConnectionIds.has(connection.id)) continue;
+      seenConnectionIds.add(connection.id);
+      connections.push(connection);
     }
-
-    const refinementMap = new Map<Id, Refinement>();
-    for (const r of this.document.refinements) refinementMap.set(r.id, r);
-
-    const seenRefinementIds = new Set<Id>();
-    const excludedElementIds = new Set<Id>();
-    const outerToInner = new Map<string, Endpoint>();
-
-    for (const sel of selections) {
-      if (seenRefinementIds.has(sel.refinementId)) {
-        return {
-          ok: false,
-          message: `Refinement '${sel.refinementId}' has more than one selection in this scenario (running both paths is invalid)`,
-        };
-      }
-      seenRefinementIds.add(sel.refinementId);
-
-      const ref = refinementMap.get(sel.refinementId);
-      if (!ref) {
-        return { ok: false, message: `Refinement selection references unknown refinement '${sel.refinementId}'` };
-      }
-
-      if (sel.mode === 'aggregate') {
-        for (const mId of ref.memberElementIds) excludedElementIds.add(mId);
-      } else {
-        excludedElementIds.add(ref.ownerElementId);
-        for (const mapping of ref.portMappings) {
-          outerToInner.set(`${mapping.outer.elementId}:${mapping.outer.portId}`, mapping.inner);
-        }
-
-        for (const conn of this.document.connections) {
-          if (conn.source.elementId === ref.ownerElementId) {
-            if (!outerToInner.has(`${conn.source.elementId}:${conn.source.portId}`)) {
-              return {
-                ok: false,
-                message: `Refinement '${ref.id}': owner port '${conn.source.portId}' has a crossing connection with no compatible port mapping`,
-              };
-            }
-          }
-          if (conn.target.elementId === ref.ownerElementId) {
-            if (!outerToInner.has(`${conn.target.elementId}:${conn.target.portId}`)) {
-              return {
-                ok: false,
-                message: `Refinement '${ref.id}': owner port '${conn.target.portId}' has a crossing connection with no compatible port mapping`,
-              };
-            }
-          }
-        }
-      }
-    }
-
-    if (outerToInner.size === 0 && excludedElementIds.size === 0) {
-      return { ok: true, excludedElementIds, connections: [...this.document.connections] };
-    }
-
-    const remapped: Connection[] = [];
-    for (const conn of this.document.connections) {
-      let source = conn.source;
-      let target = conn.target;
-      let changed = false;
-
-      if (excludedElementIds.has(source.elementId)) {
-        const inner = outerToInner.get(`${source.elementId}:${source.portId}`);
-        if (!inner) continue; // both endpoints excluded with no mapping: unreachable, drop
-        source = inner;
-        changed = true;
-      }
-      if (excludedElementIds.has(target.elementId)) {
-        const inner = outerToInner.get(`${target.elementId}:${target.portId}`);
-        if (!inner) continue;
-        target = inner;
-        changed = true;
-      }
-
-      remapped.push(changed ? ({ ...conn, source, target } as Connection) : conn);
-    }
-
-    return { ok: true, excludedElementIds, connections: remapped };
+    return connections;
   }
 
   private sortTimedQueue(): void {
@@ -905,9 +821,7 @@ export class ScenarioRunner {
     context: InvocationContext,
     atMs: number | null,
   ): Promise<{ ok: boolean; error?: string }> {
-    const outgoing = this.effectiveConnections.filter(
-      (c) => c.source.elementId === sourceEndpoint.elementId && c.source.portId === sourceEndpoint.portId,
-    );
+    const outgoing = this.connectionsFromSource(sourceEndpoint);
 
     for (const conn of outgoing) {
       if (conn.kind === 'data') {
@@ -1217,11 +1131,9 @@ export class ScenarioRunner {
         const boundary = this.scenario.boundaries.find(
           (b) =>
             (b.source.elementId === machineElementId && b.source.portId === emission.portId) ||
-            this.effectiveConnections.some(
+            this.connectionsFromSource({ elementId: machineElementId, portId: emission.portId }).some(
               (c) =>
                 c.kind === 'call' &&
-                c.source.elementId === machineElementId &&
-                c.source.portId === emission.portId &&
                 c.target.elementId === b.source.elementId &&
                 c.target.portId === b.source.portId,
             ),
@@ -1309,8 +1221,8 @@ export class ScenarioRunner {
         // The frame created above is settled once the resource's own unit_settled fires
         // (directly, or via an internal bridge continuation resolved by settleCall) —
         // see routeSettlement()/resourceCallPending.
-        const targetConn = this.effectiveConnections.find(
-          (c) => c.kind === 'call' && c.source.elementId === machineElementId && c.source.portId === emission.portId,
+        const targetConn = this.connectionsFromSource({ elementId: machineElementId, portId: emission.portId }).find(
+          (c) => c.kind === 'call',
         );
         const targetEl = targetConn ? this.elementsMap.get(targetConn.target.elementId) : undefined;
         if (targetConn && targetEl && targetEl.behavior.kind === 'resource') {
@@ -1784,9 +1696,7 @@ export class ScenarioRunner {
       // yet (the call has only just been dispatched, not settled) — the eventual reply
       // resolves via settleCallFrame()/kernelBridgeFrames once it reaches a reply effect.
       for (const out of delta.outputs) {
-        const outConnections = this.effectiveConnections.filter(
-          (c) => c.source.elementId === out.source.elementId && c.source.portId === out.source.portId,
-        );
+        const outConnections = this.connectionsFromSource(out.source);
         const payload = this.recorder.payloadTable.get(out.payloadRef);
         if (payload === undefined) {
           // §8 "No success is inferred": never substitute a fabricated `{}` payload for

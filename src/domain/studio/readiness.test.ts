@@ -572,6 +572,89 @@ describe('checkReadiness mutation tests', () => {
       expect(result.issues.some((i) => i.code === 'unresolved-crossing')).toBe(true);
     }
   });
+
+  it('reports an unmapped refinement crossing reached at depth two', () => {
+    const source = machineElement('source', [
+      port('source-in', 'in', 'data', S_ID),
+      port('source-out', 'out', 'data', S_ID),
+    ]);
+    const outer = machineElement('outer', [port('outer-in', 'in', 'data', S_ID)]);
+    const inner = machineElement('inner', [port('inner-in', 'in', 'data', S_ID)]);
+    const deep = machineElement('deep', [port('deep-in', 'in', 'data', S_ID)]);
+    const scenario: Scenario = {
+      ...logicalHappyDoc().scenarios[0],
+      id: 'scn-nested-crossing',
+      scopeElementIds: ['source', 'outer', 'inner', 'deep'],
+      entryPorts: [{ elementId: 'source', portId: 'source-in' }],
+      inputs: [
+        {
+          id: 'nested-input',
+          entry: { elementId: 'source', portId: 'source-in' },
+          fixtureId: 'fx-input',
+          journeyId: 'nested-journey',
+          atMs: null,
+          payloadBindings: [],
+          resource: null,
+        },
+      ],
+      refinementSelections: [
+        { refinementId: 'outer-refinement', mode: 'refined' },
+        { refinementId: 'inner-refinement', mode: 'refined' },
+      ],
+      assertions: [],
+    };
+    const doc = baseDoc(
+      [source, outer, inner, deep],
+      [
+        {
+          id: 'source-to-outer',
+          label: '',
+          kind: 'data',
+          source: { elementId: 'source', portId: 'source-out' },
+          target: { elementId: 'outer', portId: 'outer-in' },
+          config: {},
+        },
+      ],
+      scenario,
+    );
+    const nested: Document = {
+      ...doc,
+      refinements: [
+        {
+          id: 'outer-refinement',
+          ownerElementId: 'outer',
+          memberElementIds: ['inner'],
+          portMappings: [
+            {
+              id: 'outer-in-map',
+              outer: { elementId: 'outer', portId: 'outer-in' },
+              inner: { elementId: 'inner', portId: 'inner-in' },
+            },
+          ],
+        },
+        {
+          id: 'inner-refinement',
+          ownerElementId: 'inner',
+          memberElementIds: ['deep'],
+          portMappings: [],
+        },
+      ],
+    };
+
+    const result = checkReadiness(nested, scenario.id);
+
+    expect(result.ready).toBe(false);
+    if (!result.ready) {
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'invalid-refinement-selection',
+            entityId: 'inner-refinement',
+          }),
+        ]),
+      );
+    }
+  });
 });
 
 // ============================================================================
