@@ -88,6 +88,12 @@ export interface OpenSimulationOptions {
   hostPlacement?: Map<string, string> | Record<string, string>;
   faults?: readonly KernelFaultConfig[];
   bridges?: readonly KernelBridgeConfig[];
+  /**
+   * Seconds after which workloads schedule no more arrivals. Defaults to the run
+   * duration. A drain run stops arrivals at its arrival horizon and keeps running to its
+   * deadline (model-and-runner.md §6 completion).
+   */
+  arrivalHorizonSeconds?: number;
 }
 
 export interface KernelResourceInput {
@@ -358,6 +364,7 @@ export class OpenSimulation {
   protected seq = 0;
   protected currentTime = 0;
   protected duration: number;
+  protected arrivalHorizon: number;
   protected seed: number;
   protected finished = false;
   protected incompleteReason?: string;
@@ -434,6 +441,7 @@ export class OpenSimulation {
     this.plan = compiled.plan;
 
     this.duration = this.plan.graph.settings.duration;
+    this.arrivalHorizon = Math.min(options?.arrivalHorizonSeconds ?? this.duration, this.duration);
     this.seed = this.plan.graph.settings.seed;
 
     for (const node of this.plan.graph.nodes) {
@@ -789,7 +797,7 @@ export class OpenSimulation {
       arrTime = nextArrivalTime(adapter, afterTime, hazard);
     }
 
-    if (!Number.isFinite(arrTime) || arrTime > this.duration) return;
+    if (!Number.isFinite(arrTime) || arrTime > this.arrivalHorizon) return;
 
     this.scheduleEvent(arrTime, 2, () => {
       if (this.disabledWorkloads.has(wl.id)) return;
@@ -932,6 +940,17 @@ export class OpenSimulation {
       weight: 1,
     };
 
+    // The root is admitted at the broker as a publication; observers need its admission
+    // before the message it publishes (every message links to a known parent root).
+    this.emitFact({
+      kind: 'admitted',
+      time: this.currentTime,
+      nodeId: rootOp.nodeId,
+      unitIdentity: unit.identity,
+      category: unit.category,
+      attempt: rootOp.attempt,
+      path: rootOp.path,
+    });
     this.publishMessage(rootOp, syntheticEdge);
   }
 

@@ -16,7 +16,7 @@ Sources read: decisions.md (D21,D35,D37,D38,D39,D41, Lead defaults), requirement
 8. **Connecting into a resource element:** drawing the edge opens a compact form for request class, read/write and deadline; the edge is stored only on confirm (one undo); Esc cancels it. No default deadline.
 9. **Saved-part summary line:** the first three component kinds in saved order, then "+ n more".
 10. **Node card second line:** before any run, `kind · key setting` (a configured value, never shown as a measurement); after a run of the selected scenario, measured values from that run only.
-11. **Routes:** a router/broker is placed with one out port; dragging another connection from it adds a new out port for that route in the same command (one undo). The new port's channel is the one its target accepts (call or message), as in S02 — lead reading.
+11. **Routes:** a router/broker is placed with one out port; dragging another connection from it adds a new out port for that route in the same command (one undo). The new port's channel is the one its target accepts (call or message), as in S02 — lead reading. **Messaging (D47):** a broker connected to a resource's in:call entry gets a new out:call route port (the S02/S05 consumer shape), even on its first route; a processor connected to a broker gets a new out:message port labelled `publish`. The canvas always drags from an element's first out port, so these ports are added by the gesture.
 12. **traffic, client, mobile, device, scheduler:** diagram labels only — `unmodeled`, "Not simulated", no resource config. Scenario traffic enters at the next real component's entry port. The §2 rows for these five are superseded.
 
 ## 1. Catalog entry shape

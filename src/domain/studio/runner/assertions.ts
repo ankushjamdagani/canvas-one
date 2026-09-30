@@ -106,6 +106,15 @@ export function evaluateAssertion(
     }
 
     case 'trace-count': {
+      const truncatedBy = summary.trace?.truncatedBy ?? null;
+      if (truncatedBy !== null) {
+        return {
+          assertionId: assertion.id,
+          status: 'unevaluated',
+          actual: null,
+          reason: `The trace stopped recording at its ${truncatedBy === 'trace-rows' ? 'row' : 'byte'} budget, so trace counts would be partial`,
+        };
+      }
       let count = 0;
       for (const ev of events) {
         if (ev.elementId === subject.elementId && ev.code === subject.code) {

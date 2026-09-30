@@ -17,6 +17,7 @@
 
 import { canonicalJson, sha256Hex } from '../canonical';
 import type {
+  Boundary,
   BoundaryResponse,
   Connection,
   Document,
@@ -44,6 +45,7 @@ import type {
   TraceEvent,
   TraceEventKind,
 } from './types';
+import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD } from './types';
 import { rootId, traceEventId, PayloadTable } from './trace';
 import { defaultEvaluator, readPath } from './expr';
 import { isMissing } from './expr-api';
@@ -226,6 +228,20 @@ type GlobalSchedulerEvent =
       readonly phase: 2;
       readonly sequence: number;
       readonly held: HeldBoundaryResponse;
+    }
+  | {
+      /** A boundary's scripted reply to a resource's bridge call (§6 Boundaries, §8 frames). */
+      readonly kind: 'resource-boundary-response';
+      readonly atMs: number;
+      readonly phase: 2;
+      readonly sequence: number;
+      readonly frameId: string;
+      readonly source: Endpoint;
+      readonly rootId: string;
+      readonly journeyId: Id;
+      readonly parentEventId: string | null;
+      readonly payload: Json;
+      readonly outcome: TransportOutcome;
     };
 
 // ============================================================================
@@ -239,8 +255,14 @@ class ScenarioEventRecorder {
   private readonly recordedEvents: TraceEvent[] = [];
   private nextSeq = 0;
   private usedBytes = 0;
+  /** Set only by an invalid event: the run can't continue. */
   public stopped = false;
   public stopReason: string | null = null;
+  /**
+   * The first trace cap reached (storage.md §6, D47). From then on rows aren't recorded,
+   * but payloads still resolve and the run keeps running and counting.
+   */
+  public truncatedBy: 'trace-rows' | 'trace-bytes' | null = null;
 
   constructor(runId: string, budgets: { maxTraceRows: number; maxTraceBytes: number }) {
     this.runId = runId;
@@ -267,7 +289,7 @@ class ScenarioEventRecorder {
     payloadRef?: string | null;
     atMs: number | null;
     outcome: TransportOutcome | null;
-  }): Promise<{ ok: boolean; event?: TraceEvent }> {
+  }): Promise<{ ok: boolean; event?: TraceEvent; recorded?: boolean }> {
     if (this.stopped) return { ok: false };
 
     let payloadRef = input.payloadRef ?? null;
@@ -313,25 +335,23 @@ class ScenarioEventRecorder {
 
     const addedBytes = canonEvt.bytes + payloadBytes;
 
-    if (this.recordedEvents.length + 1 > this.budgets.maxTraceRows) {
-      this.stopped = true;
-      this.stopReason = 'trace-rows';
-      return { ok: false };
+    if (this.truncatedBy === null && this.recordedEvents.length + 1 > this.budgets.maxTraceRows) {
+      this.truncatedBy = 'trace-rows';
+    } else if (this.truncatedBy === null && this.usedBytes + addedBytes > this.budgets.maxTraceBytes) {
+      this.truncatedBy = 'trace-bytes';
     }
 
-    if (this.usedBytes + addedBytes > this.budgets.maxTraceBytes) {
-      this.stopped = true;
-      this.stopReason = 'trace-bytes';
-      return { ok: false };
-    }
-
+    // Payloads stay resolvable after truncation: later steps read them back.
     if (payloadCanonicalText && payloadRef) {
       this.payloads.commitPrecomputed(payloadRef, payloadCanonicalText);
+    }
+    if (this.truncatedBy !== null) {
+      return { ok: true, event, recorded: false };
     }
 
     this.usedBytes += addedBytes;
     this.recordedEvents.push(event);
-    return { ok: true, event };
+    return { ok: true, event, recorded: true };
   }
 }
 
@@ -578,8 +598,13 @@ export class ScenarioRunner {
         );
 
         let durationMs: number | undefined;
+        let arrivalHorizonMs: number | undefined;
         if (this.scenario.completion.kind === 'horizon') durationMs = this.scenario.completion.horizonMs;
-        else if (this.scenario.completion.kind === 'drain') durationMs = this.scenario.completion.deadlineMs;
+        else if (this.scenario.completion.kind === 'drain') {
+          // §6: no arrivals after arrivalHorizonMs; the run continues to deadlineMs to drain.
+          durationMs = this.scenario.completion.deadlineMs;
+          arrivalHorizonMs = this.scenario.completion.arrivalHorizonMs;
+        }
 
         this.adapter = new ResourceAdapter({
           elements: effectiveElements,
@@ -589,6 +614,7 @@ export class ScenarioRunner {
           workloads: this.scenario.workloads,
           seed: this.scenario.seed,
           durationMs,
+          arrivalHorizonMs,
           runId: this.runId,
           disabledWorkloadIds,
         });
@@ -703,6 +729,84 @@ export class ScenarioRunner {
       }
     }
     return true;
+  }
+
+  /**
+   * Picks a boundary's reply to one request (§6 Boundaries): the first matching response in
+   * declared order, then its fixture with request bindings applied, checked against the
+   * boundary's response schema. `consume` follows the contract for finite requests (each
+   * response answers once; exhaustion is an error). Workload traffic is statistical, so
+   * its requests reuse the first matching response (D47).
+   */
+  private answerBoundary(
+    boundary: Boundary,
+    request: Json,
+    portId: Id,
+    consume: boolean,
+  ): { ok: true; response: BoundaryResponse; payload: Json } | { ok: false; error: string } {
+    let matchedResponse: BoundaryResponse | null = null;
+    for (const resp of boundary.responses) {
+      if (consume && this.usedBoundaryResponseIds.has(resp.id)) continue;
+      const matchRes = defaultEvaluator.evalGuard(resp.match, { input: request, context: {}, outcome: null });
+      if (matchRes.ok && matchRes.value) {
+        matchedResponse = resp;
+        break;
+      }
+    }
+    if (!matchedResponse) {
+      return { ok: false, error: `Boundary exhaustion or no matching response on port '${portId}' (§6)` };
+    }
+    if (consume) this.usedBoundaryResponseIds.add(matchedResponse.id);
+
+    const fixtureVal = this.fixturesMap.get(matchedResponse.responseFixtureId);
+    if (fixtureVal === undefined) {
+      return { ok: false, error: `Boundary response fixture '${matchedResponse.responseFixtureId}' not found` };
+    }
+    let responsePayload = deepCloneJson(fixtureVal);
+    for (const binding of matchedResponse.payloadBindings) {
+      const reqVal = readPath(request, binding.requestPath);
+      if (isMissing(reqVal)) {
+        return { ok: false, error: `Boundary payload binding: requestPath '${binding.requestPath.join('.')}' not found in request` };
+      }
+      const setRes = setPathInContext(responsePayload, binding.targetPath, reqVal);
+      if (!setRes.ok) return { ok: false, error: `Boundary payload binding set failed: ${setRes.error}` };
+      responsePayload = setRes.context;
+    }
+
+    const respSchema = this.schemasMap.get(boundary.schemaId);
+    if (respSchema) {
+      const valRes = validateSchemaValue(responsePayload, respSchema.shape, [], boundary.schemaId);
+      if (!valRes.ok) return { ok: false, error: `Boundary response payload failed schema` };
+    }
+    return { ok: true, response: matchedResponse, payload: responsePayload };
+  }
+
+  /** The boundary that answers calls leaving `source` (on the port itself or on the call's target), if any. */
+  private boundaryForCall(source: Endpoint): Boundary | undefined {
+    return this.scenario.boundaries.find(
+      (b) =>
+        (b.source.elementId === source.elementId && b.source.portId === source.portId) ||
+        this.connectionsFromSource(source).some(
+          (c) => c.kind === 'call' && c.target.elementId === b.source.elementId && c.target.portId === b.source.portId,
+        ),
+    );
+  }
+
+  /**
+   * Root counts for the whole run: finite-input and machine roots tracked here, plus the
+   * roots the kernel generated from workloads, which only the adapter sees (§5, §9).
+   */
+  private totalRootCounts(): Counts {
+    const w = this.adapter?.workloadRoots();
+    if (!w) return { ...this.rootCounts };
+    return {
+      generated: this.rootCounts.generated + w.generated,
+      succeeded: this.rootCounts.succeeded + w.succeeded,
+      rejected: this.rootCounts.rejected + w.rejected,
+      failed: this.rootCounts.failed + w.failed,
+      expired: this.rootCounts.expired + w.expired,
+      inFlight: this.rootCounts.inFlight + w.inFlight,
+    };
   }
 
   /**
@@ -1140,48 +1244,9 @@ export class ScenarioRunner {
         );
 
         if (boundary) {
-          let matchedResponse: BoundaryResponse | null = null;
-          for (const resp of boundary.responses) {
-            if (this.usedBoundaryResponseIds.has(resp.id)) continue;
-            const matchRes = defaultEvaluator.evalGuard(resp.match, {
-              input: emission.value,
-              context: {},
-              outcome: null,
-            });
-            if (matchRes.ok && matchRes.value) {
-              matchedResponse = resp;
-              break;
-            }
-          }
-
-          if (!matchedResponse) {
-            return { ok: false, error: `Boundary exhaustion or no matching response on port '${emission.portId}' (§6)` };
-          }
-          this.usedBoundaryResponseIds.add(matchedResponse.id);
-
-          const fixtureVal = this.fixturesMap.get(matchedResponse.responseFixtureId);
-          if (fixtureVal === undefined) {
-            return { ok: false, error: `Boundary response fixture '${matchedResponse.responseFixtureId}' not found` };
-          }
-          let responsePayload = deepCloneJson(fixtureVal);
-          for (const binding of matchedResponse.payloadBindings) {
-            const reqVal = readPath(emission.value, binding.requestPath);
-            if (isMissing(reqVal)) {
-              return {
-                ok: false,
-                error: `Boundary payload binding: requestPath '${binding.requestPath.join('.')}' not found in request`,
-              };
-            }
-            const setRes = setPathInContext(responsePayload, binding.targetPath, reqVal);
-            if (!setRes.ok) return { ok: false, error: `Boundary payload binding set failed: ${setRes.error}` };
-            responsePayload = setRes.context;
-          }
-
-          const respSchema = this.schemasMap.get(boundary.schemaId);
-          if (respSchema) {
-            const valRes = validateSchemaValue(responsePayload, respSchema.shape, [], boundary.schemaId);
-            if (!valRes.ok) return { ok: false, error: `Boundary response payload failed schema` };
-          }
+          const answer = this.answerBoundary(boundary, emission.value, emission.portId, true);
+          if (!answer.ok) return answer;
+          const { response: matchedResponse, payload: responsePayload } = answer;
 
           const held: HeldBoundaryResponse = {
             response: matchedResponse,
@@ -1390,7 +1455,7 @@ export class ScenarioRunner {
       return false;
     }
 
-    const liveRoots = this.rootCounts.inFlight + this.messageCounts.inFlight;
+    const liveRoots = this.totalRootCounts().inFlight + this.messageCounts.inFlight;
     if (liveRoots > this.scenario.budgets.maxLiveRoots) {
       this.terminalStatus = 'incomplete';
       this.failureReason = this.budgetStop ??= 'Budget exhausted: maxLiveRoots limit reached';
@@ -1575,7 +1640,7 @@ export class ScenarioRunner {
       const isDrained =
         this.timedQueue.length === 0 &&
         !kernelMayStillMatter &&
-        this.rootCounts.inFlight === 0 &&
+        this.totalRootCounts().inFlight === 0 &&
         this.messageCounts.inFlight === 0 &&
         this.openFrames.size === 0;
 
@@ -1609,7 +1674,7 @@ export class ScenarioRunner {
       this.isFinished = true;
       if (this.scenario.completion.kind === 'drain') {
         const isDrained =
-          this.rootCounts.inFlight === 0 &&
+          this.totalRootCounts().inFlight === 0 &&
           this.messageCounts.inFlight === 0 &&
           this.openFrames.size === 0;
         this.terminalStatus = isDrained ? 'completed' : 'incomplete';
@@ -1697,7 +1762,8 @@ export class ScenarioRunner {
       // resolves via settleCallFrame()/kernelBridgeFrames once it reaches a reply effect.
       for (const out of delta.outputs) {
         const outConnections = this.connectionsFromSource(out.source);
-        const payload = this.recorder.payloadTable.get(out.payloadRef);
+        const payload =
+          out.payloadRef === WORKLOAD_PAYLOAD_REF ? WORKLOAD_REQUEST_PAYLOAD : this.recorder.payloadTable.get(out.payloadRef);
         if (payload === undefined) {
           // §8 "No success is inferred": never substitute a fabricated `{}` payload for
           // one that can't be resolved.
@@ -1708,6 +1774,44 @@ export class ScenarioRunner {
         }
         if (out.frameId) {
           this.kernelBridgeFrames.add(out.frameId);
+          const boundary = this.boundaryForCall(out.source);
+          if (boundary) {
+            // A resource calling out past a boundary (e.g. a service calling a third party):
+            // the boundary answers after its delay, and the reply settles the kernel's
+            // waiting op through the bridge frame, adding the connection's return latency.
+            const consume = out.payloadRef !== WORKLOAD_PAYLOAD_REF;
+            if (!consume) {
+              const outPort = this.portsMap.get(out.source.portId);
+              const shape = outPort ? this.schemasMap.get(outPort.schemaId)?.shape : undefined;
+              if (shape && !validateSchemaValue(WORKLOAD_REQUEST_PAYLOAD, shape, [], outPort!.schemaId).ok) {
+                this.terminalStatus = 'failed';
+                this.failureReason = `Traffic requests carry an empty payload, but the call from '${out.source.elementId}' requires fields; drive this call with inputs instead`;
+                this.isFinished = true;
+                return false;
+              }
+            }
+            const answer = this.answerBoundary(boundary, payload, out.source.portId, consume);
+            if (!answer.ok) {
+              this.terminalStatus = 'failed';
+              this.failureReason = answer.error;
+              this.isFinished = true;
+              return false;
+            }
+            this.timedQueue.push({
+              kind: 'resource-boundary-response',
+              atMs: (out.atMs ?? this.currentTimeMs) + (answer.response.delayMs ?? 0),
+              phase: 2,
+              sequence: ++this.globalSequence,
+              frameId: out.frameId,
+              source: out.source,
+              rootId: out.rootId,
+              journeyId: out.journeyId,
+              parentEventId: out.parentEventId,
+              payload: answer.payload,
+              outcome: answer.response.outcome,
+            });
+            continue;
+          }
         }
         for (const conn of outConnections) {
           const atMs = out.atMs ?? this.currentTimeMs;
@@ -2011,6 +2115,30 @@ export class ScenarioRunner {
         return true;
       }
 
+      case 'resource-boundary-response': {
+        this.processedEvents++;
+        const appendRes = await this.recorder.append({
+          rootId: evt.rootId,
+          journeyId: evt.journeyId,
+          parentId: evt.parentEventId,
+          elementId: evt.source.elementId,
+          portId: evt.source.portId,
+          kind: 'dispatch',
+          code: 'boundary-response',
+          payload: evt.payload,
+          atMs: evt.atMs,
+          outcome: evt.outcome,
+        });
+        if (!appendRes.ok) {
+          this.terminalStatus = 'incomplete';
+          this.failureReason = this.budgetStop ??= 'Budget exhausted: recorder cap hit';
+          this.isFinished = true;
+          return false;
+        }
+        await this.settleCallFrame(evt.frameId, evt.outcome, appendRes.event?.payloadRef ?? undefined);
+        return true;
+      }
+
       case 'boundary-response': {
         const { held } = evt;
         const mEl = this.elementsMap.get(held.machineElementId)!;
@@ -2090,7 +2218,7 @@ export class ScenarioRunner {
     if (this.scenario.mode === 'timed') {
       if (this.scenario.completion.kind === 'drain') {
         const isDrained =
-          this.rootCounts.inFlight === 0 &&
+          this.totalRootCounts().inFlight === 0 &&
           this.messageCounts.inFlight === 0 &&
           this.openFrames.size === 0;
         elapsedMs = isDrained ? this.currentTimeMs : Math.max(this.currentTimeMs, this.scenario.completion.deadlineMs);
@@ -2109,7 +2237,7 @@ export class ScenarioRunner {
     const summary: RunSummary = {
       mode: this.scenario.mode,
       consumedInputs: this.consumedInputs,
-      rootCounts: { ...this.rootCounts },
+      rootCounts: this.totalRootCounts(),
       messageCounts: { ...this.messageCounts },
       elementMetrics: metrics,
       finalStates: Array.from(this.machineStates.entries()).map(([elementId, st]) => ({
@@ -2134,6 +2262,7 @@ export class ScenarioRunner {
       processedEvents: this.processedEvents,
       elapsedMs,
       rowOutcomes: this.collectedRowOutcomes,
+      trace: { recordedRows: this.recorder.events.length, truncatedBy: this.recorder.truncatedBy },
     };
 
     const checks = evaluateAssertions(this.scenario.assertions, summary, this.recorder.events);

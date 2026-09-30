@@ -166,7 +166,7 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     expect(res.reason).toContain('Budget exhausted');
   });
 
-  it('honours maxTraceRows budget and returns incomplete', async () => {
+  it('stops recording at maxTraceRows but finishes the run; trace-count checks are unevaluated (D47)', async () => {
     const budgetDoc: Document = {
       ...s01Doc,
       scenarios: [
@@ -182,7 +182,12 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     };
 
     const res = await runScenario(budgetDoc, 'sc-rows-budget', 'run-rows-budget');
-    expect(res.status).toBe('incomplete');
-    expect(res.reason).toContain('Budget exhausted');
+    expect(res.status).toBe('completed');
+    expect(res.events).toHaveLength(2);
+    expect(res.summary.trace).toEqual({ recordedRows: 2, truncatedBy: 'trace-rows' });
+    const traceChecks = budgetDoc.scenarios[0].assertions.filter((a) => a.subject.kind === 'trace-count').map((a) => a.id);
+    expect(traceChecks.length).toBeGreaterThan(0);
+    for (const c of res.checks.filter((c) => traceChecks.includes(c.assertionId))) expect(c.status).toBe('unevaluated');
+    for (const c of res.checks.filter((c) => !traceChecks.includes(c.assertionId))) expect(c.status).toBe('passed');
   });
 });

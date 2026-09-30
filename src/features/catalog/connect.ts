@@ -254,12 +254,29 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   let sourceElementReplacement: Element | undefined = undefined;
   const newSourcePortChanges: RecordChange[] = [];
 
-  if (isRouterOrBroker && hasExistingOutgoing) {
+  // Messaging between resources (D47, closes audit G1). A service-like resource publishes
+  // to a broker through its own out:message port, and a broker delivers to a consumer's
+  // in:call entry through an out:call route port (the S02/S05 consumer shape). Both ports
+  // are added by the connect gesture, like a router's route ports.
+  const resourceType = (el: Element) => (el.behavior.kind === 'resource' ? (el.behavior.config as { type: string }).type : null);
+  const publishesToBroker =
+    resourceType(sourceElement) === 'processor' &&
+    resourceType(targetElement) === 'broker' &&
+    sourcePort.channel === 'call' &&
+    targetPort.channel === 'message';
+  const brokerDeliversToCallEntry =
+    resourceType(sourceElement) === 'broker' &&
+    targetElement.behavior.kind === 'resource' &&
+    resourceType(targetElement) !== 'broker' &&
+    sourcePort.channel === 'message' &&
+    targetPort.channel === 'call';
+
+  if ((isRouterOrBroker && hasExistingOutgoing) || publishesToBroker || brokerDeliversToCallEntry) {
     const newPortId = mintId();
     const acceptedChannel = targetPort.channel;
     const newPort: Port = {
       id: newPortId,
-      label: 'out',
+      label: publishesToBroker ? 'publish' : 'out',
       direction: 'out',
       channel: acceptedChannel,
       schemaId: targetPort.schemaId,

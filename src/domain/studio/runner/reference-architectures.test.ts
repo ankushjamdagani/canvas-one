@@ -6,9 +6,9 @@
  *
  * These tests characterise what the app does today. The real-world expectation for each
  * architecture was written in the audit before the first run. Where today's behaviour
- * differs, the test is tagged with the audit ID ([gap Hn], [gap Gn], [default], [bug Bn])
- * and asserts the current behaviour, so the change that fixes it has to rewrite the test
- * to the real-world expectation.
+ * differs, the test is tagged with the audit ID ([gap Hn], [default]) and asserts the
+ * current behaviour, so the change that fixes it has to rewrite the test to the
+ * real-world expectation. Tests tagged [fixed Bn]/[fixed G1] assert a defect's fix (D47).
  *
  * `REF_REPORT=1` prints one line per run.
  */
@@ -33,16 +33,12 @@ function mintIds(): () => Id {
   return () => `00000000-0000-4000-8000-${(n++).toString(16).padStart(12, '0')}`;
 }
 
-const isBroker = (e: Element) => e.behavior.kind === 'resource' && e.behavior.config.type === 'broker';
-
 class Arch {
   doc: Document;
   readonly viewId: Id;
   readonly mint = mintIds();
   /** Request class used by workloads and by bridge-call resource metadata. */
   readonly readClass = this.mint();
-  /** Changes the app can't make, recorded so the audit can say the architecture isn't buildable. */
-  readonly workarounds: string[] = [];
 
   constructor() {
     this.viewId = this.mint();
@@ -88,30 +84,9 @@ class Arch {
     this.apply([{ kind: 'replace', value: { recordKind: 'connection', record: { ...c, config: { ...c.config, ...patch } } as Connection } } as never]);
   }
 
-  /**
-   * Connects the way the canvas does: planConnection from the source's out port to the
-   * target element. `messaging` opts into two changes the app can't make (audit G1): a
-   * service gets an out:message port to publish to a broker, and a broker's consumer gets
-   * an in:message entry port (the kernel requires every broker route to be a message edge).
-   */
-  connect(from: Id, to: Id, messaging = false): Id {
-    let src = this.el(from);
-    const tgt = this.el(to);
-    if (messaging && isBroker(src) && tgt.behavior.kind === 'resource') {
-      const entryId = tgt.behavior.entryPortId;
-      if (tgt.ports.find((p) => p.id === entryId)!.channel === 'call') {
-        this.replaceElement({ ...tgt, ports: tgt.ports.map((p) => (p.id === entryId ? { ...p, channel: 'message' as const, responseSchemaId: null } : p)) });
-        this.workarounds.push(`${tgt.label}: entry port changed to in:message`);
-      }
-    }
-    if (messaging && isBroker(tgt) && !isBroker(src) && !src.ports.some((p) => p.direction === 'out' && p.channel === 'message')) {
-      const out = src.ports.find((p) => p.direction === 'out')!;
-      src = { ...src, ports: [...src.ports, { ...out, id: this.mint(), label: 'publish', channel: 'message' as const, responseSchemaId: null }] };
-      this.replaceElement(src);
-      this.workarounds.push(`${src.label}: out:message port added`);
-    }
-    const outs = src.ports.filter((p) => p.direction === 'out');
-    const out = (isBroker(tgt) ? outs.filter((p) => p.channel === 'message') : outs).at(-1)!;
+  /** Connects the way the canvas does (CanvasView handleConnectEnd): planConnection from the source's first non-event out port to the target element. */
+  connect(from: Id, to: Id): Id {
+    const out = this.el(from).ports.find((p) => p.direction === 'out' && p.channel !== 'event')!;
     const r = planConnection({ document: this.doc, viewId: this.viewId, source: { elementId: from, portId: out.id }, target: { elementId: to }, mintId: this.mint });
     if (r.kind === 'rejected') throw new Error(JSON.stringify(r.issues));
     if (r.kind === 'ready') {
@@ -126,7 +101,7 @@ class Arch {
 
   /** Tries a connection exactly as the canvas would, with no workaround; returns the rejection text. */
   tryConnect(from: Id, to: Id): string | null {
-    const out = this.el(from).ports.find((p) => p.direction === 'out')!;
+    const out = this.el(from).ports.find((p) => p.direction === 'out' && p.channel !== 'event')!;
     const r = planConnection({ document: this.doc, viewId: this.viewId, source: { elementId: from, portId: out.id }, target: { elementId: to }, mintId: this.mint });
     return r.kind === 'rejected' ? r.issues.map((i) => i.message).join('; ') : null;
   }
@@ -142,9 +117,8 @@ const uniformKeys = { kind: 'uniform' as const, catalogSize: 1000, hotSubset: 1,
 
 /**
  * Timed scenario with one workload, workload timeout 30 s (TrafficSection's default).
- * Completion is a horizon at `seconds`: drain completion keeps arrivals going to its
- * deadline (bug B2). Budgets are the contracted maxima (storage.md §6); each test keeps
- * its run under the trace cap and checks `completed` (B7).
+ * Completion defaults to a horizon at `seconds`. Budgets are the contracted maxima
+ * (storage.md §6) so the traces the tests read stay complete.
  */
 function scenario(
   a: Arch,
@@ -188,7 +162,7 @@ function metric(r: Run, key: string, elementId: Id | null = null, scope: 'root' 
 
 type Outcomes = { generated: number; succeeded: number; rejected: number; failed: number; expired: number; inFlight: number; meanMs: number };
 
-/** Root (or message) outcomes from the metrics; `summary.rootCounts` misses workload roots (B3). */
+/** Root (or message) outcomes from the adapter's metrics. */
 function outcomes(r: Run, scope: 'root' | 'message' = 'root'): Outcomes {
   const m = (k: string) => metric(r, k, null, scope);
   return {
@@ -209,7 +183,7 @@ function rootsSettled(r: Run, outcome: string, elementId?: Id): number {
 function report(a: Arch, r: Run): void {
   if (process.env.REF_REPORT !== '1') return;
   const els = a.doc.elements.filter((e) => e.behavior.kind === 'resource').map((e) => `${e.label} u=${metric(r, 'utilization', e.id).toFixed(2)}`).join(', ');
-  console.info(`[ref] ${a.doc.title} | ${r.status}${r.reason ? ` (${r.reason})` : ''} | roots ${JSON.stringify(outcomes(r))} | msgs ${JSON.stringify(outcomes(r, 'message'))} | ${els} | rows ${r.events.length}${a.workarounds.length ? ` | workarounds: ${a.workarounds.join('; ')}` : ''}`);
+  console.info(`[ref] ${a.doc.title} | ${r.status}${r.reason ? ` (${r.reason})` : ''} | roots ${JSON.stringify(outcomes(r))} | msgs ${JSON.stringify(outcomes(r, 'message'))} | ${els} | rows ${r.events.length}`);
 }
 
 /** A linear call chain, each element placed from the catalog and optionally reconfigured. */
@@ -240,7 +214,7 @@ describe('A1 cache in front of a database', () => {
     expect(o.rejected + o.failed + o.expired).toBe(0);
   });
 
-  it('defaults: at 20% hits requests are rejected, but by the API service one-slot hold, not the database [gap H11, bug B5]', async () => {
+  it('defaults: at 20% hits requests are rejected, but by the API service one-slot hold, not the database [gap H11]', async () => {
     const { a, ids } = chain('A1 defaults h20', ['service', 'cache', 'database'], [{}, { hitRate: 20 }]);
     const r = await run(a, scenario(a, ids[0], { rate: 800, seconds: 4 }));
     expect(r.status).toBe('completed');
@@ -248,10 +222,10 @@ describe('A1 cache in front of a database', () => {
     expect(rejected).toBeGreaterThan(500);
     expect(rootsSettled(r, 'rejected', ids[0])).toBe(rejected);
     // The database has headroom; the service in front of it fills its queue because it
-    // holds its only slot for the whole miss path. Its utilization only counts its own
-    // 0.5 ms of work, so it reads as lightly loaded (B5).
+    // holds its only slot for the whole miss path. Utilization counts held slots (B5 fixed),
+    // so the service shows as the saturated element.
     expect(metric(r, 'utilization', ids[2])).toBeLessThan(0.85);
-    expect(metric(r, 'utilization', ids[0])).toBeLessThan(0.5);
+    expect(metric(r, 'utilization', ids[0])).toBeGreaterThan(0.95);
   });
 
   it('realistic: the database saturates when the hit rate drops from 80% to 40%', async () => {
@@ -277,17 +251,25 @@ describe('A2 queue absorbs a burst', () => {
     const wk = a.place('worker', 'Worker');
     if (Object.keys(queue).length) a.set(q, queue);
     if (Object.keys(worker).length) a.set(wk, worker);
-    for (const c of [a.connect(api, q, true), a.connect(q, wk, true)]) if (Object.keys(message).length) a.setConn(c, message);
+    const publish = a.connect(api, q); // the message's TTL is set where it is published
+    a.connect(q, wk);
+    if (Object.keys(message).length) a.setConn(publish, message);
     return { a, api };
   }
 
-  it('the app cannot connect a service to a queue, or a queue to a worker [gap G1]', () => {
+  it('the canvas connects a service to a queue and a queue to a worker [fixed G1]', () => {
     const a = new Arch();
     const api = a.place('service');
     const q = a.place('queue');
     const wk = a.place('worker');
-    expect(a.tryConnect(api, q)).toMatch(/Channel mismatch/);
-    expect(a.tryConnect(q, wk)).toMatch(/Channel mismatch/);
+    expect(a.tryConnect(api, q)).toBeNull();
+    a.connect(api, q);
+    expect(a.tryConnect(q, wk)).toBeNull();
+    a.connect(q, wk);
+    const [publish, deliver] = a.doc.connections;
+    expect([publish.kind, deliver.kind]).toEqual(['message', 'call']);
+    expect(a.el(api).ports.find((p) => p.id === publish.source.portId)).toMatchObject({ label: 'publish', channel: 'message' });
+    expect(a.el(q).ports.find((p) => p.id === deliver.source.portId)).toMatchObject({ direction: 'out', channel: 'call' });
   });
 
   it('defaults: 2x the worker rate fills the 500-message queue limit and publishes fail [default]', async () => {
@@ -374,8 +356,8 @@ describe('A5 fan-out', () => {
     a.doc = { ...a.doc, title: `A5 ${kind}` };
     const api = a.place('service', 'API');
     const b = a.place(kind, kind);
-    a.connect(api, b, true);
-    for (const n of [1, 2, 3]) a.connect(b, a.place('worker', `Consumer ${n}`), true);
+    a.connect(api, b);
+    for (const n of [1, 2, 3]) a.connect(b, a.place('worker', `Consumer ${n}`));
     const r = await run(a, scenario(a, api, { rate: 30, seconds: 10 }));
     expect(r.status).toBe('completed');
     // A few publishes are still in flight at the horizon, so compare per-root ratios.
@@ -537,10 +519,11 @@ describe('A11 batch into a pipeline (S03)', () => {
 });
 
 describe('A12 service calling a third party', () => {
-  it('under traffic, a boundary behind a service fails the run [bug B8]', async () => {
+  async function callThirdParty(delayMs: number, outcome: 'succeeded' | 'failed') {
     const a = new Arch();
-    a.doc = { ...a.doc, title: 'A12' };
+    a.doc = { ...a.doc, title: `A12 ${delayMs} ms ${outcome}` };
     const svc = a.place('service', 'Payments API');
+    a.set(svc, { concurrency: 16 });
     a.connect(svc, a.place('thirdparty', 'Card processor'));
     const out = a.el(svc).ports.find((p) => p.direction === 'out')!;
     const schemaId = out.responseSchemaId!;
@@ -554,13 +537,30 @@ describe('A12 service calling a third party', () => {
         scopeElementIds: [svc],
         boundaries: [{
           id: a.mint(), source: { elementId: svc, portId: out.id }, schemaId,
-          responses: [{ id: a.mint(), match: { op: 'all', guards: [] }, responseFixtureId: response.id, payloadBindings: [], delayMs: 200, afterInputId: null, outcome: 'succeeded' }],
+          responses: [{ id: a.mint(), match: { op: 'exists', value: { kind: 'literal', value: true } }, responseFixtureId: response.id, payloadBindings: [], delayMs, afterInputId: null, outcome }],
         }],
       })),
     };
     const r = await run(a, id);
-    expect(r.status).toBe('failed');
-    expect(r.reason).toMatch(/unresolvable payload 'payload-workload'/);
+    expect(r.status).toBe('completed');
+    return { r, o: outcomes(r) };
+  }
+
+  it('a slow third party shows up as caller latency [fixed B8]', async () => {
+    const fast = await callThirdParty(10, 'succeeded');
+    const slow = await callThirdParty(200, 'succeeded');
+    expect(fast.o.succeeded).toBeGreaterThan(30);
+    expect(slow.o.failed + slow.o.rejected).toBe(0);
+    // One response answers every traffic request (D47); latency = service time + delay.
+    expect(fast.o.meanMs).toBeCloseTo(10.5, 0);
+    expect(slow.o.meanMs).toBeCloseTo(200.5, 0);
+  });
+
+  it('a failing third party fails the caller [fixed B8]', async () => {
+    const { o } = await callThirdParty(50, 'failed');
+    expect(o.generated).toBeGreaterThan(30);
+    expect(o.succeeded).toBe(0);
+    expect(o.failed).toBe(o.generated - o.inFlight);
   });
 });
 
@@ -568,29 +568,32 @@ describe('A12 service calling a third party', () => {
 // Runner and metric defects found while building the architectures
 // ============================================================================
 
-describe('Runner defects in timed workload runs', () => {
-  // Reached here with the G1 workaround (consumer entry port changed to in:message); in the
-  // app a queue can't feed a worker at all.
-  it('a workload entering a queue passes readiness, then the run fails [bug B1]', async () => {
+describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the fix)', () => {
+  it('a workload entering a queue runs; its messages reach the consumer [fixed B1]', async () => {
     const a = new Arch();
     const q = a.place('queue');
-    a.connect(q, a.place('worker'), true);
-    const r = await run(a, scenario(a, q, { rate: 10, seconds: 2 }));
-    expect(r.status).toBe('failed');
-    expect(r.reason).toMatch(/Cannot resolve journey for delivered message unit/);
+    a.connect(q, a.place('worker'));
+    const r = await run(a, scenario(a, q, { rate: 10, seconds: 5 }));
+    expect(r.status).toBe('completed');
+    const roots = outcomes(r);
+    const messages = outcomes(r, 'message');
+    expect(roots.generated).toBeGreaterThan(30);
+    expect(roots.failed + roots.rejected + roots.expired).toBe(0);
+    expect(messages.succeeded).toBeGreaterThanOrEqual(roots.succeeded - 1);
   });
 
-  it('drain completion keeps arrivals going past arrivalHorizonMs to the drain deadline [bug B2]', async () => {
+  it('drain completion stops arrivals at arrivalHorizonMs and runs on to drain [fixed B2]', async () => {
     const a = new Arch();
     const svc = a.place('service');
     const r = await run(a, scenario(a, svc, { rate: 50, seconds: 10, completion: { kind: 'drain', arrivalHorizonMs: 10000, deadlineMs: 20000 } }));
-    // The contract stops arrivals at 10 s (~500); they continue to the 20 s deadline.
-    const lateAdmissions = r.events.filter((e) => e.kind === 'dispatch' && e.code === 'admitted' && e.atMs! > 10000).length;
-    expect(lateAdmissions).toBeGreaterThan(300);
-    expect(outcomes(r).generated).toBeGreaterThan(800);
+    expect(r.status).toBe('completed');
+    const admissions = r.events.filter((e) => e.kind === 'dispatch' && e.code === 'admitted');
+    expect(admissions.every((e) => e.atMs! <= 10000)).toBe(true);
+    expect(Math.abs(outcomes(r).generated - 500)).toBeLessThan(100); // Poisson(500), SD ~22
+    expect(r.summary.rootCounts.inFlight).toBe(0);
   });
 
-  it('summary.rootCounts stays at zero for workload roots, so root-count assertions read 0 [bug B3]', async () => {
+  it('summary.rootCounts includes workload roots, so root-count assertions see them [fixed B3]', async () => {
     const a = new Arch();
     const svc = a.place('service');
     a.set(svc, { capacity: 10, queueLimit: 0 });
@@ -600,31 +603,38 @@ describe('Runner defects in timed workload runs', () => {
       scenarios: a.doc.scenarios.map((x) => ({ ...x, assertions: [{ ...x.assertions[0], label: 'nothing rejected', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'rejected' } }] })),
     };
     const r = await run(a, id);
-    expect(rootsSettled(r, 'rejected')).toBeGreaterThan(50);
-    expect(r.summary.rootCounts).toEqual({ generated: 0, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 0 });
-    // "rejected = 0" passes although over 50 requests were rejected.
-    expect(r.checks[0]).toMatchObject({ status: 'passed', actual: 0 });
+    const rejected = rootsSettled(r, 'rejected');
+    expect(rejected).toBeGreaterThan(50);
+    const c = r.summary.rootCounts;
+    expect(c.rejected).toBe(rejected);
+    expect(c.generated).toBe(outcomes(r).generated);
+    expect(c.succeeded + c.rejected + c.failed + c.expired + c.inFlight).toBe(c.generated);
+    expect(r.checks[0]).toMatchObject({ status: 'failed', actual: rejected });
   });
 
-  it('a root rejected at admission is counted twice in the root metrics [bug B4]', async () => {
+  it('a root rejected at admission is counted once, and root counts conserve [fixed B4]', async () => {
     const a = new Arch();
     const svc = a.place('service');
     a.set(svc, { capacity: 10, queueLimit: 0 });
     const r = await run(a, scenario(a, svc, { rate: 50, seconds: 4 }));
     const o = outcomes(r);
-    expect(o.rejected).toBe(2 * rootsSettled(r, 'rejected'));
-    expect(o.succeeded + o.rejected + o.failed + o.expired + o.inFlight).toBeGreaterThan(o.generated);
+    expect(o.rejected).toBe(rootsSettled(r, 'rejected'));
+    expect(o.succeeded + o.rejected + o.failed + o.expired + o.inFlight).toBe(o.generated);
   });
 
-  it('default budgets end a 50/s, 30 s run as incomplete after ~1,400 requests [B7]', async () => {
+  it('default budgets stop recording the trace, not the run: a 50/s, 30 s run completes [fixed B7]', async () => {
     const a = new Arch();
     const svc = a.place('service');
     a.connect(svc, a.place('database'));
     const id = scenario(a, svc, { rate: 50, seconds: 30 });
     a.doc = { ...a.doc, scenarios: a.doc.scenarios.map((x) => ({ ...x, budgets: DEFAULT_SCENARIO_BUDGETS })) };
     const r = await run(a, id);
-    expect(r.status).toBe('incomplete');
-    expect(r.reason).toBe('Budget exhausted: recorder cap hit');
-    expect(outcomes(r).generated).toBeLessThan(1500);
+    expect(r.status).toBe('completed');
+    expect(r.summary.trace).toEqual({ recordedRows: DEFAULT_SCENARIO_BUDGETS.maxTraceRows, truncatedBy: 'trace-rows' });
+    expect(r.events).toHaveLength(DEFAULT_SCENARIO_BUDGETS.maxTraceRows);
+    const c = r.summary.rootCounts;
+    // ~1,500 over 30 s (1,546 with this seed); the old cap stopped the run at ~1,400.
+    expect(c.generated).toBeGreaterThan(1450);
+    expect(c.succeeded + c.rejected + c.failed + c.expired + c.inFlight).toBe(c.generated);
   });
 });
