@@ -63,7 +63,6 @@ export function NodeCard({ data, selected }: NodeProps) {
         isConnectable={Boolean(connectable) && hasInPort}
         data-testid={`node-handle-target-${element.id}`}
         className={cn(
-          '!size-2 !border-none',
           connectable && hasInPort
             ? '!bg-primary opacity-90'
             : '!bg-control-border opacity-40 !pointer-events-none',
@@ -116,7 +115,6 @@ export function NodeCard({ data, selected }: NodeProps) {
         isConnectable={Boolean(connectable) && hasOutPort}
         data-testid={`node-handle-source-${element.id}`}
         className={cn(
-          '!size-2 !border-none',
           connectable && hasOutPort
             ? '!bg-primary opacity-90'
             : '!bg-control-border opacity-40 !pointer-events-none',

@@ -337,9 +337,9 @@ body {
   border-radius: 8px;
 }
 .react-flow__handle {
-  height: 7px;
-  width: 7px;
-  border: 1px solid var(--background);
+  height: 8px;
+  width: 8px;
+  border: none;
   background: var(--primary);
 }
 /* Selection is action green plus a heavier stroke, never colour alone (design.md). */
