@@ -1,6 +1,6 @@
 # Plan: validate that components and connections behave like the real thing
 
-2026-09-30. Status: phases 1–2 done (see [realism-audit.md](realism-audit.md)); phase 3 next. Requested by the user after the RV-18 discussion showed that one catalog pairing (router → state machine) would have produced plausible but wrong results. Nothing here is implemented.
+2026-09-30. Status: phases 1–3 done (see [realism-audit.md](realism-audit.md)). Phase 3 found runner defects B1–B8, which come before phase 4's change list. Requested by the user after the RV-18 discussion showed that one catalog pairing (router → state machine) would have produced plausible but wrong results. Nothing here is implemented.
 
 ## Goal
 

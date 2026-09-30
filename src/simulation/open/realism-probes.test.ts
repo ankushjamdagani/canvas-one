@@ -1,6 +1,8 @@
 /**
  * Realism audit probes (specs/revamp/realism-audit.md, phase 1). Evidence, not a gate:
  * they print what the kernel does in a few familiar situations and assert nothing.
+ * They use the legacy `behaviorDefaults`, not the app's catalog defaults; phase 3
+ * (src/domain/studio/runner/reference-architectures.test.ts) uses the app's own.
  * Skipped in the normal suite. Run:
  *   REALISM_PROBES=1 npx vitest run src/simulation/open/realism-probes.test.ts --silent=false
  */

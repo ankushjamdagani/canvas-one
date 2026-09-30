@@ -1,6 +1,10 @@
 # Realism audit
 
-Phase 1 (claim audit), 2026-09-30, `master`. Plan: [plan-realism-validation.md](plan-realism-validation.md). Phase 2 (oracles) is done: the kernel matches queueing theory everywhere it was tested (below). Phase 3 (reference architectures) hasn't started, and the per-entry verdicts stay **provisional** until it runs.
+Phases 1–3, 2026-09-30. Plan: [plan-realism-validation.md](plan-realism-validation.md).
+- Phase 2 (oracles): the kernel matches queueing theory everywhere it was tested.
+- Phase 3 (reference architectures) found that phase 1 probed the wrong defaults (see "Correction to phase 1"). It also found eight runner, metric and connect defects, B1–B8, and they come ahead of the modelling issues in "Ranked issues".
+
+The per-entry verdicts below are phase 1's, with the phase 3 corrections noted where they differ.
 
 Evidence comes from three places:
 - **Kernel code** (`src/simulation/open/kernel.ts`, `src/domain/execution.ts`, `src/domain/behaviorDefaults.ts`).
@@ -129,10 +133,14 @@ Legend: **F** faithful · **S** simplified, honest · **M** misleading.
 
 Each item is for the user to decide. Items that change kernel behaviour or defaults change run results; batch them into one kernel version bump (see the plan, "Consequences").
 
+**Before any model change: fix defects B1–B8** (phase 3, "Defects"). They're bugs against the existing contracts, not modelling choices. B3 and B4 make the Results panel wrong for every traffic run today. B2 changes which arrivals happen in drain runs, so drain runs stored before the fix should be marked stale.
+
+Modelling issues, updated by phase 3:
+
 1. **H11 (gateway, balancer, firewall and client throughput collapse).** The most common architecture drawn in this app, clients → gateway or balancer → services, gives wrong failure verdicts at ordinary loads once links have realistic latency.
    - *Options:* (a) routers and client kinds don't hold a slot while waiting (event-driven proxy model); (b) raise the concurrency cap (e.g. to 1,024) and adjust defaults.
    - *Recommend:* (a) for router and client kinds, plus (b) for services and databases.
-2. **H12 (message TTL 2 s).** Queues can't buffer, so "a queue absorbs the burst", a core pattern, fails. *Recommend:* default TTL of 5 minutes for queue/stream edges; keep it editable and labelled.
+2. **H12 (message TTL: 10 s in the app, not 2 s as phase 1 said).** Queues buffer only about 10 s of backlog, and the default queue limit of 500 fills first (A2), so "a queue absorbs the burst", a core pattern, fails. *Recommend:* default TTL of 5 minutes for queue/stream edges; keep it editable and labelled.
 3. **H13 (no caller retries).**
    - *Recommend:* a call-edge retry policy (max attempts, timeout, exponential backoff with jitter) applied by the caller to rejections, failures and timeouts.
    - The node-level random-failure retry would become the element's own failure behaviour only.
@@ -144,8 +152,10 @@ Each item is for the user to decide. Items that change kernel behaviour or defau
    - dns → unmodeled or a latency-only hop;
    - warehouse and search defaults lowered;
    - state-machine and pipeline "no processing time" note;
-   - inert source fields hidden;
-   - cdn fixed-mode note.
+   - inert source fields hidden (moot: traffic and scheduler are unmodeled in the app);
+   - cdn fixed-mode note, and default caches to LRU, because fixed mode ignores hot keys (A8);
+   - database write capacity below read capacity by default (A6).
+8. **G1 (messaging can't be drawn).** Services have only call ports, the catalog queue's output is `message` and the worker's input is `call`, so the canvas rejects service → queue and queue → worker ("Channel mismatch"). Only a state machine can publish (S02/S05). The catalog.md open item 11 already doubted the `out:message` broker default. *Recommend:* give processors an out:message port (or let Connect add one, as it does for router routes), and let a broker route into a processor's entry, with the kernel treating it as a message delivery.
 
 ## Phase 3: reference architectures (2026-09-30)
 
@@ -186,3 +196,54 @@ Phase 3 builds every architecture with the app's own `placeEntry` and `planConne
 | A12 | Third-party boundary | A slow boundary response shows as caller latency; a failed one as caller failure. | Holds, with the scripted delay as a constant | Holds |
 
 Predicted defaults failures: A2, A3, A5 (stream), A6, A8, A9, and A7 once links have latency. That's more than the four phase 1 predicted; A6 and A8 are default issues, not model gaps.
+
+### Results
+
+All twelve were run on 2026-09-30. Tests: `src/domain/studio/runner/reference-architectures.test.ts` (29 tests, about 3 s, part of the normal suite; `REF_REPORT=1` prints one line per run). A run that differs from the real-world expectation is tagged in the test name and asserts today's behaviour, so the fix has to rewrite it.
+
+| # | Defaults | Realistic | Observed | Cause |
+|---|---|---|---|---|
+| A1 | Holds at 80% hits. At 20% hits requests are rejected, but at the API service, not the database. | Holds | Default h20: database 70% busy, while the 1-slot API service fills its queue because it holds its slot for the whole miss path. Realistic: database utilisation goes from under 0.6 to 1.0, and latency rises about 70× (2.8 ms to 205 ms) as hits drop from 80% to 40%. | H11, B5 |
+| A2 | **Fails** | Holds | Default: at 2× the worker rate, over 500 publishes are rejected and each fails its API request. With room in the queue, the 10 s TTL expires the backlog. Realistic (limit 10,000, TTL 5 min): no losses, backlog above 1,000. The "drains afterwards" half can't be run (B2, and only steady profiles exist). Not buildable in the app (G1). | Default queue limit, H12, G1 |
+| A3 | **Can't be expressed** | Same | `maxRetries` 0 vs 3 under overload: identical rejections, zero retries. Node retries cover only the element's own random failures; callers never retry. | H13 |
+| A4 | Holds | — | S04's topology with catalog defaults, 100/s: 47–51 failures per seed (expected 50), all inside the 1 s detection window, none after | — |
+| A5 | Pub/sub holds; **stream fails** | Same | Pub/sub: 3 messages per request. Stream: 1, split between consumers. Not buildable in the app (G1). | H14, G1 |
+| A6 | **Fails** | Holds | Default: 20% and 80% write mixes give identical results. Writes costing 5×: the write-heavy mix saturates and rejects. | Default |
+| A7 | Trivially holds at 0 ms. **Collapses** with 5 ms links. | Holds | 0 ms: mean below 3 ms. 5 ms defaults: about 31/s pass at a 100/s load (1-slot hold for a 32 ms round trip) and the mean exceeds 1 s. Realistic: 32.0 ms mean, exactly 2 × 3 × 5 + 4 × 0.5. A 60 ms timeout expires requests at 90/s and none at 20/s. | H2, H11 |
+| A8 | **Fails** | Holds | Fixed mode: hot and uniform keys hit identically. LRU: hot keys 87%, uniform 1%. | Default mode |
+| A9 | **Fails** | Holds up to the cap | Default: 44/s with 1, 4 or 8 replicas. 16 gateway slots: 50 per replica, linear to 8. | H11 |
+| A10 | Holds | Holds | Checkout reply at 10 ms with a 1 ms or a 1 s fulfilment worker | — |
+| A11 | Holds | Holds | The schema-mismatch row goes to `errors`; totals are emitted | — |
+| A12 | **Fails to run** | Same | A traffic-driven service calling a third-party boundary fails the run | B8 |
+
+Predictions against results: ten of the twelve defaults predictions held. The two that didn't:
+- **A1:** predicted to hold, but rejections land at the API service because of H11.
+- **A12:** predicted to hold, but the run fails because of B8.
+
+### Defects
+
+Found while building the architectures. Each has a test tagged with its ID.
+
+| ID | Defect | Effect | Where |
+|---|---|---|---|
+| B1 | A workload whose entry is a queue passes readiness, then the run fails: "Cannot resolve journey for delivered message unit" | Traffic straight into a queue can't run. Reached with the G1 workaround; in the app a queue can't feed a worker at all. | `resource-adapter.ts` `registerMessageCreated` |
+| B2 | Drain completion gives the kernel `deadlineMs` as the duration, so arrivals continue past `arrivalHorizonMs` to the deadline | Arrivals run the whole window, so burst-then-drain can't be expressed. A run with a backlog at the deadline ends `incomplete` (A2 exploration); a light one completes. The `arrivalHorizonMs` check only covers external inputs. | `scenario-runner.ts` 582 (duration), 1749 (inputs only); `resource-adapter.ts` 332 |
+| B3 | `summary.rootCounts` counts only external-input roots. Workload roots appear only in the root metrics. | **The Results panel's roots and failures figures, the CSV export and every root-count assertion read 0 for traffic runs.** An assertion like "rejected = 0" passes with over 50 rejections. The drain check also reads `rootCounts.inFlight`, so drain can report completion while workload roots are unsettled, unless a pending kernel event holds it open. | `scenario-runner.ts` 165–175, 701, 1578, 2112; `ResultsRegion.tsx` 145, 240, 250, 398–407; `csv-export.ts` 229; `assertions.ts` 94 |
+| B4 | A root rejected at admission is counted twice in the root metrics: once on the kernel's `rejected` fact and again on `unit_settled` | Rejections shown as double, and the counts no longer add up | `resource-adapter.ts` 555–557 and 566–579 (`admit()` at 708 counts once) |
+| B5 | Element utilization counts only the element's own work, not a slot held waiting downstream | A service that rejects everything because its slots are held reads 2–20% busy | kernel utilization, adapter element metrics |
+| B6 | *(withdrawn: a test error; `hotShare` is a percentage and the editor labels it so)* | — | — |
+| B7 | The trace cap ends the run: default budgets (10,000 rows) stop any traffic run after about 1,300–1,400 requests with "Budget exhausted: recorder cap hit"; the maximum budget (100,000 rows, 16 MiB) stopped these tests' runs at about 42,000 rows, 16 MiB of trace | 50/s for 30 s can't complete on defaults. This follows storage.md §6 ("stop at the first cap"), so it's a contract decision. *Recommend:* past the trace cap, stop recording rows but keep running and counting, and mark the trace as truncated. | `scenario-runner.ts` recorder cap |
+| B8 | A traffic-driven service calling a third-party boundary fails the run: "Bridge dispatch … referenced an unresolvable payload 'payload-workload'" | "Service calls Stripe" can't run under load | `scenario-runner.ts` 1705 (payload lookup); `resource-adapter.ts` 551, 562 set `'payload-workload'`, which has no payload |
+
+Not a defect, but noted: a per-element count of generated, succeeded, rejected, failed and expired isn't among the element metrics; only queued, active and utilization are. The tests read per-root outcomes from the trace.
+
+### Verdict changes from phase 1
+
+- **client, mobile, device, traffic and scheduler:** H7 and H16 withdrawn. These are unmodeled in the app, so the verdict is F (honest).
+- **queue and stream:** still M. The TTL is 10 s rather than 2 s; the default queue limit of 500 binds first (A2); stream delivery is H14 (A5). Neither can be drawn in the app (G1).
+- **database:** S, but the write-heavy claim needs write capacity below read capacity by default (A6).
+- **cache and cdn:** the LRU mode is F (A8); fixed mode is S → M as a default, because it can't show hot keys.
+- **gateway, balancer and firewall:** M confirmed (A9); failover itself is F (A4).
+- **service:** S → M confirmed (A7, A1).
+- **state-machine and data-pipeline:** F for logic (A10, A11).
+- **thirdparty:** F behind a machine; **broken behind a traffic-driven service** (B8).
