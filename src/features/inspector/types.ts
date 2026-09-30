@@ -92,6 +92,8 @@ export type DraftHandle = {
   readonly label: string;
   readonly kindTag: string;
   readonly notSimulated: boolean;
+  readonly layer?: import('../workspace/projection').CatalogLayer | null;
+  readonly stripeColor?: string | null;
 };
 
 export type ValidateDraftResult = {

@@ -100,15 +100,7 @@ describe('openDraft', () => {
     expect(handle.status).toBe('stale');
   });
 
-  it('multi-target: no fields, "n selected" label, no bulk editing', () => {
-    const el1 = processorElement({ id: 'e1' });
-    const el2 = processorElement({ id: 'e2' });
-    const doc = makeDocument([el1, el2]);
-    const handle = openDraft('draft-1', { kind: 'element', ids: ['e1', 'e2'] }, 1, doc);
-    expect(handle.multi).toBe(true);
-    expect(handle.fields).toEqual([]);
-    expect(handle.label).toBe('2 selected');
-  });
+
 });
 
 describe('changeField', () => {

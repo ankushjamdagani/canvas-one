@@ -14,6 +14,7 @@
 import * as React from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { computeTagColors } from '../../components/studio/tokens';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
@@ -90,10 +91,15 @@ export function InspectorPanel({
                 data-testid="inspector-kind-tag"
                 className={cn(
                   'inline-flex items-center px-1.5 py-0.5 rounded-tag border text-[10px] font-mono font-medium tracking-wide',
-                  draft.notSimulated
+                  draft.notSimulated || !draft.stripeColor
                     ? 'border-control-border text-secondary-text bg-sunken'
-                    : 'border-control-border text-body bg-sunken',
+                    : '',
                 )}
+                style={(!draft.notSimulated && draft.stripeColor) ? {
+                  backgroundColor: computeTagColors(draft.stripeColor).backgroundColor,
+                  borderColor: computeTagColors(draft.stripeColor).borderColor,
+                  color: computeTagColors(draft.stripeColor).color,
+                } : undefined}
               >
                 {draft.kindTag}
               </span>

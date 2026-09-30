@@ -2283,7 +2283,9 @@ export function Workspace({
 
         {/* RV-05b inspector: 320px right dock >= 768px (commands.md §7); a full-width
             bottom sheet below 768px, same content and guard. */}
-        {draft && !isMobileInspector ? (
+        {/* A multi-selection keeps its draft (it is the selection) but shows no
+            inspector: board 16D has only the selection toolbar (D44 O2). */}
+        {draft && !draft.multi && !isMobileInspector ? (
           <InspectorPanel
             draft={draft}
             measured={measuredSection}
@@ -2317,7 +2319,7 @@ export function Workspace({
         ) : null}
       </div>
 
-      {draft && isMobileInspector && panelState.activeOverlay !== 'library' && panelState.activeOverlay !== 'history' ? (
+      {draft && !draft.multi && isMobileInspector && panelState.activeOverlay !== 'library' && panelState.activeOverlay !== 'history' ? (
         <div
           data-testid="inspector-sheet-overlay"
           // RV-05b review round 1: an explicit h-[70vh] (not just max-h) gives the

@@ -1,6 +1,7 @@
 /** 16D selection-scoped actions, routed through the command registry. */
 
 import * as React from 'react';
+import { useStore } from '@xyflow/react';
 import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,6 +63,84 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
   const [groupOpen, setGroupOpen] = React.useState(false);
   const [groupLabel, setGroupLabel] = React.useState('');
   const [groupError, setGroupError] = React.useState<string | null>(null);
+  
+  const selectedIds = React.useMemo(() => [
+    ...(context.selectedPlacementIds ?? []),
+    ...context.selectedGroupIds,
+  ], [context.selectedPlacementIds, context.selectedGroupIds]);
+  
+  const [tx, ty, tZoom] = useStore((s) => s.transform);
+  const rect = useStore((s) => {
+    const nodes = selectedIds.map(id => s.nodeLookup.get(id)).filter((n): n is NonNullable<typeof n> => !!n);
+    if (nodes.length === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      const x = n.position.x;
+      const y = n.position.y;
+      const w = n.measured?.width ?? n.width ?? 184;
+      const h = n.measured?.height ?? n.height ?? 76;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    });
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }, (a, b) => a?.x === b?.x && a?.y === b?.y && a?.width === b?.width && a?.height === b?.height);
+
+  const [viewportWidth, setViewportWidth] = React.useState(() => typeof window === 'undefined' ? 1280 : window.innerWidth);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const canvasWidth = useStore((s) => s.width);
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const measure = () => setToolbarWidth(el.offsetWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  const isFixed = isCoarse || viewportWidth < 640;
+
+  let style: React.CSSProperties = {};
+  if (isFixed || !rect) {
+    style = { top: '12px', right: '12px' };
+  } else {
+    const screenX = rect.x * tZoom + tx;
+    const screenY = rect.y * tZoom + ty;
+    const screenWidth = rect.width * tZoom;
+    const screenHeight = rect.height * tZoom;
+    
+    // Centred above the selection, clamped inside the canvas with 12 px margins
+    // (the toolbar's own measured width keeps both edges on screen).
+    const centerX = screenX + screenWidth / 2;
+    const half = toolbarWidth / 2;
+    const clampedX = canvasWidth > 0 && toolbarWidth > 0
+      ? Math.min(Math.max(centerX, 12 + half), Math.max(12 + half, canvasWidth - 12 - half))
+      : centerX;
+    style = {
+      left: `${clampedX}px`,
+      transform: 'translate(-50%, 0)',
+    };
+    if (screenY >= 60) {
+      style.top = `${screenY - 12}px`;
+      style.transform = 'translate(-50%, -100%)';
+    } else {
+      style.top = `${screenY + screenHeight + 12}px`;
+    }
+  }
+
+  // Then the component continues as normal.
   const groupAvailability = getAvailability('selection.group', context, { label: groupLabel });
   const ungroupAvailability = getAvailability('selection.ungroup', context, {
     groupIds: context.selectedGroupIds,
@@ -122,8 +201,10 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
 
   return (
     <div
+      ref={toolbarRef}
       data-testid="selection-toolbar"
-      className="absolute top-3 right-3 z-10 flex flex-wrap justify-end items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
+      className="absolute z-10 flex flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
+      style={style}
     >
       <span
         data-testid="selection-count"
@@ -132,7 +213,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         {count} {count === 1 ? 'PART' : 'PARTS'}
       </span>
 
-      <Popover
+<Popover
         open={groupOpen}
         onOpenChange={(open) => {
           setGroupOpen(open);
@@ -184,7 +265,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         </PopoverContent>
       </Popover>
 
-      {context.selectedGroupIds.length === 1 && (
+{context.selectedGroupIds.length === 1 && (
         <Button
           data-testid="selection-ungroup-btn"
           type="button"
@@ -215,7 +296,10 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         </Button>
       )}
 
-      <DropdownMenu>
+
+
+
+<DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button data-testid="selection-align-btn" type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs">
             Align <ChevronDown className="size-3.5" />
@@ -260,7 +344,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button
+<Button
         data-testid="selection-duplicate-btn"
         type="button"
         variant="ghost"
@@ -273,8 +357,11 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
       >
         <Copy className="size-4" />
       </Button>
+      
 
-      <Button
+      <div className="w-[1px] h-6 bg-divider mx-0.5" />
+
+<Button
         data-testid="selection-delete-btn"
         type="button"
         variant="ghost"
@@ -287,6 +374,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
       >
         <Trash2 className="size-4" />
       </Button>
+      
     </div>
   );
 }
