@@ -1,3 +1,4 @@
+import { filterHistorySteps } from './historyFilter';
 /**
  * HistoryController implementation for System Studio (RV-11a).
  *
@@ -797,6 +798,31 @@ export class HistoryController {
       return null;
     }
   }
+  async getCommitsTouching(elementIds: readonly Id[]): Promise<ReadonlySet<Id>> {
+    if (elementIds.length === 0) return new Set();
+    const matching = new Set<Id>();
+    if (!this.lastSyncedProjectId) return matching;
+    
+    const steps = await Promise.all(this.state.commits.map(async (commit) => {
+      if (commit.parentIds.length !== 1) return null;
+      const parentCommit = this.state.commits.find((c) => c.id === commit.parentIds[0]);
+      if (!parentCommit) return null;
+      
+      const [parentSnap, commitSnap] = await Promise.all([
+        this.repository.loadSnapshot(this.lastSyncedProjectId!, parentCommit.snapshotId),
+        this.repository.loadSnapshot(this.lastSyncedProjectId!, commit.snapshotId),
+      ]);
+      
+      if (!parentSnap || !commitSnap) return null;
+      return { id: commit.id, parentSnapshot: parentSnap.document, snapshot: commitSnap.document };
+    }));
+    
+    const validSteps = steps.filter((s): s is NonNullable<typeof s> => s !== null);
+    const filtered = filterHistorySteps(validSteps, elementIds);
+    for (const step of filtered) matching.add(step.id);
+    return matching;
+  }
+
 }
 
 /**
@@ -813,4 +839,5 @@ export type HistoryControllerLike = Pick<
   | 'commit'
   | 'loadCommitPreview'
   | 'getCommitDiffSummary'
+  | 'getCommitsTouching'
 >;

@@ -1,3 +1,5 @@
+import { createSelectionExport } from './exportSelection';
+import { planAddProbe } from './addProbePlan';
 import * as React from 'react';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
@@ -1444,6 +1446,8 @@ export function Workspace({
   // ==========================================================================
 
   const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
+  const [captureRequested, setCaptureRequested] = React.useState<number>(0);
+  const [historyFilter, setHistoryFilter] = React.useState<readonly string[]>([]);
   const [duplicateDialog, setDuplicateDialog] = React.useState<DuplicateDialogState | null>(null);
   const [duplicateApplying, setDuplicateApplying] = React.useState(false);
 
@@ -1555,6 +1559,22 @@ export function Workspace({
         csv: transferActions.getDisabledReason('csv'),
         mermaid: transferActions.getDisabledReason('mermaid'),
       },
+      selectionHasRefinement: selectedElementIds.size === 1 && (() => {
+        const id = Array.from(selectedElementIds)[0];
+        const doc = document;
+        if (!doc) return false;
+        return doc.refinements.some((r: any) => r.ownerElementId === id || r.memberElementIds.includes(id));
+      })(),
+      selectedElementScenarioScope: selectedElementIds.size === 1 && (() => {
+        const id = Array.from(selectedElementIds)[0];
+        return selectedEntry ? (selectedEntry as any).scopeElementIds.includes(id) : false;
+      })(),
+      selectedElementHasOutPort: selectedElementIds.size === 1 && (() => {
+        const id = Array.from(selectedElementIds)[0];
+        const element = document?.elements.find((e: any) => e.id === id);
+        return element ? element.ports.some((p: any) => p.direction === 'out') : false;
+      })(),
+      selectedScenarioMode: selectedEntry ? selectedEntry.mode : null,
     };
   }, [
     branches,
@@ -1756,6 +1776,63 @@ export function Workspace({
         document && activeViewId
           ? applySelectionPlan(planAlign(document, activeViewId, commandContext.selectedElementIds, edge, canvasViewRef.current?.getMeasuredHeights()))
           : { ok: false, message: 'No canvas view is open' },
+            'history.show-changes': (payload) => {
+        const ids = payload.elementIds ?? Array.from(selectedElementIds);
+        executeCommand('history.open', {}, commandContext, commandHandlers);
+        setHistoryFilter(ids);
+        return { ok: true } as any;
+      },
+      'selection.add-probe': (payload) => {
+        if (!document) return { ok: false, message: 'No document' };
+        const id = Array.from(selectedElementIds)[0];
+        if (!id || !selectedEntry) return { ok: false, message: 'No selection or scenario' };
+        const scenario = document.scenarios.find(s => s.id === selectedEntry.scenarioId);
+        if (!scenario) return { ok: false, message: 'Scenario not found' };
+
+        const plan = planAddProbe(document, scenario, id, mintId);
+        if (plan.disabledReason) return { ok: false, message: plan.disabledReason };
+
+        const live = session.getState();
+        if (!live.document || live.workingRevision === null) return { ok: false, message: 'no-live' };
+        
+        let handle = openScenarioDraft({
+          draftId: mintId(),
+          target: { kind: 'edit', scenarioId: scenario.id },
+          document: live.document,
+          baseWorkingRevision: live.workingRevision,
+          mintId,
+          randomSource,
+        });
+
+        if (plan.patch) {
+          handle = changeScenarioDraft(handle, live.document, plan.patch);
+        }
+
+        setDraft(null);
+        setFocusFieldId(null);
+        setScenarioEditorFocusName(false);
+        setScenarioDraft(handle);
+
+        return { ok: true } as any;
+      },
+      'selection.replace-part': (payload) => { return { ok: true } as any; },
+      'selection.export': (payload) => {
+        if (!document) return { ok: false, message: 'No document' };
+        if (!activeViewId) return { ok: false, message: 'No active view' };
+        const ids = payload.elementIds ?? Array.from(selectedElementIds);
+        if (ids.length === 0) return { ok: false, message: 'No selection' };
+        
+        const exportResult = createSelectionExport(document, activeViewId, ids, mintId);
+        if (!exportResult.ok) {
+          return { ok: false, message: exportResult.message };
+        }
+        
+        createBrowserDownloadSink()(
+          new Blob([exportResult.bytes.slice().buffer as ArrayBuffer], { type: "application/json;charset=utf-8" }),
+          'selection.system-studio-part.json'
+        );
+        return { ok: true } as any;
+      },
       'selection.distribute': ({ axis }) =>
         document && activeViewId
           ? applySelectionPlan(planDistribute(document, activeViewId, commandContext.selectedElementIds, axis, canvasViewRef.current?.getMeasuredHeights()))
@@ -1774,7 +1851,12 @@ export function Workspace({
           ? applySelectionPlan(planAddNote(document, activeViewId, mintId(), text, point))
           : { ok: false, message: 'No canvas view is open' };
       },
-      'part.capture': ({ command }) => session.savePart(command),
+      'part.capture': ({ command }) => {
+        if (command) return session.savePart(command);
+        openLibraryPanel();
+        setCaptureRequested(Date.now());
+        return { ok: true } as any; // executeCommand expects ExecuteResult, but for UI flows it can be ok
+      },
       'part.place': ({ content, label }) => placeSavedPart(content, label),
       'part.export': (part) => downloadSavedPart(repository, session.getState().projectId as Id, part),
       'part.import': ({ command }) => session.savePart(command),
@@ -1944,6 +2026,7 @@ export function Workspace({
             viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[]}
             blockedReason={partsBlockedReason}
             captureBlockedReason={captureBlockedReason}
+            captureRequested={captureRequested}
             execute={runCommand} searchQuery={searchQuery} view={view}
           />}
           onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}

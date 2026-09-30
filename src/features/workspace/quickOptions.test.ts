@@ -13,6 +13,10 @@ const MAIN = 'b0000000-0000-4000-8000-000000000001';
 const DRAFT = 'b0000000-0000-4000-8000-000000000002';
 
 const context: CommandContext = {
+  selectionHasRefinement: false,
+  selectedElementScenarioScope: false,
+  selectedElementHasOutPort: false,
+  selectedScenarioMode: null,
   projectId: 'a0000000-0000-4000-8000-000000000001',
   projectTitle: 'Checkout path',
   branchId: DRAFT,

@@ -65,6 +65,13 @@ function defaultSubject(): DraftAssertionSubject {
 
 export function AssertionsSection({ document, scenario, onChange, mintId, lastRunChecks, issues = [] }: AssertionsSectionProps) {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const prevCount = React.useRef(scenario.assertions.length);
+  React.useEffect(() => {
+    if (scenario.assertions.length > prevCount.current) {
+      setExpandedId(scenario.assertions[scenario.assertions.length - 1].id);
+    }
+    prevCount.current = scenario.assertions.length;
+  }, [scenario.assertions]);
   const elements = React.useMemo(() => allElementOptions(document), [document]);
   const outputPorts = React.useMemo(() => [...inboundEndpointOptions(document), ...outboundEndpointOptions(document)], [document]);
 

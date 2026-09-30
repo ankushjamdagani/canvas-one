@@ -41,7 +41,8 @@ export function routeHistoryController(
     getState: controller.getState,
     subscribe: controller.subscribe,
     loadCommitPreview: () => controller.loadCommitPreview(),
-    getCommitDiffSummary: (commitId) => controller.getCommitDiffSummary(commitId),
+    getCommitDiffSummary: controller.getCommitDiffSummary.bind(controller),
+    getCommitsTouching: controller.getCommitsTouching.bind(controller),
     saveCheckpoint: async (label) =>
       unwrap<Awaited<ReturnType<HistoryController['saveCheckpoint']>>>(await run('history.checkpoint', { label })),
     restore: async (targetId, label) =>

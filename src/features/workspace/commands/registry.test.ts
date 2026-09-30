@@ -59,7 +59,7 @@ function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
     scenarioCount: 1,
     selectedScenario: { id: SCENARIO, label: 'Peak checkout', notReadyReason: null },
     runAllBlockedReason: null,
-    exportDisabledReasons: { png: null, svg: null, json: null, csv: 'Run a scenario first', mermaid: null },
+    selectionHasRefinement: false, selectedElementScenarioScope: false, selectedElementHasOutPort: false, selectedScenarioMode: null, exportDisabledReasons: { png: null, svg: null, json: null, csv: 'Run a scenario first', mermaid: null },
     ...overrides,
   };
 }

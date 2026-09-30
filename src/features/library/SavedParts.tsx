@@ -61,6 +61,8 @@ export type SavedPartsProps = {
   blockedReason: string | null;
   /** Registry reason for `part.capture`, e.g. no selection. */
   captureBlockedReason: string | null;
+  /** Timestamp when capture was externally requested. */
+  captureRequested?: number;
   /** Runs `part.capture|place|export|import` through the command registry. */
   execute: <K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>;
 };
@@ -76,6 +78,7 @@ export function SavedParts({
   noteIds,
   blockedReason,
   captureBlockedReason,
+  captureRequested,
   execute,
   searchQuery,
   view,
@@ -96,42 +99,8 @@ export function SavedParts({
   const pendingCapture = React.useRef<PartCaptureCommand | null>(null);
   const fileInput = React.useRef<HTMLInputElement>(null);
   const disabled = busy || state.status !== "ready" || Boolean(blockedReason);
-  React.useEffect(() => {
-    let cancelled = false;
-    setParts([]);
-    if (state.projectId)
-      void repository
-        .listParts(state.projectId)
-        .then((rows) => {
-          if (!cancelled) setParts(rows);
-        })
-        .catch((error) => {
-          if (!cancelled) setMessage(formatStudioError(error));
-        });
-    return () => {
-      cancelled = true;
-    };
-  }, [repository, state.projectId, state.projectRevision]);
-  React.useEffect(() => {
-    setPreview(null);
-    setRetry(null);
-    setMessage("");
-    pendingCapture.current = null;
-  }, [state.projectId, state.branchId]);
-  const latest = new Map<string, PartRecord>();
-  for (const part of parts)
-    if ((latest.get(part.id)?.revision ?? 0) < part.revision)
-      latest.set(part.id, part);
-  const query = searchQuery.trim().toLocaleLowerCase();
-  const visible = [...latest.values()]
-    .filter((part) =>
-      `${part.label} ${part.description} saved parts`
-        .toLocaleLowerCase()
-        .includes(query),
-    )
-    .sort((a, b) => a.label.localeCompare(b.label));
 
-  const review = async () => {
+  const review = React.useCallback(async () => {
     const current = session.getState();
     if (
       !current.projectId ||
@@ -168,7 +137,49 @@ export function SavedParts({
     } finally {
       setBusy(false);
     }
-  };
+  }, [session, repository, viewId, elementIds, noteIds]);
+
+  React.useEffect(() => {
+    if (captureRequested && captureRequested > 0 && !disabled && !captureBlockedReason) {
+      void review();
+    }
+  }, [captureRequested, disabled, captureBlockedReason, review]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setParts([]);
+    if (state.projectId)
+      void repository
+        .listParts(state.projectId)
+        .then((rows) => {
+          if (!cancelled) setParts(rows);
+        })
+        .catch((error) => {
+          if (!cancelled) setMessage(formatStudioError(error));
+        });
+    return () => {
+      cancelled = true;
+    };
+  }, [repository, state.projectId, state.projectRevision]);
+  React.useEffect(() => {
+    setPreview(null);
+    setRetry(null);
+    setMessage("");
+    pendingCapture.current = null;
+  }, [state.projectId, state.branchId]);
+  const latest = new Map<string, PartRecord>();
+  for (const part of parts)
+    if ((latest.get(part.id)?.revision ?? 0) < part.revision)
+      latest.set(part.id, part);
+  const query = searchQuery.trim().toLocaleLowerCase();
+  const visible = [...latest.values()]
+    .filter((part) =>
+      `${part.label} ${part.description} saved parts`
+        .toLocaleLowerCase()
+        .includes(query),
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   const save = async () => {
     if (!preview) return;
     const source = preview.source;

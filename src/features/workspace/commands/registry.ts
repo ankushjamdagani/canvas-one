@@ -125,6 +125,10 @@ export const COMMAND_IDS = [
   'part.import',
   'canvas.expand',
   'canvas.collapse',
+  'selection.replace-part',
+  'selection.add-probe',
+  'history.show-changes',
+  'selection.export',
 ] as const;
 
 export type CommandId = (typeof COMMAND_IDS)[number];
@@ -199,12 +203,32 @@ export interface CommandPayloads {
   'selection.distribute': { readonly axis: 'x' | 'y' };
   'canvas.add-note': { readonly text: string };
   /** The bound branch envelope keeps the operation id, so a retry stays idempotent (§2). */
-  'part.capture': { readonly command: PartCaptureCommand };
+  'part.capture': { readonly command?: PartCaptureCommand };
   'part.place': { readonly content: PartContent; readonly label: string };
   'part.export': { readonly partId: Id; readonly revision: number; readonly label: string };
   'part.import': { readonly command: PartImportCommand };
   'canvas.expand': CanvasExpansionPayload;
   'canvas.collapse': CanvasExpansionPayload;
+  'selection.replace-part': {
+    readonly viewId?: Id;
+    readonly elementId?: Id;
+    readonly entryId?: Id;
+    readonly replacementElementId?: Id;
+    readonly dependencyPreviewId?: Id;
+  };
+  'selection.add-probe': {
+    readonly scenarioId?: Id;
+    readonly elementId?: Id;
+  };
+  'history.show-changes': {
+    readonly elementIds?: readonly Id[];
+  };
+  'selection.export': {
+    readonly viewId?: Id;
+    readonly elementIds?: readonly Id[];
+    readonly noteIds?: readonly Id[];
+    readonly dependencyPreviewId?: Id;
+  };
 }
 
 export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
@@ -381,6 +405,15 @@ export interface CommandContext {
   /** First not-ready scenario's reason, or null when every scenario can run. */
   readonly runAllBlockedReason: string | null;
   readonly exportDisabledReasons: Readonly<Record<TransferExportKind, string | null>>;
+  
+  /** True if the single selected element owns or belongs to a refinement. */
+  readonly selectionHasRefinement: boolean;
+  /** True if the single selected element is in the active scenario's scope. */
+  readonly selectedElementScenarioScope: boolean;
+  /** True if the single selected element has at least one out port. */
+  readonly selectedElementHasOutPort: boolean;
+  /** Mode of the selected scenario. */
+  readonly selectedScenarioMode: 'logical' | 'timed' | null;
 }
 
 // ============================================================================
@@ -1119,6 +1152,80 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: expansionAvailability('collapse'),
   },
+  'selection.replace-part': {
+    id: 'selection.replace-part',
+    label: 'Replace part…',
+    keywords: ['replace', 'swap', 'component', 'part'],
+    group: 'selection',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      if (ctx.selectedElementIds.length !== 1) {
+        return disabled('invalid-selection', 'Select exactly one component to replace');
+      }
+      if (ctx.selectionHasRefinement) {
+        return disabled('invalid-selection', 'Cannot replace a component that owns or belongs to a refinement');
+      }
+      return ENABLED;
+    },
+  },
+  'selection.add-probe': {
+    id: 'selection.add-probe',
+    label: 'Add flow probe',
+    keywords: ['probe', 'flow', 'check', 'assertion', 'scenario'],
+    group: 'selection',
+    iconKey: 'results',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      if (ctx.selectedElementIds.length !== 1) {
+        return disabled('invalid-selection', 'Select exactly one component to probe');
+      }
+      if (!ctx.selectedScenario || !ctx.selectedScenarioMode) {
+        return disabled('not-ready', 'Select a scenario first');
+      }
+      if (!ctx.selectedElementScenarioScope) {
+        return disabled('invalid-selection', 'This component is not in the scenario scope');
+      }
+      if (ctx.selectedScenarioMode === 'logical' && !ctx.selectedElementHasOutPort) {
+        return disabled('invalid-selection', 'This component has no output port to probe');
+      }
+      return ENABLED;
+    },
+  },
+  'history.show-changes': {
+    id: 'history.show-changes',
+    label: 'Changes on this part',
+    keywords: ['history', 'changes', 'part', 'component'],
+    group: 'review',
+    iconKey: 'history',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
+  'selection.export': {
+    id: 'selection.export',
+    label: 'Export selection',
+    keywords: ['export', 'download', 'part', 'component'],
+    group: 'export',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
 };
 
 // ============================================================================
@@ -1147,7 +1254,14 @@ export function getAvailability<K extends CommandId>(
  * saved-part buttons); these ignore their payload when deciding.
  */
 export function getPayloadFreeAvailability(
-  id: 'part.capture' | 'part.place' | 'part.import',
+  id:
+    | 'part.capture'
+    | 'part.place'
+    | 'part.import'
+    | 'selection.replace-part'
+    | 'selection.add-probe'
+    | 'history.show-changes'
+    | 'selection.export',
   ctx: CommandContext,
 ): Availability {
   return (COMMAND_DEFINITIONS[id].availability as (ctx: CommandContext) => Availability)(ctx);

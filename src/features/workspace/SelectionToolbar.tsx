@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   getAvailability,
+  getPayloadFreeAvailability,
   type CommandContext,
   type CommandPayloads,
   type ExecuteResult,
@@ -30,7 +31,12 @@ export type CanvasAuthoringCommandId =
   | 'selection.distribute'
   | 'canvas.add-note'
   | 'canvas.expand'
-  | 'canvas.collapse';
+  | 'canvas.collapse'
+  | 'part.capture'
+  | 'selection.replace-part'
+  | 'selection.add-probe'
+  | 'history.show-changes'
+  | 'selection.export';
 
 export type CanvasCommandExecutor = <K extends CanvasAuthoringCommandId>(
   id: K,
@@ -344,7 +350,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
         </DropdownMenuContent>
       </DropdownMenu>
 
-<Button
+      <Button
         data-testid="selection-duplicate-btn"
         type="button"
         variant="ghost"
@@ -357,7 +363,57 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
       >
         <Copy className="size-4" />
       </Button>
-      
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button data-testid="selection-overflow-btn" type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs">
+            Selection <ChevronDown className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel>SELECTION</DropdownMenuLabel>
+          {[
+            ['part.capture', 'Save as component'],
+            ['selection.replace-part', 'Replace part…'],
+            ['selection.add-probe', 'Add flow probe'],
+            ['history.show-changes', 'Changes on this part'],
+          ].map(([id, label]) => {
+            const availability = getPayloadFreeAvailability(id as any, context);
+            return (
+              <DropdownMenuItem
+                key={id}
+                data-testid={`selection-overflow-${id.replace('.', '-')}`}
+                disabled={!availability.enabled}
+                title={availability.enabled ? undefined : availability.reason}
+                onSelect={() => void executeCommand(id as any, {} as any)}
+                className="text-xs"
+              >
+                <span>{label}</span>
+                {!availability.enabled && <span className="ml-auto text-[10px] truncate max-w-[120px]">{availability.reason}</span>}
+              </DropdownMenuItem>
+            );
+          })}
+          <DropdownMenuSeparator />
+          {[
+            ['selection.export', 'Export selection'],
+          ].map(([id, label]) => {
+            const availability = getPayloadFreeAvailability(id as any, context);
+            return (
+              <DropdownMenuItem
+                key={id}
+                data-testid={`selection-overflow-${id.replace('.', '-')}`}
+                disabled={!availability.enabled}
+                title={availability.enabled ? undefined : availability.reason}
+                onSelect={() => void executeCommand(id as any, {} as any)}
+                className="text-xs"
+              >
+                <span>{label}</span>
+                {!availability.enabled && <span className="ml-auto text-[10px] truncate max-w-[120px]">{availability.reason}</span>}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <div className="w-[1px] h-6 bg-divider mx-0.5" />
 

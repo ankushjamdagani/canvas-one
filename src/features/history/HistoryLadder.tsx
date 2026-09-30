@@ -55,6 +55,8 @@ export interface HistoryLadderProps {
   readonly onEditMain?: () => void;
   readonly onComparePublication?: (publication: Readonly<PublicationRecord>) => void;
   readonly onClose?: () => void;
+  readonly filterIds?: readonly string[];
+  readonly onClearFilter?: () => void;
   readonly className?: string;
   /** PanelHost already supplies the panel title, controls, and outer chrome. */
   readonly hosted?: boolean;
@@ -86,6 +88,8 @@ export function HistoryLadder({
   onEditMain,
   onComparePublication,
   onClose,
+  filterIds,
+  onClearFilter,
   className,
   hosted = false,
 }: HistoryLadderProps): React.JSX.Element {
@@ -110,6 +114,27 @@ export function HistoryLadder({
   const commits = propCommits ?? controllerState?.commits ?? [];
   const publications = propPublications ?? controllerState?.publications ?? [];
   const orderedPublications = [...publications].sort((a, b) => b.ordinal - a.ordinal);
+
+  const [matchingCommits, setMatchingCommits] = React.useState<ReadonlySet<string> | null>(null);
+  React.useEffect(() => {
+    if (!filterIds || filterIds.length === 0) {
+      setMatchingCommits(null);
+      return;
+    }
+    if (controller) {
+      let isMounted = true;
+      void controller.getCommitsTouching(filterIds).then((matching) => {
+        if (isMounted) setMatchingCommits(matching);
+      });
+      return () => { isMounted = false; };
+    }
+  }, [filterIds, controller]);
+
+  const displayCommits = React.useMemo(() => {
+    if (!matchingCommits) return commits;
+    return commits.filter(c => matchingCommits.has(c.id));
+  }, [commits, matchingCommits]);
+
   const currentPublication = orderedPublications[0];
   const publishedMain = isMain && currentPublication !== undefined;
 
@@ -498,7 +523,7 @@ export function HistoryLadder({
             <span id="commits-header">COMMITS ({commits.length})</span>
           </div>
 
-          {commits.length === 0 ? (
+          {displayCommits.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">No commits on this branch yet</p>
           ) : (
             <div className="space-y-2">
