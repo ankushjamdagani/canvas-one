@@ -1,5 +1,3 @@
-import { createSelectionExport } from './exportSelection';
-import { planAddProbe } from './addProbePlan';
 import * as React from 'react';
 import type { SessionController } from '../session/controller';
 import { formatStudioError } from '../session/formatError';
@@ -56,6 +54,11 @@ import { NewScenarioDialog, type NewScenarioDialogProps } from '../scenarios/New
 import { ScenarioSwitcher, type ScenarioSwitcherEntry } from '../scenarios/ScenarioSwitcher';
 import type { ScenarioDraftHandle } from '../scenarios/types';
 import { createBrowserDownloadSink, useTransferActions } from '../transfer';
+import { sanitizeFilenameStem } from '../transfer/filename';
+import { createSelectionExport } from './exportSelection';
+import { planAddProbe } from './addProbePlan';
+import { planReplacePart } from './replacePlan';
+import { ReplacePartDialog } from './ReplacePartDialog';
 import {
   computeSessionRunDisabledReason,
   readScenarioSelection,
@@ -762,6 +765,7 @@ export function Workspace({
       setDraft(null);
       setFocusFieldId(null);
       setScenarioEditorFocusName(focusName);
+      setScenarioEditorFocusAssertionId(null);
       setScenarioDraft(
         openScenarioDraft({
           draftId: mintId(),
@@ -804,6 +808,7 @@ export function Workspace({
       setDraft(null);
       setFocusFieldId(null);
       setScenarioEditorFocusName(false);
+      setScenarioEditorFocusAssertionId(null);
       setScenarioDraft(
         openScenarioDraft({
           draftId: mintId(),
@@ -1452,8 +1457,12 @@ export function Workspace({
   // ==========================================================================
 
   const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
+  // 16D overflow state: a Library capture review request, History's part filter, the
+  // part being replaced, and the flow-probe check to open expanded.
   const [captureRequested, setCaptureRequested] = React.useState<number>(0);
-  const [historyFilter, setHistoryFilter] = React.useState<readonly string[]>([]);
+  const [historyFilter, setHistoryFilter] = React.useState<readonly Id[]>([]);
+  const [replaceTargetId, setReplaceTargetId] = React.useState<Id | null>(null);
+  const [scenarioEditorFocusAssertionId, setScenarioEditorFocusAssertionId] = React.useState<Id | null>(null);
   const [duplicateDialog, setDuplicateDialog] = React.useState<DuplicateDialogState | null>(null);
   const [duplicateApplying, setDuplicateApplying] = React.useState(false);
 
@@ -1494,6 +1503,19 @@ export function Workspace({
     }
     return { id: null, state: 'clean' };
   }, [draft, scenarioDraft]);
+
+  // 16D overflow availability inputs: the single selected element and the scenario a
+  // flow probe would be added to (the switcher's selection, else the first scenario).
+  const singleSelectedElement = React.useMemo(() => {
+    if (!document || selectedElementIds.size !== 1) return null;
+    const [id] = selectedElementIds;
+    return document.elements.find((e) => e.id === id) ?? null;
+  }, [document, selectedElementIds]);
+  const probeScenario = React.useMemo(() => {
+    if (!document) return null;
+    const id = selectedScenarioId ?? document.scenarios[0]?.id;
+    return document.scenarios.find((s) => s.id === id) ?? null;
+  }, [document, selectedScenarioId]);
 
   // Read-only context for availability; built from workspace state, never the DOM.
   const commandContext: CommandContext = React.useMemo(() => {
@@ -1566,22 +1588,19 @@ export function Workspace({
         csv: transferActions.getDisabledReason('csv'),
         mermaid: transferActions.getDisabledReason('mermaid'),
       },
-      selectionHasRefinement: selectedElementIds.size === 1 && (() => {
-        const id = Array.from(selectedElementIds)[0];
-        const doc = document;
-        if (!doc) return false;
-        return doc.refinements.some((r: any) => r.ownerElementId === id || r.memberElementIds.includes(id));
-      })(),
-      selectedElementScenarioScope: selectedElementIds.size === 1 && (() => {
-        const id = Array.from(selectedElementIds)[0];
-        return selectedEntry ? (selectedEntry as any).scopeElementIds.includes(id) : false;
-      })(),
-      selectedElementHasOutPort: selectedElementIds.size === 1 && (() => {
-        const id = Array.from(selectedElementIds)[0];
-        const element = document?.elements.find((e: any) => e.id === id);
-        return element ? element.ports.some((p: any) => p.direction === 'out') : false;
-      })(),
-      selectedScenarioMode: selectedEntry ? selectedEntry.mode : null,
+      selectionHasRefinement: Boolean(
+        singleSelectedElement &&
+          document?.refinements.some(
+            (r) => r.ownerElementId === singleSelectedElement.id || r.memberElementIds.includes(singleSelectedElement.id),
+          ),
+      ),
+      selectedElementScenarioScope: Boolean(
+        singleSelectedElement && probeScenario?.scopeElementIds.includes(singleSelectedElement.id),
+      ),
+      selectedElementHasOutPort: Boolean(
+        singleSelectedElement?.ports.some((p) => p.direction === 'out' && p.channel !== 'event'),
+      ),
+      selectedScenarioMode: probeScenario?.mode ?? null,
     };
   }, [
     branches,
@@ -1605,6 +1624,9 @@ export function Workspace({
     selectedGroupIds,
     selectionWhollyUngrouped,
     selectionHasRefinementMember,
+    singleSelectedElement,
+    probeScenario,
+    document,
     sessionRunDisabledReason,
     sessionState.branchId,
     sessionState.canRedo,
@@ -1797,62 +1819,63 @@ export function Workspace({
         document && activeViewId
           ? applySelectionPlan(planAlign(document, activeViewId, commandContext.selectedElementIds, edge, canvasViewRef.current?.getMeasuredHeights()))
           : { ok: false, message: 'No canvas view is open' },
-            'history.show-changes': (payload) => {
-        const ids = payload.elementIds ?? Array.from(selectedElementIds);
-        executeCommand('history.open', {}, commandContext, commandHandlers);
+      // 16D overflow (commands.md "Selection-scoped actions", D46).
+      'selection.save-as-component': () => {
+        openLibraryPanel();
+        setCaptureRequested((n) => n + 1);
+        return { ok: true };
+      },
+      'history.show-changes': () => {
+        const ids = [...selectedElementIds];
+        if (ids.length === 0) return { ok: false, message: 'Select one or more components first' };
         setHistoryFilter(ids);
-        return { ok: true } as any;
+        runGuarded(() => panelDispatch({ type: 'OPEN', panel: 'history' }));
+        return { ok: true };
       },
-      'selection.add-probe': (payload) => {
-        if (!document) return { ok: false, message: 'No document' };
-        const id = Array.from(selectedElementIds)[0];
-        if (!id || !selectedEntry) return { ok: false, message: 'No selection or scenario' };
-        const scenario = document.scenarios.find(s => s.id === selectedEntry.scenarioId);
-        if (!scenario) return { ok: false, message: 'Scenario not found' };
-
-        const plan = planAddProbe(document, scenario, id, mintId);
-        if (plan.disabledReason) return { ok: false, message: plan.disabledReason };
-
+      'selection.add-probe': () => {
         const live = session.getState();
-        if (!live.document || live.workingRevision === null) return { ok: false, message: 'no-live' };
-        
-        let handle = openScenarioDraft({
-          draftId: mintId(),
-          target: { kind: 'edit', scenarioId: scenario.id },
-          document: live.document,
-          baseWorkingRevision: live.workingRevision,
-          mintId,
-          randomSource,
+        const element = singleSelectedElement;
+        if (!live.document || live.workingRevision === null || !element || !probeScenario) {
+          return { ok: false, message: 'Select one component and a scenario first' };
+        }
+        const plan = planAddProbe(live.document, probeScenario, element.id, mintId);
+        if (!plan.ok) return { ok: false, message: plan.reason };
+        runGuarded(() => {
+          const opened = openScenarioDraft({
+            draftId: mintId(),
+            target: { kind: 'edit', scenarioId: probeScenario.id },
+            document: live.document!,
+            baseWorkingRevision: live.workingRevision!,
+            mintId,
+            randomSource: Math.random,
+          });
+          setDraft(null);
+          setFocusFieldId(null);
+          setScenarioEditorFocusName(false);
+          setScenarioEditorFocusAssertionId(plan.check.id);
+          setScenarioDraft(changeScenarioDraft(opened, live.document!, plan.patch));
         });
-
-        if (plan.patch) {
-          handle = changeScenarioDraft(handle, live.document, plan.patch);
-        }
-
-        setDraft(null);
-        setFocusFieldId(null);
-        setScenarioEditorFocusName(false);
-        setScenarioDraft(handle);
-
-        return { ok: true } as any;
+        return { ok: true };
       },
-      'selection.replace-part': (payload) => { return { ok: true } as any; },
-      'selection.export': (payload) => {
-        if (!document) return { ok: false, message: 'No document' };
-        if (!activeViewId) return { ok: false, message: 'No active view' };
-        const ids = payload.elementIds ?? Array.from(selectedElementIds);
-        if (ids.length === 0) return { ok: false, message: 'No selection' };
-        
-        const exportResult = createSelectionExport(document, activeViewId, ids, mintId);
-        if (!exportResult.ok) {
-          return { ok: false, message: exportResult.message };
-        }
-        
+      'selection.replace-part': () => {
+        if (!singleSelectedElement) return { ok: false, message: 'Select exactly one component to replace' };
+        setReplaceTargetId(singleSelectedElement.id);
+        return { ok: true };
+      },
+      'selection.export': () => {
+        if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+        const ids = [...selectedElementIds];
+        if (ids.length === 0) return { ok: false, message: 'Select one or more components first' };
+        const label = ids.length === 1
+          ? document.elements.find((e) => e.id === ids[0])?.label ?? 'Selection'
+          : `${ids.length} components`;
+        const exported = createSelectionExport(document, activeViewId, ids, [], mintId(), label);
+        if (!exported.ok) return { ok: false, message: exported.message };
         createBrowserDownloadSink()(
-          new Blob([exportResult.bytes.slice().buffer as ArrayBuffer], { type: "application/json;charset=utf-8" }),
-          'selection.system-studio-part.json'
+          new Blob([exported.bytes.slice().buffer as ArrayBuffer], { type: 'application/json;charset=utf-8' }),
+          `${sanitizeFilenameStem(label)}.system-studio-part.json`,
         );
-        return { ok: true } as any;
+        return { ok: true };
       },
       'selection.distribute': ({ axis }) =>
         document && activeViewId
@@ -1872,12 +1895,7 @@ export function Workspace({
           ? applySelectionPlan(planAddNote(document, activeViewId, mintId(), text, point))
           : { ok: false, message: 'No canvas view is open' };
       },
-      'part.capture': ({ command }) => {
-        if (command) return session.savePart(command);
-        openLibraryPanel();
-        setCaptureRequested(Date.now());
-        return { ok: true } as any; // executeCommand expects ExecuteResult, but for UI flows it can be ok
-      },
+      'part.capture': ({ command }) => session.savePart(command),
       'part.place': ({ content, label }) => placeSavedPart(content, label),
       'part.export': (part) => downloadSavedPart(repository, session.getState().projectId as Id, part),
       'part.import': ({ command }) => session.savePart(command),
@@ -2022,6 +2040,8 @@ export function Workspace({
             commitBlockedReason={commitBlockedReason}
             publishBlockedReason={publishBlockedReason}
             onOpenPublish={() => void openPublishFlow()}
+            filterIds={historyFilter}
+            onClearFilter={() => setHistoryFilter([])}
             behindMain={
               behindMainInfo
                 ? {
@@ -2418,6 +2438,7 @@ export function Workspace({
               mintId={mintId}
               lastRunChecks={scenarioEditorChecks}
               focusName={scenarioEditorFocusName}
+              focusAssertionId={scenarioEditorFocusAssertionId}
             />
           </aside>
         ) : null}
@@ -2463,6 +2484,7 @@ export function Workspace({
             mintId={mintId}
             lastRunChecks={scenarioEditorChecks}
             focusName={scenarioEditorFocusName}
+              focusAssertionId={scenarioEditorFocusAssertionId}
           />
         </div>
       ) : null}
@@ -2486,6 +2508,19 @@ export function Workspace({
         confirming={deletingScenario}
       />
 
+      <ReplacePartDialog
+        targetLabel={replaceTargetId ? (document?.elements.find((e) => e.id === replaceTargetId)?.label ?? null) : null}
+        plan={(entryId) =>
+          document && activeViewId && replaceTargetId
+            ? planReplacePart(document, activeViewId, replaceTargetId, entryId, mintId)
+            : { ok: false, reason: 'The component to replace is no longer on the canvas' }
+        }
+        onConfirm={async (plan) => {
+          const applied = await handleApplyChanges([...plan.changes], 'Replace part');
+          return applied ? { ok: true } : { ok: false, message: 'Could not save the replacement' };
+        }}
+        onClose={() => setReplaceTargetId(null)}
+      />
       <QuickOptionsDialog
         open={quickOptionsOpen}
         onOpenChange={setQuickOptionsOpen}

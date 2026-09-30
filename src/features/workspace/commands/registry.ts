@@ -126,6 +126,7 @@ export const COMMAND_IDS = [
   'part.import',
   'canvas.expand',
   'canvas.collapse',
+  'selection.save-as-component',
   'selection.replace-part',
   'selection.add-probe',
   'history.show-changes',
@@ -211,32 +212,21 @@ export interface CommandPayloads {
   'selection.distribute': { readonly axis: 'x' | 'y' };
   'canvas.add-note': { readonly text: string };
   /** The bound branch envelope keeps the operation id, so a retry stays idempotent (§2). */
-  'part.capture': { readonly command?: PartCaptureCommand };
+  'part.capture': { readonly command: PartCaptureCommand };
   'part.place': { readonly content: PartContent; readonly label: string };
   'part.export': { readonly partId: Id; readonly revision: number; readonly label: string };
   'part.import': { readonly command: PartImportCommand };
   'canvas.expand': CanvasExpansionPayload;
   'canvas.collapse': CanvasExpansionPayload;
-  'selection.replace-part': {
-    readonly viewId?: Id;
-    readonly elementId?: Id;
-    readonly entryId?: Id;
-    readonly replacementElementId?: Id;
-    readonly dependencyPreviewId?: Id;
-  };
-  'selection.add-probe': {
-    readonly scenarioId?: Id;
-    readonly elementId?: Id;
-  };
-  'history.show-changes': {
-    readonly elementIds?: readonly Id[];
-  };
-  'selection.export': {
-    readonly viewId?: Id;
-    readonly elementIds?: readonly Id[];
-    readonly noteIds?: readonly Id[];
-    readonly dependencyPreviewId?: Id;
-  };
+  // 16D overflow (commands.md "Selection-scoped actions"): invoked for the current canvas
+  // selection like selection.duplicate/delete; handlers read the selection from context.
+  /** Opens the replace dialog; the replacement applies as one model change on confirm. */
+  /** Opens the Library's capture review for the selection, which then runs part.capture. */
+  'selection.save-as-component': Empty;
+  'selection.replace-part': Empty;
+  'selection.add-probe': Empty;
+  'history.show-changes': Empty;
+  'selection.export': Empty;
 }
 
 export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
@@ -1190,6 +1180,21 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     shortcut: null,
     availability: expansionAvailability('collapse'),
   },
+  'selection.save-as-component': {
+    id: 'selection.save-as-component',
+    label: 'Save as component',
+    keywords: ['save', 'component', 'part', 'library', 'capture'],
+    group: 'selection',
+    iconKey: 'part',
+    shortcut: null,
+    availability: (ctx) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requirePartsDraft(ctx);
+      if (blocked) return blocked;
+      return ctx.selectedElementIds.length > 0
+        ? ENABLED
+        : disabled('invalid-selection', 'Select one or more components first');
+    },
+  },
   'selection.replace-part': {
     id: 'selection.replace-part',
     label: 'Replace part…',
@@ -1296,6 +1301,7 @@ export function getPayloadFreeAvailability(
     | 'part.capture'
     | 'part.place'
     | 'part.import'
+    | 'selection.save-as-component'
     | 'selection.replace-part'
     | 'selection.add-probe'
     | 'history.show-changes'

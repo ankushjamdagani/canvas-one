@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useStore } from '@xyflow/react';
-import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
+import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, MoreHorizontal, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -33,7 +33,7 @@ export type CanvasAuthoringCommandId =
   | 'canvas.add-note'
   | 'canvas.expand'
   | 'canvas.collapse'
-  | 'part.capture'
+  | 'selection.save-as-component'
   | 'selection.replace-part'
   | 'selection.add-probe'
   | 'history.show-changes'
@@ -66,6 +66,24 @@ function commandError(result: ExecuteResult): string | null {
   }
   return null;
 }
+
+type OverflowCommandId =
+  | 'selection.save-as-component'
+  | 'selection.replace-part'
+  | 'selection.add-probe'
+  | 'history.show-changes'
+  | 'selection.export';
+
+/** Board 16D overflow menu, in board order (Wrap in boundary lives on the toolbar). */
+const OVERFLOW_PRIMARY: readonly { readonly id: OverflowCommandId; readonly label: string }[] = [
+  { id: 'selection.save-as-component', label: 'Save as component' },
+  { id: 'selection.replace-part', label: 'Replace part…' },
+  { id: 'selection.add-probe', label: 'Add flow probe' },
+  { id: 'history.show-changes', label: 'Changes on this part' },
+];
+const OVERFLOW_SECONDARY: readonly { readonly id: OverflowCommandId; readonly label: string }[] = [
+  { id: 'selection.export', label: 'Export selection' },
+];
 
 export function SelectionToolbar({ context, executeCommand, mintId }: SelectionToolbarProps) {
   const [groupOpen, setGroupOpen] = React.useState(false);
@@ -243,6 +261,24 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
     ['x', 'Distribute horizontally'],
     ['y', 'Distribute vertically'],
   ] as const;
+
+  const overflowItem = ({ id, label }: { readonly id: OverflowCommandId; readonly label: string }) => {
+    const availability = getPayloadFreeAvailability(id, context);
+    return (
+      <DropdownMenuItem
+        key={id}
+        data-testid={`selection-overflow-${id.replace('.', '-')}`}
+        disabled={!availability.enabled}
+        onSelect={() => void executeCommand(id, {})}
+        className="flex flex-col items-start gap-0.5 text-xs pointer-coarse:min-h-11"
+      >
+        <span>{label}</span>
+        {availability.enabled ? null : (
+          <span className="text-[10px] text-secondary-text">{availability.reason}</span>
+        )}
+      </DropdownMenuItem>
+    );
+  };
 
   return (
     <div
@@ -458,52 +494,22 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button data-testid="selection-overflow-btn" type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs">
-            Selection <ChevronDown className="size-3.5" />
+          <Button
+            data-testid="selection-overflow-btn"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 pointer-coarse:size-11 shrink-0"
+            aria-label="More selection actions"
+          >
+            <MoreHorizontal className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel>SELECTION</DropdownMenuLabel>
-          {[
-            ['part.capture', 'Save as component'],
-            ['selection.replace-part', 'Replace part…'],
-            ['selection.add-probe', 'Add flow probe'],
-            ['history.show-changes', 'Changes on this part'],
-          ].map(([id, label]) => {
-            const availability = getPayloadFreeAvailability(id as any, context);
-            return (
-              <DropdownMenuItem
-                key={id}
-                data-testid={`selection-overflow-${id.replace('.', '-')}`}
-                disabled={!availability.enabled}
-                title={availability.enabled ? undefined : availability.reason}
-                onSelect={() => void executeCommand(id as any, {} as any)}
-                className="text-xs"
-              >
-                <span>{label}</span>
-                {!availability.enabled && <span className="ml-auto text-[10px] truncate max-w-[120px]">{availability.reason}</span>}
-              </DropdownMenuItem>
-            );
-          })}
+          <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase">Selection</DropdownMenuLabel>
+          {OVERFLOW_PRIMARY.map((item) => overflowItem(item))}
           <DropdownMenuSeparator />
-          {[
-            ['selection.export', 'Export selection'],
-          ].map(([id, label]) => {
-            const availability = getPayloadFreeAvailability(id as any, context);
-            return (
-              <DropdownMenuItem
-                key={id}
-                data-testid={`selection-overflow-${id.replace('.', '-')}`}
-                disabled={!availability.enabled}
-                title={availability.enabled ? undefined : availability.reason}
-                onSelect={() => void executeCommand(id as any, {} as any)}
-                className="text-xs"
-              >
-                <span>{label}</span>
-                {!availability.enabled && <span className="ml-auto text-[10px] truncate max-w-[120px]">{availability.reason}</span>}
-              </DropdownMenuItem>
-            );
-          })}
+          {OVERFLOW_SECONDARY.map((item) => overflowItem(item))}
         </DropdownMenuContent>
       </DropdownMenu>
 

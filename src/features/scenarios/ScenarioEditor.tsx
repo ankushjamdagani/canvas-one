@@ -37,13 +37,15 @@ export interface ScenarioEditorProps {
   readonly mintId: MintId;
   readonly lastRunChecks?: ReadonlyMap<string, CheckResult> | null;
   readonly focusName?: boolean;
+  /** A check to open expanded (flow probe added from the canvas). */
+  readonly focusAssertionId?: string | null;
 }
 
 function sectionErrorCount(handle: ScenarioDraftHandle, section: ScenarioSection): number {
   return handle.issuesBySection[section].filter((i) => i.severity === 'error').length;
 }
 
-export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, onClose = onCancel, mintId, lastRunChecks, focusName = false }: ScenarioEditorProps) {
+export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, onClose = onCancel, mintId, lastRunChecks, focusName = false, focusAssertionId = null }: ScenarioEditorProps) {
   const scenario = handle.scenario;
   const [boundaryGuardsComplete, setBoundaryGuardsComplete] = React.useState(true);
 
@@ -120,7 +122,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
           <IssueList issues={handle.issuesBySection[scenario.mode === 'timed' ? 'faults' : 'boundaries']} />
         )}
 
-        <AssertionsSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} lastRunChecks={lastRunChecks} />
+        <AssertionsSection document={document} scenario={scenario} onChange={onChange} mintId={mintId} lastRunChecks={lastRunChecks} focusAssertionId={focusAssertionId} />
         {handle.issuesBySection.assertions.length > 0 && <IssueList issues={handle.issuesBySection.assertions} />}
 
         {/* Run settings */}
