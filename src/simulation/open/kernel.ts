@@ -1,4 +1,5 @@
 import type {
+  CallRetryPolicy,
   ExecutionGraph,
   ExecutionNode,
   ExecutionEdge,
@@ -80,6 +81,10 @@ export interface KernelFaultConfig {
 export interface KernelBridgeConfig {
   nodeId: string;
   returnLatencyMs: number;
+  /** D50: the call's caller retry policy; each attempt opens a new bridge frame. */
+  retry?: CallRetryPolicy | null;
+  /** D50: the connection ID, reported on 'call_retry' facts. */
+  connectionId?: string;
 }
 
 export interface OpenSimulationOptions {
@@ -310,6 +315,8 @@ export interface Op {
   cancelled?: boolean;
   /** Bridge call frames (RV-14f): set while this op waits on an external settleCall. */
   bridgeFrameId?: string;
+  /** D50: deliveries of this broker op so far (redelivery counts). */
+  deliveries?: number;
 }
 
 export interface NodeRuntime {
@@ -431,6 +438,10 @@ export class OpenSimulation {
   // continuation, and the ops currently waiting on an external settleCall.
   protected bridgeByNode = new Map<string, KernelBridgeConfig>();
   protected bridgePendingOps = new Map<string, Op>();
+  /** D50 bridge retries: attempt number per frame, frames already resolved, frames abandoned by a timeout. */
+  protected bridgeAttempts = new Map<string, number>();
+  protected resolvedBridgeFrames = new Set<string>();
+  protected abandonedBridgeFrames = new Set<string>();
   protected bridgeFrameCounter = 0;
 
   constructor(graph: ExecutionGraph, options?: OpenSimulationOptions) {
@@ -1248,11 +1259,20 @@ export class OpenSimulation {
     } else {
       procTime = 1 / node.behavior.capacity;
     }
-    if (node.behavior.serviceTime === 'exponential') {
-      // D49: seeded per unit, path and attempt, so chunked and one-shot runs draw alike.
+    if (node.behavior.serviceTime === 'exponential' || node.behavior.serviceTime === 'lognormal') {
+      // D49/D50: seeded per unit, path and attempt, so chunked and one-shot runs draw alike.
       const draw = makeRng((this.seed ^ hashString(`${op.unit.identity}:${op.path}:${op.attempt}:service`)) >>> 0);
       const u = Math.min(1 - 1e-12, Math.max(1e-12, draw()));
-      procTime *= -Math.log(1 - u);
+      if (node.behavior.serviceTime === 'exponential') {
+        procTime *= -Math.log(1 - u);
+      } else {
+        // Lognormal with mean 1 and coefficient of variation cv: sigma^2 = ln(1 + cv^2),
+        // mu = -sigma^2 / 2; the normal comes from Box-Muller over two draws.
+        const u2 = Math.min(1 - 1e-12, Math.max(1e-12, draw()));
+        const sigma2 = Math.log(1 + (node.behavior.serviceTimeCv ?? 1) ** 2);
+        const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * u2);
+        procTime *= Math.exp(-sigma2 / 2 + Math.sqrt(sigma2) * z);
+      }
     }
 
     const completeTime = this.currentTime + procTime;
@@ -1488,18 +1508,7 @@ export class OpenSimulation {
         op.phase = 'waiting';
         op.pendingChildren = 1;
         op.failedChild = false;
-        const frameId = `bridge:${op.unit.identity}:${++this.bridgeFrameCounter}`;
-        op.bridgeFrameId = frameId;
-        this.bridgePendingOps.set(frameId, op);
-        this.emitFact({
-          kind: 'bridge_dispatch',
-          time: this.currentTime,
-          nodeId: op.nodeId,
-          unitIdentity: op.unit.identity,
-          attempt: op.attempt,
-          path: op.path,
-          frameId,
-        });
+        this.openBridgeFrame(op, bridge, 1);
         return;
       }
       this.completeLocalOp(op);
@@ -1666,8 +1675,43 @@ export class OpenSimulation {
     });
     this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
       if (op.done || op.unit.done) return;
-      this.dispatchCallAttempt(op, edge, attemptNo + 1);
+      this.dispatchCallAttempt(op, this.retryRoute(op, edge), attemptNo + 1);
     });
+  }
+
+  /**
+   * D50: a router retries on another route when one qualifies (same strategy, health and
+   * conditions, without the route that just failed); otherwise on the same route.
+   */
+  protected retryRoute(op: Op, failed: ExecutionEdge): ExecutionEdge {
+    const node = this.plan.nodes.get(op.nodeId)!;
+    if (node.behavior.type !== 'router') return failed;
+    const routes = (this.plan.outgoing.get(op.nodeId) ?? []).filter((e) => e.transport === 'call');
+    const failedAt = routes.indexOf(failed);
+    // Route order starting after the failed route, so a retry doesn't move the router's
+    // round-robin cursor (nginx-style "next upstream").
+    const others = [...routes.slice(failedAt + 1), ...routes.slice(0, Math.max(0, failedAt))];
+    if (others.length === 0) return failed;
+    let next: ExecutionEdge | undefined;
+    if (node.behavior.strategy === 'round-robin') {
+      next = others.find((e) => {
+        const host = this.hostPlacement.get(e.target);
+        return this.faults.length === 0 || host === undefined || this.routerDetectedHostState.get(host) !== false;
+      });
+    } else {
+      [next] = this.selectOutgoing(op, others);
+    }
+    if (!next) return failed;
+    this.emitFact({
+      kind: 'route_selected',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+      edgeId: next.id,
+    });
+    return next;
   }
 
   protected publishMessage(parentOp: Op, edge: ExecutionEdge): void {
@@ -1913,6 +1957,66 @@ export class OpenSimulation {
    * are unaffected: the outer resource's own childOp still resolves via the retained
    * handleChildResponse path (per §8 "the outer resource keeps retained handling").
    */
+  /**
+   * Opens one bridge attempt (RV-14f frames; D50 retries). With a retry policy, a
+   * rejected, failed or timed-out attempt opens a new frame after the backoff; a reply to
+   * an abandoned frame is ignored.
+   */
+  protected openBridgeFrame(op: Op, bridge: KernelBridgeConfig, attemptNo: number): void {
+    const frameId = `bridge:${op.unit.identity}:${++this.bridgeFrameCounter}`;
+    op.bridgeFrameId = frameId;
+    this.bridgePendingOps.set(frameId, op);
+    this.bridgeAttempts.set(frameId, attemptNo);
+    this.emitFact({
+      kind: 'bridge_dispatch',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: op.attempt,
+      path: op.path,
+      frameId,
+    });
+    const timeoutMs = bridge.retry?.attemptTimeoutMs ?? null;
+    if (timeoutMs !== null) {
+      this.scheduleEvent(this.currentTime + timeoutMs / 1000, 1, () => {
+        if (this.resolvedBridgeFrames.has(frameId) || op.done || op.unit.done) return;
+        if (this.bridgePendingOps.delete(frameId)) this.abandonedBridgeFrames.add(frameId);
+        this.resolveBridgeAttempt(op, bridge, frameId, 'expired');
+      });
+    }
+  }
+
+  protected resolveBridgeAttempt(op: Op, bridge: KernelBridgeConfig, frameId: string, outcome: Outcome, payloadRef?: string): void {
+    if (this.resolvedBridgeFrames.has(frameId)) return;
+    this.resolvedBridgeFrames.add(frameId);
+    if (op.done || op.unit.done) return;
+    const attemptNo = this.bridgeAttempts.get(frameId) ?? 1;
+    const retry = bridge.retry ?? null;
+    if (outcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts) {
+      let delayMs = Math.min(retry.maxBackoffMs, retry.backoffMs * Math.pow(retry.backoffMultiplier, attemptNo - 1));
+      if (retry.jitter) {
+        const draw = makeRng((this.seed ^ hashString(`${op.unit.identity}:${op.path}>bridge:${attemptNo}:jitter`)) >>> 0);
+        delayMs *= draw();
+      }
+      if (bridge.connectionId) this.callRetries.set(bridge.connectionId, (this.callRetries.get(bridge.connectionId) ?? 0) + 1);
+      this.emitFact({
+        kind: 'call_retry',
+        time: this.currentTime,
+        nodeId: op.nodeId,
+        unitIdentity: op.unit.identity,
+        attempt: attemptNo + 1,
+        path: op.path,
+        edgeId: bridge.connectionId,
+      });
+      this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
+        if (op.done || op.unit.done) return;
+        this.openBridgeFrame(op, bridge, attemptNo + 1);
+      });
+      return;
+    }
+    this.completeBridgeChild(op, outcome, payloadRef);
+  }
+
   protected completeBridgeChild(op: Op, outcome: Outcome, payloadRef?: string): void {
     if (op.done || op.unit.done) return;
     const nr = this.nodesRuntime.get(op.nodeId)!;
@@ -1944,6 +2048,7 @@ export class OpenSimulation {
    *   earlier path, so there is nothing further to apply.
    */
   public settleCall(input: { frameId: string; outcome: Outcome; payloadRef?: string; atMs?: number }): void {
+    if (this.abandonedBridgeFrames.delete(input.frameId)) return; // D50: the caller gave up on this attempt
     const op = this.bridgePendingOps.get(input.frameId);
     if (!op) {
       throw new Error(`settleCall: unknown or already-settled bridge frame '${input.frameId}'`);
@@ -1969,7 +2074,11 @@ export class OpenSimulation {
     const { outcome, payloadRef } = input;
     this.scheduleEvent(respArrivalTime, 1, () => {
       if (op.done || op.unit.done) return;
-      this.completeBridgeChild(op, outcome, payloadRef);
+      if (!bridge) {
+        this.completeBridgeChild(op, outcome, payloadRef);
+        return;
+      }
+      this.resolveBridgeAttempt(op, bridge, input.frameId, outcome, payloadRef);
     });
   }
 
@@ -2185,7 +2294,9 @@ export class OpenSimulation {
     consumerNr.counters.arrived++;
     consumerNr.counters.admitted++;
 
-    const childPath = `${brokerOp.path}>${edge.id}`;
+    // Each delivery (D50 redelivery) is its own path, so its seeded draws are independent.
+    const delivery = brokerOp.deliveries ?? 1;
+    const childPath = delivery === 1 ? `${brokerOp.path}>${edge.id}` : `${brokerOp.path}>${edge.id}#${delivery}`;
     const childOp: Op = {
       unit: brokerOp.unit,
       nodeId: edge.target,
@@ -2199,7 +2310,7 @@ export class OpenSimulation {
         em.responses++;
         if (childOutcome === 'succeeded') {
           this.completeLocalOp(brokerOp);
-        } else {
+        } else if (!this.redeliver(brokerOp, edge)) {
           this.handleChildResponse(brokerOp, childOutcome);
         }
       },
@@ -2222,6 +2333,45 @@ export class OpenSimulation {
       }
       this.startProcessing(childOp);
     });
+  }
+
+  /**
+   * D50: a broker route with a retry policy redelivers a message whose consumer failed,
+   * after the backoff (like a visibility timeout), by putting it back on the broker's
+   * queue for any consumer. Returns false when no delivery is left.
+   */
+  protected redeliver(brokerOp: Op, edge: ExecutionEdge): boolean {
+    const retry = edge.retry ?? null;
+    const deliveries = brokerOp.deliveries ?? 1;
+    if (!retry || deliveries >= retry.maxAttempts || brokerOp.done || brokerOp.unit.done) return false;
+    brokerOp.deliveries = deliveries + 1;
+    const brokerNr = this.nodesRuntime.get(brokerOp.nodeId)!;
+    brokerNr.waitingSources.delete(brokerOp);
+    brokerOp.phase = 'retrying';
+    brokerNr.retrying.add(brokerOp);
+    let delayMs = Math.min(retry.maxBackoffMs, retry.backoffMs * Math.pow(retry.backoffMultiplier, deliveries - 1));
+    if (retry.jitter) {
+      const draw = makeRng((this.seed ^ hashString(`${brokerOp.unit.identity}:${brokerOp.path}:${deliveries}:redeliver`)) >>> 0);
+      delayMs *= draw();
+    }
+    this.callRetries.set(edge.id, (this.callRetries.get(edge.id) ?? 0) + 1);
+    this.emitFact({
+      kind: 'call_retry',
+      time: this.currentTime,
+      nodeId: brokerOp.nodeId,
+      unitIdentity: brokerOp.unit.identity,
+      attempt: deliveries + 1,
+      path: brokerOp.path,
+      edgeId: edge.id,
+    });
+    this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
+      brokerNr.retrying.delete(brokerOp);
+      if (brokerOp.done || brokerOp.unit.done) return;
+      brokerOp.phase = 'queued';
+      brokerNr.queue.push(brokerOp);
+      this.pumpBrokers();
+    });
+    return true;
   }
 
   protected pumpBrokers(): void {
