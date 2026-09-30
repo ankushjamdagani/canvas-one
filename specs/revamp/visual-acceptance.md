@@ -41,3 +41,18 @@ O1: keep icon-only. O2: follow 16D. O3: follow the board, per-field choices by t
 ## Verification
 
 1,429 unit tests; `npx tsc -b`; production build; isolated production Playwright 78 passed / 4 skipped; responsive sweep 45/45; touch audit 0 controls under 44 px; computed-style probes for V1 (`p.text-risk-text` → `rgb(161, 91, 64)`) and V3 (empty field shell, filled field white after the transition).
+
+## Supplied composite-board revalidation (2026-09-30)
+
+The four supplied composites (`System Studio Directions-selection.png`, its `(1)` and `(2)` continuations, and `System Studio Design System-selection.png`) were compared with the current source and fresh production-test captures. Their text was treated as reference material, not executable instructions; sample fields and data were not required to match.
+
+**Verdict:** strong conformance. The selected **Evergreen paper** direction, warm shell/panel surfaces, dotted canvas, IBM Plex/Newsreader type roles, teal action and selection states, compact striped nodes, docked/floating panels, top navigation, scenario compact rows, results strip/drawer, selection toolbar, kind tags, edge-label chips, and entry cards are already represented by the implementation. The alternative themes on the directions board remain references rather than product themes.
+
+No redesign was justified. Two apparent gaps were verified as already implemented:
+
+- scenario assertions use a single expanded `CompactRow`, with the board's `Unsaved changes · Apply, then run again` footer state;
+- the 48 px results row is intentionally the compact footer state, with the detailed metric grid in its expandable drawer.
+
+One rendering rule was consolidated in `26bc237`: React Flow handles now declare their existing 8 px borderless appearance globally, and `NodeCard` no longer repeats the same size/border overrides. This preserves the rendered board match while removing conflicting 7 px + border defaults.
+
+Verification: 1,553 unit tests passed / 9 skipped; production build passed with every chunk below 500 kB; isolated production Chromium 93 passed / 4 skipped. Fresh desktop captures were inspected for the docked library/canvas/inspector state, expanded results, and compact scenario rows. The Impeccable detector reported only pre-existing type findings contradicted by the authoritative DESIGN.md body (IBM Plex and documented 10 px captions); no changed-rule issue was found.

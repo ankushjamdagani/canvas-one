@@ -1773,3 +1773,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Found**: the first S06 draft put the unmodeled card processor inside the scenario scope. `runScenario` ran it anyway, but readiness (and so the app's Run) rejected it. The generator test now checks readiness before running.
 - **Verification**: 1,553 unit tests pass (9 skipped); `npx tsc -b` clean; build clean; isolated production e2e 93 passed / 4 skipped (new: S06 runs to Passed; the boundary "Answers" choice persists); axe clean. The first "Answers" e2e wrongly expected the editor to close on Apply; it stays open, and the test now closes and reopens it.
 - **Lesson:** runner-level tests that call `runScenario` directly skip readiness; assert `checkReadiness(...).ready` first, or a fixture that the app can't run will pass.
+
+### Composite design-board conformance revalidation
+
+- **Outcome:** Claude compared the current app with the four supplied composite boards and found strong conformance with no P0 gaps. Fresh production captures confirmed the docked workspace, expanded results and compact scenario-row states. Gemini (`agy`) supplied the only justified implementation patch: consolidate React Flow handles to the existing 8 px borderless rendering and remove duplicate `NodeCard` overrides. Claude independently reviewed the committed diff and passed it.
+- **Files changed:** `src/styles.css`, `src/features/workspace/NodeCard.tsx`, `specs/revamp/visual-acceptance.md`, `HANDOFF.md`, `LESSONS.md`, `ACTION_LOG.md`.
+- **Platform/subagents:** Codex lead; Claude Sonnet 4.6 comparison and final review; Gemini 3.8 Flash Low patch-only implementation after two headless command-permission denials. Work was isolated on `codex/design-board-conformance` and integrated as `26bc237`.
+- **Verification:** `npm test` — 1,553 passed / 9 skipped; `npm run build` passed with no chunk above 500 kB; isolated production Chromium — 93 passed / 4 skipped; Impeccable detector findings were verified as pre-existing DESIGN.md/sidecar drift, not defects in the changed rules.
+- **Limitations:** the four composites use illustrative content and alternative theme studies; the review requires structural/style conformance, not identical data or implementation of unselected themes.
+- **Lesson:** when `agy` headless command permissions abort an editing run, keep the implementation delegated through a source-embedded patch-only retry, then apply, test and independently review the patch; do not grant blanket bypass permissions.
