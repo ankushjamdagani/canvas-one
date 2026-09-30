@@ -27,7 +27,8 @@ export type SimLifecycleFactKind =
   | 'host_up'
   | 'failure_detected'
   | 'recovery_detected'
-  | 'bridge_dispatch';
+  | 'bridge_dispatch'
+  | 'call_retry';
 
 export interface SimLifecycleFact {
   kind: SimLifecycleFactKind;
@@ -390,6 +391,8 @@ export class OpenSimulation {
    * so the characterization goldens are unchanged; read through `nodeLatency()`.
    */
   protected nodeLatencies = new Map<string, LatencyCollector>();
+  /** Caller retries per call edge (D49), outside `snapshot()` like `nodeLatencies`. */
+  protected callRetries = new Map<string, number>();
 
   protected messagesGenerated = 0;
   protected messagesSucceeded = 0;
@@ -583,9 +586,12 @@ export class OpenSimulation {
       const nr = this.nodesRuntime.get(nodeId);
       if (!nr) continue;
 
-      // 1. Active work on this host fails once
-      const activeOps = Array.from(nr.active);
+      // 1. Active work on this host fails once. A router's forwarded requests wait without
+      // a slot (D49) but still die with the proxy.
+      const isRouterNode = this.plan.nodes.get(nodeId)?.behavior.type === 'router';
+      const activeOps = [...nr.active, ...(isRouterNode ? nr.waitingSources : [])];
       nr.active.clear();
+      if (isRouterNode) nr.waitingSources.clear();
       for (const op of activeOps) {
         if (op.done) continue;
         op.cancelled = true;
@@ -1242,6 +1248,12 @@ export class OpenSimulation {
     } else {
       procTime = 1 / node.behavior.capacity;
     }
+    if (node.behavior.serviceTime === 'exponential') {
+      // D49: seeded per unit, path and attempt, so chunked and one-shot runs draw alike.
+      const draw = makeRng((this.seed ^ hashString(`${op.unit.identity}:${op.path}:${op.attempt}:service`)) >>> 0);
+      const u = Math.min(1 - 1e-12, Math.max(1e-12, draw()));
+      procTime *= -Math.log(1 - u);
+    }
 
     const completeTime = this.currentTime + procTime;
     let cancelled = false;
@@ -1527,6 +1539,16 @@ export class OpenSimulation {
     op.pendingChildren = selectedOutgoing.length;
     op.failedChild = false;
 
+    // D49 (audit H11): a router is an event-driven proxy. Once it has forwarded a request
+    // its slot is free for the next one; the forwarded request waits without a slot.
+    const dispatchingNode = this.plan.nodes.get(op.nodeId)!;
+    if (dispatchingNode.behavior.type === 'router') {
+      const nr = this.nodesRuntime.get(op.nodeId)!;
+      nr.active.delete(op);
+      nr.waitingSources.add(op);
+      this.pumpQueue(op.nodeId);
+    }
+
     for (const edge of selectedOutgoing) {
       this.emitFact({
         kind: 'route_selected',
@@ -1543,45 +1565,102 @@ export class OpenSimulation {
         continue;
       }
 
-      const em = this.edgeMetrics.get(edge.id)!;
-      em.sent++;
+      this.dispatchCallAttempt(op, edge, 1);
+    }
+  }
 
-      const childPath = `${op.path}>${edge.id}`;
-      const childOp: Op = {
-        unit: op.unit,
-        nodeId: edge.target,
-        path: childPath,
-        phase: 'transit',
-        done: false,
-        attempt: 0,
-        children: new Set(),
-        arrived: this.currentTime + edge.latencyMs / 1000,
-        onDone: (childOutcome) => {
-          const respArrivalTime = this.currentTime + edge.returnLatencyMs / 1000;
-          this.scheduleEvent(respArrivalTime, 1, () => {
-            em.responses++;
-            this.handleChildResponse(op, childOutcome);
-          });
-        },
-      };
+  /**
+   * One attempt of a call from `op` along `edge`. With a retry policy on the edge (D49,
+   * audit H13), a rejected, failed or timed-out attempt is retried by the caller after a
+   * backoff; the caller keeps waiting (and a non-router caller keeps its slot) meanwhile.
+   * Only the final outcome reaches handleChildResponse.
+   */
+  protected dispatchCallAttempt(op: Op, edge: ExecutionEdge, attemptNo: number): void {
+    const em = this.edgeMetrics.get(edge.id)!;
+    em.sent++;
+    const retry = edge.retry ?? null;
 
-      op.children.add(childOp);
-      op.unit.ops.add(childOp);
-      this.liveOpsCount++;
-
-      this.scheduleEvent(this.currentTime + edge.latencyMs / 1000, 2, () => {
-        if (childOp.done || childOp.unit.done) {
-          this.releaseOp(childOp);
+    const childPath = attemptNo === 1 ? `${op.path}>${edge.id}` : `${op.path}>${edge.id}~${attemptNo}`;
+    let settled = false;
+    const settleAttempt = (childOutcome: Outcome, atCaller: number) => {
+      if (settled) return;
+      settled = true;
+      this.scheduleEvent(atCaller, 1, () => {
+        em.responses++;
+        if (childOutcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts && !op.done && !op.unit.done) {
+          this.scheduleCallRetry(op, edge, attemptNo, retry);
           return;
         }
-        const admitted = this.admitOp(childOp, false);
-        if (admitted) {
-          em.admitted++;
-        } else {
-          em.rejected++;
-        }
+        this.handleChildResponse(op, childOutcome);
+      });
+    };
+
+    const childOp: Op = {
+      unit: op.unit,
+      nodeId: edge.target,
+      path: childPath,
+      phase: 'transit',
+      done: false,
+      attempt: 0,
+      children: new Set(),
+      arrived: this.currentTime + edge.latencyMs / 1000,
+      onDone: (childOutcome) => {
+        settleAttempt(childOutcome, this.currentTime + edge.returnLatencyMs / 1000);
+      },
+    };
+
+    op.children.add(childOp);
+    op.unit.ops.add(childOp);
+    this.liveOpsCount++;
+
+    this.scheduleEvent(this.currentTime + edge.latencyMs / 1000, 2, () => {
+      if (childOp.done || childOp.unit.done) {
+        this.releaseOp(childOp);
+        return;
+      }
+      const admitted = this.admitOp(childOp, false);
+      if (admitted) {
+        em.admitted++;
+      } else {
+        em.rejected++;
+      }
+    });
+
+    if (retry && retry.attemptTimeoutMs !== null) {
+      // The caller stops waiting for this attempt; the abandoned work is cancelled.
+      this.scheduleEvent(this.currentTime + retry.attemptTimeoutMs / 1000, 1, () => {
+        if (settled || childOp.done || op.done || op.unit.done) return;
+        const affectedNodes = new Set<string>();
+        this.cancelOp(childOp, affectedNodes);
+        op.children.delete(childOp);
+        for (const nid of affectedNodes) this.pumpQueue(nid);
+        settleAttempt('expired', this.currentTime);
       });
     }
+  }
+
+  /** Waits the backoff for `attemptNo`, then sends the next attempt (D49). */
+  protected scheduleCallRetry(op: Op, edge: ExecutionEdge, attemptNo: number, retry: NonNullable<ExecutionEdge['retry']>): void {
+    let delayMs = Math.min(retry.maxBackoffMs, retry.backoffMs * Math.pow(retry.backoffMultiplier, attemptNo - 1));
+    if (retry.jitter) {
+      const draw = makeRng((this.seed ^ hashString(`${op.unit.identity}:${op.path}>${edge.id}:${attemptNo}:jitter`)) >>> 0);
+      delayMs *= draw();
+    }
+    let retries = this.callRetries.get(edge.id) ?? 0;
+    this.callRetries.set(edge.id, ++retries);
+    this.emitFact({
+      kind: 'call_retry',
+      time: this.currentTime,
+      nodeId: op.nodeId,
+      unitIdentity: op.unit.identity,
+      attempt: attemptNo + 1,
+      path: op.path,
+      edgeId: edge.id,
+    });
+    this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
+      if (op.done || op.unit.done) return;
+      this.dispatchCallAttempt(op, edge, attemptNo + 1);
+    });
   }
 
   protected publishMessage(parentOp: Op, edge: ExecutionEdge): void {
@@ -1746,7 +1825,7 @@ export class OpenSimulation {
         const node = this.plan.nodes.get(parentOp.nodeId)!;
         if (node.behavior.type === 'source') {
           nr.waitingSources.delete(parentOp);
-        } else if (node.behavior.type === 'broker') {
+        } else if (node.behavior.type === 'broker' || node.behavior.type === 'router') {
           nr.waitingSources.delete(parentOp);
         } else {
           nr.active.delete(parentOp);
@@ -1803,7 +1882,7 @@ export class OpenSimulation {
 
     if (node.behavior.type === 'source') {
       nr.waitingSources.delete(op);
-    } else if (node.behavior.type === 'broker') {
+    } else if (node.behavior.type === 'broker' || node.behavior.type === 'router') {
       nr.waitingSources.delete(op);
     } else {
       nr.active.delete(op);
@@ -1887,6 +1966,11 @@ export class OpenSimulation {
     });
   }
 
+  /** Caller retries sent along one call edge (D49). */
+  edgeRetries(edgeId: string): number {
+    return this.callRetries.get(edgeId) ?? 0;
+  }
+
   /** Successful-operation count and response time (ms) at one node; see `nodeLatencies`. */
   nodeLatency(nodeId: string): { count: number; mean: number; p95: number } {
     const collector = this.nodeLatencies.get(nodeId);
@@ -1951,7 +2035,7 @@ export class OpenSimulation {
     } else if (op.phase === 'waiting') {
       if (node.behavior.type === 'source') {
         nr.waitingSources.delete(op);
-      } else if (node.behavior.type === 'broker') {
+      } else if (node.behavior.type === 'broker' || node.behavior.type === 'router') {
         nr.waitingSources.delete(op);
       } else {
         nr.active.delete(op);
@@ -2008,7 +2092,7 @@ export class OpenSimulation {
         } else if (op.phase === 'waiting') {
           if (node.behavior.type === 'source') {
             nr.waitingSources.delete(op);
-          } else if (node.behavior.type === 'broker') {
+          } else if (node.behavior.type === 'broker' || node.behavior.type === 'router') {
             nr.waitingSources.delete(op);
           } else {
             nr.active.delete(op);
