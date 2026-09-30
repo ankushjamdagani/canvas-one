@@ -52,6 +52,8 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 
 ## Code
 
+- **Build test and audit graphs through the app's own planners (`placeEntry`, `planConnection`), not hand-built records or `behaviorDefaults.ts`.** `behaviorDefaults` is test-only and differs from the catalog, and hand-built fixtures hide connect rules the canvas enforces. Why: 2026-09-30 realism phase 3 (phase 1 probed defaults the app never loads; G1 and B1–B8 surfaced only through the planners).
+
 - **Don't split with `React.lazy`/Suspense on user-facing paths; use `src/lib/lazyComponent.tsx`, and time the affected interaction against a baseline build.** React 19 throttles Suspense reveals ~300 ms even for cached chunks. Why: 2026-09-29 bundle split made project open 830 ms.
 - **Put element-level defaults in `src/styles.css` inside `@layer base`.** An unlayered `p`/`h3`/`select`/`button` rule beats every Tailwind utility on that element, so the classes silently do nothing. Why: 2026-09-29 board comparison (error text grey, all `p`/`h3` forced to 12 px, menu rows boxed).
 - **Before deleting superseded code, port its tests to the replacement.** The ported budget tests exposed a status bug in the production runner. Why: 2026-09-29 logical runner retirement.

@@ -1630,3 +1630,27 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - On the branch: 1,488 unit tests; isolated e2e 87 passed / 4 skipped; sweep 45/45; touch audit and axe clean. Sonnet review pending.
 - **Lesson:** an absolutely positioned `flex-wrap` box whose `left` is computed from its own measured width never settles, because its available width depends on `left`. Give it `w-max`. Both external executors hit quota in the same afternoon, so plan for the lead to finish a lane.
 - **Update (same day):** a1 passed Sonnet review; the one note (two old ports could map to one new port) was fixed with consumed-port tracking (`c65750b`). Merged (`1f34e48`); trailing whitespace from executor code stripped (`aa27d3e`). On master: 1,488 unit tests; `npx tsc -b`; build clean; isolated e2e 87 passed / 4 skipped; sweep 45/45; axe clean; `git diff --check` clean. Worktree and branch removed after the ancestry check.
+
+### Realism audit phase 3 (reference architectures)
+
+- **Outcome**: `81ae7b3` recorded expected outcomes before any run. `4545082` added the twelve reference architectures in `src/domain/studio/runner/reference-architectures.test.ts` (29 tests, about 3 s, in the normal suite). Each is built with the app's own `placeEntry`/`planConnection` and run through readiness and `runScenario`.
+  - Ten of twelve defaults predictions held.
+  - Failures on defaults:
+    - A2: queue limit 500 and 10 s TTL;
+    - A3: no caller retries;
+    - A5: stream splits events;
+    - A6: equal read/write cost;
+    - A8: fixed-mode cache ignores keys;
+    - A9: gateway 1-slot hold;
+    - A7 with latency: H11;
+    - A1: rejections at the API service, H11;
+    - A12: B8.
+  - Realistic settings hold everywhere except A3 and A5 (stream).
+- **Findings**:
+  - Phase 1 had probed the legacy `behaviorDefaults`, which only tests import. In the app, clients and sources are unmodeled (H7 and H16 withdrawn), message TTL is 10 s and ack delay is 0.
+  - Defects B1–B8: B3 zeroes `summary.rootCounts` for workload roots, so the Results panel, CSV export and root-count assertions read 0; B4 double-counts admission rejections; B2 lets drain arrivals run to the deadline; B7 means default budgets end load runs after about 1,400 requests; B8 fails runs where a traffic-driven service calls a boundary; B1 fails runs where traffic enters a queue; B5 leaves held slots out of utilization.
+  - G1: the canvas can't connect service → queue or queue → worker.
+- **Files**: the test file above, `specs/revamp/realism-audit.md`, `plan-realism-validation.md`, a header note in `realism-probes.test.ts`, `HANDOFF.md`, `delivery.md`.
+- **Platform**: Claude (lead) alone; a Sonnet subagent reviewed. It confirmed B1–B4, B7, B8 and G1 against the source and raised 4 test-precision risks, all fixed (B2 wording, B3 assertion, A1 rejection location, drain check noted under B3).
+- **Verification**: 1,517 unit tests pass (9 skipped); `npx tsc -b` clean; the new file passed three repeat runs. No product code changed, so the build and e2e were not rerun.
+- **Lesson:** audit the defaults the app actually loads. `behaviorDefaults.ts` looked authoritative but is test-only, and a whole phase of probes measured graphs the app can't build. Building fixtures through the app's own planners (`placeEntry`/`planConnection`) also surfaced connect and runner bugs that hand-built fixtures had hidden.
