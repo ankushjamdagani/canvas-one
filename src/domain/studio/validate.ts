@@ -2501,7 +2501,7 @@ function validateResourceConfig(
   const rec = cfg as Record<string, unknown>;
   const t = rec.type;
 
-  const commonAllowed = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs', 'serviceTime'];
+  const commonAllowed = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs', 'serviceTime', 'serviceTimeCv'];
   const commonRequired = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs'];
 
   let allowed = commonAllowed;
@@ -2526,17 +2526,28 @@ function validateResourceConfig(
     return;
   }
 
-  const required = allowed.filter((k) => k !== 'serviceTime');
+  const required = allowed.filter((k) => k !== 'serviceTime' && k !== 'serviceTimeCv');
   if (checkRecord(rec, allowed, required, path, entityId, issues, `ResourceConfig (${String(t)})`)) {
     validateNumber(rec.capacity, 1, 100000, [...path, 'capacity'], entityId, issues, 'capacity');
     validateNumber(rec.concurrency, 1, 1024, [...path, 'concurrency'], entityId, issues, 'concurrency', true);
-    if (rec.serviceTime !== undefined && rec.serviceTime !== 'fixed' && rec.serviceTime !== 'exponential') {
+    if (rec.serviceTime !== undefined && rec.serviceTime !== 'fixed' && rec.serviceTime !== 'exponential' && rec.serviceTime !== 'lognormal') {
       issues.push({
         code: 'invalid-literal',
         path: [...path, 'serviceTime'],
         entityId,
         severity: 'error',
-        message: `serviceTime must be 'fixed' or 'exponential'`,
+        message: `serviceTime must be 'fixed', 'exponential' or 'lognormal'`,
+      });
+    }
+    if (rec.serviceTime === 'lognormal') {
+      validateNumber(rec.serviceTimeCv, 0.1, 10, [...path, 'serviceTimeCv'], entityId, issues, 'serviceTimeCv');
+    } else if (rec.serviceTimeCv !== undefined) {
+      issues.push({
+        code: 'structural-rule',
+        path: [...path, 'serviceTimeCv'],
+        entityId,
+        severity: 'error',
+        message: 'serviceTimeCv applies to lognormal service time only',
       });
     }
     validateNumber(rec.queueLimit, 0, 10000, [...path, 'queueLimit'], entityId, issues, 'queueLimit', true);
@@ -2653,6 +2664,27 @@ function validateRouteCondition(
   }
 }
 
+
+
+/** D50: steady, burst ({peakRate, startMs < endMs}) or ramp ({endRate}). */
+function validateWorkloadProfile(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
+  const kind = (value as { kind?: unknown } | null)?.kind;
+  const keys = kind === 'burst' ? ['kind', 'peakRate', 'startMs', 'endMs'] : kind === 'ramp' ? ['kind', 'endRate'] : ['kind'];
+  if (!checkRecord(value, keys, keys, path, entityId, issues, 'Workload profile')) return;
+  const p = value as Record<string, unknown>;
+  if (kind === 'burst') {
+    validateNumber(p.peakRate, 0, 10000, [...path, 'peakRate'], entityId, issues, 'peakRate', false, true);
+    validateNumber(p.startMs, 0, 300000, [...path, 'startMs'], entityId, issues, 'startMs');
+    validateNumber(p.endMs, 0, 300000, [...path, 'endMs'], entityId, issues, 'endMs');
+    if (typeof p.startMs === 'number' && typeof p.endMs === 'number' && p.startMs >= p.endMs) {
+      issues.push({ code: 'structural-rule', path: [...path, 'endMs'], entityId, severity: 'error', message: 'A burst must end after it starts' });
+    }
+  } else if (kind === 'ramp') {
+    validateNumber(p.endRate, 0, 10000, [...path, 'endRate'], entityId, issues, 'endRate', false, true);
+  } else if (kind !== 'steady') {
+    issues.push({ code: 'invalid-literal', path: [...path, 'kind'], entityId, severity: 'error', message: `Workload profile kind must be 'steady', 'burst' or 'ramp'` });
+  }
+}
 
 /** D49: caller retry policy on a call connection; absent or null means no retries. */
 function validateCallRetryPolicy(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
@@ -3690,18 +3722,7 @@ function validateWorkload(
   validateBoolean(rec.enabled, [...path, 'enabled'], wId ?? scenarioId, issues, 'Workload enabled');
   validateNumber(rec.rate, 0, 10000, [...path, 'rate'], wId ?? scenarioId, issues, 'Workload rate', false, true);
 
-  if (checkRecord(rec.profile, ['kind'], ['kind'], [...path, 'profile'], wId ?? scenarioId, issues, 'Workload profile')) {
-    const prof = rec.profile as Record<string, unknown>;
-    if (prof.kind !== 'steady') {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'profile', 'kind'],
-        entityId: wId ?? scenarioId,
-        severity: 'error',
-        message: `Workload profile kind must be 'steady'`,
-      });
-    }
-  }
+  validateWorkloadProfile(rec.profile, [...path, 'profile'], wId ?? scenarioId, issues);
 
   validateNumber(rec.timeoutMs, 1, 3600000, [...path, 'timeoutMs'], wId ?? scenarioId, issues, 'Workload timeoutMs');
 

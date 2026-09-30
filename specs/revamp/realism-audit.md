@@ -285,8 +285,10 @@ The user adopted the recommendations. One runner version bump (`studio-runner/4`
 - cache and cdn: S;
 - `call`: S (latency and retries modelled).
 
-**Limits that remain (labelled):**
-- Retries don't apply to calls that leave the kernel to a boundary, or to broker deliveries.
-- There is one service-time distribution family (exponential), with no heavy tails.
-- Load balancers retry on the same route.
-- Workload profiles are steady only.
+**Limits after D49, removed by D50:**
+- Retries now apply to calls to a boundary (each attempt asks it again) and, as redelivery, to broker delivery routes.
+- `serviceTime: 'lognormal'` with a coefficient of variation gives heavy tails. Test: cv 3 gives p95 = 3.83 × mean.
+- Routers retry on another route.
+- Workloads can burst or ramp. A2 with a real 5× burst queues and drains with nothing lost.
+
+Tests: `src/simulation/open/model-d50.test.ts`, and "D50" in `reference-architectures.test.ts`.

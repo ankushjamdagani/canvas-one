@@ -251,13 +251,33 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
       label: RESOURCE_CONFIG_COPY.serviceTime.label,
       options: [
         { value: 'exponential', label: RESOURCE_CONFIG_COPY.serviceTime.options.exponential },
+        { value: 'lognormal', label: RESOURCE_CONFIG_COPY.serviceTime.options.lognormal },
         { value: 'fixed', label: RESOURCE_CONFIG_COPY.serviceTime.options.fixed },
       ],
       // Absent means 'fixed': configs created before D49 keep their behaviour.
       get: (el) => (el.behavior.kind === 'resource' ? (el.behavior.config.serviceTime ?? 'fixed') : 'fixed'),
-      set: (el, value) => withConfig(el, (c) => ({ ...c, serviceTime: value as 'fixed' | 'exponential' })),
+      set: (el, value) =>
+        withConfig(el, (c) => {
+          const { serviceTimeCv, ...rest } = c;
+          // D50: lognormal needs a variability; choosing it sets 2, shown and editable.
+          return value === 'lognormal'
+            ? { ...rest, serviceTime: 'lognormal', serviceTimeCv: serviceTimeCv ?? LOGNORMAL_CV_WHEN_CHOSEN }
+            : { ...rest, serviceTime: value as 'fixed' | 'exponential' };
+        }),
     }),
   ];
+  if (behavior.config.serviceTime === 'lognormal') {
+    common.push(
+      numberField<Element>({
+        id: 'config.serviceTimeCv',
+        label: RESOURCE_CONFIG_COPY.serviceTimeCv.label,
+        min: 0.1,
+        max: 10,
+        get: (el) => (el.behavior.kind === 'resource' ? (el.behavior.config.serviceTimeCv ?? LOGNORMAL_CV_WHEN_CHOSEN) : 0),
+        set: (el, value) => withConfig(el, (c) => ({ ...c, serviceTimeCv: value })),
+      }),
+    );
+  }
 
   const config = behavior.config;
   const variant: FieldSpec<Element>[] = [];
@@ -443,6 +463,9 @@ function connectionLabelField(): FieldSpec<Connection> {
     set: (c, value) => ({ ...c, label: value }),
   });
 }
+
+/** D50: the variability a resource gets when its author chooses lognormal (an assumption, shown). */
+const LOGNORMAL_CV_WHEN_CHOSEN = 2;
 
 /**
  * D49: the policy a call gets when its author raises Attempts above 1. Each value is an

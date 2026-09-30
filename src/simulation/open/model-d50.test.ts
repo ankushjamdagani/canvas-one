@@ -48,15 +48,13 @@ describe('D50 lognormal service time', () => {
   const runLognormal = (seed: number) =>
     new OpenSimulation(graph([node('svc', 'service', processor({ capacity: 20, concurrency: 1024, serviceTime: 'lognormal', serviceTimeCv: 3 }))], [], workload('svc', 50), seed, 300)).advance(300);
 
-  it('keeps the mean at 1/capacity', () => {
-    const means = SEEDS.map((seed) => runLognormal(seed).roots.meanLatency);
+  it('keeps the mean at 1/capacity and has the tail of its coefficient of variation (p95 = 3.83 x mean)', () => {
+    const runs = SEEDS.map(runLognormal);
+    const means = runs.map((m) => m.roots.meanLatency);
+    const p95s = runs.map((m) => m.roots.p95Latency);
     expect(Math.abs(mean(means) - 50)).toBeLessThanOrEqual(batch99(means) + 1);
-  });
-
-  it('has the heavy tail of its coefficient of variation (p95 = 3.83 x mean)', () => {
-    const p95s = SEEDS.map((seed) => runLognormal(seed).roots.p95Latency);
     expect(Math.abs(mean(p95s) - 3.83 * 50)).toBeLessThanOrEqual(0.05 * 3.83 * 50);
-  });
+  }, 30_000);
 
   it('requires a coefficient of variation, and only for lognormal', () => {
     const codes = (b: Extra) =>

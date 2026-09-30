@@ -168,6 +168,10 @@ function draftCompletenessIssues(draft: DraftScenario): ScenarioIssue[] {
   }
 
   for (const workload of draft.workloads) {
+    const p = workload.profile;
+    if ((p.kind === 'burst' && (p.peakRate === null || p.startMs === null || p.endMs === null)) || (p.kind === 'ramp' && p.endRate === null)) {
+      issues.push(draftIssue(draft.id, 'workloads', p.kind === 'burst' ? 'Enter the burst rate, start and end' : 'Enter the ramp end rate'));
+    }
     for (const cls of workload.classes) {
       const kd = cls.keyDistribution;
       if (kd.kind === null || kd.catalogSize === null || kd.hotSubset === null || kd.hotShare === null) {

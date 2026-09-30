@@ -103,6 +103,10 @@ export const READINESS_ISSUE_CODES = [
   'assertion-subject-out-of-scope',
   /** §6 Workloads: "They can target only resource entry ports." */
   'workload-target-not-resource-entry',
+  /** D50: a burst must end within the scenario's arrival window (horizon, or drain's arrival horizon). */
+  'workload-profile-outside-window',
+  /** D50: a broker's delivery route redelivers after a backoff; it has no attempt timeout. */
+  'broker-route-attempt-timeout',
   /** run-identity.md §3: compiler returned 'analysis-limit' instead of a closure. */
   'compiler-analysis-limit',
   /** run-identity.md §3: compilation was cancelled before a closure could be computed. */
@@ -767,6 +771,43 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   // --------------------------------------------------------------------------
   // §6: workloads can target only resource entry ports.
   // --------------------------------------------------------------------------
+  const arrivalWindowMs =
+    scenario.completion.kind === 'horizon'
+      ? scenario.completion.horizonMs
+      : scenario.completion.kind === 'drain'
+        ? scenario.completion.arrivalHorizonMs
+        : null;
+  scenario.workloads.forEach((w, i) => {
+    if (w.profile.kind === 'burst' && arrivalWindowMs !== null && w.profile.endMs > arrivalWindowMs) {
+      issues.push(
+        issue(
+          'workload-profile-outside-window',
+          [...scenarioPath, 'workloads', i, 'profile', 'endMs'],
+          w.id,
+          `The burst ends at ${w.profile.endMs} ms, after arrivals stop at ${arrivalWindowMs} ms`,
+        ),
+      );
+    }
+  });
+  doc.connections.forEach((conn, ci) => {
+    const src = elementsMap.get(conn.source.elementId);
+    if (
+      conn.kind === 'call' &&
+      conn.config.retry?.attemptTimeoutMs != null &&
+      src?.behavior.kind === 'resource' &&
+      src.behavior.config.type === 'broker' &&
+      closure.includedConnectionIds.includes(conn.id)
+    ) {
+      issues.push(
+        issue(
+          'broker-route-attempt-timeout',
+          ['connections', ci, 'config', 'retry', 'attemptTimeoutMs'],
+          conn.id,
+          `'${src.label}' redelivers after the backoff; a delivery route has no attempt timeout`,
+        ),
+      );
+    }
+  });
   scenario.workloads.forEach((w, i) => {
     const targetEl = elementsMap.get(w.entry.elementId);
     const isResourceEntry =

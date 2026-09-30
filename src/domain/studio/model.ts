@@ -503,7 +503,9 @@ export type ResourceConfigBase = {
    * D49: 'fixed' takes exactly 1/capacity per slot; 'exponential' draws a seeded
    * exponential time with that mean. Absent means 'fixed' (configs created before D49).
    */
-  readonly serviceTime?: 'fixed' | 'exponential';
+  readonly serviceTime?: 'fixed' | 'exponential' | 'lognormal';
+  /** D50: stdev / mean for 'lognormal' (heavy tail), 0.1..10; present only for it. */
+  readonly serviceTimeCv?: number;
 };
 
 export type SourceOrProcessorResourceConfig = ResourceConfigBase & {
@@ -1017,16 +1019,27 @@ export type RequestClass = {
 };
 
 /**
+ * D50: a workload's arrival rate over its arrival window. `burst` runs at `peakRate`
+ * between `startMs` and `endMs` (from the run start) and at `rate` otherwise; `ramp` moves
+ * linearly from `rate` to `endRate` over the arrival window.
+ */
+export type WorkloadProfile =
+  | { readonly kind: 'steady' }
+  | { readonly kind: 'burst'; readonly peakRate: number; readonly startMs: number; readonly endMs: number }
+  | { readonly kind: 'ramp'; readonly endRate: number };
+
+/**
  * Contract §6: Workload
- * Workloads keep the current WorkloadDefinition/RequestClass fields, with profile normalized to
- * {kind:'steady'}, interval to null, entryNodeId replaced by entry:Endpoint, and UUID workload/class IDs.
+ * Workloads keep the current WorkloadDefinition/RequestClass fields, with interval null,
+ * entryNodeId replaced by entry:Endpoint, UUID workload/class IDs, and a steady, burst or
+ * ramp profile (D50).
  */
 export type Workload = {
   readonly id: Id;
   readonly entry: Endpoint;
   readonly enabled: boolean;
   readonly rate: number;
-  readonly profile: { readonly kind: 'steady' };
+  readonly profile: WorkloadProfile;
   readonly timeoutMs: number;
   readonly intervalMs: null;
   readonly classes: readonly RequestClass[];

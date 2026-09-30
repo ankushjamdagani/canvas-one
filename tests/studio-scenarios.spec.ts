@@ -62,4 +62,32 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await expect(page.getByTestId('canvas-run-waits-notice')).toHaveCount(0);
     await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(0);
   });
+
+  test('D50: traffic can burst; the burst fields start empty and must be filled', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s04').click();
+    await expect(page.getByTestId('save-status')).toContainText('Saved');
+    await page.getByTestId('scenario-switcher-trigger').click();
+    await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+    const editor = page.getByTestId('scenario-editor');
+    await editor.getByRole('button', { name: /Add traffic/ }).click();
+
+    const shape = editor.getByTestId('traffic-profile-kind');
+    await expect(shape).toHaveValue('steady');
+    await shape.selectOption('burst');
+    for (const id of ['traffic-burst-peak', 'traffic-burst-start', 'traffic-burst-end']) {
+      await expect(editor.getByTestId(id)).toHaveValue('');
+    }
+    await expect(editor).toContainText('Enter the burst rate, start and end');
+    await editor.getByTestId('traffic-burst-peak').fill('50');
+    await editor.getByTestId('traffic-burst-start').fill('1000');
+    await editor.getByTestId('traffic-burst-end').fill('2000');
+    await expect(editor).not.toContainText('Enter the burst rate, start and end');
+    await page.screenshot({ path: test.info().outputPath('d50-burst.png') });
+
+    await shape.selectOption('ramp');
+    await expect(editor.getByTestId('traffic-ramp-end')).toHaveValue('');
+    await expect(editor).toContainText('Enter the ramp end rate');
+    await editor.getByRole('button', { name: 'Cancel' }).click();
+  });
 });
