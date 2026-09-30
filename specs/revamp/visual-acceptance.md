@@ -27,7 +27,9 @@
 - **Panels overlay below 1200 px** (commands.md §7), so boards drawn at 1122–1132 px show docked panels where the app shows an overlay. At 1512 px they dock.
 - **Top bar** has the scenario switcher and Run (D38) instead of "Run Simulation". Results content (charts, "vs run", p99, Stop run) follows the contracted metrics.
 
-## Open (need a design decision)
+## Open → decided (D44, 2026-09-30)
+
+O1: keep icon-only. O2: follow 16D. O3: follow the board, per-field choices by the lead. O4: follow the board. Work is planned in [plan-rv18-rv20.md](plan-rv18-rv20.md) (RV-20).
 
 | ID | Board | App today | Note |
 |---|---|---|---|

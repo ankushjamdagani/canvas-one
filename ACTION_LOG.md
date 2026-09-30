@@ -1537,3 +1537,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: axe no violations; focus-return probe all ok; 320 px reflow 9/9 states; 1,429 unit tests; `npx tsc -b`; production build; isolated production Playwright 79 passed / 4 skipped (new 320 px test); responsive sweep 45/45; touch audit 0 targets under 44 px; `git diff --check` clean.
 - **Limitations**: no screen-reader session, keyboard-only canvas editing, text-spacing or forced-colours check; 200 % zoom simulated by viewport. Below 390 px History is reached through Quick options only.
 - **Lesson:** axe passing said nothing about the overlay panels: they had no dialog role, so no rule fired. axe found 2 of the 6 defects; keyboard probes (open with Enter, close with Escape, read `activeElement`) and a 320 px reflow probe found the other 4.
+
+## 2026-09-30
+
+### Plan for items 5 and 6; board decisions recorded
+
+- **Outcome**: user decided O1–O4 (recorded as D44). Wrote [`plan-rv18-rv20.md`](specs/revamp/plan-rv18-rv20.md): RV-18 router → non-resource bridge routes (contract §8 change, kernel candidate merge, readiness rule removed), RV-19 nested refinement runtime parity (one shared resolver for closure and runner; runner maps only one hop today), RV-20 board decisions (anchored 16D toolbar, compact scenario editor per field, kind-tinted tag). Three questions open: meanings of 16D's uncontracted actions, refinement authoring, inert vs rejected inner selections.
+- **Files**: `specs/revamp/plan-rv18-rv20.md`, `decisions.md`, `visual-acceptance.md`, `ACTION_LOG.md`.
+- **Platform/subagents**: Claude lead, no subagents. No code changed.
+- **Limitations**: 16D's Replace part, Flow probe, Changes on this part, Export selection, Wrap in boundary and the ⊘ icon have no contract and no semantics in the design file; the plan proposes meanings for the user to confirm.
