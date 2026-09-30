@@ -9,7 +9,7 @@ Local records, the portable file format, publication metadata and numeric ceilin
 | Database | new Dexie `system-studio-local-v1`, version 1. The old `system-studio` DB stays untouched and is not auto-imported. |
 | Portable file | `{format:'system-studio',version:9,project:ProjectBundle}`. Versions 7, 8 and unknown ones are rejected with a clear message, and the file is left unchanged. |
 | Document / preferences / part file | `studio-model/1`, `studio-preferences/1`, `system-studio-part/1` |
-| Compiler / runner / encoding | `studio-compiler/1`, `studio-runner/1`, `canonical-json-v1` |
+| Compiler / runner / encoding | `studio-compiler/1`, `studio-runner/2` (D47; `/1` evidence is stale), `canonical-json-v1` |
 
 These are new versions, not descriptions of existing code.
 
@@ -112,7 +112,7 @@ These are v1 product ceilings, not measured performance. Bytes are UTF-8 canonic
 
 - **Depth.** Scalar payload depth is 0; each object or list adds 1. Shape depth counts shape nodes, and expression depth counts Guard/Value nodes. Raw depth counts every serialized container, with the root at 1. All limits apply at once. Inventory walks are iterative and happen after the byte check, never recursive over untrusted depth.
 - **Budgets.** Scenario budgets are positive integers ≤ the maxima. Defaults are materialized into the manifest. Limits are cumulative across nested refinements. Memory accounting is conservative byte accounting, not an exact heap measure.
-- **Trace.** The row and byte caps are independent: 100k synthetic rows exceed 16 MiB. The run stops `incomplete` at the first cap hit, and readiness and results diagnostics show both budgets. There is no sampling or hidden truncation, and display virtualization never changes stored results. Resource admission limits are modeled outcomes; hitting global budgets means incomplete, not simulated success.
+- **Trace.** The row and byte caps are independent: 100k synthetic rows exceed 16 MiB. At the first cap hit the trace stops recording rows and the run continues (D47): `RunSummary.trace` names the cap (`truncatedBy`) and the rows kept, counts, metrics and checks cover the whole run, checks that read trace rows are `unevaluated`, and Results says the trace stopped. There is no sampling, and display virtualization never changes stored results. Runs saved before D47 have no `trace` field; they stopped at the cap as `incomplete`. Resource admission limits are modeled outcomes; hitting global budgets means incomplete, not simulated success.
 - **At the project limit,** edits and runs that need space fail with recovery. The user chooses to delete unpinned artifacts, export or delete the project. Authored snapshots, history and checks are never silently removed, and there's no automatic persistent-storage permission request.
 
 ## 7. Retention

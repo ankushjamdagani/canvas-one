@@ -254,12 +254,48 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   let sourceElementReplacement: Element | undefined = undefined;
   const newSourcePortChanges: RecordChange[] = [];
 
-  if (isRouterOrBroker && hasExistingOutgoing) {
+  // Messaging between resources (D47, closes audit G1). A service-like resource publishes
+  // to a broker through its own out:message port, and a broker delivers to a consumer's
+  // in:call entry through an out:call route port (the S02/S05 consumer shape). Both ports
+  // are added by the connect gesture, like a router's route ports.
+  const resourceType = (el: Element) => (el.behavior.kind === 'resource' ? (el.behavior.config as { type: string }).type : null);
+  const publishesToBroker =
+    resourceType(sourceElement) === 'processor' &&
+    resourceType(targetElement) === 'broker' &&
+    sourcePort.channel === 'call' &&
+    targetPort.channel === 'message';
+  const brokerDeliversToCallEntry =
+    resourceType(sourceElement) === 'broker' &&
+    resourceType(targetElement) === 'processor' &&
+    sourcePort.channel === 'message' &&
+    targetPort.channel === 'call';
+
+  // Both add a port, so the duplicate-pair check below can't see an existing link to the
+  // same target port; a second publish or delivery would double every message.
+  if (
+    (publishesToBroker || brokerDeliversToCallEntry) &&
+    document.connections.some(
+      (c) => c.source.elementId === source.elementId && c.target.elementId === targetElement.id && c.target.portId === targetPort.id,
+    )
+  ) {
+    return {
+      kind: 'rejected',
+      issues: [
+        createIssue(
+          'structural-rule',
+          `'${sourceElement.label}' is already connected to '${targetElement.label}'`,
+          ['duplicate'],
+        ),
+      ],
+    };
+  }
+
+  if ((isRouterOrBroker && hasExistingOutgoing) || publishesToBroker || brokerDeliversToCallEntry) {
     const newPortId = mintId();
     const acceptedChannel = targetPort.channel;
     const newPort: Port = {
       id: newPortId,
-      label: 'out',
+      label: publishesToBroker ? 'publish' : 'out',
       direction: 'out',
       channel: acceptedChannel,
       schemaId: targetPort.schemaId,

@@ -31,5 +31,6 @@ export function createEmptySummary(mode: 'logical' | 'timed' = 'logical'): RunSu
     processedEvents: 0,
     elapsedMs: null,
     rowOutcomes: [],
+    trace: { recordedRows: 0, truncatedBy: null },
   };
 }

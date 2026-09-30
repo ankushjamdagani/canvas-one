@@ -105,7 +105,18 @@ export function evaluateAssertion(
       break;
     }
 
+    // Assertions that read trace rows must check `summary.trace?.truncatedBy`: after a
+    // trace cap the rows are partial while counts and metrics cover the whole run (D47).
     case 'trace-count': {
+      const truncatedBy = summary.trace?.truncatedBy ?? null;
+      if (truncatedBy !== null) {
+        return {
+          assertionId: assertion.id,
+          status: 'unevaluated',
+          actual: null,
+          reason: `The trace stopped recording at its ${truncatedBy === 'trace-rows' ? 'row' : 'byte'} budget, so trace counts would be partial`,
+        };
+      }
       let count = 0;
       for (const ev of events) {
         if (ev.elementId === subject.elementId && ev.code === subject.code) {

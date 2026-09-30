@@ -349,6 +349,27 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.getByTestId('connect-rejected-message')).toHaveCount(0);
   });
 
+  test('D47: a service publishes to a queue and the queue feeds a worker', async ({ page }) => {
+    await openBlankProject(page, 'Messaging');
+    const serviceId = await placeAtFraction(page, 'service', 0.1, 0.15);
+    const queueId = await placeAtFraction(page, 'queue', 0.4, 0.15);
+    const workerId = await placeAtFraction(page, 'worker', 0.1, 0.6);
+
+    for (const [sourceId, targetId, edges] of [
+      [serviceId, queueId, 1],
+      [queueId, workerId, 2],
+    ] as const) {
+      expect(await dragConnect(page, sourceId, targetId)).toBe('form');
+      await page.getByTestId('connect-form-request-class').fill('order');
+      await page.getByTestId('connect-form-op-write').check();
+      await page.getByTestId('connect-form-deadline').fill('1000');
+      await page.getByTestId('connect-form-confirm').click();
+      await expect(page.locator('.react-flow__edge')).toHaveCount(edges);
+    }
+    await expect(page.getByTestId('connect-rejected-message')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('d47-messaging.png') });
+  });
+
   test('select and delete a connected node; undo restores node and edge', async ({ page }) => {
     await openBlankProject(page, 'Select and delete');
     const queueId = await placeAtFraction(page, 'queue', 0.1, 0.3);

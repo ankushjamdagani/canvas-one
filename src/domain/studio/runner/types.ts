@@ -165,6 +165,13 @@ export type RunSummary = {
   readonly processedEvents: number;
   readonly elapsedMs: number | null;
   readonly rowOutcomes: readonly RowOutcome[];
+  /**
+   * The trace covers the whole run unless `truncatedBy` names the cap it reached
+   * (storage.md §6, D47). Counts, metrics and checks always cover the whole run; checks
+   * that read trace rows are unevaluated when the trace is truncated. Absent on runs saved
+   * before D47: those stopped at the cap as `incomplete`, so their traces were never truncated.
+   */
+  readonly trace?: { readonly recordedRows: number; readonly truncatedBy: 'trace-rows' | 'trace-bytes' | null };
 };
 
 export type RunUpdate =
@@ -184,6 +191,15 @@ export type RunUpdate =
       readonly summary: RunSummary;
       readonly reason: string | null;
     };
+
+/**
+ * The request a workload-generated root carries (model-and-runner.md §6 Workloads):
+ * the empty record, the only value the catalog's generic request schema accepts.
+ * A workload request that crosses to a boundary must satisfy that call's request schema.
+ */
+export const WORKLOAD_REQUEST_PAYLOAD: Json = Object.freeze({}) as Json;
+/** Payload reference the adapter gives workload roots; resolves to WORKLOAD_REQUEST_PAYLOAD. */
+export const WORKLOAD_PAYLOAD_REF = 'payload-workload';
 
 // ============================================================================
 // Retained adapter types (§8 "Retained adapter")

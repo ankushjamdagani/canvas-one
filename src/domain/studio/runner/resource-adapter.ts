@@ -35,6 +35,7 @@ import type {
   ElementMetric,
   TraceEvent,
 } from './types';
+import { WORKLOAD_PAYLOAD_REF } from './types';
 import {
   OpenSimulation,
   type SimLifecycleFact,
@@ -184,6 +185,8 @@ export interface ResourceAdapterOptions {
   workloads?: readonly Workload[];
   seed?: number;
   durationMs?: number;
+  /** Drain completion: workloads stop arriving here; the run continues to `durationMs`. */
+  arrivalHorizonMs?: number;
   disabledWorkloadIds?: Iterable<string>;
 }
 
@@ -267,11 +270,17 @@ function buildExecutionGraph(opts: {
     if (conn.kind === 'call') {
       const callConn = conn as CallConnection;
       edgeMap.set(conn.id, conn);
+      // A broker's call route to its consumer (S02/S05 shape) is how the broker delivers a
+      // message; the kernel models every broker route as a message delivery. The message's
+      // TTL is set on the publishing connection; this hop's 1 h TTL never binds, because a
+      // delivery's deadline is the minimum along its lineage.
+      const fromBroker = resourceElements.get(conn.source.elementId)?.behavior.kind === 'resource' &&
+        (resourceElements.get(conn.source.elementId)!.behavior as { config: { type: string } }).config.type === 'broker';
       edges.push({
         id: conn.id,
         source: conn.source.elementId,
         target: conn.target.elementId,
-        transport: 'call',
+        transport: fromBroker ? 'message' : 'call',
         latencyMs: callConn.config.latencyMs,
         returnLatencyMs: callConn.config.returnLatencyMs,
         ackDelayMs: 0,
@@ -378,6 +387,21 @@ export class ResourceAdapter {
     inFlight: 0,
   };
 
+  /**
+   * Roots the kernel generated from workloads (never admitted through `admit()`). The
+   * runner only sees finite inputs, so it adds these to its own root counts (§5 counts
+   * conserve every root, whatever its source).
+   */
+  private readonly workloadRootCounts: MutableCounts = {
+    generated: 0,
+    succeeded: 0,
+    rejected: 0,
+    failed: 0,
+    expired: 0,
+    inFlight: 0,
+  };
+  private readonly workloadUnits = new Set<string>();
+
   private readonly messageCounts: MutableCounts = {
     generated: 0,
     succeeded: 0,
@@ -395,6 +419,7 @@ export class ResourceAdapter {
     let workloads: readonly Workload[] | undefined;
     let seed: number | undefined;
     let durationMs: number | undefined;
+    let arrivalHorizonMs: number | undefined;
     let faults: readonly Fault[] | undefined;
     let relations: readonly Relation[] | undefined;
     const disabledWorkloadIds = new Set<string>(init.disabledWorkloadIds ?? []);
@@ -411,6 +436,7 @@ export class ResourceAdapter {
         durationMs = scenario.completion.horizonMs;
       } else if (scenario?.completion.kind === 'drain') {
         durationMs = scenario.completion.deadlineMs;
+        arrivalHorizonMs = scenario.completion.arrivalHorizonMs;
       }
 
       if (scenario) {
@@ -431,6 +457,7 @@ export class ResourceAdapter {
       workloads = init.workloads;
       seed = init.seed;
       durationMs = init.durationMs;
+      arrivalHorizonMs = init.arrivalHorizonMs;
       faults = init.faults;
       relations = init.relations;
     }
@@ -489,6 +516,7 @@ export class ResourceAdapter {
       hostPlacement,
       faults: kernelFaults,
       bridges: kernelBridges,
+      ...(arrivalHorizonMs !== undefined ? { arrivalHorizonSeconds: arrivalHorizonMs / 1000 } : {}),
     });
   }
 
@@ -509,6 +537,11 @@ export class ResourceAdapter {
     const failure = this.journeyFailure;
     this.journeyFailure = null;
     return failure;
+  }
+
+  /** Counts for workload-generated roots only (see `workloadRootCounts`). */
+  workloadRoots(): Counts {
+    return { ...this.workloadRootCounts };
   }
 
   /**
@@ -544,22 +577,30 @@ export class ResourceAdapter {
     if (fact.kind === 'admitted' && fact.category === 'root' && !this.unitContexts.has(fact.unitIdentity)) {
       this.rootCounts.generated++;
       this.rootCounts.inFlight++;
+      this.workloadRootCounts.generated++;
+      this.workloadRootCounts.inFlight++;
+      this.workloadUnits.add(fact.unitIdentity);
       this.unitContexts.set(fact.unitIdentity, {
         rootId: fact.unitIdentity,
         journeyId: fact.unitIdentity,
         parentEventId: null,
-        payloadRef: 'payload-workload',
+        payloadRef: WORKLOAD_PAYLOAD_REF,
         elementId: fact.nodeId,
         entryPortId: this.getEntryPortId(fact.nodeId),
       });
     } else if (fact.kind === 'rejected' && fact.category === 'root' && !this.unitContexts.has(fact.unitIdentity)) {
+      // The kernel follows a root's 'rejected' fact with its 'unit_settled' fact, which
+      // records the outcome; counting 'rejected' here too would count it twice.
       this.rootCounts.generated++;
-      this.rootCounts.rejected++;
+      this.rootCounts.inFlight++;
+      this.workloadRootCounts.generated++;
+      this.workloadRootCounts.inFlight++;
+      this.workloadUnits.add(fact.unitIdentity);
       this.unitContexts.set(fact.unitIdentity, {
         rootId: fact.unitIdentity,
         journeyId: fact.unitIdentity,
         parentEventId: null,
-        payloadRef: 'payload-workload',
+        payloadRef: WORKLOAD_PAYLOAD_REF,
         elementId: fact.nodeId,
         entryPortId: this.getEntryPortId(fact.nodeId),
       });
@@ -577,6 +618,10 @@ export class ResourceAdapter {
       } else {
         this.rootCounts.inFlight = Math.max(0, this.rootCounts.inFlight - 1);
         this.rootCounts[outcome]++;
+        if (this.workloadUnits.delete(fact.unitIdentity)) {
+          this.workloadRootCounts.inFlight--;
+          this.workloadRootCounts[outcome]++;
+        }
       }
     }
   }
@@ -1212,7 +1257,10 @@ export class ResourceAdapter {
           elementId: nodeId,
           scope: 'element',
           key: 'utilization',
-          value: nm.utilization,
+          // Share of slot-time occupied, including slots held while waiting on a downstream
+          // call or acknowledgement (model-and-runner.md §9). The kernel's processing-only
+          // `utilization` makes a blocked element look idle.
+          value: nm.occupancy,
           unit: 'ratio',
           available: true,
           reason: null,

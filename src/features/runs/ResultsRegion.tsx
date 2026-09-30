@@ -361,6 +361,12 @@ export function ResultsRegion({
                 </div>
                 <span className="text-[11px] font-mono text-secondary-text">
                   {events.length} events recorded
+                  {isMeasured && terminal?.summary?.trace?.truncatedBy && (
+                    <span data-testid="results-trace-truncated" className="block sm:inline sm:ml-1">
+                      · trace stopped at its {terminal.summary.trace.truncatedBy === 'trace-rows' ? 'row' : 'byte'} budget; counts, metrics
+                      and checks cover the whole run
+                    </span>
+                  )}
                 </span>
               </div>
 

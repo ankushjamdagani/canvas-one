@@ -133,7 +133,7 @@ Legend: **F** faithful · **S** simplified, honest · **M** misleading.
 
 Each item is for the user to decide. Items that change kernel behaviour or defaults change run results; batch them into one kernel version bump (see the plan, "Consequences").
 
-**Before any model change: fix defects B1–B8** (phase 3, "Defects"). They're bugs against the existing contracts, not modelling choices. B3 and B4 make the Results panel wrong for every traffic run today. B2 changes which arrivals happen in drain runs, so drain runs stored before the fix should be marked stale.
+**Defects B1–B5, B7, B8 and G1 are fixed (D47, 2026-09-30; runner version `studio-runner/2`, so earlier evidence is stale).** B9 (below) is open. The modelling issues below still need decisions.
 
 Modelling issues, updated by phase 3:
 
@@ -155,7 +155,7 @@ Modelling issues, updated by phase 3:
    - inert source fields hidden (moot: traffic and scheduler are unmodeled in the app);
    - cdn fixed-mode note, and default caches to LRU, because fixed mode ignores hot keys (A8);
    - database write capacity below read capacity by default (A6).
-8. **G1 (messaging can't be drawn).** Services have only call ports, the catalog queue's output is `message` and the worker's input is `call`, so the canvas rejects service → queue and queue → worker ("Channel mismatch"). Only a state machine can publish (S02/S05). The catalog.md open item 11 already doubted the `out:message` broker default. *Recommend:* give processors an out:message port (or let Connect add one, as it does for router routes), and let a broker route into a processor's entry, with the kernel treating it as a message delivery.
+8. **G1 (messaging can't be drawn): fixed (D47).** Services have only call ports, the catalog queue's output is `message` and the worker's input is `call`, so the canvas rejects service → queue and queue → worker ("Channel mismatch"). Only a state machine can publish (S02/S05). The catalog.md open item 11 already doubted the `out:message` broker default. *Recommend:* give processors an out:message port (or let Connect add one, as it does for router routes), and let a broker route into a processor's entry, with the kernel treating it as a message delivery.
 
 ## Phase 3: reference architectures (2026-09-30)
 
@@ -222,7 +222,7 @@ Predictions against results: ten of the twelve defaults predictions held. The tw
 
 ### Defects
 
-Found while building the architectures. Each has a test tagged with its ID.
+Found while building the architectures. Each has a test tagged with its ID. **Status (D47):** B1–B5, B7 and B8 fixed; B6 withdrawn; B9 open.
 
 | ID | Defect | Effect | Where |
 |---|---|---|---|
@@ -234,6 +234,17 @@ Found while building the architectures. Each has a test tagged with its ID.
 | B6 | *(withdrawn: a test error; `hotShare` is a percentage and the editor labels it so)* | — | — |
 | B7 | The trace cap ends the run: default budgets (10,000 rows) stop any traffic run after about 1,300–1,400 requests with "Budget exhausted: recorder cap hit"; the maximum budget (100,000 rows, 16 MiB) stopped these tests' runs at about 42,000 rows, 16 MiB of trace | 50/s for 30 s can't complete on defaults. This follows storage.md §6 ("stop at the first cap"), so it's a contract decision. *Recommend:* past the trace cap, stop recording rows but keep running and counting, and mark the trace as truncated. | `scenario-runner.ts` recorder cap |
 | B8 | A traffic-driven service calling a third-party boundary fails the run: "Bridge dispatch … referenced an unresolvable payload 'payload-workload'" | "Service calls Stripe" can't run under load | `scenario-runner.ts` 1705 (payload lookup); `resource-adapter.ts` 551, 562 set `'payload-workload'`, which has no payload |
+| B9 | *(open)* Metric assertions (`{kind:'metric'}`: throughput, latency, utilization) always return `unevaluated` ("unsupported in logical mode"), in timed mode too, so a scenario with one can never qualify | Latency and throughput checks, the natural checks for load runs, can't pass | `assertions.ts` `case 'metric'` |
+
+**Fixes (D47):**
+- **B1:** the kernel emits the root's `admitted` fact at a broker entry before publishing (`kernel.ts` `handleBrokerWorkloadEntry`).
+- **B2:** the kernel takes an arrival horizon separate from the run duration; drain passes `arrivalHorizonMs`.
+- **B3:** the adapter keeps workload-root counts; the runner adds them to `summary.rootCounts` and to its drain and live-root checks. So `maxLiveRoots` now counts workload roots too: a saturation run with more than the budget in flight ends `incomplete`, where before it ran on uncounted.
+- **B4:** a root's `rejected` fact counts only generation; its `unit_settled` records the outcome.
+- **B5:** element `utilization` is slot occupancy (the kernel's `occupancy`), so held slots count.
+- **B7:** at a trace cap the recorder stops keeping rows and the run continues; `RunSummary.trace` records it and Results shows it; trace-count checks become unevaluated.
+- **B8:** workload requests carry `{}`; a boundary answers a resource's outbound call and settles its bridge frame; workload traffic reuses the matching response.
+- **G1:** Connect adds a `publish` out:message port (processor → broker) and an out:call route port (broker → call entry); the adapter delivers a broker's call route as a message.
 
 Not a defect, but noted: a per-element count of generated, succeeded, rejected, failed and expired isn't among the element metrics; only queued, active and utilization are. The tests read per-root outcomes from the trace.
 
