@@ -147,6 +147,42 @@ Each item is for the user to decide. Items that change kernel behaviour or defau
    - inert source fields hidden;
    - cdn fixed-mode note.
 
-## Next (phases 2 and 3)
+## Phase 3: reference architectures (2026-09-30)
 
-- **Phase 3 reference architectures:** the twelve in the plan, run on today's defaults and again with realistic settings. Expected outcomes are written before running. Architectures 2 (queue absorbs a burst), 3 (retry storm), 9 (gateway scaling) and 10 (async order flow) are expected to **fail on today's defaults** because of H11, H12 and H13. That confirms the ranking above.
+### Correction to phase 1: which defaults the app uses
+
+The phase 1 probes built graphs from `src/domain/behaviorDefaults.ts`. Only tests import that file; the app never loads it. A studio document gets its defaults from `src/features/catalog/catalog.ts` (element config) and `src/features/catalog/connect.ts` (connection config). Scenario workloads come from `TrafficSection.tsx`: timeout 30 s, rate 1/s, steady only. The differences:
+
+| Item | Phase 1 probe (`behaviorDefaults`) | App (catalog and connect) | Effect on findings |
+|---|---|---|---|
+| traffic, scheduler, client, mobile, device | Processors or sources with capacity | **Unmodeled**, diagram labels only (D42 resolution 12). Workloads enter a resource's entry port directly. | **H7 and H16 don't apply to the app.** E3 measured a graph the app can't build. |
+| Message TTL | 2 s | **10 s**, still including queue time | H12 stands, but milder: a queue buffers about 10 s of backlog, not 2 s |
+| Message ack delay | 8 ms | 0 ms | None |
+| Call latency | 0 ms | 0 ms | H2 stands |
+| Broker queue limit | — | 500 | New: a queue holds at most 500 waiting messages by default |
+| Worker | — | 100/s per slot, 2 slots, 2 retries, no local queue | — |
+| Gateway, balancer, firewall | 1 slot | 1 slot, 2000/s, queue 500 | H11 stands |
+| Database | 500/s, 1 slot | 500/s read and write, 1 slot | Same |
+
+Phase 3 builds every architecture with the app's own `placeEntry` and `planConnection`, so the defaults under test are the ones a user gets.
+
+### Expected outcomes (written before running)
+
+"Defaults" means catalog and connection defaults, with only the values the architecture needs (rates, and latencies where the architecture is about latency). "Realistic" means values a practitioner would pick: concurrency 16, links of a few ms, a queue TTL of minutes, and so on. Each test lists its exact values.
+
+| # | Architecture | Real-world expectation | Prediction: defaults | Prediction: realistic |
+|---|---|---|---|---|
+| A1 | Cache in front of a database | At a hit rate that keeps the database below saturation, reads succeed. When the hit rate drops, the database saturates and requests fail. | Holds. The cache's one slot is held during misses, which lowers the load it can take. | Holds |
+| A2 | Queue absorbs a 5× burst | During a burst the backlog grows; workers drain it afterwards; nothing is lost while the backlog is within the queue limit. | **Fails.** Broker queue limit 500 rejects publishes, and 10 s TTL expires waiting messages (H12). | Holds with TTL 300 s and queue limit 10,000 |
+| A3 | Retry storm | An overloaded service with caller retries fails worse (more attempts, lower goodput) than without them. | **Can't be expressed.** Callers never retry, and `maxRetries` doesn't react to rejections (H13). Rejections identical with and without retries. | Same (model gap) |
+| A4 | Balancer failover | Errors during the detection delay (≈ load on the failed host × delay), then all traffic succeeds on the healthy instance. | Holds | Holds |
+| A5 | Pub/sub fan-out; stream with two consumers | Pub/sub: each subscriber receives every event. Stream: each consumer group receives every event. | Pub/sub holds. **Stream fails**: events are split between consumers (H14). | Same |
+| A6 | Write-heavy mix on a database | Writes cost more than reads, so a write-heavy mix saturates sooner than a read-heavy one at the same rate. | **Fails**: read and write capacity default to the same value (500/s), so the mix doesn't matter. Default issue, not a model gap. | Holds with write capacity below read capacity |
+| A7 | Synchronous chain and timeouts | Latency grows with hops (2 × hops × link latency). A timeout shorter than the tail causes expirations under load, and not under light load. | Latency part holds, but with 0 ms links there's nothing to add up (H2). With 5 ms links, a chain of 1-slot services **collapses** at modest load (H11). | Holds with concurrency 16 |
+| A8 | Hot keys on an LRU cache | A skewed key distribution hits more often than a uniform one. | **Fails**: the default `fixed` mode ignores keys, so both hit 80%. | Holds in `lru` mode |
+| A9 | Gateway in front of replicas | Throughput grows with the replica count until the gateway itself saturates. | **Fails**: a 1-slot gateway holds its slot for each backend call, so throughput stays flat as replicas are added (H11). | Holds up to the 16-slot cap, then flattens (H11 cap) |
+| A10 | Async order flow (S05) | Checkout latency doesn't depend on the fulfilment worker's speed. | Holds: the reply is released before fulfilment | Holds |
+| A11 | Batch into a pipeline | Rows that fail validation go to the error output; valid rows reach the result. | Holds (S03) | Holds |
+| A12 | Third-party boundary | A slow boundary response shows as caller latency; a failed one as caller failure. | Holds, with the scripted delay as a constant | Holds |
+
+Predicted defaults failures: A2, A3, A5 (stream), A6, A8, A9, and A7 once links have latency. That's more than the four phase 1 predicted; A6 and A8 are default issues, not model gaps.
