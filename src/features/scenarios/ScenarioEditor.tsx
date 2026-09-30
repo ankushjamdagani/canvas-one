@@ -56,10 +56,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
       <div data-testid="scenario-editor-missing" className="p-4 text-xs text-secondary-text">
         This scenario was deleted elsewhere.
         <div className="pt-2">
-          <Button type="button" size="sm" onClick={onApply} disabled={!canApply} data-testid="scenario-editor-apply" className="w-full">
-          Apply
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             Close
           </Button>
         </div>
@@ -327,6 +324,9 @@ function ScenarioEditorFooter({
       <div className="grid grid-cols-2 gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={handle.status === 'saving'} className="w-full">
           Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={onApply} disabled={!canApply} data-testid="scenario-editor-apply" className="w-full">
+          Apply
         </Button>
       </div>
     </div>
