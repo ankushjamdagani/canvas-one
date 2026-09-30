@@ -1546,3 +1546,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Files**: `specs/revamp/plan-rv18-rv20.md`, `decisions.md`, `visual-acceptance.md`, `ACTION_LOG.md`.
 - **Platform/subagents**: Claude lead, no subagents. No code changed.
 - **Limitations**: 16D's Replace part, Flow probe, Changes on this part, Export selection, Wrap in boundary and the ⊘ icon have no contract and no semantics in the design file; the plan proposes meanings for the user to confirm.
+
+### RV-19 nested refinement runtime parity
+
+- **Outcome**: added one pure refinement router shared by closure and runtime. It resolves mappings transitively in both directions, makes nested selections inert below an aggregate owner, excludes the aggregate's complete ownership subtree, remaps connections to deepest endpoints, mirrors inner emissions to outer-authored routes, and reports depth-aware crossing violations through readiness and runtime `invalid-refinement-selection`. Duplicate and unknown selection errors remain unchanged. Updated the §6 contract and removed the obsolete one-level limitation from the handoff.
+- **Files**: `src/domain/studio/refinementRouting.ts`, closure, readiness, scenario runner, their refinement tests, `model-and-runner.md`, `HANDOFF.md`, `LESSONS.md`.
+- **Platform/subagents**: Codex executor, no subagents.
+- **Verification**: `npx tsc -b`; 1,446 unit tests in 126 files passed with `--isolate false`; production build passed with `--configLoader runner`, largest chunk 420.81 kB (no chunk over 500 kB); `git diff --check` clean. Before the final test addition, the default isolated full run passed 1,444/1,445 tests but twice timed out in the unrelated `session.test.ts` 101-apply case under load (9.86); that file passed alone, 34/34. Playwright intentionally not run per executor instructions.
+- **Limitations**: the ordinary bundled Vite config loader cannot write through this worktree's external `node_modules` symlink under the sandbox, so Vitest/build used Vite's equivalent non-bundling `runner` config loader. The isolated-worker full-suite timeout remains a machine-load flake; the complete reused-worker run is green.
+- **Lesson:** `ScenarioRunner` checks `maxEvents` at step boundaries; `processedEvents` includes a terminating over-budget attempt, and a run whose work consumes the nominal count needs another step to observe quiescence.
