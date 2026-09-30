@@ -259,6 +259,14 @@ describe('Refinement selection (RV-14f, §6)', () => {
     expect(result.reason).toMatch(/running both paths is invalid/i);
   });
 
+  it('an unknown refinement selection keeps the existing invalid-selection error', async () => {
+    const { document, scenario } = docWith([{ refinementId: 'missing-refinement', mode: 'refined' }]);
+    const result = await runScenario(document, scenario.id, 'run-unknown-refinement');
+
+    expect(result.status).toBe('invalid');
+    expect(result.reason).toBe("Refinement selection references unknown refinement 'missing-refinement'");
+  });
+
   it('a refined selection whose owner has a crossing connection with no compatible port mapping is invalid', async () => {
     const mismatchedRefinement: Refinement = { ...refinement, portMappings: [] };
     const connections = [dataConnection('caller-to-owner', 'caller', 'caller-out', 'owner', 'owner-in')];
