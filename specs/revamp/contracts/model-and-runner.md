@@ -176,6 +176,9 @@ Logical completion needs all inputs consumed, the queue drained and all frames s
 - `Refinement={id,ownerElementId,memberElementIds:Id[],portMappings:[{id,outer:Endpoint,inner:Endpoint}]}` and `Selection={refinementId,mode:'aggregate'|'refined'}`.
 - Same-document only in v1; the candidate snapshot pins content, with no live external fetch. Each member has at most one owner, and recursive ownership is rejected as a storable structural error (D33). Every crossing port has exactly one compatible mapping.
 - Aggregate runs the owner and excludes members; refined runs the members and excludes the owner. Nesting is allowed within expansion budgets.
+- Port mappings resolve transitively in both directions at runtime and during scope closure: outer-to-inner routing reaches the deepest selected member, and an inner mapped-port emission also activates connections authored at every mapped outer port.
+- A selection whose owner is excluded by an outer aggregate selection is inert. The outer owner runs and every element inside its ownership subtree is excluded.
+- After inert selections are removed, every connection crossing a refined owner boundary at any nesting depth requires a compatible mapping. Missing mappings reject readiness and the run as `invalid-refinement-selection`.
 - Unselected visible elements stay uncovered. View expand/collapse never changes execution.
 
 **Assertions and assumptions.**

@@ -23,6 +23,7 @@ import type {
   ResourceBehavior,
 } from './model';
 import type { Issue } from './validate';
+import { resolveRefinementRouting } from './refinementRouting';
 
 // ============================================================================
 // Closure Issue Codes and Types
@@ -219,85 +220,13 @@ export function computeClosure(
   const relationsMap = new Map<Id, Relation>();
   for (const rel of doc.relations) relationsMap.set(rel.id, rel);
 
-  // Process scenario refinement selections
-  // model-and-runner.md §6: "Aggregate runs the owner and excludes members; refined runs the members and excludes the owner."
+  // Process scenario refinement selections through the shared runtime/compiler routing model.
+  // model-and-runner.md §6: mappings are transitive in both directions; a nested
+  // selection below an aggregate outer refinement is inert.
   const refinementMap = new Map<Id, Refinement>();
   for (const ref of doc.refinements) refinementMap.set(ref.id, ref);
-
-  const refinementExcludedElementIds = new Set<Id>();
-  const refinedOuterToInner = new Map<string, Endpoint>();
-  const refinedInnerToOuter = new Map<string, Endpoint[]>();
-
-  for (const sel of scenario.refinementSelections) {
-    const ref = refinementMap.get(sel.refinementId);
-    if (!ref) continue;
-
-    if (sel.mode === 'aggregate') {
-      // Keeps the owner and excludes members
-      for (const mId of ref.memberElementIds) {
-        refinementExcludedElementIds.add(mId);
-      }
-    } else if (sel.mode === 'refined') {
-      // Excludes the owner and includes members
-      refinementExcludedElementIds.add(ref.ownerElementId);
-
-      for (const mapping of ref.portMappings) {
-        const outerKey = `${mapping.outer.elementId}:${mapping.outer.portId}`;
-        const innerKey = `${mapping.inner.elementId}:${mapping.inner.portId}`;
-
-        refinedOuterToInner.set(outerKey, mapping.inner);
-
-        const existing = refinedInnerToOuter.get(innerKey) ?? [];
-        existing.push(mapping.outer);
-        refinedInnerToOuter.set(innerKey, existing);
-      }
-    }
-  }
-
-  /**
-   * Resolves an endpoint through refined portMappings (outer -> inner).
-   * model-and-runner.md §6: "routing through portMappings (outer -> inner)"
-   */
-  function resolveRefinedEndpoint(ep: Endpoint): Endpoint {
-    let curr = ep;
-    const seen = new Set<string>();
-    while (true) {
-      const key = `${curr.elementId}:${curr.portId}`;
-      if (seen.has(key)) break;
-      seen.add(key);
-      const inner = refinedOuterToInner.get(key);
-      if (!inner) break;
-      curr = inner;
-    }
-    return curr;
-  }
-
-  /**
-   * For an outbound port, returns all endpoints (original inner/member and mapped outer)
-   * that can activate outbound connections authored at this or outer ports.
-   */
-  function getOutboundPortEndpoints(elementId: Id, portId: Id): Endpoint[] {
-    const results: Endpoint[] = [{ elementId, portId }];
-    const queue: Endpoint[] = [{ elementId, portId }];
-    const seen = new Set<string>([`${elementId}:${portId}`]);
-
-    while (queue.length > 0) {
-      const curr = queue.shift()!;
-      const key = `${curr.elementId}:${curr.portId}`;
-      const outers = refinedInnerToOuter.get(key);
-      if (outers) {
-        for (const outer of outers) {
-          const outerKey = `${outer.elementId}:${outer.portId}`;
-          if (!seen.has(outerKey)) {
-            seen.add(outerKey);
-            results.push(outer);
-            queue.push(outer);
-          }
-        }
-      }
-    }
-    return results;
-  }
+  const refinementRouting = resolveRefinementRouting(doc, scenario);
+  const refinementExcludedElementIds = new Set(refinementRouting.excludedElementIds);
 
   // --------------------------------------------------------------------------
   // Step 3: Work Queue and Visited Sets Setup (storage.md §6 Compiler limits)
@@ -350,20 +279,20 @@ export function computeClosure(
   // --------------------------------------------------------------------------
   for (const ep of scenario.entryPorts) {
     referencesCount += 2;
-    const resolved = resolveRefinedEndpoint(ep);
+    const resolved = refinementRouting.resolveOuterToInner(ep);
     enqueueElement(resolved.elementId);
   }
 
   for (const inp of scenario.inputs) {
     referencesCount += 2;
-    const resolved = resolveRefinedEndpoint(inp.entry);
+    const resolved = refinementRouting.resolveOuterToInner(inp.entry);
     enqueueElement(resolved.elementId);
     enqueueFixture(inp.fixtureId);
   }
 
   for (const w of scenario.workloads) {
     referencesCount += 2;
-    const resolved = resolveRefinedEndpoint(w.entry);
+    const resolved = refinementRouting.resolveOuterToInner(w.entry);
     enqueueElement(resolved.elementId);
   }
 
@@ -377,6 +306,7 @@ export function computeClosure(
   // Structural relations: contains when used by active refinement
   // "structuralRelationIds: Id[] (sorted: only interpreted relations — deployed-on for included resources, contains when used by refinement)"
   for (const sel of scenario.refinementSelections) {
+    if (!refinementRouting.activeRefinementIds.includes(sel.refinementId)) continue;
     const ref = refinementMap.get(sel.refinementId);
     if (!ref) continue;
     const memberSet = new Set(ref.memberElementIds);
@@ -493,7 +423,7 @@ export function computeClosure(
         const sortedConns = [...doc.connections].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
         for (const portId of reachablePortIds) {
           // Resolve endpoints that could trigger outbound connections (including refinement outer mappings)
-          const sourceEndpoints = getOutboundPortEndpoints(el.id, portId);
+          const sourceEndpoints = refinementRouting.outboundEndpoints(el.id, portId);
           for (const srcEp of sourceEndpoints) {
             for (const conn of sortedConns) {
               if (conn.source.elementId === srcEp.elementId && conn.source.portId === srcEp.portId) {
@@ -536,7 +466,7 @@ export function computeClosure(
           }
         } else {
           // Target is inside declared scope: element becomes reached
-          const resolvedTarget = resolveRefinedEndpoint(conn.target);
+          const resolvedTarget = refinementRouting.resolveOuterToInner(conn.target);
           enqueueElement(resolvedTarget.elementId);
         }
       }
