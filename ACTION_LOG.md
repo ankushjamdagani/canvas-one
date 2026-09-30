@@ -1546,3 +1546,17 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Files**: `specs/revamp/plan-rv18-rv20.md`, `decisions.md`, `visual-acceptance.md`, `ACTION_LOG.md`.
 - **Platform/subagents**: Claude lead, no subagents. No code changed.
 - **Limitations**: 16D's Replace part, Flow probe, Changes on this part, Export selection, Wrap in boundary and the ⊘ icon have no contract and no semantics in the design file; the plan proposes meanings for the user to confirm.
+
+### RV-18 dropped; realism plan; RV-19/RV-20 lanes started (status)
+
+- **Outcome**:
+  - `7b3aaea`: RV-18 dropped (D45). Readiness code `router-bridge-unsupported` is now `router-route-needs-resource`, telling the author to put a component with capacity (e.g. a Service) between the router and the machine. Contract §8 records the rule.
+  - `a17852b`: [`plan-realism-validation.md`](specs/revamp/plan-realism-validation.md): claim audit, statistical queueing oracles, 12 reference architectures, defaults review. Ten hypotheses, e.g. deterministic service time under-predicts tails, zero default call latency.
+  - `f5e1dd3`: `/delegate` subtasks can set `cwd` (their own worktree).
+  - `/delegate` run `.delegate/runs/20260930-113429`: three lanes in worktrees `claude/rv20-toolbar-tag` (Gemini: O4 tag, O2 anchored toolbar), `claude/rv20-scenario-editor` (Gemini: O3), `claude/rv19-refinement` (Codex: shared refinement resolver). Gemini critic passed the plan.
+- **Blockers hit**:
+  - Headless agy auto-denied shell commands: added scoped allow-rules to `~/.gemini/antigravity-cli/settings.json` (user approved; backup in the session scratchpad).
+  - agy then failed with `failed to create PTY`: `traycer-host` held 509 of 511 PTYs. Killed with the user's approval.
+  - Codex read AGENTS.md §2 and started its own nested `/delegate` run instead of implementing.
+  - A second `dispatch` while Codex was running treated its `.pid` as orphaned and killed it. Prompts now forbid nested delegation; lanes relaunched.
+- **Lesson:** executor prompts must say "you are an executor; don't delegate", because AGENTS.md tells every agent to use `/delegate`. Never run `state.py dispatch` while any lane of the round is live: it kills lanes that have a `.pid`. agy `failed to create PTY` can mean the machine is out of PTYs (`lsof /dev/ptmx`), not a sandbox limit.

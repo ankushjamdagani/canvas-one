@@ -35,6 +35,9 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **Check delegate output against source before integrating.** Delegates repeatedly got FIFO/reservation accounting, cancellation order and random draws wrong. Why: 2026-09-13.
 - **Verify reviewer claims before applying them.** Reviewers have cited wrong callers and stale decisions. Why: 2026-09-22.
 - **Self-reviewed corrections don't close a review.** Closure needs an independent reviewer (fresh session or subagent). Why: 2026-09-23 S05.
+- **Start every executor prompt with "you are an executor: don't use /delegate or spawn agents".** AGENTS.md §2 tells every agent to delegate, and Codex started a nested `/delegate` run instead of implementing. Why: 2026-09-30 RV-19 lane.
+- **Don't run `state.py dispatch` while any lane of the round is live.** It treats a `.pid` as orphaned and kills that lane. Re-dispatch only after the round has finished. Why: 2026-09-30.
+- **If agy fails with `failed to create PTY`, check `lsof /dev/ptmx` before blaming the sandbox.** A leaking process had taken 509 of 511 PTYs. Why: 2026-09-30 (`traycer-host`).
 - **Smoke-test an executor with a no-edit prompt before dispatching real lanes.** Why: 2026-09-23 preflight caught a blocked executor cheaply.
 - **Reject invented defaults in delegate code.** Grep delegate diffs for fallbacks such as `?? 'unknown'`, `|| 'main'`, success inferred from a missing outcome, zero-filled counts, placeholder labels and `as unknown as` casts; the contract needs an explicit value or a typed rejection. Why: review rounds on 2026-09-24 (RV-14d/e/f, RV-08c/e, RV-16b), 2026-09-26 (RV-11a), 2026-09-28 (RV-05c).
 - **Run each executor lane in its own git worktree and commit partial work.** Quota and rate-limit hits interrupted Gemini, Sonnet and Codex lanes about 10 times; intact worktrees let another executor resume. Why: 2026-09-24 → 2026-09-29.
