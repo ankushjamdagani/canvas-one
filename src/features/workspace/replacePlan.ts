@@ -184,11 +184,15 @@ export function planReplacePart(
   if (!generated) return { ok: false, reason: 'The replacement entry did not create a component' };
   const replacement = { ...generated, label: oldElement.label };
   const schemaById = new Map<Id, PayloadSchema>(placedDocument.document.schemas.map((schema) => [schema.id, schema]));
+  // Each old port moves to the first compatible port of the replacement not already taken,
+  // so two old ports never collapse onto one new port.
   const portMap = new Map<Id, Id>();
+  const taken = new Set<Id>();
   for (const oldPort of oldElement.ports) {
     const oldSchema = schemaById.get(oldPort.schemaId);
     if (!oldSchema) continue;
     const compatible = replacement.ports.find((port) => {
+      if (taken.has(port.id)) return false;
       if (port.direction !== oldPort.direction || port.channel !== oldPort.channel) return false;
       const newSchema = schemaById.get(port.schemaId);
       if (!newSchema || !shapesCompatible(oldSchema.shape, newSchema.shape)) return false;
@@ -198,7 +202,10 @@ export function planReplacePart(
       const newResponse = schemaById.get(port.responseSchemaId);
       return Boolean(oldResponse && newResponse && shapesCompatible(oldResponse.shape, newResponse.shape));
     });
-    if (compatible) portMap.set(oldPort.id, compatible.id);
+    if (compatible) {
+      portMap.set(oldPort.id, compatible.id);
+      taken.add(compatible.id);
+    }
   }
 
   const movedConnectionIds: Id[] = [];
