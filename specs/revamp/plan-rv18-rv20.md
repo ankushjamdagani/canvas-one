@@ -135,7 +135,9 @@ Only one row is expanded at a time. Keyboard: a row is a button with `aria-expan
 
 Each item gets its own commit series on `master`, the checks in AGENTS.md §5, and entries in the ledger and `ACTION_LOG.md`.
 
-## Questions
+## Questions (answered 2026-09-30: all as recommended)
+
+Q1: build every proposed meaning. The ⊘ icon has no meaning to recommend, so it is dropped. Q2: pair RV-19 with "Wrap in boundary". Q3: inert. RV-18 is under discussion; see the ACTION_LOG entry for 2026-09-30.
 
 - **Q1 — 16D's uncontracted actions.** For each, a proposed meaning; say which to build:
   - **Wrap in boundary:** create a new owner element that refines the selection (members = selection, crossing ports mapped automatically). This is the natural authoring entry for refinement (RV-19).
