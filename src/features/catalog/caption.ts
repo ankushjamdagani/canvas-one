@@ -76,7 +76,7 @@ export function defaultsLine(entry: CatalogEntry): string {
       break;
   }
 
-  if (cfg.serviceTime === 'fixed' || cfg.serviceTime === 'exponential') {
+  if (cfg.serviceTime === 'fixed' || cfg.serviceTime === 'exponential' || cfg.serviceTime === 'lognormal') {
     parts.push(value(RESOURCE_CONFIG_COPY.serviceTime.label, RESOURCE_CONFIG_COPY.serviceTime.options[cfg.serviceTime]));
   }
 

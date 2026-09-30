@@ -18,8 +18,10 @@ export const RESOURCE_CONFIG_COPY = {
     options: {
       fixed: 'Fixed',
       exponential: 'Variable (exponential)',
+      lognormal: 'Heavy tail (lognormal)',
     },
   },
+  serviceTimeCv: { label: 'Variability (stdev / mean)' },
   strategy: {
     label: 'Strategy',
     options: {

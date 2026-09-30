@@ -107,6 +107,19 @@ describe('fieldsForElement: resource variants', () => {
     expect(concurrency.parse('1024').ok).toBe(true);
   });
 
+  it('service time: choosing lognormal sets a variability of 2 and shows its field; leaving it drops it (D50)', () => {
+    const el = processorElement();
+    const field = fieldsForElement(el).find((f) => f.id === 'config.serviceTime')!;
+    const heavy = field.apply(el, 'lognormal');
+    expect(heavy.behavior.kind === 'resource' && heavy.behavior.config).toMatchObject({ serviceTime: 'lognormal', serviceTimeCv: 2 });
+    const cv = fieldsForElement(heavy).find((f) => f.id === 'config.serviceTimeCv')!;
+    expect(cv.parse('0.05').ok).toBe(false);
+    expect(cv.parse('4').ok).toBe(true);
+    const back = field.apply(heavy, 'exponential');
+    expect(back.behavior.kind === 'resource' && 'serviceTimeCv' in back.behavior.config).toBe(false);
+    expect(fieldsForElement(back).some((f) => f.id === 'config.serviceTimeCv')).toBe(false);
+  });
+
   it('service time: absent reads as fixed; choosing exponential writes it (D49)', () => {
     const el = processorElement();
     const field = fieldsForElement(el).find((f) => f.id === 'config.serviceTime')!;

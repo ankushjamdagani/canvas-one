@@ -22,7 +22,7 @@ import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { Switch } from '../../components/ui/switch';
 import { inboundEndpointOptions, endpointLabel } from './pickers';
-import { UNSET_KEY_DISTRIBUTION, type DraftRequestClass, type DraftScenario, type DraftWorkload } from './draftScenario';
+import { UNSET_KEY_DISTRIBUTION, type DraftRequestClass, type DraftScenario, type DraftWorkload, type DraftWorkloadProfile } from './draftScenario';
 import type { ScenarioIssue } from './types';
 import { summarizeWorkloadMix } from './summaries';
 import { CompactRow } from './CompactRow';
@@ -170,6 +170,10 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
               }
             >
               <div className="space-y-3">
+                <ProfileFields
+                  profile={workload.profile}
+                  onChange={(profile) => updateWorkload(workload.id, (w) => ({ ...w, profile }))}
+                />
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1 text-[11px] text-secondary-text col-span-2">
                     Timeout (ms)
@@ -225,6 +229,65 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
         )}
       </div>
     </section>
+  );
+}
+
+const numberOrNull = (raw: string): number | null => {
+  if (raw.trim() === '') return null;
+  const v = Number(raw);
+  return Number.isFinite(v) ? v : null;
+};
+
+/** D50: steady, burst (peak rate between two times) or ramp (to an end rate over the arrival window). */
+function ProfileFields({
+  profile,
+  onChange,
+}: {
+  readonly profile: DraftWorkloadProfile;
+  readonly onChange: (profile: DraftWorkloadProfile) => void;
+}) {
+  const field = (label: string, testId: string, value: number | null, set: (v: number | null) => void) => (
+    <label className="space-y-1 text-[11px] text-secondary-text">
+      {label}
+      <Input type="number" min={0} step="any" placeholder="—" data-testid={testId} value={value ?? ''} onChange={(e) => set(numberOrNull(e.target.value))} />
+    </label>
+  );
+  return (
+    <div className="space-y-2">
+      <label className="block space-y-1 text-[11px] text-secondary-text">
+        Shape
+        <NativeSelect
+          data-testid="traffic-profile-kind"
+          value={profile.kind}
+          onChange={(e) => {
+            const kind = e.target.value;
+            onChange(
+              kind === 'burst'
+                ? { kind: 'burst', peakRate: null, startMs: null, endMs: null }
+                : kind === 'ramp'
+                  ? { kind: 'ramp', endRate: null }
+                  : { kind: 'steady' },
+            );
+          }}
+        >
+          <NativeSelectOption value="steady">Steady</NativeSelectOption>
+          <NativeSelectOption value="burst">Burst (a higher rate for a while)</NativeSelectOption>
+          <NativeSelectOption value="ramp">Ramp (rate changes steadily)</NativeSelectOption>
+        </NativeSelect>
+      </label>
+      {profile.kind === 'burst' && (
+        <div className="grid grid-cols-3 gap-2">
+          {field('Peak rate (/s)', 'traffic-burst-peak', profile.peakRate, (v) => onChange({ ...profile, peakRate: v }))}
+          {field('Starts at (ms)', 'traffic-burst-start', profile.startMs, (v) => onChange({ ...profile, startMs: v }))}
+          {field('Ends at (ms)', 'traffic-burst-end', profile.endMs, (v) => onChange({ ...profile, endMs: v }))}
+        </div>
+      )}
+      {profile.kind === 'ramp' && (
+        <div className="grid grid-cols-2 gap-2">
+          {field('Rate at the end (/s)', 'traffic-ramp-end', profile.endRate, (v) => onChange({ ...profile, endRate: v }))}
+        </div>
+      )}
+    </div>
   );
 }
 

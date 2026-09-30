@@ -52,6 +52,8 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 
 ## Code
 
+- **Give every retried or redelivered kernel operation its own path (`~n`, `#n`).** Seeded draws are keyed by unit, path and attempt, so a reused path replays the same failure on every retry. Why: 2026-09-30 RV-25 (redelivery failed the same messages forever).
+
 - **Build test and audit graphs through the app's own planners (`placeEntry`, `planConnection`), not hand-built records or `behaviorDefaults.ts`.** `behaviorDefaults` is test-only and differs from the catalog, and hand-built fixtures hide connect rules the canvas enforces. Why: 2026-09-30 realism phase 3 (phase 1 probed defaults the app never loads; G1 and B1–B8 surfaced only through the planners).
 
 - **Don't split with `React.lazy`/Suspense on user-facing paths; use `src/lib/lazyComponent.tsx`, and time the affected interaction against a baseline build.** React 19 throttles Suspense reveals ~300 ms even for cached chunks. Why: 2026-09-29 bundle split made project open 830 ms.

@@ -1729,3 +1729,32 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - router utilization covers only its own processing.
 - Left as-is: lowering Attempts to 1 in the same draft as edits to the detail fields drops those edits along with the policy; the fields disappear with it.
 - Final: 1,530 unit tests; tsc clean; build clean; isolated e2e 89 passed / 4 skipped; axe clean.
+
+### RV-25: remaining realism limits (D50)
+
+- **Outcome**: the user asked to remove the D49 limits.
+  - Kernel:
+    - Bridge retries: each attempt opens a new frame; an attempt timeout abandons the frame and a late reply to it is ignored.
+    - Broker redelivery on a failed consumer: after the backoff the message goes back on the queue for any consumer, up to `maxAttempts` deliveries; each delivery gets its own path, so seeded draws stay independent.
+    - Router retries on another route: round robin takes the next route without moving the cursor, weighted redraws, and conditional keeps its route.
+    - `serviceTime: 'lognormal'` with `serviceTimeCv`.
+  - Studio:
+    - lognormal in the model, validation, merge descriptor and inspector (choosing it sets a visible cv of 2);
+    - workload profiles steady/burst/ramp through the model, validation, manifest, drafts (unset until typed), Traffic section "Shape" and adapter (ms to s);
+    - retries passed to broker routes and bridge calls;
+    - readiness `workload-profile-outside-window` and `broker-route-attempt-timeout`.
+  - Runner `studio-runner/5`; contracts; D50; audit.
+- **Tests**:
+  - `model-d50.test.ts` (8): lognormal mean and p95, validation, router next-route, single-route, conditional keeps its route, redelivery 1 + p + p², no-policy, broker timeout rejected.
+  - Nine studio tests: burst absorbed and drained, ramp, burst window readiness, third-party retries and timeouts, queue redelivery, broker timeout readiness, gateway retry, heavy tail.
+  - Inspector lognormal unit test; e2e "D50: traffic can burst".
+- **Review**: Sonnet REVISE, then fixed.
+  - `retryRoute` threw on a conditional router with no other match, and could misroute to the fallback.
+  - The retry policy now comes from the first attempt's route for the whole chain.
+  - The bridge frame maps are pruned.
+  - `serviceTimeCv ?? 1` is now an assertion.
+- **Noted**:
+  - A retried bridge call from a finite request consumes another scripted boundary response (the contract's consume rule), so exhaustion fails the run.
+  - The broker redelivery policy comes from the route that delivered the failed attempt.
+- **Verification**: 1,548 unit tests pass (9 skipped); `npx tsc -b` clean; build clean, no chunk warning; isolated production e2e 90 passed / 4 skipped (after `npm run build`); axe clean (pre-review run). The one unrelated `session.test.ts` timeout seen by the reviewer passed on an isolated rerun (load average ~6).
+- **Lesson:** a redelivered or retried operation needs its own path in the seeded-draw key; reusing the path replays the same random failure every time (the first redelivery run failed exactly the same half of messages forever).

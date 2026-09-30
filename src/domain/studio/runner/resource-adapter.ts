@@ -290,8 +290,8 @@ function buildExecutionGraph(opts: {
           ? { field: callConn.config.condition.field, value: String(callConn.config.condition.value) }
           : undefined,
         fallback: callConn.config.fallback,
-        // D49: caller retries apply to calls; a broker delivery has no caller to retry.
-        ...(!fromBroker && callConn.config.retry ? { retry: callConn.config.retry } : {}),
+        // D49/D50: a caller's retries, or a broker route's redelivery policy.
+        ...(callConn.config.retry ? { retry: callConn.config.retry } : {}),
       });
     } else if (conn.kind === 'message') {
       const msgConn = conn as MessageConnection;
@@ -324,6 +324,13 @@ function buildExecutionGraph(opts: {
     rate: w.rate,
     timeoutMs: w.timeoutMs,
     intervalMs: w.intervalMs ?? undefined,
+    // D50: the ms<->s conversion lives only at this boundary.
+    profile:
+      w.profile.kind === 'burst'
+        ? { kind: 'burst', peakRate: w.profile.peakRate, start: w.profile.startMs / 1000, end: w.profile.endMs / 1000 }
+        : w.profile.kind === 'ramp'
+          ? { kind: 'ramp', endRate: w.profile.endRate }
+          : { kind: 'steady' },
     classes: w.classes.map((c: StudioRequestClass): KernelRequestClass => ({
       id: c.id,
       name: c.name,
@@ -505,7 +512,9 @@ export class ResourceAdapter {
     const kernelBridges: KernelBridgeConfig[] = [];
     for (const [nodeId, conn] of bridgeConnByNode.entries()) {
       const returnLatencyMs = conn.kind === 'call' ? (conn as CallConnection).config.returnLatencyMs : 0;
-      kernelBridges.push({ nodeId, returnLatencyMs });
+      // D50: a resource's retries on a call that leaves the kernel (e.g. to a boundary).
+      const retry = conn.kind === 'call' ? ((conn as CallConnection).config.retry ?? null) : null;
+      kernelBridges.push({ nodeId, returnLatencyMs, retry, connectionId: conn.id });
     }
 
     const hasActiveWorkloads = graph.workloads.some((w) => w.enabled && !disabledWorkloadIds.has(w.id));
@@ -1071,9 +1080,10 @@ export class ResourceAdapter {
           outcome: null,
         };
       case 'call_retry': {
-        // D49: the caller sends another attempt along this call connection after a backoff.
+        // D49/D50: the caller sends another attempt along this call connection after a
+        // backoff (a kernel edge, a bridge connection, or a broker route's redelivery).
         if (!fact.edgeId) return null;
-        const conn = this.edgeMap.get(fact.edgeId);
+        const conn = this.edgeMap.get(fact.edgeId) ?? [...this.bridgeConnByNode.values()].find((c) => c.id === fact.edgeId);
         if (!conn) return null;
         return {
           id,

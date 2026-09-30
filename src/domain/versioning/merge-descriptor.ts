@@ -158,6 +158,7 @@ export const RESOURCE_CONFIG_DESCRIPTOR: UnionFieldDescriptor = {
         maxRetries: { type: 'scalar' },
         retryDelayMs: { type: 'scalar' },
         serviceTime: { type: 'scalar' },
+        serviceTimeCv: { type: 'scalar' },
       },
     },
     processor: {
@@ -171,6 +172,7 @@ export const RESOURCE_CONFIG_DESCRIPTOR: UnionFieldDescriptor = {
         maxRetries: { type: 'scalar' },
         retryDelayMs: { type: 'scalar' },
         serviceTime: { type: 'scalar' },
+        serviceTimeCv: { type: 'scalar' },
       },
     },
     storage: {
@@ -185,6 +187,7 @@ export const RESOURCE_CONFIG_DESCRIPTOR: UnionFieldDescriptor = {
         maxRetries: { type: 'scalar' },
         retryDelayMs: { type: 'scalar' },
         serviceTime: { type: 'scalar' },
+        serviceTimeCv: { type: 'scalar' },
       },
     },
     router: {
@@ -198,6 +201,7 @@ export const RESOURCE_CONFIG_DESCRIPTOR: UnionFieldDescriptor = {
         maxRetries: { type: 'scalar' },
         retryDelayMs: { type: 'scalar' },
         serviceTime: { type: 'scalar' },
+        serviceTimeCv: { type: 'scalar' },
         strategy: { type: 'scalar' },
       },
     },
@@ -212,6 +216,7 @@ export const RESOURCE_CONFIG_DESCRIPTOR: UnionFieldDescriptor = {
         maxRetries: { type: 'scalar' },
         retryDelayMs: { type: 'scalar' },
         serviceTime: { type: 'scalar' },
+        serviceTimeCv: { type: 'scalar' },
         mode: { type: 'scalar' },
         hitRate: { type: 'scalar' },
         entries: { type: 'scalar' },
@@ -229,6 +234,7 @@ export const RESOURCE_CONFIG_DESCRIPTOR: UnionFieldDescriptor = {
         maxRetries: { type: 'scalar' },
         retryDelayMs: { type: 'scalar' },
         serviceTime: { type: 'scalar' },
+        serviceTimeCv: { type: 'scalar' },
         delivery: { type: 'scalar' },
       },
     },

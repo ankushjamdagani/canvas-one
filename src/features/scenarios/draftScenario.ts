@@ -41,6 +41,7 @@ import type {
   RequestClass,
   Scenario,
   Workload,
+  WorkloadProfile,
 } from '../../domain/studio/model';
 
 // ============================================================================
@@ -108,7 +109,26 @@ export type DraftRequestClass = Omit<RequestClass, 'keyDistribution'> & {
   readonly keyDistribution: DraftKeyDistribution;
 };
 
-export type DraftWorkload = Omit<Workload, 'classes'> & {
+/**
+ * D50: burst and ramp fields start unset when the author picks the shape; Apply is blocked
+ * until they're typed (commands.md §4 "Empty drafts invent nothing").
+ */
+export type DraftWorkloadProfile =
+  | { readonly kind: 'steady' }
+  | { readonly kind: 'burst'; readonly peakRate: number | null; readonly startMs: number | null; readonly endMs: number | null }
+  | { readonly kind: 'ramp'; readonly endRate: number | null };
+
+export function draftProfileToStorable(p: DraftWorkloadProfile): WorkloadProfile | null {
+  if (p.kind === 'burst') {
+    if (p.peakRate === null || p.startMs === null || p.endMs === null) return null;
+    return { kind: 'burst', peakRate: p.peakRate, startMs: p.startMs, endMs: p.endMs };
+  }
+  if (p.kind === 'ramp') return p.endRate === null ? null : { kind: 'ramp', endRate: p.endRate };
+  return { kind: 'steady' };
+}
+
+export type DraftWorkload = Omit<Workload, 'classes' | 'profile'> & {
+  readonly profile: DraftWorkloadProfile;
   readonly classes: readonly DraftRequestClass[];
 };
 
@@ -127,13 +147,15 @@ function workloadToDraft(w: Workload): DraftWorkload {
 }
 
 function draftWorkloadToStorable(w: DraftWorkload): Workload | null {
+  const profile = draftProfileToStorable(w.profile);
+  if (profile === null) return null;
   const classes: RequestClass[] = [];
   for (const c of w.classes) {
     const stored = draftRequestClassToStorable(c);
     if (stored === null) return null;
     classes.push(stored);
   }
-  return { ...w, classes };
+  return { ...w, profile, classes };
 }
 
 // ============================================================================
@@ -241,6 +263,8 @@ export function toValidationScenario(draft: DraftScenario): Scenario {
     if (stored) return stored;
     return {
       ...w,
+      // Validation-only stand-in for unset burst/ramp fields (never persisted).
+      profile: draftProfileToStorable(w.profile) ?? { kind: 'steady' },
       classes: w.classes.map((c) => ({
         ...c,
         keyDistribution: draftKeyDistributionToStorable(c.keyDistribution) ?? {

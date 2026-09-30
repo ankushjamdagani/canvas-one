@@ -67,6 +67,7 @@ import type {
   ScenarioMode,
   CompletionPolicy,
   ScenarioBudgets,
+  WorkloadProfile,
 } from './model';
 import { checkReadiness, type ReadinessIssue } from './readiness';
 import { canonicalJson } from './canonical';
@@ -155,7 +156,7 @@ export type ManifestWorkload = {
   readonly entry: Endpoint;
   readonly enabled: boolean;
   readonly rate: number;
-  readonly profile: { readonly kind: 'steady' };
+  readonly profile: WorkloadProfile;
   readonly timeoutMs: number;
   readonly intervalMs: null;
   readonly classes: readonly ManifestRequestClass[];

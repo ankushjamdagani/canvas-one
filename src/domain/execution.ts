@@ -16,9 +16,12 @@ export interface ResourceConfig {
   /**
    * D49 (audit H1): how long one attempt takes. 'fixed' is exactly 1/capacity per slot
    * (M/D/c); 'exponential' draws a seeded exponential time with that mean (M/M/c).
-   * Absent means 'fixed', the behaviour of graphs built before D49.
+   * Absent means 'fixed', the behaviour of graphs built before D49. 'lognormal' (D50)
+   * has a heavy tail: mean 1/capacity and coefficient of variation `serviceTimeCv`.
    */
-  serviceTime?: 'fixed' | 'exponential';
+  serviceTime?: 'fixed' | 'exponential' | 'lognormal';
+  /** D50: coefficient of variation (stdev / mean) for 'lognormal', 0.1..10; required for it. */
+  serviceTimeCv?: number;
 }
 
 /**
@@ -162,8 +165,14 @@ function validateBehavior(b: unknown, id: string, issues: ValidationIssue[]): vo
   if (!isNum(b.failureRate, 0, 100)) err(issues, 'INVALID_FAILURE_RATE', 'failureRate must be 0..100', id);
   if (!isNum(b.maxRetries, 0, 5, true)) err(issues, 'INVALID_MAX_RETRIES', 'maxRetries must be int 0..5', id);
   if (!isNum(b.retryDelayMs, 0, 10000)) err(issues, 'INVALID_RETRY_DELAY', 'retryDelayMs must be 0..10000', id);
-  if (b.serviceTime !== undefined && b.serviceTime !== 'fixed' && b.serviceTime !== 'exponential') {
-    err(issues, 'INVALID_SERVICE_TIME', 'serviceTime must be fixed or exponential', id);
+  if (b.serviceTime !== undefined && b.serviceTime !== 'fixed' && b.serviceTime !== 'exponential' && b.serviceTime !== 'lognormal') {
+    err(issues, 'INVALID_SERVICE_TIME', 'serviceTime must be fixed, exponential or lognormal', id);
+  }
+  if (b.serviceTime === 'lognormal' && !isNum(b.serviceTimeCv, 0.1, 10)) {
+    err(issues, 'INVALID_SERVICE_TIME_CV', 'lognormal serviceTimeCv must be 0.1..10', id);
+  }
+  if (b.serviceTime !== 'lognormal' && b.serviceTimeCv !== undefined) {
+    err(issues, 'INVALID_SERVICE_TIME_CV', 'serviceTimeCv applies to lognormal only', id);
   }
 
   const t = b.type;
@@ -272,6 +281,7 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
   }
 
   const edgePairs = new Set<string>();
+  const brokerIds = new Set(rawNodes.filter((n) => isObj(n) && isObj(n.behavior) && n.behavior.type === 'broker').map((n) => (n as RawObj).id));
   for (const e of rawEdges) {
     if (!isObj(e)) { err(issues, 'INVALID_EDGE', 'edge must be an object'); continue; }
     if (!isStr(e.id)) err(issues, 'INVALID_EDGE_ID', 'edge id must be 1..100 chars');
@@ -307,7 +317,11 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
       const edgeId = isStr(e.id) ? e.id : undefined;
       if (!isObj(r)) err(issues, 'INVALID_EDGE_RETRY', 'retry must be an object or null', undefined, edgeId);
       else {
-        if (e.transport !== 'call') err(issues, 'INVALID_EDGE_RETRY', 'retry applies to call edges only', undefined, edgeId);
+        // D50: a broker route's retry is redelivery (no attempt timeout); other message
+        // edges have no caller to retry.
+        const fromBroker = brokerIds.has(src);
+        if (e.transport !== 'call' && !fromBroker) err(issues, 'INVALID_EDGE_RETRY', 'retry applies to call edges and broker routes only', undefined, edgeId);
+        if (fromBroker && r.attemptTimeoutMs !== null) err(issues, 'INVALID_EDGE_RETRY', 'a broker route has no attempt timeout', undefined, edgeId);
         if (!isNum(r.maxAttempts, 1, 10, true)) err(issues, 'INVALID_EDGE_RETRY', 'retry.maxAttempts must be int 1..10', undefined, edgeId);
         if (!isNum(r.backoffMs, 0, 60000)) err(issues, 'INVALID_EDGE_RETRY', 'retry.backoffMs must be 0..60000', undefined, edgeId);
         if (!isNum(r.backoffMultiplier, 1, 10)) err(issues, 'INVALID_EDGE_RETRY', 'retry.backoffMultiplier must be 1..10', undefined, edgeId);

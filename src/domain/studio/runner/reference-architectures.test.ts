@@ -555,6 +555,156 @@ describe('A12 service calling a third party', () => {
 });
 
 // ============================================================================
+// D50: the D49 limits
+// ============================================================================
+
+describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
+  const retryPolicy = (o: Record<string, unknown> = {}) => ({ maxAttempts: 3, backoffMs: 0, backoffMultiplier: 2, maxBackoffMs: 1000, jitter: false, attemptTimeoutMs: null, ...o });
+  const withProfile = (a: Arch, id: Id, profile: Workload['profile']) => {
+    a.doc = { ...a.doc, scenarios: a.doc.scenarios.map((x) => (x.id === id ? { ...x, workloads: x.workloads.map((w) => ({ ...w, profile })) } : x)) };
+  };
+
+  it('A2 with a real burst: 5x traffic for 5 s is absorbed by the queue and drained; nothing is lost', async () => {
+    const a = new Arch();
+    a.doc = { ...a.doc, title: 'D50 burst' };
+    const api = a.place('service', 'API');
+    const q = a.place('queue', 'Queue');
+    a.connect(api, q);
+    a.connect(q, a.place('worker', 'Worker')); // 2 x 100/s
+    const id = scenario(a, api, { rate: 100, seconds: 20, completion: { kind: 'drain', arrivalHorizonMs: 20000, deadlineMs: 60000 } });
+    withProfile(a, id, { kind: 'burst', peakRate: 500, startMs: 5000, endMs: 10000 });
+    const r = await run(a, id);
+    expect(r.status).toBe('completed');
+    const m = outcomes(r, 'message');
+    // 100/s for 15 s + 500/s for 5 s = 4,000 expected (Poisson SD ~63).
+    expect(Math.abs(m.generated - 4000)).toBeLessThan(250);
+    expect(m.succeeded).toBe(m.generated);
+    expect(outcomes(r).failed).toBe(0);
+  });
+
+  it('a ramp from 10/s to 100/s over 10 s sends the average of the two rates', async () => {
+    const { a, ids } = chain('D50 ramp', ['service']);
+    const id = scenario(a, ids[0], { rate: 10, seconds: 10 });
+    withProfile(a, id, { kind: 'ramp', endRate: 100 });
+    const r = await run(a, id);
+    expect(Math.abs(outcomes(r).generated - 550)).toBeLessThan(80);
+  });
+
+  it('readiness rejects a burst that ends after arrivals stop', () => {
+    const { a, ids } = chain('D50 burst window', ['service']);
+    const id = scenario(a, ids[0], { rate: 10, seconds: 10 });
+    withProfile(a, id, { kind: 'burst', peakRate: 50, startMs: 5000, endMs: 15000 });
+    const ready = checkReadiness(a.doc, id);
+    expect(ready.ready).toBe(false);
+    if (!ready.ready) expect(ready.issues.map((i) => i.code)).toContain('workload-profile-outside-window');
+  });
+
+  async function thirdParty(title: string, delayMs: number, outcome: 'succeeded' | 'failed', retry: ReturnType<typeof retryPolicy>) {
+    const a = new Arch();
+    a.doc = { ...a.doc, title };
+    const svc = a.place('service', 'Payments API');
+    const call = a.connect(svc, a.place('thirdparty', 'Card processor'));
+    a.setConn(call, { retry });
+    const out = a.el(svc).ports.find((p) => p.direction === 'out')!;
+    const schemaId = out.responseSchemaId!;
+    const response = { id: a.mint(), schemaId, value: {} };
+    const id = scenario(a, svc, { rate: 10, seconds: 5 });
+    a.doc = {
+      ...a.doc,
+      fixtures: [...a.doc.fixtures, response],
+      scenarios: a.doc.scenarios.map((x) => ({
+        ...x,
+        scopeElementIds: [svc],
+        boundaries: [{
+          id: a.mint(), source: { elementId: svc, portId: out.id }, schemaId,
+          responses: [{ id: a.mint(), match: { op: 'exists', value: { kind: 'literal', value: true } }, responseFixtureId: response.id, payloadBindings: [], delayMs, afterInputId: null, outcome }],
+        }],
+      })),
+    };
+    const r = await run(a, id);
+    expect(r.status).toBe('completed');
+    return r;
+  }
+
+  it('a service retries a failing third party: every attempt asks the boundary again', async () => {
+    const r = await thirdParty('D50 third party fails', 10, 'failed', retryPolicy({ maxAttempts: 3, backoffMs: 20 }));
+    const o = outcomes(r);
+    const settledRoots = o.generated - o.inFlight;
+    expect(o.failed).toBe(settledRoots);
+    expect(o.inFlight).toBe(0);
+    expect(r.events.filter((e) => e.code === 'bridge-dispatch').length).toBe(3 * settledRoots);
+    expect(r.events.filter((e) => e.code === 'call-retry').length).toBe(2 * settledRoots);
+  });
+
+  it('an attempt timeout on a slow third party gives up and retries; late replies are ignored', async () => {
+    const r = await thirdParty('D50 third party slow', 200, 'succeeded', retryPolicy({ maxAttempts: 2, attemptTimeoutMs: 50 }));
+    const o = outcomes(r);
+    expect(o.succeeded).toBe(0);
+    expect(o.expired).toBe(o.generated - o.inFlight);
+    expect(r.events.filter((e) => e.code === 'call-retry').length).toBe(o.generated - o.inFlight);
+  });
+
+  it('a queue redelivers failed messages: final failures fall from p to p^3', async () => {
+    const lost = async (retry: ReturnType<typeof retryPolicy> | null) => {
+      const a = new Arch();
+      a.doc = { ...a.doc, title: `D50 redelivery ${retry ? 'on' : 'off'}` };
+      const api = a.place('service', 'API');
+      const q = a.place('queue', 'Queue');
+      const wk = a.place('worker', 'Worker');
+      a.set(wk, { failureRate: 50, maxRetries: 0, concurrency: 8 });
+      a.connect(api, q);
+      const route = a.connect(q, wk);
+      if (retry) a.setConn(route, { retry });
+      const r = await run(a, scenario(a, api, { rate: 50, seconds: 20 }));
+      const m = outcomes(r, 'message');
+      return m.failed / (m.succeeded + m.failed);
+    };
+    expect(Math.abs((await lost(null)) - 0.5)).toBeLessThan(0.05);
+    expect(Math.abs((await lost(retryPolicy({ maxAttempts: 3, backoffMs: 50 }))) - 0.125)).toBeLessThan(0.04);
+  });
+
+  it('readiness rejects an attempt timeout on a queue delivery route', () => {
+    const a = new Arch();
+    const api = a.place('service');
+    const q = a.place('queue');
+    a.connect(api, q);
+    const route = a.connect(q, a.place('worker'));
+    a.setConn(route, { retry: retryPolicy({ attemptTimeoutMs: 100 }) });
+    const id = scenario(a, api, { rate: 1, seconds: 2 });
+    const ready = checkReadiness(a.doc, id);
+    expect(ready.ready).toBe(false);
+    if (!ready.ready) expect(ready.issues.map((i) => i.code)).toContain('broker-route-attempt-timeout');
+  });
+
+  it('a gateway retries on the healthy replica when one replica fails', async () => {
+    const a = new Arch();
+    a.doc = { ...a.doc, title: 'D50 gateway retry' };
+    const g = a.place('gateway', 'Gateway');
+    const bad = a.place('service', 'Broken replica');
+    a.set(bad, { failureRate: 100 });
+    const good = a.place('service', 'Healthy replica');
+    for (const t of [bad, good]) a.setConn(a.connect(g, t), { retry: retryPolicy({ maxAttempts: 2 }) });
+    const r = await run(a, scenario(a, g, { rate: 50, seconds: 5 }));
+    const o = outcomes(r);
+    expect(o.failed + o.rejected).toBe(0);
+    expect(o.succeeded).toBeGreaterThan(200);
+  });
+
+  it('a heavy-tailed (lognormal) service has a much longer p95 than an exponential one with the same mean', async () => {
+    const p95 = async (serviceTime: Record<string, unknown>) => {
+      const { a, ids } = chain(`D50 ${JSON.stringify(serviceTime)}`, ['service'], [{ capacity: 50, ...serviceTime }]);
+      const r = await run(a, scenario(a, ids[0], { rate: 100, seconds: 20 }));
+      return { mean: metric(r, 'meanLatencyMs', ids[0]), p95: metric(r, 'p95LatencyMs', ids[0]) };
+    };
+    const exp = await p95({ serviceTime: 'exponential' });
+    const heavy = await p95({ serviceTime: 'lognormal', serviceTimeCv: 4 });
+    expect(Math.abs(heavy.mean - exp.mean)).toBeLessThan(0.25 * exp.mean);
+    // cv 4: p95 = exp(-ln17/2 + 1.645 sqrt(ln17)) = 4.1 x mean, against 3.0 x for exponential.
+    expect(heavy.p95).toBeGreaterThan(1.2 * exp.p95);
+  });
+});
+
+// ============================================================================
 // Runner and metric defects found while building the architectures
 // ============================================================================
 
