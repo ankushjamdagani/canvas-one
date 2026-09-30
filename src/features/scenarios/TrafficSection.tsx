@@ -195,7 +195,7 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
                         const v = raw === '' ? null : Number(raw);
                         updateWorkload(workload.id, (w) => ({
                           ...w,
-                          intervalMs: null,
+                          intervalMs: v,
                         }));
                       }}
                     />
