@@ -1586,3 +1586,20 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: `npx tsc -b`; 1,446 unit tests in 126 files passed with `--isolate false`; production build passed with `--configLoader runner`, largest chunk 420.81 kB (no chunk over 500 kB); `git diff --check` clean. Before the final test addition, the default isolated full run passed 1,444/1,445 tests but twice timed out in the unrelated `session.test.ts` 101-apply case under load (9.86); that file passed alone, 34/34. Playwright intentionally not run per executor instructions.
 - **Limitations**: the ordinary bundled Vite config loader cannot write through this worktree's external `node_modules` symlink under the sandbox, so Vitest/build used Vite's equivalent non-bundling `runner` config loader. The isolated-worker full-suite timeout remains a machine-load flake; the complete reused-worker run is green.
 - **Lesson:** `ScenarioRunner` checks `maxEvents` at step boundaries; `processedEvents` includes a terminating over-budget attempt, and a run whose work consumes the nominal count needs another step to observe quiescence.
+
+### RV-19 and RV-20 integrated
+
+- **Outcome**:
+  - RV-19 (Codex lane) passed an independent Sonnet review first time and was merged (`da8ae42`).
+  - RV-20 (two Gemini lanes, run with `--dangerously-skip-permissions` at the user's choice) failed Sonnet review round 1: missing contrast tests, no horizontal clamp, a dead import. It also carried a multi-select regression that review missed and the lead's browser probe caught: shift-click cleared the selection, because the inspector draft *is* the selection. The lead fixed all of it; round 2 passed; merged (`595ab18`, `39dfe08`).
+  - Reviewer claim rejected: "the interval input should save the value". `Workload.intervalMs` is `null` by contract, so the input itself was out of contract (from a wrong line in the lead's prompt) and was removed.
+  - Lead additions: the canvas "Traffic enters here" tag and run-waits notice (`99aeccb`), with an e2e test, and 44 px coarse-pointer targets for compact rows and the editor close button (`323f87a`).
+  - Lane worktrees and branches were removed after an ancestry check.
+- **Files**: refinement routing, closure, readiness, runner; inspector tag, tokens, SelectionToolbar, Workspace; scenario editor sections, CompactRow, summaries; CanvasView, NodeCard, projection; `tests/studio-scenarios.spec.ts`; delivery ledger, plan, HANDOFF.
+- **Platform/subagents**: `/delegate` run `20260930-113429`. Gemini critic; Codex and Gemini executors; Claude Sonnet reviewer (three review passes).
+- **Verification**:
+  - 1,456 unit tests pass; `npx tsc -b`; production build (largest chunk 421 kB).
+  - Isolated production Playwright: 80 passed / 4 skipped.
+  - Responsive sweep 45/45; touch audit 0 real targets under 44 px, plus the new scenario-editor probe 0.
+  - axe: no violations. Focus return all ok. 320 px reflow 9/9. `git diff --check` clean.
+- **Lesson:** the reviewer passed code with a behaviour regression that a 20-line browser probe found in a minute; for UI lanes, run a quick interaction probe of the changed behaviour before trusting a review. Headless agy ignored prompt-level command limits three times; allow-lists don't converge, so choose skip-permissions (with approval) or another executor up front.

@@ -14,8 +14,8 @@ Preserve in all work touching architecture, simulation, persistence, exports or 
 ## Current state (2026-09-29)
 
 - **Branch:** `master` holds everything: app, specs, ledger and agent workflow (merged `@ 3b4bda9` from the UI line, the ledger branch and the two workflow branches (`/retro` learning loop, `/delegate` hardening)). No remote is configured; nothing has been pushed.
-- **Revamp:** RV-01 to RV-17 are complete. RV-13 (release acceptance) and RV-17 (design conformance) were accepted by the user. The app runs only on the studio model and `system-studio-local-v1`. Ledger: [`specs/revamp/delivery.md`](specs/revamp/delivery.md). Reports: [`rv13-acceptance.md`](specs/revamp/rv13-acceptance.md), [`rv15-retirement.md`](specs/revamp/rv15-retirement.md).
-- **Verification baseline on master:** 1,429 unit tests (125 files); `npx tsc -b` clean; production build passes with no chunk over 500 kB (entry path 702 kB / 197 kB gzip across `react-vendor`, `storage-vendor` and `index`; workspace chunk 384 kB plus `canvas-vendor` 178 kB, prefetched on idle); production Chromium 79 passed / 4 skipped (dev-only specimen) in about 33 s; `node scripts/a11y-audit.mjs` reports no axe violations.
+- **Revamp:** RV-01 to RV-17, RV-19 and RV-20 are complete; RV-18 was dropped (D45). Next: the 16D overflow actions and Wrap in boundary ([plan-rv18-rv20.md](specs/revamp/plan-rv18-rv20.md)), and realism audit phases 2–3 ([realism-audit.md](specs/revamp/realism-audit.md)). RV-13 (release acceptance) and RV-17 (design conformance) were accepted by the user. The app runs only on the studio model and `system-studio-local-v1`. Ledger: [`specs/revamp/delivery.md`](specs/revamp/delivery.md). Reports: [`rv13-acceptance.md`](specs/revamp/rv13-acceptance.md), [`rv15-retirement.md`](specs/revamp/rv15-retirement.md).
+- **Verification baseline on master:** 1,456 unit tests (127 files; 9 opt-in realism probes skipped); `npx tsc -b` clean; production build passes with no chunk over 500 kB (entry path 702 kB / 197 kB gzip across `react-vendor`, `storage-vendor` and `index`; workspace chunk 384 kB plus `canvas-vendor` 178 kB, prefetched on idle); production Chromium 80 passed / 4 skipped (dev-only specimen) in about 33 s; `node scripts/a11y-audit.mjs` reports no axe violations.
 - **Design and accessibility reports:** [`visual-acceptance.md`](specs/revamp/visual-acceptance.md) (screens vs the design boards; open O1–O4 need design decisions), [`accessibility.md`](specs/revamp/accessibility.md) (WCAG 2.2 AA pass). The design package lives untracked in `artifacts/design/Copy of Elegant and modern design refresh/`.
 
 ## Running and verifying
@@ -35,10 +35,10 @@ Tracked here until resolved; none blocks release.
 
 | Item | Where | Notes |
 |---|---|---|
-| Visual open items O1–O4 (dock labels, anchored 16D toolbar and empty multi-select inspector, compact scenario editor rows, kind tag tone) | [`visual-acceptance.md`](specs/revamp/visual-acceptance.md) | Need a design decision, not a guess |
+| Realism issues H11–H14 and defaults (gateway/client slot hold with 16-slot cap, 2 s message TTL, no caller retries, deterministic service time, stream delivery, 0 ms call latency) | [`realism-audit.md`](specs/revamp/realism-audit.md) | Each needs a user decision; batch into one kernel version bump |
 | Accessibility gaps not yet assessed: screen reader, keyboard-only canvas editing, text spacing, forced colours | [`accessibility.md`](specs/revamp/accessibility.md) | Automated and keyboard probes are clean |
 
-Resolved 2026-09-29 (see `ACTION_LOG.md`): the Button spinner test, the filled-field state (design package found), stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
+Resolved 2026-09-30: visual open items O1–O4 (D44; O1 kept icon-only). Resolved 2026-09-29 (see `ACTION_LOG.md`): the Button spinner test, the filled-field state (design package found), stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
 
 Accepted limitations (by design, not debt): a router's routes must reach resources (D45; readiness explains the fix); the 16E picker is catalog-only (saved parts live in the Library panel); Replace part has no contracted command.
 

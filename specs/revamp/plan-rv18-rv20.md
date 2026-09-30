@@ -1,6 +1,6 @@
 # Plan: RV-18 router bridges, RV-19 nested refinement, RV-20 board decisions
 
-2026-09-30, `master` @ `d33b1d2`. Status: approved 2026-09-30 except RV-18 (dropped, D45). RV-19 and RV-20 are in progress.
+2026-09-30, `master` @ `d33b1d2`. Status: RV-18 dropped (D45). RV-19 and RV-20 (O2 anchoring, O3, O4) done and merged 2026-09-30. Remaining: the Q1 16D actions (Wrap in boundary with refinement authoring, Replace part, Add flow probe, Changes on this part, Export selection).
 
 ## RV-18: routers may route to non-resource elements — DROPPED (D45)
 
@@ -108,7 +108,7 @@ The board decides the shape. The per-field choices:
 | Field group | Choice | Why |
 |---|---|---|
 | Name, kind line | Inline, unchanged | Already matches |
-| Traffic (workload) | Card: name, ON toggle, "Enters at" and "Rate" inline; request mix as one summary line ("browse 80% read · checkout 20% write · edit") that expands to the class editor; timeout and interval inside the expansion | Entry and rate are what people change; the mix is set once |
+| Traffic (workload) | Card: name, ON toggle, "Enters at" and "Rate" inline; request mix as one summary line ("browse 80% read · checkout 20% write · edit") that expands to the class editor; timeout inside the expansion (the contract has no workload interval) | Entry and rate are what people change; the mix is set once |
 | Outage (fault) | Summary row "down 2.0 s → up 4.0 s · noticed after 1.0 s" with an OUTAGE tag; click expands the four fields | Four numbers read better as one sentence |
 | Checks (assertions) | One row "subject · at most 0" with a check mark; click expands subject/operator/type/value | The expanded form is the tallest part of the editor today |
 | Steps (logical inputs) | Same compact-row pattern ("step n · input · after …") | Consistent with checks |
