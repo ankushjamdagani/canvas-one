@@ -198,7 +198,7 @@ function duplicateConfirmationItems(preview: {
   return Array.from(new Set(items));
 }
 
-export function useViewportWidth(): number {
+function useViewportWidth(): number {
   const [width, setWidth] = React.useState<number>(() =>
     typeof window === 'undefined' ? 1280 : window.innerWidth,
   );

@@ -1,8 +1,7 @@
 /** 16D selection-scoped actions, routed through the command registry. */
 
 import * as React from 'react';
-import { useReactFlow, useStore, type InternalNode } from '@xyflow/react';
-import { useViewportWidth } from './Workspace';
+import { useStore } from '@xyflow/react';
 import { ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -96,6 +95,20 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const canvasWidth = useStore((s) => s.width);
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const measure = () => setToolbarWidth(el.offsetWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   const isFixed = isCoarse || viewportWidth < 640;
 
@@ -108,19 +121,15 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
     const screenWidth = rect.width * tZoom;
     const screenHeight = rect.height * tZoom;
     
-    // float centered above bounding box
+    // Centred above the selection, clamped inside the canvas with 12 px margins
+    // (the toolbar's own measured width keeps both edges on screen).
     const centerX = screenX + screenWidth / 2;
-    // clamphorizontally inside canvas with 12px margin
-    // we use position: absolute with left: 0, right: 0 to let the container span width?
-    // actually, best to position using left and transform.
-    // CSS clamp: clamp(12px + 50%, centerX, 100vw - 12px - 50%) is hard because we don't know the width.
-    // Instead we can use a wrapper that is fixed to the bounds left/right, and flex justify-center.
-    
-    // For now, let's use a simpler approach: calculate an estimated width or just let flex do it.
-    // Actually, setting left: `min(max(12px, ${centerX}px), calc(100vw - 12px))` and transform: `translateX(-50%)`
-    // can result in overflowing the edges by half the toolbar width.
+    const half = toolbarWidth / 2;
+    const clampedX = canvasWidth > 0 && toolbarWidth > 0
+      ? Math.min(Math.max(centerX, 12 + half), Math.max(12 + half, canvasWidth - 12 - half))
+      : centerX;
     style = {
-      left: `${centerX}px`,
+      left: `${clampedX}px`,
       transform: 'translate(-50%, 0)',
     };
     if (screenY >= 60) {
@@ -192,6 +201,7 @@ export function SelectionToolbar({ context, executeCommand }: SelectionToolbarPr
 
   return (
     <div
+      ref={toolbarRef}
       data-testid="selection-toolbar"
       className="absolute z-10 flex flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
       style={style}

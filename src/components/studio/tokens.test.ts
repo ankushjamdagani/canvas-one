@@ -252,3 +252,13 @@ describe("Evergreen tokens and styles.css single source check", () => {
   });
 
 });
+
+describe("computeTagColors (inspector kind tag, D44 O4)", () => {
+  for (const [layer, stripe] of Object.entries(nodeKindColor)) {
+    it(`${layer}: tag text reaches 4.5:1 on its tinted background composited on the panel`, () => {
+      const tag = computeTagColors(stripe);
+      expect(contrastRatio(tag.color, tag["--bg-solid"])).toBeGreaterThanOrEqual(4.5);
+      expect(tag.backgroundColor).toMatch(/^rgba\(\d+, \d+, \d+, 0\.12\)$/);
+    });
+  }
+});

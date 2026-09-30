@@ -218,8 +218,8 @@ function compositeColor(fgHex: string, bgHex: string, alpha: number): string {
  * >= 4.5:1 contrast against the tinted background composited over the panel surface.
  */
 export function computeTagColors(stripeColor: string) {
-  // Panel surface is #F7F5F1
-  const bgSolid = compositeColor(stripeColor, '#F7F5F1', 0.12);
+  // The tag sits on the panel surface.
+  const bgSolid = compositeColor(stripeColor, evergreen.panel, 0.12);
   let textSolid = stripeColor;
   
   for (let alpha = 1.0; alpha >= 0; alpha -= 0.01) {
