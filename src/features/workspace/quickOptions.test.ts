@@ -38,6 +38,7 @@ const context: CommandContext = {
   selectedConnectionIds: [],
   selectedGroupIds: [],
   selectionWhollyUngrouped: false,
+  selectionHasRefinementMember: false,
   activeViewGroupCount: 0,
   activeViewNoteCount: 0,
   runBlockedReason: null,

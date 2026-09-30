@@ -86,4 +86,34 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await expect(noteInput).toHaveValue('ab');
     await expect(page.getByTestId('delete-confirm-dialog')).toHaveCount(0);
   });
+
+  test('wraps two nodes in a refinement boundary and restores them with one undo', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s05').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await waitForIdle(page);
+
+    const queue = page.locator('.component-node', { hasText: 'Fulfillment queue' });
+    const worker = page.locator('.component-node', { hasText: 'Fulfillment worker' });
+    await queue.click();
+    await worker.click({ modifiers: ['Shift'] });
+    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+
+    await page.getByTestId('selection-wrap-btn').click();
+    const input = page.getByTestId('selection-wrap-input');
+    await input.fill('Async fulfilment');
+    await input.press('Enter');
+    await waitForIdle(page);
+
+    const frame = page.getByTestId(/boundary-frame-/).filter({ hasText: 'Async fulfilment' });
+    await expect(frame).toBeVisible();
+    await expect(queue).toBeVisible();
+    await expect(worker).toBeVisible();
+
+    await page.keyboard.press('ControlOrMeta+z');
+    await waitForIdle(page);
+    await expect(frame).toHaveCount(0);
+    await expect(queue).toBeVisible();
+    await expect(worker).toBeVisible();
+  });
 });

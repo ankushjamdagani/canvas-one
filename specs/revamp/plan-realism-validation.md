@@ -1,6 +1,6 @@
 # Plan: validate that components and connections behave like the real thing
 
-2026-09-30. Status: **proposed**. Requested by the user after the RV-18 discussion showed that one catalog pairing (router → state machine) would have produced plausible but wrong results. Nothing here is implemented.
+2026-09-30. Status: phases 1–2 done (see [realism-audit.md](realism-audit.md)); phase 3 next. Requested by the user after the RV-18 discussion showed that one catalog pairing (router → state machine) would have produced plausible but wrong results. Nothing here is implemented.
 
 ## Goal
 
@@ -72,7 +72,7 @@ Property tests that compare simulated metrics with closed-form results. Each run
 | Cache | Fixed hit rate h; LRU with a Zipf-like hot set | Origin load = (1 − h)·λ; LRU hit rate within the expected range for its entries and key distribution |
 | Routing | Round-robin, weighted w₁:w₂, conditional | Equal split; split in proportion to weights; class-exact split |
 | Brokers | Competing with N consumers; broadcast to N | Load split across consumers; N× downstream load |
-| Faults | Host down for D seconds with detection delay d | Failures ≈ λ·d at each transition; round-robin resumes on the healthy pool |
+| Faults | Host down for D seconds with detection delay d | Failures ≈ λ_host·d at failure detection (λ_host = the load that host receives; recovery detection only reduces capacity); round-robin resumes on the healthy pool |
 | Connection latency | A chain of k calls with latency ℓ each way | End-to-end latency grows by 2·k·ℓ |
 
 These live next to the kernel's characterization tests in `src/simulation/open/`. They don't change the golden files.

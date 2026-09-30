@@ -84,6 +84,7 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   duplicate: Copy,
   delete: Trash2,
   group: Group,
+  boundary: Boxes,
   ungroup: Ungroup,
   align: Rows3,
   distribute: Workflow,

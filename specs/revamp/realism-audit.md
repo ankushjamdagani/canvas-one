@@ -1,6 +1,6 @@
 # Realism audit
 
-Phase 1 (claim audit), 2026-09-30, `master`. Plan: [plan-realism-validation.md](plan-realism-validation.md). Phases 2 (oracles) and 3 (reference architectures) haven't started; the verdicts below are **provisional** until they confirm them.
+Phase 1 (claim audit), 2026-09-30, `master`. Plan: [plan-realism-validation.md](plan-realism-validation.md). Phase 2 (oracles) is done: the kernel matches queueing theory everywhere it was tested (below). Phase 3 (reference architectures) hasn't started, and the per-entry verdicts stay **provisional** until it runs.
 
 Evidence comes from three places:
 - **Kernel code** (`src/simulation/open/kernel.ts`, `src/domain/execution.ts`, `src/domain/behaviorDefaults.ts`).
@@ -99,6 +99,32 @@ Legend: **F** faithful · **S** simplified, honest · **M** misleading.
 | message | **M** by default | Publish-with-ack is modelled correctly. The 2 s TTL default makes queues lossy (H12). | TTL of minutes by default; "retention" label |
 | data | F | Logical pipeline wiring; identical shapes; no timing claims | None |
 
+## Phase 2: analytical oracles (2026-09-30)
+
+`src/simulation/open/oracles.test.ts` (part of the normal suite, about 6 s). Every oracle runs over 6 seeds. Each tolerance is a 99% batch-means confidence interval plus an analytic sampling term, derived in comments and not tuned to pass. An M/M/1-style kernel would fail the M/D/1 checks by a wide margin.
+
+| Oracle | Expected | Observed (mean over seeds) | Result |
+|---|---:|---:|---|
+| Little's law | λW = 2.535 | L = 2.556 | Pass |
+| Throughput, stable / saturated | 6.00 / 10.00 per s | 6.07 / 9.99 | Pass |
+| Rejections beyond saturation | 5.00/s | 4.99/s | Pass |
+| M/D/1 mean wait, ρ = 0.5 / 0.8 / 0.95 | 0.025 / 0.100 / 0.475 s | 0.025 / 0.107 / 0.465 s | Pass |
+| M/D/2 mean wait (Cosmetatos, ±5% approximation allowance) | 0.0088 / 0.0451 / 0.2321 s | 0.0090 / 0.0484 / 0.2460 s | Pass |
+| Retry attempts per request (p = 0.3, r = 2) | 1.390 | 1.381 | Pass |
+| Final failure share | 0.027 | 0.029 | Pass |
+| Deadlines | all expire / all succeed as designed | same | Pass |
+| Fixed-cache origin share (h = 70%) | 0.300 | 0.299 | Pass |
+| LRU hot keys vs uniform | hot > uniform | 0.905 vs 0.099 | Pass |
+| Weighted routing 1:3 | 0.250 | 0.249 | Pass |
+| Conditional routing | class-exact | class-exact | Pass |
+| Broadcast multiplier (3 consumers) | 3× | 3× | Pass |
+| Fault detection-window failures | 40.0 | 39.8 | Pass |
+| Four-hop call latency | 56.0 ms | 56.0 ms | Pass |
+
+**Reading.** The arithmetic is right. What the audit ranks below are modelling choices and defaults: slot hold and cap, message TTL, caller retries, the service-time distribution, stream semantics and link latency. Fixing them won't mean fixing bugs.
+
+**Fault accounting.** Failures from a detection delay are λ_host·d per failing host, where λ_host is the load that host receives. Behind a two-host round-robin router that's λ·d/2 for one failed host, which is what the oracle asserts. Recovery detection only reduces capacity: the host is already healthy, so it adds no failures. The plan's "λ·d at each transition" wording is corrected to this.
+
 ## Ranked issues for decisions
 
 Each item is for the user to decide. Items that change kernel behaviour or defaults change run results; batch them into one kernel version bump (see the plan, "Consequences").
@@ -123,5 +149,4 @@ Each item is for the user to decide. Items that change kernel behaviour or defau
 
 ## Next (phases 2 and 3)
 
-- **Phase 2 oracles:** the formulas in the plan, asserted against the **current** kernel where it is internally correct (Little's law, M/D/c waiting, routing splits, broadcast fan-out, cache origin load, fault windows). The probes above show the kernel is internally consistent. The issues are modelling choices and defaults, not arithmetic bugs.
 - **Phase 3 reference architectures:** the twelve in the plan, run on today's defaults and again with realistic settings. Expected outcomes are written before running. Architectures 2 (queue absorbs a burst), 3 (retry storm), 9 (gateway scaling) and 10 (async order flow) are expected to **fail on today's defaults** because of H11, H12 and H13. That confirms the ranking above.

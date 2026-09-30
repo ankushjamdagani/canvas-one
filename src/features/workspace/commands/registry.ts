@@ -115,6 +115,7 @@ export const COMMAND_IDS = [
   'selection.duplicate',
   'selection.delete',
   'selection.group',
+  'selection.wrap-in-boundary',
   'selection.ungroup',
   'selection.align',
   'selection.distribute',
@@ -196,6 +197,13 @@ export interface CommandPayloads {
   /** Current selection; the handler shows the dependency preview/confirmation (deletePlan.ts). */
   'selection.delete': Empty;
   'selection.group': { readonly label: string };
+  'selection.wrap-in-boundary': {
+    readonly viewId: Id;
+    readonly elementIds: readonly Id[];
+    readonly ownerElementId: Id;
+    readonly refinementId: Id;
+    readonly label: string;
+  };
   'selection.ungroup': { readonly groupIds: readonly Id[] };
   'selection.align': {
     readonly edge: 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
@@ -275,6 +283,7 @@ export type CommandIconKey =
   | 'duplicate'
   | 'delete'
   | 'group'
+  | 'boundary'
   | 'ungroup'
   | 'align'
   | 'distribute'
@@ -385,6 +394,8 @@ export interface CommandContext {
   /** Exact presentation groups represented by the current element selection. */
   readonly selectedGroupIds: readonly Id[];
   readonly selectionWhollyUngrouped: boolean;
+  /** True when any selected element already has a refinement owner (D33). */
+  readonly selectionHasRefinementMember: boolean;
   readonly activeViewGroupCount: number;
   readonly activeViewNoteCount: number;
   /** Active view's expanded flag per placement id / group id (groups: not collapsed). */
@@ -1028,6 +1039,33 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
         return disabled('invalid-selection', 'Select only ungrouped components');
       }
       if (ctx.activeViewGroupCount >= 50) return disabled('limit', 'This view already has 50 groups');
+      return ENABLED;
+    },
+  },
+  'selection.wrap-in-boundary': {
+    id: 'selection.wrap-in-boundary',
+    label: 'Wrap in boundary…',
+    keywords: ['wrap', 'boundary', 'refinement', 'selection', 'parts'],
+    group: 'selection',
+    iconKey: 'boundary',
+    shortcut: null,
+    availability: (ctx, payload) => {
+      const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
+      if (blocked) return blocked;
+      if (ctx.selectedElementIds.length === 0) {
+        return disabled('invalid-selection', 'Select at least 1 component to wrap');
+      }
+      if (ctx.selectionHasRefinementMember) {
+        return disabled('invalid-selection', 'A selected component already belongs to a refinement boundary');
+      }
+      if (payload.viewId !== ctx.activeViewId) {
+        return disabled('invalid-selection', 'The selected view is no longer active');
+      }
+      const selected = [...ctx.selectedElementIds].sort();
+      const requested = [...payload.elementIds].sort();
+      if (selected.length !== requested.length || selected.some((id, index) => id !== requested[index])) {
+        return disabled('invalid-selection', 'The selected components changed');
+      }
       return ENABLED;
     },
   },
