@@ -154,6 +154,20 @@ Screens: `screens/scenario_*.png` (approved proposal). A scenario is a named tes
 
 **Commit panel** (screen `scenario_commit_gate`) lists every scenario's status on the exact working version with a Run action per non-passing scenario and "Run the n remaining"; Commit stays disabled until all pass (D27/D28).
 
+### Selection-scoped actions (board 16D, D44/D46)
+
+The 16D toolbar shows Group, Wrap in boundary, Align, Duplicate and Delete, and an overflow menu ("Selection") with Save as component, Replace part…, Add flow probe, Changes on this part and Export selection. Each is a registry command with an availability reason; none exists only as a button.
+
+| Action | Payload | Rules |
+|---|---|---|
+| selection.wrap-in-boundary | `{viewId, elementIds, ownerElementId, refinementId, label}` | ≥1 placed element in the active view; none is already a refinement member (D33, one owner). One compound model change, one undo, **behaviour-preserving**: (1) a new owner element (`visualKind:'custom'`, `unmodeled` with reason "Aggregate behaviour not configured"); (2) one owner port per distinct member port that has a connection crossing the selection boundary, copying direction, channel and schemas, labelled "<member> · <port>"; (3) a `Refinement` with the selection as members and one mapping per owner port; (4) every crossing connection re-pointed from the member port to its owner port (IDs kept); (5) every scenario that could reach a member gets `{refinementId, mode:'refined'}`, and the owner joins its `scopeElementIds` where a member is in scope, so every scenario executes the same element set and trace as before; (6) an owner placement whose frame covers the members' bounds plus 24 px. |
+| selection.replace-part | `{viewId, elementId, entryId, replacementElementId, dependencyPreviewId}` | Exactly one placed element; refused if it owns or belongs to a refinement. The replacement is built from the catalog entry's defaults at the same placement position and keeps the old label. Each connection and scenario reference (workload/input entry, assertion subject, boundary, fault placement) moves to the first compatible port of the replacement (same direction and channel, compatible shapes, stable port order); anything that can't move is listed in the dependency preview (`intent:'replace'`) and removed on confirm. One undo. |
+| selection.add-probe | `{scenarioId, elementId}` | Opens the scenario editor for the selected scenario with one new check on this element, expanded and unsaved until Apply: logical scenarios get `{kind:'output', port:<first non-event out port>, path:[]}`, `equals`, expected empty; timed scenarios get `{kind:'metric', elementId, key:'throughput'}`, `at-least`, expected empty. Disabled with a reason when there is no scenario, the element isn't in the scenario's scope, or (logical) it has no out port. |
+| history.show-changes | `{elementIds}` | Read-only, no receipt. Opens History filtered to steps whose change from their parent (`diffDocuments`) touches any of the elements: the element record, its connections, relations or refinements, or scenario references to it. A filter chip names the parts and clears the filter. |
+| selection.export | `{viewId, elementIds, noteIds, dependencyPreviewId}` | download. The same content and preview as `part.capture` (dependency preview `intent:'capture'`), written as a part file without storing a Library part or changing any revision. |
+
+**Canvas: boundary frames.** A placed element that owns a refinement whose members are placed in the same view renders as a labelled frame around those members, with its ports on the frame edge; connections to its ports attach to the frame. The frame's size follows the members (24 px padding), so it isn't independently resizable, and moving the frame moves its members. Collapsing it (`canvas.collapse`) shows it as an ordinary node and hides the members, which is presentation only.
+
 ## 5. Inspector, panels, parts and exports
 
 `PanelId = 'library' | 'history'`. The inspector and results are separate contextual regions, never floating panels. `DraftTarget={kind:'element'|'connection'|'scenario'|'workload'|'selection', ids}`.
