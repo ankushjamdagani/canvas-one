@@ -1560,3 +1560,20 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Codex read AGENTS.md §2 and started its own nested `/delegate` run instead of implementing.
   - A second `dispatch` while Codex was running treated its `.pid` as orphaned and killed it. Prompts now forbid nested delegation; lanes relaunched.
 - **Lesson:** executor prompts must say "you are an executor; don't delegate", because AGENTS.md tells every agent to use `/delegate`. Never run `state.py dispatch` while any lane of the round is live: it kills lanes that have a `.pid`. agy `failed to create PTY` can mean the machine is out of PTYs (`lsof /dev/ptmx`), not a sandbox limit.
+
+### Realism audit phase 1
+
+- **Outcome** (`f188b70`): [`realism-audit.md`](specs/revamp/realism-audit.md). The kernel is an internally consistent M/D/c model: a probe matches M/D/1 mean wait within seed noise. The problems are modelling choices and defaults. Ranked for decisions:
+  1. A resource holds its slot while waiting downstream, with a cap of 16 slots. Gateway, balancer, firewall and client elements collapse at ordinary load with 50 ms links: 10 of 2,900 requests succeeded.
+  2. The 2 s message TTL includes queue time, so queues lose about 85% of a sustained 3× overload.
+  3. Callers never retry rejections, timeouts or failures (no retry storms).
+  4. Service time is deterministic (short tails).
+  5. Streams split events between consumers.
+  6. Calls default to 0 ms latency.
+  7. Catalog relabels: dns, warehouse, search, sources, cdn.
+
+  Provisional verdicts cover all 31 entries and 3 connection kinds. Opt-in probes are in `src/simulation/open/realism-probes.test.ts` (`REALISM_PROBES=1`).
+- **Platform/subagents**: Claude lead, no subagents.
+- **Verification**: 1,429 unit tests pass (probes skipped by default); probes run with the flag.
+- **Limitations**: provisional until the phase 2 oracles and phase 3 reference architectures run. Probe numbers vary slightly because `defaultWorkload` mints random IDs that feed the seed.
+- **Status of lanes**: the Gemini lanes were denied again for `sed -i` and heredoc scripts. Prompts now restrict them to the allowed commands and require edits through the edit tool. Relaunched by hand; `dispatch` wasn't used while Codex was live.
