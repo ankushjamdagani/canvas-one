@@ -8,7 +8,7 @@ export function NodeCard({ data, selected }: NodeProps) {
   const nodeData = data as ProjectedNodeData;
   if (nodeData.kind !== 'element') return null;
 
-  const { element, layer, stripeColor, placement, connectable } = nodeData;
+  const { element, layer, stripeColor, placement, connectable, trafficEntry } = nodeData;
   // placement.width stays authoritative (2A workspace: ~184px nominal card,
   // wider placements render as authored rather than truncating fields).
   const Icon = getNodeIcon(element.visualKind);
@@ -37,6 +37,14 @@ export function NodeCard({ data, selected }: NodeProps) {
         width: placement.width,
       }}
     >
+      {trafficEntry ? (
+        <span
+          data-testid={`node-traffic-entry-${element.id}`}
+          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-primary/40 bg-selected-tint px-1.5 py-0.5 font-mono text-meta uppercase text-primary"
+        >
+          Traffic enters here
+        </span>
+      ) : null}
       {/* Node kind stripe by catalog layer (D35, extended by D42: state-machine,
           data-pipeline and host each get their own stripe group; custom gets
           none — getCatalogLayer/CATALOG_LAYER_COLORS in projection.ts). */}

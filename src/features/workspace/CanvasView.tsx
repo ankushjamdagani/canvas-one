@@ -86,6 +86,10 @@ export interface CanvasViewProps {
   activeViewId: Id | null;
   onSelectView: (viewId: Id) => void;
   isSaving: boolean;
+  /** Elements a workload of the scenario being edited enters at (board scenario_traffic_editor). */
+  trafficEntryElementIds?: ReadonlySet<Id>;
+  /** A dirty scenario draft blocks Run; the canvas says so (board scenario_traffic_editor). */
+  runWaitsForScenarioDraft?: boolean;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -177,6 +181,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   dockPreferenceState,
   onConfigureDock,
   onRestoreDockDefaults,
+  trafficEntryElementIds,
+  runWaitsForScenarioDraft,
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
@@ -264,10 +270,11 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         if (data.kind !== 'element') return n;
         const selected = Boolean(selectedElementIds?.has(data.element.id));
         const connectable = dragMode !== 'pan';
-        if (selected === n.selected && connectable === data.connectable) return n;
-        return { ...n, selected, data: { ...data, connectable } };
+        const trafficEntry = Boolean(trafficEntryElementIds?.has(data.element.id));
+        if (selected === n.selected && connectable === data.connectable && trafficEntry === Boolean(data.trafficEntry)) return n;
+        return { ...n, selected, data: { ...data, connectable, trafficEntry } };
       }),
-    [nodes, selectedElementIds, dragMode, projection.activeView, onExecuteCommand],
+    [nodes, selectedElementIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds],
   );
 
   const displayEdges = React.useMemo(
@@ -778,6 +785,15 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       onDrop={(e) => void handleCanvasDrop(e)}
       className="relative flex-1 w-full h-full overflow-hidden bg-canvas outline-none"
     >
+      {runWaitsForScenarioDraft ? (
+        <div
+          data-testid="canvas-run-waits-notice"
+          role="status"
+          className="absolute top-3 right-3 z-10 max-w-[280px] rounded-control border border-warning-edge bg-warning-tint px-3 py-2 text-xs text-warning-text"
+        >
+          Run waits until you Apply or Cancel the scenario changes.
+        </div>
+      ) : null}
       {/* View selector when the document has more than one view */}
       {projection.hasMultipleViews && (
         <div

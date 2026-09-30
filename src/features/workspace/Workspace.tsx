@@ -1452,6 +1452,14 @@ export function Workspace({
     refreshBehindMainCheck();
   }, [panelDispatch, refreshBehindMainCheck]);
 
+  // Board scenario_traffic_editor: while a scenario is edited, its enabled workloads'
+  // entry elements carry a "Traffic enters here" tag on the canvas.
+  const trafficEntryElementIds = React.useMemo((): ReadonlySet<Id> | undefined => {
+    const workloads = scenarioDraft?.scenario?.workloads;
+    if (!workloads || workloads.length === 0) return undefined;
+    return new Set(workloads.filter((w) => w.enabled).map((w) => w.entry.elementId));
+  }, [scenarioDraft]);
+
   // Open inspector / scenario draft as the registry sees it (commands.md §1).
   const draftContext = React.useMemo((): { readonly id: Id | null; readonly state: CommandDraftState } => {
     if (scenarioDraft) {
@@ -2193,6 +2201,8 @@ export function Workspace({
                     dockPreferenceState={dockPreferenceState}
                     onConfigureDock={(config) => void executeCommand('dock.configure', config, commandContext, commandHandlers)}
                     onRestoreDockDefaults={() => void executeCommand('dock.restore-defaults', {}, commandContext, commandHandlers)}
+                    trafficEntryElementIds={trafficEntryElementIds}
+                    runWaitsForScenarioDraft={Boolean(scenarioDraft && (scenarioDraft.dirty || scenarioDraft.isNew))}
                   />
 
                   {/* 22E draft behind main: a real conflict count from

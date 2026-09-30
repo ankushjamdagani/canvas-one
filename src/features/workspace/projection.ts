@@ -112,6 +112,8 @@ export type ProjectedNodeData =
        * stays a pure function of Document + activeViewId.
        */
       readonly connectable?: boolean;
+      /** While a scenario is being edited: a workload enters here (board "TRAFFIC ENTERS HERE"). Set by CanvasView. */
+      readonly trafficEntry?: boolean;
     }
   | {
       readonly kind: 'group';
