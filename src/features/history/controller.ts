@@ -803,21 +803,21 @@ export class HistoryController {
     const matching = new Set<Id>();
     const projectId = this.lastSyncedProjectId;
     if (!projectId) return matching;
-    
+
     const steps = await Promise.all(this.state.commits.map(async (commit) => {
       if (commit.parentIds.length !== 1) return null;
       const parentCommit = this.state.commits.find((c) => c.id === commit.parentIds[0]);
       if (!parentCommit) return null;
-      
+
       const [parentSnap, commitSnap] = await Promise.all([
         this.repository.loadSnapshot(projectId, parentCommit.snapshotId),
         this.repository.loadSnapshot(projectId, commit.snapshotId),
       ]);
-      
+
       if (!parentSnap || !commitSnap) return null;
       return { id: commit.id, parentSnapshot: parentSnap.document, snapshot: commitSnap.document };
     }));
-    
+
     const validSteps = steps.filter((s): s is NonNullable<typeof s> => s !== null);
     const filtered = filterHistorySteps(validSteps, elementIds);
     for (const step of filtered) matching.add(step.id);

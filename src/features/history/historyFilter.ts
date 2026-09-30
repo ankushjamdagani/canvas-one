@@ -19,7 +19,7 @@ export function touchesElement(
   if (diff.recordKind === 'document') return false;
   if (diff.recordKind === 'view') return false;
   if (diff.recordKind === 'element' && elementIds.has(diff.id)) return true;
-  
+
   const findRecord = (doc: Document | null) => {
     if (!doc) return undefined;
     switch (diff.recordKind) {

@@ -406,7 +406,7 @@ export interface CommandContext {
   /** First not-ready scenario's reason, or null when every scenario can run. */
   readonly runAllBlockedReason: string | null;
   readonly exportDisabledReasons: Readonly<Record<TransferExportKind, string | null>>;
-  
+
   /** True if the single selected element owns or belongs to a refinement. */
   readonly selectionHasRefinement: boolean;
   /** True if the single selected element is in the active scenario's scope. */

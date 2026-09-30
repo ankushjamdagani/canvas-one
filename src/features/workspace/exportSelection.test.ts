@@ -40,11 +40,11 @@ describe('createSelectionExport', () => {
       const c = idCounter++;
       return `00000000-0000-4000-8000-${c.toString().padStart(12, '0')}` as Id;
     };
-    
+
     const res = createSelectionExport(doc, doc.views[0].id, [E1_ID], [], mintId(), 'Exported Selection');
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    
+
     const parsed = parsePartFile(res.bytes);
     if (!parsed.ok) {
       console.log('ISSUES:', JSON.stringify(parsed.issues, null, 2));
