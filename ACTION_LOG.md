@@ -1603,3 +1603,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Responsive sweep 45/45; touch audit 0 real targets under 44 px, plus the new scenario-editor probe 0.
   - axe: no violations. Focus return all ok. 320 px reflow 9/9. `git diff --check` clean.
 - **Lesson:** the reviewer passed code with a behaviour regression that a 20-line browser probe found in a minute; for UI lanes, run a quick interaction probe of the changed behaviour before trusting a review. Headless agy ignored prompt-level command limits three times; allow-lists don't converge, so choose skip-permissions (with approval) or another executor up front.
+
+### 16D actions and realism phase 2 started (status)
+
+- **Outcome**:
+  - `3bdbe08`: contracts for the 16D selection-scoped actions (commands.md, D46), including Wrap in boundary. Wrap is behaviour-preserving: owner, mirrored ports, a refinement, re-pointed crossings, and a `refined` selection plus the owner in scope for affected scenarios. Also contracted: Replace part with a preview, Add flow probe (a mode-aware check), Changes on this part (History filtered by `diffDocuments`), Export selection (a part file with no Library save), and boundary-frame rendering.
+  - `/delegate` run `.delegate/runs/20260930-123335` (Gemini critic passed):
+    - w1, Codex: Wrap in boundary, worktree `claude/wrap-boundary`.
+    - a1, Gemini with skip-permissions: overflow menu and the other four actions, worktree `claude/16d-actions`.
+    - o1, Codex: realism phase 2 statistical oracles, worktree `claude/realism-oracles`.
