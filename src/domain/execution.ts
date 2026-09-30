@@ -13,6 +13,27 @@ export interface ResourceConfig {
   failureRate: number;
   maxRetries: number;
   retryDelayMs: number;
+  /**
+   * D49 (audit H1): how long one attempt takes. 'fixed' is exactly 1/capacity per slot
+   * (M/D/c); 'exponential' draws a seeded exponential time with that mean (M/M/c).
+   * Absent means 'fixed', the behaviour of graphs built before D49.
+   */
+  serviceTime?: 'fixed' | 'exponential';
+}
+
+/**
+ * D49 (audit H13): the caller retries a call that is rejected, fails or times out.
+ * Attempt n waits min(maxBackoffMs, backoffMs * multiplier^(n-1)) before retrying, scaled
+ * by a seeded uniform draw when `jitter` is on ("full jitter"). `attemptTimeoutMs` bounds
+ * each attempt; null leaves only the request's own deadline.
+ */
+export interface CallRetryPolicy {
+  maxAttempts: number;
+  backoffMs: number;
+  backoffMultiplier: number;
+  maxBackoffMs: number;
+  jitter: boolean;
+  attemptTimeoutMs: number | null;
 }
 
 export type BehaviorConfig = ResourceConfig & (
@@ -64,6 +85,8 @@ export interface ExecutionEdge {
   };
   fallback?: boolean;
   needsReview?: boolean;
+  /** Call edges only; absent or null means the caller never retries. */
+  retry?: CallRetryPolicy | null;
 }
 
 export interface ExecutionNode {
@@ -134,11 +157,14 @@ function warn(issues: ValidationIssue[], code: string, message: string, nodeId?:
 function validateBehavior(b: unknown, id: string, issues: ValidationIssue[]): void {
   if (!isObj(b)) return err(issues, 'INVALID_BEHAVIOR', 'Behavior must be an object', id);
   if (!isNum(b.capacity, 1, 100000)) err(issues, 'INVALID_CAPACITY', 'capacity must be 1..100000', id);
-  if (!isNum(b.concurrency, 1, 16, true)) err(issues, 'INVALID_CONCURRENCY', 'concurrency must be int 1..16', id);
+  if (!isNum(b.concurrency, 1, 1024, true)) err(issues, 'INVALID_CONCURRENCY', 'concurrency must be int 1..1024', id);
   if (!isNum(b.queueLimit, 0, 10000, true)) err(issues, 'INVALID_QUEUE_LIMIT', 'queueLimit must be int 0..10000', id);
   if (!isNum(b.failureRate, 0, 100)) err(issues, 'INVALID_FAILURE_RATE', 'failureRate must be 0..100', id);
   if (!isNum(b.maxRetries, 0, 5, true)) err(issues, 'INVALID_MAX_RETRIES', 'maxRetries must be int 0..5', id);
   if (!isNum(b.retryDelayMs, 0, 10000)) err(issues, 'INVALID_RETRY_DELAY', 'retryDelayMs must be 0..10000', id);
+  if (b.serviceTime !== undefined && b.serviceTime !== 'fixed' && b.serviceTime !== 'exponential') {
+    err(issues, 'INVALID_SERVICE_TIME', 'serviceTime must be fixed or exponential', id);
+  }
 
   const t = b.type;
   if (t === 'source' || t === 'processor') return;
@@ -276,6 +302,20 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
     }
     if (e.fallback !== undefined && typeof e.fallback !== 'boolean') err(issues, 'INVALID_EDGE_FALLBACK', 'fallback must be boolean', undefined, isStr(e.id) ? e.id : undefined);
     if (e.needsReview !== undefined && typeof e.needsReview !== 'boolean') err(issues, 'INVALID_EDGE_NEEDS_REVIEW', 'needsReview must be boolean', undefined, isStr(e.id) ? e.id : undefined);
+    if (e.retry !== undefined && e.retry !== null) {
+      const r = e.retry;
+      const edgeId = isStr(e.id) ? e.id : undefined;
+      if (!isObj(r)) err(issues, 'INVALID_EDGE_RETRY', 'retry must be an object or null', undefined, edgeId);
+      else {
+        if (e.transport !== 'call') err(issues, 'INVALID_EDGE_RETRY', 'retry applies to call edges only', undefined, edgeId);
+        if (!isNum(r.maxAttempts, 1, 10, true)) err(issues, 'INVALID_EDGE_RETRY', 'retry.maxAttempts must be int 1..10', undefined, edgeId);
+        if (!isNum(r.backoffMs, 0, 60000)) err(issues, 'INVALID_EDGE_RETRY', 'retry.backoffMs must be 0..60000', undefined, edgeId);
+        if (!isNum(r.backoffMultiplier, 1, 10)) err(issues, 'INVALID_EDGE_RETRY', 'retry.backoffMultiplier must be 1..10', undefined, edgeId);
+        if (!isNum(r.maxBackoffMs, 0, 600000)) err(issues, 'INVALID_EDGE_RETRY', 'retry.maxBackoffMs must be 0..600000', undefined, edgeId);
+        if (typeof r.jitter !== 'boolean') err(issues, 'INVALID_EDGE_RETRY', 'retry.jitter must be boolean', undefined, edgeId);
+        if (r.attemptTimeoutMs !== null && !isNum(r.attemptTimeoutMs, 1, 600000)) err(issues, 'INVALID_EDGE_RETRY', 'retry.attemptTimeoutMs must be 1..600000 or null', undefined, edgeId);
+      }
+    }
   }
 
   const workloadIds = new Set<string>();

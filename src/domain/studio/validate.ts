@@ -2501,7 +2501,7 @@ function validateResourceConfig(
   const rec = cfg as Record<string, unknown>;
   const t = rec.type;
 
-  const commonAllowed = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs'];
+  const commonAllowed = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs', 'serviceTime'];
   const commonRequired = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs'];
 
   let allowed = commonAllowed;
@@ -2526,9 +2526,19 @@ function validateResourceConfig(
     return;
   }
 
-  if (checkRecord(rec, allowed, allowed, path, entityId, issues, `ResourceConfig (${String(t)})`)) {
+  const required = allowed.filter((k) => k !== 'serviceTime');
+  if (checkRecord(rec, allowed, required, path, entityId, issues, `ResourceConfig (${String(t)})`)) {
     validateNumber(rec.capacity, 1, 100000, [...path, 'capacity'], entityId, issues, 'capacity');
-    validateNumber(rec.concurrency, 1, 16, [...path, 'concurrency'], entityId, issues, 'concurrency', true);
+    validateNumber(rec.concurrency, 1, 1024, [...path, 'concurrency'], entityId, issues, 'concurrency', true);
+    if (rec.serviceTime !== undefined && rec.serviceTime !== 'fixed' && rec.serviceTime !== 'exponential') {
+      issues.push({
+        code: 'invalid-literal',
+        path: [...path, 'serviceTime'],
+        entityId,
+        severity: 'error',
+        message: `serviceTime must be 'fixed' or 'exponential'`,
+      });
+    }
     validateNumber(rec.queueLimit, 0, 10000, [...path, 'queueLimit'], entityId, issues, 'queueLimit', true);
     validateNumber(rec.failureRate, 0, 100, [...path, 'failureRate'], entityId, issues, 'failureRate');
     validateNumber(rec.maxRetries, 0, 5, [...path, 'maxRetries'], entityId, issues, 'maxRetries', true);
@@ -2596,8 +2606,10 @@ function validateConnectionConfig(
   if (kind === 'data') {
     checkRecord(rec, [], [], path, entityId, issues, 'DataConnectionConfig');
   } else if (kind === 'call') {
-    const allowed = ['latencyMs', 'returnLatencyMs', 'weight', 'condition', 'fallback', 'resource'];
-    if (checkRecord(rec, allowed, allowed, path, entityId, issues, 'CallConnectionConfig')) {
+    const allowed = ['latencyMs', 'returnLatencyMs', 'weight', 'condition', 'fallback', 'resource', 'retry'];
+    const required = ['latencyMs', 'returnLatencyMs', 'weight', 'condition', 'fallback', 'resource'];
+    if (checkRecord(rec, allowed, required, path, entityId, issues, 'CallConnectionConfig')) {
+      validateCallRetryPolicy(rec.retry, [...path, 'retry'], entityId, issues);
       validateNumber(rec.latencyMs, 0, 60000, [...path, 'latencyMs'], entityId, issues, 'latencyMs');
       validateNumber(rec.returnLatencyMs, 0, 60000, [...path, 'returnLatencyMs'], entityId, issues, 'returnLatencyMs');
       validateNumber(rec.weight, 0, 1e6, [...path, 'weight'], entityId, issues, 'weight', false, true);
@@ -2638,6 +2650,23 @@ function validateRouteCondition(
       });
     }
     validateString(rec.value, 1, 80, [...path, 'value'], entityId, issues, 'RouteCondition value');
+  }
+}
+
+
+/** D49: caller retry policy on a call connection; absent or null means no retries. */
+function validateCallRetryPolicy(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
+  if (value === undefined || value === null) return;
+  const keys = ['maxAttempts', 'backoffMs', 'backoffMultiplier', 'maxBackoffMs', 'jitter', 'attemptTimeoutMs'];
+  if (!checkRecord(value, keys, keys, path, entityId, issues, 'CallRetryPolicy')) return;
+  const r = value as Record<string, unknown>;
+  validateNumber(r.maxAttempts, 1, 10, [...path, 'maxAttempts'], entityId, issues, 'maxAttempts', true);
+  validateNumber(r.backoffMs, 0, 60000, [...path, 'backoffMs'], entityId, issues, 'backoffMs');
+  validateNumber(r.backoffMultiplier, 1, 10, [...path, 'backoffMultiplier'], entityId, issues, 'backoffMultiplier');
+  validateNumber(r.maxBackoffMs, 0, 600000, [...path, 'maxBackoffMs'], entityId, issues, 'maxBackoffMs');
+  validateBoolean(r.jitter, [...path, 'jitter'], entityId, issues, 'jitter');
+  if (r.attemptTimeoutMs !== null) {
+    validateNumber(r.attemptTimeoutMs, 1, 600000, [...path, 'attemptTimeoutMs'], entityId, issues, 'attemptTimeoutMs');
   }
 }
 

@@ -290,6 +290,8 @@ function buildExecutionGraph(opts: {
           ? { field: callConn.config.condition.field, value: String(callConn.config.condition.value) }
           : undefined,
         fallback: callConn.config.fallback,
+        // D49: caller retries apply to calls; a broker delivery has no caller to retry.
+        ...(!fromBroker && callConn.config.retry ? { retry: callConn.config.retry } : {}),
       });
     } else if (conn.kind === 'message') {
       const msgConn = conn as MessageConnection;
@@ -1068,6 +1070,26 @@ export class ResourceAdapter {
           atMs,
           outcome: null,
         };
+      case 'call_retry': {
+        // D49: the caller sends another attempt along this call connection after a backoff.
+        if (!fact.edgeId) return null;
+        const conn = this.edgeMap.get(fact.edgeId);
+        if (!conn) return null;
+        return {
+          id,
+          sequence: seq,
+          rootId: unitCtx.rootId,
+          journeyId: unitCtx.journeyId,
+          parentId: unitCtx.parentEventId,
+          elementId: fact.nodeId,
+          portId: conn.source.portId,
+          kind: 'dispatch',
+          code: 'call-retry',
+          payloadRef: unitCtx.payloadRef,
+          atMs,
+          outcome: null,
+        };
+      }
       case 'route_selected': {
         // Surfaces which element a router chose for this attempt. Distinct from admission:
         // a selected target may still be rejected at its own admission gate (e.g. an

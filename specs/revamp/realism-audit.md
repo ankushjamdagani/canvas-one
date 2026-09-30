@@ -131,6 +131,8 @@ Legend: **F** faithful · **S** simplified, honest · **M** misleading.
 
 ## Ranked issues for decisions
 
+**All eight are adopted (D49, 2026-09-30, runner `studio-runner/4`).** See "Phase 5: modelling fixes" at the end. The text below is the original ranking.
+
 Each item is for the user to decide. Items that change kernel behaviour or defaults change run results; batch them into one kernel version bump (see the plan, "Consequences").
 
 **Defects B1–B5, B7, B8 and G1 are fixed (D47, 2026-09-30; runner version `studio-runner/2`, so earlier evidence is stale).** B9 is fixed too (D48, `studio-runner/3`). The modelling issues below still need decisions.
@@ -258,3 +260,33 @@ Not a defect, but noted: a per-element count of generated, succeeded, rejected, 
 - **service:** S → M confirmed (A7, A1).
 - **state-machine and data-pipeline:** F for logic (A10, A11).
 - **thirdparty:** F behind a machine; **broken behind a traffic-driven service** (B8).
+
+## Phase 5: modelling fixes (D49, 2026-09-30)
+
+The user adopted the recommendations. One runner version bump (`studio-runner/4`); stored documents keep their configs (absent `serviceTime` and `retry` mean fixed and none).
+
+| Issue | Change | Evidence |
+|---|---|---|
+| H11 | Routers release their slot once they forward a request, and forwarded requests still fail with the router's host. The concurrency cap rises to 1,024, and defaults are pool-sized: processors, routers and caches 64; database 10; search 8; warehouse 4. | `model-d49.test.ts`: a one-slot gateway passes 150/s over 5 ms links. A9 on defaults scales linearly with replicas. A7 with 5 ms links holds 100/s. Goldens 03/04/05: only router occupancy changed. |
+| H1 | `serviceTime: 'exponential'` (seeded per unit, path and attempt) is the default; `fixed` stays available. | M/M/1 oracle: mean wait ρS/(1−ρ) at ρ = 0.8 within the 99% interval; mean service time 1/capacity; chunk-independent. |
+| H13 | Call connections take a retry policy: attempts, exponential backoff, full jitter, per-attempt timeout. Retries appear as `call-retry` trace rows. | Amplification 1 + p + p², final failures p³. Exact backoff timings. The timeout cancels abandoned work. Retry storm (A3): more load, no more goodput, higher latency. Caller retries recover transient failures. |
+| H12 | Message TTL 5 minutes; broker queue limit 10,000 | A2 on defaults: a 2× burst queues and drains with nothing lost |
+| H14 | Stream delivery is broadcast | A5: 3 messages per request for both stream and pub/sub |
+| H2 | 2 ms default call and message latency | A7 on defaults: 14 ms over four hops (2 × 3 × 2 + 4 × 0.5) |
+| Defaults | Database write 200/s against read 500/s; search indexing 100/s; warehouse 2 queries/s; LRU caches (1,000 entries, TTL 60 s); DNS unmodeled; label notes | A6: a write-heavy mix saturates first. A1: a cache that holds the working set protects the database, and an outgrown one lets it saturate. A8: LRU hot keys 87% against uniform 10%. |
+
+**Verdicts after D49:**
+- gateway, balancer and firewall: M → F for throughput;
+- service, function and container: S (thread-per-request with 64 slots is a real model);
+- queue: S (TTL, limit and retention are real knobs);
+- stream: M → S (broadcast; no consumer groups within a route);
+- dns: M → F (honest, unmodeled);
+- search and warehouse: M → S;
+- cache and cdn: S;
+- `call`: S (latency and retries modelled).
+
+**Limits that remain (labelled):**
+- Retries don't apply to calls that leave the kernel to a boundary, or to broker deliveries.
+- There is one service-time distribution family (exponential), with no heavy tails.
+- Load balancers retry on the same route.
+- Workload profiles are steady only.

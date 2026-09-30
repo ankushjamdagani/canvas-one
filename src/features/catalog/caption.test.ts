@@ -15,7 +15,7 @@ describe('caption.ts', () => {
       expect(libraryCaption(pubsub)).toBe('broker · broadcast');
 
       const dns = getEntry('dns')!;
-      expect(libraryCaption(dns)).toBe('cache · fixed');
+      expect(libraryCaption(dns)).toBe('not simulated');
 
       const email = getEntry('email')!;
       expect(libraryCaption(email)).toBe('not simulated');
@@ -39,49 +39,49 @@ describe('caption.ts', () => {
 
     it('formats processor defaults line', () => {
       const service = getEntry('service')!;
-      expect(defaultsLine(service)).toBe('DEFAULTS · Capacity per slot 2000/s, Concurrency 1, Queue limit 500');
+      expect(defaultsLine(service)).toBe('DEFAULTS · Capacity per slot 2000/s, Concurrency 64, Queue limit 500, Service time Variable (exponential)');
 
       const worker = getEntry('worker')!;
       expect(defaultsLine(worker)).toBe(
-        'DEFAULTS · Capacity per slot 100/s, Concurrency 2, Queue limit 0, Max retries 2',
+        'DEFAULTS · Capacity per slot 100/s, Concurrency 2, Queue limit 0, Max retries 2, Service time Variable (exponential)',
       );
     });
 
     it('formats storage defaults line', () => {
       const db = getEntry('database')!;
       expect(defaultsLine(db)).toBe(
-        'DEFAULTS · Capacity per slot 500/s, Write capacity 500/s, Queue limit 500',
+        'DEFAULTS · Capacity per slot 500/s, Write capacity 200/s, Queue limit 500, Service time Variable (exponential)',
       );
 
       const nosql = getEntry('nosql')!;
       expect(defaultsLine(nosql)).toBe(
-        'DEFAULTS · Capacity per slot 2000/s, Write capacity 2000/s, Queue limit 500',
+        'DEFAULTS · Capacity per slot 2000/s, Write capacity 1000/s, Queue limit 500, Service time Variable (exponential)',
       );
     });
 
     it('formats router defaults line', () => {
       const gateway = getEntry('gateway')!;
       expect(defaultsLine(gateway)).toBe(
-        'DEFAULTS · Strategy Round robin, Capacity per slot 2000/s, Queue limit 500',
+        'DEFAULTS · Strategy Round robin, Capacity per slot 2000/s, Queue limit 500, Service time Variable (exponential)',
       );
     });
 
     it('formats cache defaults line', () => {
-      const dns = getEntry('dns')!;
-      expect(defaultsLine(dns)).toBe(
-        'DEFAULTS · Mode Fixed, Hit rate 80%, Entries 100, TTL 10000ms, Capacity per slot 5000/s',
+      const cache = getEntry('cache')!;
+      expect(defaultsLine(cache)).toBe(
+        'DEFAULTS · Mode LRU, Hit rate 80%, Entries 1000, TTL 60000ms, Capacity per slot 5000/s, Service time Variable (exponential)',
       );
     });
 
     it('formats broker defaults line', () => {
       const queue = getEntry('queue')!;
       expect(defaultsLine(queue)).toBe(
-        'DEFAULTS · Delivery Competing, Capacity per slot 2000/s, Queue limit 500',
+        'DEFAULTS · Delivery Competing, Capacity per slot 2000/s, Queue limit 10000, Service time Variable (exponential)',
       );
 
       const pubsub = getEntry('pubsub')!;
       expect(defaultsLine(pubsub)).toBe(
-        'DEFAULTS · Delivery Broadcast, Capacity per slot 2000/s, Queue limit 500',
+        'DEFAULTS · Delivery Broadcast, Capacity per slot 2000/s, Queue limit 10000, Service time Variable (exponential)',
       );
     });
 

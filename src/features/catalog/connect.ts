@@ -483,12 +483,13 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       source: sourceEndpoint,
       target: targetEndpoint,
       config: {
-        latencyMs: 0, // assumption (catalog.md)
-        returnLatencyMs: 0, // assumption (catalog.md)
+        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
+        returnLatencyMs: 2, // assumption (catalog.md, D49)
         weight: 1, // assumption (catalog.md)
         condition: null,
         fallback: false,
         resource: null,
+        retry: null, // D49: no caller retries unless the author adds a policy
       },
     };
     connection = callConnection;
@@ -501,9 +502,9 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       source: sourceEndpoint,
       target: targetEndpoint,
       config: {
-        latencyMs: 0, // assumption (catalog.md)
+        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
         ackDelayMs: 0, // assumption (catalog.md, resolution 5)
-        messageTtlMs: 10000, // assumption (catalog.md, resolution 5)
+        messageTtlMs: 300000, // assumption (catalog.md, D49): 5 minutes of retention
         weight: 1, // assumption (catalog.md)
         condition: null,
         fallback: false,
@@ -609,12 +610,13 @@ export function completeConnection(
       source: draft.source,
       target: draft.target,
       config: {
-        latencyMs: 0, // assumption (catalog.md)
-        returnLatencyMs: 0, // assumption (catalog.md)
+        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
+        returnLatencyMs: 2, // assumption (catalog.md, D49)
         weight: 1, // assumption (catalog.md)
         condition: null,
         fallback: false,
         resource: resourceCallMetadata,
+        retry: null, // D49: no caller retries unless the author adds a policy
       },
     };
     connection = callConn;
@@ -626,9 +628,9 @@ export function completeConnection(
       source: draft.source,
       target: draft.target,
       config: {
-        latencyMs: 0, // assumption (catalog.md)
+        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
         ackDelayMs: 0, // assumption (catalog.md, resolution 5)
-        messageTtlMs: 10000, // assumption (catalog.md, resolution 5)
+        messageTtlMs: 300000, // assumption (catalog.md, D49): 5 minutes of retention
         weight: 1, // assumption (catalog.md)
         condition: null,
         fallback: false,

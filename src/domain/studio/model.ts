@@ -163,6 +163,21 @@ export type CallConnectionConfig = {
   readonly condition: RouteCondition | null;
   readonly fallback: boolean;
   readonly resource: ResourceCallMetadata | null;
+  /**
+   * D49: the caller's retry policy for this call. Absent or null means no retries
+   * (connections created before D49 have no field).
+   */
+  readonly retry?: CallRetryPolicy | null;
+};
+
+/** D49: caller retry policy (model-and-runner.md §4). */
+export type CallRetryPolicy = {
+  readonly maxAttempts: number;
+  readonly backoffMs: number;
+  readonly backoffMultiplier: number;
+  readonly maxBackoffMs: number;
+  readonly jitter: boolean;
+  readonly attemptTimeoutMs: number | null;
 };
 
 /**
@@ -484,6 +499,11 @@ export type ResourceConfigBase = {
   readonly failureRate: number;
   readonly maxRetries: number;
   readonly retryDelayMs: number;
+  /**
+   * D49: 'fixed' takes exactly 1/capacity per slot; 'exponential' draws a seeded
+   * exponential time with that mean. Absent means 'fixed' (configs created before D49).
+   */
+  readonly serviceTime?: 'fixed' | 'exponential';
 };
 
 export type SourceOrProcessorResourceConfig = ResourceConfigBase & {

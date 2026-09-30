@@ -91,13 +91,17 @@ export function groupOf(entry: CatalogEntry): CatalogGroup {
 // Shared Default Configurations
 // ============================================================================
 
+// D49 (realism audit): exponential service time by default; slot pools sized like real
+// thread and connection pools; brokers retain 10,000 messages; caches use LRU so hot keys
+// matter; storage writes cost more than reads.
 const BASE_RESOURCE_DEFAULTS = {
   capacity: 2000, // assumption (catalog.md)
-  concurrency: 1, // assumption (catalog.md)
+  concurrency: 64, // assumption (catalog.md, D49): a typical request thread/worker pool
   queueLimit: 500, // assumption (catalog.md)
   failureRate: 0, // assumption (catalog.md)
   maxRetries: 0, // assumption (catalog.md)
   retryDelayMs: 100, // assumption (catalog.md)
+  serviceTime: 'exponential' as const, // assumption (catalog.md, D49)
 } as const;
 
 const PROCESSOR_CONFIG = {
@@ -106,17 +110,13 @@ const PROCESSOR_CONFIG = {
 };
 
 const CACHE_CONFIG = {
+  ...BASE_RESOURCE_DEFAULTS,
   capacity: 5000, // assumption (catalog.md)
-  concurrency: 1, // assumption (catalog.md)
-  queueLimit: 500, // assumption (catalog.md)
-  failureRate: 0, // assumption (catalog.md)
-  maxRetries: 0, // assumption (catalog.md)
-  retryDelayMs: 100, // assumption (catalog.md)
   type: 'cache' as const,
-  mode: 'fixed' as const,
-  hitRate: 80, // assumption (catalog.md)
-  entries: 100, // assumption (catalog.md)
-  ttlMs: 10000, // assumption (catalog.md)
+  mode: 'lru' as const, // assumption (catalog.md, D49)
+  hitRate: 80, // assumption (catalog.md); used in fixed mode
+  entries: 1000, // assumption (catalog.md, D49)
+  ttlMs: 60000, // assumption (catalog.md, D49)
 };
 
 const ROUTER_CONFIG = {
@@ -126,46 +126,60 @@ const ROUTER_CONFIG = {
 };
 
 const STORAGE_DATABASE_CONFIG = {
-  capacity: 500, // assumption (catalog.md)
-  concurrency: 1, // assumption (catalog.md)
-  queueLimit: 500, // assumption (catalog.md)
-  failureRate: 0, // assumption (catalog.md)
-  maxRetries: 0, // assumption (catalog.md)
-  retryDelayMs: 100, // assumption (catalog.md)
+  ...BASE_RESOURCE_DEFAULTS,
+  capacity: 500, // assumption (catalog.md): 2 ms per read
+  concurrency: 10, // assumption (catalog.md, D49): connection pool
   type: 'storage' as const,
-  writeCapacity: 500, // assumption (catalog.md)
+  writeCapacity: 200, // assumption (catalog.md, D49): 5 ms per write
 };
 
 const STORAGE_DEFAULT_CONFIG = {
-  capacity: 2000, // assumption (catalog.md)
-  concurrency: 1, // assumption (catalog.md)
-  queueLimit: 500, // assumption (catalog.md)
-  failureRate: 0, // assumption (catalog.md)
-  maxRetries: 0, // assumption (catalog.md)
-  retryDelayMs: 100, // assumption (catalog.md)
+  ...BASE_RESOURCE_DEFAULTS,
+  concurrency: 16, // assumption (catalog.md, D49)
   type: 'storage' as const,
-  writeCapacity: 2000, // assumption (catalog.md)
+  writeCapacity: 1000, // assumption (catalog.md, D49)
+};
+
+const STORAGE_SEARCH_CONFIG = {
+  ...BASE_RESOURCE_DEFAULTS,
+  capacity: 1000, // assumption (catalog.md, D49): 1 ms per query
+  concurrency: 8, // assumption (catalog.md, D49)
+  type: 'storage' as const,
+  writeCapacity: 100, // assumption (catalog.md, D49): indexing costs 10 ms
+};
+
+const STORAGE_WAREHOUSE_CONFIG = {
+  ...BASE_RESOURCE_DEFAULTS,
+  capacity: 2, // assumption (catalog.md, D49): 500 ms analytical query
+  concurrency: 4, // assumption (catalog.md, D49)
+  queueLimit: 100, // assumption (catalog.md, D49)
+  type: 'storage' as const,
+  writeCapacity: 1, // assumption (catalog.md, D49): 1 s load batch
+};
+
+const BROKER_BASE = {
+  ...BASE_RESOURCE_DEFAULTS,
+  queueLimit: 10000, // assumption (catalog.md, D49): retained messages
 };
 
 const BROKER_COMPETING_CONFIG = {
-  ...BASE_RESOURCE_DEFAULTS,
+  ...BROKER_BASE,
   type: 'broker' as const,
   delivery: 'competing' as const,
 };
 
 const BROKER_BROADCAST_CONFIG = {
-  ...BASE_RESOURCE_DEFAULTS,
+  ...BROKER_BASE,
   type: 'broker' as const,
   delivery: 'broadcast' as const,
 };
 
 const WORKER_CONFIG = {
+  ...BASE_RESOURCE_DEFAULTS,
   capacity: 100, // assumption (catalog.md)
   concurrency: 2, // assumption (catalog.md)
   queueLimit: 0, // assumption (catalog.md)
-  failureRate: 0, // assumption (catalog.md)
   maxRetries: 2, // assumption (catalog.md)
-  retryDelayMs: 100, // assumption (catalog.md)
   type: 'processor' as const,
 };
 
@@ -321,13 +335,13 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     group: 'Edge',
     category: 'Edge',
     visualKind: 'dns',
-    behaviorKind: 'resource',
-    ports: CALL_IN_OUT_PORTS,
-    defaultConfig: CACHE_CONFIG,
-    models: 'A name-resolution hop modeled as a cache (hit/miss, ttl) in front of one origin',
-    doesNotModel: 'Real DNS propagation, anycast, record types',
-    tags: ['cache', 'fixed'],
-    caption: { line1: 'DNS', line2template: 'cache · 80% hit' },
+    behaviorKind: 'unmodeled',
+    ports: CALL_IN_PORT,
+    defaultConfig: null,
+    models: 'A name-resolution service, shown for completeness. Clients cache lookups, so DNS is not on the per-request path (D49)',
+    doesNotModel: 'Resolution time, propagation, anycast, record types',
+    tags: ['not simulated'],
+    caption: { line1: 'DNS', line2template: 'Not simulated' },
   },
   {
     entryId: 'cdn',
@@ -338,10 +352,10 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     behaviorKind: 'resource',
     ports: CALL_IN_OUT_PORTS,
     defaultConfig: CACHE_CONFIG,
-    models: 'An edge cache in front of one origin',
-    doesNotModel: 'Geographic PoPs, real cache invalidation protocols',
-    tags: ['cache', 'fixed'],
-    caption: { line1: 'CDN', line2template: 'cache · 80% hit' },
+    models: 'An edge cache in front of one origin; LRU over the request keys, or a fixed hit rate that ignores keys',
+    doesNotModel: 'Geographic PoPs, many origins, real cache invalidation protocols',
+    tags: ['cache', 'lru'],
+    caption: { line1: 'CDN', line2template: 'cache · lru' },
   },
   {
     entryId: 'firewall',
@@ -491,7 +505,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     models: 'A relational-style store with read capacity and write capacity',
     doesNotModel: 'Schemas, transactions, query planning, indexes',
     tags: ['storage', 'read-write'],
-    caption: { line1: 'Relational Database', line2template: 'storage · 500 /s cap' },
+    caption: { line1: 'Relational Database', line2template: 'storage · 500 /s read' },
   },
   {
     entryId: 'nosql',
@@ -502,7 +516,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     behaviorKind: 'resource',
     ports: CALL_IN_PORT,
     defaultConfig: STORAGE_DEFAULT_CONFIG,
-    models: 'Same accounting as database, different label',
+    models: 'A key-value/document store: the database model (read and write capacity), different defaults',
     doesNotModel: 'Consistency models, partitioning, real query APIs',
     tags: ['storage', 'read-write'],
     caption: { line1: 'NoSQL Database', line2template: 'storage · 2 000 /s cap' },
@@ -518,8 +532,8 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     defaultConfig: CACHE_CONFIG,
     models: 'An in-memory or intermediate cache modeled with hit/miss and ttl',
     doesNotModel: 'Eviction protocols beyond mode, replication, distributed caching',
-    tags: ['cache', 'fixed'],
-    caption: { line1: 'Cache Store', line2template: 'cache · 80% hit' },
+    tags: ['cache', 'lru'],
+    caption: { line1: 'Cache Store', line2template: 'cache · lru' },
   },
   {
     entryId: 'objectstore',
@@ -530,7 +544,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     behaviorKind: 'resource',
     ports: CALL_IN_PORT,
     defaultConfig: STORAGE_DEFAULT_CONFIG,
-    models: 'Same storage accounting',
+    models: 'An object store: the database model (read and write capacity)',
     doesNotModel: 'Real object APIs, multipart upload, storage classes',
     tags: ['storage', 'read-write'],
     caption: { line1: 'Object Store', line2template: 'storage · 2 000 /s cap' },
@@ -543,11 +557,11 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     visualKind: 'search',
     behaviorKind: 'resource',
     ports: CALL_IN_PORT,
-    defaultConfig: STORAGE_DEFAULT_CONFIG,
-    models: 'Same storage accounting',
-    doesNotModel: 'Indexing, relevance ranking, query DSL',
+    defaultConfig: STORAGE_SEARCH_CONFIG,
+    models: 'A search index: queries at read capacity, indexing (writes) at a much lower write capacity',
+    doesNotModel: 'Relevance ranking, query DSL, index structure',
     tags: ['storage', 'read-write'],
-    caption: { line1: 'Search Engine', line2template: 'storage · 2 000 /s cap' },
+    caption: { line1: 'Search Engine', line2template: 'storage · 1 000 /s read' },
   },
   {
     entryId: 'warehouse',
@@ -557,11 +571,11 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     visualKind: 'warehouse',
     behaviorKind: 'resource',
     ports: CALL_IN_PORT,
-    defaultConfig: STORAGE_DEFAULT_CONFIG,
-    models: 'Same storage accounting',
-    doesNotModel: 'Query engines, partitioned storage, ETL',
+    defaultConfig: STORAGE_WAREHOUSE_CONFIG,
+    models: 'An analytical store: a few slow queries at a time (default 500 ms each), loads slower still',
+    doesNotModel: 'Query engines, partitioned storage, ETL, query-size variation beyond the service-time draw',
     tags: ['storage', 'read-write'],
-    caption: { line1: 'Data Warehouse', line2template: 'storage · 2 000 /s cap' },
+    caption: { line1: 'Data Warehouse', line2template: 'storage · 2 /s read' },
   },
 
   // --------------------------------------------------------------------------
@@ -589,11 +603,11 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     visualKind: 'stream',
     behaviorKind: 'resource',
     ports: MESSAGE_BROKER_PORTS,
-    defaultConfig: BROKER_COMPETING_CONFIG,
-    models: 'Same broker accounting, labelled for a stream/log',
-    doesNotModel: 'Partitioning, offsets, replay, ordering guarantees beyond FIFO',
-    tags: ['broker', 'competing'],
-    caption: { line1: 'Event Stream', line2template: 'broker · competing' },
+    defaultConfig: BROKER_BROADCAST_CONFIG,
+    models: 'A stream/log: every consumer route gets every event, like one consumer group per route (D49)',
+    doesNotModel: 'Partitioning, offsets, replay, competing consumers within a group, ordering guarantees beyond FIFO',
+    tags: ['broker', 'broadcast'],
+    caption: { line1: 'Event Stream', line2template: 'broker · broadcast' },
   },
   {
     entryId: 'pubsub',
@@ -695,7 +709,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
       },
     ],
     defaultConfig: null,
-    models: 'Explicit state + event + guard + effect logic (S01 pattern)',
+    models: 'Explicit state + event + guard + effect logic (S01 pattern). Takes no processing time in timed runs: put a service in front for capacity',
     doesNotModel: 'Nothing hidden — behavior is 100% authored, no default states shipped',
     tags: ['state machine'],
     caption: { line1: 'State Machine', line2template: 'state machine · 0 states' },
@@ -732,7 +746,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
       },
     ],
     defaultConfig: null,
-    models: 'An ordered validate/transform/aggregate row pipeline (S03 pattern)',
+    models: 'An ordered validate/transform/aggregate row pipeline (S03 pattern). Takes no processing time in timed runs',
     doesNotModel: 'Joins, loops, arbitrary code, streaming windows',
     tags: ['data pipeline'],
     caption: { line1: 'Data Pipeline', line2template: 'data pipeline · 0 steps' },

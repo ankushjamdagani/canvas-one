@@ -1697,3 +1697,35 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Tests**: assertions unit test (pass, fail, missing, unavailable); a reference-architecture chain test (element latency 32 → 21.5 → 0.5 ms down the chain; checks pass, fail, pass).
 - **Review**: Sonnet REVISE (minor). Fixed: publication-only broker-entry acks no longer mix into broker latency; unavailable throughput is `null`.
 - **Verification**: 1,520 unit tests pass (9 skipped); `npx tsc -b` clean; build clean; isolated production e2e 88 passed / 4 skipped (before the two one-line review fixes; unit suite rerun after them).
+
+### RV-24: modelling fixes (D49)
+
+- **Outcome**: the user adopted the realism audit's recommendations.
+  - Kernel:
+    - routers release their slot after forwarding (outages still fail their forwarded requests);
+    - `serviceTime: 'exponential'`, seeded per unit, path and attempt;
+    - caller retry policy on call edges (attempts, exponential backoff, full jitter, per-attempt timeout that cancels abandoned work), reported as `call_retry` facts and `call-retry` trace rows;
+    - concurrency cap 1–1024.
+  - Studio: `serviceTime` and `retry` on the model, validation, merge descriptor, adapter and inspector (service-time select; "Attempts (1 = no retries)" plus detail fields once enabled).
+  - Catalog defaults:
+    - pools of 64, or 10/8/4 for database, search and warehouse;
+    - storage write costs above read costs;
+    - LRU caches;
+    - broker queue 10,000, and streams broadcast;
+    - DNS unmodeled;
+    - 2 ms call and message latency; message TTL 5 minutes;
+    - label notes.
+  - Runner `studio-runner/4`. Contracts: model-and-runner.md §4, catalog.md "D49 defaults", storage.md versions; decisions.md D49; audit "Phase 5".
+- **Tests**:
+  - `model-d49.test.ts` (11): M/M/1 oracle, router throughput, retry amplification, backoff timing, jitter, attempt timeout, retry storm, validation.
+  - Reference architectures rewritten to assert real-world behaviour on the new defaults.
+  - Inspector and caption tests updated.
+  - New e2e "D49: a service shows its service time, and a call can be given caller retries".
+- **Found and fixed**: the inspector kept the field list it opened with after Apply, so record-dependent fields (retry details) never appeared; `applyDraft` now rebuilds the fields from the applied record.
+- **Verification**: 1,529 unit tests pass (9 skipped); `npx tsc -b` clean; build clean, no chunk warning; isolated production e2e 89 passed / 4 skipped; axe clean. Goldens 03/04/05 regenerated; only router `occupancy` changed.
+- **Lesson:** the isolated e2e config serves whatever is in `dist` (`vite preview`); a run after source changes without `npm run build` tests the old app. The first D49 e2e failure was a stale build, not a bug.
+- **Review**: Sonnet PASS with 5 risks. Fixed: an attempt timeout now counts until the response reaches the caller, including return latency (new test). Documented as intended:
+  - abandoned in-service work keeps its callee slot (wasted work);
+  - router utilization covers only its own processing.
+- Left as-is: lowering Attempts to 1 in the same draft as edits to the detail fields drops those edits along with the policy; the fields disappear with it.
+- Final: 1,530 unit tests; tsc clean; build clean; isolated e2e 89 passed / 4 skipped; axe clean.

@@ -9,7 +9,7 @@ Local records, the portable file format, publication metadata and numeric ceilin
 | Database | new Dexie `system-studio-local-v1`, version 1. The old `system-studio` DB stays untouched and is not auto-imported. |
 | Portable file | `{format:'system-studio',version:9,project:ProjectBundle}`. Versions 7, 8 and unknown ones are rejected with a clear message, and the file is left unchanged. |
 | Document / preferences / part file | `studio-model/1`, `studio-preferences/1`, `system-studio-part/1` |
-| Compiler / runner / encoding | `studio-compiler/1`, `studio-runner/3` (D47, D48; earlier evidence is stale), `canonical-json-v1` |
+| Compiler / runner / encoding | `studio-compiler/1`, `studio-runner/4` (D47–D49; earlier evidence is stale), `canonical-json-v1` |
 
 These are new versions, not descriptions of existing code.
 

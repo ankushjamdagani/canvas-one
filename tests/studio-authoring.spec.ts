@@ -370,6 +370,35 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await page.screenshot({ path: test.info().outputPath('d47-messaging.png') });
   });
 
+  test('D49: a service shows its service time, and a call can be given caller retries', async ({ page }) => {
+    await openBlankProject(page, 'Retries');
+    const serviceId = await placeAtFraction(page, 'service', 0.1, 0.3);
+    const databaseId = await placeAtFraction(page, 'database', 0.4, 0.3);
+
+    await page.locator(`[data-element-id="${serviceId}"]`).click();
+    await expect(page.getByTestId('inspector-field-config.serviceTime')).toHaveValue('exponential');
+    await expect(page.getByTestId('inspector-field-config.concurrency')).toHaveValue('64');
+
+    expect(await dragConnect(page, serviceId, databaseId)).toBe('form');
+    await page.getByTestId('connect-form-request-class').fill('read-order');
+    await page.getByTestId('connect-form-op-read').check();
+    await page.getByTestId('connect-form-deadline').fill('500');
+    await page.getByTestId('connect-form-confirm').click();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+    await waitForIdle(page);
+
+    await page.locator('.react-flow__edge').first().click({ force: true });
+    const attempts = page.getByTestId('inspector-field-config.retry.maxAttempts');
+    await expect(attempts).toHaveValue('1');
+    await expect(page.getByTestId('inspector-field-config.retry.backoffMs')).toHaveCount(0);
+    await attempts.fill('3');
+    await page.getByTestId('inspector-apply').click();
+    await waitForIdle(page);
+    await expect(page.getByTestId('inspector-field-config.retry.backoffMs')).toHaveValue('100');
+    await expect(page.getByTestId('inspector-field-config.retry.attemptTimeoutMs')).toHaveValue('0');
+    await page.screenshot({ path: test.info().outputPath('d49-retry-fields.png') });
+  });
+
   test('select and delete a connected node; undo restores node and edge', async ({ page }) => {
     await openBlankProject(page, 'Select and delete');
     const queueId = await placeAtFraction(page, 'queue', 0.1, 0.3);
