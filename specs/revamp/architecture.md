@@ -116,7 +116,7 @@ Evidence from a read-only caller audit (2026-09-21). An imported symbol, a test-
 
 ## 7. Future boundaries (not built now)
 
-Two confirmed future directions constrain today's design without adding code.
+Three future directions are recorded here. The first two constrain today's design without adding code.
 
 **Hosted, self-hosted and sync (D18).** Local, hosted and self-hosted bundles share one core; GitHub/server sync and async review come first, live coediting later. Required now:
 - **IDs.** Project, document, element, branch and scenario IDs never depend on a provider or on names.
@@ -137,3 +137,5 @@ Later decisions (not now):
 - UI-independent validated commands, candidate diff/validation, stable revision-aware references, provenance and run identity. A future agent is just another client of these; it never writes Zustand/Dexie directly or scrapes the UI.
 - Proposals will carry a base revision, operations, rationale and evidence refs; stale proposals are rebased or rejected, never applied blindly.
 - No AI providers, chat UI, agent services, plugin frameworks or speculative tables now. Local use never requires AI.
+
+**Full accessibility assessment (user, 2026-09-30).** Moved from open debt to future scope. It covers what the automated (axe) and keyboard-focus probes can't show: screen reader use (announcements, landmarks, live regions for run results), keyboard-only canvas editing (placing, moving and connecting parts without a pointer), text spacing, and forced colours (Windows high contrast). The gaps are listed in [accessibility.md](accessibility.md#not-covered). It starts when the user asks.

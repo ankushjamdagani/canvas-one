@@ -122,6 +122,30 @@ describe('scenarioStatus derivation and loader', () => {
     }
   });
 
+  it('a runner version bump alone makes a saved passing run need a rerun (D47-D50)', async () => {
+    const scenario = s01Doc.scenarios[0];
+    const older = { ...DEFAULT_BUILD_VERSIONS, runnerVersions: [{ runnerId: 'studio-runner', version: 'studio-runner/4' }] };
+    const before = await buildManifest(s01Doc, scenario.id, older);
+    const now = await buildManifest(s01Doc, scenario.id, DEFAULT_BUILD_VERSIONS);
+    if (before.status !== 'ok' || now.status !== 'ok') throw new Error('manifest not built');
+    expect(DEFAULT_BUILD_VERSIONS.runnerVersions[0].version).not.toBe('studio-runner/4');
+    expect(now.fingerprint).not.toBe(before.fingerprint);
+
+    const runUnderOldRunner: any = {
+      id: 'run-old-runner',
+      manifest: before.manifest,
+      fingerprint: before.fingerprint,
+      status: 'completed',
+      provenance: 'local',
+      checks: [{ assertionId: 'a1', status: 'passed', actual: 'succeeded', reason: null }],
+      summary: { mode: 'logical', consumedInputs: 1, rootCounts: { generated: 1, succeeded: 1, rejected: 0, failed: 0, expired: 0, inFlight: 0 } },
+      completedAt: 1000,
+    };
+    const scope = now.manifest.scope.includedElementIds;
+    expect(deriveScenarioStatus(scenario.id, before.fingerprint, [runUnderOldRunner], scope).kind).toBe('passed');
+    expect(deriveScenarioStatus(scenario.id, now.fingerprint, [runUnderOldRunner], scope).kind).toBe('needs-rerun');
+  });
+
   it('Item 6: deriveScenarioStatus returns not-ready when the manifest cannot be built, taking priority over run-derived status', () => {
     const scenarioId = s01Doc.scenarios[0].id;
     const compiledScope = s01Doc.scenarios[0].scopeElementIds;

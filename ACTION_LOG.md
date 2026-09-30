@@ -1758,3 +1758,18 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - The broker redelivery policy comes from the route that delivered the failed attempt.
 - **Verification**: 1,548 unit tests pass (9 skipped); `npx tsc -b` clean; build clean, no chunk warning; isolated production e2e 90 passed / 4 skipped (after `npm run build`); axe clean (pre-review run). The one unrelated `session.test.ts` timeout seen by the reviewer passed on an isolated rerun (load average ~6).
 - **Lesson:** a redelivered or retried operation needs its own path in the seeded-draw key; reusing the path replays the same random failure every time (the first redelivery run failed exactly the same half of messages forever).
+
+### RV-26: S06 example, repeating boundary replies, stale-evidence check (D51)
+
+- **Outcome**:
+  - **S06 "Checkout under a traffic spike".** A gateway in front of two checkout replicas retries on the other replica. Orders go to a database, a payment service calls a card processor (boundary: 150 ms, 2 attempts, 1 s attempt timeout; 3 attempts from checkout to payments), and fulfilment is queued for a worker.
+    - "Steady traffic" (100/s, 30 s): no failures, p95 166 ms, 97/s.
+    - "Flash sale" (a 600/s burst from 10 to 20 s, drained): the queue absorbs all 7,209 fulfilment messages with none expired or left, and the checkout replicas turn away 805 of 8,014 orders at the peak. That is the lesson; a third replica fixes it.
+    - The fixture is built from the app's planners by `src/features/entry/s06-example.test.ts` (`UPDATE_S06=1` regenerates it).
+    - Added to the example catalog and the entry e2e; a new e2e runs both scenarios to Passed in the browser.
+  - **Repeating replies.** A boundary response may set `repeat: true` (model, validation, runner, and an "Answers" select in the Boundaries section) to answer every matching request instead of being used once.
+  - **Stale evidence.** A new test proves that a runner-version bump alone turns a Passed scenario into "Needs a rerun" (the fingerprint includes `runnerVersions`).
+  - The accessibility gaps moved from open debt to future scope (architecture.md §7).
+- **Found**: the first S06 draft put the unmodeled card processor inside the scenario scope. `runScenario` ran it anyway, but readiness (and so the app's Run) rejected it. The generator test now checks readiness before running.
+- **Verification**: 1,553 unit tests pass (9 skipped); `npx tsc -b` clean; build clean; isolated production e2e 93 passed / 4 skipped (new: S06 runs to Passed; the boundary "Answers" choice persists); axe clean. The first "Answers" e2e wrongly expected the editor to close on Apply; it stays open, and the test now closes and reopens it.
+- **Lesson:** runner-level tests that call `runScenario` directly skip readiness; assert `checkReadiness(...).ready` first, or a fixture that the app can't run will pass.

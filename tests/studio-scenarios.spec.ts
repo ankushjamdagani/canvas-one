@@ -90,4 +90,34 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await expect(editor).toContainText('Enter the ramp end rate');
     await editor.getByRole('button', { name: 'Cancel' }).click();
   });
+
+  test('D51: a boundary reply can answer every matching request; the choice is saved', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s01').click();
+    await expect(page.getByTestId('save-status')).toContainText('Saved');
+    const openEditor = async () => {
+      await page.getByTestId('scenario-switcher-trigger').click();
+      await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+      const editor = page.getByTestId('scenario-editor');
+      await expect(editor).toBeVisible();
+      const boundaries = editor.getByTestId('scenario-section-boundaries');
+      await boundaries.getByRole('button', { expanded: false }).first().click();
+      return { editor, answers: boundaries.getByTestId('boundary-response-repeat').first() };
+    };
+
+    const first = await openEditor();
+    await expect(first.answers).toHaveValue('once');
+    await first.answers.selectOption('every');
+    const apply = first.editor.getByTestId('scenario-editor-apply');
+    await expect(apply).toBeEnabled();
+    await apply.click();
+    // The editor stays open after Apply; the draft is clean again.
+    await expect(apply).toBeDisabled();
+    await expect(page.getByTestId('save-status')).toContainText('Saved');
+    await first.editor.getByRole('button', { name: 'Close editor' }).click();
+    await expect(first.editor).toBeHidden();
+
+    const second = await openEditor();
+    await expect(second.answers).toHaveValue('every');
+  });
 });

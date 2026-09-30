@@ -11,7 +11,7 @@ import { test, expect, type Page } from '@playwright/test';
  * does not repeat those.
  */
 
-const EXAMPLE_IDS = ['s01', 's02', 's03', 's04', 's05'] as const;
+const EXAMPLE_IDS = ['s01', 's02', 's03', 's04', 's05', 's06'] as const;
 
 async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');

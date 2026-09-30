@@ -1,13 +1,13 @@
 import type { Document } from '../../domain/studio/model';
 
 /**
- * Entry-screen list of the S01–S05 reference examples. Titles and counts are inline so
+ * Entry-screen list of the S01–S06 reference examples. Titles and counts are inline so
  * the entry screen renders without the fixture JSON; a document loads only when its
  * example is created. `exampleCatalog.test.ts` pins this list to the fixtures.
  */
 export type ExampleCatalogEntry = {
-  readonly id: 's01' | 's02' | 's03' | 's04' | 's05';
-  readonly key: 'S01' | 'S02' | 'S03' | 'S04' | 'S05';
+  readonly id: 's01' | 's02' | 's03' | 's04' | 's05' | 's06';
+  readonly key: 'S01' | 'S02' | 'S03' | 'S04' | 'S05' | 'S06';
   readonly title: string;
   readonly componentCount: number;
   readonly scenarioCount: number;
@@ -27,4 +27,6 @@ export const EXAMPLE_CATALOG: readonly ExampleCatalogEntry[] = Object.freeze([
     load: () => import('../../../specs/revamp/fixtures/s04.json').then(asDocument) },
   { id: 's05', key: 'S05', title: 'S05 Fullstack', componentCount: 9, scenarioCount: 2,
     load: () => import('../../../specs/revamp/fixtures/s05.json').then(asDocument) },
+  { id: 's06', key: 'S06', title: 'S06 Checkout under a traffic spike', componentCount: 8, scenarioCount: 2,
+    load: () => import('../../../specs/revamp/fixtures/s06.json').then(asDocument) },
 ] as const);

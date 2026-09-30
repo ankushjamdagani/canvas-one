@@ -219,4 +219,27 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
       path: test.info().outputPath('rv12d-mobile-blank.png'),
     });
   });
+
+  test('D51: the S06 example runs both scenarios to Passed in the browser', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s06').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await expect(page.getByTestId('save-status')).toContainText('Saved');
+    await expect(page.locator('.component-node')).toHaveCount(8);
+
+    const switcherTrigger = page.getByTestId('scenario-switcher-trigger');
+    const popover = page.getByTestId('scenario-switcher-popover');
+    await switcherTrigger.click();
+    await popover.getByTestId('scenario-run-all-btn').click();
+    const rows = popover.locator('[data-testid^="scenario-row-"]');
+    await expect
+      .poll(async () => {
+        if (!(await popover.isVisible())) await switcherTrigger.click();
+        const texts = await rows.allTextContents();
+        return texts.filter((t) => t.includes('Passed')).length;
+      }, { timeout: 60000, intervals: [1000] })
+      .toBe(2);
+    await page.keyboard.press('Escape');
+    await page.screenshot({ path: test.info().outputPath('s06-passed.png') });
+  });
 });

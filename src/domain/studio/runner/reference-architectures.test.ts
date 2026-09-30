@@ -704,6 +704,29 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   });
 });
 
+describe('D51 repeating boundary responses', () => {
+  it('a response used once runs out; marked repeat, it answers every matching request', async () => {
+    const d = fixture('s01.json');
+    const base = d.scenarios.find((x) => x.label === 'Timeout retry stale response')!;
+    const oneResponse = (repeat: boolean): Document => ({
+      ...d,
+      scenarios: [{
+        ...base,
+        boundaries: base.boundaries.map((b) => ({
+          ...b,
+          responses: [{ ...b.responses[0], ...(repeat ? { repeat: true } : {}) }],
+        })),
+      }],
+    });
+    const once = await runScenario(oneResponse(false), base.id, 'd51-once');
+    expect(once.status).toBe('failed');
+    expect(once.reason).toMatch(/Boundary exhaustion/);
+    const every = await runScenario(oneResponse(true), base.id, 'd51-every');
+    expect(every.reason ?? '').not.toMatch(/Boundary exhaustion/);
+    expect(every.status).toBe('completed');
+  });
+});
+
 // ============================================================================
 // Runner and metric defects found while building the architectures
 // ============================================================================
