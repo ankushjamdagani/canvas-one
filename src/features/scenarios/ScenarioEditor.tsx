@@ -79,7 +79,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
     <div data-testid="scenario-editor" className="flex flex-col h-full text-xs">
       <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
         <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Scenario</span>
-        <button type="button" onClick={onClose} aria-label="Close editor" className="text-secondary-text hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label="Close editor" className="inline-flex items-center justify-center text-secondary-text hover:text-foreground pointer-coarse:size-11">
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>

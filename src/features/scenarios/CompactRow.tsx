@@ -33,7 +33,7 @@ export function CompactRow({ isExpanded, onToggle, summary, issues = [], childre
         aria-expanded={isExpanded}
         onClick={onToggle}
         className={cn(
-          "w-full text-left px-3 py-2 text-[11px] font-medium flex items-center justify-between",
+          "w-full text-left px-3 py-2 text-[11px] font-medium flex items-center justify-between pointer-coarse:min-h-11",
           statusClass,
           isExpanded ? "bg-background border-b border-control-border" : "hover:bg-background"
         )}

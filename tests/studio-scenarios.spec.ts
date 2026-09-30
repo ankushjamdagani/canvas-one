@@ -41,4 +41,25 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     const visibleText = (await editor.textContent()) ?? '';
     expect(visibleText).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
   });
+
+  test('editing traffic tags the entry node and says Run waits for Apply or Cancel (board scenario_traffic_editor)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s04').click();
+    await expect(page.getByTestId('save-status')).toContainText('Saved');
+    await page.getByTestId('scenario-switcher-trigger').click();
+    await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+    const editor = page.getByTestId('scenario-editor');
+    await expect(editor).toBeVisible();
+    await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-run-waits-notice')).toHaveCount(0);
+
+    await editor.getByRole('button', { name: /Add traffic/ }).click();
+    await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(1);
+    await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveText(/traffic enters here/i);
+    await expect(page.getByTestId('canvas-run-waits-notice')).toBeVisible();
+
+    await editor.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByTestId('canvas-run-waits-notice')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(0);
+  });
 });
