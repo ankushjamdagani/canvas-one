@@ -318,6 +318,42 @@ describe('Refinement selection (RV-14f, §6)', () => {
     expect(outputValueAt(result.summary.outputs, 'sink')).toEqual([7]);
   });
 
+  it('keeps the event budget cumulative across three refinement levels', async () => {
+    const document = nestedDocument(
+      [
+        { refinementId: 'outer-refinement', mode: 'refined' },
+        { refinementId: 'inner-refinement', mode: 'refined' },
+        { refinementId: 'deep-refinement', mode: 'refined' },
+      ],
+      true,
+    );
+    const budgeted: Document = {
+      ...document,
+      scenarios: document.scenarios.map((candidate) => ({
+        ...candidate,
+        budgets: { ...candidate.budgets, maxEvents: 2 },
+      })),
+    };
+    const nearLimit: Document = {
+      ...document,
+      scenarios: document.scenarios.map((candidate) => ({
+        ...candidate,
+        budgets: { ...candidate.budgets, maxEvents: 5 },
+      })),
+    };
+
+    const result = await runScenario(budgeted, 'scenario-1', 'run-three-level-budget');
+    const nearLimitResult = await runScenario(nearLimit, 'scenario-1', 'run-three-level-near-budget');
+
+    expect(result.status).toBe('incomplete');
+    expect(result.reason).toMatch(/maxEvents limit reached/i);
+    // The terminating over-budget attempt is counted, while no fresh budget is created
+    // as routing descends through refinement levels.
+    expect(result.summary.processedEvents).toBe(3);
+    expect(nearLimitResult.status).toBe('completed');
+    expect(nearLimitResult.summary.processedEvents).toBe(4);
+  });
+
   it('reports an unmapped crossing at depth two through invalid-refinement-selection', async () => {
     const document = nestedDocument([
       { refinementId: 'outer-refinement', mode: 'refined' },
