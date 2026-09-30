@@ -105,6 +105,8 @@ Adopt the Planner persona. Produce subtasks JSON; assign executors from `executo
   ]
 }
 ```
+Optional `"cwd": "<absolute path>"` on a subtask runs its executor there — give each editing lane its own git worktree so parallel lanes can't collide.
+
 Invalid JSON → retry once with "Output ONLY valid JSON, no prose, no code fences." Still invalid → abort: `ERROR: Planner failed to produce valid JSON. State: $STATE`.
 
 ```bash

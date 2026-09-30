@@ -190,8 +190,10 @@ def dispatch(path):
         ex = sub["assigned_executor"]
         argv = [runner, prefix, str(ex.get("timeout_sec", cfg.get("timeout_sec", 300))),
                 ex["cli"], ex["model"], ex.get("effort", ""), "--"] + ex.get("args", [])
+        # Optional per-subtask working directory (e.g. the lane's own git worktree).
+        cd = "cd %s && " % shlex.quote(sub["cwd"]) if sub.get("cwd") else ""
         with open(prefix + ".sh", "w") as f:
-            f.write(" ".join(shlex.quote(a) for a in argv) + "\n")
+            f.write(cd + " ".join(shlex.quote(a) for a in argv) + "\n")
         print(prefix + ".sh")
     save(path, state)
 
