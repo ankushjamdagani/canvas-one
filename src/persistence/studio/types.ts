@@ -36,7 +36,7 @@ export const PREFERENCES_SCHEMA = 'studio-preferences/1';
 
 export const DEFAULT_BUILD_VERSIONS: BuildManifestVersions = Object.freeze({
   compilerVersion: 'studio-compiler/1',
-  runnerVersions: Object.freeze([{ runnerId: 'studio-runner', version: 'studio-runner/2' }]),
+  runnerVersions: Object.freeze([{ runnerId: 'studio-runner', version: 'studio-runner/3' }]),
 });
 
 // ============================================================================

@@ -7,7 +7,8 @@
  * - Canonical-JSON equality for 'equals'.
  * - Numeric operators ('at-most', 'at-least') apply strictly to numbers; wrong types return 'error'.
  * - Missing/unsupported subjects return status 'unevaluated' or 'error' with a reason, never zero.
- * - The 'metric' subject returns 'unevaluated' in logical mode (§6 & §9).
+ * - The 'metric' subject reads the element's metric from a timed run; logical runs and
+ *   missing or unavailable metrics are 'unevaluated' (§6 & §9, D48).
  * - Pure function without side effects.
  */
 
@@ -128,12 +129,36 @@ export function evaluateAssertion(
     }
 
     case 'metric': {
-      return {
-        assertionId: assertion.id,
-        status: 'unevaluated',
-        actual: null,
-        reason: 'Metric assertions are unsupported in logical mode (§6)',
-      };
+      if (summary.mode === 'logical') {
+        return {
+          assertionId: assertion.id,
+          status: 'unevaluated',
+          actual: null,
+          reason: 'Logical runs have no timing, so metric checks are unavailable (§6)',
+        };
+      }
+      const metric = summary.elementMetrics.find(
+        (m) => m.scope === 'element' && m.elementId === subject.elementId && m.key === subject.key,
+      );
+      // §6: a missing or unavailable metric is an unevaluated failure, never zero.
+      if (!metric) {
+        return {
+          assertionId: assertion.id,
+          status: 'unevaluated',
+          actual: null,
+          reason: `Element '${subject.elementId}' has no '${subject.key}' metric in this run (only simulated components have metrics)`,
+        };
+      }
+      if (!metric.available || metric.value === null) {
+        return {
+          assertionId: assertion.id,
+          status: 'unevaluated',
+          actual: null,
+          reason: metric.reason ?? `Metric '${subject.key}' is unavailable for element '${subject.elementId}'`,
+        };
+      }
+      actual = metric.value;
+      break;
     }
 
     default:

@@ -626,6 +626,29 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(o.succeeded + o.rejected + o.failed + o.expired + o.inFlight).toBe(o.generated);
   });
 
+  it('metric checks evaluate element throughput and latency in timed runs [fixed B9]', async () => {
+    const c16 = { concurrency: 16 };
+    const { a, ids } = chain('B9 metrics', ['service', 'service', 'service', 'service'], [c16, c16, c16, c16], 5);
+    const id = scenario(a, ids[0], { rate: 100, seconds: 5 });
+    const check = (key: 'p95LatencyMs' | 'throughput', operator: 'at-most' | 'at-least', expected: number) => ({
+      id: a.mint(), label: `${key} ${operator} ${expected}`, subject: { kind: 'metric' as const, elementId: ids[0], key }, operator, expected,
+    });
+    a.doc = {
+      ...a.doc,
+      scenarios: a.doc.scenarios.map((x) => ({
+        ...x,
+        assertions: [check('p95LatencyMs', 'at-most', 40), check('p95LatencyMs', 'at-most', 20), check('throughput', 'at-least', 80)],
+      })),
+    };
+    const r = await run(a, id);
+    // Each element's response time covers everything below it: 2 x 5 ms per remaining hop plus 0.5 ms per element.
+    const mean = (i: number) => metric(r, 'meanLatencyMs', ids[i]);
+    expect(mean(0)).toBeCloseTo(32, 0);
+    expect(mean(1)).toBeCloseTo(21.5, 0);
+    expect(mean(3)).toBeCloseTo(0.5, 1);
+    expect(r.checks.map((c) => c.status)).toEqual(['passed', 'failed', 'passed']);
+  });
+
   it('default budgets stop recording the trace, not the run: a 50/s, 30 s run completes [fixed B7]', async () => {
     const a = new Arch();
     const svc = a.place('service');

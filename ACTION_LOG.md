@@ -1686,3 +1686,14 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: 1,518 unit tests pass (9 skipped); `npx tsc -b` clean; build clean with no chunk warning; isolated production e2e 88 passed / 4 skipped.
 - **Found**: B9. Metric assertions always return unevaluated, in timed mode too. Recorded in the audit and not fixed.
 - **Lesson:** a runs-without-workloads path (`requireRunnable: false`) skips the kernel's structural validation, so a fixture can pass while the same graph under traffic throws; test graphs under traffic as well as with finite inputs.
+
+### RV-23: metric checks evaluate (B9, D48)
+
+- **Outcome**: metric assertions (throughput, mean or p95 latency, utilization on an element) now evaluate in timed runs. Before this, they always returned "unevaluated", so such a scenario could never qualify.
+  - The kernel keeps a per-node response-time collector: arrival to success, including queueing, retries and downstream waits. It's exposed through `nodeLatency()`, outside `snapshot()`, so the goldens are unchanged.
+  - The adapter reports element `throughput`, `meanLatencyMs` and `p95LatencyMs`; unavailable metrics are `null`, not zero.
+  - Runner version is now `studio-runner/3`.
+  - Contracts: model-and-runner.md §6/§9; decisions.md D48; audit B9 marked fixed.
+- **Tests**: assertions unit test (pass, fail, missing, unavailable); a reference-architecture chain test (element latency 32 → 21.5 → 0.5 ms down the chain; checks pass, fail, pass).
+- **Review**: Sonnet REVISE (minor). Fixed: publication-only broker-entry acks no longer mix into broker latency; unavailable throughput is `null`.
+- **Verification**: 1,520 unit tests pass (9 skipped); `npx tsc -b` clean; build clean; isolated production e2e 88 passed / 4 skipped (before the two one-line review fixes; unit suite rerun after them).
