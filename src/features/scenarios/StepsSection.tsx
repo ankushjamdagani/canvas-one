@@ -20,9 +20,13 @@ import { Button } from '../../components/ui/button';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { Checkbox } from '../../components/ui/checkbox';
 import { endpointLabel, fixtureOptionsForSchema, inboundEndpointOptions } from './pickers';
-import type { MintId } from './types';
+import type { MintId, ScenarioIssue } from './types';
+import { summarizeStep } from './summaries';
+import { CompactRow } from './CompactRow';
 
 export interface StepsSectionProps {
+  readonly issues?: readonly ScenarioIssue[];
+  _defaultExpandedId?: string;
   readonly document: Document;
   readonly scenario: DraftScenario;
   readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
@@ -44,7 +48,8 @@ export function reorderInputs(inputs: readonly Input[], sourceId: string, target
   return reordered;
 }
 
-export function StepsSection({ document, scenario, onChange, mintId }: StepsSectionProps) {
+export function StepsSection({ document, scenario, onChange, mintId, issues = [], _defaultExpandedId }: StepsSectionProps) {
+  const [expandedId, setExpandedId] = React.useState<string | null>(_defaultExpandedId ?? null);
   const [draggedStepId, setDraggedStepId] = React.useState<string | null>(null);
   const entryOptions = React.useMemo(() => inboundEndpointOptions(document), [document]);
 
@@ -74,6 +79,7 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
       resource: null,
     };
     onChange((s) => ({ ...s, inputs: [...s.inputs, input] }));
+    setExpandedId(input.id);
   };
 
   const updateStep = (id: string, patch: (i: Input) => Input) => {
@@ -131,141 +137,133 @@ export function StepsSection({ document, scenario, onChange, mintId }: StepsSect
           const sameJourney = previous !== null && previous.journeyId === input.journeyId;
 
           return (
-            <div
+            <CompactRow
               key={input.id}
-              data-testid={`step-row-${input.id}`}
-              className={`rounded-control border bg-panel p-3 space-y-2 ${
-                draggedStepId === input.id ? 'border-primary opacity-70' : 'border-control-border'
-              }`}
-              onDragOver={(event) => {
-                if (draggedStepId !== null && draggedStepId !== input.id) event.preventDefault();
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (draggedStepId !== null) moveStepBefore(draggedStepId, input.id);
-                setDraggedStepId(null);
-              }}
+              isExpanded={expandedId === input.id}
+              onToggle={() => setExpandedId(expandedId === input.id ? null : input.id)}
+              issues={issues.filter(i => i.path?.[0] === 'inputs' && i.path?.[1] === index)}
+              summary={
+                <span className="flex items-center gap-2">
+                  <span className="text-secondary-text">{summarizeStep(input, index, document, previous ?? undefined)}</span>
+                </span>
+              }
             >
-              <div className="flex items-center justify-between">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    draggable
-                    className="cursor-grab text-secondary-text active:cursor-grabbing"
-                    aria-label={`Drag step ${index + 1}; use arrow keys to reorder`}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = 'move';
-                      event.dataTransfer.setData('text/plain', input.id);
-                      setDraggedStepId(input.id);
-                    }}
-                    onDragEnd={() => setDraggedStepId(null)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'ArrowUp' && index > 0) {
-                        event.preventDefault();
-                        moveStep(index, -1);
-                      } else if (event.key === 'ArrowDown' && index < scenario.inputs.length - 1) {
-                        event.preventDefault();
-                        moveStep(index, 1);
+              <div data-testid={`step-row-${input.id}`} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="cursor-grab text-secondary-text hover:text-foreground active:cursor-grabbing"
+                      aria-label={`Drag step ${index + 1}; use arrow keys to reorder`}
+                      draggable={true}
+                      onKeyDown={(event) => {
+                        if (event.key === 'ArrowUp' && index > 0) {
+                          event.preventDefault();
+                          moveStep(index, -1);
+                        } else if (event.key === 'ArrowDown' && index < scenario.inputs.length - 1) {
+                          event.preventDefault();
+                          moveStep(index, 1);
+                        }
+                      }}
+                    >
+                      <GripVertical className="size-3.5" aria-hidden="true" />
+                    </button>
+                    <span className="truncate text-xs font-semibold text-foreground">
+                      {index + 1}. {endpointLabel(document, input.entry)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="text-secondary-text hover:text-foreground disabled:opacity-30"
+                      disabled={index === 0}
+                      onClick={() => moveStep(index, -1)}
+                      aria-label="Move step up"
+                    >
+                      <ArrowUp className="size-3.5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="text-secondary-text hover:text-foreground disabled:opacity-30"
+                      disabled={index === scenario.inputs.length - 1}
+                      onClick={() => moveStep(index, 1)}
+                      aria-label="Move step down"
+                    >
+                      <ArrowDown className="size-3.5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="text-secondary-text hover:text-risk-text"
+                      onClick={() => removeStep(input.id)}
+                      aria-label="Remove step"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 text-[11px] text-secondary-text">
+                    Entry point
+                    <NativeSelect
+                      value={`${input.entry.elementId}:${input.entry.portId}`}
+                      onChange={(e) => {
+                        const [elementId, portId] = e.target.value.split(':');
+                        const newSchemaId = portSchemaId(document, elementId, portId);
+                        const newFixtures = newSchemaId ? fixtureOptionsForSchema(document, newSchemaId) : [];
+                        updateStep(input.id, (i) => ({
+                          ...i,
+                          entry: { elementId, portId },
+                          fixtureId: newFixtures[0]?.fixtureId ?? i.fixtureId,
+                        }));
+                      }}
+                      aria-label="Step entry point"
+                    >
+                      {entriesWithFixtures.map((opt) => (
+                        <NativeSelectOption key={`${opt.elementId}:${opt.portId}`} value={`${opt.elementId}:${opt.portId}`}>
+                          {opt.label}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </label>
+
+                  <label className="space-y-1 text-[11px] text-secondary-text">
+                    Payload
+                    <NativeSelect
+                      value={input.fixtureId}
+                      onChange={(e) =>
+                        updateStep(input.id, (i) => ({
+                          ...i,
+                          fixtureId: e.target.value,
+                        }))
                       }
-                    }}
-                  >
-                    <GripVertical className="size-3.5" aria-hidden="true" />
-                  </button>
-                  <span className="truncate text-xs font-semibold text-foreground">
-                    {index + 1}. {endpointLabel(document, input.entry)}
-                  </span>
+                      aria-label="Step payload fixture"
+                    >
+                      {fixtures.map((f) => (
+                        <NativeSelectOption key={f.fixtureId} value={f.fixtureId}>
+                          {f.label}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </label>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    className="text-secondary-text hover:text-foreground disabled:opacity-30"
-                    disabled={index === 0}
-                    onClick={() => moveStep(index, -1)}
-                    aria-label="Move step up"
-                  >
-                    <ArrowUp className="size-3.5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="text-secondary-text hover:text-foreground disabled:opacity-30"
-                    disabled={index === scenario.inputs.length - 1}
-                    onClick={() => moveStep(index, 1)}
-                    aria-label="Move step down"
-                  >
-                    <ArrowDown className="size-3.5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="text-secondary-text hover:text-risk-text"
-                    onClick={() => removeStep(input.id)}
-                    aria-label="Remove step"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                  </button>
-                </div>
+
+                {previous && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-secondary-text">
+                    <Checkbox
+                      checked={sameJourney}
+                      onCheckedChange={(checked) =>
+                        updateStep(input.id, (i) => ({
+                          ...i,
+                          journeyId: checked === true ? previous.journeyId : mintId(),
+                        }))
+                      }
+                    />
+                    Same journey as previous step
+                  </label>
+                )}
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <label className="space-y-1 text-[11px] text-secondary-text">
-                  Entry point
-                  <NativeSelect
-                    value={`${input.entry.elementId}:${input.entry.portId}`}
-                    onChange={(e) => {
-                      const [elementId, portId] = e.target.value.split(':');
-                      const newSchemaId = portSchemaId(document, elementId, portId);
-                      const newFixtures = newSchemaId ? fixtureOptionsForSchema(document, newSchemaId) : [];
-                      updateStep(input.id, (i) => ({
-                        ...i,
-                        entry: { elementId, portId },
-                        fixtureId: newFixtures[0]?.fixtureId ?? i.fixtureId,
-                      }));
-                    }}
-                    aria-label="Step entry point"
-                  >
-                    {entriesWithFixtures.map((opt) => (
-                      <NativeSelectOption key={`${opt.elementId}:${opt.portId}`} value={`${opt.elementId}:${opt.portId}`}>
-                        {opt.label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </label>
-
-                <label className="space-y-1 text-[11px] text-secondary-text">
-                  Payload
-                  <NativeSelect
-                    value={input.fixtureId}
-                    onChange={(e) =>
-                      updateStep(input.id, (i) => ({
-                        ...i,
-                        fixtureId: e.target.value,
-                      }))
-                    }
-                    aria-label="Step payload fixture"
-                  >
-                    {fixtures.map((f) => (
-                      <NativeSelectOption key={f.fixtureId} value={f.fixtureId}>
-                        {f.label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </label>
-              </div>
-
-              {previous && (
-                <label className="flex items-center gap-1.5 text-[11px] text-secondary-text">
-                  <Checkbox
-                    checked={sameJourney}
-                    onCheckedChange={(checked) =>
-                      updateStep(input.id, (i) => ({
-                        ...i,
-                        journeyId: checked === true ? previous.journeyId : mintId(),
-                      }))
-                    }
-                  />
-                  Same journey as previous step
-                </label>
-              )}
-            </div>
+            </CompactRow>
           );
         })}
 

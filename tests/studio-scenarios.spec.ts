@@ -15,10 +15,12 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     const editor = page.getByTestId('scenario-editor');
     await expect(editor).toBeVisible();
     await expect(editor.getByTestId('scenario-section-steps')).toBeVisible();
+    await editor.getByTestId('scenario-section-steps').getByRole('button', { expanded: false }).first().click();
     await expect(editor.locator('[aria-label^="Drag step "]').first()).toHaveAttribute('draggable', 'true');
     await expect(editor.getByRole('button', { name: 'Move step down' }).first()).toBeVisible();
 
     const boundaries = editor.getByTestId('scenario-section-boundaries');
+    await boundaries.getByRole('button', { expanded: false }).first().click();
     await expect(boundaries).toContainText('Match condition');
     await expect(boundaries).toContainText('Payload bindings');
     await expect(boundaries).toContainText('From request');

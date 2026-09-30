@@ -18,8 +18,13 @@ import type { DraftScenario } from './draftScenario';
 import type { MintId } from './types';
 import { GuardBuilder } from './GuardBuilder';
 import { SchemaPathPicker } from './SchemaPathPicker';
+import type { ScenarioIssue } from './types';
+import { summarizeBoundary } from './summaries';
+import { CompactRow } from './CompactRow';
 
 export interface BoundariesSectionProps {
+  readonly issues?: readonly ScenarioIssue[];
+  _defaultExpandedId?: string;
   readonly document: Document;
   readonly scenario: DraftScenario;
   readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
@@ -67,11 +72,14 @@ function sourceSchemas(document: Document, source: Endpoint) {
 
 export function BoundariesSection({
   document,
+  issues = [],
   scenario,
   onChange,
   mintId,
   onGuardValidityChange,
+  _defaultExpandedId,
 }: BoundariesSectionProps) {
+  const [expandedId, setExpandedId] = React.useState<string | null>(_defaultExpandedId ?? null);
   const options = React.useMemo(() => crossingOptions(document, scenario), [document, scenario]);
   const [adding, setAdding] = React.useState(false);
   const [invalidGuardIds, setInvalidGuardIds] = React.useState<ReadonlySet<string>>(() => new Set());
@@ -100,7 +108,8 @@ export function BoundariesSection({
     boundaryId: string,
     responseId: string,
     patch: (response: BoundaryResponse) => BoundaryResponse,
-  ) =>
+  ) => {
+    setExpandedId(responseId);
     onChange((draft) => ({
       ...draft,
       boundaries: draft.boundaries.map((boundary) =>
@@ -114,6 +123,7 @@ export function BoundariesSection({
           : boundary,
       ),
     }));
+  };
   const removeResponse = (boundaryId: string, responseId: string) =>
     onChange((draft) => ({
       ...draft,
@@ -184,45 +194,57 @@ export function BoundariesSection({
             <div
               key={boundary.id}
               data-testid={`boundary-row-${boundary.id}`}
-              className="rounded-control border border-control-border bg-panel p-3 space-y-2"
+              className="space-y-2"
             >
-              <div className="text-xs font-semibold text-foreground">{endpointLabel(document, boundary.source)}</div>
+              <div className="text-xs font-semibold text-foreground px-2">{endpointLabel(document, boundary.source)}</div>
               {boundary.responses.map((response, responseIndex) => (
-                <div key={response.id} className="space-y-2 border-l border-control-border pl-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-secondary-text">Reply {responseIndex + 1}</span>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Remove reply"
-                      onClick={() => removeResponse(boundary.id, response.id)}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden="true" />
-                    </Button>
+                <CompactRow
+                  key={response.id}
+                  isExpanded={expandedId === response.id}
+                  onToggle={() => setExpandedId(expandedId === response.id ? null : response.id)}
+                  issues={issues.filter(i => i.path?.[0] === 'boundaries' && i.path?.[1] === scenario.boundaries.findIndex(b => b.id === boundary.id) && i.path?.[2] === 'responses' && i.path?.[3] === responseIndex)}
+                  summary={
+                    <span className="flex items-center gap-2">
+                      <span className="text-secondary-text">Reply {responseIndex + 1} · {response.outcome}</span>
+                    </span>
+                  }
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-secondary-text">Reply {responseIndex + 1}</span>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Remove reply"
+                        onClick={() => removeResponse(boundary.id, response.id)}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                      </Button>
+                    </div>
+                    <GuardBuilder
+                      document={document}
+                      inputSchemaId={schemas.request}
+                      guard={response.match}
+                      onValidChange={(match) => {
+                        if (match)
+                          updateResponse(boundary.id, response.id, (current) => ({
+                            ...current,
+                            match,
+                          }));
+                      }}
+                      onValidityChange={(valid) => setGuardValidity(response.id, valid)}
+                    />
+                    <ResponseFields
+                      document={document}
+                      scenario={scenario}
+                      boundary={boundary}
+                      response={response}
+                      requestSchemaId={schemas.request}
+                      onChange={(patch) => updateResponse(boundary.id, response.id, patch)}
+                    />
                   </div>
-                  <GuardBuilder
-                    document={document}
-                    inputSchemaId={schemas.request}
-                    guard={response.match}
-                    onValidChange={(match) => {
-                      if (match)
-                        updateResponse(boundary.id, response.id, (current) => ({
-                          ...current,
-                          match,
-                        }));
-                    }}
-                    onValidityChange={(valid) => setGuardValidity(response.id, valid)}
-                  />
-                  <ResponseFields
-                    document={document}
-                    scenario={scenario}
-                    boundary={boundary}
-                    response={response}
-                    requestSchemaId={schemas.request}
-                    onChange={(patch) => updateResponse(boundary.id, response.id, patch)}
-                  />
-                </div>
+                </CompactRow>
               ))}
             </div>
           );
@@ -243,6 +265,7 @@ function NewResponseForm({
   onAdd,
   onCancel,
 }: {
+  _defaultExpandedId?: string;
   readonly document: Document;
   readonly scenario: DraftScenario;
   readonly options: readonly CrossingOption[];
@@ -381,6 +404,7 @@ function ResponseFields({
   requestSchemaId,
   onChange,
 }: {
+  _defaultExpandedId?: string;
   readonly document: Document;
   readonly scenario: DraftScenario;
   readonly boundary: Boundary;
@@ -511,6 +535,7 @@ function BindingEditor({
   onChange,
   onRemove,
 }: {
+  _defaultExpandedId?: string;
   readonly document: Document;
   readonly requestSchemaId: string | null;
   readonly responseSchemaId: string;
@@ -548,6 +573,7 @@ function NewBindingForm({
   onAdd,
   onCancel,
 }: {
+  _defaultExpandedId?: string;
   readonly document: Document;
   readonly requestSchemaId: string | null;
   readonly responseSchemaId: string;

@@ -23,6 +23,9 @@ import { NativeSelect, NativeSelectOption } from '../../components/ui/native-sel
 import { Switch } from '../../components/ui/switch';
 import { inboundEndpointOptions, endpointLabel } from './pickers';
 import { UNSET_KEY_DISTRIBUTION, type DraftRequestClass, type DraftScenario, type DraftWorkload } from './draftScenario';
+import type { ScenarioIssue } from './types';
+import { summarizeWorkloadMix } from './summaries';
+import { CompactRow } from './CompactRow';
 import type { MintId } from './types';
 
 function newRequestClass(mintId: MintId): DraftRequestClass {
@@ -37,13 +40,15 @@ function newRequestClass(mintId: MintId): DraftRequestClass {
 }
 
 export interface TrafficSectionProps {
+  readonly issues?: readonly ScenarioIssue[];
   readonly document: Document;
   readonly scenario: DraftScenario;
   readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly mintId: MintId;
 }
 
-export function TrafficSection({ document, scenario, onChange, mintId }: TrafficSectionProps) {
+export function TrafficSection({ document, scenario, onChange, mintId, issues = [] }: TrafficSectionProps) {
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const entryOptions = React.useMemo(() => inboundEndpointOptions(document), [document]);
 
   const addWorkload = () => {
@@ -60,6 +65,7 @@ export function TrafficSection({ document, scenario, onChange, mintId }: Traffic
       classes: [],
     };
     onChange((s) => ({ ...s, workloads: [...s.workloads, workload] }));
+    setExpandedId(workload.id);
   };
 
   const updateWorkload = (id: string, patch: (w: DraftWorkload) => DraftWorkload) => {
@@ -152,36 +158,65 @@ export function TrafficSection({ document, scenario, onChange, mintId }: Traffic
               </label>
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-secondary-text">Request mix</span>
-                <button
-                  type="button"
-                  className="text-[11px] text-primary hover:text-primary-hover"
-                  onClick={() => updateWorkload(workload.id, (w) => ({ ...w, classes: [...w.classes, newRequestClass(mintId)] }))}
-                >
-                  + Add class
-                </button>
+            <CompactRow
+              isExpanded={expandedId === workload.id}
+              onToggle={() => setExpandedId(expandedId === workload.id ? null : workload.id)}
+              issues={issues.filter(i => i.path?.[0] === 'workloads' && i.path?.[1] === scenario.workloads.findIndex(w => w.id === workload.id))}
+              summary={
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold text-secondary-text">Request mix</span>
+                  <span className="text-secondary-text">{summarizeWorkloadMix(workload.classes)}</span>
+                </span>
+              }
+            >
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 text-[11px] text-secondary-text col-span-2">
+                    Timeout (ms)
+                    <Input
+                      type="number"
+                      min={0}
+                      value={workload.timeoutMs}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        updateWorkload(workload.id, (w) => ({ ...w, timeoutMs: Number.isFinite(v) ? v : w.timeoutMs }));
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-secondary-text">Classes</span>
+                    <button
+                      type="button"
+                      className="text-[11px] text-primary hover:text-primary-hover"
+                      onClick={() => updateWorkload(workload.id, (w) => ({ ...w, classes: [...w.classes, newRequestClass(mintId)] }))}
+                    >
+                      + Add class
+                    </button>
+                  </div>
+                  {workload.classes.length === 0 && (
+                    <p className="text-[11px] text-secondary-text">One request class, undifferentiated traffic.</p>
+                  )}
+                  {workload.classes.map((cls) => (
+                    <RequestClassRow
+                      key={cls.id}
+                      cls={cls}
+                      onChange={(patch) =>
+                        updateWorkload(workload.id, (w) => ({
+                          ...w,
+                          classes: w.classes.map((c) => (c.id === cls.id ? patch(c) : c)),
+                        }))
+                      }
+                      onRemove={() =>
+                        updateWorkload(workload.id, (w) => ({ ...w, classes: w.classes.filter((c) => c.id !== cls.id) }))
+                      }
+                    />
+                  ))}
+                </div>
               </div>
-              {workload.classes.length === 0 && (
-                <p className="text-[11px] text-secondary-text">One request class, undifferentiated traffic.</p>
-              )}
-              {workload.classes.map((cls) => (
-                <RequestClassRow
-                  key={cls.id}
-                  cls={cls}
-                  onChange={(patch) =>
-                    updateWorkload(workload.id, (w) => ({
-                      ...w,
-                      classes: w.classes.map((c) => (c.id === cls.id ? patch(c) : c)),
-                    }))
-                  }
-                  onRemove={() =>
-                    updateWorkload(workload.id, (w) => ({ ...w, classes: w.classes.filter((c) => c.id !== cls.id) }))
-                  }
-                />
-              ))}
-            </div>
+            </CompactRow>
           </div>
         ))}
 

@@ -164,6 +164,7 @@ describe('scenario authoring completeness', () => {
         scenario,
         onChange: vi.fn(),
         mintId,
+        _defaultExpandedId: scenario.boundaries[0].responses[0].id,
       }),
     );
     expect(html).toContain('Storefront · checkout call');
@@ -216,6 +217,7 @@ describe('scenario authoring completeness', () => {
         scenario,
         onChange: vi.fn(),
         mintId,
+        _defaultExpandedId: scenario.inputs[0].id,
       }),
     );
     expect(html).toContain('draggable="true"');
