@@ -1,6 +1,6 @@
 # Plan: RV-18 router bridges, RV-19 nested refinement, RV-20 board decisions
 
-2026-09-30, `master` @ `d33b1d2`. Status: approved 2026-09-30 except RV-18 (dropped, D45). RV-19 and RV-20 are in progress. Nothing here is implemented.
+2026-09-30, `master` @ `d33b1d2`. Status: approved 2026-09-30 except RV-18 (dropped, D45). RV-19 and RV-20 are in progress.
 
 ## RV-18: routers may route to non-resource elements — DROPPED (D45)
 
