@@ -270,6 +270,10 @@ describe('A2 queue absorbs a burst', () => {
     expect([publish.kind, deliver.kind]).toEqual(['message', 'call']);
     expect(a.el(api).ports.find((p) => p.id === publish.source.portId)).toMatchObject({ label: 'publish', channel: 'message' });
     expect(a.el(q).ports.find((p) => p.id === deliver.source.portId)).toMatchObject({ direction: 'out', channel: 'call' });
+    // A second identical link would double every message; brokers deliver only to processors.
+    expect(a.tryConnect(api, q)).toMatch(/already connected/);
+    expect(a.tryConnect(q, wk)).toMatch(/already connected/);
+    expect(a.tryConnect(q, a.place('database'))).toMatch(/Channel mismatch/);
   });
 
   it('defaults: 2x the worker rate fills the 500-message queue limit and publishes fail [default]', async () => {

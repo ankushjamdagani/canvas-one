@@ -790,7 +790,8 @@ export class OpenSimulation {
       const adapter = {
         traffic: wl.rate,
         seed: this.seed,
-        duration: this.duration,
+        // Profiles (ramp, burst) are shaped over the arrival window.
+        duration: this.arrivalHorizon,
         timeoutMs: wl.timeoutMs,
         profile: wl.profile,
       };

@@ -1654,3 +1654,35 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform**: Claude (lead) alone; a Sonnet subagent reviewed. It confirmed B1–B4, B7, B8 and G1 against the source and raised 4 test-precision risks, all fixed (B2 wording, B3 assertion, A1 rejection location, drain check noted under B3).
 - **Verification**: 1,517 unit tests pass (9 skipped); `npx tsc -b` clean; the new file passed three repeat runs. No product code changed, so the build and e2e were not rerun.
 - **Lesson:** audit the defaults the app actually loads. `behaviorDefaults.ts` looked authoritative but is test-only, and a whole phase of probes measured graphs the app can't build. Building fixtures through the app's own planners (`placeEntry`/`planConnection`) also surfaced connect and runner bugs that hand-built fixtures had hidden.
+
+### RV-22: runner defects B1–B5, B7, B8 and messaging connect G1 (D47)
+
+- **Outcome**: the user approved fixing B1–B5 and B8, plus the recommendations for B7 (keep running past the trace cap) and G1 (messaging on the canvas). All are done:
+  - Kernel:
+    - B1: admitted fact at a broker workload entry.
+    - B2: separate arrival horizon; profiles are shaped over it.
+  - Adapter:
+    - B3: workload-root counts.
+    - B4: a rejection counted once.
+    - B5: utilization = occupancy.
+    - G1: a broker's call route is delivered as a message.
+  - Runner:
+    - B3: `totalRootCounts()` feeds the summary, drain and live roots.
+    - B7: the recorder truncates rows and the run continues; `RunSummary.trace`; trace-count checks unevaluated.
+    - B8: `answerBoundary` is shared by machine and resource calls; workload traffic reuses the response; `{}` workload payload.
+  - Connect (G1): `publish` out:message port for processor → broker; out:call route port for broker → processor; duplicate links rejected.
+  - Results shows a trace-truncated notice. Runner version bumped to `studio-runner/2`.
+  - Contracts: model-and-runner.md §6/§9, storage.md §6 and versions, catalog.md resolution 11; decisions.md D47.
+- **Tests**: `reference-architectures.test.ts` defect tests now assert the fixes (30 tests); s01 budget test updated; new e2e "D47: a service publishes to a queue and the queue feeds a worker".
+- **Review**: Sonnet PASS with 5 risks. Fixed:
+  - post-truncation payloads count against the byte budget;
+  - ramp and burst profiles span the arrival window;
+  - duplicate publish and delivery rejected;
+  - broker delivery limited to processors.
+  - Also fixed the comment nits.
+- **Noted, not fixed**:
+  - a workload request bound to a boundary with request bindings fails the run (as for machines);
+  - `maxLiveRoots` now counts workload roots.
+- **Verification**: 1,518 unit tests pass (9 skipped); `npx tsc -b` clean; build clean with no chunk warning; isolated production e2e 88 passed / 4 skipped.
+- **Found**: B9. Metric assertions always return unevaluated, in timed mode too. Recorded in the audit and not fixed.
+- **Lesson:** a runs-without-workloads path (`requireRunnable: false`) skips the kernel's structural validation, so a fixture can pass while the same graph under traffic throws; test graphs under traffic as well as with finite inputs.

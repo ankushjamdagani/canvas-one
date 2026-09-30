@@ -266,10 +266,29 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     targetPort.channel === 'message';
   const brokerDeliversToCallEntry =
     resourceType(sourceElement) === 'broker' &&
-    targetElement.behavior.kind === 'resource' &&
-    resourceType(targetElement) !== 'broker' &&
+    resourceType(targetElement) === 'processor' &&
     sourcePort.channel === 'message' &&
     targetPort.channel === 'call';
+
+  // Both add a port, so the duplicate-pair check below can't see an existing link to the
+  // same target port; a second publish or delivery would double every message.
+  if (
+    (publishesToBroker || brokerDeliversToCallEntry) &&
+    document.connections.some(
+      (c) => c.source.elementId === source.elementId && c.target.elementId === targetElement.id && c.target.portId === targetPort.id,
+    )
+  ) {
+    return {
+      kind: 'rejected',
+      issues: [
+        createIssue(
+          'structural-rule',
+          `'${sourceElement.label}' is already connected to '${targetElement.label}'`,
+          ['duplicate'],
+        ),
+      ],
+    };
+  }
 
   if ((isRouterOrBroker && hasExistingOutgoing) || publishesToBroker || brokerDeliversToCallEntry) {
     const newPortId = mintId();

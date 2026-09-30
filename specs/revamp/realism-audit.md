@@ -239,7 +239,7 @@ Found while building the architectures. Each has a test tagged with its ID. **St
 **Fixes (D47):**
 - **B1:** the kernel emits the root's `admitted` fact at a broker entry before publishing (`kernel.ts` `handleBrokerWorkloadEntry`).
 - **B2:** the kernel takes an arrival horizon separate from the run duration; drain passes `arrivalHorizonMs`.
-- **B3:** the adapter keeps workload-root counts; the runner adds them to `summary.rootCounts` and to its drain and live-root checks.
+- **B3:** the adapter keeps workload-root counts; the runner adds them to `summary.rootCounts` and to its drain and live-root checks. So `maxLiveRoots` now counts workload roots too: a saturation run with more than the budget in flight ends `incomplete`, where before it ran on uncounted.
 - **B4:** a root's `rejected` fact counts only generation; its `unit_settled` records the outcome.
 - **B5:** element `utilization` is slot occupancy (the kernel's `occupancy`), so held slots count.
 - **B7:** at a trace cap the recorder stops keeping rows and the run continues; `RunSummary.trace` records it and Results shows it; trace-count checks become unevaluated.

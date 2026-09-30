@@ -341,12 +341,23 @@ class ScenarioEventRecorder {
       this.truncatedBy = 'trace-bytes';
     }
 
-    // Payloads stay resolvable after truncation: later steps read them back.
+    if (this.truncatedBy !== null) {
+      // Payloads stay resolvable after truncation (later steps read them back) and still
+      // count against the byte budget, which keeps bounding memory; past it the run stops.
+      if (payloadCanonicalText && payloadRef) {
+        if (this.usedBytes + payloadBytes > this.budgets.maxTraceBytes) {
+          this.stopped = true;
+          this.stopReason = 'trace-bytes';
+          return { ok: false };
+        }
+        this.usedBytes += payloadBytes;
+        this.payloads.commitPrecomputed(payloadRef, payloadCanonicalText);
+      }
+      return { ok: true, event, recorded: false };
+    }
+
     if (payloadCanonicalText && payloadRef) {
       this.payloads.commitPrecomputed(payloadRef, payloadCanonicalText);
-    }
-    if (this.truncatedBy !== null) {
-      return { ok: true, event, recorded: false };
     }
 
     this.usedBytes += addedBytes;

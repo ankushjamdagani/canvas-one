@@ -272,7 +272,8 @@ function buildExecutionGraph(opts: {
       edgeMap.set(conn.id, conn);
       // A broker's call route to its consumer (S02/S05 shape) is how the broker delivers a
       // message; the kernel models every broker route as a message delivery. The message's
-      // own TTL was set where it was published, so this hop adds none.
+      // TTL is set on the publishing connection; this hop's 1 h TTL never binds, because a
+      // delivery's deadline is the minimum along its lineage.
       const fromBroker = resourceElements.get(conn.source.elementId)?.behavior.kind === 'resource' &&
         (resourceElements.get(conn.source.elementId)!.behavior as { config: { type: string } }).config.type === 'broker';
       edges.push({
