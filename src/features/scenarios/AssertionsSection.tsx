@@ -32,8 +32,12 @@ import { allElementOptions, inboundEndpointOptions, outboundEndpointOptions } fr
 import type { DraftAssertion, DraftAssertionSubject, DraftScenario } from './draftScenario';
 import type { MintId } from './types';
 import { SchemaPathPicker } from './SchemaPathPicker';
+import type { ScenarioIssue } from './types';
+import { summarizeAssertion } from './summaries';
+import { CompactRow } from './CompactRow';
 
 export interface AssertionsSectionProps {
+  readonly issues?: readonly ScenarioIssue[];
   readonly document: Document;
   readonly scenario: DraftScenario;
   readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
@@ -59,7 +63,8 @@ function defaultSubject(): DraftAssertionSubject {
   };
 }
 
-export function AssertionsSection({ document, scenario, onChange, mintId, lastRunChecks }: AssertionsSectionProps) {
+export function AssertionsSection({ document, scenario, onChange, mintId, lastRunChecks, issues = [] }: AssertionsSectionProps) {
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const elements = React.useMemo(() => allElementOptions(document), [document]);
   const outputPorts = React.useMemo(() => [...inboundEndpointOptions(document), ...outboundEndpointOptions(document)], [document]);
 
@@ -72,6 +77,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
       expected: 0,
     };
     onChange((s) => ({ ...s, assertions: [...s.assertions, assertion] }));
+    setExpandedId(assertion.id);
   };
 
   const updateAssertion = (id: string, patch: (a: DraftAssertion) => DraftAssertion) => {
@@ -107,25 +113,14 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
           const expectedKind = expectedKindOf(assertion.expected);
 
           return (
-            <div
+            <CompactRow
               key={assertion.id}
-              data-testid={`assertion-row-${assertion.id}`}
-              className="rounded-control border border-control-border bg-panel p-3 space-y-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <Input
-                  className="h-7 text-xs font-semibold"
-                  value={assertion.label}
-                  onChange={(e) =>
-                    updateAssertion(assertion.id, (a) => ({
-                      ...a,
-                      label: e.target.value,
-                    }))
-                  }
-                  aria-label="Check label"
-                />
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {check && (
+              isExpanded={expandedId === assertion.id}
+              onToggle={() => setExpandedId(expandedId === assertion.id ? null : assertion.id)}
+              issues={issues.filter(i => i.path?.[0] === 'assertions' && i.path?.[1] === scenario.assertions.findIndex(a => a.id === assertion.id))}
+              summary={
+                <span className="flex items-center gap-2">
+                  {check ? (
                     <span
                       data-testid={`assertion-check-mark-${assertion.id}`}
                       className={check.status === 'passed' ? 'text-primary' : 'text-risk-text'}
@@ -137,88 +132,117 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
                         <X className="size-3.5" aria-hidden="true" />
                       )}
                     </span>
+                  ) : (
+                    <Check className="size-3.5 text-primary" aria-hidden="true" />
                   )}
-                  <button
-                    type="button"
-                    className="text-secondary-text hover:text-risk-text"
-                    onClick={() => removeAssertion(assertion.id)}
-                    aria-label="Remove check"
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-
-              <SubjectEditor
-                document={document}
-                elements={elements}
-                outputPorts={outputPorts}
-                subject={assertion.subject}
-                onChange={(subject) => updateAssertion(assertion.id, (a) => ({ ...a, subject }))}
-              />
-
-              <div className="grid grid-cols-3 gap-2 items-end">
-                <label className="space-y-1 text-[11px] text-secondary-text">
-                  Operator
-                  <NativeSelect
-                    value={assertion.operator}
+                  <span className="text-secondary-text">{summarizeAssertion(assertion, document)}</span>
+                </span>
+              }
+            >
+              <div data-testid={`assertion-row-${assertion.id}`} className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Input
+                    className="h-7 text-xs font-semibold"
+                    value={assertion.label}
                     onChange={(e) =>
                       updateAssertion(assertion.id, (a) => ({
                         ...a,
-                        operator: e.target.value as DraftAssertion['operator'],
+                        label: e.target.value,
                       }))
                     }
-                    aria-label="Operator"
-                  >
-                    {ASSERTION_OPERATORS.map((op) => (
-                      <NativeSelectOption key={op} value={op}>
-                        {op}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </label>
+                    aria-label="Check label"
+                  />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      className="text-secondary-text hover:text-risk-text"
+                      onClick={() => removeAssertion(assertion.id)}
+                      aria-label="Remove check"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
 
-                <label className="space-y-1 text-[11px] text-secondary-text">
-                  Expected type
-                  <NativeSelect
-                    value={expectedKind}
-                    onChange={(e) => {
-                      const kind = e.target.value as ExpectedKind;
-                      const expected: Json = kind === 'number' ? 0 : kind === 'true' ? true : kind === 'false' ? false : '';
-                      updateAssertion(assertion.id, (a) => ({
-                        ...a,
-                        expected,
-                      }));
-                    }}
-                    aria-label="Expected value type"
-                  >
-                    <NativeSelectOption value="number">Number</NativeSelectOption>
-                    <NativeSelectOption value="text">Text</NativeSelectOption>
-                    <NativeSelectOption value="true">True</NativeSelectOption>
-                    <NativeSelectOption value="false">False</NativeSelectOption>
-                  </NativeSelect>
-                </label>
+                <SubjectEditor
+                  document={document}
+                  elements={elements}
+                  outputPorts={outputPorts}
+                  subject={assertion.subject}
+                  onChange={(subject) => updateAssertion(assertion.id, (a) => ({ ...a, subject }))}
+                />
 
-                {(expectedKind === 'number' || expectedKind === 'text') && (
+                <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1 text-[11px] text-secondary-text">
-                    Expected value
-                    <Input
-                      type={expectedKind === 'number' ? 'number' : 'text'}
-                      value={typeof assertion.expected === 'string' || typeof assertion.expected === 'number' ? assertion.expected : ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const expected: Json = expectedKind === 'number' ? (raw === '' ? 0 : Number(raw)) : raw;
+                    Must be
+                    <NativeSelect
+                      value={assertion.operator}
+                      onChange={(e) =>
                         updateAssertion(assertion.id, (a) => ({
                           ...a,
-                          expected,
-                        }));
-                      }}
-                      aria-label="Expected value"
-                    />
+                          operator: e.target.value as any,
+                        }))
+                      }
+                      aria-label="Check operator"
+                    >
+                      {ASSERTION_OPERATORS.map((o) => (
+                        <NativeSelectOption key={o} value={o}>
+                          {o}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
                   </label>
-                )}
+                  <label className="space-y-1 text-[11px] text-secondary-text">
+                    Value
+                    <div className="flex items-center gap-1">
+                      <NativeSelect
+                        className="w-20"
+                        value={expectedKind}
+                        onChange={(e) => {
+                          const kind = e.target.value as ExpectedKind;
+                          const next =
+                            kind === 'number'
+                              ? 0
+                              : kind === 'text'
+                                ? ''
+                                : kind === 'true'
+                                  ? true
+                                  : false;
+                          updateAssertion(assertion.id, (a) => ({ ...a, expected: next }));
+                        }}
+                        aria-label="Check expected kind"
+                      >
+                        <NativeSelectOption value="number">Number</NativeSelectOption>
+                        <NativeSelectOption value="text">Text</NativeSelectOption>
+                        <NativeSelectOption value="true">True</NativeSelectOption>
+                        <NativeSelectOption value="false">False</NativeSelectOption>
+                      </NativeSelect>
+                      {expectedKind === 'number' && (
+                        <Input
+                          type="number"
+                          step="any"
+                          value={assertion.expected as number}
+                          onChange={(e) =>
+                            updateAssertion(assertion.id, (a) => ({
+                              ...a,
+                              expected: Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : a.expected,
+                            }))
+                          }
+                          aria-label="Check expected number"
+                        />
+                      )}
+                      {expectedKind === 'text' && (
+                        <Input
+                          value={assertion.expected as string}
+                          onChange={(e) => updateAssertion(assertion.id, (a) => ({ ...a, expected: e.target.value }))}
+                          aria-label="Check expected text"
+                        />
+                      )}
+                    </div>
+                  </label>
+                </div>
               </div>
-            </div>
+            </CompactRow>
           );
         })}
 

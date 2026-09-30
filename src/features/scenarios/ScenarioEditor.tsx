@@ -308,18 +308,24 @@ function ScenarioEditorFooter({
             : null;
 
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-divider bg-panel">
-      <span
-        data-testid="scenario-editor-status"
-        className={cn('text-[11px]', handle.status === 'invalid' || handle.status === 'stale' ? 'text-risk-text' : 'text-warning-text')}
-      >
-        {statusText}
-      </span>
-      <div className="flex items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={handle.status === 'saving'}>
+    <div className="flex flex-col gap-2 px-3 py-2 border-t border-divider bg-panel">
+      {statusText && (
+        <div
+          data-testid="scenario-editor-status"
+          className={cn(
+            'flex items-center gap-1.5 text-[11px]',
+            handle.status === 'invalid' || handle.status === 'stale' ? 'text-risk-text' : 'text-warning-text'
+          )}
+        >
+          <div className="size-1.5 rounded-full bg-current" aria-hidden="true" />
+          {statusText}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={handle.status === 'saving'} className="w-full">
           Cancel
         </Button>
-        <Button type="button" size="sm" onClick={onApply} disabled={!canApply} data-testid="scenario-editor-apply">
+        <Button type="button" size="sm" onClick={onApply} disabled={!canApply} data-testid="scenario-editor-apply" className="w-full">
           Apply
         </Button>
       </div>
