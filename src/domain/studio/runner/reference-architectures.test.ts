@@ -205,45 +205,38 @@ const fixture = (name: string): Document => JSON.parse(readFileSync(join(process
 // A1-A12
 // ============================================================================
 
+const keys = (catalogSize: number) => ({ kind: 'uniform' as const, catalogSize, hotSubset: 1, hotShare: 100 });
+
 describe('A1 cache in front of a database', () => {
-  it('defaults: an 80% hit rate protects the database', async () => {
-    const { a, ids } = chain('A1 defaults h80', ['service', 'cache', 'database'], [{}, { hitRate: 80 }]);
-    const r = await run(a, scenario(a, ids[0], { rate: 800, seconds: 4 }));
+  async function cacheRun(title: string, catalogSize: number, rate: number) {
+    const { a, ids } = chain(title, ['service', 'cache', 'database']);
+    const r = await run(a, scenario(a, ids[0], {
+      rate, seconds: 2,
+      classes: [{ id: a.readClass, name: 'read', weight: 1, operation: 'read', tags: [], keyDistribution: keys(catalogSize) }],
+    }));
     expect(r.status).toBe('completed');
+    return { r, ids };
+  }
+
+  it('defaults: a cache that holds the working set protects the database', async () => {
+    // 500 keys fit the default 1,000-entry LRU cache.
+    const { r, ids } = await cacheRun('A1 working set fits', 500, 3000);
     const o = outcomes(r);
     expect(o.rejected + o.failed + o.expired).toBe(0);
+    expect(metric(r, 'utilization', ids[2])).toBeLessThan(0.3);
   });
 
-  it('defaults: at 20% hits requests are rejected, but by the API service one-slot hold, not the database [gap H11]', async () => {
-    const { a, ids } = chain('A1 defaults h20', ['service', 'cache', 'database'], [{}, { hitRate: 20 }]);
-    const r = await run(a, scenario(a, ids[0], { rate: 800, seconds: 4 }));
-    expect(r.status).toBe('completed');
-    const rejected = rootsSettled(r, 'rejected');
-    expect(rejected).toBeGreaterThan(500);
-    expect(rootsSettled(r, 'rejected', ids[0])).toBe(rejected);
-    // The database has headroom; the service in front of it fills its queue because it
-    // holds its only slot for the whole miss path. Utilization counts held slots (B5 fixed),
-    // so the service shows as the saturated element.
-    expect(metric(r, 'utilization', ids[2])).toBeLessThan(0.85);
-    expect(metric(r, 'utilization', ids[0])).toBeGreaterThan(0.95);
-  });
-
-  it('realistic: the database saturates when the hit rate drops from 80% to 40%', async () => {
-    const cfg = (hit: number) => [{ concurrency: 16 }, { concurrency: 16, hitRate: hit }, { concurrency: 5, capacity: 100, writeCapacity: 100 }];
-    const high = chain('A1 realistic h80', ['service', 'cache', 'database'], cfg(80));
-    const low = chain('A1 realistic h40', ['service', 'cache', 'database'], cfg(40));
-    const rh = await run(high.a, scenario(high.a, high.ids[0], { rate: 1000, seconds: 3 }));
-    const rl = await run(low.a, scenario(low.a, low.ids[0], { rate: 1000, seconds: 3 }));
-    expect([rh.status, rl.status]).toEqual(['completed', 'completed']);
-    expect(rootsSettled(rh, 'rejected')).toBe(0);
-    expect(metric(rh, 'utilization', high.ids[2])).toBeLessThan(0.6);
-    expect(metric(rl, 'utilization', low.ids[2])).toBeGreaterThan(0.95);
-    expect(outcomes(rl).meanMs).toBeGreaterThan(20 * outcomes(rh).meanMs);
+  it('defaults: when the working set outgrows the cache, the database saturates and requests fail', async () => {
+    // 100,000 keys: almost every read misses; 6,000/s exceeds the database's 10 x 500/s.
+    const { r, ids } = await cacheRun('A1 working set too big', 100_000, 6000);
+    const o = outcomes(r);
+    expect(metric(r, 'utilization', ids[2])).toBeGreaterThan(0.95);
+    expect(o.failed + o.rejected).toBeGreaterThan(100);
   });
 });
 
 describe('A2 queue absorbs a burst', () => {
-  function build(title: string, queue: Record<string, unknown>, message: Record<string, unknown>, worker: Record<string, unknown> = {}) {
+  function build(title: string, queue: Record<string, unknown> = {}, publish: Record<string, unknown> = {}, worker: Record<string, unknown> = {}) {
     const a = new Arch();
     a.doc = { ...a.doc, title };
     const api = a.place('service', 'API');
@@ -251,9 +244,9 @@ describe('A2 queue absorbs a burst', () => {
     const wk = a.place('worker', 'Worker');
     if (Object.keys(queue).length) a.set(q, queue);
     if (Object.keys(worker).length) a.set(wk, worker);
-    const publish = a.connect(api, q); // the message's TTL is set where it is published
+    const publishId = a.connect(api, q); // the message's TTL is set where it is published
     a.connect(q, wk);
-    if (Object.keys(message).length) a.setConn(publish, message);
+    if (Object.keys(publish).length) a.setConn(publishId, publish);
     return { a, api };
   }
 
@@ -276,44 +269,56 @@ describe('A2 queue absorbs a burst', () => {
     expect(a.tryConnect(q, a.place('database'))).toMatch(/Channel mismatch/);
   });
 
-  it('defaults: 2x the worker rate fills the 500-message queue limit and publishes fail [default]', async () => {
-    const { a, api } = build('A2 defaults', {}, {});
-    const r = await run(a, scenario(a, api, { rate: 400, seconds: 8 }));
+  it('defaults: a burst at 2x the worker rate queues up and drains afterwards; nothing is lost', async () => {
+    const { a, api } = build('A2 defaults burst and drain');
+    const r = await run(a, scenario(a, api, { rate: 400, seconds: 8, completion: { kind: 'drain', arrivalHorizonMs: 8000, deadlineMs: 30000 } }));
     expect(r.status).toBe('completed');
     const m = outcomes(r, 'message');
-    expect(m.rejected).toBeGreaterThan(500);
-    expect(outcomes(r).failed).toBe(m.rejected); // a rejected publish fails the API request
-  });
-
-  it('defaults: with room in the queue, the 10 s message TTL still expires the backlog [gap H12]', async () => {
-    const { a, api } = build('A2 TTL', { queueLimit: 10000 }, {}, { capacity: 10 });
-    const r = await run(a, scenario(a, api, { rate: 40, seconds: 25 }));
-    expect(r.status).toBe('completed');
-    expect(outcomes(r, 'message').expired).toBeGreaterThan(50);
-  });
-
-  it('realistic: with a large queue and a 5-minute TTL nothing is lost; the backlog waits', async () => {
-    const { a, api } = build('A2 realistic', { queueLimit: 10000 }, { messageTtlMs: 300000 });
-    const r = await run(a, scenario(a, api, { rate: 400, seconds: 8 }));
-    expect(r.status).toBe('completed');
-    const m = outcomes(r, 'message');
-    expect(m.rejected + m.failed + m.expired).toBe(0);
-    expect(m.inFlight).toBeGreaterThan(1000);
+    expect(m.rejected + m.failed + m.expired + m.inFlight).toBe(0);
+    expect(m.succeeded).toBe(m.generated);
     expect(outcomes(r).failed).toBe(0);
+  });
+
+  it('a queue limit or a short TTL loses the backlog (the knobs are real)', async () => {
+    const limited = build('A2 queue limit 500', { queueLimit: 500 });
+    const rl = await run(limited.a, scenario(limited.a, limited.api, { rate: 400, seconds: 8 }));
+    expect(outcomes(rl, 'message').rejected).toBeGreaterThan(500);
+    expect(outcomes(rl).failed).toBe(outcomes(rl, 'message').rejected); // a rejected publish fails the API request
+
+    const shortTtl = build('A2 TTL 10 s', {}, { messageTtlMs: 10000 }, { capacity: 10 });
+    const rt = await run(shortTtl.a, scenario(shortTtl.a, shortTtl.api, { rate: 40, seconds: 25 }));
+    expect(outcomes(rt, 'message').expired).toBeGreaterThan(50);
   });
 });
 
-describe('A3 retry storm', () => {
-  it('overload rejections are never retried, so maxRetries changes nothing [gap H13]', async () => {
-    const results = [];
-    for (const maxRetries of [0, 3]) {
-      const { a, ids } = chain(`A3 maxRetries ${maxRetries}`, ['service'], [{ capacity: 10, concurrency: 1, queueLimit: 5, maxRetries }]);
-      const r = await run(a, scenario(a, ids[0], { rate: 20, seconds: 20 }));
-      results.push({ rejected: rootsSettled(r, 'rejected'), retries: r.events.filter((e) => e.kind === 'started' && e.code !== 'attempt:1').length });
-    }
-    expect(results[0].rejected).toBeGreaterThan(100);
-    expect(results[1]).toEqual(results[0]);
-    expect(results[1].retries).toBe(0);
+describe('A3 retries', () => {
+  const policy = (o: Record<string, unknown> = {}) => ({ maxAttempts: 4, backoffMs: 20, backoffMultiplier: 2, maxBackoffMs: 1000, jitter: true, attemptTimeoutMs: null, ...o });
+
+  async function callDep(title: string, dep: Record<string, unknown>, retry: ReturnType<typeof policy> | null, rate: number, seconds: number) {
+    const { a, ids } = chain(title, ['service', 'service'], [{}, dep]);
+    if (retry) a.setConn(a.doc.connections[0].id, { retry });
+    const r = await run(a, scenario(a, ids[0], { rate, seconds }));
+    expect(r.status).toBe('completed');
+    return { r, ids };
+  }
+
+  it('caller retries recover transient failures', async () => {
+    const plain = await callDep('A3 transient, no retry', { failureRate: 30 }, null, 100, 10);
+    const retried = await callDep('A3 transient, 3 attempts', { failureRate: 30 }, policy({ maxAttempts: 3 }), 100, 10);
+    const share = (r: Run) => outcomes(r).failed / outcomes(r).generated;
+    expect(share(plain.r)).toBeGreaterThan(0.25);
+    expect(share(retried.r)).toBeLessThan(0.06); // 0.3^3 = 0.027
+  });
+
+  it('retries against an overloaded service add load and latency, not goodput (retry storm)', async () => {
+    const dep = { capacity: 10, concurrency: 1, queueLimit: 5 };
+    const plain = await callDep('A3 overload, no retry', dep, null, 20, 20);
+    const storm = await callDep('A3 overload, 4 attempts', dep, policy(), 20, 20);
+    const attemptsAtDep = (x: { r: Run; ids: Id[] }) => new Set(x.r.events.filter((e) => e.elementId === x.ids[1] && e.kind === 'started').map((e) => e.id)).size;
+    expect(attemptsAtDep(storm)).toBeGreaterThan(attemptsAtDep(plain));
+    expect(storm.r.events.filter((e) => e.code === 'call-retry').length).toBeGreaterThan(100);
+    expect(outcomes(storm.r).succeeded).toBeLessThanOrEqual(outcomes(plain.r).succeeded * 1.1);
+    expect(outcomes(storm.r).meanMs).toBeGreaterThan(outcomes(plain.r).meanMs);
   });
 });
 
@@ -372,124 +377,104 @@ describe('A5 fan-out', () => {
     expect(Math.abs((await fanOut('pubsub')) - 3)).toBeLessThan(0.03);
   });
 
-  it('a stream splits events between its consumers instead of giving each consumer every event [gap H14]', async () => {
-    expect(Math.abs((await fanOut('stream')) - 1)).toBeLessThan(0.02);
+  it('a stream gives each consumer every event [fixed H14]', async () => {
+    expect(Math.abs((await fanOut('stream')) - 3)).toBeLessThan(0.03);
   });
 });
 
 describe('A6 write-heavy mix on a database', () => {
-  async function mix(title: string, db: Record<string, unknown>, writeShare: number) {
-    const { a, ids } = chain(title, ['service', 'database'], [{ concurrency: 16 }, db]);
-    const r = await run(a, scenario(a, ids[0], {
-      rate: 400, seconds: 5,
-      classes: [
-        { id: a.readClass, name: 'read', weight: 10 - writeShare * 10, operation: 'read', tags: [], keyDistribution: uniformKeys },
-        { id: a.mint(), name: 'write', weight: writeShare * 10, operation: 'write', tags: [], keyDistribution: uniformKeys },
-      ],
-    }));
-    expect(r.status).toBe('completed');
-    return { rejected: rootsSettled(r, 'rejected'), util: metric(r, 'utilization', ids[1]) };
-  }
-
-  it('defaults: reads and writes cost the same, so the mix makes no difference [default]', async () => {
-    expect(await mix('A6 defaults 80% writes', {}, 0.8)).toEqual(await mix('A6 defaults 20% writes', {}, 0.2));
-  });
-
-  it('realistic: with writes 5x as expensive, a write-heavy mix saturates the database', async () => {
-    const db = { capacity: 1000, writeCapacity: 200 };
-    const reads = await mix('A6 realistic 20% writes', db, 0.2);
-    const writes = await mix('A6 realistic 80% writes', db, 0.8);
-    expect(reads.rejected).toBe(0);
-    expect(writes.rejected).toBeGreaterThan(100);
+  it('defaults: writes cost more than reads, so a write-heavy mix saturates the database first', async () => {
+    const mix = async (writeShare: number) => {
+      const { a, ids } = chain(`A6 ${writeShare * 100}% writes`, ['service', 'database']);
+      const r = await run(a, scenario(a, ids[0], {
+        rate: 3000, seconds: 2,
+        classes: [
+          { id: a.readClass, name: 'read', weight: 10 - writeShare * 10, operation: 'read', tags: [], keyDistribution: uniformKeys },
+          { id: a.mint(), name: 'write', weight: writeShare * 10, operation: 'write', tags: [], keyDistribution: uniformKeys },
+        ],
+      }));
+      expect(r.status).toBe('completed');
+      const o = outcomes(r);
+      return { lost: o.failed + o.rejected, util: metric(r, 'utilization', ids[1]) };
+    };
+    // 10 slots: 20% writes need ~2.6 ms per request (3,800/s), 80% writes ~4.4 ms (2,300/s).
+    const reads = await mix(0.2);
+    const writes = await mix(0.8);
+    expect(reads.lost).toBe(0);
+    expect(reads.util).toBeLessThan(0.9);
     expect(writes.util).toBeGreaterThan(0.95);
+    expect(writes.lost).toBeGreaterThan(100);
   });
 });
 
 describe('A7 synchronous chain', () => {
   const four = ['service', 'service', 'service', 'service'] as const;
 
-  it('defaults: 0 ms links, so four hops add only service time [gap H2]', async () => {
-    const { a, ids } = chain('A7 defaults 0 ms', four);
+  it('defaults: 2 ms links add up across hops', async () => {
+    const { a, ids } = chain('A7 defaults', four);
     const r = await run(a, scenario(a, ids[0], { rate: 100, seconds: 5 }));
-    expect(outcomes(r).meanMs).toBeLessThan(3);
+    // 2 x 3 hops x 2 ms plus four 0.5 ms mean service times.
+    expect(outcomes(r).meanMs).toBeCloseTo(14, 0);
   });
 
-  it('defaults with 5 ms links: one-slot services collapse at 100/s [gap H11]', async () => {
-    const { a, ids } = chain('A7 defaults 5 ms', four, [], 5);
+  it('defaults with 5 ms links: the chain holds 100/s without collapsing', async () => {
+    const { a, ids } = chain('A7 5 ms links', four, [], 5);
     const r = await run(a, scenario(a, ids[0], { rate: 100, seconds: 5 }));
     const o = outcomes(r);
-    // The first service holds its only slot for the ~32 ms round trip: at most ~31/s pass,
-    // and the rest wait in its queue.
-    expect(metric(r, 'throughput')).toBeLessThan(35);
-    expect(o.succeeded).toBeLessThan(0.5 * o.generated);
-    expect(o.meanMs).toBeGreaterThan(1000);
+    expect(o.rejected + o.failed + o.expired).toBe(0);
+    expect(o.meanMs).toBeCloseTo(32, 0);
   });
 
-  it('realistic: latency is 2 x hops x link latency plus service time', async () => {
-    const c16 = { concurrency: 16 };
-    const { a, ids } = chain('A7 realistic 5 ms', four, [c16, c16, c16, c16], 5);
-    const r = await run(a, scenario(a, ids[0], { rate: 100, seconds: 5 }));
-    expect(outcomes(r).meanMs).toBeCloseTo(2 * 3 * 5 + 4 * 0.5, 1);
-  });
-
-  it('realistic: a timeout below the tail expires requests under load and not under light load', async () => {
-    const c16 = { concurrency: 16 };
-    const slow = { concurrency: 1, capacity: 100 }; // 10 ms per request, 100/s
-    const expired: number[] = [];
+  it('a timeout below the tail expires a few requests at light load and many under heavy load', async () => {
+    const slow = { concurrency: 1, capacity: 100 }; // 10 ms mean per request, 100/s
+    const share: number[] = [];
     for (const rate of [20, 90]) {
-      const { a, ids } = chain(`A7 timeout at ${rate}/s`, four, [c16, c16, c16, slow], 5);
-      const r = await run(a, scenario(a, ids[0], { rate, seconds: 10, timeoutMs: 60 }));
+      const { a, ids } = chain(`A7 timeout at ${rate}/s`, four, [{}, {}, {}, slow], 5);
+      const r = await run(a, scenario(a, ids[0], { rate, seconds: 10, timeoutMs: 100 }));
       expect(r.status).toBe('completed');
-      expired.push(outcomes(r).expired);
+      share.push(outcomes(r).expired / outcomes(r).generated);
     }
-    expect(expired[0]).toBe(0);
-    expect(expired[1]).toBeGreaterThan(20);
+    // M/M/1 at 90% load: the queue is still growing over 10 s, so the share is below the
+    // steady-state ~50% but far above light load.
+    expect(share[0]).toBeLessThan(0.02);
+    expect(share[1]).toBeGreaterThan(0.15);
   });
 });
 
 describe('A8 hot keys', () => {
   async function hitRatio(mode: 'fixed' | 'lru', hot: boolean) {
-    const { a, ids } = chain(`A8 ${mode} ${hot ? 'hot' : 'uniform'}`, ['cache', 'database'], [{ mode, entries: 100 }, { concurrency: 16 }]);
-    const keyDistribution = hot ? { kind: 'hot' as const, catalogSize: 10000, hotSubset: 50, hotShare: 90 } : { ...uniformKeys, catalogSize: 10000 };
+    const { a, ids } = chain(`A8 ${mode} ${hot ? 'hot' : 'uniform'}`, ['cache', 'database'], [{ mode }]);
+    const keyDistribution = hot ? { kind: 'hot' as const, catalogSize: 10000, hotSubset: 50, hotShare: 90 } : keys(10000);
     const r = await run(a, scenario(a, ids[0], { rate: 200, seconds: 10, classes: [{ id: a.readClass, name: 'read', weight: 1, operation: 'read', tags: [], keyDistribution }] }));
     const h = metric(r, 'cacheHits', ids[0]);
     return h / (h + metric(r, 'cacheMisses', ids[0]));
   }
 
-  it('defaults: fixed mode ignores keys, so hot and uniform traffic hit equally [default]', async () => {
-    expect(await hitRatio('fixed', true)).toBe(await hitRatio('fixed', false));
+  it('defaults (LRU): a hot set hits far more often than uniform keys', async () => {
+    expect(await hitRatio('lru', true)).toBeGreaterThan(0.8);
+    expect(await hitRatio('lru', false)).toBeLessThan(0.15);
   });
 
-  it('realistic: in LRU mode a hot set hits far more often than uniform keys', async () => {
-    expect(await hitRatio('lru', true)).toBeGreaterThan(0.8);
-    expect(await hitRatio('lru', false)).toBeLessThan(0.05);
+  it('fixed mode ignores keys: hot and uniform traffic hit equally (a labelled simplification)', async () => {
+    expect(await hitRatio('fixed', true)).toBe(await hitRatio('fixed', false));
   });
 });
 
 describe('A9 gateway in front of replicas', () => {
-  async function throughput(gateway: Record<string, unknown>, replicas: number) {
-    const a = new Arch();
-    a.doc = { ...a.doc, title: `A9 ${JSON.stringify(gateway)} x${replicas}` };
-    const g = a.place('gateway', 'Gateway');
-    if (Object.keys(gateway).length) a.set(g, gateway);
-    for (let i = 0; i < replicas; i++) {
-      const s = a.place('service', `Replica ${i}`);
-      a.set(s, { capacity: 50, concurrency: 1 });
-      a.setConn(a.connect(g, s), { latencyMs: 1, returnLatencyMs: 1 });
+  it('defaults: throughput grows with the replica count', async () => {
+    for (const n of [1, 2, 4, 8]) {
+      const a = new Arch();
+      a.doc = { ...a.doc, title: `A9 x${n}` };
+      const g = a.place('gateway', 'Gateway');
+      for (let i = 0; i < n; i++) {
+        const s = a.place('service', `Replica ${i}`);
+        a.set(s, { capacity: 50, concurrency: 1 });
+        a.connect(g, s);
+      }
+      const r = await run(a, scenario(a, g, { rate: 1000, seconds: 5 }));
+      expect(r.status).toBe('completed');
+      expect(Math.abs(metric(r, 'throughput') - 50 * n)).toBeLessThan(0.1 * 50 * n);
     }
-    const r = await run(a, scenario(a, g, { rate: 1000, seconds: 5 }));
-    expect(r.status).toBe('completed');
-    return metric(r, 'throughput');
-  }
-
-  it('defaults: throughput stays flat as replicas are added, capped by the gateway one-slot hold [gap H11]', async () => {
-    const t = [await throughput({}, 1), await throughput({}, 4), await throughput({}, 8)];
-    expect(t[0]).toBeGreaterThan(30);
-    for (const x of t) expect(Math.abs(x - t[0])).toBeLessThan(0.05 * t[0]);
-  });
-
-  it('realistic: with 16 gateway slots throughput grows with the replica count', async () => {
-    for (const n of [1, 2, 4, 8]) expect(Math.abs((await throughput({ concurrency: 16 }, n)) - 50 * n)).toBeLessThan(0.05 * 50 * n);
   });
 });
 
@@ -555,9 +540,10 @@ describe('A12 service calling a third party', () => {
     const slow = await callThirdParty(200, 'succeeded');
     expect(fast.o.succeeded).toBeGreaterThan(30);
     expect(slow.o.failed + slow.o.rejected).toBe(0);
-    // One response answers every traffic request (D47); latency = service time + delay.
-    expect(fast.o.meanMs).toBeCloseTo(10.5, 0);
-    expect(slow.o.meanMs).toBeCloseTo(200.5, 0);
+    // One response answers every traffic request (D47); latency = service time + 2 x 2 ms
+    // default link latency + the boundary's delay.
+    expect(fast.o.meanMs).toBeCloseTo(14.5, 0);
+    expect(slow.o.meanMs).toBeCloseTo(204.5, 0);
   });
 
   it('a failing third party fails the caller [fixed B8]', async () => {
@@ -600,7 +586,7 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
   it('summary.rootCounts includes workload roots, so root-count assertions see them [fixed B3]', async () => {
     const a = new Arch();
     const svc = a.place('service');
-    a.set(svc, { capacity: 10, queueLimit: 0 });
+    a.set(svc, { capacity: 10, concurrency: 1, queueLimit: 0 });
     const id = scenario(a, svc, { rate: 50, seconds: 4 });
     a.doc = {
       ...a.doc,
@@ -619,9 +605,10 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
   it('a root rejected at admission is counted once, and root counts conserve [fixed B4]', async () => {
     const a = new Arch();
     const svc = a.place('service');
-    a.set(svc, { capacity: 10, queueLimit: 0 });
+    a.set(svc, { capacity: 10, concurrency: 1, queueLimit: 0 });
     const r = await run(a, scenario(a, svc, { rate: 50, seconds: 4 }));
     const o = outcomes(r);
+    expect(o.rejected).toBeGreaterThan(50);
     expect(o.rejected).toBe(rootsSettled(r, 'rejected'));
     expect(o.succeeded + o.rejected + o.failed + o.expired + o.inFlight).toBe(o.generated);
   });

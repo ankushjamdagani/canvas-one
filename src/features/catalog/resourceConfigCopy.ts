@@ -13,6 +13,13 @@ export const RESOURCE_CONFIG_COPY = {
   maxRetries: { label: 'Max retries' },
   retryDelayMs: { label: 'Retry delay', unit: 'ms' },
   writeCapacity: { label: 'Write capacity', unit: '/s' },
+  serviceTime: {
+    label: 'Service time',
+    options: {
+      fixed: 'Fixed',
+      exponential: 'Variable (exponential)',
+    },
+  },
   strategy: {
     label: 'Strategy',
     options: {

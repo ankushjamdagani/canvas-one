@@ -315,8 +315,22 @@ export async function applyDraft(handle: DraftHandle, session: DraftSession): Pr
         'Contract violation: session.getState().workingRevision is null after an applied inspector edit',
       );
     }
+    // Some fields depend on the record (e.g. retry details appear once a call has a retry
+    // policy, D49), so the field list is rebuilt from the applied record. Accepted values
+    // stay as typed; fields that just appeared take the record's value.
+    const refreshedFields =
+      handle.target.kind === 'element'
+        ? fieldsForElement(updatedRecord as Element)
+        : fieldsForConnection(updatedRecord as Connection);
+    for (const field of refreshedFields) {
+      if (!(field.id in acceptedValues)) acceptedValues[field.id] = field.toRaw(updatedRecord as never);
+    }
+    for (const id of Object.keys(acceptedValues)) {
+      if (!refreshedFields.some((f) => f.id === id)) delete acceptedValues[id];
+    }
     const clean = Object.freeze({
       ...savingHandle,
+      fields: refreshedFields,
       baseWorkingRevision: newWorkingRevision,
       baseValues: Object.freeze(acceptedValues),
       values: Object.freeze(acceptedValues),

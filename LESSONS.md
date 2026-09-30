@@ -22,7 +22,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 
 ## Verification
 
-- **Before calling UI, CSS or app-shell work done, run the full production browser suite on an isolated port.** `playwright.config.ts` reuses any server on 5174 (possibly a stale build); use a throwaway config with its own port, `reuseExistingServer: false`, 2 workers and no retries. Fixing the named selectors isn't enough; CSS alone broke the export journey. Why: 2026-09-14, 2026-09-15, 2026-09-27 onward.
+- **Before calling UI, CSS or app-shell work done, run `npm run build`, then the full production browser suite on an isolated port.** The isolated config serves the existing `dist` via `vite preview`, so skipping the build tests the old app (2026-09-30 RV-24). `playwright.config.ts` reuses any server on 5174 (possibly a stale build); use a throwaway config with its own port, `reuseExistingServer: false`, 2 workers and no retries. Fixing the named selectors isn't enough; CSS alone broke the export journey. Why: 2026-09-14, 2026-09-15, 2026-09-27 onward.
 - **One passing run doesn't prove a flaky test is fixed.** Say so in the log. Why: 2026-09-10.
 - **Keep every build chunk under Vite's 500 kB warning; a new size warning is a regression.** Check with `npm run build`. Why: 2026-09-29 bundle split removed the long-standing warning.
 - **Custom colour utilities (`text-ink`, `bg-canvas`) only work if `--color-<name>` is defined in `src/styles.css` `@theme`.** After using a new token class, grep `dist/assets/*.css` for it. Why: 2026-09-29 RV-17 (four classes generated no CSS) and bundle split (`bg-riskTint` camelCase).

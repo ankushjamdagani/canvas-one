@@ -156,6 +156,15 @@ Saved parts ("Ours") reuse the identical row/detail shape (`STANDARD`→`v{revis
 
 Open-question count: **12**.
 
+**D49 defaults (realism audit, supersede the table's numbers where they differ).** Every value is an **assumption**, shown in the Library's DEFAULTS line and the inspector.
+- Resources: `serviceTime:'exponential'`; concurrency 64 for processors, routers and caches (a request thread/worker pool); worker keeps capacity 100, concurrency 2, queue 0, 2 retries.
+- Storage: database read 500/s, write 200/s, concurrency 10; nosql/objectstore read 2000/s, write 1000/s, concurrency 16; search read 1000/s, write 100/s (indexing), concurrency 8; warehouse read 2/s (500 ms queries), write 1/s, concurrency 4, queue 100.
+- Cache/cdn: LRU mode, 1000 entries, TTL 60 s (fixed mode stays available and ignores keys).
+- Brokers: queue limit 10,000 retained messages; stream delivery is `broadcast` (every consumer route gets every event); queue stays `competing`.
+- DNS: unmodeled (diagram only). Clients cache lookups, so DNS isn't on the per-request path.
+- Connections: `call` latency 2 ms each way and `retry:null`; `message` latency 2 ms and TTL 300,000 ms (5 minutes).
+- Labels: state machines and pipelines take no processing time in timed runs; nosql/objectstore/search/warehouse state their own model.
+
 **Note on `behaviorDefaults.ts` as a source.** Every number cited above from `behaviorDefaults.ts` (capacity, concurrency, queueLimit, cache hitRate/entries/ttlMs, worker overrides, `defaultExecutionEdge`'s latency/ack/ttl fields) comes from the old, pre-rewrite app that D37 marks wholly disposable ("The whole old UI and its functionality are disposable … no adapters from the legacy `Graph`/editor/canvas"). It is kept here only because it is the sole numeric precedent in the repository for these defaults — it carries no authority beyond that, and every value drawn from it is still marked **assumption**, not fact, per architecture.md §2.
 
 RESULT: DONE

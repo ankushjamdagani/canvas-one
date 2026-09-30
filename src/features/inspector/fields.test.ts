@@ -99,12 +99,20 @@ describe('fieldsForElement: resource variants', () => {
     expect(capacity.parse('not-a-number').ok).toBe(false);
   });
 
-  it('concurrency must be a safe integer in [1,16]', () => {
+  it('concurrency must be a safe integer in [1,1024] (D49)', () => {
     const el = processorElement();
     const concurrency = fieldsForElement(el).find((f) => f.id === 'config.concurrency')!;
     expect(concurrency.parse('1.5').ok).toBe(false);
-    expect(concurrency.parse('17').ok).toBe(false);
-    expect(concurrency.parse('16').ok).toBe(true);
+    expect(concurrency.parse('1025').ok).toBe(false);
+    expect(concurrency.parse('1024').ok).toBe(true);
+  });
+
+  it('service time: absent reads as fixed; choosing exponential writes it (D49)', () => {
+    const el = processorElement();
+    const field = fieldsForElement(el).find((f) => f.id === 'config.serviceTime')!;
+    expect(field.toRaw(el)).toBe('fixed');
+    const next = field.apply(el, 'exponential');
+    expect(next.behavior.kind === 'resource' && next.behavior.config.serviceTime).toBe('exponential');
   });
 
   it('storage: adds writeCapacity [1,100000]', () => {
@@ -257,6 +265,24 @@ describe('kindTagForElement', () => {
 });
 
 describe('fieldsForConnection', () => {
+  it('retries: Attempts 1 means none; raising it adds a policy and its detail fields (D49)', () => {
+    const conn = callConnection();
+    const attempts = fieldsForConnection(conn).find((f) => f.id === 'config.retry.maxAttempts')!;
+    expect(attempts.toRaw(conn)).toBe('1');
+    expect(fieldsForConnection(conn).some((f) => f.id === 'config.retry.backoffMs')).toBe(false);
+    const withRetry = attempts.apply(conn, 3);
+    expect(withRetry.kind === 'call' && withRetry.config.retry).toEqual({
+      maxAttempts: 3, backoffMs: 100, backoffMultiplier: 2, maxBackoffMs: 10000, jitter: true, attemptTimeoutMs: null,
+    });
+    const ids = fieldsForConnection(withRetry).map((f) => f.id);
+    expect(ids).toEqual(expect.arrayContaining(['config.retry.backoffMs', 'config.retry.jitter', 'config.retry.attemptTimeoutMs']));
+    const timeout = fieldsForConnection(withRetry).find((f) => f.id === 'config.retry.attemptTimeoutMs')!;
+    const timed = timeout.apply(withRetry, 250);
+    expect(timed.kind === 'call' && timed.config.retry?.attemptTimeoutMs).toBe(250);
+    const off = attempts.apply(timed, 1);
+    expect(off.kind === 'call' && off.config.retry).toBeNull();
+  });
+
   it('call: latencyMs/returnLatencyMs/weight editable with contract bounds', () => {
     const conn = callConnection();
     const fields = fieldsForConnection(conn);

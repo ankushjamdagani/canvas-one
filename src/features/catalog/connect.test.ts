@@ -140,7 +140,8 @@ describe('connect.ts', () => {
 
     const connChange = plan.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'connection');
     expect((connChange as any).value.record.config.resource).toBeNull();
-    expect((connChange as any).value.record.config.latencyMs).toBe(0);
+    expect((connChange as any).value.record.config.latencyMs).toBe(2); // D49 default
+    expect((connChange as any).value.record.config.retry).toBeNull();
     expect((connChange as any).value.record.config.weight).toBe(1);
 
     const finalDoc = applyChanges(doc2, plan.changes);

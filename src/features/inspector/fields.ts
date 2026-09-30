@@ -205,7 +205,7 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
       id: 'config.concurrency',
       label: RESOURCE_CONFIG_COPY.concurrency.label,
       min: 1,
-      max: 16,
+      max: 1024,
       integer: true,
       get: (el) => (el.behavior.kind === 'resource' ? el.behavior.config.concurrency : 0),
       set: (el, value) => withConfig(el, (c) => ({ ...c, concurrency: value })),
@@ -245,6 +245,17 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
       max: 10000,
       get: (el) => (el.behavior.kind === 'resource' ? el.behavior.config.retryDelayMs : 0),
       set: (el, value) => withConfig(el, (c) => ({ ...c, retryDelayMs: value })),
+    }),
+    selectField<Element>({
+      id: 'config.serviceTime',
+      label: RESOURCE_CONFIG_COPY.serviceTime.label,
+      options: [
+        { value: 'exponential', label: RESOURCE_CONFIG_COPY.serviceTime.options.exponential },
+        { value: 'fixed', label: RESOURCE_CONFIG_COPY.serviceTime.options.fixed },
+      ],
+      // Absent means 'fixed': configs created before D49 keep their behaviour.
+      get: (el) => (el.behavior.kind === 'resource' ? (el.behavior.config.serviceTime ?? 'fixed') : 'fixed'),
+      set: (el, value) => withConfig(el, (c) => ({ ...c, serviceTime: value as 'fixed' | 'exponential' })),
     }),
   ];
 
@@ -433,6 +444,91 @@ function connectionLabelField(): FieldSpec<Connection> {
   });
 }
 
+/**
+ * D49: the policy a call gets when its author raises Attempts above 1. Each value is an
+ * assumption shown in the inspector, not a hidden default.
+ */
+const RETRY_WHEN_ENABLED = {
+  backoffMs: 100,
+  backoffMultiplier: 2,
+  maxBackoffMs: 10000,
+  jitter: true,
+  attemptTimeoutMs: null,
+} as const;
+
+function retryFields(connection: Connection): FieldSpec<Connection>[] {
+  const retryOf = (c: Connection) => (c.kind === 'call' ? (c.config.retry ?? null) : null);
+  const withRetry = (c: Connection, patch: (r: NonNullable<CallConnection['config']['retry']>) => CallConnection['config']['retry']): Connection => {
+    const r = retryOf(c);
+    return c.kind === 'call' && r ? { ...c, config: { ...c.config, retry: patch(r) } } : c;
+  };
+  const fields: FieldSpec<Connection>[] = [
+    numberField<Connection>({
+      id: 'config.retry.maxAttempts',
+      label: 'Attempts (1 = no retries)',
+      min: 1,
+      max: 10,
+      integer: true,
+      get: (c) => retryOf(c)?.maxAttempts ?? 1,
+      set: (c, value) => {
+        if (c.kind !== 'call') return c;
+        const r = retryOf(c);
+        const retry = value === 1 ? null : r ? { ...r, maxAttempts: value } : { ...RETRY_WHEN_ENABLED, maxAttempts: value };
+        return { ...c, config: { ...c.config, retry } };
+      },
+    }),
+  ];
+  if (!retryOf(connection)) return fields;
+  fields.push(
+    numberField<Connection>({
+      id: 'config.retry.backoffMs',
+      label: 'Retry backoff',
+      unit: 'ms',
+      min: 0,
+      max: 60000,
+      get: (c) => retryOf(c)?.backoffMs ?? 0,
+      set: (c, value) => withRetry(c, (r) => ({ ...r, backoffMs: value })),
+    }),
+    numberField<Connection>({
+      id: 'config.retry.backoffMultiplier',
+      label: 'Backoff multiplier',
+      min: 1,
+      max: 10,
+      get: (c) => retryOf(c)?.backoffMultiplier ?? 1,
+      set: (c, value) => withRetry(c, (r) => ({ ...r, backoffMultiplier: value })),
+    }),
+    numberField<Connection>({
+      id: 'config.retry.maxBackoffMs',
+      label: 'Max backoff',
+      unit: 'ms',
+      min: 0,
+      max: 600000,
+      get: (c) => retryOf(c)?.maxBackoffMs ?? 0,
+      set: (c, value) => withRetry(c, (r) => ({ ...r, maxBackoffMs: value })),
+    }),
+    selectField<Connection>({
+      id: 'config.retry.jitter',
+      label: 'Jitter',
+      options: [
+        { value: 'on', label: 'On (random up to the backoff)' },
+        { value: 'off', label: 'Off' },
+      ],
+      get: (c) => (retryOf(c)?.jitter ? 'on' : 'off'),
+      set: (c, value) => withRetry(c, (r) => ({ ...r, jitter: value === 'on' })),
+    }),
+    numberField<Connection>({
+      id: 'config.retry.attemptTimeoutMs',
+      label: 'Attempt timeout (0 = none)',
+      unit: 'ms',
+      min: 0,
+      max: 600000,
+      get: (c) => retryOf(c)?.attemptTimeoutMs ?? 0,
+      set: (c, value) => withRetry(c, (r) => ({ ...r, attemptTimeoutMs: value === 0 ? null : value })),
+    }),
+  );
+  return fields;
+}
+
 function callFields(): readonly FieldSpec<Connection>[] {
   const withConfig = (c: Connection, patch: (config: CallConnection['config']) => CallConnection['config']): Connection =>
     c.kind === 'call' ? { ...c, config: patch(c.config) } : c;
@@ -565,7 +661,7 @@ function readOnlyRoutingFields(
 export function fieldsForConnection(connection: Connection): readonly FieldSpec<Connection>[] {
   const base = [connectionLabelField()];
   if (connection.kind === 'call') {
-    return [...base, ...callFields().filter((f) => shouldShowReadonly(connection, f))];
+    return [...base, ...callFields().filter((f) => shouldShowReadonly(connection, f)), ...retryFields(connection)];
   }
   if (connection.kind === 'message') {
     return [...base, ...messageFields().filter((f) => shouldShowReadonly(connection, f))];
