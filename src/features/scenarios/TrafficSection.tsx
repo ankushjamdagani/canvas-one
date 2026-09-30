@@ -171,7 +171,7 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
             >
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="space-y-1 text-[11px] text-secondary-text">
+                  <label className="space-y-1 text-[11px] text-secondary-text col-span-2">
                     Timeout (ms)
                     <Input
                       type="number"
@@ -180,23 +180,6 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
                       onChange={(e) => {
                         const v = Number(e.target.value);
                         updateWorkload(workload.id, (w) => ({ ...w, timeoutMs: Number.isFinite(v) ? v : w.timeoutMs }));
-                      }}
-                    />
-                  </label>
-                  <label className="space-y-1 text-[11px] text-secondary-text">
-                    Interval (ms)
-                    <Input
-                      type="number"
-                      min={0}
-                      placeholder="—"
-                      value={workload.intervalMs ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = raw === '' ? null : Number(raw);
-                        updateWorkload(workload.id, (w) => ({
-                          ...w,
-                          intervalMs: null,
-                        }));
                       }}
                     />
                   </label>

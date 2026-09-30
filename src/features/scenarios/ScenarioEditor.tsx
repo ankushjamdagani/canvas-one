@@ -322,11 +322,11 @@ function ScenarioEditorFooter({
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={handle.status === 'saving'} className="w-full">
-          Cancel
-        </Button>
         <Button type="button" size="sm" onClick={onApply} disabled={!canApply} data-testid="scenario-editor-apply" className="w-full">
           Apply
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={handle.status === 'saving'} className="w-full">
+          Cancel
         </Button>
       </div>
     </div>
