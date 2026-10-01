@@ -31,6 +31,7 @@ import {
   // Functions
   createInitialPanelState,
   clampSideWidth,
+  computeEffectiveSideWidth,
   clampFloatRect,
   defaultFloatRect,
   effectiveLayout,
@@ -1227,6 +1228,140 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       expect(prefsAfter).toEqual(prefsBefore);
       expect(prefsAfter.panels.history.collapsed).toBe(false);
       expect(prefsAfter.panels.history.open).toBe(true);
+    });
+  });
+
+  // ==========================================================================
+  // 12. Constrained Desktop Viewports (1225 px) & Effective Side Width
+  // ==========================================================================
+  describe('Constrained Desktop Viewports (1225 px) & Effective Side Width', () => {
+    it('computes effective side width clamped to available space at 1225 px', () => {
+      const state = createInitialPanelState({
+        viewport: { width: 1225, height: 773 },
+        sideWidths: { left: 320, right: 380 },
+        panels: {
+          library: {
+            open: true,
+            placement: 'right',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 0,
+          },
+          history: {
+            open: false,
+            placement: 'left',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 1,
+          },
+        },
+      });
+
+      // At 1225 px: baseOccupancy = 480 (canvas) + 44 (rail) + 16 (gutters) + 320 (inspector) = 860 px
+      // Available width for right side = 1225 - 860 = 365 px
+      // Preferred width is 380 px, so effective width is clamped to 365 px
+      const effectiveRight = computeEffectiveSideWidth('right', state, ['library']);
+      expect(effectiveRight).toBe(365);
+
+      // On wider screens (1440 px), preferred width 380 px is preserved
+      const wideState = { ...state, viewport: { width: 1440, height: 900 } };
+      expect(computeEffectiveSideWidth('right', wideState, ['library'])).toBe(380);
+    });
+
+    it('docks side panels at 1225 px even when preferred side width is 380 px', () => {
+      const state = createInitialPanelState({
+        viewport: { width: 1225, height: 773 },
+        sideWidths: { left: 320, right: 380 },
+        panels: {
+          library: {
+            open: true,
+            placement: 'right',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 0,
+          },
+          history: {
+            open: true,
+            placement: 'right',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 1,
+          },
+        },
+      });
+
+      const layout = effectiveLayout(state);
+      expect(layout.inspector).toBe('docked');
+      // Both panels on right fit horizontally (sharing right side) and stack vertically
+      expect(layout.panels.library).toBe('docked-right');
+      expect(layout.panels.history).toBe('docked-right');
+    });
+
+    it('EXPAND uncollapses and docks an effectively collapsed panel even if preferences had collapsed: false', () => {
+      // Setup state where panel was effectively collapsed due to previous constraints
+      const state = createInitialPanelState({
+        viewport: { width: 1225, height: 773 },
+        sideWidths: { left: 320, right: 380 },
+        focusedPanel: 'library',
+        panels: {
+          library: {
+            open: true,
+            placement: 'left',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 0,
+          },
+          history: {
+            open: true,
+            placement: 'right',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 0,
+          },
+        },
+        lastFocusedSequence: { library: 1, history: 2 },
+      });
+
+      // Initially, history is more recently focused, so library is collapsed
+      const initialLayout = effectiveLayout(state);
+      expect(initialLayout.panels.library).toBe('collapsed');
+      expect(initialLayout.panels.history).toBe('docked-right');
+
+      // Dispatch EXPAND on library
+      const result = panelReducer(state, { type: 'EXPAND', panel: 'library' });
+      const nextLayout = effectiveLayout(result.state);
+      expect(nextLayout.panels.library).toBe('docked-left');
+      expect(nextLayout.panels.history).toBe('collapsed');
+    });
+
+    it('OPEN uncollapses and docks an effectively collapsed panel even if already focused', () => {
+      const state = createInitialPanelState({
+        viewport: { width: 1225, height: 773 },
+        sideWidths: { left: 320, right: 380 },
+        focusedPanel: 'library',
+        panels: {
+          library: {
+            open: true,
+            placement: 'left',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 0,
+          },
+          history: {
+            open: true,
+            placement: 'right',
+            collapsed: false,
+            floatRect: defaultFloatRect({ width: 1225, height: 773 }),
+            stackOrder: 0,
+          },
+        },
+        lastFocusedSequence: { library: 1, history: 2 },
+      });
+
+      const result = panelReducer(state, { type: 'OPEN', panel: 'library' });
+      const nextLayout = effectiveLayout(result.state);
+      expect(nextLayout.panels.library).toBe('docked-left');
+      expect(nextLayout.panels.history).toBe('collapsed');
     });
   });
 });

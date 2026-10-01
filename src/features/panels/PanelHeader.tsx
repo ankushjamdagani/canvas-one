@@ -193,7 +193,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
 
       {/* Left: Title + optional badge */}
       <div className="flex items-center gap-2 min-w-0">
-        <h2 className="text-ui font-medium text-foreground tracking-tight truncate">
+        <h2 className="text-ui font-medium text-foreground truncate">
           {title}
         </h2>
         {badge && (

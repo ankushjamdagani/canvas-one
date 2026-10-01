@@ -394,6 +394,13 @@ body {
   background: var(--selected-edge);
   color: var(--foreground);
 }
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

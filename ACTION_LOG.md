@@ -2135,4 +2135,137 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `npm run build-storybook`: All stories and interaction tests built cleanly in 3.34s into `storybook-static/`.
   - `graphify update .`: AST updated cleanly (4,927 nodes, 13,582 edges).
 
+## 2026-10-01 — Adopt Storybook Segmented Toggle & Zoom Controls in Workspace Dock
+
+- **Outcome**: Aligned the workspace canvas dock (`FloatingDock`) with the Storybook `Patterns/Toolbar & Action Bar` design recipe:
+  - **Select & Pan Toggle**: Replaced separate buttons with foundation `Segmented` component with active shadow pill, preserving test IDs (`dock-select-btn`, `dock-pan-btn`), responsive mobile touch sizing (`h-11 md:h-7`), and WAI-ARIA compliance.
+  - **Zoom Controls**: Replaced generic `Minus` / `Plus` with semantic `ZoomOut` / `ZoomIn` icons, wrapped zoom-out, zoom-in, and fit-view buttons in foundation `Tooltip` primitives with `TooltipProvider`, and styled the zoom percentage badge with tabular numbers.
+  - **Separators**: Replaced hardcoded `#EFEBE3` border dividers with foundation `Separator` components using the `bg-hairline` token.
+  - **Foundation Primitives**: Enhanced `SegmentedOption` in `src/components/ui/segmented.tsx` to support `dataTestId`, `ariaLabel`, `title`, and custom `className`, while ensuring standard `role="group"` with `aria-pressed` for toggle buttons (avoiding `aria-allowed-attr` violations from `role="tab"`).
+- **Files**:
+  - `src/components/ui/segmented.tsx` (enhanced with option attributes and group/tablist role switching)
+  - `src/features/workspace/FloatingDock.tsx` (adopted Segmented toggle, Tooltip-wrapped ZoomOut/ZoomIn controls, Separators)
+  - `src/features/workspace/QuickOptionRow.tsx` (aligned zoom quick-options with ZoomOut and ZoomIn)
+  - `LESSONS.md` (recorded lesson on `aria-pressed` with `role="group"` vs `role="tab"`)
+  - `ACTION_LOG.md` (this summary)
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b`: 0 TypeScript compiler errors.
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npm run build-storybook`: Storybook build passed cleanly into `storybook-static/`.
+  - `node scripts/a11y-audit.mjs`: Axe audit passed with 0 violations across desktop and mobile for all 11 application states.
+  - `TEST_PRODUCTION=1 npx playwright test tests/studio-dock-customization.spec.ts tests/studio-shell.spec.ts`: All E2E tests passed cleanly.
+- **Lesson**: Do not combine `aria-pressed` with `role="tab"` on segmented or toggle elements. WAI-ARIA and Axe treat `aria-pressed` on a `tab` as a critical `aria-allowed-attr` violation (tabs allow only `aria-selected`). For segmented tool switchers or toggle groups, default to `role="group"` with native buttons using `aria-pressed`, and reserve `role="tablist"`/`role="tab"` strictly for tabbed view switchers with `aria-selected`.
+
+## 2026-10-01 — Codified Frontend Guidance into Workspace Rules & Agent Workflows
+
+- **Outcome**: Codified the user's frontend design guidance and empathy instructions into durable workspace rules and linked them across agent workflow instructions:
+  - **Durable Rule Created**: [`.agents/rules/frontend-guidance.md`](file:///Users/ankushjamdagani/personal/system-design-planner/.agents/rules/frontend-guidance.md) (`trigger: always_on`) defining:
+    - *Empathy & Domain Tailoring*: Quiet, utilitarian, work-focused, dense, and scan-friendly layouts for operational/SaaS tools; ergonomic and comprehensive workflows.
+    - *Control Semantics*: Icons in buttons for tools, swatches for color, segmented controls for modes, toggles for binary settings, sliders/inputs for numeric values, menus for option sets, tabs for views, and Lucide icons with tooltips.
+    - *Structural Constraints*: Cards $\le 8\text{px}$ radius (unless design system tokens dictate otherwise); no nested cards; page sections as full-width bands or unframed layouts.
+    - *Visual Hygiene & Stability*: Stable dimensions with responsive constraints for fixed-format UI elements (preventing hover/dynamic layout shifts); zero negative letter-spacing; no discrete/gradient orbs; text fit without truncation or occlusion; dev server lifecycle rules.
+  - **Workflow Integration**: Updated [`AGENTS.md`](file:///Users/ankushjamdagani/personal/system-design-planner/AGENTS.md) §5 with direct link and guidance summary for all models and platforms.
+- **Files**:
+  - `Created`: [`.agents/rules/frontend-guidance.md`](file:///Users/ankushjamdagani/personal/system-design-planner/.agents/rules/frontend-guidance.md)
+  - `Modified`: [`AGENTS.md`](file:///Users/ankushjamdagani/personal/system-design-planner/AGENTS.md), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md)
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b`: 0 TypeScript compiler errors.
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npm run build-storybook`: Storybook build passed cleanly into `storybook-static/`.
+  - `node scripts/a11y-audit.mjs`: Axe audit passed with 0 violations across all 11 application states.
+  - `graphify update .`: AST updated cleanly (4,929 nodes, 13,595 edges).
+
+## 2026-10-01 — Application-Wide Remediation of Frontend Guidance & Design Invariants
+
+- **Outcome**: Executed complete codebase remediation to align with `.agents/rules/frontend-guidance.md` and foundation design system rules:
+  - **Zero Negative Letter-Spacing**: Eliminated 100% of negative tracking (`tracking-tight`, `tracking-[-0.01em]`) across foundation primitives (`dialog.tsx`, `card.tsx`, `alert.tsx`), workspace features (`TopBar.tsx`, `EntryScreen.tsx`, `PanelHeader.tsx`, `LibraryPanel.tsx`, `LibraryPreview.tsx`, `HistoryLadder.tsx`, `CommitPanel.tsx`), design token documentation, and Storybook stories (`Tokens.stories.tsx`, `FoundationFirst.stories.tsx`, `NodeKindColors.stories.tsx`, `Overview.stories.tsx`, `Specimen.tsx`). Verified with global regex check: 0 negative tracking occurrences in `src/`.
+  - **Toolbar Stability & Layout Invariants**:
+    - `FloatingDock.tsx`: Replaced multi-row `flex-wrap` ballooning with `flex-nowrap shrink overflow-hidden` so the central customizable command cluster remains on a single stable row and never wraps into an oversized 4-tier vertical stack.
+    - Preserved responsive constraints on the dock (`max-w-[calc(100vw-24px)]`).
+  - **Control Semantics & Tooltips**:
+    - `FloatingDock.tsx`: Wrapped all icon-only commands and overflow triggers in foundation `Tooltip` primitives when command text labels are hidden.
+    - `SelectionToolbar.tsx`: Wrapped icon-only buttons (`Duplicate`, `More actions`, and `Delete`) in foundation `Tooltip` primitives (`TooltipProvider delayDuration={150}`), ensuring proper hover naming with keyboard shortcuts (`⌘D`, `Backspace`).
+  - **Token Harmonization**:
+    - `FloatingDock.tsx`: Replaced hardcoded hex colors (`#0B5C54`, `#EAEFEC`, `#F4F8F6`, `#DCD7CD`, `#EFEBE3`, `#6B7671`, `#16201D`, `#8A938F`) and arbitrary pixel radii (`rounded-[14px]`, `rounded-[10px]`, `rounded-[7px]`, `rounded-[5px]`) with semantic design tokens (`border-primary`, `bg-selected-tint`, `bg-sunken`, `border-control-border`, `bg-hairline`, `text-secondary-text`, `text-foreground`, `rounded-dock`, `rounded-node`, `rounded-control`, `rounded-xs`).
+  - **In-App Clutter Removal**:
+    - `SavedParts.tsx`: Replaced instructional tutorial copy (`Save a selection to reuse it in this project.`) with quiet status messaging (`No saved parts yet.`).
+- **Files**:
+  - `src/components/ui/dialog.tsx`
+  - `src/components/ui/card.tsx`
+  - `src/components/ui/alert.tsx`
+  - `src/features/workspace/FloatingDock.tsx`
+  - `src/features/workspace/SelectionToolbar.tsx`
+  - `src/features/workspace/TopBar.tsx`
+  - `src/features/entry/EntryScreen.tsx`
+  - `src/features/panels/PanelHeader.tsx`
+  - `src/features/library/LibraryPanel.tsx`
+  - `src/features/library/LibraryPreview.tsx`
+  - `src/features/library/SavedParts.tsx`
+  - `src/features/history/HistoryLadder.tsx`
+  - `src/features/history/CommitPanel.tsx`
+  - `src/components/studio/specimen/Specimen.tsx`
+  - `src/stories/design-system/FoundationFirst.stories.tsx`
+  - `src/stories/design-system/NodeKindColors.stories.tsx`
+  - `src/stories/design-system/Overview.stories.tsx`
+  - `src/stories/design-system/Tokens.stories.tsx`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b`: 0 TypeScript compiler errors.
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npm run build-storybook`: Storybook build passed cleanly into `storybook-static/`.
+  - `node scripts/a11y-audit.mjs`: Axe audit passed with 0 violations across all 11 application states.
+  - `graphify update .`: AST updated cleanly (4,930 nodes, 13,601 edges).
+
+## 2026-10-01 — Added Horizontal Scroll to Canvas Floating Dock
+
+- **Outcome**: Resolved clipped/hidden controls on the canvas floating dock:
+  - **Horizontal Scroll & Safe Alignment**: Replaced restrictive clipping on the center customizable controls container with `overflow-x-auto scrollbar-none flex-1 min-w-0 py-0.5` and `style={{ justifyContent: 'safe center' }}`.
+  - **Eliminated Left/Right Edge Clipping**: `safe center` ensures that when controls fit in the available width they are centered, and when they exceed the width they align safely to the start without clipping the first item (`Library` is 100% visible instead of `ibrary`).
+  - **Mouse Wheel & Touch Support**: Added `onWheel` listener mapping vertical wheel delta (`deltaY`) to horizontal scroll (`scrollLeft += deltaY`), allowing seamless scrolling on standard mouse wheels as well as native horizontal trackpad gestures and touch panning.
+  - **Utility Defined**: Added `@utility scrollbar-none` in `src/styles.css` for clean hidden scrollbars across WebKit and Firefox.
+- **Files**:
+  - `src/features/workspace/FloatingDock.tsx`
+  - `src/styles.css`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead, browser subagent.
+- **Verification**:
+  - `npx tsc -b`: 0 errors.
+  - `npm test`: 1,559 passed across 138 test files.
+  - `npm run build`: built clean in 530ms.
+  - `node scripts/a11y-audit.mjs`: 0 axe violations.
+  - Browser inspection: Captured live screenshot confirming all labels are fully visible and horizontally scrollable.
+  - `graphify update .`: AST updated cleanly (4,931 nodes, 13,602 edges).
+
+## 2026-10-01 — Fixed Side Panels Not Opening at 1225px Viewport Width
+
+- **Outcome**: Resolved issue where side panels (Library, History) could not be opened or docked at 1225px viewport width and remained trapped in the right collapsed activity rail (`data-slot="panel-rail"`):
+  - **Dynamic Side Width Clamping (`computeEffectiveSideWidth`)**: In `src/features/workspace/panels.ts`, exported `computeEffectiveSideWidth(side, state, activeCandidateIds)` to dynamically clamp side width to available space (`Math.min(preferred, maxAvailable)`) down to `MIN_SIDE_WIDTH = 280px` in the desktop tier (`>= 1200px`) while accounting for minimum canvas (480px), rail (44px), gutter (16px), and inspector (320px) reservations without mutating stored preferences (§7 invariant).
+  - **Dock Occupancy Calculation**: Updated `computeDockedOccupancy` in `effectiveLayout` to use `computeEffectiveSideWidth` for candidate panels instead of raw stored `state.sideWidths`. At 1225px, remaining space is 365px; previously a 380px or 440px preferred width summed to `860 + 380 = 1240 > 1225px`, which incorrectly forced candidate panels out of `activeDocked` into `collapsed`.
+  - **Reducer Guard Correction**: In `panelReducer` (`OPEN` and `EXPAND`), replaced the pure preference guard `if (current.open && !current.collapsed && state.focusedPanel === panel)` with a check against `effectiveLayout(state)`. When a panel was auto-collapsed by layout constraints while `current.collapsed` remained `false` in preferences, opening or expanding previously early-returned as a no-op.
+  - **PanelHost Clamped Width**: Updated `src/features/panels/PanelHost.tsx` to pass `computeEffectiveSideWidth` to left and right `DockColumn` instances.
+  - **Expand All Collapsed Panels in Rail**: Updated `src/features/panels/PanelRail.tsx` line 170 so the rail expand button (`<<`) uncollapses all panels in `collapsedPanels` instead of only the first one, allowing stacked panels to dock together.
+- **Files**:
+  - `src/features/workspace/panels.ts`
+  - `src/features/panels/PanelHost.tsx`
+  - `src/features/panels/PanelRail.tsx`
+  - `src/features/workspace/panels.test.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx vitest run src/features/workspace/panels.test.ts`: 59/59 passed (including 4 new unit tests covering 1225px clamping and effective collapse recovery).
+  - `npm test`: 1,563 passed across 138 test files.
+  - `npm run build`: built clean in 550ms with 0 errors.
+  - `npm run build-storybook`: Storybook build passed cleanly.
+  - Browser inspection over CDP (`localhost:9222`, page `localhost:5173`): verified at 1225x773 that clicking "Library" on rail docks at 365px, clicking "History" docks stacked at 365px, expanding via `<<` uncollapses both panels, resizing to 1440px widens dock to preferred 380px, and resizing back to 1225px smoothly clamps to 365px.
+  - `graphify update .`: AST updated cleanly (4,933 nodes, 13,608 edges, 337 communities).
+- **Lesson**: Do not check stored preferences (`panel.collapsed === false`) to determine whether a panel is currently visible; always check `effectiveLayout(state)`. If layout constraints auto-collapse a panel while stored preferences remain `collapsed: false`, actions like `OPEN` or `EXPAND` will early-return as no-ops unless they evaluate the effective layout. Responsive constraints must clamp runtime dimensions dynamically (`computeEffectiveSideWidth`) without mutating stored user preferences (§7).
+
+
+
 

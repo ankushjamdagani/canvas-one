@@ -28,7 +28,7 @@ export function LibraryPreview() {
   return (
     <div className="p-8 space-y-12 bg-[#F9FAF8] min-h-screen text-[#16201D] font-sans">
       <div className="max-w-6xl mx-auto space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">System Studio Library Preview (RV-06b)</h1>
+        <h1 className="text-2xl font-bold">System Studio Library Preview (RV-06b)</h1>
         <p className="text-sm text-[#626D68]">
           Reference screenshots comparison: 12A (List view), 12B (Grid view), 12C (Hover detail), 16E (Dock picker).
         </p>

@@ -88,7 +88,7 @@ export const ColorsAndSurfaces: StoryObj = {
     return (
       <div className="space-y-8 max-w-5xl">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink font-sans">Evergreen Color Tokens</h2>
+          <h2 className="text-2xl font-semibold text-ink font-sans">Evergreen Color Tokens</h2>
           <p className="text-xs text-secondary-text mt-1">
             Exact hexadecimal values and roles defined in specs and tokens.ts.
           </p>
@@ -120,7 +120,7 @@ export const Typography: StoryObj = {
     return (
       <div className="space-y-8 max-w-5xl">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink font-sans">Typography Scale</h2>
+          <h2 className="text-2xl font-semibold text-ink font-sans">Typography Scale</h2>
           <p className="text-xs text-secondary-text mt-1">
             Designed for high density information architecture with three specialized font families.
           </p>
@@ -192,7 +192,7 @@ export const RadiiAndShadows: StoryObj = {
     return (
       <div className="space-y-8 max-w-5xl">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink font-sans">Radii & Elevation</h2>
+          <h2 className="text-2xl font-semibold text-ink font-sans">Radii & Elevation</h2>
           <p className="text-xs text-secondary-text mt-1">
             Systematic corner radii and multi-tiered warm shadow elevations.
           </p>

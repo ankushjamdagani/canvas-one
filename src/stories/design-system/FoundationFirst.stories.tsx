@@ -38,7 +38,7 @@ export const ArchitectureGuide: StoryObj = {
           <Badge variant="neutral">WORKFLOW RULE</Badge>
           <StatusDot status="live" label="Single Source of Truth" />
         </div>
-        <h1 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight text-ink">
+        <h1 className="text-3xl sm:text-4xl font-serif font-bold text-ink">
           The Foundation-First Architecture
         </h1>
         <p className="text-base text-body max-w-3xl leading-relaxed">

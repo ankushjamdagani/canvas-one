@@ -11,6 +11,7 @@ import { computeDropTarget } from './geometry';
 import {
   clampFloatRect,
   effectiveLayout,
+  computeEffectiveSideWidth,
   type PanelId,
   type WorkspacePanelState,
   type WorkspacePanelAction,
@@ -232,7 +233,11 @@ export const PanelHost: React.FC<PanelHostProps> = ({
       {dockedLeftItems.length > 0 && (
         <DockColumn
           side="left"
-          width={state.sideWidths.left}
+          width={computeEffectiveSideWidth(
+            'left',
+            { ...state, viewport: currentViewport },
+            dockedLeftItems.map((p) => p.id)
+          )}
           panels={dockedLeftItems}
           dispatch={dispatch}
           renderPanel={renderPanel}
@@ -262,7 +267,11 @@ export const PanelHost: React.FC<PanelHostProps> = ({
       {dockedRightItems.length > 0 && (
         <DockColumn
           side="right"
-          width={state.sideWidths.right}
+          width={computeEffectiveSideWidth(
+            'right',
+            { ...state, viewport: currentViewport },
+            dockedRightItems.map((p) => p.id)
+          )}
           panels={dockedRightItems}
           dispatch={dispatch}
           renderPanel={renderPanel}

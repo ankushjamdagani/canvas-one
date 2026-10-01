@@ -430,7 +430,7 @@ export function SavedParts({
         <p className="text-xs text-secondary-text">
           {latest.size
             ? "No saved parts match this search."
-            : "Save a selection to reuse it in this project."}
+            : "No saved parts yet."}
         </p>
       )}
       <div className={view === "grid" ? "grid grid-cols-2 gap-2" : "space-y-2"}>

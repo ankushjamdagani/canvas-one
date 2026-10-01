@@ -222,7 +222,7 @@ export function LibraryPanel({
       {/* 1. Header (12A/12B): "Library" + Close Button */}
       {!hosted && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground tracking-tight">Library</h2>
+          <h2 className="text-base font-semibold text-foreground">Library</h2>
           <button
             type="button"
             onClick={onClose}

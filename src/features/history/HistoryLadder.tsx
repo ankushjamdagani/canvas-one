@@ -270,7 +270,7 @@ export function HistoryLadder({
       {/* 1. Header */}
       {!hosted && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">History</h2>
+          <h2 className="text-base font-semibold text-foreground">History</h2>
           {onClose && (
             <button
               type="button"

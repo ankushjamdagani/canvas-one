@@ -242,6 +242,49 @@ export function clampSideWidth(width: number): number {
 }
 
 /**
+ * Computes effective side width in a given viewport, clamped between MIN_SIDE_WIDTH (280)
+ * and MAX_SIDE_WIDTH (440), but also constrained to what fits in the viewport without
+ * violating minimum canvas, rail, gutter, and inspector reservations (§7).
+ */
+export function computeEffectiveSideWidth(
+  side: 'left' | 'right',
+  state: {
+    viewport: Viewport;
+    sideWidths: SideWidths;
+    panels: Record<PanelId, PanelPreference>;
+  },
+  activeCandidateIds?: PanelId[]
+): number {
+  const preferred = clampSideWidth(state.sideWidths[side]);
+  if (state.viewport.width < BREAKPOINT_DESKTOP) {
+    return preferred;
+  }
+
+  const inspectorBaseOccupancy = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH + INSPECTOR_WIDTH;
+  const inspectorDocked = state.viewport.width >= inspectorBaseOccupancy;
+  let baseOcc = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH;
+  if (inspectorDocked) {
+    baseOcc += INSPECTOR_WIDTH;
+  }
+
+  // If the other side also has docked candidates, it requires at least MIN_SIDE_WIDTH
+  const otherSide = side === 'left' ? 'right' : 'left';
+  const otherActive = activeCandidateIds
+    ? activeCandidateIds.some((id) => state.panels[id]?.placement === otherSide)
+    : false;
+
+  if (otherActive) {
+    baseOcc += MIN_SIDE_WIDTH;
+  }
+
+  const maxAvailable = state.viewport.width - baseOcc;
+  if (maxAvailable < MIN_SIDE_WIDTH) {
+    return preferred;
+  }
+  return Math.min(preferred, maxAvailable);
+}
+
+/**
  * Clamps floating panel rect so header and close button stay inside bounds (§7).
  */
 export function clampFloatRect(rect: FloatRect, viewport: Viewport): FloatRect {
@@ -513,10 +556,10 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
     const hasLeft = candidateIds.some((id) => panels[id].placement === 'left');
     const hasRight = candidateIds.some((id) => panels[id].placement === 'right');
     if (hasLeft) {
-      occ += clampSideWidth(sideWidths.left);
+      occ += computeEffectiveSideWidth('left', state, candidateIds);
     }
     if (hasRight) {
-      occ += clampSideWidth(sideWidths.right);
+      occ += computeEffectiveSideWidth('right', state, candidateIds);
     }
     return occ;
   };
@@ -622,7 +665,11 @@ export function panelReducer(
     case 'OPEN': {
       const panel = action.panel;
       const current = state.panels[panel];
-      if (current.open && !current.collapsed && state.focusedPanel === panel) {
+      const currentLayout = effectiveLayout(state);
+      const isEffectivelyExpanded =
+        currentLayout.panels[panel] !== 'collapsed' &&
+        currentLayout.panels[panel] !== 'hidden';
+      if (current.open && !current.collapsed && state.focusedPanel === panel && isEffectivelyExpanded) {
         return { state, effects: [] };
       }
 
@@ -836,7 +883,11 @@ export function panelReducer(
     case 'EXPAND': {
       const panel = action.panel;
       const current = state.panels[panel];
-      if (current.open && !current.collapsed && state.focusedPanel === panel) {
+      const currentLayout = effectiveLayout(state);
+      const isEffectivelyExpanded =
+        currentLayout.panels[panel] !== 'collapsed' &&
+        currentLayout.panels[panel] !== 'hidden';
+      if (current.open && !current.collapsed && state.focusedPanel === panel && isEffectivelyExpanded) {
         return { state, effects: [] };
       }
 

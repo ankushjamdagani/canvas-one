@@ -264,7 +264,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
             </defs>
             <rect width="20" height="20" rx="5" fill="url(#entry-brand-gradient)" />
           </svg>
-          <span className="font-semibold text-sm tracking-[-0.01em]">System studio</span>
+          <span className="font-semibold text-sm">System studio</span>
         </div>
       </header>
 

@@ -36,7 +36,7 @@ export const Introduction: StoryObj = {
           <Badge variant="neutral">DESIGN SYSTEM V9</Badge>
           <StatusDot status="live" label="Evergreen Light Palette" />
         </div>
-        <h1 className="text-4xl font-serif font-bold tracking-tight text-ink sm:text-5xl">
+        <h1 className="text-4xl font-serif font-bold text-ink sm:text-5xl">
           Evergreen Design System
         </h1>
         <p className="text-base text-body max-w-3xl leading-relaxed">

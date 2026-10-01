@@ -168,7 +168,9 @@ export const PanelRail: React.FC<PanelRailProps> = ({
           aria-label={side === 'left' ? 'Expand left panels' : 'Expand right panels'}
           onClick={() => {
             if (collapsedPanels.length > 0) {
-              expand(collapsedPanels[0].id);
+              for (const item of collapsedPanels) {
+                expand(item.id);
+              }
             }
           }}
           className="p-1.5 rounded text-secondary-text hover:text-foreground hover:bg-sunken transition-colors cursor-pointer"

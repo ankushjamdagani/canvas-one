@@ -26,7 +26,7 @@ export const NodeKindPalette: StoryObj = {
     return (
       <div className="space-y-6 max-w-4xl">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink font-sans">Node Kind Layer Colors</h2>
+          <h2 className="text-2xl font-semibold text-ink font-sans">Node Kind Layer Colors</h2>
           <p className="text-xs text-secondary-text mt-1">
             Top 3px stripe colors applied to canvas nodes based on their architectural catalog layer.
             Meets WCAG 2.2 contrast requirements against both white canvas and panel surfaces.

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   getAvailability,
   getPayloadFreeAvailability,
@@ -295,12 +296,13 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
   };
 
   return (
-    <div
-      ref={toolbarRef}
-      data-testid="selection-toolbar"
-      className={cn("absolute z-10 flex w-max flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised", className)}
-      style={{ ...style, ...customStyle }}
-    >
+    <TooltipProvider delayDuration={150}>
+      <div
+        ref={toolbarRef}
+        data-testid="selection-toolbar"
+        className={cn("absolute z-10 flex w-max flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised", className)}
+        style={{ ...style, ...customStyle }}
+      >
       <span
         data-testid="selection-count"
         className="h-7 px-2 inline-flex items-center rounded-tag bg-sunken font-mono text-[10px] font-semibold tracking-wide text-secondary-text"
@@ -504,33 +506,45 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Button
-        data-testid="selection-duplicate-btn"
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-8 pointer-coarse:size-11 shrink-0"
-        aria-label="Duplicate selection"
-        disabled={!duplicateAvailability.enabled}
-        title={duplicateAvailability.enabled ? undefined : duplicateAvailability.reason}
-        onClick={() => void executeCommand('selection.duplicate', {})}
-      >
-        <Copy className="size-4" />
-      </Button>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger asChild>
           <Button
-            data-testid="selection-overflow-btn"
+            data-testid="selection-duplicate-btn"
             type="button"
             variant="ghost"
             size="icon"
             className="size-8 pointer-coarse:size-11 shrink-0"
-            aria-label="More selection actions"
+            aria-label="Duplicate selection"
+            disabled={!duplicateAvailability.enabled}
+            title={duplicateAvailability.enabled ? undefined : duplicateAvailability.reason}
+            onClick={() => void executeCommand('selection.duplicate', {})}
           >
-            <MoreHorizontal className="size-4" aria-hidden="true" />
+            <Copy className="size-4" />
           </Button>
-        </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          {duplicateAvailability.enabled ? 'Duplicate selection (⌘D)' : duplicateAvailability.reason}
+        </TooltipContent>
+      </Tooltip>
+
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button
+                data-testid="selection-overflow-btn"
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 pointer-coarse:size-11 shrink-0"
+                aria-label="More selection actions"
+              >
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top">More selection actions</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
           <DropdownMenuHeader className="px-3 py-2 text-secondary-text">SELECTION ACTIONS</DropdownMenuHeader>
           <div className="p-1.5 bg-background space-y-0.5">
@@ -553,20 +567,28 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
 
       <div className="w-[1px] h-6 bg-divider mx-0.5" />
 
-<Button
-        data-testid="selection-delete-btn"
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-8 pointer-coarse:size-11 shrink-0 text-destructive hover:text-destructive"
-        aria-label="Delete selection"
-        disabled={!deleteAvailability.enabled}
-        title={deleteAvailability.enabled ? undefined : deleteAvailability.reason}
-        onClick={() => void executeCommand('selection.delete', {})}
-      >
-        <Trash2 className="size-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            data-testid="selection-delete-btn"
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 pointer-coarse:size-11 shrink-0 text-destructive hover:text-destructive"
+            aria-label="Delete selection"
+            disabled={!deleteAvailability.enabled}
+            title={deleteAvailability.enabled ? undefined : deleteAvailability.reason}
+            onClick={() => void executeCommand('selection.delete', {})}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          {deleteAvailability.enabled ? 'Delete selection (Backspace)' : deleteAvailability.reason}
+        </TooltipContent>
+      </Tooltip>
       
     </div>
+    </TooltipProvider>
   );
 }

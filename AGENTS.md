@@ -60,6 +60,7 @@ Do not invent milestones beyond the requested task.
 - Never claim a check passed if it was skipped or blocked
 - Follow [`LESSONS.md`](LESSONS.md); cite the rule when it changes your approach
 - **Foundation-first UI design:** Foundation components (`src/components/ui/`) and tokens (`src/styles.css`) are the core of the app. Before adding ad-hoc Tailwind overrides or bespoke elements in feature code (`src/features/*`), evaluate if the change belongs to the foundation component or design tokens. Update the foundation first so all consuming UIs update consistently, and verify with Storybook (`npm run build-storybook`).
+- **Frontend guidance & empathy:** Follow [`.agents/rules/frontend-guidance.md`](.agents/rules/frontend-guidance.md). For operational and studio tools, prioritize quiet, utilitarian, dense, and scan-friendly layouts; apply strict control semantics (segmented controls for modes, icons for tools, toggles for binary settings, tabs for views, Lucide icons with tooltips); enforce zero negative letter-spacing, non-overlapping responsive constraints, and stable fixed-format dimensions.
 
 ---
 

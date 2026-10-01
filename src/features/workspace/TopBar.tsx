@@ -141,7 +141,7 @@ export function TopBar({
         {/* Brand mark */}
         <div
           data-testid="brand"
-          className="flex items-center gap-2 font-semibold text-[14px] tracking-[-0.01em] text-foreground shrink-0 select-none max-sm:pointer-coarse:hidden"
+          className="flex items-center gap-2 font-semibold text-[14px] text-foreground shrink-0 select-none max-sm:pointer-coarse:hidden"
         >
           <svg
             className="size-5 shrink-0"

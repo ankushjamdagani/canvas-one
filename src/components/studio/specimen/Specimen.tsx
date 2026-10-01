@@ -180,7 +180,7 @@ export function Specimen() {
           </span>
           <span className="font-mono text-xs text-muted-foreground">Evergreen v2.0</span>
         </div>
-        <h1 className="font-display text-4xl sm:text-5xl font-normal tracking-tight text-foreground">
+        <h1 className="font-display text-4xl sm:text-5xl font-normal tracking-normal text-foreground">
           System Studio Design System
         </h1>
         <p className="text-sm text-secondary-text max-w-3xl leading-relaxed">
@@ -356,13 +356,13 @@ export function Specimen() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-baseline pb-6 border-b border-hairline">
             <div className="space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Display · 46px</span>
-              <div className="font-display text-4xl sm:text-5xl font-normal tracking-tight text-foreground leading-none">
+              <div className="font-display text-4xl sm:text-5xl font-normal tracking-normal text-foreground leading-none">
                 System Studio
               </div>
             </div>
             <div className="space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Heading · 28px</span>
-              <div className="font-display text-2xl font-normal tracking-tight text-foreground">
+              <div className="font-display text-2xl font-normal tracking-normal text-foreground">
                 Discrete-event simulator
               </div>
             </div>
@@ -908,7 +908,7 @@ export function Specimen() {
 
         {/* Selection Controls: Checkbox, Radio, Switch, Slider */}
         <div className="border border-border rounded-lg bg-panel p-6 space-y-6">
-          <h3 id="heading-selection-controls" className="text-lg font-semibold tracking-tight text-foreground">
+          <h3 id="heading-selection-controls" className="text-lg font-semibold tracking-normal text-foreground">
             Selection Controls
           </h3>
 
@@ -1269,7 +1269,7 @@ export function Specimen() {
 
         {/* Toast, Tooltip, Overlays */}
         <div className="border border-border rounded-lg bg-panel p-6 space-y-6">
-          <h3 id="heading-overlays" className="text-lg font-semibold tracking-tight text-foreground">
+          <h3 id="heading-overlays" className="text-lg font-semibold tracking-normal text-foreground">
             Overlays
           </h3>
 
