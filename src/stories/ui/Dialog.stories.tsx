@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
+import { within, userEvent, expect } from 'storybook/test';
 import {
   Dialog,
   DialogTrigger,
@@ -90,4 +91,54 @@ export const OpenDialog: StoryObj = {
       </DialogContent>
     </Dialog>
   ),
+};
+
+export const PlayInteractionTest: StoryObj = {
+  name: 'Keyboard & Click Interaction Test (Play)',
+  render: () => (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="default" data-testid="dialog-play-trigger">
+          Open Test Dialog
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Automated Play Test</DialogTitle>
+          <DialogDescription>Verifying modal trigger, portal mounting, and keyboard dismissal.</DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Input data-testid="dialog-play-input" placeholder="Type here..." />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" data-testid="dialog-play-cancel">
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByTestId('dialog-play-trigger');
+    await expect(trigger).toBeInTheDocument();
+
+    // Click trigger to open
+    await userEvent.click(trigger);
+
+    // Find input in modal portal
+    const body = within(document.body);
+    const input = await body.findByTestId('dialog-play-input');
+    await expect(input).toBeInTheDocument();
+
+    // Type text
+    await userEvent.type(input, 'Verified In Storybook');
+    await expect(input).toHaveValue('Verified In Storybook');
+
+    // Click Close
+    const closeBtn = body.getByTestId('dialog-play-cancel');
+    await userEvent.click(closeBtn);
+  },
 };

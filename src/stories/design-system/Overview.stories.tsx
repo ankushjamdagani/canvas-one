@@ -121,20 +121,52 @@ export const Introduction: StoryObj = {
       <div className="rounded-card border border-control-border bg-panel p-6 space-y-4">
         <h3 className="text-sm font-semibold">Exploring the Storybook</h3>
         <p className="text-xs text-body leading-relaxed max-w-2xl">
-          Use the left sidebar navigation to inspect every individual component. Each component story provides live controls, comprehensive variant coverage, and accessibility tags.
+          Use the left sidebar navigation to inspect design tokens, foundation primitives, composite recipes, and workspace features.
         </p>
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Badge variant="neutral">UI/Button</Badge>
-          <Badge variant="neutral">UI/Badge</Badge>
-          <Badge variant="neutral">UI/Dialog</Badge>
-          <Badge variant="neutral">UI/DropdownMenu</Badge>
-          <Badge variant="neutral">UI/Select</Badge>
-          <Badge variant="neutral">UI/Slider</Badge>
-          <Badge variant="neutral">UI/Tabs</Badge>
-          <Badge variant="neutral">UI/Toast</Badge>
-          <Badge variant="neutral">Workspace/NodeCard</Badge>
-          <Badge variant="neutral">Workspace/FloatingDock</Badge>
-          <Badge variant="neutral">Workspace/SelectionToolbar</Badge>
+
+        <div className="space-y-3 pt-2">
+          <div>
+            <span className="text-[11px] font-mono font-semibold text-secondary-text uppercase block mb-1.5">
+              Design System & Governance
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="accent">Design System/Foundation-First Architecture</Badge>
+              <Badge variant="neutral">Design System/State Matrix</Badge>
+              <Badge variant="neutral">Design System/Elevation & Contrast</Badge>
+              <Badge variant="neutral">Design System/Component Health</Badge>
+              <Badge variant="neutral">Design System/Tokens</Badge>
+              <Badge variant="neutral">Design System/NodeKindColors</Badge>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-[11px] font-mono font-semibold text-secondary-text uppercase block mb-1.5">
+              Composite Pattern Recipes
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="neutral">Patterns/Modal Dialog Form</Badge>
+              <Badge variant="neutral">Patterns/Toolbar & Action Bar</Badge>
+              <Badge variant="neutral">Patterns/Settings & Property Rows</Badge>
+              <Badge variant="neutral">Patterns/Search & Filter Bar</Badge>
+              <Badge variant="neutral">Patterns/Destructive Prompt Dialog</Badge>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-[11px] font-mono font-semibold text-secondary-text uppercase block mb-1.5">
+              Key Foundation Primitives & Workspace
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="neutral">UI/Button</Badge>
+              <Badge variant="neutral">UI/Dialog</Badge>
+              <Badge variant="neutral">UI/DropdownMenu</Badge>
+              <Badge variant="neutral">UI/Select</Badge>
+              <Badge variant="neutral">UI/Tabs</Badge>
+              <Badge variant="neutral">Workspace/QuickOptions</Badge>
+              <Badge variant="neutral">Workspace/FloatingDock</Badge>
+              <Badge variant="neutral">Workspace/NodeCard</Badge>
+            </div>
+          </div>
         </div>
       </div>
     </div>

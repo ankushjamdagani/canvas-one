@@ -2104,3 +2104,35 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `graphify update .`: AST updated cleanly.
 - **Lesson**: In Tailwind CSS v4, CSS variables declared only in `:root` do NOT generate utility classes (`border-*`, `bg-*`, `text-*`). Any direct color variable intended for utility use must be registered under `@theme inline` (or `@theme`).
 
+## 2026-10-01 — Foundation-First Design System Governance & Storybook Expansion
+
+- **Outcome**: Established durable "Foundation-First" governance across agents, rules, and skills, and expanded Storybook into a comprehensive design system hub with architecture documentation, composite pattern recipes, state matrices, elevation/contrast validation, and automated interaction tests:
+  - **Agent Governance & Rules**:
+    - Created [`.agents/rules/foundation-design-system.md`](file:///Users/ankushjamdagani/personal/system-design-planner/.agents/rules/foundation-design-system.md) establishing that foundation primitives (`src/components/ui/`) and design tokens (`src/styles.css`) are the core and single source of truth for the app, requiring agents to evaluate UI changes at the foundation level first.
+    - Updated [`AGENTS.md`](file:///Users/ankushjamdagani/personal/system-design-planner/AGENTS.md) §5 with the Foundation-First UI design rule.
+    - Added durable rule to [`LESSONS.md`](file:///Users/ankushjamdagani/personal/system-design-planner/LESSONS.md) under code lessons.
+  - **Storybook Design System Expansion**:
+    - **Foundation-First Architecture Guide**: Created [`FoundationFirst.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/FoundationFirst.stories.tsx) featuring the 5-step decision flowchart, real-world case study (Dialog harmonization), and rules of engagement for developers and agents.
+    - **State Matrix Story**: Created [`StateMatrix.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/StateMatrix.stories.tsx) rendering side-by-side matrices of all interactive states (Default, Focus Ring, Disabled, Active) across buttons, form inputs, checkboxes, switches, segmented controls, and sliders.
+    - **Elevation & Contrast Story**: Created [`ElevationAndContrast.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/ElevationAndContrast.stories.tsx) with a 6-layer surface ladder (Layers 0–5) and a live WCAG 2.2 AA/AAA contrast matrix for text tokens on warm paper surfaces.
+    - **Component Health Index**: Created [`ComponentHealth.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/ComponentHealth.stories.tsx) indexing all 38 primitive components with their categories, engine bindings, token mappings, consumers, and maturity badges.
+    - **Composite Pattern Recipes (`src/stories/patterns/`)**: Created 5 canonical composition patterns:
+      1. [`ModalDialogPattern.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/ModalDialogPattern.stories.tsx) (modal form with validation, badges, inputs, selects, and footer actions).
+      2. [`ToolbarPattern.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/ToolbarPattern.stories.tsx) (segmented pointer mode, zoom/view action controls with tooltips, and simulate trigger).
+      3. [`SettingsRowPattern.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/SettingsRowPattern.stories.tsx) (property inspector panel with switches, selects, and steppers).
+      4. [`SearchFilterPattern.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/SearchFilterPattern.stories.tsx) (search field with filter popover, count badges, active filter chips, and sorting).
+      5. [`DestructivePromptPattern.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/DestructivePromptPattern.stories.tsx) (destructive confirmation dialog composed with `InlineAlert` and destructive button).
+    - **Interactive Play Tests**: Added automated interaction tests using `storybook/test` (`userEvent`, `within`, `expect`) to [`ModalDialogPattern.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/ModalDialogPattern.stories.tsx), [`Dialog.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/ui/Dialog.stories.tsx), and [`DropdownMenu.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/ui/DropdownMenu.stories.tsx).
+    - **Updated Overview**: Aligned [`Overview.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/Overview.stories.tsx) navigation links with the new design system guides and patterns.
+- **Files**:
+  - Created: [`.agents/rules/foundation-design-system.md`](file:///Users/ankushjamdagani/personal/system-design-planner/.agents/rules/foundation-design-system.md), [`src/stories/design-system/FoundationFirst.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/FoundationFirst.stories.tsx), [`src/stories/design-system/StateMatrix.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/StateMatrix.stories.tsx), [`src/stories/design-system/ElevationAndContrast.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/ElevationAndContrast.stories.tsx), [`src/stories/design-system/ComponentHealth.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/ComponentHealth.stories.tsx), 5 pattern stories in [`src/stories/patterns/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/patterns/).
+  - Modified: [`AGENTS.md`](file:///Users/ankushjamdagani/personal/system-design-planner/AGENTS.md), [`LESSONS.md`](file:///Users/ankushjamdagani/personal/system-design-planner/LESSONS.md), [`src/stories/ui/Dialog.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/ui/Dialog.stories.tsx), [`src/stories/ui/DropdownMenu.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/ui/DropdownMenu.stories.tsx), [`src/stories/design-system/Overview.stories.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/stories/design-system/Overview.stories.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b`: 0 TypeScript compiler errors.
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npm run build-storybook`: All stories and interaction tests built cleanly in 3.34s into `storybook-static/`.
+  - `graphify update .`: AST updated cleanly (4,927 nodes, 13,582 edges).
+
+

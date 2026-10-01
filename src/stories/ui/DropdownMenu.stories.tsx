@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
+import { within, userEvent, expect } from 'storybook/test';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -155,5 +156,47 @@ export const OpenMenu: StoryObj = {
         </DropdownMenu>
       </div>
     );
+  },
+};
+
+export const PlayInteractionTest: StoryObj = {
+  name: 'Menu Trigger & Select (Play Test)',
+  render: () => (
+    <div className="p-8">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" data-testid="menu-play-trigger">
+            Actions Menu
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-52">
+          <DropdownMenuLabel>Node Actions</DropdownMenuLabel>
+          <DropdownMenuItem data-testid="menu-item-duplicate">
+            <Copy className="size-3.5 mr-2" />
+            Duplicate
+          </DropdownMenuItem>
+          <DropdownMenuItem data-testid="menu-item-delete" className="text-destructive focus:text-destructive">
+            <Trash2 className="size-3.5 mr-2" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByTestId('menu-play-trigger');
+    await expect(trigger).toBeInTheDocument();
+
+    // Click trigger to open menu
+    await userEvent.click(trigger);
+
+    // Menu portal mounts in document.body
+    const body = within(document.body);
+    const dupItem = await body.findByTestId('menu-item-duplicate');
+    await expect(dupItem).toBeInTheDocument();
+
+    // Click item
+    await userEvent.click(dupItem);
   },
 };
