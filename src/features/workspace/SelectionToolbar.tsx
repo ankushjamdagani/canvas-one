@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useStore } from '@xyflow/react';
 import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, MoreHorizontal, Trash2, Ungroup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,8 @@ export interface SelectionToolbarProps {
   readonly context: CommandContext;
   readonly executeCommand: CanvasCommandExecutor;
   readonly mintId: () => string;
+  readonly className?: string;
+  readonly style?: React.CSSProperties;
 }
 
 function commandSucceeded(result: ExecuteResult): boolean {
@@ -87,7 +90,7 @@ const OVERFLOW_SECONDARY: readonly { readonly id: OverflowCommandId; readonly la
   { id: 'selection.export', label: 'Export selection' },
 ];
 
-export function SelectionToolbar({ context, executeCommand, mintId }: SelectionToolbarProps) {
+export function SelectionToolbar({ context, executeCommand, mintId, className, style: customStyle }: SelectionToolbarProps) {
   const [groupOpen, setGroupOpen] = React.useState(false);
   const [groupLabel, setGroupLabel] = React.useState('');
   const [groupError, setGroupError] = React.useState<string | null>(null);
@@ -295,8 +298,8 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
     <div
       ref={toolbarRef}
       data-testid="selection-toolbar"
-      className="absolute z-10 flex w-max flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised"
-      style={style}
+      className={cn("absolute z-10 flex w-max flex-wrap justify-center items-center gap-1 max-w-[calc(100%-24px)] px-1.5 py-1 rounded-control bg-panel border border-control-border shadow-raised", className)}
+      style={{ ...style, ...customStyle }}
     >
       <span
         data-testid="selection-count"

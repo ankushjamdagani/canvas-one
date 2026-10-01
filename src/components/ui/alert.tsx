@@ -79,15 +79,15 @@ export function InlineAlert({
   ...props
 }: InlineAlertProps) {
   const tones = {
-    risk: "border-clay-edge border-l-clay shadow-xs",
-    branch: "border-purple-edge border-l-purple",
-    done: "border-green-edge border-l-green",
+    risk: "border-risk-edge border-l-destructive shadow-xs",
+    branch: "border-branch-edge border-l-branch",
+    done: "border-selected-edge border-l-primary",
   }[tone];
 
   const spineColors = {
-    risk: "text-clay",
-    branch: "text-purple",
-    done: "text-green",
+    risk: "text-risk-text",
+    branch: "text-branch",
+    done: "text-primary",
   }[tone];
 
   return (

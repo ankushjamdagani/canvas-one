@@ -64,7 +64,7 @@ export function QuickOptionsContent({
   // Disabled rows stay visible with their reason; cmdk skips them for
   // keyboard selection, so the first enabled row starts highlighted.
   return (
-    <CommandPrimitive label="Quick options" loop className="flex flex-col min-w-0">
+    <CommandPrimitive label="Quick options" loop className="flex flex-col min-w-0 bg-background">
       <div className="flex items-center gap-3 px-4 h-14 border-b border-border bg-shell">
         <CommandIcon className="size-4 text-secondary-text shrink-0" aria-hidden="true" />
         <CommandPrimitive.Input
@@ -167,8 +167,8 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
         }}
         className={cn(
           'top-[max(64px,14vh)] translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2',
-          'w-[calc(100vw-32px)] max-w-[660px] p-0 gap-0 overflow-hidden',
-          'rounded-popover border border-control-border bg-panel shadow-popover',
+          'w-[calc(100vw-32px)] max-w-xl p-0 gap-0 overflow-hidden flex flex-col',
+          'rounded-popover sm:rounded-[11px] border border-border bg-background shadow-popover',
         )}
       >
         <DialogTitle className="sr-only">Quick options</DialogTitle>

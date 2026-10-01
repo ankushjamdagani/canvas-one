@@ -81,7 +81,7 @@ export function QuickOptionsTextStep({ kind, onSubmit, onBack }: QuickOptionsTex
 
   const Icon = details.Icon;
   return (
-    <div data-testid={`quick-options-${kind}`}>
+    <div data-testid={`quick-options-${kind}`} className="bg-background">
       <div className="flex items-center gap-3 px-4 h-14 border-b border-border bg-shell">
         <Badge variant="accent" className="h-6 px-2 gap-1 text-xs font-sans font-semibold normal-case tracking-normal shrink-0">
           <Icon className="size-3" aria-hidden="true" />

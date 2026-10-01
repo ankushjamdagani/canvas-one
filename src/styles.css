@@ -72,7 +72,27 @@
   --color-canvas: var(--canvas);
   --color-selected-tint: var(--accent);
   --color-divider: var(--border);
+  --color-hairline: var(--hairline);
   --color-hairline-soft: var(--hairline-soft);
+  --color-border-strong: var(--border-strong);
+  --color-text-placeholder: var(--text-placeholder);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-on-ink: var(--text-on-ink);
+  --color-text-on-green: var(--text-on-green);
+  --color-text-primary: var(--text-primary);
+  --color-text-body: var(--text-body);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-meta: var(--text-meta);
+  --color-green: var(--green);
+  --color-green-tint: var(--green-tint);
+  --color-green-edge: var(--green-edge);
+  --color-green-edge-strong: var(--green-edge-strong);
+  --color-clay: var(--clay);
+  --color-clay-tint: var(--clay-tint);
+  --color-clay-edge: var(--clay-edge);
+  --color-purple: var(--purple);
+  --color-purple-tint: var(--purple-tint);
+  --color-purple-edge: var(--purple-edge);
 
   --radius-sm: 4px;
   --radius-md: 6px;

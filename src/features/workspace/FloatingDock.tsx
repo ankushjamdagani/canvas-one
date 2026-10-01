@@ -62,6 +62,8 @@ export interface FloatingDockProps {
   readonly onToggleSnapToGrid?: (snap: boolean) => void;
   readonly showMinimap?: boolean;
   readonly onToggleMinimap?: (show: boolean) => void;
+  readonly className?: string;
+  readonly style?: React.CSSProperties;
 }
 
 function availability(id: DockCommandId, context: CommandContext): Availability {
@@ -74,7 +76,7 @@ function availability(id: DockCommandId, context: CommandContext): Availability 
 /** The same command view is used in the dock and its narrow-screen overflow. */
 export function FloatingDock({ dragMode, zoom, context, config, preferenceState, onInvoke,
   onConfigure, onRestoreDefaults, onAddNote, onGroup, onPlaceEntry,
-  snapToGrid, onToggleSnapToGrid, showMinimap, onToggleMinimap }: FloatingDockProps) {
+  snapToGrid, onToggleSnapToGrid, showMinimap, onToggleMinimap, className, style }: FloatingDockProps) {
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [customizing, setCustomizing] = React.useState(false);
   const [showLabels, setShowLabelsState] = React.useState(() => {
@@ -256,8 +258,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
         customizing
           ? 'w-[min(calc(100vw-24px),840px)] rounded-[14px] border border-[#0B5C54] bg-background shadow-[0_0_0_4px_rgba(11,92,84,0.10),0_22px_46px_-18px_rgba(22,32,29,0.38)] overflow-hidden flex flex-col p-0'
           : 'max-w-[calc(100vw-24px)] flex items-center gap-1 rounded-dock border border-border bg-background p-1 shadow-floating',
-        dropTarget === 'dock' && 'ring-2 ring-primary'
+        dropTarget === 'dock' && 'ring-2 ring-primary',
+        className
       )}
+      style={style}
       onDragOver={(event) => {
         if (!canEdit || !event.dataTransfer.types.includes(DOCK_DRAG_MIME)) return;
         event.preventDefault();

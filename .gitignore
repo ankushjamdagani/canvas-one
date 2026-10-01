@@ -21,3 +21,6 @@ graphify-out/cache/*
 
 # /delegate run state and full agent logs
 .delegate/
+
+*storybook.log
+storybook-static
