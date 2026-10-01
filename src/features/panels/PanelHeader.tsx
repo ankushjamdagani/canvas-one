@@ -19,6 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuHeader,
+  DropdownMenuFooter,
 } from '@/components/ui/dropdown-menu';
 import type {
   PanelId,
@@ -224,79 +226,85 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
           <DropdownMenuContent
             align="end"
             sideOffset={4}
-            className="w-56"
+            className="w-56 p-0 overflow-hidden"
             data-slot="panel-dropdown-menu"
           >
-            <DropdownMenuLabel>
+            <DropdownMenuHeader className="px-3 py-2 text-secondary-text">
               {title} {isFloating ? 'panel' : 'tab'}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            </DropdownMenuHeader>
 
-            {/* Dock right */}
-            <DropdownMenuItem
-              onClick={handleDockRight}
-              className={cn(isDockedRight && 'bg-accent/70 font-medium text-foreground')}
-              data-slot="menu-item-dock-right"
-            >
-              <PanelRight className="size-4 mr-2 text-secondary-text" />
-              <span>Dock right</span>
-              {isDockedRight && <Check className="ml-auto size-4 text-primary" data-slot="check-icon" />}
-            </DropdownMenuItem>
+            <div className="p-1.5 bg-background space-y-0.5">
+              {/* Dock right */}
+              <DropdownMenuItem
+                onClick={handleDockRight}
+                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isDockedRight && 'bg-accent/70 font-medium text-foreground')}
+                data-slot="menu-item-dock-right"
+              >
+                <PanelRight className="size-3.5 text-secondary-text shrink-0" />
+                <span>Dock right</span>
+                {isDockedRight && <Check className="ml-auto size-3.5 text-primary" data-slot="check-icon" />}
+              </DropdownMenuItem>
 
-            {/* Dock left */}
-            <DropdownMenuItem
-              onClick={handleDockLeft}
-              className={cn(isDockedLeft && 'bg-accent/70 font-medium text-foreground')}
-              data-slot="menu-item-dock-left"
-            >
-              <PanelLeft className="size-4 mr-2 text-secondary-text" />
-              <span>Dock left</span>
-              {isDockedLeft && <Check className="ml-auto size-4 text-primary" data-slot="check-icon" />}
-            </DropdownMenuItem>
+              {/* Dock left */}
+              <DropdownMenuItem
+                onClick={handleDockLeft}
+                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isDockedLeft && 'bg-accent/70 font-medium text-foreground')}
+                data-slot="menu-item-dock-left"
+              >
+                <PanelLeft className="size-3.5 text-secondary-text shrink-0" />
+                <span>Dock left</span>
+                {isDockedLeft && <Check className="ml-auto size-3.5 text-primary" data-slot="check-icon" />}
+              </DropdownMenuItem>
 
-            {/* Float */}
-            <DropdownMenuItem
-              onClick={handleFloat}
-              className={cn(isFloat && 'bg-accent/70 font-medium text-foreground')}
-              data-slot="menu-item-float"
-            >
-              <AppWindow className="size-4 mr-2 text-secondary-text" />
-              <span>Float</span>
-              {isFloat && <Check className="ml-auto size-4 text-primary" data-slot="check-icon" />}
-            </DropdownMenuItem>
+              {/* Float */}
+              <DropdownMenuItem
+                onClick={handleFloat}
+                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isFloat && 'bg-accent/70 font-medium text-foreground')}
+                data-slot="menu-item-float"
+              >
+                <AppWindow className="size-3.5 text-secondary-text shrink-0" />
+                <span>Float</span>
+                {isFloat && <Check className="ml-auto size-3.5 text-primary" data-slot="check-icon" />}
+              </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="my-1" />
 
-            {/* Collapse to rail */}
-            <DropdownMenuItem
-              onClick={handleCollapse}
-              data-slot="menu-item-collapse"
-            >
-              <ArrowRightToLine className="size-4 mr-2 text-secondary-text" />
-              <span>Collapse to rail</span>
-            </DropdownMenuItem>
+              {/* Collapse to rail */}
+              <DropdownMenuItem
+                onClick={handleCollapse}
+                className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
+                data-slot="menu-item-collapse"
+              >
+                <ArrowRightToLine className="size-3.5 text-secondary-text shrink-0" />
+                <span>Collapse to rail</span>
+              </DropdownMenuItem>
 
-            {/* Reset width */}
-            <DropdownMenuItem
-              onClick={handleResetWidth}
-              data-slot="menu-item-reset-width"
-            >
-              <ArrowLeftRight className="size-4 mr-2 text-secondary-text" />
-              <span>Reset width</span>
-              <span className="ml-auto font-mono text-xs text-secondary-text">
-                {currentWidth}
-              </span>
-            </DropdownMenuItem>
+              {/* Reset width */}
+              <DropdownMenuItem
+                onClick={handleResetWidth}
+                className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
+                data-slot="menu-item-reset-width"
+              >
+                <ArrowLeftRight className="size-3.5 text-secondary-text shrink-0" />
+                <span>Reset width</span>
+                <span className="ml-auto font-mono text-xs text-secondary-text">
+                  {currentWidth}
+                </span>
+              </DropdownMenuItem>
+            </div>
 
-            {/* Close */}
-            <DropdownMenuItem
-              onClick={handleClose}
-              data-slot="menu-item-close"
-              variant="default"
-            >
-              <X className="size-4 mr-2 text-secondary-text" />
-              <span>Close tab</span>
-            </DropdownMenuItem>
+            <DropdownMenuFooter className="p-1 bg-panel border-t border-hairline">
+              {/* Close */}
+              <DropdownMenuItem
+                onClick={handleClose}
+                data-slot="menu-item-close"
+                variant="default"
+                className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
+              >
+                <X className="size-3.5 text-secondary-text shrink-0" />
+                <span>Close tab</span>
+              </DropdownMenuItem>
+            </DropdownMenuFooter>
           </DropdownMenuContent>
         </DropdownMenu>
 

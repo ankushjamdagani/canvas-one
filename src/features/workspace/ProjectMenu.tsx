@@ -10,6 +10,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuHeader,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
@@ -31,7 +32,8 @@ export interface ProjectMenuProps {
  *
  * Implements specs and aesthetics from Screens 13A & 18B:
  * - 268px width menu with subtle border and elevation shadow
- * - Uppercase mono category and metadata subtitle (platform team · N branches)
+ * - Standardized faded gray top header with uppercase mono category and metadata subtitle
+ * - Pure white body section with standardized 14px icon sizing and consistent row spacing
  * - Rename project with shortcut hint (⌘R)
  * - Duplicate, Move to team, Settings, Export (submenu opening to the right), All projects, Archive
  */
@@ -56,19 +58,17 @@ export function ProjectMenu({
         sideOffset={6}
         className="w-[268px]"
       >
-        <div role="presentation" className="px-2.5 pt-2 pb-1.5 select-none">
+        <DropdownMenuHeader className="flex-col items-start gap-0.5 px-3 py-2.5">
           <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-secondary-text">
             PROJECT
           </div>
-          <div className="text-[13.5px] font-semibold text-ink mt-0.5 truncate">
+          <div className="text-[13.5px] font-semibold text-ink truncate w-full">
             {projectTitle}
           </div>
-          <div className="font-mono text-[9.5px] text-secondary-text mt-0.5">
+          <div className="font-mono text-[9.5px] text-secondary-text">
             platform team · {branchCount} {branchCount === 1 ? 'branch' : 'branches'}
           </div>
-        </div>
-
-        <DropdownMenuSeparator />
+        </DropdownMenuHeader>
 
         {/* Rename project */}
         <DropdownMenuItem
@@ -78,7 +78,7 @@ export function ProjectMenu({
             onRenameProject();
           }}
         >
-          <Pencil size={12} className="shrink-0 text-primary" aria-hidden="true" />
+          <Pencil size={14} className="shrink-0 text-primary" aria-hidden="true" />
           <span className="flex-1">Rename project</span>
           <DropdownMenuShortcut className="text-primary font-mono text-[10px]">⌘R</DropdownMenuShortcut>
         </DropdownMenuItem>
@@ -88,7 +88,7 @@ export function ProjectMenu({
           data-testid="project-menu-duplicate"
           onSelect={() => {}}
         >
-          <Copy size={12} className="shrink-0 text-secondary-text" aria-hidden="true" />
+          <Copy size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
           <span>Duplicate project</span>
         </DropdownMenuItem>
 
@@ -97,7 +97,7 @@ export function ProjectMenu({
           data-testid="project-menu-move-team"
           onSelect={() => {}}
         >
-          <ArrowLeftRight size={12} className="shrink-0 text-secondary-text" aria-hidden="true" />
+          <ArrowLeftRight size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
           <span>Move to team…</span>
         </DropdownMenuItem>
 
@@ -106,7 +106,7 @@ export function ProjectMenu({
           data-testid="project-menu-settings"
           onSelect={() => {}}
         >
-          <Settings size={12} className="shrink-0 text-secondary-text" aria-hidden="true" />
+          <Settings size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
           <span>Project settings</span>
         </DropdownMenuItem>
 
@@ -123,7 +123,7 @@ export function ProjectMenu({
             onAllProjects();
           }}
         >
-          <FolderOpen size={12} className="shrink-0 text-secondary-text" aria-hidden="true" />
+          <FolderOpen size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
           <span>All projects</span>
         </DropdownMenuItem>
 
@@ -135,7 +135,7 @@ export function ProjectMenu({
           variant="destructive"
           onSelect={() => {}}
         >
-          <Trash2 size={12} className="shrink-0 text-destructive" aria-hidden="true" />
+          <Trash2 size={14} className="shrink-0 text-destructive" aria-hidden="true" />
           <span>Archive project</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

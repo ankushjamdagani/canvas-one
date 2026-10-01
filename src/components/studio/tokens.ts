@@ -99,16 +99,30 @@ export const evergreen = Object.freeze({
   }),
 
   // Elevation shadows
-  // Source: /private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/design.k81I/tokens/shape.css
+  // Source: artifacts/design/Copy of Elegant and modern design refresh (1)/tokens/shape.css
   shadow: Object.freeze({
     raised: '0 1px 2px rgba(22, 32, 29, 0.08)',
+    lifted: '0 6px 14px -8px rgba(22, 32, 29, 0.30)',
     popover: '0 18px 32px -16px rgba(22, 32, 29, 0.32)',
     floating: '0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06)',
+    frame: '0 24px 48px -20px rgba(22, 32, 29, 0.24)',
+    toast: '0 18px 32px -16px rgba(22, 32, 29, 0.50)',
   }),
   shadows: Object.freeze({
     raised: '0 1px 2px rgba(22, 32, 29, 0.08)',
+    lifted: '0 6px 14px -8px rgba(22, 32, 29, 0.30)',
     popover: '0 18px 32px -16px rgba(22, 32, 29, 0.32)',
     floating: '0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06)',
+    frame: '0 24px 48px -20px rgba(22, 32, 29, 0.24)',
+    toast: '0 18px 32px -16px rgba(22, 32, 29, 0.50)',
+  }),
+  // Focus rings
+  ringShadows: Object.freeze({
+    soft: '0 0 0 3px rgba(11, 92, 84, 0.10)',
+    focus: '0 0 0 3px rgba(11, 92, 84, 0.18)',
+    strong: '0 0 0 3px rgba(11, 92, 84, 0.28)',
+    danger: '0 0 0 3px rgba(180, 103, 74, 0.28)',
+    dangerSoft: '0 0 0 3px rgba(180, 103, 74, 0.12)',
   }),
 } as const);
 

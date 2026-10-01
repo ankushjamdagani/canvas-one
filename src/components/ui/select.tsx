@@ -91,7 +91,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       data-slot="select-content"
       className={cn(
-        "relative z-popover max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "relative z-popover max-h-96 min-w-[8rem] overflow-hidden rounded-popover border border-border bg-background text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className
@@ -103,7 +103,7 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Viewport
         data-slot="select-viewport"
         className={cn(
-          "p-1",
+          "p-1 bg-background",
           position === "popper" &&
             "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
         )}
@@ -124,7 +124,7 @@ const SelectLabel = React.forwardRef<
     ref={ref}
     data-slot="select-label"
     className={cn(
-      "px-2 py-1.5 font-mono text-xs uppercase tracking-wide font-semibold text-secondary-text",
+      "px-2.5 py-1.5 font-mono text-meta uppercase tracking-wide font-medium text-secondary-text",
       className
     )}
     {...props}
@@ -140,7 +140,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     data-slot="select-item"
     className={cn(
-      "relative flex w-full cursor-default select-none items-center justify-between gap-2 rounded-sm py-1.5 pl-2 pr-2 text-base outline-none transition-colors data-[highlighted]:bg-sunken data-[highlighted]:text-foreground data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[state=checked]:font-semibold data-[disabled]:pointer-events-none data-[disabled]:bg-sunken data-[disabled]:text-secondary-text",
+      "relative flex w-full cursor-default select-none items-center justify-between gap-2.5 rounded-control py-1.5 pl-2.5 pr-2.5 text-[13px] outline-none transition-colors data-[highlighted]:bg-sunken data-[highlighted]:text-foreground data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[state=checked]:font-semibold data-[disabled]:pointer-events-none data-[disabled]:bg-sunken data-[disabled]:text-secondary-text",
       className
     )}
     {...props}
@@ -148,10 +148,10 @@ const SelectItem = React.forwardRef<
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     <span
       data-slot="select-item-indicator"
-      className="ml-auto flex h-3.5 w-3.5 items-center justify-center"
+      className="ml-auto flex h-3.5 w-3.5 items-center justify-center text-primary"
     >
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
+        <Check className="size-3.5" />
       </SelectPrimitive.ItemIndicator>
     </span>
   </SelectPrimitive.Item>

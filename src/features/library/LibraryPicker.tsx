@@ -182,70 +182,72 @@ export function LibraryPicker({
       aria-label="Component Picker"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className={`flex flex-col w-full max-w-[640px] rounded-xl border border-[var(--color-border,#E7E3DB)] bg-[var(--color-panel,#F7F5F1)] shadow-[0_20px_44px_-18px_rgba(22,32,29,0.38),0_2px_6px_rgba(22,32,29,0.06)] p-3.5 text-[var(--color-foreground,#16201D)] font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary,#0B5C54)] ${className ?? ''}`}
+      className={`flex flex-col w-full max-w-[640px] rounded-popover border border-border bg-background shadow-popover overflow-hidden text-foreground font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary ${className ?? ''}`}
       data-testid="library-picker"
     >
-      {/* Search Bar */}
-      <div className="relative flex items-center mb-2.5">
-        <Search className="absolute left-2.5 w-4 h-4 text-secondary-text pointer-events-none" />
-        <input
-          ref={searchInputRef}
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              if (searchQuery) {
-                e.stopPropagation();
-                setSearchQuery('');
+      {/* Header: Search Bar & Group Filter Chips */}
+      <div className="bg-panel border-b border-hairline p-3 shrink-0">
+        <div className="relative flex items-center mb-2.5">
+          <Search className="absolute left-2.5 w-4 h-4 text-secondary-text pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (searchQuery) {
+                  e.stopPropagation();
+                  setSearchQuery('');
+                }
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                gridContainerRef.current?.focus();
               }
-            } else if (e.key === 'ArrowDown') {
-              e.preventDefault();
-              gridContainerRef.current?.focus();
-            }
-          }}
-          placeholder="Search components, tags, groups..."
-          aria-label="Search components"
-          className="w-full h-8 pointer-coarse:h-11 pl-8 pr-16 text-xs rounded-md bg-white border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-secondary-text focus:border-[var(--color-control-border-strong,#948D80)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
-        />
-        {searchQuery.trim().length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            aria-label="Clear search query"
-            className="absolute right-2 p-1 pointer-coarse:size-11 pointer-coarse:right-0 inline-flex items-center justify-center text-secondary-text hover:text-[var(--color-foreground,#16201D)]"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-
-      {/* Group Filter Chips (Horizontal Row) */}
-      <div
-        role="tablist"
-        aria-label="Filter by group"
-        className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none"
-      >
-        {filterChips.map((chip) => {
-          const isActive = activeGroup === chip;
-          return (
+            }}
+            placeholder="Search components, tags, groups..."
+            aria-label="Search components"
+            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-16 text-xs rounded-md bg-white border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-secondary-text focus:border-[var(--color-control-border-strong,#948D80)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
+          />
+          {searchQuery.trim().length > 0 && (
             <button
-              key={chip}
               type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-label={`Filter by ${chip}`}
-              onClick={() => setActiveGroup(chip)}
-              className={`shrink-0 px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none ${
-                isActive
-                  ? 'bg-[var(--color-accent,#EAEFEC)] border-[var(--color-primary,#0B5C54)] text-[var(--color-primary,#0B5C54)] font-semibold shadow-2xs'
-                  : 'bg-white border-[var(--color-control-border,#DCD7CD)] text-secondary-text hover:bg-[var(--color-sunken,#F2EFE9)] hover:text-[var(--color-foreground,#16201D)]'
-              }`}
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search query"
+              className="absolute right-2 p-1 pointer-coarse:size-11 pointer-coarse:right-0 inline-flex items-center justify-center text-secondary-text hover:text-[var(--color-foreground,#16201D)]"
             >
-              {chip}
+              <X className="w-3.5 h-3.5" />
             </button>
-          );
-        })}
+          )}
+        </div>
+
+        {/* Group Filter Chips (Horizontal Row) */}
+        <div
+          role="tablist"
+          aria-label="Filter by group"
+          className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
+        >
+          {filterChips.map((chip) => {
+            const isActive = activeGroup === chip;
+            return (
+              <button
+                key={chip}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-label={`Filter by ${chip}`}
+                onClick={() => setActiveGroup(chip)}
+                className={`shrink-0 px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none ${
+                  isActive
+                    ? 'bg-[var(--color-accent,#EAEFEC)] border-[var(--color-primary,#0B5C54)] text-[var(--color-primary,#0B5C54)] font-semibold shadow-2xs'
+                    : 'bg-white border-[var(--color-control-border,#DCD7CD)] text-secondary-text hover:bg-[var(--color-sunken,#F2EFE9)] hover:text-[var(--color-foreground,#16201D)]'
+                }`}
+              >
+                {chip}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 4-Column Card Grid (16E) */}
@@ -254,7 +256,7 @@ export function LibraryPicker({
         role="listbox"
         aria-label="Component grid"
         tabIndex={0}
-        className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-2.5 max-h-[300px] overflow-y-auto p-0.5 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary,#0B5C54)]"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 max-h-[300px] overflow-y-auto bg-background focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
       >
         {filteredEntries.length === 0 ? (
           <div className="col-span-full py-8 text-center">
@@ -331,7 +333,7 @@ export function LibraryPicker({
       </div>
 
       {/* Footer (16E) */}
-      <div className="pt-2 border-t border-[var(--color-border,#E7E3DB)] flex items-center justify-between text-xs">
+      <div className="px-3.5 py-2.5 bg-panel border-t border-hairline flex items-center justify-between text-xs shrink-0">
         <div className="text-[11px] font-mono text-secondary-text pointer-coarse:hidden">
           {actionLabel === 'Place' ? '↵ place at centre · drag to position' : `↵ ${actionLabel.toLowerCase()} selected`}
         </div>

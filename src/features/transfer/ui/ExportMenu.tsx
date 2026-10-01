@@ -215,13 +215,13 @@ export function ExportMenu({
           <button
             type="button"
             data-testid="export-menu-trigger"
-            className="w-full flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-[7px] text-[13px] text-ink hover:bg-sunken transition-colors text-left cursor-pointer"
+            className="w-full flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] text-ink hover:bg-sunken transition-colors text-left cursor-pointer"
           >
             <span className="flex items-center gap-2.5">
               <Download className="size-3.5 text-secondary-text" aria-hidden="true" />
               <span>Export...</span>
             </span>
-            <ChevronRight className="size-3 text-secondary-text" aria-hidden="true" />
+            <ChevronRight className="size-3.5 text-secondary-text" aria-hidden="true" />
           </button>
         )}
       </DropdownMenuTrigger>

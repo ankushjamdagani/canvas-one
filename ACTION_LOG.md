@@ -1838,3 +1838,210 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - Playwright e2e: 6 passed (`npx playwright test tests/studio-shell.spec.ts tests/studio-transfer.spec.ts`).
   - Visual verification: Captured browser screenshot in rename mode confirming crisp single outline and proper breadcrumb key hint placement.
 
+### Design System and Component Conformance (`System Studio Design System.dc.html`)
+
+- **Outcome**: Verified, updated, and aligned the entire design system, foundational UI primitives, custom studio components, canvas components, and the developer specimen page with `artifacts/design/Copy of Elegant and modern design refresh (1)/System Studio Design System.dc.html`, `styles.css`, and `support.js`:
+  - **Design tokens & theme**:
+    - Exported 3 elevation shadow tiers (`lifted`, `frame`, `toast`) and 5 ring shadow tiers (`soft`, `focus`, `strong`, `danger`, `dangerSoft`) in `tokens.ts`.
+    - Added `@theme` elevations, ring shadows, keyframe `@keyframes ss-spin`, and direct `:root` variables (`--canvas-white`, `--hairline`, `--border-strong`, `--text-placeholder`, `--text-disabled`, `--text-on-ink`, `--text-on-green`, `--ring-soft`, `--ring-strong`, `--ring-danger`, `--ring-danger-soft`) to `src/styles.css`.
+  - **Foundational UI primitives**:
+    - `Button`: Standardized variant-specific disabled fills (`bg-hairline` for primary/destructive, `bg-panel` for secondary/tint, transparent for ghost), focus ring shadows (`shadow-ring-strong`, `shadow-ring-danger`), and custom 2px ring spinner with `animate-spin` on `currentColor`.
+    - `RadioGroup`: Updated unchecked border to `border-hover-border` (`#C6C0B4`), `bg-background` and 8px dot indicator.
+    - `Checkbox`: Added `bg-background`, `border-hover-border`, checked `bg-primary`, and disabled `bg-panel border-hairline`.
+    - `Switch`: Standardized dimensions (`w-[34px] h-5`), `0px` computed padding (`p-0 border-2`), 14px thumb (`size-3.5`), translation `translate-x-[14px]`.
+    - `Slider`: Standardized 4px track (`h-1 bg-[#E2DED6]`), 14px thumb (`size-3.5`) with 1px green border (`border border-primary bg-background shadow-xs`).
+    - `Toast`: Ink surface `#16201D`, text `#F7F5F1`, `shadow-toast`, pale green action button `#74B2A8`.
+    - `Alert`: Added `InlineAlert` with 3 colored spine tones (`risk` clay, `branch` purple, `done` green).
+    - `Kbd`: Added `KeyHint` mechanical keyboard hint export (`border-b-2 bg-panel text-body border-border`).
+  - **Custom studio components created**:
+    - `StatusDot`: 4 status tones (`live`, `degraded`, `idle`, `branch`) with optional breathing pulse halo.
+    - `SearchField`: Search input with glyph, `⌘K` shortcut badge, value-clearing trigger, and focus ring.
+    - `Stepper`: Numeric stepper with minus/plus buttons and mono count readout.
+    - `Segmented`: Segmented tab pill with active white card, subtle shadow, and disabled option state.
+    - `Meter`: Capacity / throughput meter with label, bar track, readout, and green/clay tones.
+    - `EmptyState`: Empty state container with glyph, title, description, and action slot.
+    - `LibraryRow`: 6 interaction states (Rest, Hover, Selected, Dragging with dashed border, Disabled, Skeleton loader).
+    - `AvatarStack`: Overlapping colored avatars with overflow count badge.
+  - **Canvas components**:
+    - `FloatingDock`: Background updated to crisp white `bg-background` (`#FFFFFF`).
+    - `NodeCard`: Added `hover:shadow-lifted` for elevation depth on hover.
+  - **Specimen review page (`Specimen.tsx`)**:
+    - Fully organized into all 11 design sections (01 Colour Tokens, 02 Typography, 03 Radii & Elevation, 04 Interaction & Motion, 05 Buttons & Badges, 06 Inputs & Selection, 07 Tabs & Navigation, 08 Alerts & Feedback, 09 Surfaces & Panels, 10 Canvas Components, 11 Rules of Use).
+    - Tested computed styles for all primitives and verified keyboard navigation.
+- **Files**:
+  - Modified: [`src/components/studio/tokens.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/studio/tokens.ts), [`src/styles.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/styles.css), [`src/components/ui/button.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/button.tsx), [`src/components/ui/radio-group.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/radio-group.tsx), [`src/components/ui/checkbox.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/checkbox.tsx), [`src/components/ui/switch.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/switch.tsx), [`src/components/ui/slider.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/slider.tsx), [`src/components/ui/toast.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/toast.tsx), [`src/components/ui/alert.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/alert.tsx), [`src/components/ui/kbd.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/kbd.tsx), [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`src/features/workspace/NodeCard.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/NodeCard.tsx), [`src/components/studio/specimen/Specimen.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/studio/specimen/Specimen.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+  - Created: [`src/components/ui/status-dot.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/status-dot.tsx), [`src/components/ui/search-field.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/search-field.tsx), [`src/components/ui/stepper.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/stepper.tsx), [`src/components/ui/segmented.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/segmented.tsx), [`src/components/ui/meter.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/meter.tsx), [`src/components/ui/empty-state.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/empty-state.tsx), [`src/components/ui/library-row.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/library-row.tsx), [`src/components/ui/avatar-stack.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/avatar-stack.tsx).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean.
+  - Unit tests: 1,559 passed across 138 files (`npm test`).
+  - Production build: `npm run build` clean, no chunk over 500 kB.
+  - Playwright specimen tests: 4 passed (`npx playwright test tests/specimen.spec.ts`).
+  - Visual verification: Full-page screenshot of specimen (`specimen_updated.png`) and active canvas workspace (`workspace_app.png`) captured and visually verified.
+- **Lesson**: In deterministic specimen review pages, when Playwright asserts keyboard Tab order (`page.keyboard.press("Tab"); await expect(firstButton).toBeFocused()`), ensure no earlier container (like `<details><summary>`) captures focus, and ensure the specific targeted variant (`default (default)`) appears before any decorative matrix tables or other buttons in DOM order. Also ensure container tags in the header use standard border tokens so bare `.border` selectors match the expected default token border.
+
+## 2026-09-30 — Unified Dropdown Component and System-Wide Standardization
+
+- **Outcome**: Standardized dropdown menus and popovers across the application with unified structure, consistent spacing, and icon sizing:
+  - Created [`src/components/ui/dropdown.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/dropdown.tsx) with compound exports (`Dropdown`, `DropdownTrigger`, `DropdownContent`, `DropdownHeader`, `DropdownBody`, `DropdownFooter`, `DropdownItem`, `DropdownSeparator`, `DropdownLabel`, `DropdownShortcut`, `DropdownSub`, `DropdownSubTrigger`, `DropdownSubContent`, and declarative `DropdownMenuPanel`).
+  - Standardized structure invariants:
+    - **Header & Footer**: Default background of faded gray `bg-panel` (`#F7F5F1`) with subtle `border-hairline` separators.
+    - **Body**: Pure crisp white background `bg-background` (`#FFFFFF`).
+    - **Sizing & Spacing**: Unified 14px icons (`size-3.5` / `size={14}`), 13px typography (`text-[13px]`), `gap-2.5`, `rounded-control` selection states, and `rounded-popover` (11px) elevation container.
+  - Enhanced [`src/components/ui/dropdown-menu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/dropdown-menu.tsx) to export `DropdownMenuHeader` and `DropdownMenuFooter` matching design system tokens.
+  - Standardized all dropdown-like components across the workspace:
+    - [`src/features/workspace/ProjectMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/ProjectMenu.tsx): Faded gray header with project meta, pure white body with 14px icons, and faded gray footer with Archive action.
+    - [`src/features/workspace/BranchPopover.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/BranchPopover.tsx): Faded gray top search row, pure white branch selector body with 14px branch glyphs, and faded gray action footer.
+    - [`src/features/scenarios/ScenarioSwitcher.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios/ScenarioSwitcher.tsx): Faded gray header with scenario count and run-all action, pure white body with scenario items, and faded gray footer with action buttons.
+    - [`src/components/studio/specimen/Specimen.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/studio/specimen/Specimen.tsx): Showcases live dropdown menu with submenus, shortcuts, and header/footer, alongside declarative `DropdownMenuPanel`.
+- **Files**:
+  - Created: [`src/components/ui/dropdown.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/dropdown.tsx).
+  - Modified: [`src/components/ui/dropdown-menu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/dropdown-menu.tsx), [`src/features/workspace/ProjectMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/ProjectMenu.tsx), [`src/features/workspace/BranchPopover.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/BranchPopover.tsx), [`src/features/scenarios/ScenarioSwitcher.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios/ScenarioSwitcher.tsx), [`src/components/studio/specimen/Specimen.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/studio/specimen/Specimen.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean.
+  - Unit tests: 1,559 passed across 138 files (`npm test`).
+  - Production build: `npm run build` clean (all chunks < 500 kB).
+  - Playwright specimen tests: 4 passed (`npx playwright test tests/specimen.spec.ts`).
+  - Playwright workspace/shell tests: 13 passed (`tests/studio-shell.spec.ts`, `tests/studio-branch-controls.spec.ts`, `tests/studio-phone.spec.ts`, `tests/studio-scenarios.spec.ts`).
+  - Visual verification: Captured and inspected screenshots of specimen menu (`dropdown_specimen.png`), project menu (`dropdown_project_menu.png`), branch popover (`dropdown_branch_popover.png`), and scenario switcher (`dropdown_scenario_switcher.png`).
+- **Lesson**: Do not render Radix `DropdownMenu.Item` outside an active `DropdownMenu.Root`. Radix throws at runtime if items are mounted statically or outside a menu context (`MenuItem must be used within Menu`); for static previews or declarative menu panels, render styled DOM elements with `role="menuitem"`.
+
+## 2026-09-30 — Comprehensive Menu & Popover Recheck & Standardization
+
+- **Outcome**: Rechecked and standardized all secondary menus, dropdowns, trays, and popovers across the application to conform strictly to the design system:
+  - **Structure Invariants Applied Everywhere**:
+    - **Header & Footer**: Faded gray background `bg-panel` (`#F7F5F1`) with hairline borders (`border-hairline` `#E8E4DC`).
+    - **Body Section**: Pure crisp white background `bg-background` (`#FFFFFF`).
+    - **Item & Icon Tokens**: Standardized 14px icons (`size-3.5` / `size={14}`), `gap-2.5`, `rounded-control` (5px) active selection states, `text-[13px]` item labels, and `rounded-popover` (11px) container elevation with `shadow-popover`.
+  - **Surfaces Rechecked & Standardized**:
+    - **Floating Library Menu** ([`LibraryPicker.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library/LibraryPicker.tsx) & [`EntryDetailCard.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library/EntryDetailCard.tsx)): Outer container elevated with `rounded-popover shadow-popover`; search bar and filter chips in faded gray `bg-panel`; card grid body in pure white `bg-background`; footer in faded gray `bg-panel`. Detail preview cards standardized with faded gray header badge, white details body, and faded gray hints footer.
+    - **Selection Menu & Popovers** ([`SelectionToolbar.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/SelectionToolbar.tsx)): Align dropdown and Selection actions dropdown converted to compound header (`bg-panel`), pure white body with 14px icons, and footer (`bg-panel`). Group and Wrap boundary popovers updated with faded gray headers and footers.
+    - **Scenario Item Menu** ([`ScenarioSwitcher.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios/ScenarioSwitcher.tsx)): Row action dropdown standardized to pure white body, 14px icons (`size-3.5`), `text-[13px]`, `gap-2.5`, `rounded-control`, and red destructive Delete item.
+    - **Dock Actions Menu** ([`FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx)): Dock more actions popover standardized with faded gray `DOCK ACTIONS` header, pure white body with 14px icons and shortcuts, and faded gray footer (`Configure dock...`).
+    - **Customize Dock Menu** ([`FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx)): Customize dock tray standardized with faded gray header + Done action, pure white body with switches, and faded gray footer (`Reset to defaults`). Note and Group dock popovers standardized with faded gray headers and footers.
+    - **Panel Options Menu** ([`PanelHeader.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/panels/PanelHeader.tsx)): Panel header dropdown menu updated with faded gray header (`PANEL OPTIONS`), pure white body with 14px icons, and faded gray footer (`Dock to left/right`).
+    - **Foundational Primitives** ([`popover.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/popover.tsx), [`select.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/select.tsx), [`ExportMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/transfer/ui/ExportMenu.tsx)): Added `PopoverHeader`, `PopoverBody`, and `PopoverFooter` primitives; standardized `SelectContent` and `SelectItem` to match menu tokens and icon sizes.
+- **Files**:
+  - Modified: [`src/components/ui/popover.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/popover.tsx), [`src/components/ui/select.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui/select.tsx), [`src/features/library/LibraryPicker.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library/LibraryPicker.tsx), [`src/features/library/EntryDetailCard.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library/EntryDetailCard.tsx), [`src/features/workspace/SelectionToolbar.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/SelectionToolbar.tsx), [`src/features/scenarios/ScenarioSwitcher.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios/ScenarioSwitcher.tsx), [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`src/features/panels/PanelHeader.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/panels/PanelHeader.tsx), [`src/features/transfer/ui/ExportMenu.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/transfer/ui/ExportMenu.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean (0 errors).
+  - `npm test`: 1,559 unit tests passed across 138 files.
+  - `npm run build`: clean production build, all chunks below 500 kB.
+  - Playwright test suites: 22 passed across `tests/specimen.spec.ts`, `tests/studio-shell.spec.ts`, `tests/studio-branch-controls.spec.ts`, `tests/studio-phone.spec.ts`, `tests/studio-scenarios.spec.ts`, `tests/studio-panels.spec.ts`.
+  - Visual verification: Captured and inspected screenshots for all 6 target menus in `<appDataDir>/brain/<conversation-id>/scratch/`:
+    - `menu_library_picker.png` (Floating Library Menu)
+    - `menu_dock_actions.png` (Dock Actions Menu)
+    - `menu_customize_dock.png` (Customize Dock Menu)
+    - `menu_scenario_item.png` (Scenario Item Action Menu)
+    - `menu_panel_header.png` (Panel Header Options Menu)
+    - `menu_selection.png` (Selection Toolbar Actions Menu)
+- **Lesson**: Standalone popovers (`PopoverContent`) that contain compound sections (`PopoverHeader`, `PopoverBody`, `PopoverFooter`) must use `p-0 overflow-hidden` so that the faded gray background of header and footer elements seamlessly bleeds to the rounded outer boundary without awkward white gaps or doubled padding.
+
+## 2026-10-01 — 16C-4 Expanded Dock Customization Implementation
+
+- **Outcome**: Implemented the `16C-4 Expanded dock` experience from the design system refresh (`System Studio Directions.dc.html` / `16C_4_Expanded_dock.png`):
+  - Converted dock customization from an isolated vertical popover into an in-place expanding dock with no second surface.
+  - **Header Row**: Teal border `#0B5C54`, subtle elevation ring `shadow-[0_0_0_4px_rgba(11,92,84,0.10),0_22px_46px_-18px_rgba(22,32,29,0.38)]`, light mint `#F4F8F6` background, `Settings2` icon with "Customising toolbar" title, uppercase monospace badge `{slotsLeft} SLOTS LEFT · DRAG TO REORDER`, text "Reset" action (`aria-label="Restore defaults"`), and solid teal "Done" button (`setCustomizing(false)`).
+  - **Shelf Row**: Horizontal shelf with `SHELF` badge displaying available (hidden) commands as draggable chips (`GripVertical` handle, icon, label, and `Add` button), drop target support to hide commands dragged back to the shelf, and an accessible `Labels` toggle switch (`Switch`).
+  - **Dock Tool Cluster**: Green-tinted container (`bg-[#F4F8F6] border-[#A8CBC5]`) containing ordered tools with grip handles, tool buttons, accessible `Move left`, `Move right`, and `Hide` actions, dynamic `[ DROP HERE ]` drop indicator slots, and dashed `＋` slot targets when slots remain.
+  - Preserved resting dock single-row layout, mobile touch overflow, and Escape key dismissal.
+- **Files**:
+  - Modified: [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean (0 errors).
+  - `npm test`: 1,559 unit tests passed across 138 files.
+  - `npm run build`: clean production build (all chunks < 500 kB).
+  - Playwright e2e tests: passed `tests/studio-dock-customization.spec.ts`, `tests/studio-selection-actions.spec.ts`, `tests/studio-phone.spec.ts`, `tests/studio-library.spec.ts`, `tests/studio-panels.spec.ts`.
+  - Accessibility audit: `node scripts/a11y-audit.mjs` reported 0 axe violations.
+- **Lesson**: When expanding a compact toolbar into a multi-row card in-place, automated drag-and-drop actions targeted at the outer container element will drop at the container's geometric center (which lands in the middle row/shelf). Ensure drop handlers on the shelf discern between dragging a dock item to hide it versus dropping an available item to add it to the dock, avoiding swallowed drop events.
+
+## 2026-10-01 — Dock Customization Horizontal Scroll Elimination & Item Wrapping
+
+- **Outcome**: Eliminated all horizontal scrollbars and replaced overflow scrolling with natural multi-line wrapping in the customize dock toolbar:
+  - Removed `whitespace-nowrap` and `overflow-x-auto` from the outer tray, the `SHELF` available tools row, and the customizable tool cluster container in [`FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx).
+  - Applied `flex-wrap` to the `SHELF` container and tool chips so available tools wrap onto multiple lines while keeping the `Labels` toggle switch neatly aligned and always visible on the right.
+  - Applied `flex-wrap` to the customizable dock tool cluster (`bg-[#F4F8F6] border-[#A8CBC5]`) so ordered tools, drop targets, and empty slot indicators wrap cleanly within the green cluster border without requiring horizontal scrolling or cutting off tools.
+  - Grouped dock more button and zoom indicator in a dedicated right-aligned container with `shrink-0`.
+  - Set explicit responsive width constraint `w-[min(calc(100vw-24px),840px)]` on the expanded customize dock so flex items calculate wrapping predictably across viewport sizes.
+  - Also removed `overflow-x-auto` from the resting dock items container to prevent any horizontal scroll tracks.
+- **Files**:
+  - Modified: [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npx tsc -b` clean (0 errors).
+  - Unit tests: 1,559 passed across 138 test files (`npm test`).
+  - Production build: `npm run build` clean (all chunks < 500 kB).
+  - Playwright test: passed `tests/studio-dock-customization.spec.ts` (2/2 passed).
+  - Accessibility audit: `node scripts/a11y-audit.mjs` passed with 0 axe violations.
+  - Visual verification: Inspected browser rendered state with `browser_subagent`; confirmed zero horizontal scrollbars, clean multi-line wrapping of shelf tools and dock cluster tools, and full visibility of all controls and the `Labels` toggle switch.
+
+## 2026-10-01 — 16B More Popover Implementation with Pinning & Action Toggles
+
+- **Outcome**: Implemented the `16B More popover` design from `System Studio Directions.dc.html`:
+  - **Non-Sticky Inventory with Pin Buttons**: Popover enumerates all non-sticky options (`STICKY_COMMAND_IDS`: Select, Pan, Library remaining on resting dock), displaying pinned items with sage/teal background (`bg-[#EAEFEC] text-[#0B5C54]`), bold typography, and a filled rotated pin icon; and unpinned items with standard foreground text and outline pin icon.
+  - **In-Place Pin Toggling**: Each row features a dedicated pin toggle button (`dock-pin-${id}`) that toggles the item's presence in the resting dock config without closing the popover, allowing the user to curate their dock slots while observing live updates.
+  - **Keyboard Shortcuts**: Formatted shortcuts (e.g., `⌘Z`, `⇧⌘Z`) right-aligned in monospace styling.
+  - **Toggleable Actions Section**: Integrated switches for toggleable canvas settings:
+    - `Snap to grid` (`dock-snap-grid-toggle`, controlling ReactFlow `snapToGrid` on `[26, 26]` dot grid).
+    - `Minimap` (`dock-minimap-toggle`, dynamically rendering `<MiniMap>` on the canvas).
+    - `Command labels` (`dock-labels-toggle`, toggling dock command labels).
+  - **Header & Footer Actions**: Monospace uppercase header `MORE TOOLS` · `PIN TO DOCK`; footer actions `Customise toolbar…` (opening 16C-4 expanded dock) and `Restore defaults`.
+- **Files**:
+  - Modified: [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`src/features/workspace/CanvasView.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/CanvasView.tsx), [`tests/studio-dock-customization.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/studio-dock-customization.spec.ts), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production build succeeded with all bundles under 500 kB.
+  - `npm run test:e2e`: All 98 Playwright journey tests passed in 1.2 minutes.
+  - `npx playwright test tests/studio-dock-customization.spec.ts`: 3/3 passed (including new 16B popover test verifying pinned/unpinned tools, pin toggle updates, and minimap toggle).
+  - Accessibility: `node scripts/a11y-audit.mjs` passed with 0 axe violations.
+  - Visual verification: Captured and inspected browser screenshot (`dock_more_popover_16b_1790820491617.png`) verifying 16B popover styling, header, rows, pin icons, shortcuts, switches, and footers.
+
+## 2026-10-01 — 3-Section Floating Dock with Fixed Left/Right Controls & Working Label Toggle
+
+- **Outcome**: Restructured floating bar and customize dock into 3 distinct sections adhering to 16C-4 design:
+  - **Left Fixed Controls**: Fixed `Select` and `Pan` tools on the left (`shrink-0`), separated by a vertical hairline divider. In customize mode, left controls remain visible and disabled with `opacity-50 pointer-events-none select-none`.
+  - **Center Customizable Controls**: Up to at most 10 controls (`MAX_CENTER_CONTROLS = 10`), rendering with flexible multi-line wrapping (`flex-wrap flex-1 min-w-0`) that isolates wrapping internally without displacing left or right fixed controls. In customize mode, displayed as the green editable cluster (`bg-[#F4F8F6] border-[#A8CBC5]`) with drag handles, labels, reorder/remove buttons, and dashed placeholder slots up to 10.
+  - **Right Fixed Controls**: Fixed `More` popover trigger and zoom controls (`-`, zoom %, `+`, `⤢`) on the right (`shrink-0`). In customize mode, right controls remain visible and disabled with `opacity-50 pointer-events-none select-none`.
+  - **Working Labels Toggle**: Fixed the label toggle switch in customize toolbar by resolving HTML ID collisions (`dock-customize-labels-toggle` vs `dock-more-labels-toggle`), persisting to `localStorage` (`system_studio_dock_labels`), and conditionally rendering text label spans across chips, left controls, right controls, and resting dock.
+- **Files**:
+  - Modified: [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`tests/studio-dock-customization.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/studio-dock-customization.spec.ts), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npx playwright test tests/studio-dock-customization.spec.ts`: 4/4 passed (including new test verifying 3 sections, disabled left/right controls in customize mode, max 10 slots calculation, and label toggle behavior).
+  - Accessibility audit: `node scripts/a11y-audit.mjs` passed with 0 axe violations.
+
+## 2026-10-01 — Customize Dock Chips: Drag-Only Reordering & Soft Clay Tint Rounded Square Cross Buttons
+
+- **Outcome**: Streamlined customize dock toolbar chips by removing redundant directional move buttons in favor of drag-and-drop and upgrading the hide/remove button:
+  - **Removed Directional Move Buttons**: Removed `ChevronLeft` and `ChevronRight` buttons and the unused `moveCenterCommand` function. Reordering within the center customizable cluster is handled exclusively via drag-and-drop on the chips.
+  - **Soft Clay Tint Rounded Square Cross Button (05 Core)**: Replaced the cross button with the design system's `05 Core` Soft Clay Tint button (`border border-[#E0C9B6] bg-[#FBF1EA] text-[#B4674A] hover:bg-[#F5E5DC] active:bg-[#ECD0C0] hover:text-[#8E5038] size-5 rounded-[5px]`) with a crisp bold cross icon (`<X className="size-3 stroke-[2.5]" />`), explicitly styled as a rounded square rather than a circle (`rounded-full`) to seamlessly fit the chip geometry.
+- **Files**:
+  - Modified: [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`tests/studio-dock-customization.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/studio-dock-customization.spec.ts), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npx playwright test tests/studio-dock-customization.spec.ts`: 4/4 passed.
+  - Accessibility audit: `node scripts/a11y-audit.mjs` passed with 0 axe violations.
+  - Visual verification: Captured and inspected browser screenshots (`customize_dock_soft_clay_tint_rounded_square.png`, `customize_dock_soft_clay_tint_compact_square.png`).
+
+## 2026-10-01 — Shelf Chips: Soft Evergreen Tint Rounded Square Add Buttons (05 Core)
+
+- **Outcome**: Upgraded the Add button on available shelf command chips to match the geometry and design system styling of the dock's cross button:
+  - **Soft Evergreen Tint (05 Core)**: Replaced the ghost text button with the design system's `05 Core` Soft Evergreen Tint button (`border border-[#A8CBC5] bg-[#EAEFEC] text-[#0B5C54] hover:bg-[#DFE8E4] active:bg-[#D3E0DB] hover:text-[#0A4E47] size-5 rounded-[5px]`) with a crisp bold plus icon (`<Plus className="size-3 stroke-[2.5]" />`).
+  - **Harmonious Symmetrical Pair**: The shelf `[+]` button (Soft Evergreen Tint) seamlessly mirrors the dock `[✕]` button (Soft Clay Tint) in geometry, size (`size-5 rounded-[5px]`), and interaction feedback.
+- **Files**:
+  - Modified: [`src/features/workspace/FloatingDock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/FloatingDock.tsx), [`tests/studio-dock-customization.spec.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/tests/studio-dock-customization.spec.ts), [`ACTION_LOG.md`](file:///Users/ankushjamdagani/personal/system-design-planner/ACTION_LOG.md).
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,559 unit tests passed across 138 test files.
+  - `npm run build`: Production bundle built clean with all chunks under 500 kB.
+  - `npx playwright test tests/studio-dock-customization.spec.ts`: 4/4 passed (including verifying that clicking the new Add button properly adds commands to the dock).
+  - Accessibility audit: `node scripts/a11y-audit.mjs` passed with 0 axe violations.
+  - Visual verification: Captured and inspected browser screenshots (`customize_dock_soft_evergreen_add_button.png`, `customize_dock_soft_evergreen_add_button_labels_on.png`).

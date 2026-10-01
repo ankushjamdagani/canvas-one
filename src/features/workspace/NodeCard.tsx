@@ -28,10 +28,10 @@ export function NodeCard({ data, selected }: NodeProps) {
       data-placement-id={placement.id}
       data-element-id={element.id}
       className={cn(
-        'component-node relative block rounded-node border bg-background transition-colors select-none',
+        'component-node relative block rounded-node border bg-background transition-all select-none',
         selected
           ? 'selected border-2 border-primary ring-2 ring-selected-edge ring-offset-1 shadow-none'
-          : 'border-control-border hover:border-hover-border',
+          : 'border-control-border hover:border-hover-border hover:shadow-lifted',
       )}
       style={{
         width: placement.width,

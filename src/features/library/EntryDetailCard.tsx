@@ -26,54 +26,57 @@ export function EntryDetailCard({ entry, className }: EntryDetailCardProps) {
     <div
       role="region"
       aria-label={`${entry.label} details`}
-      className={`w-72 sm:w-80 rounded-xl border border-[var(--color-border,#E7E3DB)] bg-[var(--color-panel,#F7F5F1)] p-4 shadow-[0_18px_32px_-16px_rgba(22,32,29,0.32)] text-[var(--color-foreground,#16201D)] font-sans ${className ?? ''}`}
+      className={`w-72 sm:w-80 rounded-popover border border-border bg-background shadow-popover overflow-hidden text-foreground font-sans flex flex-col ${className ?? ''}`}
       data-testid="entry-detail-card"
     >
-      {/* Category / Group header + STANDARD badge */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
+      {/* Header: Category / Group header + STANDARD badge */}
+      <div className="px-3.5 py-2.5 bg-panel border-b border-hairline flex items-center justify-between gap-2 shrink-0">
         <span
-          className="text-[10.5px] font-mono font-medium uppercase tracking-widest text-[var(--color-secondary-text,#626D68)]"
+          className="text-[10.5px] font-mono font-medium uppercase tracking-widest text-secondary-text"
           style={detail.stripeColor ? { color: detail.stripeColor } : undefined}
         >
           {detail.group.toUpperCase()}
         </span>
-        <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-[var(--color-primary,#0B5C54)]/40 text-[var(--color-primary,#0B5C54)] bg-[var(--color-accent,#EAEFEC)]/60">
+        <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-primary/40 text-primary bg-accent/60">
           {detail.badge}
         </span>
       </div>
 
-      {/* Entry Title */}
-      <h3 className="text-base font-semibold text-[var(--color-foreground,#16201D)] mb-2">
-        {detail.label}
-      </h3>
+      {/* Body: Title, description, models, defaults */}
+      <div className="p-3.5 bg-background flex-1">
+        {/* Entry Title */}
+        <h3 className="text-base font-semibold text-foreground mb-1.5">
+          {detail.label}
+        </h3>
 
-      {/* models (what this entry actually simulates) */}
-      <p className="text-xs text-[var(--color-body,#4A544F)] leading-relaxed mb-3">
-        {detail.models}
-      </p>
+        {/* models (what this entry actually simulates) */}
+        <p className="text-xs text-body leading-relaxed mb-3">
+          {detail.models}
+        </p>
 
-      {/* DEFAULTS row */}
-      <div className="border-t border-[var(--color-border,#E7E3DB)]/80 pt-2.5 mb-2.5">
-        <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--color-secondary-text,#626D68)] mb-1">
-          DEFAULTS
+        {/* DEFAULTS row */}
+        <div className="border-t border-hairline pt-2.5 mb-2.5">
+          <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-secondary-text mb-1">
+            DEFAULTS
+          </div>
+          <div className="text-xs font-mono text-body break-words">
+            {detail.defaults}
+          </div>
         </div>
-        <div className="text-xs font-mono text-[var(--color-body,#4A544F)] break-words">
-          {detail.defaults}
+
+        {/* DOES NOT MODEL row */}
+        <div className="border-t border-hairline pt-2.5">
+          <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-secondary-text mb-1">
+            DOES NOT MODEL
+          </div>
+          <div className="text-xs text-body leading-relaxed">
+            {detail.doesNotModel}
+          </div>
         </div>
       </div>
 
-      {/* DOES NOT MODEL row */}
-      <div className="border-t border-[var(--color-border,#E7E3DB)]/80 pt-2.5 mb-3">
-        <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[var(--color-secondary-text,#626D68)] mb-1">
-          DOES NOT MODEL
-        </div>
-        <div className="text-xs text-[var(--color-body,#4A544F)] leading-relaxed">
-          {detail.doesNotModel}
-        </div>
-      </div>
-
-      {/* Footer shortcut hints */}
-      <div className="border-t border-[var(--color-border,#E7E3DB)]/80 pt-2 flex items-center justify-between text-[11px] font-mono text-[var(--color-secondary-text,#626D68)]">
+      {/* Footer: shortcut hints */}
+      <div className="px-3.5 py-2 bg-panel border-t border-hairline flex items-center justify-between text-[11px] font-mono text-secondary-text shrink-0">
         <span>↵ place · drag to position</span>
       </div>
     </div>

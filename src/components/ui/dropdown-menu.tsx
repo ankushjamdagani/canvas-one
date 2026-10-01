@@ -56,7 +56,7 @@ const DropdownMenuSubContent = React.forwardRef<
     sideOffset={sideOffset}
     alignOffset={alignOffset}
     className={cn(
-      "z-popover min-w-[12rem] overflow-hidden rounded-[10px] border border-control-border bg-popover p-1.5 text-popover-foreground shadow-[0_22px_40px_-16px_rgba(22,32,29,0.30)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+      "z-popover min-w-[12rem] overflow-hidden rounded-popover border border-border bg-background p-1.5 text-popover-foreground shadow-popover outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
       className
     )}
     {...props}
@@ -64,6 +64,46 @@ const DropdownMenuSubContent = React.forwardRef<
 ));
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName;
+
+/**
+ * Standardized Top / Header section for DropdownMenu.
+ * Default faded gray background (`bg-panel` #F7F5F1) with hairline border-bottom.
+ */
+const DropdownMenuHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-slot="dropdown-menu-header"
+    className={cn(
+      "-mx-1.5 -mt-1.5 mb-1.5 px-3 py-2.5 border-b border-hairline bg-panel text-xs flex items-center justify-between select-none shrink-0",
+      className
+    )}
+    {...props}
+  />
+));
+DropdownMenuHeader.displayName = "DropdownMenuHeader";
+
+/**
+ * Standardized Bottom / Footer section for DropdownMenu.
+ * Default faded gray background (`bg-panel` #F7F5F1) with hairline border-top.
+ */
+const DropdownMenuFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    data-slot="dropdown-menu-footer"
+    className={cn(
+      "-mx-1.5 -mb-1.5 mt-1.5 px-3 py-2.5 border-t border-hairline bg-panel text-xs flex items-center justify-between select-none shrink-0",
+      className
+    )}
+    {...props}
+  />
+));
+DropdownMenuFooter.displayName = "DropdownMenuFooter";
 
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
@@ -75,7 +115,7 @@ const DropdownMenuContent = React.forwardRef<
       data-slot="dropdown-menu-content"
       sideOffset={sideOffset}
       className={cn(
-        "z-popover min-w-[12rem] overflow-hidden rounded-[10px] border border-control-border bg-popover p-1.5 text-popover-foreground shadow-[0_22px_40px_-16px_rgba(22,32,29,0.30)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "z-popover min-w-[12rem] overflow-hidden rounded-popover border border-border bg-background p-1.5 text-popover-foreground shadow-popover outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className
       )}
       {...props}
@@ -219,6 +259,8 @@ export {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuHeader,
+  DropdownMenuFooter,
   DropdownMenuItem,
   DropdownMenuShortcut,
   DropdownMenuCheckboxItem,

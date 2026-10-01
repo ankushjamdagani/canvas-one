@@ -101,9 +101,9 @@ export function BranchPopover({
         data-testid="branch-popover"
         align="start"
         sideOffset={6}
-        className="w-[392px] max-w-[calc(100vw-24px)] p-0 rounded-[10px] border border-[#DCD7CD] bg-white shadow-[0_22px_40px_-16px_rgba(22,32,29,0.30)] overflow-hidden outline-none flex flex-col"
+        className="w-[392px] max-w-[calc(100vw-24px)] p-0 rounded-popover border border-border bg-background shadow-popover overflow-hidden outline-none flex flex-col"
       >
-        <div className="px-3 py-2.5 border-b border-[#EFEBE3] flex items-center gap-2 bg-[#FBFAF7]">
+        <div className="px-3 py-2.5 border-b border-hairline flex items-center gap-2 bg-panel select-none">
           <Search size={14} className="text-secondary-text shrink-0" aria-hidden="true" />
           <Input
             data-testid="branch-find-input"
@@ -233,9 +233,9 @@ export function BranchPopover({
                 </div>
                 <div
                   data-testid="branch-current-row"
-                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-[8px] bg-[#F7F4FC] border border-[#C9B9E4]"
+                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-control bg-[#F7F4FC] border border-[#C9B9E4]"
                 >
-                  <GitBranch size={13} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
+                  <GitBranch size={14} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[13px] font-semibold text-[#7C5FC0] truncate">
@@ -252,7 +252,7 @@ export function BranchPopover({
                       edited {formatRelativeTime(project.updatedAt ? Math.max(current.createdAt, project.updatedAt) : current.createdAt)}
                     </div>
                   </div>
-                  <Check size={13} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
+                  <Check size={14} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
                 </div>
               </div>
             )}
@@ -367,7 +367,7 @@ export function BranchPopover({
             </div>
 
             {/* Bottom bar */}
-            <div className="border-t border-[#EFEBE3] bg-[#FBFAF7] px-3 py-2.5 flex items-center justify-between mt-auto">
+            <div className="border-t border-hairline bg-panel px-3 py-2.5 flex items-center justify-between select-none mt-auto">
               <button
                 type="button"
                 data-testid="branch-create-open"
@@ -379,7 +379,7 @@ export function BranchPopover({
                 }}
                 className="flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-hover disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                <Plus size={13} aria-hidden="true" />
+                <Plus size={14} aria-hidden="true" />
                 <span>New branch from here</span>
               </button>
               <button

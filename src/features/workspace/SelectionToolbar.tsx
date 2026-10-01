@@ -11,6 +11,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuHeader,
+  DropdownMenuFooter,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -279,7 +281,7 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
         data-testid={`selection-overflow-${id.replace('.', '-')}`}
         disabled={!availability.enabled}
         onSelect={() => void runOverflow(id)}
-        className="flex flex-col items-start gap-0.5 text-xs pointer-coarse:min-h-11"
+        className="flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-control text-[13px] pointer-coarse:min-h-11"
       >
         <span>{label}</span>
         {availability.enabled ? null : (
@@ -323,7 +325,7 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
             <Group className="size-3.5" /> Group
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-3">
+        <PopoverContent align="end" className="w-64 p-0 overflow-hidden rounded-popover border border-border shadow-popover">
           <form
             data-testid="selection-group-popover"
             onSubmit={(event) => {
@@ -331,22 +333,27 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
               void submitGroup();
             }}
           >
-            <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-group-label">
-              Group name
-            </label>
-            <Input
-              id="selection-group-label"
-              data-testid="selection-group-input"
-              autoFocus
-              value={groupLabel}
-              placeholder="Name this group…"
-              onChange={(event) => {
-                setGroupLabel(event.target.value);
-                setGroupError(null);
-              }}
-            />
-            {groupError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{groupError}</p>}
-            <div className="mt-2 flex justify-end">
+            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+              NEW GROUP
+            </div>
+            <div className="p-3 bg-background">
+              <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-group-label">
+                Group name
+              </label>
+              <Input
+                id="selection-group-label"
+                data-testid="selection-group-input"
+                autoFocus
+                value={groupLabel}
+                placeholder="Name this group…"
+                onChange={(event) => {
+                  setGroupLabel(event.target.value);
+                  setGroupError(null);
+                }}
+              />
+              {groupError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{groupError}</p>}
+            </div>
+            <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
               <Button type="submit" size="sm" variant="tint" disabled={groupLabel.trim().length === 0}>
                 Group
               </Button>
@@ -390,7 +397,7 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
             <BoxSelect className="size-3.5" /> Wrap in boundary
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="center" className="w-64 p-3">
+        <PopoverContent align="center" className="w-64 p-0 overflow-hidden rounded-popover border border-border shadow-popover">
           <form
             data-testid="selection-wrap-popover"
             onSubmit={(event) => {
@@ -398,23 +405,27 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
               void submitWrap();
             }}
           >
-            <h2 className="text-sm font-semibold text-ink">Wrap in boundary</h2>
-            <label className="mt-2 block text-xs font-medium text-ink mb-1.5" htmlFor="selection-wrap-label">
-              Boundary name
-            </label>
-            <Input
-              id="selection-wrap-label"
-              data-testid="selection-wrap-input"
-              autoFocus
-              value={wrapLabel}
-              placeholder="Name this boundary…"
-              onChange={(event) => {
-                setWrapLabel(event.target.value);
-                setWrapError(null);
-              }}
-            />
-            {wrapError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{wrapError}</p>}
-            <div className="mt-2 flex justify-end">
+            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+              WRAP IN BOUNDARY
+            </div>
+            <div className="p-3 bg-background">
+              <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-wrap-label">
+                Boundary name
+              </label>
+              <Input
+                id="selection-wrap-label"
+                data-testid="selection-wrap-input"
+                autoFocus
+                value={wrapLabel}
+                placeholder="Name this boundary…"
+                onChange={(event) => {
+                  setWrapLabel(event.target.value);
+                  setWrapError(null);
+                }}
+              />
+              {wrapError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{wrapError}</p>}
+            </div>
+            <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
               <Button type="submit" size="sm" variant="tint" disabled={wrapLabel.trim().length === 0}>
                 Wrap
               </Button>
@@ -442,48 +453,51 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
 
 
 
-<DropdownMenu>
+      <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button data-testid="selection-align-btn" type="button" variant="ghost" size="sm" className="h-8 gap-1 text-xs">
             Align <ChevronDown className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel>Align</DropdownMenuLabel>
-          {alignItems.map(([edge, label]) => {
-            const availability = getAvailability('selection.align', context, { edge });
-            return (
-              <DropdownMenuItem
-                key={edge}
-                data-testid={`selection-align-${edge}`}
-                disabled={!availability.enabled}
-                title={availability.enabled ? undefined : availability.reason}
-                onSelect={() => void executeCommand('selection.align', { edge })}
-                className="text-xs"
-              >
-                <span>{label}</span>
-                {!availability.enabled && <span className="ml-auto text-[10px]">{availability.reason}</span>}
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Distribute</DropdownMenuLabel>
-          {distributeItems.map(([axis, label]) => {
-            const availability = getAvailability('selection.distribute', context, { axis });
-            return (
-              <DropdownMenuItem
-                key={axis}
-                data-testid={`selection-distribute-${axis}`}
-                disabled={!availability.enabled}
-                title={availability.enabled ? undefined : availability.reason}
-                onSelect={() => void executeCommand('selection.distribute', { axis })}
-                className="text-xs"
-              >
-                <span>{label}</span>
-                {!availability.enabled && <span className="ml-auto text-[10px]">{availability.reason}</span>}
-              </DropdownMenuItem>
-            );
-          })}
+        <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
+          <DropdownMenuHeader className="px-3 py-2 text-secondary-text">ALIGN & DISTRIBUTE</DropdownMenuHeader>
+          <div className="p-1.5 bg-background">
+            <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2.5 py-1">Align</DropdownMenuLabel>
+            {alignItems.map(([edge, label]) => {
+              const availability = getAvailability('selection.align', context, { edge });
+              return (
+                <DropdownMenuItem
+                  key={edge}
+                  data-testid={`selection-align-${edge}`}
+                  disabled={!availability.enabled}
+                  title={availability.enabled ? undefined : availability.reason}
+                  onSelect={() => void executeCommand('selection.align', { edge })}
+                  className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
+                >
+                  <span>{label}</span>
+                  {!availability.enabled && <span className="ml-auto text-[10px]">{availability.reason}</span>}
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator className="my-1" />
+            <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2.5 py-1">Distribute</DropdownMenuLabel>
+            {distributeItems.map(([axis, label]) => {
+              const availability = getAvailability('selection.distribute', context, { axis });
+              return (
+                <DropdownMenuItem
+                  key={axis}
+                  data-testid={`selection-distribute-${axis}`}
+                  disabled={!availability.enabled}
+                  title={availability.enabled ? undefined : availability.reason}
+                  onSelect={() => void executeCommand('selection.distribute', { axis })}
+                  className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
+                >
+                  <span>{label}</span>
+                  {!availability.enabled && <span className="ml-auto text-[10px]">{availability.reason}</span>}
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -514,11 +528,14 @@ export function SelectionToolbar({ context, executeCommand, mintId }: SelectionT
             <MoreHorizontal className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase">Selection</DropdownMenuLabel>
-          {OVERFLOW_PRIMARY.map((item) => overflowItem(item))}
-          <DropdownMenuSeparator />
-          {OVERFLOW_SECONDARY.map((item) => overflowItem(item))}
+        <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
+          <DropdownMenuHeader className="px-3 py-2 text-secondary-text">SELECTION ACTIONS</DropdownMenuHeader>
+          <div className="p-1.5 bg-background space-y-0.5">
+            {OVERFLOW_PRIMARY.map((item) => overflowItem(item))}
+          </div>
+          <DropdownMenuFooter className="p-1.5 bg-panel border-t border-hairline">
+            {OVERFLOW_SECONDARY.map((item) => overflowItem(item))}
+          </DropdownMenuFooter>
         </DropdownMenuContent>
       </DropdownMenu>
       {overflowError ? (

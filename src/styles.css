@@ -130,10 +130,20 @@
   --z-index-tooltip: 80;
   --z-index-toast: 80;
 
-  /* Elevation tokens from /private/tmp/claude-501/-Users-ankushjamdagani-personal-system-design-planner/578f1a4b-3d34-4104-afe3-18d23c00799f/scratchpad/design.k81I/tokens/shape.css */
+  /* Elevation tokens from artifacts/design/Copy of Elegant and modern design refresh (1)/tokens/shape.css */
   --shadow-raised: 0 1px 2px rgba(22, 32, 29, 0.08);
+  --shadow-lifted: 0 6px 14px -8px rgba(22, 32, 29, 0.30);
   --shadow-popover: 0 18px 32px -16px rgba(22, 32, 29, 0.32);
   --shadow-floating: 0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06);
+  --shadow-frame: 0 24px 48px -20px rgba(22, 32, 29, 0.24);
+  --shadow-toast: 0 18px 32px -16px rgba(22, 32, 29, 0.50);
+
+  /* Focus and selection ring shadows */
+  --shadow-ring-soft: 0 0 0 3px rgba(11, 92, 84, 0.10);
+  --shadow-ring: 0 0 0 3px rgba(11, 92, 84, 0.18);
+  --shadow-ring-strong: 0 0 0 3px rgba(11, 92, 84, 0.28);
+  --shadow-ring-danger: 0 0 0 3px rgba(180, 103, 74, 0.28);
+  --shadow-ring-danger-soft: 0 0 0 3px rgba(180, 103, 74, 0.12);
 
   /* Animation tokens */
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
@@ -256,11 +266,47 @@
   --canvas: #FFFFFF;
   --hairline-soft: #EFEBE3;
 
+  /* Evergreen direct role additions from System Studio Design System.dc.html */
+  --canvas-white: #FFFFFF;
+  --hairline: #E7E3DB;
+  --border-strong: #C6C0B4;
+  --text-placeholder: #8A938F;
+  --text-disabled: #C0C6C1;
+  --text-on-ink: #F7F5F1;
+  --text-on-green: #FBFAF7;
+  --text-primary: #16201D;
+  --text-body: #4A544F;
+  --text-secondary: #626D68;
+  --text-meta: #8A938F;
+  --ink: #16201D;
+  --green: #0B5C54;
+  --green-tint: #EAEFEC;
+  --green-edge: #A8CBC5;
+  --green-edge-strong: #74B2A8;
+  --clay: #B4674A;
+  --clay-tint: #F7EDE8;
+  --clay-edge: #D89B84;
+  --purple: #7D5A9B;
+  --purple-tint: #F3EDF7;
+  --purple-edge: #C6B6D6;
+
+  /* Ring shadows */
+  --ring-soft: 0 0 0 3px rgba(11, 92, 84, 0.18);
+  --ring-strong: 0 0 0 3px #0B5C54;
+  --ring-danger: 0 0 0 3px #B4674A;
+  --ring-danger-soft: 0 0 0 3px rgba(180, 103, 74, 0.18);
+
   font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   color: var(--foreground);
   background: var(--shell);
   font-synthesis: none;
   font-size: 13px;
+}
+
+@keyframes ss-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 * {

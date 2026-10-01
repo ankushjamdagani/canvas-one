@@ -27,7 +27,7 @@ const RadioGroupItem = React.forwardRef<
       ref={ref}
       data-slot="radio-group-item"
       className={cn(
-        "aspect-square h-4 w-4 rounded-full border border-primary p-0 text-primary shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text disabled:border-control-border",
+        "aspect-square size-4 rounded-full border border-hover-border bg-background p-0 text-primary shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=checked]:border-primary data-[state=checked]:bg-background disabled:cursor-not-allowed disabled:bg-panel disabled:border-hairline disabled:text-text-disabled",
         className
       )}
       {...props}
@@ -36,7 +36,7 @@ const RadioGroupItem = React.forwardRef<
         data-slot="radio-group-indicator"
         className="flex items-center justify-center"
       >
-        <Circle className="h-2 w-2 fill-primary" />
+        <Circle className="size-2 fill-primary text-primary" />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   );

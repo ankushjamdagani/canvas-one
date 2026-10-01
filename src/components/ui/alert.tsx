@@ -62,4 +62,52 @@ const AlertDescription = React.forwardRef<
 ));
 AlertDescription.displayName = "AlertDescription";
 
+export interface InlineAlertProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+  tone?: "risk" | "branch" | "done";
+  title?: React.ReactNode;
+  detail?: React.ReactNode;
+  glyph?: React.ReactNode;
+}
+
+export function InlineAlert({
+  tone = "risk",
+  title,
+  detail,
+  glyph,
+  children,
+  className,
+  ...props
+}: InlineAlertProps) {
+  const tones = {
+    risk: "border-clay-edge border-l-clay shadow-xs",
+    branch: "border-purple-edge border-l-purple",
+    done: "border-green-edge border-l-green",
+  }[tone];
+
+  const spineColors = {
+    risk: "text-clay",
+    branch: "text-purple",
+    done: "text-green",
+  }[tone];
+
+  return (
+    <div
+      role="alert"
+      className={cn(
+        "flex items-center gap-3 rounded-lg border border-l-[3px] bg-background p-3 text-sm font-sans transition-colors",
+        tones,
+        className
+      )}
+      {...props}
+    >
+      {glyph && <span className={cn("text-xs font-semibold", spineColors)}>{glyph}</span>}
+      <div className="flex-1 min-w-0">
+        {title && <div className="text-xs font-semibold text-foreground leading-tight">{title}</div>}
+        {detail && <div className="text-xs text-secondary-text mt-0.5 leading-normal">{detail}</div>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export { Alert, AlertTitle, AlertDescription };

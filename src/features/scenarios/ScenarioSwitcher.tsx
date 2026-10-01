@@ -180,11 +180,11 @@ export function ScenarioSwitcher({
 
         <PopoverContent
           data-testid="scenario-switcher-popover"
-          className="w-80 md:w-96 p-0 bg-panel border border-control-border rounded-popover shadow-md overflow-hidden text-xs"
+          className="w-80 md:w-96 p-0 bg-background border border-border rounded-popover shadow-popover overflow-hidden text-xs outline-none flex flex-col"
           align="end"
           sideOffset={4}
         >
-          <div className="flex items-center justify-between px-3 py-2 border-b border-divider bg-panel">
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-hairline bg-panel select-none shrink-0">
             <span className="font-mono text-meta font-medium text-secondary-text uppercase">
               SCENARIOS · {totalScenarios}
             </span>
@@ -198,10 +198,10 @@ export function ScenarioSwitcher({
                 }}
                 disabled={isRunAllDisabled}
                 title={runAllDisabledReason ?? undefined}
-                className="inline-flex items-center gap-1 font-semibold text-primary hover:text-primary-hover active:text-primary-pressed transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-secondary-text"
+                className="inline-flex items-center gap-1.5 font-semibold text-primary hover:text-primary-hover active:text-primary-pressed transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-secondary-text"
                 aria-label={`Run all ${totalScenarios} scenarios`}
               >
-                <Play className="size-3 fill-current" aria-hidden="true" />
+                <Play className="size-3.5 fill-current" aria-hidden="true" />
                 <span>Run all {totalScenarios}</span>
               </button>
             )}
@@ -261,18 +261,18 @@ export function ScenarioSwitcher({
                           <MoreHorizontal className="size-3.5" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-36 text-xs bg-panel border-control-border">
-                        <DropdownMenuItem onClick={() => onRename(s.id)} className="gap-2">
-                          <Pencil className="size-3 text-secondary-text" />
-                          Rename
+                      <DropdownMenuContent align="end" className="w-40 p-1.5 bg-background border-border shadow-popover rounded-popover">
+                        <DropdownMenuItem onClick={() => onRename(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
+                          <Pencil className="size-3.5 text-secondary-text shrink-0" />
+                          <span>Rename</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDuplicate(s.id)} className="gap-2">
-                          <Copy className="size-3 text-secondary-text" />
-                          Duplicate
+                        <DropdownMenuItem onClick={() => onDuplicate(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
+                          <Copy className="size-3.5 text-secondary-text shrink-0" />
+                          <span>Duplicate</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(s.id)} className="gap-2 text-risk-text hover:text-risk-text">
-                          <Trash2 className="size-3 text-risk-text" />
-                          Delete…
+                        <DropdownMenuItem onClick={() => onDelete(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] text-destructive hover:text-destructive">
+                          <Trash2 className="size-3.5 text-destructive shrink-0" />
+                          <span>Delete…</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -302,7 +302,7 @@ export function ScenarioSwitcher({
             </div>
           )}
 
-          <div className="flex items-center justify-between px-2.5 py-2 border-t border-divider bg-panel text-[11px] font-medium text-body">
+          <div className="flex items-center justify-between px-3 py-2.5 border-t border-hairline bg-panel text-[11px] font-medium text-body select-none shrink-0 mt-auto">
             <button
               type="button"
               onClick={() => {

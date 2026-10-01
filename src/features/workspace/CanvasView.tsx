@@ -4,6 +4,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -551,6 +552,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
   const [rejectMessage, setRejectMessage] = React.useState<RejectMessage | null>(null);
   const [resourceForm, setResourceForm] = React.useState<ResourceFormState | null>(null);
+  const [snapToGrid, setSnapToGrid] = React.useState(true);
+  const [showMinimap, setShowMinimap] = React.useState(false);
 
   React.useEffect(() => {
     if (!rejectMessage) return;
@@ -903,6 +906,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         // the dependency preview); ReactFlow's own key would drop the node
         // locally even when that preview is cancelled.
         deleteKeyCode={null}
+        snapToGrid={snapToGrid}
+        snapGrid={[26, 26]}
         // No `fitView` prop: it also fires when an empty view gets its first
         // node, moving the camera after a placement. The open/view-switch
         // effect above is the only automatic fit.
@@ -912,6 +917,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         {/* Dotted canvas background from design token CSS variable */}
         {/* Design system canvas texture: #EFEBE3 dots on a 26px grid. */}
         <Background color="var(--hairline-soft)" gap={26} size={1} />
+        {showMinimap && (
+          <MiniMap
+            nodeColor="#0B5C54"
+            maskColor="rgba(247, 245, 241, 0.7)"
+            className="!bottom-20 !right-4 rounded-lg border border-border bg-background shadow-floating"
+          />
+        )}
       </ReactFlow>
 
       {/* Connect: rejected -- small inline message near the pointer/edge */}
@@ -1060,6 +1072,10 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           }
           return { ok: true };
         }}
+        snapToGrid={snapToGrid}
+        onToggleSnapToGrid={setSnapToGrid}
+        showMinimap={showMinimap}
+        onToggleMinimap={setShowMinimap}
       />
 
       {/* Delete dependency preview: removals, scenario repairs, or why it cannot be applied */}
