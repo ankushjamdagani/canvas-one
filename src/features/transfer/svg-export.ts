@@ -34,9 +34,7 @@ export function xmlEscape(text: string | null | undefined): string {
 
 const CARD_HEIGHT = 76;
 const PADDING = 32;
-const GROUP_PADDING_X = 24;
-const GROUP_PADDING_Y_TOP = 36;
-const GROUP_PADDING_Y_BOTTOM = 24;
+const GROUP_PADDING = 24;
 
 export type SvgDimensions = {
   readonly minX: number;
@@ -140,10 +138,10 @@ export function renderDiagramSvg(document: Document, viewId?: string | null): st
       gMaxY = Math.max(gMaxY, p.y + CARD_HEIGHT);
     }
 
-    const boxX = gMinX - GROUP_PADDING_X;
-    const boxY = gMinY - GROUP_PADDING_Y_TOP;
-    const boxWidth = gMaxX - gMinX + GROUP_PADDING_X * 2;
-    const boxHeight = gMaxY - gMinY + GROUP_PADDING_Y_TOP + GROUP_PADDING_Y_BOTTOM;
+    const boxX = gMinX - GROUP_PADDING;
+    const boxY = gMinY - GROUP_PADDING;
+    const boxWidth = gMaxX - gMinX + GROUP_PADDING * 2;
+    const boxHeight = gMaxY - gMinY + GROUP_PADDING * 2;
 
     expandBounds(boxX, boxY, boxWidth, boxHeight);
 

@@ -168,6 +168,12 @@ export function ExportMenu({
     onOpenChange?.(next);
   }
 
+  React.useEffect(() => {
+    const handleDismiss = () => handleOpenChange(false);
+    window.addEventListener('studio:dismiss-transients', handleDismiss);
+    return () => window.removeEventListener('studio:dismiss-transients', handleDismiss);
+  }, []);
+
   const items = (
     <>
       {PRIMARY_ITEMS.map((item) => (

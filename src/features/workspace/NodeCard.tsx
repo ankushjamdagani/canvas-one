@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
 import { getNodeCaption, getNodeIcon } from './nodeVisuals';
@@ -77,11 +78,30 @@ export function NodeCard({ data, selected }: NodeProps) {
             aria-hidden="true"
           />
           <strong
-            className="text-xs font-semibold text-ink truncate leading-tight"
+            className="text-xs font-semibold text-ink truncate leading-tight flex-1 min-w-0"
             title={element.label}
           >
             {element.label}
           </strong>
+          {nodeData.onToggleExpanded && (
+            <button
+              type="button"
+              data-testid={`node-expand-toggle-${element.id}`}
+              aria-label={placement.expanded ? `Collapse ${element.label} ports` : `Expand ${element.label} ports`}
+              title={placement.expanded ? 'Collapse ports' : 'Expand ports'}
+              className="nodrag nopan pointer-events-auto shrink-0 inline-flex size-5 items-center justify-center rounded-xs text-secondary-text hover:text-foreground hover:bg-sunken transition-colors cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                nodeData.onToggleExpanded?.();
+              }}
+            >
+              {placement.expanded ? (
+                <ChevronsDownUp className="size-3" />
+              ) : (
+                <ChevronsUpDown className="size-3" />
+              )}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -102,6 +122,7 @@ export function NodeCard({ data, selected }: NodeProps) {
         {placement.expanded ? (
           <div
             data-testid={`node-ports-${element.id}`}
+            aria-label="Port summary"
             className="mt-0.5 pt-1 border-t border-control-border text-[10px] font-mono text-secondary-text leading-snug break-words"
           >
             {portSummary}

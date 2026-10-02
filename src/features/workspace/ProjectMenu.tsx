@@ -47,6 +47,12 @@ export function ProjectMenu({
 }: ProjectMenuProps) {
   const [open, setOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    const handleDismiss = () => setOpen(false);
+    window.addEventListener('studio:dismiss-transients', handleDismiss);
+    return () => window.removeEventListener('studio:dismiss-transients', handleDismiss);
+  }, []);
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>

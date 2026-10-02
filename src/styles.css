@@ -421,6 +421,12 @@ body {
   stroke-width: 2.5 !important;
 }
 
+/* Hide default unpadded XYFlow nodesselection box in favor of our design-system SelectionBox */
+.react-flow__nodesselection {
+  display: none !important;
+}
+
+
 .react-flow__edges,
 .react-flow__edge,
 .react-flow__edge-textwrapper {

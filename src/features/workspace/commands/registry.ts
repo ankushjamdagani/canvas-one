@@ -381,6 +381,7 @@ export interface CommandContext {
   readonly canRedo: boolean;
   readonly selectedElementIds: readonly Id[];
   readonly selectedConnectionIds: readonly Id[];
+  readonly selectedNoteIds?: readonly Id[];
   /** Exact presentation groups represented by the current element selection. */
   readonly selectedGroupIds: readonly Id[];
   readonly selectionWhollyUngrouped: boolean;
@@ -991,7 +992,8 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
       if (blocked) return blocked;
-      return ctx.selectedElementIds.length > 0
+      const count = ctx.selectedElementIds.length + (ctx.selectedNoteIds?.length ?? 0);
+      return count > 0
         ? ENABLED
         : disabled('invalid-selection', 'Select at least 1 component to duplicate');
     },
@@ -1007,7 +1009,11 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
       if (blocked) return blocked;
-      return ctx.selectedElementIds.length > 0 || ctx.selectedConnectionIds.length > 0
+      const count =
+        ctx.selectedElementIds.length +
+        ctx.selectedConnectionIds.length +
+        (ctx.selectedNoteIds?.length ?? 0);
+      return count > 0
         ? ENABLED
         : disabled('invalid-selection', 'Select a component or connection to delete');
     },
@@ -1066,9 +1072,11 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     group: 'selection',
     iconKey: 'ungroup',
     shortcut: null,
-    availability: (ctx) => {
+    availability: (ctx, payload) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
       if (blocked) return blocked;
+      const groupIds = (payload as CommandPayloads['selection.ungroup'] | undefined)?.groupIds;
+      if (groupIds && groupIds.length > 0) return ENABLED;
       return ctx.selectedGroupIds.length > 0
         ? ENABLED
         : disabled('invalid-selection', 'Select all parts in one group to ungroup');
@@ -1084,7 +1092,8 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
       if (blocked) return blocked;
-      return ctx.selectedElementIds.length >= 2
+      const totalCount = ctx.selectedElementIds.length + (ctx.selectedNoteIds?.length ?? 0);
+      return totalCount >= 2
         ? ENABLED
         : disabled('invalid-selection', 'Select at least 2 components to align');
     },
@@ -1099,7 +1108,8 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
       if (blocked) return blocked;
-      return ctx.selectedElementIds.length >= 3
+      const totalCount = ctx.selectedElementIds.length + (ctx.selectedNoteIds?.length ?? 0);
+      return totalCount >= 3
         ? ENABLED
         : disabled('invalid-selection', 'Select at least 3 components to distribute');
     },

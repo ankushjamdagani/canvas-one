@@ -216,7 +216,7 @@ describe('projectDocumentToCanvas', () => {
     expect(g1.id).toBe('g1');
     expect(g1.type).toBe('groupNode');
     expect(g1.selectable).toBe(false);
-    expect(g1.draggable).toBe(false);
+    expect(g1.draggable).toBe(true);
     expect(g1.data.kind).toBe('group');
     if (g1.data.kind === 'group') {
       expect(g1.data.label).toBe('Backend Layer');
@@ -470,8 +470,8 @@ describe('collapsed groups (RV-04g)', () => {
     expect(res.nodes.filter((n) => n.type === 'elementNode').map((n) => n.id)).toEqual(['pl1']);
     const group = res.nodes.find((n) => n.id === 'g1');
     expect(group?.data).toMatchObject({ kind: 'group', collapsed: true, memberCount: 2, width: 184, height: 44 });
-    // Bounding-box origin: min member x/y minus the boundary padding.
-    expect(group?.position).toEqual({ x: 376, y: 114 });
+    // Bounding-box origin: min member x/y minus the uniform boundary padding.
+    expect(group?.position).toEqual({ x: 376, y: 126 });
     expect(group?.draggable).toBe(true);
   });
 
@@ -487,7 +487,7 @@ describe('collapsed groups (RV-04g)', () => {
     const res = projectDocumentToCanvas(makeTestDocument(), 'v1');
     expect(res.nodes.filter((n) => n.type === 'elementNode')).toHaveLength(3);
     expect(res.nodes.find((n) => n.id === 'g1')?.data).toMatchObject({ collapsed: false, memberCount: 2 });
-    expect(res.nodes.find((n) => n.id === 'g1')?.draggable).toBe(false);
+    expect(res.nodes.find((n) => n.id === 'g1')?.draggable).toBe(true);
     expect(res.edges.map((e) => e.id)).toEqual(['c1', 'c2']);
     expect(res.edges.some((e) => e.data.rerouted)).toBe(false);
   });
@@ -501,5 +501,50 @@ describe('collapsed groups (RV-04g)', () => {
     );
     const flags = res.nodes.filter((n) => n.data.kind === 'element').map((n) => n.data.kind === 'element' && n.data.placement.expanded);
     expect(flags).toEqual([false, true, false]);
+  });
+
+  it('hides notes attached to group members when the group collapses', () => {
+    const doc = makeTestDocument();
+    const view = doc.views[0];
+    const docWithNote = {
+      ...doc,
+      views: [
+        {
+          ...view,
+          groups: [{ id: 'g1', label: 'Backend Layer', elementIds: ['e2', 'e3'], collapsed: true }],
+          notes: [
+            { id: 'note1', text: 'Important backend note', x: 260, y: 120, width: 220, tone: 'paper' as const, attachedElementIds: ['e2'] },
+            { id: 'note2', text: 'Frontend note', x: 20, y: 120, width: 220, tone: 'paper' as const, attachedElementIds: ['e1'] },
+          ],
+        },
+      ],
+    };
+    const res = projectDocumentToCanvas(docWithNote, 'v1');
+    const noteNodes = res.nodes.filter((n) => n.type === 'noteNode');
+    expect(noteNodes.map((n) => n.id)).toEqual(['note2']);
+  });
+
+  it('expands group bounding box to encompass member attached notes', () => {
+    const doc = makeTestDocument();
+    const view = doc.views[0];
+    const baseRes = projectDocumentToCanvas(doc, 'v1');
+    const baseGroup = baseRes.nodes.find((n) => n.id === 'g1')!;
+
+    const docWithDistantNote = {
+      ...doc,
+      views: [
+        {
+          ...view,
+          notes: [
+            { id: 'note1', text: 'Attached note extending boundary', x: 900, y: 300, width: 220, tone: 'paper' as const, attachedElementIds: ['e2'] },
+          ],
+        },
+      ],
+    };
+    const expandedRes = projectDocumentToCanvas(docWithDistantNote, 'v1');
+    const expandedGroup = expandedRes.nodes.find((n) => n.id === 'g1')!;
+
+    expect(expandedGroup.position.x).toBeLessThanOrEqual(baseGroup.position.x);
+    expect(expandedGroup.style?.width as number).toBeGreaterThan(baseGroup.style?.width as number);
   });
 });

@@ -107,7 +107,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   const handleToggleSnap = onToggleSnapToGrid ?? setLocalSnapToGrid;
   const handleToggleMinimap = onToggleMinimap ?? setLocalShowMinimap;
 
-  const [textAction, setTextAction] = React.useState<'canvas.add-note' | 'selection.group' | null>(null);
+  const [textAction, setTextAction] = React.useState<'selection.group' | null>(null);
   const [textValue, setTextValue] = React.useState('');
   const [textError, setTextError] = React.useState<string | null>(null);
   // 16E compact picker (D30 as amended 2026-09-29): the dock's Component button opens it
@@ -156,11 +156,25 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   const allNonStickyHidden = config.hiddenCommandIds.filter((id) => !FIXED_LEFT_SET.has(id));
   const allNonSticky = [...allNonStickyOrdered, ...allNonStickyHidden];
 
+  // Dismiss popovers when clicking outside on the canvas
+  React.useEffect(() => {
+    const handleDismiss = () => {
+      setMoreOpen(false);
+      setPickerOpen(false);
+      setTextAction(null);
+    };
+    window.addEventListener('studio:dismiss-transients', handleDismiss);
+    return () => window.removeEventListener('studio:dismiss-transients', handleDismiss);
+  }, []);
+
   function invoke(id: DockCommandId) {
     if (id === 'library.open' && !libraryPanelOpen) {
       setMoreOpen(false);
       setPickerOpen((open) => !open);
-    } else if (id === 'canvas.add-note' || id === 'selection.group') {
+    } else if (id === 'canvas.add-note') {
+      setMoreOpen(false);
+      void onAddNote('New note');
+    } else if (id === 'selection.group') {
       setMoreOpen(false);
       setTextAction(id);
       setTextValue('');
@@ -174,7 +188,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   async function submitText() {
     const text = textValue.trim();
     if (!text || !textAction) return;
-    const outcome = textAction === 'canvas.add-note' ? await onAddNote(text) : await onGroup(text);
+    const outcome = await onGroup(text);
     if (outcome.ok) {
       setTextAction(null);
       setTextValue('');
@@ -205,6 +219,13 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
         aria-description={state.enabled ? undefined : state.reason}
         title={state.enabled ? def.label : state.reason}
         disabled={!state.enabled}
+        draggable={id === 'canvas.add-note'}
+        onDragStart={(event) => {
+          if (id === 'canvas.add-note') {
+            event.dataTransfer.setData('application/x-system-studio-note', 'note');
+            event.dataTransfer.effectAllowed = 'copy';
+          }
+        }}
         onClick={() => invoke(id)}>
         <Icon className="size-4" aria-hidden="true" />
         {(compact || showLabels) && (
@@ -626,7 +647,12 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
               }
             }}
           >
-            {(narrow ? mobileCenterVisible : centerCommandIds).map((id) => commandButton(id))}
+            {(narrow ? mobileCenterVisible : centerCommandIds).map((id) => {
+              if (id === 'selection.group' && !customizing && context.selectedElementIds.length < 2) {
+                return null;
+              }
+              return commandButton(id);
+            })}
           </div>
 
           <Separator orientation="vertical" className="h-5 bg-hairline shrink-0 mx-0.5" />
@@ -917,22 +943,22 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
       )}
       <Popover open={textAction !== null} onOpenChange={(open) => { if (!open) setTextAction(null); }}>
         <PopoverAnchor asChild><span className="absolute left-1/2 top-0" /></PopoverAnchor>
-        <PopoverContent side="top" align="center" className="w-72 p-0 overflow-hidden rounded-popover border border-border bg-background shadow-popover" data-testid={textAction === 'canvas.add-note' ? 'dock-note-popover' : 'dock-group-popover'}>
+        <PopoverContent side="top" align="center" className="w-72 p-0 overflow-hidden rounded-popover border border-border bg-background shadow-popover" data-testid="dock-group-popover">
           <form onSubmit={(event) => { event.preventDefault(); void submitText(); }}>
             <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
-              {textAction === 'canvas.add-note' ? 'New canvas note' : 'New subsystem group'}
+              New subsystem group
             </div>
             <div className="p-3 bg-background">
               <label htmlFor="dock-text-input" className="block text-xs font-medium text-ink mb-1.5">
-                {textAction === 'canvas.add-note' ? 'Note text' : 'Group name'}
+                Group name
               </label>
-              <Input id="dock-text-input" data-testid={textAction === 'canvas.add-note' ? 'dock-note-input' : 'dock-group-input'}
+              <Input id="dock-text-input" data-testid="dock-group-input"
                 autoFocus value={textValue} onChange={(event) => { setTextValue(event.target.value); setTextError(null); }} />
               {textError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{textError}</p>}
             </div>
             <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
               <Button type="submit" size="sm" variant="tint" disabled={!textValue.trim()}>
-                {textAction === 'canvas.add-note' ? 'Add note' : 'Group'}
+                Group
               </Button>
             </div>
           </form>

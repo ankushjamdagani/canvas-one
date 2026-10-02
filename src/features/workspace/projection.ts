@@ -125,6 +125,8 @@ export type ProjectedNodeData =
       readonly connectable?: boolean;
       /** While a scenario is being edited: a workload enters here (board "TRAFFIC ENTERS HERE"). Set by CanvasView. */
       readonly trafficEntry?: boolean;
+      /** Directly toggles port summary expansion on the node card itself. */
+      readonly onToggleExpanded?: () => void;
     }
   | {
       readonly kind: 'group';
@@ -140,6 +142,8 @@ export type ProjectedNodeData =
        * through canvas.expand / canvas.collapse. Not part of the projection.
        */
       readonly onToggleCollapsed?: () => void;
+      readonly onUngroup?: () => void;
+      readonly onSelectGroup?: () => void;
     }
   | {
       readonly kind: 'note';
@@ -147,6 +151,11 @@ export type ProjectedNodeData =
       readonly text: string;
       readonly tone: 'paper' | 'neutral';
       readonly width: number;
+      readonly attachedElementLabel?: string;
+      readonly availableElements?: readonly { readonly id: Id; readonly label: string }[];
+      readonly onUpdateText?: (newText: string) => void;
+      readonly onDelete?: () => void;
+      readonly onAttach?: (elementId: string | null) => void;
     };
 
 export type ProjectedNode = {
@@ -220,9 +229,7 @@ export type MeasuredHeights = ReadonlyMap<Id, number>;
 export function placementHeight(placement: Placement, heights?: MeasuredHeights): number {
   return heights?.get(placement.id) ?? ESTIMATED_ELEMENT_NODE_HEIGHT;
 }
-const GROUP_PADDING_X = 24;
-const GROUP_PADDING_Y_TOP = 36;
-const GROUP_PADDING_Y_BOTTOM = 24;
+export const GROUP_PADDING = 24;
 /** Compact boundary node a collapsed group renders as (RV-04g). */
 export const COLLAPSED_GROUP_WIDTH = 184;
 export const COLLAPSED_GROUP_HEIGHT = 44;
@@ -415,13 +422,23 @@ export function projectDocumentToCanvas(
       maxY = Math.max(maxY, p.y + placementHeight(p, measuredHeights));
     }
 
-    const boxX = minX - GROUP_PADDING_X;
-    const boxY = minY - GROUP_PADDING_Y_TOP;
-    const boxWidth = maxX - minX + GROUP_PADDING_X * 2;
-    const boxHeight = maxY - minY + GROUP_PADDING_Y_TOP + GROUP_PADDING_Y_BOTTOM;
+    const memberNotes = (activeView.notes ?? []).filter((n) =>
+      n.attachedElementIds?.some((id) => group.elementIds.includes(id)),
+    );
+    for (const n of memberNotes) {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + (n.width ?? 220));
+      maxY = Math.max(maxY, n.y + (measuredHeights?.get(n.id) ?? 100));
+    }
+
+    const boxX = minX - GROUP_PADDING;
+    const boxY = minY - GROUP_PADDING;
+    const boxWidth = maxX - minX + GROUP_PADDING * 2;
+    const boxHeight = maxY - minY + GROUP_PADDING * 2;
 
     // Collapsed: one compact node at the bounding-box origin; it is draggable
-    // (CanvasView moves every member by the same delta in one undo).
+    // (CanvasView moves every member and attached note by the same delta in one undo).
     const collapsed = group.collapsed;
     const width = collapsed ? COLLAPSED_GROUP_WIDTH : boxWidth;
     const height = collapsed ? COLLAPSED_GROUP_HEIGHT : boxHeight;
@@ -439,7 +456,7 @@ export function projectDocumentToCanvas(
         memberCount: memberPlacements.length,
       },
       selectable: false,
-      draggable: collapsed,
+      draggable: true,
       zIndex: collapsed ? 1 : 0,
       style: { width, height },
     });
@@ -447,6 +464,16 @@ export function projectDocumentToCanvas(
 
   // 4. Notes (presentation: note card with text)
   for (const note of activeView.notes) {
+    const attachedId = note.attachedElementIds?.[0];
+    if (attachedId && collapsedGroupByElementId.has(attachedId)) continue;
+    const attachedElement = attachedId ? document.elements.find((e) => e.id === attachedId) : undefined;
+    const availableElements = activeView.placements
+      .map((p) => {
+        const el = document.elements.find((e) => e.id === p.elementId);
+        return el ? { id: el.id, label: el.label } : null;
+      })
+      .filter((el): el is { id: Id; label: string } => el !== null);
+
     nodes.push({
       id: note.id, // note.id as ReactFlow node id (no prefix)
       type: 'noteNode',
@@ -457,9 +484,11 @@ export function projectDocumentToCanvas(
         text: note.text,
         tone: note.tone,
         width: note.width,
+        attachedElementLabel: attachedElement?.label,
+        availableElements,
       },
       selectable: true,
-      draggable: false,
+      draggable: true,
       zIndex: 2,
       style: { width: note.width },
     });
@@ -597,11 +626,30 @@ export function buildMoveChange(
     return placement;
   });
 
+  const updatedNotes = (view.notes ?? []).map((note) => {
+    const moved = movedMap.get(note.id);
+    if (!moved) return note;
+
+    const newX = Math.round(moved.x);
+    const newY = Math.round(moved.y);
+
+    if (note.x !== newX || note.y !== newY) {
+      hasChanges = true;
+      return {
+        ...note,
+        x: newX,
+        y: newY,
+      };
+    }
+    return note;
+  });
+
   if (!hasChanges) return null;
 
   const updatedView: View = {
     ...view,
     placements: updatedPlacements,
+    notes: updatedNotes,
   };
 
   return {

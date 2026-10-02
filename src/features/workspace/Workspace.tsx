@@ -32,7 +32,7 @@ import type {
   StudioRepository,
 } from '../../persistence/studio/types';
 import { createCandidateController, type Actor } from '../../persistence/studio';
-import type { Id } from '../../domain/studio/model';
+import type { Id, Note } from '../../domain/studio/model';
 import { captureSelection } from '../../domain/parts/capture';
 import { planPlacement } from '../../domain/parts/place';
 import type { PartContent } from '../../domain/parts/types';
@@ -303,6 +303,7 @@ export function Workspace({
   const isMobileInspector = viewportWidth < MOBILE_BREAKPOINT_PX;
 
   const [draft, setDraft] = React.useState<DraftHandle | null>(null);
+  const [selectedNoteIds, setSelectedNoteIds] = React.useState<ReadonlySet<Id>>(new Set());
   const [scenarioDraft, setScenarioDraft] = React.useState<ScenarioDraftHandle | null>(null);
   const [scenarioEditorFocusName, setScenarioEditorFocusName] = React.useState(false);
   const [focusFieldId, setFocusFieldId] = React.useState<string | null>(null);
@@ -395,28 +396,83 @@ export function Workspace({
 
   const closeInspector = React.useCallback(() => {
     setDraft(null);
+    setSelectedNoteIds(new Set());
     setScenarioDraft(null);
     setFocusFieldId(null);
   }, []);
 
   const handleRequestSelection = React.useCallback(
     (request: CanvasSelectionRequest) => {
+      if (request.kind === 'mixed') {
+        const nextNoteIds = request.additive
+          ? new Set([...selectedNoteIds, ...request.noteIds])
+          : new Set(request.noteIds);
+        setSelectedNoteIds(nextNoteIds);
+
+        if (request.elementIds.length > 0) {
+          const nextElementIds =
+            request.additive && draft && draft.target.kind === 'element'
+              ? Array.from(new Set([...draft.target.ids, ...request.elementIds]))
+              : [...request.elementIds];
+          runGuarded(() => openInspectorFor({ kind: 'element', ids: nextElementIds }));
+        } else {
+          runGuarded(() => {
+            setDraft(null);
+            setScenarioDraft(null);
+            setFocusFieldId(null);
+          });
+        }
+        return;
+      }
+
+      if (request.kind === 'note') {
+        const requestedIds = 'ids' in request ? request.ids : [request.id];
+        if (request.additive) {
+          const nextNoteIds = new Set(selectedNoteIds);
+          for (const id of requestedIds) {
+            if (nextNoteIds.has(id)) nextNoteIds.delete(id);
+            else nextNoteIds.add(id);
+          }
+          setSelectedNoteIds(nextNoteIds);
+        } else {
+          setSelectedNoteIds(new Set(requestedIds));
+          runGuarded(() => {
+            setDraft(null);
+            setScenarioDraft(null);
+            setFocusFieldId(null);
+          });
+        }
+        return;
+      }
+
+      if (!request.additive) {
+        setSelectedNoteIds(new Set());
+      }
+
+      const requestedIds = 'ids' in request ? request.ids : [request.id];
+      if (requestedIds.length === 0) {
+        runGuarded(closeInspector);
+        return;
+      }
+
       const nextTarget: DraftTarget =
         request.additive && draft && draft.target.kind === request.kind
           ? {
               kind: request.kind,
-              ids: draft.target.ids.includes(request.id)
+              ids: 'ids' in request
+                ? Array.from(new Set([...draft.target.ids, ...requestedIds]))
+                : draft.target.ids.includes(request.id)
                 ? draft.target.ids.filter((id) => id !== request.id)
                 : [...draft.target.ids, request.id],
             }
-          : { kind: request.kind, ids: [request.id] };
+          : { kind: request.kind, ids: [...requestedIds] };
 
       if (
         !request.additive &&
         draft &&
         draft.target.kind === nextTarget.kind &&
-        draft.target.ids.length === 1 &&
-        draft.target.ids[0] === nextTarget.ids[0]
+        draft.target.ids.length === nextTarget.ids.length &&
+        draft.target.ids.every((id, idx) => id === nextTarget.ids[idx])
       ) {
         return; // already the open target -- keep editing, don't reopen
       }
@@ -428,10 +484,11 @@ export function Workspace({
 
       runGuarded(() => openInspectorFor(nextTarget));
     },
-    [draft, runGuarded, openInspectorFor, closeInspector],
+    [draft, runGuarded, openInspectorFor, closeInspector, selectedNoteIds],
   );
 
   const handleRequestClearSelection = React.useCallback(() => {
+    setSelectedNoteIds(new Set());
     if (!draft && !scenarioDraft) return;
     runGuarded(closeInspector);
   }, [draft, scenarioDraft, runGuarded, closeInspector]);
@@ -528,15 +585,15 @@ export function Workspace({
     [document, activeViewId],
   );
   const selectedGroupIds = React.useMemo(() => {
-    if (!activeView || selectedElementIds.size === 0) return [];
+    const totalCount = selectedElementIds.size + selectedNoteIds.size;
+    if (!activeView || totalCount <= 1) return [];
     return activeView.groups
-      .filter(
-        (group) =>
-          group.elementIds.length === selectedElementIds.size &&
-          group.elementIds.every((elementId) => selectedElementIds.has(elementId)),
+      .filter((group) =>
+        group.elementIds.length > 0 &&
+        group.elementIds.every((elementId) => selectedElementIds.has(elementId)),
       )
       .map((group) => group.id);
-  }, [activeView, selectedElementIds]);
+  }, [activeView, selectedElementIds, selectedNoteIds]);
   const selectionWhollyUngrouped = React.useMemo(() => {
     if (!activeView || selectedElementIds.size === 0) return false;
     const grouped = new Set(activeView.groups.flatMap((group) => group.elementIds));
@@ -1557,6 +1614,7 @@ export function Workspace({
       canRedo: sessionState.canRedo && sessionState.status === 'ready',
       selectedElementIds: Array.from(selectedElementIds),
       selectedConnectionIds: Array.from(selectedConnectionIds),
+      selectedNoteIds: Array.from(selectedNoteIds),
       selectedGroupIds,
       selectionWhollyUngrouped,
       selectionHasRefinementMember,
@@ -1621,6 +1679,7 @@ export function Workspace({
     selectedScenarioId,
     selectedConnectionIds,
     selectedElementIds,
+    selectedNoteIds,
     selectedGroupIds,
     selectionWhollyUngrouped,
     selectionHasRefinementMember,
@@ -1686,7 +1745,42 @@ export function Workspace({
       setDuplicateDialog({ kind: 'error', messages: [message] });
       return { ok: false, message };
     }
-    const selectedIds = commandContext.selectedElementIds;
+    const selectedIds = Array.from(selectedElementIds);
+    const selectedNoteIdsList = Array.from(selectedNoteIds);
+
+    if (selectedIds.length === 0 && selectedNoteIdsList.length > 0) {
+      const notesToDup = activeView.notes.filter((n) => selectedNoteIdsList.includes(n.id));
+      if (notesToDup.length === 0) {
+        const message = 'The selected notes no longer exist';
+        setDuplicateDialog({ kind: 'error', messages: [message] });
+        return { ok: false, message };
+      }
+      const newNotes: Note[] = notesToDup.map((n) => ({
+        ...n,
+        id: mintId(),
+        x: n.x + 24,
+        y: n.y + 24,
+      }));
+      const plan: SelectionPlan = {
+        ok: true,
+        label: 'Duplicate notes',
+        changes: [
+          {
+            kind: 'replace',
+            value: {
+              recordKind: 'view',
+              record: { ...activeView, notes: [...activeView.notes, ...newNotes] },
+            },
+          },
+        ],
+      };
+      const outcome = await applySelectionPlan(plan);
+      if (outcome.ok) {
+        setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
+      }
+      return outcome;
+    }
+
     const selected = new Set(selectedIds);
     const sourcePlacements = activeView.placements.filter((placement) => selected.has(placement.elementId));
     if (sourcePlacements.length !== selectedIds.length) {
@@ -1696,7 +1790,7 @@ export function Workspace({
     }
     const captured = captureSelection(document, activeViewId, {
       elementIds: selectedIds,
-      noteIds: [],
+      noteIds: selectedNoteIdsList,
     });
     if (!captured.ok) {
       const messages = duplicateIssueMessages(
@@ -1722,7 +1816,7 @@ export function Workspace({
       return { ok: true };
     }
     return applyDuplicate(captured.content, anchor);
-  }, [activeView, activeViewId, applyDuplicate, commandContext.selectedElementIds, document]);
+  }, [activeView, activeViewId, applyDuplicate, applySelectionPlan, selectedElementIds, selectedNoteIds, document, mintId]);
 
   // Exhaustive over CommandId: keyboard and Quick options share these.
   const commandHandlers: CommandHandlers = React.useMemo(
@@ -1794,22 +1888,36 @@ export function Workspace({
       'edit.redo': () => handleRedo(),
       'selection.duplicate': () => handleDuplicateSelection(),
       'selection.delete': () => canvasViewRef.current?.deleteSelection(),
-      'selection.group': ({ label }) =>
-        document && activeViewId
-          ? applySelectionPlan(planGroup(document, activeViewId, commandContext.selectedElementIds, mintId(), label))
-          : { ok: false, message: 'No canvas view is open' },
+      'selection.group': async ({ label }) => {
+        if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+        const result = await applySelectionPlan(
+          planGroup(document, activeViewId, Array.from(selectedElementIds), mintId(), label, Array.from(selectedNoteIds)),
+        );
+        if (result.ok) {
+          closeInspector();
+        }
+        return result;
+      },
       'selection.wrap-in-boundary': ({ viewId, elementIds, ownerElementId, refinementId, label }) => {
         if (!document) return { ok: false, message: 'No canvas view is open' };
         const portIds = wrapBoundaryCrossingEndpoints(document, elementIds).map(() => ({
           ownerPortId: mintId(),
           mappingId: mintId(),
         }));
-        return applySelectionPlan(planWrapInBoundary(document, viewId, elementIds, {
-          ownerElementId,
-          refinementId,
-          portIds,
-          placementId: mintId(),
-        }, label));
+        return applySelectionPlan(
+          planWrapInBoundary(
+            document,
+            viewId,
+            elementIds,
+            {
+              ownerElementId,
+              refinementId,
+              portIds,
+              placementId: mintId(),
+            },
+            label,
+          ),
+        );
       },
       'selection.ungroup': ({ groupIds }) =>
         document && activeViewId
@@ -1817,7 +1925,7 @@ export function Workspace({
           : { ok: false, message: 'No canvas view is open' },
       'selection.align': ({ edge }) =>
         document && activeViewId
-          ? applySelectionPlan(planAlign(document, activeViewId, commandContext.selectedElementIds, edge, canvasViewRef.current?.getMeasuredHeights()))
+          ? applySelectionPlan(planAlign(document, activeViewId, Array.from(selectedElementIds), edge, canvasViewRef.current?.getMeasuredHeights(), Array.from(selectedNoteIds)))
           : { ok: false, message: 'No canvas view is open' },
       // 16D overflow (commands.md "Selection-scoped actions", D46).
       'selection.save-as-component': () => {
@@ -1865,11 +1973,12 @@ export function Workspace({
       'selection.export': () => {
         if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
         const ids = [...selectedElementIds];
-        if (ids.length === 0) return { ok: false, message: 'Select one or more components first' };
+        const noteIds = [...selectedNoteIds];
+        if (ids.length === 0 && noteIds.length === 0) return { ok: false, message: 'Select one or more components or notes first' };
         const label = ids.length === 1
           ? document.elements.find((e) => e.id === ids[0])?.label ?? 'Selection'
-          : `${ids.length} components`;
-        const exported = createSelectionExport(document, activeViewId, ids, [], mintId(), label);
+          : `${ids.length + noteIds.length} items`;
+        const exported = createSelectionExport(document, activeViewId, ids, noteIds, mintId(), label);
         if (!exported.ok) return { ok: false, message: exported.message };
         createBrowserDownloadSink()(
           new Blob([exported.bytes.slice().buffer as ArrayBuffer], { type: 'application/json;charset=utf-8' }),
@@ -1879,7 +1988,7 @@ export function Workspace({
       },
       'selection.distribute': ({ axis }) =>
         document && activeViewId
-          ? applySelectionPlan(planDistribute(document, activeViewId, commandContext.selectedElementIds, axis, canvasViewRef.current?.getMeasuredHeights()))
+          ? applySelectionPlan(planDistribute(document, activeViewId, Array.from(selectedElementIds), axis, canvasViewRef.current?.getMeasuredHeights(), Array.from(selectedNoteIds)))
           : { ok: false, message: 'No canvas view is open' },
       'canvas.expand': ({ viewId, target }) =>
         document
@@ -1890,10 +1999,31 @@ export function Workspace({
           ? applySelectionPlan(planExpansion(document, viewId, target, 'collapse'))
           : { ok: false, message: 'No canvas view is open' },
       'canvas.add-note': ({ text }) => {
-        const point = canvasViewRef.current?.getVisibleCentre();
-        return document && activeViewId && point
-          ? applySelectionPlan(planAddNote(document, activeViewId, mintId(), text, point))
-          : { ok: false, message: 'No canvas view is open' };
+        if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+        const view = document.views.find((v) => v.id === activeViewId);
+        const selectedId = commandContext.selectedElementIds.length === 1
+          ? commandContext.selectedElementIds[0]
+          : null;
+        const selectedPlacement = selectedId && view
+          ? view.placements.find((p) => p.elementId === selectedId)
+          : null;
+
+        const point = selectedPlacement
+          ? { x: selectedPlacement.x + selectedPlacement.width + 24, y: selectedPlacement.y }
+          : canvasViewRef.current?.getVisibleCentre();
+
+        if (!point) return { ok: false, message: 'No canvas view is open' };
+
+        return applySelectionPlan(
+          planAddNote(
+            document,
+            activeViewId,
+            mintId(),
+            text || 'New note',
+            point,
+            selectedPlacement ? [selectedPlacement.elementId] : [],
+          ),
+        );
       },
       'part.capture': ({ command }) => session.savePart(command),
       'part.place': ({ content, label }) => placeSavedPart(content, label),
@@ -1913,7 +2043,8 @@ export function Workspace({
       handleUndo,
       activeViewId,
       applySelectionPlan,
-      commandContext.selectedElementIds,
+      selectedElementIds,
+      selectedNoteIds,
       document,
       mintId,
       openHistoryPanel,
@@ -2064,7 +2195,7 @@ export function Workspace({
           onViewChange={setLibraryView}
           renderSavedParts={(searchQuery, view) => <SavedParts
             repository={repository} session={session} actor={actor} mintId={mintId}
-            viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[]}
+            viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[...selectedNoteIds]}
             blockedReason={partsBlockedReason}
             captureBlockedReason={captureBlockedReason}
             captureRequested={captureRequested}
@@ -2315,6 +2446,7 @@ export function Workspace({
                     onMoveNodes={handleMoveNodes}
                     selectedElementIds={selectedElementIds}
                     selectedConnectionIds={selectedConnectionIds}
+                    selectedNoteIds={selectedNoteIds}
                     onRequestSelection={handleRequestSelection}
                     onRequestClearSelection={handleRequestClearSelection}
                     mintId={mintId}

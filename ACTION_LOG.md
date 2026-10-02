@@ -2266,6 +2266,201 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `graphify update .`: AST updated cleanly (4,933 nodes, 13,608 edges, 337 communities).
 - **Lesson**: Do not check stored preferences (`panel.collapsed === false`) to determine whether a panel is currently visible; always check `effectiveLayout(state)`. If layout constraints auto-collapse a panel while stored preferences remain `collapsed: false`, actions like `OPEN` or `EXPAND` will early-return as no-ops unless they evaluate the effective layout. Responsive constraints must clamp runtime dimensions dynamically (`computeEffectiveSideWidth`) without mutating stored user preferences (§7).
 
+## 2026-10-01 — Revalidated Bottom Dock Panel Actions and Implemented Area Selection & Note Enhancements
+
+- **Outcome**: Revalidated all bottom dock actions, tools, options, popovers, customization trays, and panel interactions across viewports and test suites. Implemented key workflow improvements identified during revalidation:
+  - **Area / Marquee Box Selection**: Enabled box selection across multiple canvas nodes in `select` mode by capturing marquee selection during `onSelectionStart`/`onSelectionEnd` in `CanvasView.tsx` and mapping to batch selection (`ids: readonly Id[]`) in `Workspace.tsx` through `handleRequestSelection` without conflicting with single/Shift+click navigation guard invariants.
+  - **Notes Workflow Revamp**:
+    - Pure presentation planners `planUpdateNote` and `planDeleteNote` added to `src/features/workspace/selectionPlans.ts` with complete vitest test suites.
+    - Inline note editing on `NoteNode.tsx` with double-click or pencil button activation, enter/esc keyboard handling, auto-focus, and auto-resize.
+    - Note deletion via trash button with undoable command application.
+    - Sticky note linking indicator and detachment action via `attachedElementIds`, with parent element dragging moving attached notes automatically in `handleNodeDragStop` and `buildMoveChange`.
+  - **Node Card Port Expansion**: Wired port summary expand/collapse toggle button on `NodeCard.tsx` directly to `canvas.expand` / `canvas.collapse` command execution via `onToggleExpanded`, with accessible `aria-label="Port summary"` attributes.
+  - **Transient Dismissal**: Added `studio:dismiss-transients` event on empty canvas pane clicks, cleanly dismissing open floating dock popovers, overflow menus, branch popovers, and export menus.
+- **Files**:
+  - `src/features/workspace/CanvasView.tsx`
+  - `src/features/workspace/Workspace.tsx`
+  - `src/features/workspace/NoteNode.tsx`
+  - `src/features/workspace/NodeCard.tsx`
+  - `src/features/workspace/FloatingDock.tsx`
+  - `src/features/workspace/selectionPlans.ts`
+  - `src/features/workspace/selectionPlans.test.ts`
+  - `src/features/workspace/projection.ts`
+  - `src/features/workspace/SelectionToolbar.tsx`
+  - `src/features/transfer/ui/ExportMenu.tsx`
+  - `src/features/workspace/BranchPopover.tsx`
+  - `src/features/workspace/ProjectMenu.tsx`
+  - `tests/studio-selection-actions.spec.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,569 passed across 138 test files (+6 new unit tests in `selectionPlans.test.ts`).
+  - `npx playwright test tests/studio-selection-actions.spec.ts`: 4/4 passed (including new tests for note inline edit/delete, port expansion toggle, outside dismissal, and marquee drag selection).
+  - `npx playwright test tests/studio-dock-customization.spec.ts`: 4/4 passed.
+  - `npx playwright test tests/studio-panels.spec.ts`: 5/5 passed.
+  - `npm run build`: built clean in 497ms.
+  - `npm run build-storybook`: Storybook build passed cleanly.
+  - `node scripts/a11y-audit.mjs`: 0 axe violations.
+  - `graphify update .`: AST updated cleanly.
+## 2026-10-02 — Sticky Notes Linking & Direct Canvas Drag-and-Drop
+
+- **Outcome**: Improved sticky notes linking, eliminated the intrusive "New canvas note" dialog, and enabled direct drag-and-drop of notes onto the canvas:
+  - **No More Note Dialog**: Clicking the dock note button or shortcut adds a note directly to the canvas in inline-editing mode without prompting for note text in a popover dialog.
+  - **Dock Note Drag-and-Drop**: Enabled dragging the note button (`application/x-system-studio-note`) from the floating dock directly onto the canvas. Allowed the MIME type in `CanvasView.handleCanvasDragOver` and instantiated the note at drop flow coordinates.
+  - **Sticky Notes Linking**:
+    - Dropping a note from the dock on or near an existing component placement automatically creates it as a sticky note attached to that component.
+    - Adding a note while 1 component is selected automatically positions it next to the component and attaches it as a sticky note.
+    - Dropping an unattached note near a component placement on the canvas auto-links it as a sticky note in a single atomic undoable action.
+    - Sticky notes feature an explicit status badge (`Sticky: <Component Name>`) with a `PinOff` detachment button.
+    - Unattached notes offer a "Link to node" dropdown picker to immediately attach to any available component in the view.
+    - Parent component movements continue to move all attached sticky notes seamlessly with them.
+- **Files**:
+  - `src/features/workspace/FloatingDock.tsx`
+  - `src/features/workspace/CanvasView.tsx`
+  - `src/features/workspace/Workspace.tsx`
+  - `src/features/workspace/NoteNode.tsx`
+  - `src/features/workspace/projection.ts`
+  - `src/features/workspace/selectionPlans.ts`
+  - `src/features/workspace/selectionPlans.test.ts`
+  - `tests/studio-selection-actions.spec.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,570 tests passed across 138 test files.
+  - `npx playwright test tests/studio-selection-actions.spec.ts`: 5/5 passed (including new sticky notes linking, drag-and-drop from dock, and detachment test).
+  - `npm run build`: built cleanly in 530ms without TypeScript errors.
+  - `npm run build-storybook`: Storybook build passed cleanly.
+  - Browser subagent: visually confirmed direct note creation on canvas, inline editing, component linking, and sticky badge display.
+
+## 2026-10-02 — Align Menu Sections, Expand/Collapse Removal, Group Visibility & Ungrouping
+
+- **Outcome**: Addressed toolbar and canvas grouping ergonomics:
+  - **Structured Align Menu**: Organized the Align menu in `SelectionToolbar.tsx` into 3 distinct sections (Horizontal Alignment, Vertical Alignment, Distribute) with clear Lucide icons (`AlignLeft`, `AlignCenterHorizontal`, `AlignRight`, `AlignStartVertical`, `AlignCenterVertical`, `AlignEndVertical`, `AlignHorizontalDistributeCenter`, `AlignVerticalDistributeCenter`).
+  - **Removed Expand/Collapse from Floating Bar**: Removed redundant expand/collapse button from the floating selection toolbar, since node card expansion toggles are already accessible directly on the nodes themselves (`node-expand-toggle-` and `boundary-collapse-`).
+  - **Multi-Node Group Visibility**: Ensured Group options (`selection.group` on dock and toolbar, and `selection.wrap-in-boundary`) are only visible when multiple nodes are selected (`count > 1` / `selectedElementIds.length >= 2`).
+  - **Ungrouping Option**:
+    - Added dedicated Ungroup button on `GroupNode` for both collapsed and expanded group frames (`group-ungroup-<id>`), allowing direct one-click ungrouping on the canvas.
+    - Updated `selectedGroupIds` in `Workspace.tsx` so selecting any member nodes of a group marks the group for ungrouping.
+    - Enabled `selection.ungroup` button on `SelectionToolbar.tsx` whenever `selectedGroupIds.length > 0`.
+- **Files**:
+  - `src/features/workspace/SelectionToolbar.tsx`
+  - `src/features/workspace/FloatingDock.tsx`
+  - `src/features/workspace/GroupNode.tsx`
+  - `src/features/workspace/CanvasView.tsx`
+  - `src/features/workspace/Workspace.tsx`
+  - `src/features/workspace/projection.ts`
+  - `tests/studio-selection-actions.spec.ts`
+  - `tests/studio-canvas-collapse.spec.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,570 passed across 138 test files.
+  - `npx playwright test tests/studio-selection-actions.spec.ts tests/studio-dock-customization.spec.ts tests/studio-canvas-collapse.spec.ts tests/studio-selection-options.spec.ts`: 13/13 passed.
+  - `npm run build`: built clean in 520ms.
+## 2026-10-02 — Align Menu Horizontal Icons, Selectable & Repositionable Groups, Mutually Exclusive Group/Ungroup & Real-time Sticky Notes
+
+- **Outcome**: Addressed toolbar icon ergonomics, group container interactions, and real-time sticky note behavior:
+  - **Align Menu Horizontal Icons with Tooltips**:
+    - Refactored `SelectionToolbar.tsx` Align dropdown to display compact horizontal rows of icon buttons (`flex items-center gap-1`) for Horizontal Alignment, Vertical Alignment, and Distribute sections.
+    - Wrapped each icon button in a Radix Tooltip with descriptive tooltips (`Align left`, `Align top`, `Distribute horizontally`, etc.), removing bulky text labels and matching modern design tools (Figma/Illustrator).
+  - **Group Container Selection, Repositioning & Mutually Exclusive Group/Ungroup**:
+    - Fixed the ungroup button on the group toggle (`GroupNode.tsx`) by allowing `selection.ungroup` command availability in `registry.ts` to accept explicit `payload.groupIds`.
+    - Made group containers selectable: clicking the group container frame or header tag selects all member nodes in the group (`selection: { kind: 'element', ids: group.elementIds }`).
+    - Made group containers repositionable when expanded: dragging the group boundary moves all member placements and attached sticky notes together in real-time and on drop.
+    - Enforced that selecting an individual node (`count === 1`) never shows Ungroup or Group.
+    - Enforced that when multiple nodes are selected (`count > 1`), exactly one option is available: either Group (if ungrouped) OR Ungroup (if grouped), never both.
+  - **Real-Time Sticky Note Movement & Group Containment**:
+    - Implemented real-time note movement during drag (`handleNodeDragStart` and `handleNodeDrag` in `CanvasView.tsx`) so attached sticky notes smoothly glide along with their linked node in real-time.
+    - Added group containment for sticky notes: attached notes are included in group bounding boxes, collapse with the group when the group collapses, and reposition with the group when the group container is dragged.
+- **Files**:
+  - `src/features/workspace/SelectionToolbar.tsx`
+  - `src/features/workspace/GroupNode.tsx`
+  - `src/features/workspace/CanvasView.tsx`
+  - `src/features/workspace/projection.ts`
+  - `src/features/workspace/projection.test.ts`
+  - `src/features/workspace/Workspace.tsx`
+  - `src/features/workspace/commands/registry.ts`
+  - `tests/studio-selection-actions.spec.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,572 passed across 138 test files.
+  - `npx playwright test tests/studio-selection-actions.spec.ts`: 6/6 passed.
+  - `npx playwright test`: 102/102 passed across the entire project.
+  - `npm run build`: built cleanly in 499ms without TypeScript errors.
+  - `npm run build-storybook`: Storybook build passed cleanly in 2.73s.
+
+## 2026-10-02 — First-Class Sticky Notes: Mixed Selection, Alignment, Distribution, Duplication, Deletion & Grouping
+
+- **Outcome**: Treated sticky notes as first-class canvas selection items alongside architecture nodes:
+  - **Mixed & Note Selection**:
+    - Enabled single-click, Shift-click additive toggle, and marquee/box selection for notes, nodes, and mixed node+note selections.
+    - Updated `NoteNode.tsx` so clicking the note body selects the note card without accidentally triggering text edit mode (double click / pencil button still edits).
+    - Preserved visual selection highlight with focus rings on selected notes.
+  - **Alignment & Distribution**:
+    - Extended `planAlign` and `planDistribute` in `selectionPlans.ts` to compute joint bounding boxes across placements and notes.
+    - Aligns notes and node placements together (left, center, right, top, middle, bottom) and distributes them with equal spacing along horizontal or vertical axes.
+  - **Duplication & Deletion**:
+    - Updated `planDelete` in `deletePlan.ts` to support note IDs alongside element IDs, cleanly removing selected notes, nodes, or mixed batches without dangling pointers.
+    - Updated `capturePart` and `handleDuplicateSelection` to duplicate selected notes, nodes, or mixed selections with appropriate layout offset.
+  - **Grouping & Real-Time Dragging**:
+    - Updated `planGroup` to attach selected notes to the created group's elements, ensuring they are contained within the group boundary and collapse/expand together.
+    - Selecting a group container frame or header tag selects all member nodes and attached notes as a mixed selection.
+    - Dragging mixed selections or group containers moves nodes and notes in real-time and updates positions cleanly on drop without coordinate drift.
+  - **Command Registry & Toolbar**:
+    - Updated `CommandContext` to support `selectedNoteIds`.
+    - Updated availability rules for `selection.duplicate`, `selection.delete`, `selection.align`, and `selection.distribute` to consider total selected items (nodes + notes).
+    - Updated `SelectionToolbar` item count and coordinates to incorporate notes.
+- **Files**:
+  - `src/domain/parts/capture.ts`
+  - `src/features/workspace/NoteNode.tsx`
+  - `src/features/workspace/CanvasView.tsx`
+  - `src/features/workspace/Workspace.tsx`
+  - `src/features/workspace/SelectionToolbar.tsx`
+  - `src/features/workspace/commands/registry.ts`
+  - `src/features/workspace/deletePlan.ts`
+  - `src/features/workspace/selectionPlans.ts`
+  - `tests/studio-selection-actions.spec.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,572 passed across 138 test files.
+  - `npx playwright test tests/studio-selection-actions.spec.ts`: 7/7 passed (including comprehensive mixed node+note E2E test).
+  - `npm run build`: built cleanly with 0 TypeScript errors.
 
 
+## 2026-10-02 — Unified selection box and grouping box geometry & spacing
 
+- **Outcome**: Harmonized selection box and grouping box styling and dimensions to have identical uniform 24px spacing all around and matching `rounded-card` radii. When converting a selection to a group, the selection box is immediately dismissed and replaced seamlessly by the grouping box at the exact same canvas coordinates.
+- **Key Changes**:
+  - **Uniform Grouping Padding**:
+    - Replaced asymmetrical padding (`GROUP_PADDING_X = 24`, `GROUP_PADDING_Y_TOP = 36`, `GROUP_PADDING_Y_BOTTOM = 24`) in `src/features/workspace/projection.ts` and `src/features/transfer/svg-export.ts` with uniform `GROUP_PADDING = 24` on all sides (top, bottom, left, right).
+  - **Design-System SelectionBox**:
+    - Created `src/features/workspace/SelectionBox.tsx` using `@xyflow/react` node lookup and `ViewportPortal`.
+    - Computes bounding box across selected nodes and notes with uniform 24px padding matching the grouping box formula.
+    - Styled with `rounded-card border-2 border-dashed border-primary bg-primary/[0.04]` pointer-events-none container.
+    - Hid ReactFlow's default unpadded `.react-flow__nodesselection` in `src/styles.css`.
+  - **Selection to Group Transition**:
+    - Made `commandHandlers['selection.group']` async and awaited `applySelectionPlan`.
+    - On success, invoked `closeInspector()` to clear `draft` (which derives `selectedElementIds`) and reset `selectedNoteIds`, cleanly removing the selection box immediately upon grouping.
+  - **Selection Toolbar Positioning**:
+    - Updated `SelectionToolbar.tsx` positioning calculation to account for uniform 24px selection box padding so toolbar floats 12px above the selection box boundary.
+- **Files**:
+  - `src/features/workspace/projection.ts`
+  - `src/features/workspace/projection.test.ts`
+  - `src/features/transfer/svg-export.ts`
+  - `src/features/workspace/SelectionBox.tsx`
+  - `src/features/workspace/CanvasView.tsx`
+  - `src/styles.css`
+  - `src/features/workspace/SelectionToolbar.tsx`
+  - `src/features/workspace/Workspace.tsx`
+  - `tests/studio-selection-actions.spec.ts`
+  - `ACTION_LOG.md`
+- **Platform/subagents**: agy lead.
+- **Verification**:
+  - `npm test`: 1,572 unit tests passed across 138 files.
+  - `npx playwright test tests/studio-selection-actions.spec.ts`: 8/8 passed (including new test verifying exact bounding box match before and after grouping).
+  - `npx playwright test`: 104/104 end-to-end browser journeys passed across the entire project.
+  - `npm run build`: Production TypeScript & Vite bundle built in 527ms.
+  - `npm run build-storybook`: Storybook build passed in 3.05s.
+  - `graphify update .`: AST updated cleanly.

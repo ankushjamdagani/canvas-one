@@ -247,9 +247,19 @@ export function captureSelection(
   }
 
   const sourcePlacements = view.placements.filter((placement) => includedElementIds.has(placement.elementId));
-  const selectedPlacements = selectedIds.map((elementId) => placementsByElementId.get(elementId)!);
-  const minX = Math.min(...selectedPlacements.map((placement) => placement.x));
-  const minY = Math.min(...selectedPlacements.map((placement) => placement.y));
+  const selectedPlacements = selectedIds.map((elementId) => placementsByElementId.get(elementId)!).filter(Boolean);
+  const minX =
+    selectedPlacements.length > 0
+      ? Math.min(...selectedPlacements.map((placement) => placement.x))
+      : includedNotes.length > 0
+      ? Math.min(...includedNotes.map((note) => note.x))
+      : 0;
+  const minY =
+    selectedPlacements.length > 0
+      ? Math.min(...selectedPlacements.map((placement) => placement.y))
+      : includedNotes.length > 0
+      ? Math.min(...includedNotes.map((note) => note.y))
+      : 0;
   const placements = sourcePlacements.map((placement) => ({ ...placement, x: placement.x - minX, y: placement.y - minY }));
   const notes = includedNotes.map((note) => ({ ...note, x: note.x - minX, y: note.y - minY }));
   const schemas: PayloadSchema[] = document.schemas.filter((schema) => requiredSchemaIds.has(schema.id));

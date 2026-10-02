@@ -71,6 +71,18 @@ function selectedPlacements(view: View, elementIds: readonly Id[]): Placement[] 
   return placements;
 }
 
+function selectedNotes(view: View, noteIds: readonly Id[]): Note[] | null {
+  if (hasDuplicates(noteIds)) return null;
+  const noteById = new Map(view.notes.map((note) => [note.id, note]));
+  const notes: Note[] = [];
+  for (const noteId of noteIds) {
+    const note = noteById.get(noteId);
+    if (!note) return null;
+    notes.push(note);
+  }
+  return notes;
+}
+
 function replacePlacements(view: View, replacements: ReadonlyMap<Id, Placement>): View {
   return {
     ...view,
@@ -85,6 +97,7 @@ export function planGroup(
   elementIds: readonly Id[],
   groupId: Id,
   rawLabel: string,
+  noteIds: readonly Id[] = [],
 ): SelectionPlan {
   const view = findView(document, viewId);
   if (!view) return reject('The active view no longer exists');
@@ -107,7 +120,19 @@ export function planGroup(
   }
 
   const group: Group = { id: groupId, label, elementIds: [...elementIds], collapsed: false };
-  return replaceView({ ...view, groups: [...view.groups, group] }, 'Group');
+  // When notes are selected with grouped elements, attach them to the group (attaching to the first member element if unattached)
+  const targetElementId = elementIds[0];
+  const updatedNotes = view.notes.map((note) => {
+    if (noteIds.includes(note.id)) {
+      const alreadyAttachedToGroup = note.attachedElementIds.some((id) => elementIds.includes(id));
+      if (!alreadyAttachedToGroup) {
+        return { ...note, attachedElementIds: [targetElementId] };
+      }
+    }
+    return note;
+  });
+
+  return replaceView({ ...view, groups: [...view.groups, group], notes: updatedNotes }, 'Group');
 }
 
 /** Removes only presentation groups; their elements and placements stay intact. */
@@ -124,41 +149,82 @@ export function planUngroup(document: Document, viewId: Id, groupIds: readonly I
   return replaceView({ ...view, groups: view.groups.filter((group) => !removed.has(group.id)) }, 'Ungroup');
 }
 
-/** Aligns selected placement bounding boxes; placement width is authored and card height is the projection constant. */
+/** Aligns selected placement and note bounding boxes; placement width is authored and card height is the projection constant. */
 export function planAlign(
   document: Document,
   viewId: Id,
   elementIds: readonly Id[],
   edge: AlignEdge,
   heights?: MeasuredHeights,
+  noteIds: readonly Id[] = [],
 ): SelectionPlan {
   const view = findView(document, viewId);
   if (!view) return reject('The active view no longer exists');
-  if (elementIds.length < 2) return reject('Select at least 2 components to align');
-  const placements = selectedPlacements(view, elementIds);
-  if (!placements) return reject('Every selected component must be placed in this view');
+  const totalCount = elementIds.length + noteIds.length;
+  if (totalCount < 2) return reject('Select at least 2 components to align');
 
-  const minX = Math.min(...placements.map((placement) => placement.x));
-  const maxX = Math.max(...placements.map((placement) => placement.x + placement.width));
-  const minY = Math.min(...placements.map((placement) => placement.y));
-  const maxY = Math.max(...placements.map((placement) => placement.y + placementHeight(placement, heights)));
+  const placements = elementIds.length > 0 ? selectedPlacements(view, elementIds) : [];
+  if (elementIds.length > 0 && !placements) return reject('Every selected component must be placed in this view');
+
+  const notes = noteIds.length > 0 ? selectedNotes(view, noteIds) : [];
+  if (noteIds.length > 0 && !notes) return reject('Every selected note must exist in this view');
+
+  type AlignItem =
+    | { kind: 'placement'; record: Placement; width: number; height: number; x: number; y: number }
+    | { kind: 'note'; record: Note; width: number; height: number; x: number; y: number };
+
+  const items: AlignItem[] = [
+    ...(placements ?? []).map((p) => ({
+      kind: 'placement' as const,
+      record: p,
+      width: p.width,
+      height: placementHeight(p, heights),
+      x: p.x,
+      y: p.y,
+    })),
+    ...(notes ?? []).map((n) => ({
+      kind: 'note' as const,
+      record: n,
+      width: n.width ?? DEFAULT_NOTE_WIDTH,
+      height: heights?.get(n.id) ?? 100,
+      x: n.x,
+      y: n.y,
+    })),
+  ];
+
+  const minX = Math.min(...items.map((i) => i.x));
+  const maxX = Math.max(...items.map((i) => i.x + i.width));
+  const minY = Math.min(...items.map((i) => i.y));
+  const maxY = Math.max(...items.map((i) => i.y + i.height));
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
-  const replacements = new Map<Id, Placement>();
 
-  for (const placement of placements) {
-    let x = placement.x;
-    let y = placement.y;
+  const placementReplacements = new Map<Id, Placement>();
+  const noteReplacements = new Map<Id, Note>();
+
+  for (const item of items) {
+    let x = item.x;
+    let y = item.y;
     switch (edge) {
       case 'left': x = minX; break;
-      case 'center-x': x = centerX - placement.width / 2; break;
-      case 'right': x = maxX - placement.width; break;
+      case 'center-x': x = centerX - item.width / 2; break;
+      case 'right': x = maxX - item.width; break;
       case 'top': y = minY; break;
-      case 'center-y': y = centerY - placementHeight(placement, heights) / 2; break;
-      case 'bottom': y = maxY - placementHeight(placement, heights); break;
+      case 'center-y': y = centerY - item.height / 2; break;
+      case 'bottom': y = maxY - item.height; break;
     }
-    replacements.set(placement.id, { ...placement, x, y });
+    if (item.kind === 'placement') {
+      placementReplacements.set(item.record.id, { ...item.record, x, y });
+    } else {
+      noteReplacements.set(item.record.id, { ...item.record, x: Math.round(x), y: Math.round(y) });
+    }
   }
+
+  const updatedView = {
+    ...view,
+    placements: view.placements.map((p) => placementReplacements.get(p.id) ?? p),
+    notes: view.notes.map((n) => noteReplacements.get(n.id) ?? n),
+  };
 
   const labels: Record<AlignEdge, string> = {
     left: 'Align left',
@@ -168,7 +234,7 @@ export function planAlign(
     'center-y': 'Align centers vertically',
     bottom: 'Align bottom',
   };
-  return replaceView(replacePlacements(view, replacements), labels[edge]);
+  return replaceView(updatedView, labels[edge]);
 }
 
 /** Keeps the sorted endpoints fixed and makes the gaps between bounding boxes equal. */
@@ -178,37 +244,83 @@ export function planDistribute(
   elementIds: readonly Id[],
   axis: DistributeAxis,
   heights?: MeasuredHeights,
+  noteIds: readonly Id[] = [],
 ): SelectionPlan {
   const view = findView(document, viewId);
   if (!view) return reject('The active view no longer exists');
-  if (elementIds.length < 3) return reject('Select at least 3 components to distribute');
-  const placements = selectedPlacements(view, elementIds);
-  if (!placements) return reject('Every selected component must be placed in this view');
+  const totalCount = elementIds.length + noteIds.length;
+  if (totalCount < 3) return reject('Select at least 3 components to distribute');
 
-  const ordered = [...placements].sort((a, b) => {
+  const placements = elementIds.length > 0 ? selectedPlacements(view, elementIds) : [];
+  if (elementIds.length > 0 && !placements) return reject('Every selected component must be placed in this view');
+
+  const notes = noteIds.length > 0 ? selectedNotes(view, noteIds) : [];
+  if (noteIds.length > 0 && !notes) return reject('Every selected note must exist in this view');
+
+  type DistItem =
+    | { kind: 'placement'; record: Placement; id: string; size: number; x: number; y: number }
+    | { kind: 'note'; record: Note; id: string; size: number; x: number; y: number };
+
+  const items: DistItem[] = [
+    ...(placements ?? []).map((p) => ({
+      kind: 'placement' as const,
+      record: p,
+      id: p.elementId,
+      size: axis === 'x' ? p.width : placementHeight(p, heights),
+      x: p.x,
+      y: p.y,
+    })),
+    ...(notes ?? []).map((n) => ({
+      kind: 'note' as const,
+      record: n,
+      id: n.id,
+      size: axis === 'x' ? (n.width ?? DEFAULT_NOTE_WIDTH) : (heights?.get(n.id) ?? 100),
+      x: n.x,
+      y: n.y,
+    })),
+  ];
+
+  const ordered = [...items].sort((a, b) => {
     const delta = axis === 'x' ? a.x - b.x : a.y - b.y;
-    return delta || a.elementId.localeCompare(b.elementId);
+    return delta || a.id.localeCompare(b.id);
   });
-  const size = (placement: Placement) => axis === 'x' ? placement.width : placementHeight(placement, heights);
+
   const first = ordered[0];
   const last = ordered[ordered.length - 1];
   const start = axis === 'x' ? first.x : first.y;
-  const end = (axis === 'x' ? last.x : last.y) + size(last);
-  const totalSize = ordered.reduce((sum, placement) => sum + size(placement), 0);
+  const end = (axis === 'x' ? last.x : last.y) + last.size;
+  const totalSize = ordered.reduce((sum, item) => sum + item.size, 0);
   const gap = (end - start - totalSize) / (ordered.length - 1);
-  const replacements = new Map<Id, Placement>();
+
+  const placementReplacements = new Map<Id, Placement>();
+  const noteReplacements = new Map<Id, Note>();
   let cursor = start;
 
-  for (const placement of ordered) {
-    replacements.set(
-      placement.id,
-      axis === 'x' ? { ...placement, x: cursor } : { ...placement, y: cursor },
-    );
-    cursor += size(placement) + gap;
+  for (const item of ordered) {
+    if (item.kind === 'placement') {
+      placementReplacements.set(
+        item.record.id,
+        axis === 'x' ? { ...item.record, x: cursor } : { ...item.record, y: cursor },
+      );
+    } else {
+      noteReplacements.set(
+        item.record.id,
+        axis === 'x'
+          ? { ...item.record, x: Math.round(cursor) }
+          : { ...item.record, y: Math.round(cursor) },
+      );
+    }
+    cursor += item.size + gap;
   }
 
+  const updatedView = {
+    ...view,
+    placements: view.placements.map((p) => placementReplacements.get(p.id) ?? p),
+    notes: view.notes.map((n) => noteReplacements.get(n.id) ?? n),
+  };
+
   return replaceView(
-    replacePlacements(view, replacements),
+    updatedView,
     axis === 'x' ? 'Distribute horizontally' : 'Distribute vertically',
   );
 }
@@ -220,6 +332,7 @@ export function planAddNote(
   noteId: Id,
   rawText: string,
   point: { readonly x: number; readonly y: number },
+  attachedElementIds: readonly Id[] = [],
 ): SelectionPlan {
   const view = findView(document, viewId);
   if (!view) return reject('The active view no longer exists');
@@ -248,7 +361,56 @@ export function planAddNote(
     y: point.y,
     width: DEFAULT_NOTE_WIDTH,
     tone: 'paper',
-    attachedElementIds: [],
+    attachedElementIds: [...attachedElementIds],
   };
   return replaceView({ ...view, notes: [...view.notes, note] }, 'Add note');
 }
+
+/** Updates an existing note's text, tone, attached elements, or position. */
+export function planUpdateNote(
+  document: Document,
+  viewId: Id,
+  noteId: Id,
+  updates: {
+    readonly text?: string;
+    readonly attachedElementIds?: readonly Id[];
+    readonly tone?: Note['tone'];
+    readonly position?: { readonly x: number; readonly y: number };
+  },
+): SelectionPlan {
+  const view = findView(document, viewId);
+  if (!view) return reject('The active view no longer exists');
+  const index = view.notes.findIndex((n) => n.id === noteId);
+  if (index < 0) return reject('The note no longer exists');
+  const existing = view.notes[index];
+  const nextText = updates.text !== undefined ? updates.text.trim() : existing.text;
+  if (codePointLength(nextText) === 0) return reject('Enter note text');
+  if (codePointLength(nextText) > NOTE_TEXT_MAX_LENGTH) {
+    return reject(`Use ${NOTE_TEXT_MAX_LENGTH} characters or fewer`);
+  }
+  const nextNote: Note = {
+    ...existing,
+    text: nextText,
+    tone: updates.tone ?? existing.tone,
+    attachedElementIds: updates.attachedElementIds ? [...updates.attachedElementIds] : existing.attachedElementIds,
+    x: updates.position ? Math.round(updates.position.x) : existing.x,
+    y: updates.position ? Math.round(updates.position.y) : existing.y,
+  };
+  const updatedNotes = [...view.notes];
+  updatedNotes[index] = nextNote;
+  return replaceView({ ...view, notes: updatedNotes }, 'Update note');
+}
+
+/** Deletes a note from the active view. */
+export function planDeleteNote(
+  document: Document,
+  viewId: Id,
+  noteId: Id,
+): SelectionPlan {
+  const view = findView(document, viewId);
+  if (!view) return reject('The active view no longer exists');
+  const updatedNotes = view.notes.filter((n) => n.id !== noteId);
+  if (updatedNotes.length === view.notes.length) return reject('The note no longer exists');
+  return replaceView({ ...view, notes: updatedNotes }, 'Delete note');
+}
+

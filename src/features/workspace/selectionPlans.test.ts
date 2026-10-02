@@ -7,6 +7,8 @@ import {
   VIEW_GROUP_LIMIT,
   VIEW_NOTE_LIMIT,
   planAddNote,
+  planUpdateNote,
+  planDeleteNote,
   planAlign,
   planDistribute,
   planGroup,
@@ -224,6 +226,12 @@ describe('planAddNote', () => {
     ]);
   });
 
+  it('adds attached note linking to element', () => {
+    const plan = planAddNote(makeDocument(), VIEW_ID, 'note-sticky', 'DB read replica notes', { x: 50, y: 50 }, ['a']);
+    expect(plan).toMatchObject({ ok: true, label: 'Add note' });
+    expect(plannedView(plan).notes[0].attachedElementIds).toEqual(['a']);
+  });
+
   it.each([
     ['missing view', () => planAddNote(makeDocument(), 'missing', 'note-new', 'Text', { x: 0, y: 0 })],
     ['blank text', () => planAddNote(makeDocument(), VIEW_ID, 'note-new', '   ', { x: 0, y: 0 })],
@@ -237,5 +245,52 @@ describe('planAddNote', () => {
     ],
   ])('rejects %s', (_name, run) => {
     expect(run()).toMatchObject({ ok: false, reason: expect.any(String) });
+  });
+});
+
+describe('planUpdateNote', () => {
+  it('updates text, tone, attachedElementIds, and position', () => {
+    const doc = makeDocument({
+      notes: [{ id: 'n1', text: 'Original', x: 10, y: 10, width: 220, tone: 'paper', attachedElementIds: [] }],
+    });
+    const plan = planUpdateNote(doc, VIEW_ID, 'n1', {
+      text: 'Updated text',
+      tone: 'neutral',
+      attachedElementIds: ['a'],
+      position: { x: 120, y: 240 },
+    });
+    expect(plan).toMatchObject({ ok: true, label: 'Update note' });
+    expect(plannedView(plan).notes).toEqual([
+      { id: 'n1', text: 'Updated text', x: 120, y: 240, width: 220, tone: 'neutral', attachedElementIds: ['a'] },
+    ]);
+  });
+
+  it.each([
+    ['missing view', () => planUpdateNote(makeDocument(), 'missing', 'n1', { text: 'New' })],
+    ['missing note', () => planUpdateNote(makeDocument({ notes: [] }), VIEW_ID, 'n1', { text: 'New' })],
+    ['blank text', () => planUpdateNote(makeDocument({ notes: [{ id: 'n1', text: 'Old', x: 0, y: 0, width: 220, tone: 'paper', attachedElementIds: [] }] }), VIEW_ID, 'n1', { text: '   ' })],
+  ])('rejects %s', (_name, run) => {
+    expect(run()).toMatchObject({ ok: false, reason: expect.any(String) });
+  });
+});
+
+describe('planDeleteNote', () => {
+  it('deletes an existing note', () => {
+    const doc = makeDocument({
+      notes: [
+        { id: 'n1', text: 'Note 1', x: 0, y: 0, width: 220, tone: 'paper', attachedElementIds: [] },
+        { id: 'n2', text: 'Note 2', x: 100, y: 100, width: 220, tone: 'paper', attachedElementIds: [] },
+      ],
+    });
+    const plan = planDeleteNote(doc, VIEW_ID, 'n1');
+    expect(plan).toMatchObject({ ok: true, label: 'Delete note' });
+    expect(plannedView(plan).notes).toEqual([
+      { id: 'n2', text: 'Note 2', x: 100, y: 100, width: 220, tone: 'paper', attachedElementIds: [] },
+    ]);
+  });
+
+  it('rejects missing note', () => {
+    const doc = makeDocument({ notes: [] });
+    expect(planDeleteNote(doc, VIEW_ID, 'missing')).toMatchObject({ ok: false, reason: expect.any(String) });
   });
 });

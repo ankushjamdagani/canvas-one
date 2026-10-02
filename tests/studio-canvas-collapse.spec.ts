@@ -72,7 +72,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     await expect(page.locator('.component-node')).toHaveCount(total);
   });
 
-  test('toggles a single component from the selection toolbar', async ({ page }) => {
+  test('toggles a single component from the node card expand toggle', async ({ page }) => {
     await page.goto('/');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -80,13 +80,12 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
 
     const node = page.locator('.component-node').first();
     const ports = node.locator('[data-testid^="node-ports-"]');
-    await node.click();
+    const toggle = node.getByTestId(/node-expand-toggle-/);
     await expect(ports).toHaveCount(0);
-    await page.getByTestId('selection-expansion-btn').click();
+    await toggle.click();
     await waitForIdle(page);
     await expect(ports).toHaveCount(1);
-    await expect(page.getByTestId('selection-expansion-btn')).toHaveText(/Collapse/);
-    await page.getByTestId('selection-expansion-btn').click();
+    await toggle.click();
     await waitForIdle(page);
     await expect(ports).toHaveCount(0);
   });
@@ -108,8 +107,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     await expect(boundary).toBeVisible();
 
     const member = nodes.nth(0);
-    await member.click();
-    await page.getByTestId('selection-expansion-btn').click();
+    await member.getByTestId(/node-expand-toggle-/).click();
     await waitForIdle(page);
     await expect(member.locator('[data-testid^="node-ports-"]')).toHaveCount(1);
 

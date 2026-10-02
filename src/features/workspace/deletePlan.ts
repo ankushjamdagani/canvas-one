@@ -35,6 +35,7 @@ import type { RecordChange } from '../../persistence/studio/types';
 export type DeleteSelection = {
   readonly elementIds: readonly Id[];
   readonly connectionIds: readonly Id[];
+  readonly noteIds?: readonly Id[];
 };
 
 export type DeletePlan = {
@@ -178,8 +179,9 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
     }
   }
 
-  // Views: every view drops what points at the removed records.
+  // Views: every view drops what points at the removed records, and active view removes selected notes.
   const removedPlacementIds: Id[] = [];
+  const removedNoteIdSet = new Set(selection.noteIds ?? []);
   const viewReplacements: View[] = [];
   for (const v of document.views) {
     const placements = v.placements.filter((p) => !removedElementIdSet.has(p.elementId));
@@ -189,17 +191,20 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
     const groups = v.groups
       .map((g) => ({ ...g, elementIds: g.elementIds.filter((id) => !removedElementIdSet.has(id)) }))
       .filter((g, i) => g.elementIds.length === v.groups[i].elementIds.length || g.elementIds.length > 0);
-    const notes = v.notes.map((n) =>
-      n.attachedElementIds.some((id) => removedElementIdSet.has(id))
-        ? { ...n, attachedElementIds: n.attachedElementIds.filter((id) => !removedElementIdSet.has(id)) }
-        : n,
-    );
+    const notes = v.notes
+      .filter((n) => !removedNoteIdSet.has(n.id))
+      .map((n) =>
+        n.attachedElementIds.some((id) => removedElementIdSet.has(id))
+          ? { ...n, attachedElementIds: n.attachedElementIds.filter((id) => !removedElementIdSet.has(id)) }
+          : n,
+      );
     const changed =
       placements.length !== v.placements.length ||
       connectionIds.length !== v.connectionIds.length ||
       relationIds.length !== v.relationIds.length ||
       groups.length !== v.groups.length ||
       groups.some((g, i) => g.elementIds.length !== v.groups[i]?.elementIds.length) ||
+      notes.length !== v.notes.length ||
       notes.some((n, i) => n !== v.notes[i]);
     if (changed) viewReplacements.push({ ...v, placements, connectionIds, relationIds, groups, notes });
   }

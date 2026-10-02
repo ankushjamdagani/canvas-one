@@ -61,6 +61,12 @@ export function BranchPopover({
   onOpenHistory,
 }: BranchPopoverProps) {
   const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleDismiss = () => setOpen(false);
+    window.addEventListener('studio:dismiss-transients', handleDismiss);
+    return () => window.removeEventListener('studio:dismiss-transients', handleDismiss);
+  }, []);
   const [query, setQuery] = React.useState('');
   const [creating, setCreating] = React.useState(false);
   const [label, setLabel] = React.useState('');

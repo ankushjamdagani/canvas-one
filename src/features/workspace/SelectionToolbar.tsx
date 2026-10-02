@@ -2,7 +2,23 @@
 
 import * as React from 'react';
 import { useStore } from '@xyflow/react';
-import { BoxSelect, ChevronDown, ChevronsDownUp, ChevronsUpDown, Copy, Group, MoreHorizontal, Trash2, Ungroup } from 'lucide-react';
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndVertical,
+  AlignHorizontalDistributeCenter,
+  AlignLeft,
+  AlignRight,
+  AlignStartVertical,
+  AlignVerticalDistributeCenter,
+  BoxSelect,
+  ChevronDown,
+  Copy,
+  Group,
+  MoreHorizontal,
+  Trash2,
+  Ungroup,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -97,7 +113,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
   const [groupError, setGroupError] = React.useState<string | null>(null);
   const [wrapOpen, setWrapOpen] = React.useState(false);
   const [overflowError, setOverflowError] = React.useState<string | null>(null);
-  const selectionKey = context.selectedElementIds.join(',');
+  const selectionKey = `${context.selectedElementIds.join(',')}:${(context.selectedNoteIds ?? []).join(',')}`;
   React.useEffect(() => setOverflowError(null), [selectionKey]);
   const [wrapLabel, setWrapLabel] = React.useState('');
   const [wrapError, setWrapError] = React.useState<string | null>(null);
@@ -105,7 +121,8 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
   const selectedIds = React.useMemo(() => [
     ...(context.selectedPlacementIds ?? []),
     ...context.selectedGroupIds,
-  ], [context.selectedPlacementIds, context.selectedGroupIds]);
+    ...(context.selectedNoteIds ?? []),
+  ], [context.selectedPlacementIds, context.selectedGroupIds, context.selectedNoteIds]);
   
   const [tx, ty, tZoom] = useStore((s) => s.transform);
   const rect = useStore((s) => {
@@ -122,7 +139,13 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
       maxX = Math.max(maxX, x + w);
       maxY = Math.max(maxY, y + h);
     });
-    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    const padding = nodes.length > 1 ? 24 : 0;
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      width: maxX - minX + padding * 2,
+      height: maxY - minY + padding * 2,
+    };
   }, (a, b) => a?.x === b?.x && a?.y === b?.y && a?.width === b?.width && a?.height === b?.height);
 
   const [viewportWidth, setViewportWidth] = React.useState(() => typeof window === 'undefined' ? 1280 : window.innerWidth);
@@ -193,24 +216,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
   const wrapAvailability = getAvailability('selection.wrap-in-boundary', context, wrapPayloadBase);
   const duplicateAvailability = getAvailability('selection.duplicate', context, {});
   const deleteAvailability = getAvailability('selection.delete', context, {});
-  const count = context.selectedElementIds.length;
-  // One group (preferred) or one component: toggles its presentation state.
-  const expansionTarget = !context.activeViewId
-    ? null
-    : context.selectedGroupIds.length === 1
-      ? ({ kind: 'group', id: context.selectedGroupIds[0] } as const)
-      : context.selectedPlacementIds?.length === 1 && context.selectedElementIds.length === 1
-        ? ({ kind: 'placement', id: context.selectedPlacementIds[0] } as const)
-        : null;
-  const targetExpanded = expansionTarget ? (context.expansionState?.[expansionTarget.id] ?? true) : true;
-  const expansionCommand = targetExpanded ? 'canvas.collapse' : 'canvas.expand';
-  const expansionPayload = expansionTarget && context.activeViewId
-    ? { viewId: context.activeViewId, target: expansionTarget }
-    : null;
-  const expansionAvailability = expansionPayload
-    ? getAvailability(expansionCommand, context, expansionPayload)
-    : null;
-
+  const count = context.selectedElementIds.length + (context.selectedNoteIds?.length ?? 0);
   async function submitGroup() {
     const label = groupLabel.trim();
     if (!groupAvailability.enabled) return;
@@ -258,17 +264,21 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
     }
   }
 
-  const alignItems = [
-    ['left', 'Align left'],
-    ['center-x', 'Align center horizontally'],
-    ['right', 'Align right'],
-    ['top', 'Align top'],
-    ['center-y', 'Align center vertically'],
-    ['bottom', 'Align bottom'],
+  const horizontalAlignItems = [
+    { edge: 'left', label: 'Align left', Icon: AlignLeft },
+    { edge: 'center-x', label: 'Align center horizontally', Icon: AlignCenterHorizontal },
+    { edge: 'right', label: 'Align right', Icon: AlignRight },
   ] as const;
+
+  const verticalAlignItems = [
+    { edge: 'top', label: 'Align top', Icon: AlignStartVertical },
+    { edge: 'center-y', label: 'Align center vertically', Icon: AlignCenterVertical },
+    { edge: 'bottom', label: 'Align bottom', Icon: AlignEndVertical },
+  ] as const;
+
   const distributeItems = [
-    ['x', 'Distribute horizontally'],
-    ['y', 'Distribute vertically'],
+    { axis: 'x', label: 'Distribute horizontally', Icon: AlignHorizontalDistributeCenter },
+    { axis: 'y', label: 'Distribute vertically', Icon: AlignVerticalDistributeCenter },
   ] as const;
 
   const runOverflow = async (id: OverflowCommandId) => {
@@ -310,64 +320,66 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
         {count} {count === 1 ? 'PART' : 'PARTS'}
       </span>
 
-<Popover
-        open={groupOpen}
-        onOpenChange={(open) => {
-          setGroupOpen(open);
-          if (!open) setGroupError(null);
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            data-testid="selection-group-btn"
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            disabled={!groupAvailability.enabled}
-            title={groupAvailability.enabled ? undefined : groupAvailability.reason}
-          >
-            <Group className="size-3.5" /> Group
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-0 overflow-hidden rounded-popover border border-border shadow-popover">
-          <form
-            data-testid="selection-group-popover"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submitGroup();
-            }}
-          >
-            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
-              NEW GROUP
-            </div>
-            <div className="p-3 bg-background">
-              <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-group-label">
-                Group name
-              </label>
-              <Input
-                id="selection-group-label"
-                data-testid="selection-group-input"
-                autoFocus
-                value={groupLabel}
-                placeholder="Name this group…"
-                onChange={(event) => {
-                  setGroupLabel(event.target.value);
-                  setGroupError(null);
-                }}
-              />
-              {groupError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{groupError}</p>}
-            </div>
-            <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
-              <Button type="submit" size="sm" variant="tint" disabled={groupLabel.trim().length === 0}>
-                Group
-              </Button>
-            </div>
-          </form>
-        </PopoverContent>
-      </Popover>
+      {count > 1 && context.selectedGroupIds.length === 0 && (
+        <Popover
+          open={groupOpen}
+          onOpenChange={(open) => {
+            setGroupOpen(open);
+            if (!open) setGroupError(null);
+          }}
+        >
+          <PopoverTrigger asChild>
+            <Button
+              data-testid="selection-group-btn"
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              disabled={!groupAvailability.enabled}
+              title={groupAvailability.enabled ? undefined : groupAvailability.reason}
+            >
+              <Group className="size-3.5" /> Group
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-64 p-0 overflow-hidden rounded-popover border border-border shadow-popover">
+            <form
+              data-testid="selection-group-popover"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitGroup();
+              }}
+            >
+              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+                NEW GROUP
+              </div>
+              <div className="p-3 bg-background">
+                <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-group-label">
+                  Group name
+                </label>
+                <Input
+                  id="selection-group-label"
+                  data-testid="selection-group-input"
+                  autoFocus
+                  value={groupLabel}
+                  placeholder="Name this group…"
+                  onChange={(event) => {
+                    setGroupLabel(event.target.value);
+                    setGroupError(null);
+                  }}
+                />
+                {groupError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{groupError}</p>}
+              </div>
+              <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
+                <Button type="submit" size="sm" variant="tint" disabled={groupLabel.trim().length === 0}>
+                  Group
+                </Button>
+              </div>
+            </form>
+          </PopoverContent>
+        </Popover>
+      )}
 
-{context.selectedGroupIds.length === 1 && (
+      {count > 1 && context.selectedGroupIds.length > 0 && (
         <Button
           data-testid="selection-ungroup-btn"
           type="button"
@@ -382,81 +394,64 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
         </Button>
       )}
 
-      <Popover
-        open={wrapOpen}
-        onOpenChange={(open) => {
-          setWrapOpen(open);
-          if (!open) setWrapError(null);
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            data-testid="selection-wrap-btn"
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 pointer-coarse:h-11 gap-1.5 text-xs"
-            disabled={!wrapAvailability.enabled}
-            title={wrapAvailability.enabled ? undefined : wrapAvailability.reason}
-          >
-            <BoxSelect className="size-3.5" /> Wrap in boundary
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="center" className="w-64 p-0 overflow-hidden rounded-popover border border-border shadow-popover">
-          <form
-            data-testid="selection-wrap-popover"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void submitWrap();
-            }}
-          >
-            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
-              WRAP IN BOUNDARY
-            </div>
-            <div className="p-3 bg-background">
-              <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-wrap-label">
-                Boundary name
-              </label>
-              <Input
-                id="selection-wrap-label"
-                data-testid="selection-wrap-input"
-                autoFocus
-                value={wrapLabel}
-                placeholder="Name this boundary…"
-                onChange={(event) => {
-                  setWrapLabel(event.target.value);
-                  setWrapError(null);
-                }}
-              />
-              {wrapError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{wrapError}</p>}
-            </div>
-            <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
-              <Button type="submit" size="sm" variant="tint" disabled={wrapLabel.trim().length === 0}>
-                Wrap
-              </Button>
-            </div>
-          </form>
-        </PopoverContent>
-      </Popover>
-
-      {expansionPayload && expansionAvailability && (
-        <Button
-          data-testid="selection-expansion-btn"
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 pointer-coarse:h-11 gap-1.5 text-xs"
-          disabled={!expansionAvailability.enabled}
-          title={expansionAvailability.enabled ? undefined : expansionAvailability.reason}
-          onClick={() => void executeCommand(expansionCommand, expansionPayload)}
+      {count > 1 && (
+        <Popover
+          open={wrapOpen}
+          onOpenChange={(open) => {
+            setWrapOpen(open);
+            if (!open) setWrapError(null);
+          }}
         >
-          {targetExpanded ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}
-          {targetExpanded ? 'Collapse' : 'Expand'}
-        </Button>
+          <PopoverTrigger asChild>
+            <Button
+              data-testid="selection-wrap-btn"
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 pointer-coarse:h-11 gap-1.5 text-xs"
+              disabled={!wrapAvailability.enabled}
+              title={wrapAvailability.enabled ? undefined : wrapAvailability.reason}
+            >
+              <BoxSelect className="size-3.5" /> Wrap in boundary
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="center" className="w-64 p-0 overflow-hidden rounded-popover border border-border shadow-popover">
+            <form
+              data-testid="selection-wrap-popover"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitWrap();
+              }}
+            >
+              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+                WRAP IN BOUNDARY
+              </div>
+              <div className="p-3 bg-background">
+                <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-wrap-label">
+                  Boundary name
+                </label>
+                <Input
+                  id="selection-wrap-label"
+                  data-testid="selection-wrap-input"
+                  autoFocus
+                  value={wrapLabel}
+                  placeholder="Name this boundary…"
+                  onChange={(event) => {
+                    setWrapLabel(event.target.value);
+                    setWrapError(null);
+                  }}
+                />
+                {wrapError && <p role="alert" className="mt-1.5 text-xs text-risk-text">{wrapError}</p>}
+              </div>
+              <div className="px-3 py-2 bg-panel border-t border-hairline flex justify-end">
+                <Button type="submit" size="sm" variant="tint" disabled={wrapLabel.trim().length === 0}>
+                  Wrap
+                </Button>
+              </div>
+            </form>
+          </PopoverContent>
+        </Popover>
       )}
-
-
-
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -464,44 +459,102 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
             Align <ChevronDown className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
+        <DropdownMenuContent align="end" className="w-auto min-w-[152px] p-0 overflow-hidden shadow-popover">
           <DropdownMenuHeader className="px-3 py-2 text-secondary-text">ALIGN & DISTRIBUTE</DropdownMenuHeader>
-          <div className="p-1.5 bg-background">
-            <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2.5 py-1">Align</DropdownMenuLabel>
-            {alignItems.map(([edge, label]) => {
-              const availability = getAvailability('selection.align', context, { edge });
-              return (
-                <DropdownMenuItem
-                  key={edge}
-                  data-testid={`selection-align-${edge}`}
-                  disabled={!availability.enabled}
-                  title={availability.enabled ? undefined : availability.reason}
-                  onSelect={() => void executeCommand('selection.align', { edge })}
-                  className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
-                >
-                  <span>{label}</span>
-                  {!availability.enabled && <span className="ml-auto text-[10px]">{availability.reason}</span>}
-                </DropdownMenuItem>
-              );
-            })}
+          <div className="p-1.5 bg-background space-y-1">
+            {/* Horizontal Alignment Section */}
+            <div>
+              <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
+                Horizontal Alignment
+              </DropdownMenuLabel>
+              <div className="flex items-center gap-1 px-1 py-0.5">
+                {horizontalAlignItems.map(({ edge, label, Icon }) => {
+                  const availability = getAvailability('selection.align', context, { edge });
+                  return (
+                    <Tooltip key={edge}>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem
+                          data-testid={`selection-align-${edge}`}
+                          disabled={!availability.enabled}
+                          onSelect={() => void executeCommand('selection.align', { edge })}
+                          className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
+                          aria-label={label}
+                        >
+                          <Icon className="size-4 shrink-0 text-foreground" />
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {availability.enabled ? label : `${label} (${availability.reason})`}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
+
             <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2.5 py-1">Distribute</DropdownMenuLabel>
-            {distributeItems.map(([axis, label]) => {
-              const availability = getAvailability('selection.distribute', context, { axis });
-              return (
-                <DropdownMenuItem
-                  key={axis}
-                  data-testid={`selection-distribute-${axis}`}
-                  disabled={!availability.enabled}
-                  title={availability.enabled ? undefined : availability.reason}
-                  onSelect={() => void executeCommand('selection.distribute', { axis })}
-                  className="text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control"
-                >
-                  <span>{label}</span>
-                  {!availability.enabled && <span className="ml-auto text-[10px]">{availability.reason}</span>}
-                </DropdownMenuItem>
-              );
-            })}
+
+            {/* Vertical Alignment Section */}
+            <div>
+              <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
+                Vertical Alignment
+              </DropdownMenuLabel>
+              <div className="flex items-center gap-1 px-1 py-0.5">
+                {verticalAlignItems.map(({ edge, label, Icon }) => {
+                  const availability = getAvailability('selection.align', context, { edge });
+                  return (
+                    <Tooltip key={edge}>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem
+                          data-testid={`selection-align-${edge}`}
+                          disabled={!availability.enabled}
+                          onSelect={() => void executeCommand('selection.align', { edge })}
+                          className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
+                          aria-label={label}
+                        >
+                          <Icon className="size-4 shrink-0 text-foreground" />
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {availability.enabled ? label : `${label} (${availability.reason})`}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
+
+            <DropdownMenuSeparator className="my-1" />
+
+            {/* Distribute Section */}
+            <div>
+              <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
+                Distribute
+              </DropdownMenuLabel>
+              <div className="flex items-center gap-1 px-1 py-0.5">
+                {distributeItems.map(({ axis, label, Icon }) => {
+                  const availability = getAvailability('selection.distribute', context, { axis });
+                  return (
+                    <Tooltip key={axis}>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem
+                          data-testid={`selection-distribute-${axis}`}
+                          disabled={!availability.enabled}
+                          onSelect={() => void executeCommand('selection.distribute', { axis })}
+                          className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
+                          aria-label={label}
+                        >
+                          <Icon className="size-4 shrink-0 text-foreground" />
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {availability.enabled ? label : `${label} (${availability.reason})`}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </DropdownMenuContent>
       </DropdownMenu>

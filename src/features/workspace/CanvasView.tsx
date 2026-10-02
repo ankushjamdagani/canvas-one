@@ -10,6 +10,7 @@ import {
   useReactFlow,
   useViewport,
   useNodesInitialized,
+  ViewportPortal,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -27,12 +28,15 @@ import { NoteNode } from './NoteNode';
 import { BoundaryFrameNode } from './BoundaryFrameNode';
 import { TrafficEdge } from './TrafficEdge';
 import { FloatingDock } from './FloatingDock';
+import { SelectionBox } from './SelectionBox';
 import {
   projectDocumentToCanvas,
   type ProjectedNodeData,
   type MeasuredHeights,
 } from './projection';
 import { planDelete, type DeletePlan } from './deletePlan';
+import { planAddNote, planUpdateNote, planDeleteNote } from './selectionPlans';
+export const NOTE_MIME_TYPE = 'application/x-system-studio-note';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,11 +56,23 @@ import { SelectionToolbar } from './SelectionToolbar';
 import type { CommandContext, CommandId, CommandPayloads, ExecuteResult, ShortcutEvent } from './commands/registry';
 import type { DockCommandId, DockConfig } from './dockConfig';
 
-export type CanvasSelectionRequest = {
-  readonly kind: InspectorTargetKind;
-  readonly id: Id;
-  readonly additive: boolean;
-};
+export type CanvasSelectionRequest =
+  | {
+      readonly kind: InspectorTargetKind | 'note';
+      readonly id: Id;
+      readonly additive: boolean;
+    }
+  | {
+      readonly kind: InspectorTargetKind | 'note';
+      readonly ids: readonly Id[];
+      readonly additive?: boolean;
+    }
+  | {
+      readonly kind: 'mixed';
+      readonly elementIds: readonly Id[];
+      readonly noteIds: readonly Id[];
+      readonly additive?: boolean;
+    };
 
 const nodeTypes = {
   elementNode: NodeCard,
@@ -104,6 +120,8 @@ export interface CanvasViewProps {
   selectedElementIds?: ReadonlySet<Id>;
   /** Currently selected connection ids (inspector target), for visual highlight only. */
   selectedConnectionIds?: ReadonlySet<Id>;
+  /** Currently selected note ids, for visual highlight and operations. */
+  selectedNoteIds?: ReadonlySet<Id>;
   /** A node/edge was clicked -- the caller (Workspace) runs the navigation guard. */
   onRequestSelection?: (request: CanvasSelectionRequest) => void;
   /** Empty canvas was clicked -- clears selection through the guard. */
@@ -173,6 +191,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onMoveNodes,
   selectedElementIds,
   selectedConnectionIds,
+  selectedNoteIds,
   onRequestSelection,
   onRequestClearSelection,
   mintId,
@@ -220,13 +239,26 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     projection.edges as unknown as Edge[],
   );
 
+  const isBoxSelectingRef = React.useRef(false);
+  const boxSelectedIdsRef = React.useRef<Set<string>>(new Set());
+
   // Selection is owned by the inspector's navigation guard (Workspace), not by
   // ReactFlow's own click-selection: 'select' changes are dropped here and the
   // `selected` flag is instead derived below from selectedElementIds /
   // selectedConnectionIds, which only change once the guard has approved the
   // navigation (commands.md §6: "the guard runs before any change").
+  // When dragging a marquee selection box across the pane, we capture the selected
+  // node IDs and dispatch batch selection onSelectionEnd.
   const onNodesChange = React.useCallback(
     (changes: NodeChange<Node<ProjectedNodeData>>[]) => {
+      if (isBoxSelectingRef.current) {
+        for (const c of changes) {
+          if (c.type === 'select') {
+            if (c.selected) boxSelectedIdsRef.current.add(c.id);
+            else boxSelectedIdsRef.current.delete(c.id);
+          }
+        }
+      }
       onNodesChangeRaw(changes.filter((c) => c.type !== 'select'));
     },
     [onNodesChangeRaw],
@@ -267,6 +299,25 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               ...data,
               onToggleCollapsed: () =>
                 void onExecuteCommand(data.collapsed ? 'canvas.expand' : 'canvas.collapse', payload),
+              onUngroup: () =>
+                void onExecuteCommand('selection.ungroup', { groupIds: [data.group.id] }),
+              onSelectGroup: () => {
+                const memberNotes = (projection.activeView?.notes ?? [])
+                  .filter((n) => n.attachedElementIds?.some((id) => data.group.elementIds.includes(id)))
+                  .map((n) => n.id);
+                if (memberNotes.length > 0) {
+                  onRequestSelection?.({
+                    kind: 'mixed',
+                    elementIds: data.group.elementIds,
+                    noteIds: memberNotes,
+                  });
+                } else {
+                  onRequestSelection?.({
+                    kind: 'element',
+                    ids: data.group.elementIds,
+                  });
+                }
+              },
             },
           };
         }
@@ -284,14 +335,61 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             },
           };
         }
+        if (data.kind === 'note') {
+          const selected = Boolean(selectedNoteIds?.has(data.note.id));
+          const viewId = projection.activeView?.id;
+          if (!viewId) return { ...n, selected };
+          return {
+            ...n,
+            selected,
+            data: {
+              ...data,
+              onUpdateText: (newText: string) => {
+                if (!document) return;
+                const plan = planUpdateNote(document, viewId, data.note.id, { text: newText });
+                if (plan.ok) {
+                  void onApplyChanges(plan.changes, plan.label);
+                }
+              },
+              onDelete: () => {
+                if (!document) return;
+                const plan = planDeleteNote(document, viewId, data.note.id);
+                if (plan.ok) {
+                  void onApplyChanges(plan.changes, plan.label);
+                }
+              },
+              onAttach: (elementId: string | null) => {
+                if (!document) return;
+                const plan = planUpdateNote(document, viewId, data.note.id, {
+                  attachedElementIds: elementId ? [elementId as Id] : [],
+                });
+                if (plan.ok) {
+                  void onApplyChanges(plan.changes, plan.label);
+                }
+              },
+            },
+          };
+        }
         if (data.kind !== 'element') return n;
         const selected = Boolean(selectedElementIds?.has(data.element.id));
         const connectable = dragMode !== 'pan';
         const trafficEntry = Boolean(trafficEntryElementIds?.has(data.element.id));
-        if (selected === n.selected && connectable === data.connectable && trafficEntry === Boolean(data.trafficEntry)) return n;
-        return { ...n, selected, data: { ...data, connectable, trafficEntry } };
+        const viewId = projection.activeView?.id;
+        const togglePayload = viewId ? ({ viewId, target: { kind: 'placement', id: data.placement.id } } as const) : null;
+        return {
+          ...n,
+          selected,
+          data: {
+            ...data,
+            connectable,
+            trafficEntry,
+            onToggleExpanded: togglePayload
+              ? () => void onExecuteCommand(data.placement.expanded ? 'canvas.collapse' : 'canvas.expand', togglePayload)
+              : undefined,
+          },
+        };
       }),
-    [nodes, selectedElementIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds],
+    [nodes, selectedElementIds, selectedNoteIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds, document, onApplyChanges, onRequestSelection],
   );
 
   const displayEdges = React.useMemo(
@@ -308,10 +406,30 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const handleNodeClick: NodeMouseHandler<Node<ProjectedNodeData>> = React.useCallback(
     (event, node) => {
       const data = node.data;
+      if (data.kind === 'group') {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('button')) return;
+        const memberNotes = (projection.activeView?.notes ?? [])
+          .filter((n) => n.attachedElementIds?.some((id) => data.group.elementIds.includes(id)))
+          .map((n) => n.id);
+        onRequestSelection?.({
+          kind: 'mixed',
+          elementIds: data.group.elementIds,
+          noteIds: memberNotes,
+          additive: event.shiftKey,
+        });
+        return;
+      }
+      if (data.kind === 'note') {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('button') || target?.closest('textarea') || target?.closest('input')) return;
+        onRequestSelection?.({ kind: 'note', id: data.note.id, additive: event.shiftKey });
+        return;
+      }
       if (data.kind !== 'element' && data.kind !== 'boundary') return;
       onRequestSelection?.({ kind: 'element', id: data.element.id, additive: event.shiftKey });
     },
-    [onRequestSelection],
+    [onRequestSelection, projection.activeView?.notes],
   );
 
   const handleEdgeClick: EdgeMouseHandler = React.useCallback(
@@ -327,11 +445,124 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
   const handlePaneClick = React.useCallback(() => {
     onRequestClearSelection?.();
+    window.dispatchEvent(new CustomEvent('studio:dismiss-transients'));
   }, [onRequestClearSelection]);
+
+  const handleSelectionStart = React.useCallback(() => {
+    isBoxSelectingRef.current = true;
+    boxSelectedIdsRef.current.clear();
+  }, []);
+
+  const handleSelectionEnd = React.useCallback(() => {
+    isBoxSelectingRef.current = false;
+    const selectedPlacementIds = Array.from(boxSelectedIdsRef.current);
+    boxSelectedIdsRef.current.clear();
+    if (selectedPlacementIds.length === 0) return;
+
+    // Map placement IDs to element IDs and note IDs
+    const elementIds: Id[] = [];
+    const noteIds: Id[] = [];
+    for (const plId of selectedPlacementIds) {
+      const node = nodes.find((n) => n.id === plId);
+      if (node) {
+        if (node.data.kind === 'element' || node.data.kind === 'boundary') {
+          elementIds.push(node.data.element.id);
+        } else if (node.data.kind === 'note') {
+          noteIds.push(node.data.note.id);
+        }
+      }
+    }
+    if (elementIds.length > 0 || noteIds.length > 0) {
+      onRequestSelection?.({
+        kind: 'mixed',
+        elementIds,
+        noteIds,
+      });
+    }
+  }, [nodes, onRequestSelection]);
 
   // Node drag end handler:
   // Identify nodes by node.type (not string prefixes on IDs)
-  // Moved list built by placement.id (ReactFlow node id)
+  const dragStartPositionsRef = React.useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  const handleNodeDragStart: OnNodeDrag<Node<ProjectedNodeData>> = React.useCallback(
+    (_event, node, draggedNodes) => {
+      const map = new Map<string, { x: number; y: number }>();
+      for (const n of nodes) {
+        map.set(n.id, { x: n.position.x, y: n.position.y });
+      }
+      dragStartPositionsRef.current = map;
+    },
+    [nodes],
+  );
+
+  const handleNodeDrag: OnNodeDrag<Node<ProjectedNodeData>> = React.useCallback(
+    (_event, node, draggedNodes) => {
+      const startPositions = dragStartPositionsRef.current;
+      if (startPositions.size === 0) return;
+
+      const nodesToProcess = draggedNodes && draggedNodes.length > 0 ? draggedNodes : [node];
+      const updates = new Map<string, { x: number; y: number }>();
+
+      for (const n of nodesToProcess) {
+        const startPos = startPositions.get(n.id);
+        if (!startPos) continue;
+        const dx = n.position.x - startPos.x;
+        const dy = n.position.y - startPos.y;
+        if (dx === 0 && dy === 0) continue;
+
+        // 1. If element node dragged, move its attached notes in real time
+        if (n.type === 'elementNode' && n.data.kind === 'element') {
+          const elementId = n.data.element.id;
+          for (const candidate of nodes) {
+            if (candidate.type === 'noteNode' && candidate.data.kind === 'note') {
+              if (nodesToProcess.some((p) => p.id === candidate.id)) continue;
+              if (candidate.data.note.attachedElementIds?.includes(elementId)) {
+                const noteStart = startPositions.get(candidate.id);
+                if (noteStart) {
+                  updates.set(candidate.id, { x: noteStart.x + dx, y: noteStart.y + dy });
+                }
+              }
+            }
+          }
+        }
+
+        // 2. If group node dragged, move its member elements AND their attached notes in real time
+        if (n.type === 'groupNode' && n.data.kind === 'group') {
+          const groupElementIds = n.data.group.elementIds;
+          for (const candidate of nodes) {
+            if (candidate.type === 'elementNode' && candidate.data.kind === 'element') {
+              if (groupElementIds.includes(candidate.data.element.id)) {
+                const memberStart = startPositions.get(candidate.id);
+                if (memberStart) {
+                  updates.set(candidate.id, { x: memberStart.x + dx, y: memberStart.y + dy });
+                }
+              }
+            } else if (candidate.type === 'noteNode' && candidate.data.kind === 'note') {
+              if (candidate.data.note.attachedElementIds?.some((id) => groupElementIds.includes(id))) {
+                const noteStart = startPositions.get(candidate.id);
+                if (noteStart) {
+                  updates.set(candidate.id, { x: noteStart.x + dx, y: noteStart.y + dy });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (updates.size > 0) {
+        setNodes((prevNodes) =>
+          prevNodes.map((item) => {
+            const updatedPos = updates.get(item.id);
+            return updatedPos ? { ...item, position: updatedPos } : item;
+          }),
+        );
+      }
+    },
+    [nodes, setNodes],
+  );
+
+  // Moved list built by placement.id (ReactFlow node id) and note.id
   const handleNodeDragStop: OnNodeDrag<Node<ProjectedNodeData>> = React.useCallback(
     async (_event, node, draggedNodes) => {
       if (!projection.activeView || isSaving) return;
@@ -339,28 +570,64 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       const nodesToProcess =
         draggedNodes && draggedNodes.length > 0 ? draggedNodes : [node];
 
-      // Filter only element nodes by node.type (groups/notes are presentation)
+      // Filter element and note nodes
       const elementNodes = nodesToProcess.filter(
         (n) => n.type === 'elementNode',
       );
+      const noteNodes = nodesToProcess.filter(
+        (n) => n.type === 'noteNode',
+      );
 
-      const movedList = elementNodes.map((n) => ({
-        id: n.id, // placement.id
-        position: { x: n.position.x, y: n.position.y },
-      }));
+      const movedList: Array<{ id: string; position: { x: number; y: number } }> = [
+        ...elementNodes.map((n) => ({
+          id: n.id, // placement.id
+          position: { x: n.position.x, y: n.position.y },
+        })),
+        ...noteNodes.map((n) => ({
+          id: n.id, // note.id
+          position: { x: n.position.x, y: n.position.y },
+        })),
+      ];
 
-      // A dragged collapsed group moves every hidden member by the same delta,
-      // in the same single move batch (one undo entry).
-      for (const n of nodesToProcess) {
-        if (n.type !== 'groupNode' || n.data.kind !== 'group' || !n.data.collapsed) continue;
-        const origin = projection.nodes.find((p) => p.id === n.id)?.position;
+      // Sticky notes move with their parent element
+      for (const n of elementNodes) {
+        const origin = dragStartPositionsRef.current.get(n.id) ?? projection.nodes.find((p) => p.id === n.id)?.position;
         if (!origin) continue;
         const dx = n.position.x - origin.x;
         const dy = n.position.y - origin.y;
+        if (dx === 0 && dy === 0) continue;
+        const nodeData = n.data as ProjectedNodeData;
+        const elementId = nodeData.kind === 'element' ? nodeData.element.id : null;
+        if (!elementId) continue;
+        for (const note of projection.activeView.notes ?? []) {
+          if (noteNodes.some((nn) => nn.id === note.id)) continue;
+          if (note.attachedElementIds?.includes(elementId)) {
+            if (movedList.some((m) => m.id === note.id)) continue;
+            movedList.push({ id: note.id, position: { x: note.x + dx, y: note.y + dy } });
+          }
+        }
+      }
+
+      // A dragged group (collapsed or expanded) moves every member and attached sticky note
+      // by the same delta, in the same single move batch (one undo entry).
+      for (const n of nodesToProcess) {
+        if (n.type !== 'groupNode' || n.data.kind !== 'group') continue;
+        const origin = dragStartPositionsRef.current.get(n.id) ?? projection.nodes.find((p) => p.id === n.id)?.position;
+        if (!origin) continue;
+        const dx = n.position.x - origin.x;
+        const dy = n.position.y - origin.y;
+        if (dx === 0 && dy === 0) continue;
+        const group = n.data.group;
         for (const placement of projection.activeView.placements) {
-          if (!n.data.group.elementIds.includes(placement.elementId)) continue;
+          if (!group.elementIds.includes(placement.elementId)) continue;
           if (movedList.some((m) => m.id === placement.id)) continue;
           movedList.push({ id: placement.id, position: { x: placement.x + dx, y: placement.y + dy } });
+        }
+        for (const note of projection.activeView.notes ?? []) {
+          if (note.attachedElementIds?.some((id) => group.elementIds.includes(id))) {
+            if (movedList.some((m) => m.id === note.id)) continue;
+            movedList.push({ id: note.id, position: { x: note.x + dx, y: note.y + dy } });
+          }
         }
       }
       // Moving an expanded refinement frame moves its owner placement and every
@@ -382,6 +649,34 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           }
         }
       }
+      // If a single unattached note is dragged near an element, auto-link it
+      if (noteNodes.length === 1 && elementNodes.length === 0 && projection.activeView && document) {
+        const draggedNote = noteNodes[0];
+        const existingNote = projection.activeView.notes?.find((n) => n.id === draggedNote.id);
+        const isCurrentlyUnattached = Boolean(existingNote && (!existingNote.attachedElementIds || existingNote.attachedElementIds.length === 0));
+        if (isCurrentlyUnattached && existingNote) {
+          for (const placement of projection.activeView.placements) {
+            const width = placement.width ?? 240;
+            const height = measuredHeights.get(placement.id) ?? 140;
+            if (
+              draggedNote.position.x >= placement.x - 40 &&
+              draggedNote.position.x <= placement.x + width + 40 &&
+              draggedNote.position.y >= placement.y - 40 &&
+              draggedNote.position.y <= placement.y + height + 60
+            ) {
+              const attachPlan = planUpdateNote(document, projection.activeView.id, existingNote.id, {
+                position: { x: Math.round(draggedNote.position.x), y: Math.round(draggedNote.position.y) },
+                attachedElementIds: [placement.elementId],
+              });
+              if (attachPlan.ok) {
+                await onApplyChanges(attachPlan.changes, 'Link sticky note');
+                return;
+              }
+            }
+          }
+        }
+      }
+
       if (movedList.length === 0) return;
 
       const success = await onMoveNodes(movedList);
@@ -390,7 +685,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         setNodes((previous) => keepMeasurements(previous, projection.nodes));
       }
     },
-    [projection, isSaving, onMoveNodes, setNodes],
+    [projection, isSaving, onMoveNodes, setNodes, document, measuredHeights, onApplyChanges],
   );
 
   // Zoom controls per specs/revamp/contracts/commands.md §4:
@@ -527,9 +822,10 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   }, [reactFlow]);
 
   // The docked Library panel places at the viewport centre via this handle.
-  // Dragging a picker card onto the canvas places it at the drop point.
+  // Dragging a picker card or a note onto the canvas places it at the drop point.
   const handleCanvasDragOver = React.useCallback((e: React.DragEvent) => {
-    if (Array.from(e.dataTransfer.types).includes(CATALOG_ENTRY_MIME_TYPE)) {
+    const types = Array.from(e.dataTransfer.types);
+    if (types.includes(CATALOG_ENTRY_MIME_TYPE) || types.includes(NOTE_MIME_TYPE)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     }
@@ -537,13 +833,51 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
   const handleCanvasDrop = React.useCallback(
     async (e: React.DragEvent) => {
-      const entryId = e.dataTransfer.getData(CATALOG_ENTRY_MIME_TYPE);
-      if (!entryId || !getEntry(entryId)) return;
-      e.preventDefault();
-      const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      await applyPlacement(entryId, flowPoint);
+      const types = Array.from(e.dataTransfer.types);
+      if (types.includes(CATALOG_ENTRY_MIME_TYPE)) {
+        const entryId = e.dataTransfer.getData(CATALOG_ENTRY_MIME_TYPE);
+        if (!entryId || !getEntry(entryId)) return;
+        e.preventDefault();
+        const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        await applyPlacement(entryId, flowPoint);
+        return;
+      }
+
+      if (types.includes(NOTE_MIME_TYPE)) {
+        e.preventDefault();
+        if (!document || !projection.activeView || isSaving) return;
+        const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+
+        // Auto-attach as sticky note if dropped onto/near an existing component placement
+        let attachedElementIds: readonly Id[] = [];
+        for (const placement of projection.activeView.placements) {
+          const width = placement.width ?? 240;
+          const height = measuredHeights.get(placement.id) ?? 140;
+          if (
+            flowPoint.x >= placement.x - 40 &&
+            flowPoint.x <= placement.x + width + 40 &&
+            flowPoint.y >= placement.y - 40 &&
+            flowPoint.y <= placement.y + height + 60
+          ) {
+            attachedElementIds = [placement.elementId];
+            break;
+          }
+        }
+
+        const plan = planAddNote(
+          document,
+          projection.activeView.id,
+          mintId(),
+          'New note',
+          flowPoint,
+          attachedElementIds,
+        );
+        if (plan.ok) {
+          await onApplyChanges(plan.changes, plan.label);
+        }
+      }
     },
-    [reactFlow, applyPlacement],
+    [reactFlow, applyPlacement, document, projection.activeView, isSaving, measuredHeights, mintId, onApplyChanges],
   );
 
   // ==========================================================================
@@ -710,10 +1044,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     () => ({
       elementIds: Array.from(selectedElementIds ?? []),
       connectionIds: Array.from(selectedConnectionIds ?? []),
+      noteIds: Array.from(selectedNoteIds ?? []),
     }),
-    [selectedElementIds, selectedConnectionIds],
+    [selectedElementIds, selectedConnectionIds, selectedNoteIds],
   );
-  const hasSelection = currentSelection.elementIds.length > 0 || currentSelection.connectionIds.length > 0;
+  const hasSelection =
+    currentSelection.elementIds.length > 0 ||
+    currentSelection.connectionIds.length > 0 ||
+    currentSelection.noteIds.length > 0;
 
   const runDeletePlan = React.useCallback(
     (plan: DeletePlan) => {
@@ -883,6 +1221,9 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         />
       )}
 
+      {/* Selected node IDs for the unified selection box */}
+      {(() => null)()}
+
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -890,10 +1231,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStart={handleNodeDragStart}
+        onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        onSelectionStart={handleSelectionStart}
+        onSelectionEnd={handleSelectionEnd}
         onConnectEnd={(event, state) => void handleConnectEnd(event, state)}
         nodesDraggable={!isSaving}
         nodesConnectable={!isSaving}
@@ -914,6 +1259,15 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         proOptions={{ hideAttribution: true }}
         className="system-canvas bg-canvas"
       >
+        <ViewportPortal>
+          <SelectionBox
+            selectedIds={[
+              ...(commandContext.selectedPlacementIds ?? []),
+              ...commandContext.selectedGroupIds,
+              ...(commandContext.selectedNoteIds ?? []),
+            ]}
+          />
+        </ViewportPortal>
         {/* Dotted canvas background from design token CSS variable */}
         {/* Design system canvas texture: #EFEBE3 dots on a 26px grid. */}
         <Background color="var(--hairline-soft)" gap={26} size={1} />
