@@ -5,7 +5,6 @@
 
 import {
   ArchiveRestore,
-  Bookmark,
   Boxes,
   Braces,
   Check,
@@ -66,7 +65,6 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
   apply: Check,
   close: X,
   panel: PanelRight,
-  checkpoint: Bookmark,
   commit: GitCommitHorizontal,
   restore: ArchiveRestore,
   publish: GitMerge,

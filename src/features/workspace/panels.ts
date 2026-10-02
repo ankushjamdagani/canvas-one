@@ -12,7 +12,21 @@
 // Types
 // ============================================================================
 
-export type PanelId = 'library' | 'history';
+export type PanelId = 'library' | 'history' | 'inspector';
+
+/** Every panel the host can place, in a stable order. */
+export const PANEL_IDS: readonly PanelId[] = ['library', 'history', 'inspector'];
+
+/**
+ * The user-opened panels. Below the desktop tier these are single overlays; the
+ * inspector is draft-driven (it follows the selection) and keeps its own
+ * dock/sheet below 1200 px.
+ */
+export const AUXILIARY_PANEL_IDS: readonly PanelId[] = ['library', 'history'];
+
+function hiddenPanelModes(): Record<PanelId, PanelMode> {
+  return { library: 'hidden', history: 'hidden', inspector: 'hidden' };
+}
 
 export type Placement = 'left' | 'right' | 'floating';
 
@@ -130,6 +144,11 @@ export interface EffectiveLayout {
 export type WorkspacePanelAction =
   | { type: 'OPEN'; panel: PanelId }
   | { type: 'CLOSE'; panel: PanelId }
+  /**
+   * Mirrors a draft-driven panel's visibility (the inspector) without focusing it
+   * or saving preferences: opening it must not steal focus from the canvas.
+   */
+  | { type: 'SYNC_OPEN'; panel: PanelId; open: boolean }
   | { type: 'FOCUS'; panel: PanelId }
   | { type: 'PLACE'; panel: PanelId; placement: Placement; index: number }
   | { type: 'COLLAPSE'; panel: PanelId }
@@ -260,12 +279,8 @@ export function computeEffectiveSideWidth(
     return preferred;
   }
 
-  const inspectorBaseOccupancy = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH + INSPECTOR_WIDTH;
-  const inspectorDocked = state.viewport.width >= inspectorBaseOccupancy;
-  let baseOcc = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH;
-  if (inspectorDocked) {
-    baseOcc += INSPECTOR_WIDTH;
-  }
+  const baseOcc0 = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH;
+  let baseOcc = baseOcc0;
 
   // If the other side also has docked candidates, it requires at least MIN_SIDE_WIDTH
   const otherSide = side === 'left' ? 'right' : 'left';
@@ -319,8 +334,17 @@ export function defaultFloatRect(viewport: Viewport): FloatRect {
 /**
  * Factory creating initial valid workspace panel state.
  */
+export type PanelStateOverrides = Partial<
+  Omit<WorkspacePanelState, 'panels' | 'sideWidths' | 'lastFocusedSequence' | 'viewport'>
+> & {
+  panels?: Partial<Record<PanelId, PanelPreference>>;
+  sideWidths?: Partial<SideWidths>;
+  lastFocusedSequence?: Partial<Record<PanelId, number>>;
+  viewport?: Partial<Viewport>;
+};
+
 export function createInitialPanelState(
-  overrides?: Partial<WorkspacePanelState>
+  overrides?: PanelStateOverrides
 ): WorkspacePanelState {
   const defaultViewport: Viewport = { width: 1440, height: 900 };
   const base: WorkspacePanelState = {
@@ -334,10 +358,18 @@ export function createInitialPanelState(
       },
       history: {
         open: false,
-        placement: 'left',
+        placement: 'right',
         collapsed: false,
         floatRect: defaultFloatRect(defaultViewport),
         stackOrder: 1,
+      },
+      // Draft-driven: opened and closed with the selection, docked right by default.
+      inspector: {
+        open: false,
+        placement: 'right',
+        collapsed: false,
+        floatRect: defaultFloatRect(defaultViewport),
+        stackOrder: 0,
       },
     },
     sideWidths: {
@@ -348,6 +380,7 @@ export function createInitialPanelState(
     lastFocusedSequence: {
       library: 0,
       history: 0,
+      inspector: 0,
     },
     activeOverlay: null,
     gesture: null,
@@ -364,6 +397,7 @@ export function createInitialPanelState(
     panels: {
       library: { ...base.panels.library, ...(overrides.panels?.library ?? {}) },
       history: { ...base.panels.history, ...(overrides.panels?.history ?? {}) },
+      inspector: { ...base.panels.inspector, ...(overrides.panels?.inspector ?? {}) },
     },
     sideWidths: {
       ...base.sideWidths,
@@ -398,10 +432,7 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
   // --------------------------------------------------------------------------
   if (viewport.width < BREAKPOINT_MOBILE) {
     const inspector: InspectorMode = 'overlay';
-    const resultPanels: Record<PanelId, PanelMode> = {
-      library: 'hidden',
-      history: 'hidden',
-    };
+    const resultPanels = hiddenPanelModes();
 
     let chosenOverlay: PanelId | null = null;
     if (activeOverlay === 'library' || activeOverlay === 'history') {
@@ -412,7 +443,7 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
       if (focusedPanel && panels[focusedPanel].open) {
         chosenOverlay = focusedPanel;
       } else {
-        const openPanels = (['library', 'history'] as PanelId[]).filter((id) => panels[id].open);
+        const openPanels = AUXILIARY_PANEL_IDS.filter((id) => panels[id].open);
         if (openPanels.length === 1) {
           chosenOverlay = openPanels[0];
         } else if (openPanels.length > 1) {
@@ -448,13 +479,10 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
     const inspector: InspectorMode =
       remainingForCanvas >= CANVAS_MIN_WIDTH_TABLET ? 'docked' : 'overlay';
 
-    const resultPanels: Record<PanelId, PanelMode> = {
-      library: 'hidden',
-      history: 'hidden',
-    };
+    const resultPanels = hiddenPanelModes();
 
     // Auxiliary panels are single overlays
-    const openAuxiliary = (['library', 'history'] as PanelId[]).filter((id) => panels[id].open);
+    const openAuxiliary = AUXILIARY_PANEL_IDS.filter((id) => panels[id].open);
 
     if (activeOverlay === 'library' || activeOverlay === 'history') {
       if (panels[activeOverlay].open) {
@@ -495,13 +523,10 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
   // is kept; if it alone doesn't fit, it becomes an overlay. When width returns,
   // restore the preferred state without stealing focus."
   // --------------------------------------------------------------------------
-  const resultPanels: Record<PanelId, PanelMode> = {
-    library: 'hidden',
-    history: 'hidden',
-  };
+  const resultPanels = hiddenPanelModes();
 
   // 1. Process floating panels and closed panels
-  for (const id of ['library', 'history'] as PanelId[]) {
+  for (const id of PANEL_IDS) {
     const pref = panels[id];
     if (!pref.open) {
       resultPanels[id] = 'hidden';
@@ -527,20 +552,18 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
     }
   }
 
-  // 2. Evaluate inspector docking
-  // Inspector takes 320 px; needs canvas min 480 + rail 44 + gutters 16 = 860 px
-  const inspectorBaseOccupancy = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH + INSPECTOR_WIDTH;
-  const inspector: InspectorMode =
-    viewport.width >= inspectorBaseOccupancy ? 'docked' : 'overlay';
+  // 2. On desktop the inspector is a regular panel (docks, floats, collapses and
+  // stacks like Library and History); it only ever counts toward the occupancy.
+  const inspector: InspectorMode = 'docked';
 
   // 3. Docked candidate auxiliary panels that are open and not explicitly collapsed
-  const dockedCandidates = (['library', 'history'] as PanelId[]).filter((id) => {
+  const dockedCandidates = PANEL_IDS.filter((id) => {
     const pref = panels[id];
     return pref.open && !pref.collapsed && pref.placement !== 'floating';
   });
 
   // Handle explicitly collapsed docked panels
-  for (const id of ['library', 'history'] as PanelId[]) {
+  for (const id of PANEL_IDS) {
     const pref = panels[id];
     if (pref.open && pref.collapsed && pref.placement !== 'floating') {
       resultPanels[id] = 'collapsed';
@@ -550,9 +573,6 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
   // Helper calculating horizontal width needed for a subset of docked panels
   const computeDockedOccupancy = (candidateIds: PanelId[]): number => {
     let occ = CANVAS_MIN_WIDTH_DESKTOP + RAIL_WIDTH + GUTTER_WIDTH;
-    if (inspector === 'docked') {
-      occ += INSPECTOR_WIDTH;
-    }
     const hasLeft = candidateIds.some((id) => panels[id].placement === 'left');
     const hasRight = candidateIds.some((id) => panels[id].placement === 'right');
     if (hasLeft) {
@@ -566,19 +586,26 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
 
   // If occupancy exceeds width, repeatedly collapse least-recently-focused auxiliary panel
   const activeDocked = [...dockedCandidates];
-  while (activeDocked.length > 0 && computeDockedOccupancy(activeDocked) > viewport.width) {
+  // The inspector is kept (it is the thing being edited); only the others collapse.
+  while (
+    activeDocked.some((id) => id !== 'inspector') &&
+    computeDockedOccupancy(activeDocked) > viewport.width
+  ) {
     // Sort so least recently focused is at index 0
-    activeDocked.sort((a, b) => {
-      const seqA = lastFocusedSequence[a] ?? 0;
-      const seqB = lastFocusedSequence[b] ?? 0;
-      if (seqA !== seqB) {
-        return seqA - seqB; // lower sequence = least recently focused
-      }
-      // Ties broken deterministically by panel id ('history' before 'library')
-      return a.localeCompare(b);
-    });
+    const collapsible = activeDocked
+      .filter((id) => id !== 'inspector')
+      .sort((a, b) => {
+        const seqA = lastFocusedSequence[a] ?? 0;
+        const seqB = lastFocusedSequence[b] ?? 0;
+        if (seqA !== seqB) {
+          return seqA - seqB; // lower sequence = least recently focused
+        }
+        // Ties broken deterministically by panel id ('history' before 'library')
+        return a.localeCompare(b);
+      });
 
-    const toCollapse = activeDocked.shift()!;
+    const toCollapse = collapsible[0];
+    activeDocked.splice(activeDocked.indexOf(toCollapse), 1);
     resultPanels[toCollapse] = 'collapsed';
   }
 
@@ -589,33 +616,30 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
   // other as a collapsed header."
   const checkSideStack = (side: 'left' | 'right') => {
     const sidePanels = activeDocked.filter((id) => panels[id].placement === side);
-    if (sidePanels.length === 2) {
-      const availableHeight = viewport.height - TOPBAR_HEIGHT_DESKTOP;
-      const minRequired = STACK_MIN_EXPANDED_HEIGHT * 2; // 200 + 200 = 400 px
-      if (availableHeight < minRequired) {
-        // One expanded, the other collapsed header.
-        // Collapse the least-recently-focused panel in the stack.
-        sidePanels.sort((a, b) => {
+    const availableHeight = viewport.height - TOPBAR_HEIGHT_DESKTOP;
+    const kept = [...sidePanels];
+    // While the stack cannot give every panel its minimum, collapse the
+    // least-recently-focused one (never the inspector) to a header.
+    while (kept.length > 1 && availableHeight < STACK_MIN_EXPANDED_HEIGHT * kept.length) {
+      const candidates = kept
+        .filter((id) => id !== 'inspector')
+        .sort((a, b) => {
           const seqA = lastFocusedSequence[a] ?? 0;
           const seqB = lastFocusedSequence[b] ?? 0;
-          if (seqA !== seqB) {
-            return seqA - seqB;
-          }
+          if (seqA !== seqB) return seqA - seqB;
           // Tie-break by stackOrder (higher stackOrder collapses first, or by id)
           if (panels[a].stackOrder !== panels[b].stackOrder) {
             return panels[b].stackOrder - panels[a].stackOrder;
           }
           return a.localeCompare(b);
         });
-        const toCollapse = sidePanels[0];
-        const toKeep = sidePanels[1];
-        resultPanels[toCollapse] = 'collapsed';
-        resultPanels[toKeep] = side === 'left' ? 'docked-left' : 'docked-right';
-        return;
-      }
+      const toCollapse = candidates[0];
+      if (!toCollapse) break;
+      kept.splice(kept.indexOf(toCollapse), 1);
+      resultPanels[toCollapse] = 'collapsed';
     }
 
-    for (const id of sidePanels) {
+    for (const id of kept) {
       resultPanels[id] = side === 'left' ? 'docked-left' : 'docked-right';
     }
   };
@@ -714,6 +738,21 @@ export function panelReducer(
     }
 
     // ------------------------------------------------------------------------
+    // SYNC_OPEN(panel, open): draft-driven visibility, no focus and no save
+    // ------------------------------------------------------------------------
+    case 'SYNC_OPEN': {
+      const { panel, open } = action;
+      if (state.panels[panel].open === open) return { state, effects: [] };
+      const nextState: WorkspacePanelState = {
+        ...state,
+        panels: { ...state.panels, [panel]: { ...state.panels[panel], open } },
+        focusedPanel: !open && state.focusedPanel === panel ? null : state.focusedPanel,
+        activeOverlay: !open && state.activeOverlay === panel ? null : state.activeOverlay,
+      };
+      return { state: nextState, effects: detectAutoCollapseAnnounce(state, nextState) };
+    }
+
+    // ------------------------------------------------------------------------
     // CLOSE(panel)
     // ------------------------------------------------------------------------
     case 'CLOSE': {
@@ -800,9 +839,6 @@ export function panelReducer(
         }
       }
 
-      const otherPanel: PanelId = panel === 'library' ? 'history' : 'library';
-      const otherPref = state.panels[otherPanel];
-
       const nextPanels = {
         ...state.panels,
         [panel]: {
@@ -813,12 +849,17 @@ export function panelReducer(
         },
       };
 
-      // If docked on same side, ensure unique stack order
-      if (placement !== 'floating' && otherPref.placement === placement) {
-        nextPanels[otherPanel] = {
-          ...otherPref,
-          stackOrder: index === 0 ? 1 : 0,
-        };
+      // If docked on a side shared with others, keep stack orders unique and
+      // contiguous: the moved panel sits at `index`, the rest keep their order.
+      if (placement !== 'floating') {
+        const others = PANEL_IDS.filter((id) => id !== panel && state.panels[id].placement === placement)
+          .sort((a, b) => state.panels[a].stackOrder - state.panels[b].stackOrder);
+        const slot = Math.min(Math.max(index, 0), others.length);
+        const ordered: PanelId[] = [...others];
+        ordered.splice(slot, 0, panel);
+        ordered.forEach((id, order) => {
+          nextPanels[id] = { ...nextPanels[id], stackOrder: order };
+        });
       }
 
       const nextSeq = getNextSequence(state.lastFocusedSequence);
@@ -1180,7 +1221,7 @@ function detectAutoCollapseAnnounce(
   const nextLayout = effectiveLayout(nextState);
   const effects: PanelEffect[] = [];
 
-  for (const id of ['library', 'history'] as PanelId[]) {
+  for (const id of PANEL_IDS) {
     // Only announce if the panel is preferred expanded in preferences
     // but effective layout collapsed it, and it was not collapsed before.
     const pref = nextState.panels[id];
@@ -1190,12 +1231,14 @@ function detectAutoCollapseAnnounce(
 
       if (!wasCollapsed && isCollapsed) {
         let reason = 'to preserve minimum canvas width';
-        if (
-          nextState.viewport.width >= BREAKPOINT_DESKTOP &&
-          nextState.panels.library.placement === nextState.panels.history.placement
-        ) {
+        if (nextState.viewport.width >= BREAKPOINT_DESKTOP) {
+          const sharedSide = PANEL_IDS.filter(
+            (other) =>
+              nextState.panels[other].open &&
+              nextState.panels[other].placement === nextState.panels[id].placement,
+          ).length;
           const availableH = nextState.viewport.height - TOPBAR_HEIGHT_DESKTOP;
-          if (availableH < STACK_MIN_EXPANDED_HEIGHT * 2) {
+          if (sharedSide > 1 && availableH < STACK_MIN_EXPANDED_HEIGHT * sharedSide) {
             reason = 'to fit available height in stack';
           }
         }

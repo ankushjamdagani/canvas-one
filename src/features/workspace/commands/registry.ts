@@ -32,10 +32,10 @@
  *   the scenario editor; availability mirrors the open draft. inspector.open is
  *   not registered: it is a consequence of a guarded selection change (target
  *   and revision come from the canvas), not a user-invoked command.
- * - History: history.checkpoint/commit/restore/prepare-publish/resolve-conflict/
+ * - History: history.commit/restore/prepare-publish/resolve-conflict/
  *   publish. HistoryLadder, CommitPanel and PublishFlow receive controller
  *   facades (historyRouting.ts), so their existing buttons run these commands.
- *   Quick options lists checkpoint and commit (nested form), and publish review;
+ *   Quick options lists commit (nested form), and publish review;
  *   restore and conflict resolution need a chosen target, so they live in the
  *   History panel. Payloads carry user input only; ids are minted by the
  *   controllers, as with branch.create.
@@ -81,7 +81,6 @@ export const COMMAND_IDS = [
   'run.reset',
   'history.open',
   'history.close',
-  'history.checkpoint',
   'history.commit',
   'history.restore',
   'history.prepare-publish',
@@ -161,7 +160,6 @@ export interface CommandPayloads {
   'history.open': Empty;
   'history.close': Empty;
   /** Ids are minted by the history controller; the payload carries only the user's input. */
-  'history.checkpoint': { readonly label: string };
   'history.commit': { readonly message: string };
   /** `targetId` is a checkpoint or snapshot id; `label` names the pre-restore checkpoint. */
   'history.restore': { readonly targetId: string; readonly label: string };
@@ -172,7 +170,7 @@ export interface CommandPayloads {
   'library.close': Empty;
   'results.open': Empty;
   'results.close': Empty;
-  'panel.place': { readonly panelId: PanelId; readonly placement: Placement; readonly index: 0 | 1 };
+  'panel.place': { readonly panelId: PanelId; readonly placement: Placement; readonly index: number };
   'panel.collapse': { readonly panelId: PanelId };
   'panel.expand': { readonly panelId: PanelId };
   'panel.reset-width': { readonly panelId: PanelId };
@@ -256,7 +254,6 @@ export type CommandIconKey =
   | 'apply'
   | 'close'
   | 'panel'
-  | 'checkpoint'
   | 'commit'
   | 'restore'
   | 'publish'
@@ -370,7 +367,9 @@ export interface CommandContext {
   readonly draftState: CommandDraftState;
   readonly draftId: Id | null;
   /** Library/History preference state (commands.md §7). */
-  readonly panels: Readonly<Record<PanelId, CommandPanelState>>;
+  /** The inspector entry is optional: it only exists on desktop, where it is a hosted panel. */
+  readonly panels: Readonly<Record<'library' | 'history', CommandPanelState>> &
+    Readonly<Partial<Record<'inspector', CommandPanelState>>>;
   /** True while the results region is on screen (a scenario is selected or results.open ran). */
   readonly resultsVisible: boolean;
   /** Commits on the current branch (prepare-publish needs a committed head). */
@@ -451,7 +450,7 @@ function requireActiveView(ctx: CommandContext): Availability | null {
 }
 
 function requirePanelOpen(ctx: CommandContext, panelId: PanelId): Availability | null {
-  return ctx.panels[panelId].open ? null : disabled('not-open', 'Open the panel first');
+  return ctx.panels[panelId]?.open ? null : disabled('not-open', 'Open the panel first');
 }
 
 function requireDraft(ctx: CommandContext, draftId: Id): Availability | null {
@@ -688,24 +687,11 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
   'history.open': {
     id: 'history.open',
     label: 'Open history',
-    keywords: ['history', 'checkpoint', 'commit', 'publish', 'versions'],
+    keywords: ['history', 'commit', 'publish', 'versions'],
     group: 'review',
     iconKey: 'history',
     shortcut: null,
     availability: (ctx) => requireProject(ctx) ?? ENABLED,
-  },
-  'history.checkpoint': {
-    id: 'history.checkpoint',
-    label: 'Save checkpoint…',
-    keywords: ['checkpoint', 'save', 'history', 'version'],
-    group: 'review',
-    iconKey: 'checkpoint',
-    shortcut: null,
-    availability: (ctx) =>
-      requireProject(ctx) ?? requireIdle(ctx) ??
-      requireStorageHealthy(ctx, 'saving a checkpoint') ??
-      requireOpenBranch(ctx, 'saving a checkpoint') ??
-      requireCleanDraft(ctx, 'saving a checkpoint') ?? ENABLED,
   },
   'history.commit': {
     id: 'history.commit',
@@ -723,7 +709,7 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
   'history.restore': {
     id: 'history.restore',
     label: 'Restore version',
-    keywords: ['restore', 'revert', 'checkpoint', 'history'],
+    keywords: ['restore', 'revert', 'history'],
     group: 'review',
     iconKey: 'restore',
     shortcut: null,
@@ -838,7 +824,7 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     group: 'review', iconKey: 'panel', shortcut: null,
     availability: (ctx, payload) =>
       requirePanelOpen(ctx, payload.panelId) ??
-      (ctx.panels[payload.panelId].collapsed ? disabled('current', 'Panel is already collapsed') : ENABLED),
+      (ctx.panels[payload.panelId]?.collapsed ? disabled('current', 'Panel is already collapsed') : ENABLED),
   },
   // Enabled for any open panel: layout-driven auto-collapse leaves the stored
   // `collapsed` flag false, and the rail still needs to expand it.
@@ -1552,12 +1538,11 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   if (ctx.runPhase === 'running' || ctx.runPhase === 'paused') run.push(option('run.cancel', {}, ctx));
   if (ctx.hasRunDisplay || isExecutionActive(ctx.runPhase)) run.push(option('run.reset', {}, ctx));
 
-  // Parameterized history actions open their nested form (checkpoint name, commit
+  // Parameterized history actions open their nested form (commit
   // message) or the publish review; restore and conflict resolution need a chosen
   // target, so they stay in the History panel.
   const review: QuickOption[] = [
     option('history.open', {}, ctx),
-    option('history.checkpoint', { label: '' }, ctx),
     option('history.commit', { message: '' }, ctx),
     option('history.prepare-publish', {}, ctx),
     option('library.open', {}, ctx),

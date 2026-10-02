@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { PanelHeader } from './PanelHeader';
+import { panelContentClass } from './panelContentClass';
 import { computeResizedFloatRect } from './geometry';
 import type {
   PanelId,
@@ -155,7 +156,7 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
       {/* Content Area */}
       <div
         data-slot="panel-content"
-        className="flex-1 overflow-y-auto p-4 text-ui text-foreground bg-panel"
+        className={panelContentClass(panelId, 'text-foreground')}
       >
         {renderPanel(panelId)}
       </div>

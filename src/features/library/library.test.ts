@@ -265,9 +265,8 @@ describe('Library Feature (RV-06b)', () => {
         }),
       );
 
-      // Header
-      expect(html).toContain('Library');
-      expect(html).toContain('aria-label="Close library"');
+      // PanelHost supplies the title and close button
+      expect(html).not.toContain('aria-label="Close library"');
 
       // Search input
       expect(html).toContain('aria-label="Search components"');
@@ -325,10 +324,9 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).not.toMatch(/platform team/i);
     });
 
-    it('omits duplicate chrome and permits narrow grid cards when hosted', () => {
+    it('renders no duplicate chrome and permits narrow grid cards', () => {
       const html = renderToStaticMarkup(
         React.createElement(LibraryPanel, {
-          hosted: true,
           onPlace: () => {},
           onClose: () => {},
           view: 'grid',
@@ -400,23 +398,6 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).toContain('↵ place · drag to position');
 
       // Strictly assert absence of excluded design elements
-      expect(html).not.toMatch(/owner/i);
-      expect(html).not.toMatch(/used in/i);
-      expect(html).not.toMatch(/failures go to/i);
-      expect(html).not.toMatch(/open docs/i);
-      expect(html).not.toMatch(/platform team/i);
-    });
-
-    it('renders LibraryPreview composite without errors and free of forbidden fields', async () => {
-      const { LibraryPreview } = await import('./LibraryPreview');
-      const html = renderToStaticMarkup(React.createElement(LibraryPreview));
-
-      expect(html).toContain('System Studio Library Preview');
-      expect(html).toContain('Screen 12A');
-      expect(html).toContain('Screen 12B');
-      expect(html).toContain('Screen 12C');
-      expect(html).toContain('Screen 16E');
-
       expect(html).not.toMatch(/owner/i);
       expect(html).not.toMatch(/used in/i);
       expect(html).not.toMatch(/failures go to/i);

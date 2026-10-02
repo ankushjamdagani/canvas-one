@@ -11,12 +11,12 @@
  */
 
 import * as React from 'react';
-import { GitBranch, Undo2, Redo2, X, Bookmark, RotateCcw } from 'lucide-react';
+import { GitBranch, Undo2, Redo2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
-import type { CheckpointRecord, CommitRecord, PublicationRecord } from '../../persistence/studio';
+import type { CommitRecord, PublicationRecord } from '../../persistence/studio';
 import type { HistoryControllerLike } from './controller';
 import {
   computeEvidenceSummary,
@@ -32,7 +32,6 @@ export interface HistoryLadderProps {
   readonly isMain?: boolean;
   readonly aheadOfVersion?: AheadOfVersionInfo | null;
   readonly workingEdits?: readonly string[];
-  readonly checkpoints?: readonly Readonly<CheckpointRecord>[];
   readonly commits?: readonly Readonly<CommitRecord>[];
   readonly publications?: readonly Readonly<PublicationRecord>[];
   readonly commitDiffSummaries?: Readonly<Record<string, string | null>>;
@@ -40,7 +39,6 @@ export interface HistoryLadderProps {
   readonly canRedo?: boolean;
   readonly onUndo?: () => void;
   readonly onRedo?: () => void;
-  readonly onSaveCheckpoint?: (label: string) => Promise<unknown> | void;
   readonly onRestore?: (snapshotIdOrCheckpointId: string, label: string) => Promise<unknown> | void;
   readonly onOpenCommit?: () => void;
   readonly onOpenPublish?: () => void;
@@ -68,7 +66,6 @@ export function HistoryLadder({
   isMain: propIsMain,
   aheadOfVersion: propAheadOfVersion,
   workingEdits: propWorkingEdits,
-  checkpoints: propCheckpoints,
   commits: propCommits,
   publications: propPublications,
   commitDiffSummaries: propCommitDiffSummaries,
@@ -76,7 +73,6 @@ export function HistoryLadder({
   canRedo: propCanRedo,
   onUndo: propOnUndo,
   onRedo: propOnRedo,
-  onSaveCheckpoint: propOnSaveCheckpoint,
   onRestore: propOnRestore,
   onOpenCommit,
   onOpenPublish,
@@ -110,7 +106,6 @@ export function HistoryLadder({
       ? propAheadOfVersion
       : (controllerState?.aheadOfVersion ?? null);
   const workingEdits = propWorkingEdits ?? controllerState?.workingEdits ?? [];
-  const checkpoints = propCheckpoints ?? controllerState?.checkpoints ?? [];
   const commits = propCommits ?? controllerState?.commits ?? [];
   const publications = propPublications ?? controllerState?.publications ?? [];
   const orderedPublications = [...publications].sort((a, b) => b.ordinal - a.ordinal);
@@ -141,14 +136,10 @@ export function HistoryLadder({
   // Local state for UI toggles and forms
   const [showAllEdits, setShowAllEdits] = React.useState(false);
   const [showAllCommits, setShowAllCommits] = React.useState(false);
-  const [checkpointLabel, setCheckpointLabel] = React.useState('');
-  const [isSavingCheckpoint, setIsSavingCheckpoint] = React.useState(false);
-  const [checkpointError, setCheckpointError] = React.useState<string | null>(null);
 
-  // Restore confirmation: which item (checkpoint id or commit snapshotId) has its
-  // inline "pre-restore checkpoint label" field open, matching 22B's checkpoint
-  // affordance. No label is ever prefilled — Confirm stays disabled until the
-  // person types one.
+  // Restore confirmation: which commit snapshotId has its inline "pre-restore
+  // checkpoint label" field open. No label is ever prefilled — Confirm stays
+  // disabled until the person types one.
   const [restoreTargetId, setRestoreTargetId] = React.useState<string | null>(null);
   const [restoreLabel, setRestoreLabel] = React.useState('');
   const [isRestoring, setIsRestoring] = React.useState(false);
@@ -180,33 +171,6 @@ export function HistoryLadder({
       isMounted = false;
     };
   }, [controller, commits, propCommitDiffSummaries]);
-
-  // Checkpoint submission
-  const handleSaveCheckpoint = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = checkpointLabel.trim();
-    if (!trimmed) return;
-
-    setIsSavingCheckpoint(true);
-    setCheckpointError(null);
-    try {
-      if (propOnSaveCheckpoint) {
-        await propOnSaveCheckpoint(trimmed);
-      } else if (controller) {
-        const res = await controller.saveCheckpoint(trimmed);
-        if (res.status !== 'applied') {
-          setCheckpointError(requireResultMessage(res));
-          return;
-        }
-      }
-      setCheckpointLabel('');
-    } catch (err) {
-      if (err instanceof ResultMessageContractError) throw err;
-      setCheckpointError(requireResultMessage(err));
-    } finally {
-      setIsSavingCheckpoint(false);
-    }
-  };
 
   // Restore requires its own pre-restore checkpoint label (commands.md
   // history.restore payload {snapshotId, checkpointId, label}) — never invented,
@@ -258,18 +222,69 @@ export function HistoryLadder({
   const mainRestoreDisabledReason =
     'Direct restore on main branch is rejected; main is changed only by publication';
 
+  // Restore needs its own pre-restore checkpoint label; this inline form is used
+  // by commit cards.
+  const renderRestoreForm = (id: string) => (
+    <div className="flex flex-col items-end gap-1 shrink-0" data-testid={`restore-confirm-${id}`}>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="text"
+          autoFocus
+          value={restoreLabel}
+          onChange={(e) => setRestoreLabel(e.target.value)}
+          placeholder="Checkpoint label for current work"
+          maxLength={80}
+          className="h-6 text-[11px] w-40"
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          disabled={isRestoring || restoreLabel.trim().length === 0}
+          onClick={() => confirmRestore(id)}
+        >
+          Confirm
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs"
+          disabled={isRestoring}
+          onClick={cancelRestore}
+        >
+          Cancel
+        </Button>
+      </div>
+      {restoreError && <p className="text-[11px] text-risk-text font-medium">{restoreError}</p>}
+    </div>
+  );
+
+  const restoreLink = (id: string) => (
+    <button
+      type="button"
+      className="shrink-0 text-xs font-medium text-primary hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      disabled={isMain}
+      title={isMain ? mainRestoreDisabledReason : undefined}
+      onClick={() => beginRestore(id)}
+    >
+      Restore
+    </button>
+  );
+
   return (
     <div
       data-testid="history-ladder"
       className={cn(
-        'flex flex-col h-full bg-card text-foreground overflow-hidden select-none',
+        'flex flex-col h-full bg-panel text-foreground overflow-hidden select-none',
         hosted ? 'rounded-none border-0 shadow-none' : 'rounded-panel border border-border shadow-panel',
         className,
       )}
     >
       {/* 1. Header */}
       {!hosted && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background">
           <h2 className="text-base font-semibold text-foreground">History</h2>
           {onClose && (
             <button
@@ -284,30 +299,33 @@ export function HistoryLadder({
         </div>
       )}
 
-      {/* Scrollable Content Body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
-        {/* 2. Branch selector row — omitted entirely when no real branch name is known */}
-        {branchName && (
+      {/* 2. Branch selector row (22A: sits in the white header block) — omitted
+       * entirely when no real branch name is known */}
+      {branchName && (
+        <div className="shrink-0 border-b border-border bg-background px-4 pb-3 pt-1">
           <div
             data-testid="branch-selector-row"
-            className="flex items-center justify-between px-3 py-2 rounded-control bg-accent/40 border border-selected-edge/30 text-sm font-medium"
+            className="flex h-9 items-center justify-between gap-2 rounded-control border border-branch-edge bg-branch-tint px-3"
           >
-            <div className="flex items-center gap-2 truncate">
-              <GitBranch className="size-4 text-branch shrink-0" />
-              <span className="font-mono text-sm truncate text-foreground">{branchName}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <GitBranch className="size-3.5 shrink-0 text-branch" aria-hidden="true" />
+              <span className="truncate text-[13px] font-semibold text-branch">{branchName}</span>
             </div>
             {aheadOfVersion && (
               <span
                 data-testid="ahead-of-version"
-                className="font-mono text-xs text-muted-foreground shrink-0 ml-2"
+                className="shrink-0 font-mono text-[11px] text-secondary-text"
               >
                 {aheadOfVersion.aheadCount} ahead of {aheadOfVersion.versionKey}
               </span>
             )}
             {publishedMain && <span className="text-xs font-mono text-primary">up to date · {currentPublication.versionKey}</span>}
           </div>
-        )}
+        </div>
+      )}
 
+      {/* Scrollable Content Body */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 space-y-5">
         {/* 2b. "This draft is behind main" callout (22E) — shown only once a real
          * prepare-publish has found the draft behind main (never inferred). */}
         {behindMain && (
@@ -330,329 +348,187 @@ export function HistoryLadder({
           </div>
         )}
 
-        {/* 3. NOW · NOT COMMITTED block */}
-        {!publishedMain && (!behindMain || workingEdits.length > 0) && <section aria-labelledby="now-not-committed-header" className="space-y-2">
-          <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
-            <span id="now-not-committed-header" className="font-semibold text-risk-text">
-              NOW · NOT COMMITTED
-            </span>
-            <span data-testid="working-edits-count">
-              {workingEdits.length} edit{workingEdits.length === 1 ? '' : 's'}
-            </span>
-          </div>
-
-          <p className="text-[11px] text-muted-foreground italic">
-            This session only: uncommitted edit history resets upon session reload
-          </p>
-
-          <div className="rounded-control border border-border bg-sunken/40 p-3 space-y-2">
-            {workingEdits.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No uncommitted edits in this session</p>
-            ) : (
-              <ul className="space-y-1.5">
-                {visibleEdits.map((editLabel, index) => {
-                  const isLatest = index === 0;
-                  return (
-                    <li
-                      key={`${editLabel}-${index}`}
-                      className="flex items-center justify-between text-xs text-foreground gap-2"
-                    >
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="text-risk-text shrink-0">•</span>
-                        <span className={cn('truncate', isLatest ? 'font-medium' : 'text-body')}>
-                          {editLabel}
-                        </span>
-                      </div>
-                      {isLatest && (
-                        <Badge variant="risk" className="text-[10px] px-1.5 py-0">
-                          LATEST
-                        </Badge>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {workingEdits.length > 3 && (
-              <button
-                type="button"
-                onClick={() => setShowAllEdits(!showAllEdits)}
-                className="text-xs text-primary hover:underline font-medium pt-1 block"
-              >
-                {showAllEdits ? 'Show less' : `Show all ${workingEdits.length} edits`}
-              </button>
-            )}
-
-            {/* Undo / Redo controls */}
-            <div className="flex items-center gap-2 pt-2 border-t border-border/60">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs flex-1"
-                onClick={propOnUndo}
-                disabled={propCanUndo === false}
-              >
-                <Undo2 className="size-3.5 mr-1" />
-                Undo
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs flex-1"
-                onClick={propOnRedo}
-                disabled={propCanRedo === false}
-              >
-                <Redo2 className="size-3.5 mr-1" />
-                Redo
-              </Button>
+        {/* 3. NOW · NOT COMMITTED block (22A) */}
+        {!publishedMain && (!behindMain || workingEdits.length > 0) && (
+          <section aria-labelledby="now-not-committed-header" className="space-y-2">
+            <div className="flex items-center justify-between font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-secondary-text">
+              <span id="now-not-committed-header" className="text-risk-text">
+                NOW · NOT COMMITTED
+              </span>
+              <span data-testid="working-edits-count" className="normal-case tracking-normal text-[11px]">
+                {workingEdits.length} edit{workingEdits.length === 1 ? '' : 's'}
+              </span>
             </div>
-          </div>
-        </section>}
+            <p className="sr-only">This session only: uncommitted edit history resets upon session reload</p>
 
-        {/* 4. CHECKPOINTS Section & Save checkpoint inline form */}
-        {!publishedMain && (!behindMain || checkpoints.length > 0) && <section aria-labelledby="checkpoints-header" className="space-y-2">
-          <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
-            <span id="checkpoints-header">CHECKPOINTS ({checkpoints.length})</span>
-          </div>
-
-          {/* Small inline form: Save checkpoint */}
-          <form onSubmit={handleSaveCheckpoint} className="flex gap-2">
-            <Input
-              type="text"
-              value={checkpointLabel}
-              onChange={(e) => setCheckpointLabel(e.target.value)}
-              placeholder="Save checkpoint label"
-              maxLength={80}
-              className="h-7 text-xs"
-            />
-            <Button
-              type="submit"
-              variant="secondary"
-              size="sm"
-              className="h-7 text-xs shrink-0"
-              disabled={isSavingCheckpoint || checkpointLabel.trim().length === 0}
-            >
-              <Bookmark className="size-3.5 mr-1" />
-              Save
-            </Button>
-          </form>
-          {checkpointError && (
-            <p className="text-xs text-risk-text font-medium">{checkpointError}</p>
-          )}
-
-          {/* Checkpoint list */}
-          {checkpoints.length > 0 && (
-            <ul className="space-y-1.5 pt-1">
-              {checkpoints.map((cp) => (
-                <li
-                  key={cp.id}
-                  className="flex items-center justify-between text-xs rounded-control border border-border/60 bg-sunken/20 px-2.5 py-1.5"
-                >
-                  <div className="flex flex-col truncate pr-2">
-                    <span className="font-medium text-foreground truncate">{cp.label}</span>
-                    <span className="text-[11px] text-muted-foreground font-mono">
-                      {formatCommitTime(cp.createdAt)}
-                    </span>
-                  </div>
-                  {restoreTargetId === cp.id ? (
-                    <div
-                      className="flex flex-col items-end gap-1 shrink-0"
-                      data-testid={`restore-confirm-${cp.id}`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Input
-                          type="text"
-                          autoFocus
-                          value={restoreLabel}
-                          onChange={(e) => setRestoreLabel(e.target.value)}
-                          placeholder="Checkpoint label for current work"
-                          maxLength={80}
-                          className="h-6 text-[11px] w-40"
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          disabled={isRestoring || restoreLabel.trim().length === 0}
-                          onClick={() => confirmRestore(cp.id)}
+            <div className="rounded-control border border-border bg-background overflow-hidden">
+              <div className="p-1.5">
+                {workingEdits.length === 0 ? (
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground">No uncommitted edits in this session</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {visibleEdits.map((editLabel, index) => {
+                      const isLatest = index === 0;
+                      return (
+                        <li
+                          key={`${editLabel}-${index}`}
+                          className={cn(
+                            'flex items-center justify-between gap-2 rounded-[6px] px-2.5 py-2 text-[13px]',
+                            isLatest ? 'bg-risk-tint text-foreground' : 'text-body',
+                          )}
                         >
-                          Confirm
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          disabled={isRestoring}
-                          onClick={cancelRestore}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                      {restoreError && (
-                        <p className="text-[11px] text-risk-text font-medium">{restoreError}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-primary hover:text-primary-hover shrink-0"
-                      disabled={isMain}
-                      title={isMain ? mainRestoreDisabledReason : undefined}
-                      onClick={() => beginRestore(cp.id)}
-                    >
-                      <RotateCcw className="size-3 mr-1" />
-                      Restore
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              aria-hidden="true"
+                              className={cn('size-1.5 rounded-full shrink-0', isLatest ? 'bg-risk-text' : 'bg-border')}
+                            />
+                            <span className={cn('truncate', isLatest && 'font-semibold')}>{editLabel}</span>
+                          </div>
+                          {isLatest && (
+                            <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-risk-text shrink-0">
+                              Latest
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
 
-        {/* 5. COMMITS Section */}
-        {!publishedMain && <section aria-labelledby="commits-header" className="space-y-2">
-          {filterIds && filterIds.length > 0 && (
-            <div data-testid="history-filter-chip" className="inline-flex min-h-8 items-center gap-2 rounded-full border border-control-border bg-sunken px-3 text-xs text-ink">
-              <span>{filterIds.length === 1 ? 'Changes on selected part' : `Changes on ${filterIds.length} selected parts`}</span>
-              <button type="button" className="rounded px-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label="Clear history filter" onClick={onClearFilter}>×</button>
-            </div>
-          )}
-          <div className="flex items-center justify-between text-meta font-mono font-medium uppercase text-secondary-text">
-            <span id="commits-header">COMMITS ({displayCommits.length})</span>
-          </div>
-
-          {displayCommits.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">No commits on this branch yet</p>
-          ) : (
-            <div className="space-y-2">
-              {visibleCommits.map((commit, idx) => {
-                const isHead = idx === 0;
-                const fieldsChanged = diffSummaries[commit.id];
-                const evidenceSummary = computeEvidenceSummary(commit);
-
-                return (
-                  <div
-                    key={commit.id}
-                    data-testid={`commit-card-${commit.id}`}
-                    className="rounded-control border border-border bg-card p-3 space-y-1.5 shadow-sm"
+                {workingEdits.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllEdits(!showAllEdits)}
+                    className="block px-2 pt-2 pb-1 text-xs font-medium text-primary hover:underline cursor-pointer"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-baseline gap-2 truncate">
-                        <span className="font-mono text-xs text-muted-foreground shrink-0">
+                    {showAllEdits ? 'Show less' : `Show all ${workingEdits.length} edits`}
+                  </button>
+                )}
+              </div>
+
+              {/* Undo / Redo controls */}
+              <div className="flex items-center gap-2 border-t border-hairline bg-panel px-2.5 py-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={propOnUndo}
+                  disabled={propCanUndo === false}
+                >
+                  <Undo2 className="size-3.5 mr-1" />
+                  Undo
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={propOnRedo}
+                  disabled={propCanRedo === false}
+                >
+                  <Redo2 className="size-3.5 mr-1" />
+                  Redo
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 4. COMMITS Section */}
+        {!publishedMain && (
+          <section aria-labelledby="commits-header" className="space-y-2">
+            {filterIds && filterIds.length > 0 && (
+              <div data-testid="history-filter-chip" className="inline-flex min-h-8 items-center gap-2 rounded-full border border-control-border bg-sunken px-3 text-xs text-ink">
+                <span>{filterIds.length === 1 ? 'Changes on selected part' : `Changes on ${filterIds.length} selected parts`}</span>
+                <button type="button" className="rounded px-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label="Clear history filter" onClick={onClearFilter}>×</button>
+              </div>
+            )}
+            <div className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-secondary-text">
+              <span id="commits-header">COMMITS ({displayCommits.length})</span>
+            </div>
+
+            {displayCommits.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No commits on this branch yet</p>
+            ) : (
+              <div className="space-y-2">
+                {visibleCommits.map((commit, idx) => {
+                  const isHead = idx === 0;
+                  const fieldsChanged = diffSummaries[commit.id];
+                  const evidenceSummary = computeEvidenceSummary(commit);
+
+                  return (
+                    <div
+                      key={commit.id}
+                      data-testid={`commit-card-${commit.id}`}
+                      className="rounded-control border border-border bg-background overflow-hidden"
+                    >
+                      <div className="flex items-start gap-2.5 px-3 py-2.5">
+                        <span className="font-mono text-[11px] text-secondary-text shrink-0 pt-[3px]">
                           {formatCommitTime(commit.createdAt)}
                         </span>
-                        <span className="font-semibold text-sm text-foreground truncate">
-                          {commit.message}
-                        </span>
-                      </div>
-                      {isHead ? (
-                        <Badge variant="solid" className="text-[10px] px-1.5 py-0 uppercase shrink-0">
-                          Current
-                        </Badge>
-                      ) : restoreTargetId === commit.snapshotId ? (
-                        <div
-                          className="flex flex-col items-end gap-1 shrink-0"
-                          data-testid={`restore-confirm-${commit.snapshotId}`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <Input
-                              type="text"
-                              autoFocus
-                              value={restoreLabel}
-                              onChange={(e) => setRestoreLabel(e.target.value)}
-                              placeholder="Checkpoint label for current work"
-                              maxLength={80}
-                              className="h-6 text-[11px] w-40"
-                            />
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                              disabled={isRestoring || restoreLabel.trim().length === 0}
-                              onClick={() => confirmRestore(commit.snapshotId)}
-                            >
-                              Confirm
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs"
-                              disabled={isRestoring}
-                              onClick={cancelRestore}
-                            >
-                              Cancel
-                            </Button>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className={cn('text-[13px] text-foreground', isHead ? 'font-semibold' : 'font-medium')}>
+                              {commit.message}
+                            </span>
+                            {isHead ? (
+                              <span className="inline-flex h-4 shrink-0 items-center rounded-tag bg-primary px-1.5 text-[9.5px] font-semibold text-primary-foreground">
+                                Current
+                              </span>
+                            ) : restoreTargetId === commit.snapshotId ? null : (
+                              restoreLink(commit.snapshotId)
+                            )}
                           </div>
-                          {restoreError && (
-                            <p className="text-[11px] text-risk-text font-medium">{restoreError}</p>
+                          {/* Diff line: "n fields changed" only if computable via diffDocuments — else omit */}
+                          {fieldsChanged && (
+                            <p
+                              data-testid="fields-changed-text"
+                              className="mt-0.5 font-mono text-[10.5px] text-secondary-text"
+                            >
+                              {fieldsChanged}
+                            </p>
                           )}
                         </div>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs text-primary hover:text-primary-hover shrink-0"
-                          disabled={isMain}
-                          title={isMain ? mainRestoreDisabledReason : undefined}
-                          onClick={() => beginRestore(commit.snapshotId)}
-                        >
-                          Restore
-                        </Button>
+                      </div>
+                      {!isHead && restoreTargetId === commit.snapshotId && (
+                        <div className="border-t border-hairline px-3 py-2">{renderRestoreForm(commit.snapshotId)}</div>
+                      )}
+
+                      {/* Evidence summary: e.g. "3 scenarios passed" — NO p95 / burst */}
+                      {evidenceSummary && (
+                        <div className="border-t border-hairline bg-panel px-3 py-2">
+                          <p
+                            data-testid="evidence-summary-text"
+                            className="font-mono text-[10.5px] text-primary flex items-center gap-1.5"
+                          >
+                            <span className="size-1.5 rounded-full bg-primary shrink-0" />
+                            {evidenceSummary}
+                          </p>
+                        </div>
                       )}
                     </div>
+                  );
+                })}
 
-                    {/* Diff line: "n fields changed" only if computable via diffDocuments — else omit */}
-                    {fieldsChanged && (
-                      <p
-                        data-testid="fields-changed-text"
-                        className="text-xs text-muted-foreground font-mono"
-                      >
-                        {fieldsChanged}
-                      </p>
-                    )}
-
-                    {/* Evidence summary: e.g. "3 scenarios passed" — NO p95 / burst */}
-                    {evidenceSummary && (
-                      <p
-                        data-testid="evidence-summary-text"
-                        className="text-xs text-primary font-medium flex items-center gap-1.5"
-                      >
-                        <span className="size-1.5 rounded-full bg-primary shrink-0" />
-                        {evidenceSummary}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-
-              {displayCommits.length > 3 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllCommits(!showAllCommits)}
-                  className="text-xs text-primary hover:underline font-medium pt-1 block"
-                >
-                  {showAllCommits ? 'Show less' : `Show ${displayCommits.length - 3} earlier commits`}
-                </button>
-              )}
-            </div>
-          )}
-        </section>}
+                {displayCommits.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllCommits(!showAllCommits)}
+                    className="block text-xs font-medium text-primary hover:underline cursor-pointer"
+                  >
+                    {showAllCommits ? 'Show less' : `Show ${displayCommits.length - 3} earlier commits`}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* 6. PUBLISHED ON MAIN Section */}
         {publications.length > 0 && (
           <section aria-labelledby="published-on-main-header" className="space-y-2">
-            <div className="text-meta font-mono font-medium uppercase text-secondary-text">
+            <div className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-secondary-text">
               <span id="published-on-main-header">PUBLISHED ON MAIN</span>
             </div>
             <div className="space-y-2">
@@ -660,20 +536,23 @@ export function HistoryLadder({
                 <div
                   key={pub.id}
                   data-testid={`publication-card-${pub.id}`}
-                  className={cn('flex items-center justify-between rounded-control border px-3 py-2 text-sm', index === 0 && isMain ? 'border-primary bg-card ring-2 ring-primary/10' : 'border-border bg-sunken/30')}
+                  className={cn(
+                    'flex items-center justify-between gap-2 rounded-control border px-3 py-2.5 text-sm',
+                    index === 0 && isMain ? 'border-primary bg-background ring-2 ring-primary/10' : 'border-border bg-sunken',
+                  )}
                 >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <Badge variant="neutral" className="font-mono text-xs font-semibold px-1.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Badge variant="accent" className="font-mono text-[10px] font-semibold px-1.5 py-0 h-4 shrink-0 normal-case tracking-normal">
                       {pub.versionKey}
                     </Badge>
                     <div className="min-w-0">
-                      <span className="font-medium text-foreground truncate">{pub.metadata.title}</span>
-                      {isMain && index === 0 && <p className="text-[11px] text-muted-foreground">{formatPublicationDate(pub.createdAt)}</p>}
+                      <span className="block text-[13px] font-medium text-foreground truncate">{pub.metadata.title}</span>
+                      <p className="font-mono text-[10.5px] text-secondary-text">{formatPublicationDate(pub.createdAt)}</p>
                       {commits.find((commit) => commit.id === pub.commitId)?.evidence.length ? <p className="text-[10px] font-mono text-primary">REFERENCE · {computeEvidenceSummary(commits.find((commit) => commit.id === pub.commitId)!)}</p> : null}
                     </div>
                   </div>
-                  <span className="font-mono text-xs text-muted-foreground shrink-0 ml-2">
-                    {index === 0 && isMain ? 'CURRENT' : formatPublicationDate(pub.createdAt)}
+                  <span className="font-mono text-[10.5px] text-secondary-text shrink-0">
+                    {index === 0 && isMain ? 'CURRENT' : null}
                     {index > 0 && onComparePublication && <button type="button" className="ml-2 text-primary" onClick={() => onComparePublication(pub)}>Compare</button>}
                   </span>
                 </div>
@@ -684,7 +563,7 @@ export function HistoryLadder({
       </div>
 
       {/* 7. Footer */}
-      <div className="px-4 py-3 border-t border-border bg-card space-y-2">
+      <div className="px-4 py-3 border-t border-border bg-background space-y-2">
         {publishedMain ? <>
           <Button type="button" className="w-full" disabled={!onStartDraft} onClick={() => onStartDraft?.(currentPublication)}>Start a new draft from {currentPublication.versionKey}</Button>
           <button type="button" className="text-xs text-primary disabled:text-muted-foreground" disabled={!onEditMain} onClick={onEditMain}>Edit main directly</button>
@@ -692,7 +571,7 @@ export function HistoryLadder({
         </> : <>
         {!behindMain && <Button
           type="button"
-          className="w-full bg-primary hover:bg-primary-hover text-primary-foreground font-semibold"
+          className="w-full h-11 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold"
           disabled={isMain || Boolean(commitBlockedReason)}
           title={isMain ? mainCommitDisabledReason : (commitBlockedReason ?? undefined)}
           onClick={onOpenCommit}
@@ -730,10 +609,10 @@ export function HistoryLadder({
             }
             onClick={onOpenPublish}
             className={cn(
-              'w-full text-xs text-center py-1 pointer-coarse:min-h-11 block select-none',
+              'block text-xs text-left py-1 pointer-coarse:min-h-11 select-none',
               isMain || commits.length === 0 || !onOpenPublish || publishBlockedReason
                 ? 'text-muted-foreground cursor-not-allowed opacity-60'
-                : 'text-primary hover:underline font-medium',
+                : 'text-primary hover:underline font-medium cursor-pointer',
             )}
           >
             Publish draft to main

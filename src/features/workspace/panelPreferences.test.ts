@@ -26,6 +26,13 @@ const savedPanels: WorkspacePanelPreferences = {
       floatRect: { x: 30, y: 70, width: 360, height: 480 },
       stackOrder: 0,
     },
+    inspector: {
+      open: false,
+      placement: 'left',
+      collapsed: false,
+      floatRect: { x: 40, y: 80, width: 360, height: 480 },
+      stackOrder: 0,
+    },
   },
   sideWidths: { left: 300, right: 420 },
 };
@@ -79,6 +86,11 @@ describe('workspace panel preferences', () => {
   it('accepts the contracted panel fields and rejects incomplete or out-of-range values', () => {
     expect(readWorkspacePanelPreferences(savedPanels)).toEqual(savedPanels);
     expect(readWorkspacePanelPreferences({ panels: savedPanels.panels })).toBeNull();
+    // Values stored before the inspector became a panel still load, with its default.
+    const { inspector: _inspector, ...legacyPanels } = savedPanels.panels;
+    expect(readWorkspacePanelPreferences({ ...savedPanels, panels: legacyPanels })?.panels.inspector).toEqual(
+      createInitialPanelState().panels.inspector,
+    );
     expect(readWorkspacePanelPreferences({ ...savedPanels, sideWidths: { left: 279, right: 320 } })).toBeNull();
   });
 
@@ -94,7 +106,7 @@ describe('workspace panel preferences', () => {
     expect(hydrated.focusedPanel).toBe('history');
     expect(hydrated.activeOverlay).toBe('history');
     expect(hydrated.viewport).toEqual({ width: 390, height: 844 });
-    expect(hydrated.lastFocusedSequence).toEqual({ library: 4, history: 7 });
+    expect(hydrated.lastFocusedSequence).toEqual({ library: 4, history: 7, inspector: 0 });
   });
 
   it('rolls back only the latest outstanding request', () => {

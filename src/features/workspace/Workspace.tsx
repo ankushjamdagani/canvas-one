@@ -6,6 +6,7 @@ import type { BranchActionOutcome } from './BranchPopover';
 import { CanvasView, type CanvasSelectionRequest, type CanvasViewHandle } from './CanvasView';
 import { buildMoveChange } from './projection';
 import {
+  BREAKPOINT_DESKTOP,
   createInitialPanelState,
   panelReducer,
   type PanelId,
@@ -31,7 +32,7 @@ import type {
   ProjectRecord,
   StudioRepository,
 } from '../../persistence/studio/types';
-import { createCandidateController, type Actor } from '../../persistence/studio';
+import { createCandidateController, createIssue, type Actor } from '../../persistence/studio';
 import type { Id, Note } from '../../domain/studio/model';
 import { captureSelection } from '../../domain/parts/capture';
 import { planPlacement } from '../../domain/parts/place';
@@ -1068,12 +1069,46 @@ export function Workspace({
     return '';
   }, [isSaving, sessionState.lastError, sessionState.status]);
 
+  // Other projects, so renaming can refuse a name another project already uses (13A "name taken").
+  const [otherProjects, setOtherProjects] = React.useState<readonly { id: string; title: string }[]>([]);
+  const currentProjectId = sessionState.projectId;
+  const currentProjectTitle = projectRecord?.title;
+  React.useEffect(() => {
+    let cancelled = false;
+    void repository.listProjects().then((list) => {
+      if (cancelled) return;
+      setOtherProjects(
+        list.filter((p) => p.id !== currentProjectId).map((p) => ({ id: p.id, title: p.title })),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repository, currentProjectId, currentProjectTitle]);
+
   // Rename project handler
   const handleRenameProject = React.useCallback(
-    async (newTitle: string) => {
+    async (newTitle: string): Promise<SessionRenameResult> => {
+      const wanted = newTitle.trim().toLowerCase();
+      if (otherProjects.some((p) => p.title.trim().toLowerCase() === wanted)) {
+        return {
+          status: 'invalid',
+          issues: [createIssue('structural-rule', `Your team already has a project called ${newTitle.trim()}.`, [])],
+        };
+      }
       return session.renameProject(newTitle);
     },
-    [session],
+    [session, otherProjects],
+  );
+
+  const handleOpenProject = React.useCallback(
+    (projectId: string) => {
+      if (isSaving) return;
+      runGuarded(() => {
+        void session.openProject(projectId, null);
+      });
+    },
+    [session, isSaving, runGuarded],
   );
 
   // Undo / Redo handlers
@@ -1346,6 +1381,15 @@ export function Workspace({
     [applyPanelAction],
   );
 
+  // From 1200 px the inspector is a hosted panel (dock, float, collapse, stack, resize)
+  // opened and closed by the selection; below that it keeps its own dock or sheet.
+  const inspectorHosted = panelState.viewport.width >= BREAKPOINT_DESKTOP;
+  const inspectorWanted =
+    inspectorHosted && Boolean((draft && !draft.multi) || (scenarioDraft && document));
+  React.useEffect(() => {
+    panelDispatch({ type: 'SYNC_OPEN', panel: 'inspector', open: inspectorWanted });
+  }, [inspectorWanted, panelDispatch]);
+
   React.useEffect(() => {
     panelPreferenceMountedRef.current = true;
     let cancelled = false;
@@ -1602,6 +1646,10 @@ export function Workspace({
           open: panelState.panels.history.open,
           collapsed: panelState.panels.history.collapsed,
         },
+        inspector: {
+          open: panelState.panels.inspector.open,
+          collapsed: panelState.panels.inspector.collapsed,
+        },
       },
       resultsVisible: showResultsRegion,
       commitCount: historyControllerState.commits.length,
@@ -1835,7 +1883,6 @@ export function Workspace({
       'run.reset': () => handleResetRun(),
       'history.open': () => openHistoryPanel(),
       'history.close': () => panelDispatch({ type: 'CLOSE', panel: 'history' }),
-      'history.checkpoint': ({ label }) => historyController.saveCheckpoint(label),
       'history.commit': ({ message }) => historyController.commit(message),
       'history.restore': ({ targetId, label }) => historyController.restore(targetId, label),
       // Opens the review overlay first so its "preparing" state is visible.
@@ -2144,8 +2191,54 @@ export function Workspace({
     if (result.status === 'disabled') setHistoryNotice(result.reason);
   }, [runCommand]);
 
+  // Inspector / scenario editor buttons run the registry commands for the open draft.
+  const inspectorApply = React.useCallback(() => {
+    if (draftContext.id) void runCommand('inspector.apply', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+  const inspectorCancel = React.useCallback(() => {
+    if (draftContext.id) void runCommand('inspector.cancel', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+  const inspectorClose = React.useCallback(() => {
+    void runCommand('inspector.close', { draftId: draftContext.id });
+  }, [draftContext.id, runCommand]);
+
   const renderPanel = React.useCallback(
     (panelId: PanelId): React.ReactNode => {
+      if (panelId === 'inspector') {
+        if (scenarioDraft && document) {
+          return (
+            <ScenarioEditor
+              hosted
+              document={document}
+              handle={scenarioDraft}
+              onChange={handleChangeScenarioDraft}
+              onApply={inspectorApply}
+              onCancel={inspectorCancel}
+              onClose={inspectorClose}
+              mintId={mintId}
+              lastRunChecks={scenarioEditorChecks}
+              focusName={scenarioEditorFocusName}
+              focusAssertionId={scenarioEditorFocusAssertionId}
+            />
+          );
+        }
+        if (draft && !draft.multi) {
+          return (
+            <InspectorPanel
+              draft={draft}
+              measured={measuredSection}
+              onChangeField={handleChangeField}
+              onApply={inspectorApply}
+              onCancel={inspectorCancel}
+              onClose={inspectorClose}
+              saving={draft.status === 'saving'}
+              focusFieldId={focusFieldId}
+              variant="hosted"
+            />
+          );
+        }
+        return null;
+      }
       if (panelId === 'history') {
         if (historyView === 'commit') {
           return (
@@ -2190,16 +2283,17 @@ export function Workspace({
       }
       return (
         <LibraryPanel
-          hosted
           view={libraryView}
           onViewChange={setLibraryView}
-          renderSavedParts={(searchQuery, view) => <SavedParts
+          captureRequested={captureRequested}
+          renderSavedParts={({ searchQuery, view, active, onCountChange }) => <SavedParts
             repository={repository} session={session} actor={actor} mintId={mintId}
             viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[...selectedNoteIds]}
             blockedReason={partsBlockedReason}
             captureBlockedReason={captureBlockedReason}
             captureRequested={captureRequested}
             execute={runCommand} searchQuery={searchQuery} view={view}
+            active={active} onCountChange={onCountChange}
           />}
           onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
           onClose={() => void runCommand('library.close', {})}
@@ -2208,6 +2302,20 @@ export function Workspace({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      draft,
+      scenarioDraft,
+      document,
+      measuredSection,
+      handleChangeField,
+      handleChangeScenarioDraft,
+      inspectorApply,
+      inspectorCancel,
+      inspectorClose,
+      mintId,
+      scenarioEditorChecks,
+      scenarioEditorFocusName,
+      scenarioEditorFocusAssertionId,
+      focusFieldId,
       historyView,
       routedHistoryController,
       statusRefreshToken,
@@ -2240,9 +2348,12 @@ export function Workspace({
       collapse: (panelId) => void runCommand('panel.collapse', { panelId }),
       expand: (panelId) => void runCommand('panel.expand', { panelId }),
       resetWidth: (panelId) => void runCommand('panel.reset-width', { panelId }),
-      close: (panelId) => void runCommand(panelId === 'history' ? 'history.close' : 'library.close', {}),
+      close: (panelId) => {
+        if (panelId === 'inspector') void runCommand('inspector.close', { draftId: draftContext.id });
+        else void runCommand(panelId === 'history' ? 'history.close' : 'library.close', {});
+      },
     }),
-    [runCommand],
+    [runCommand, draftContext.id],
   );
 
   const quickOptionGroups = React.useMemo(
@@ -2275,18 +2386,16 @@ export function Workspace({
           ? await executeCommand('selection.group', { label: value }, commandContext, commandHandlers)
           : kind === 'note'
             ? await executeCommand('canvas.add-note', { text: value }, commandContext, commandHandlers)
-            : kind === 'checkpoint'
-              ? await executeCommand('history.checkpoint', { label: value }, commandContext, commandHandlers)
-              : await executeCommand('history.commit', { message: value }, commandContext, commandHandlers);
+            : await executeCommand('history.commit', { message: value }, commandContext, commandHandlers);
       if (result.status === 'disabled') return { ok: false, message: result.reason };
       let outcome: RenameOutcome;
-      if (kind === 'checkpoint' || kind === 'commit') {
+      if (kind === 'commit') {
         // History commands return the controller's authored result.
         const authored = result.value as { readonly status?: string } | null;
         outcome =
           authored?.status === 'applied'
             ? { ok: true }
-            : { ok: false, message: formatStudioError(authored, kind === 'commit' ? 'Could not commit' : 'Could not save the checkpoint') };
+            : { ok: false, message: formatStudioError(authored, 'Could not commit') };
       } else {
         outcome = result.value as RenameOutcome;
       }
@@ -2337,17 +2446,6 @@ export function Workspace({
     [commandContext, commandHandlers],
   );
 
-  // Inspector / scenario editor buttons run the registry commands for the open draft.
-  const inspectorApply = React.useCallback(() => {
-    if (draftContext.id) void runCommand('inspector.apply', { draftId: draftContext.id });
-  }, [draftContext.id, runCommand]);
-  const inspectorCancel = React.useCallback(() => {
-    if (draftContext.id) void runCommand('inspector.cancel', { draftId: draftContext.id });
-  }, [draftContext.id, runCommand]);
-  const inspectorClose = React.useCallback(() => {
-    void runCommand('inspector.close', { draftId: draftContext.id });
-  }, [draftContext.id, runCommand]);
-
   const quickOptionsShortcut = formatShortcut(COMMAND_DEFINITIONS['commands.open'].shortcut!, IS_MAC);
   const currentBranchLabel =
     commandContext.branches.find((branch) => branch.id === commandContext.branchId)?.label ?? '';
@@ -2383,6 +2481,8 @@ export function Workspace({
           branches={branches}
           branchId={sessionState.branchId ?? projectRecord.mainBranchId}
           onRenameProject={handleRenameProject}
+          otherProjects={otherProjects}
+          onOpenProject={handleOpenProject}
           onSwitchBranch={handleSwitchBranch}
           onCreateBranch={(label, source) =>
             runGuardedBranchCommand('branch.create', { label, source })
@@ -2406,7 +2506,7 @@ export function Workspace({
       ) : (
         <header
           data-testid="workspace-topbar-loading"
-          className="shrink-0 h-[52px] min-h-[52px] border-b border-border bg-shell"
+          className="shrink-0 h-14 min-h-14 border-b border-border bg-background"
         />
       )}
 
@@ -2425,6 +2525,7 @@ export function Workspace({
               dispatch={panelDispatch}
               commands={panelCommandRoutes}
               renderPanel={renderPanel}
+              panelTitles={{ inspector: scenarioDraft ? 'Scenario' : 'Configuration' }}
               panelBadges={{
                 history:
                   historyControllerState.workingEdits.length > 0
@@ -2542,7 +2643,7 @@ export function Workspace({
             bottom sheet below 768px, same content and guard. */}
         {/* A multi-selection keeps its draft (it is the selection) but shows no
             inspector: board 16D has only the selection toolbar (D44 O2). */}
-        {draft && !draft.multi && !isMobileInspector ? (
+        {draft && !draft.multi && !isMobileInspector && !inspectorHosted ? (
           <InspectorPanel
             draft={draft}
             measured={measuredSection}
@@ -2555,7 +2656,7 @@ export function Workspace({
             variant="dock"
           />
         ) : null}
-        {scenarioDraft && document && !isMobileInspector ? (
+        {scenarioDraft && document && !isMobileInspector && !inspectorHosted ? (
           <aside
             data-testid="scenario-inspector-dock"
             className="w-[320px] min-w-[320px] h-full overflow-hidden border-l border-border bg-panel"

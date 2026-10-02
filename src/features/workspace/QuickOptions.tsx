@@ -43,6 +43,27 @@ const GROUP_HEADING_CLASSES =
   '[&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase ' +
   '[&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-secondary-text';
 
+/**
+ * cmdk's default filter is a loose subsequence match ("note" matches any row
+ * whose text has n, o, t, e in order). Quick options match whole words
+ * instead: every query word must start a word in the row's label, detail or
+ * keywords, with label hits ranked first.
+ */
+export function quickOptionFilter(_value: string, search: string, keywords?: readonly string[]): number {
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 1;
+  const [label = '', ...rest] = keywords ?? [];
+  const startsWord = (text: string, word: string) =>
+    text.toLowerCase().split(/[^a-z0-9]+/).some((part) => part.startsWith(word));
+  let score = 0;
+  for (const word of words) {
+    if (startsWord(label, word)) score += 1;
+    else if (rest.some((text) => startsWord(text, word))) score += 0.5;
+    else return 0;
+  }
+  return score / words.length;
+}
+
 /** Dialog body; rendered on its own in tests (no portal). */
 export function QuickOptionsContent({
   groups,
@@ -64,7 +85,7 @@ export function QuickOptionsContent({
   // Disabled rows stay visible with their reason; cmdk skips them for
   // keyboard selection, so the first enabled row starts highlighted.
   return (
-    <CommandPrimitive label="Quick options" loop className="flex flex-col min-w-0 bg-background">
+    <CommandPrimitive label="Quick options" loop filter={quickOptionFilter} className="flex flex-col min-w-0 bg-background">
       <div className="flex items-center gap-3 px-4 h-14 border-b border-border bg-shell">
         <CommandIcon className="size-4 text-secondary-text shrink-0" aria-hidden="true" />
         <CommandPrimitive.Input
@@ -167,7 +188,7 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
         }}
         className={cn(
           'top-[max(64px,14vh)] translate-y-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2',
-          'w-[calc(100vw-32px)] max-w-xl p-0 gap-0 overflow-hidden flex flex-col',
+          'w-[calc(100vw-32px)] max-w-[660px] p-0 gap-0 overflow-hidden flex flex-col',
           'rounded-popover sm:rounded-[11px] border border-border bg-background shadow-popover',
         )}
       >
@@ -189,10 +210,6 @@ export function QuickOptionsDialog({ open, onOpenChange, onRun, ...content }: Qu
             }
             if (option.id === 'canvas.add-note') {
               setMode('note');
-              return;
-            }
-            if (option.id === 'history.checkpoint') {
-              setMode('checkpoint');
               return;
             }
             if (option.id === 'history.commit') {

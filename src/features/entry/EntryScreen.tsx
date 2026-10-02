@@ -38,6 +38,8 @@ export type ProjectRowItem = {
   readonly errorMessage?: string;
 };
 
+const DEFAULT_PROJECT_TITLE = 'Untitled';
+
 /**
  * 2A "new system" entry screen: two columns.
  *
@@ -111,7 +113,8 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
     void refreshProjects();
   }, [refreshProjects]);
 
-  const trimmedBlankName = blankProjectName.trim();
+  // An empty field creates "Untitled"; the name can be changed from the top bar.
+  const trimmedBlankName = blankProjectName.trim() || DEFAULT_PROJECT_TITLE;
   const isBlankNameValid = trimmedBlankName.length >= 1 && trimmedBlankName.length <= 80;
 
   // Blank project creator ("Open an empty canvas")
@@ -247,7 +250,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
       className="min-h-screen w-full max-w-full overflow-x-hidden bg-shell text-ink flex flex-col items-center select-none"
     >
       {/* Top Header */}
-      <header className="w-full h-[52px] border-b border-border bg-shell px-4 sm:px-8 flex items-center justify-between shrink-0">
+      <header className="w-full h-14 border-b border-border bg-background px-4 sm:px-8 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <svg
             className="size-5 shrink-0"
@@ -380,7 +383,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                       data-testid="blank-project-name-input"
                       aria-label="Blank project name"
                       type="text"
-                      placeholder="Project name"
+                      placeholder={DEFAULT_PROJECT_TITLE}
                       value={blankProjectName}
                       onChange={(e) => setBlankProjectName(e.target.value)}
                       maxLength={80}

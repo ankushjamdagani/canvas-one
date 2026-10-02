@@ -220,12 +220,12 @@ The 16D toolbar shows Group, Wrap in boundary, Align, Duplicate and Delete, and 
 ## 7. Panels and geometry
 
 **Preferences** `studio-preferences/1`:
-- `{schema, revision, panels:{library, history}, sideWidths:{left, right}, dock:{orderedCommandIds, hiddenCommandIds}, cameras:[{projectId, viewId, x, y, zoom}]}`, with at most 50 cameras.
+- `{schema, revision, panels:{library, history, inspector}, sideWidths:{left, right}, dock:{orderedCommandIds, hiddenCommandIds}, cameras:[{projectId, viewId, x, y, zoom}]}`, with at most 50 cameras.
 - `PanelPreference={open, placement:'left'|'right'|'floating', collapsed, floatRect:{x, y, width, height}, stackOrder}`.
-- There is exactly one Library and one History. The inspector is a fixed-right contextual region on desktop; results sit in the bottom region.
+- There is exactly one Library, one History and one inspector. From 1200 px the inspector is a hosted panel like the other two (dock left/right, float, collapse, resize, stack; default docked right); its `open` follows the selection's draft and is never persisted. Below 1200 px it keeps its own dock or sheet. Older stored values without `inspector` load with its default. Results sit in the bottom region.
 - Runtime-only state: `focusedPanel`, `lastFocusedSequence`, `activeOverlay`, selection, playback, drafts.
 
-**Reducer events:** `OPEN(panel)`, `CLOSE(panel)`, `FOCUS(panel)`, `PLACE(panel,placement,index)`, `COLLAPSE(panel)`, `EXPAND(panel)`, `RESIZE_SIDE(side,width)`, `RESET_SIDE(side)`, `RESIZE_FLOAT(panel,rect)`, `VIEWPORT_CHANGED(width,height)`, `BEGIN_GESTURE`, `PREVIEW_GESTURE`, `COMMIT_GESTURE`, `CANCEL_GESTURE`.
+**Reducer events:** `OPEN(panel)`, `CLOSE(panel)`, `FOCUS(panel)`, `PLACE(panel,placement,index)`, `COLLAPSE(panel)`, `EXPAND(panel)`, `RESIZE_SIDE(side,width)`, `RESET_SIDE(side)`, `RESIZE_FLOAT(panel,rect)`, `SYNC_OPEN(panel,open)` (draft-driven visibility: no focus, no save), `VIEWPORT_CHANGED(width,height)`, `BEGIN_GESTURE`, `PREVIEW_GESTURE`, `COMMIT_GESTURE`, `CANCEL_GESTURE`.
 - Only COMMIT persists. Escape and pointercancel restore the original state.
 - Responsive overrides never overwrite desktop preferences.
 - The reducer is pure: it returns state plus effect descriptors (save, announce, focus), with no DOM or DB access.
@@ -236,11 +236,11 @@ The 16D toolbar shows Group, Wrap in boundary, Align, Duplicate and Delete, and 
 |---|---|
 | < 768 | One modal overlay at a time: a full-width sheet under the topbar, max remaining height. Inspector, Library, History and results replace one another (after the draft guard). Canvas tools stay reachable; nothing is hover-only. |
 | 768–1199 | Auxiliary panels are single overlays. The inspector may take 320 px only if the canvas keeps ≥360 px (after the 44 px rail and 16 px gutters); otherwise it becomes an overlay too. An auxiliary overlay can cover the inspector without losing its draft; focus returns afterwards. |
-| ≥ 1200 | Docking and floating. Side widths default 320, clamped 280–440; inspector 320; canvas min 480; rail 44; gutters 16. If occupancy exceeds width, collapse the least-recently-focused auxiliary panel (ties by panel ID) and repeat. The inspector is kept; if it alone doesn't fit, it becomes an overlay. When width returns, restore the preferred state without stealing focus. |
+| ≥ 1200 | Docking and floating. Side widths default 320, clamped 280–440 (the inspector shares its side's width); canvas min 480; rail 44; gutters 16. If occupancy exceeds width, collapse the least-recently-focused auxiliary panel (ties by panel ID) and repeat. The inspector is never auto-collapsed. When width returns, restore the preferred state without stealing focus. |
 
 - **Collapsed rail:** 44 px.
 - **Scrolling.** The inspector and results scroll their own content, never the page.
-- **Stacks.** Library and History can stack on one side, sharing its width with an equal initial split and accessible separators. The minimum expanded content is 160 px plus a 40 px header; if both don't fit, show one expanded panel and the other as a collapsed header.
+- **Stacks.** Up to three panels (Library, History, inspector) can stack on one side, sharing its width with an equal initial split and accessible separators. The minimum expanded content is 160 px plus a 40 px header each; if they don't all fit, collapse the least-recently-focused panel (never the inspector) to a header and repeat.
 - **Floating.** Default 360×480, minimum 280×240, maximum = viewport minus 16 px margins, with the header and close button always inside. Below the minimum, switch to an overlay. The topbar reserves 54 px on desktop (measured height on mobile).
 - Keyboard resize steps are 10 px (Shift: 1 px), alongside a numeric positioning menu.
 - **Auto-collapse** announces which panel moved and why.

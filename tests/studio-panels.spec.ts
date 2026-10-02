@@ -113,23 +113,6 @@ test.describe('RV-12h: History and Library panels', () => {
     await expect(page.getByTestId('branch-selector-row')).toBeVisible();
   });
 
-  test('saves a checkpoint from the History panel', async ({ page }) => {
-    await openS05Project(page);
-    await page.getByTestId('topbar-history-btn').click();
-
-    const ladder = page.getByTestId('history-ladder');
-    await expect(ladder).toBeVisible();
-
-    const label = `Before tweak ${Date.now()}`;
-    await ladder.getByPlaceholder('Save checkpoint label').fill(label);
-    await ladder.getByRole('button', { name: 'Save' }).click();
-
-    await waitForIdle(page);
-    await expect(ladder.getByText(label)).toBeVisible();
-    // The inline form clears its label once the checkpoint is really saved.
-    await expect(ladder.getByPlaceholder('Save checkpoint label')).toHaveValue('');
-  });
-
   test('opens the singleton Library from the dock and places a component', async ({ page }) => {
     await openBlankProject(page, `RV-12h library ${Date.now()}`);
 

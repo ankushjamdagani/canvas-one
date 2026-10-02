@@ -126,6 +126,7 @@ export function createState23E(): WorkspacePanelState {
   return {
     ...base,
     panels: {
+      ...base.panels,
       history: {
         open: true,
         placement: 'right',
@@ -154,6 +155,7 @@ export function createState23F(): WorkspacePanelState {
   return {
     ...base,
     panels: {
+      ...base.panels,
       history: {
         open: true,
         placement: 'left',
@@ -182,6 +184,7 @@ export function createState23G(): WorkspacePanelState {
   return {
     ...base,
     panels: {
+      ...base.panels,
       history: {
         open: true,
         placement: 'left',

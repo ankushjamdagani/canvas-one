@@ -835,7 +835,6 @@ export type HistoryControllerLike = Pick<
   HistoryController,
   | 'getState'
   | 'subscribe'
-  | 'saveCheckpoint'
   | 'restore'
   | 'commit'
   | 'loadCommitPreview'

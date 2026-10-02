@@ -33,7 +33,8 @@ export interface InspectorPanelProps {
   readonly saving: boolean;
   /** Set once, right after a failed Apply, so the panel can focus that field. */
   readonly focusFieldId: string | null;
-  readonly variant: 'dock' | 'sheet';
+  /** `hosted`: inside PanelHost, which supplies the title bar, close button and docking. */
+  readonly variant: 'dock' | 'sheet' | 'hosted';
 }
 
 export function InspectorPanel({
@@ -69,7 +70,10 @@ export function InspectorPanel({
   const containerClass =
     variant === 'dock'
       ? 'flex flex-col h-full w-[320px] shrink-0 border-l border-control-border bg-panel'
-      : 'flex flex-col w-full h-full bg-panel';
+      : variant === 'hosted'
+        ? 'flex flex-col w-full h-full min-h-0 bg-panel'
+        : 'flex flex-col w-full h-full bg-panel';
+  const hosted = variant === 'hosted';
 
   return (
     <div
@@ -80,7 +84,7 @@ export function InspectorPanel({
       className={containerClass}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3 border-b border-divider">
+      <div className={cn('flex items-start justify-between gap-2 px-4 pt-4 pb-3 border-b border-divider', hosted && 'bg-background')}>
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-ink truncate" data-testid="inspector-title">
             {draft.multi ? draft.label : draft.label || 'Untitled'}
@@ -106,7 +110,7 @@ export function InspectorPanel({
             ) : null}
           </div>
         </div>
-        <Button
+        {hosted ? null : <Button
           type="button"
           variant="ghost"
           size="icon"
@@ -122,7 +126,7 @@ export function InspectorPanel({
           className="shrink-0"
         >
           <X aria-hidden="true" />
-        </Button>
+        </Button>}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto">
@@ -205,7 +209,7 @@ export function InspectorPanel({
 
       {/* Footer */}
       {!draft.multi ? (
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-control-border">
+        <div className={cn('flex items-center gap-2 px-4 py-3 border-t border-control-border', hosted && 'bg-background')}>
           <Button
             type="button"
             data-testid="inspector-apply"

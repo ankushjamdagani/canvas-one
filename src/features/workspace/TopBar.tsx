@@ -5,7 +5,6 @@ import {
   Command as CommandIcon,
   GitBranch,
   History as HistoryIcon,
-  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +12,7 @@ import { Kbd } from '@/components/ui/kbd';
 import { cn } from '@/lib/utils';
 import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
 import { ProjectMenu } from './ProjectMenu';
+import { RenameConflictPopover, RenamedNotice } from './ProjectRenameFeedback';
 import { BranchPopover, type BranchActionOutcome } from './BranchPopover';
 import type { TransferActions } from '../transfer';
 
@@ -21,6 +21,9 @@ export interface TopBarProps {
   branches: readonly BranchRecord[];
   branchId: string;
   onRenameProject: (title: string) => Promise<unknown>;
+  /** Other projects (id + title) so a rename can flag a name that is already taken. */
+  otherProjects?: readonly { readonly id: string; readonly title: string }[];
+  onOpenProject?: (projectId: string) => void;
   onSwitchBranch: (branchId: string) => void;
   onCreateBranch: (label: string, source: 'working' | 'head') => Promise<BranchActionOutcome>;
   onReopenBranch: (branchId: string) => Promise<BranchActionOutcome>;
@@ -67,6 +70,8 @@ export function TopBar({
   branches,
   branchId,
   onRenameProject,
+  otherProjects = [],
+  onOpenProject,
   onSwitchBranch,
   onCreateBranch,
   onReopenBranch,
@@ -118,22 +123,55 @@ export function TopBar({
       : currentBranch.label
     : '';
 
+  const [renamedNotice, setRenamedNotice] = React.useState<{ from: string; to: string } | null>(null);
+  React.useEffect(() => {
+    if (!renamedNotice) return;
+    const timer = window.setTimeout(() => setRenamedNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [renamedNotice]);
+
+  const normalizedDraft = titleDraft.trim().toLowerCase();
+  const nameConflict =
+    isRenaming && normalizedDraft.length > 0
+      ? (otherProjects.find((p) => p.title.trim().toLowerCase() === normalizedDraft) ?? null)
+      : null;
+
+  const cancelRename = () => {
+    setTitleDraft(project.title);
+    setIsRenaming(false);
+  };
+
   const commitRename = async () => {
     const trimmed = titleDraft.trim();
+    if (nameConflict) {
+      cancelRename();
+      return;
+    }
     if (trimmed.length > 0 && trimmed.length <= 80 && trimmed !== project.title) {
-      await onRenameProject(trimmed);
+      const previous = project.title;
+      const result = await onRenameProject(trimmed);
+      if ((result as { status?: string } | null)?.status === 'applied') {
+        setRenamedNotice({ from: previous, to: trimmed });
+      }
     } else {
       setTitleDraft(project.title);
     }
     setIsRenaming(false);
   };
 
+  const undoRename = async () => {
+    if (!renamedNotice) return;
+    const { from } = renamedNotice;
+    setRenamedNotice(null);
+    await onRenameProject(from);
+  };
+
   return (
     <header
       data-testid="workspace-topbar"
       className={cn(
-        'relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-[52px] min-h-[52px]',
-        'border-b border-border bg-shell select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2',
+        'relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-14 min-h-14',
+        'border-b border-border bg-background select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2',
       )}
       role="banner"
     >
@@ -164,129 +202,144 @@ export function TopBar({
         {/* Vertical divider from brand mark */}
         <div className="hidden sm:block w-px h-[22px] bg-border shrink-0 mx-0.5" aria-hidden="true" />
 
-        {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] */}
-        <div
-          data-testid="breadcrumb-chip"
-          className="flex items-center gap-1 sm:gap-1.5 min-w-0 max-sm:min-w-min h-7 pointer-coarse:h-12 shrink-0 pl-1 pr-1.5"
+        {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] (13A toggle sizing) */}
+        <RenamedNotice
+          open={renamedNotice !== null && !isRenaming}
+          title={renamedNotice?.to ?? ''}
+          onUndo={() => void undoRename()}
+          onDismiss={() => setRenamedNotice(null)}
         >
-          {isRenaming ? (
-            <input
-              autoFocus
-              data-testid="project-title-input"
-              aria-label="Project title"
-              className="h-6 px-2 py-0.5 text-[13px] font-medium text-ink bg-white border border-primary rounded-[5px] shadow-[0_0_0_2px_rgba(11,92,84,0.15)] outline-none focus:outline-none w-28 sm:w-44 truncate"
-              value={titleDraft}
-              maxLength={80}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.currentTarget.blur();
-                  void commitRename();
-                } else if (e.key === 'Escape') {
-                  setTitleDraft(project.title);
-                  setIsRenaming(false);
-                  e.currentTarget.blur();
-                }
-              }}
-              onBlur={() => void commitRename()}
-            />
-          ) : (
-            <ProjectMenu
-              projectTitle={project.title}
-              branchCount={branches.length}
-              onRenameProject={() => setIsRenaming(true)}
-              onAllProjects={onAllProjects}
-              transferActions={transferActions}
+          <div
+            data-testid="breadcrumb-chip"
+            className="flex items-center gap-0.5 sm:gap-1 min-w-0 max-sm:min-w-min h-7 pointer-coarse:h-12 shrink-0"
+          >
+            {isRenaming ? (
+              <RenameConflictPopover
+                open={nameConflict !== null}
+                conflictTitle={nameConflict?.title ?? ''}
+                currentTitle={project.title}
+                onKeep={cancelRename}
+                onOpenExisting={() => {
+                  const target = nameConflict;
+                  cancelRename();
+                  if (target) onOpenProject?.(target.id);
+                }}
+              >
+                <input
+                  autoFocus
+                  data-testid="project-title-input"
+                  aria-label="Project title"
+                  aria-invalid={nameConflict !== null || undefined}
+                  className={cn(
+                    'h-7 px-2.5 text-[13px] font-medium text-ink bg-background border rounded-[6px] outline-none focus:outline-none w-28 sm:w-44 truncate',
+                    nameConflict
+                      ? 'border-risk-text shadow-[0_0_0_2px_rgba(176,72,40,0.15)]'
+                      : 'border-primary shadow-[0_0_0_2px_rgba(11,92,84,0.15)]',
+                  )}
+                  value={titleDraft}
+                  maxLength={80}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (nameConflict) return;
+                      e.currentTarget.blur();
+                    } else if (e.key === 'Escape') {
+                      cancelRename();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onBlur={() => void commitRename()}
+                />
+              </RenameConflictPopover>
+            ) : (
+              <ProjectMenu
+                projectTitle={project.title}
+                branchCount={branches.length}
+                onRenameProject={() => setIsRenaming(true)}
+                onAllProjects={onAllProjects}
+                transferActions={transferActions}
+              >
+                {(isOpen) => (
+                  <button
+                    type="button"
+                    data-testid="breadcrumb-project-btn"
+                    className={cn(
+                      'group flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
+                      isOpen
+                        ? 'bg-accent border-selected-edge text-primary'
+                        : 'border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]',
+                    )}
+                    title={project.title}
+                  >
+                    <span className="truncate">{project.title}</span>
+                    {isOpen ? (
+                      <ChevronUp size={11} className="text-primary shrink-0" aria-hidden="true" />
+                    ) : (
+                      <ChevronDown size={11} className="text-secondary-text shrink-0" aria-hidden="true" />
+                    )}
+                  </button>
+                )}
+              </ProjectMenu>
+            )}
+
+            {/* RV-05b review round 1: dropped below sm so a 390px top bar has room
+                for the project name and the branch toggle without clipping. */}
+            <span className="hidden sm:inline text-[#C0C6C1] text-[11px] select-none shrink-0" aria-hidden="true">
+              /
+            </span>
+
+            <BranchPopover
+              project={project}
+              branches={branches}
+              currentBranchId={branchId}
+              onSwitchBranch={onSwitchBranch}
+              onCreateBranch={onCreateBranch}
+              onReopenBranch={onReopenBranch}
+              createDisabledReason={createBranchDisabledReason}
+              isSaving={isSaving}
+              onOpenHistory={onOpenHistory}
             >
               {(isOpen) => (
                 <button
                   type="button"
-                  data-testid="breadcrumb-project-btn"
+                  data-testid="breadcrumb-branch-btn"
                   className={cn(
-                    'group flex items-center gap-1.5 px-2 py-1 sm:py-[5px] sm:px-[9px] rounded-[6px] border text-[13px] font-medium transition-colors truncate min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
+                    'group flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
                     isOpen
-                      ? 'bg-[#EAEFEC] border-[#A8CBC5] text-[#0B5C54]'
-                      : 'border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]',
+                      ? 'bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]'
+                      : 'border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]',
                   )}
-                  title={project.title}
+                  title={branchLabel}
                 >
-                  <span className="truncate">{project.title}</span>
+                  <GitBranch size={12} className={cn('shrink-0', isOpen ? 'text-[#5B3E9B]' : 'text-[#7C5FC0]')} />
+                  <span className="hidden sm:inline font-semibold truncate max-w-[110px] sm:max-w-[180px]">
+                    {branchLabel}
+                  </span>
+                  <Badge
+                    data-testid="breadcrumb-branch-state"
+                    variant={isMainBranch ? 'accent' : 'risk'}
+                    className="text-[9.5px] font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
+                  >
+                    {isMainBranch ? 'MAIN' : 'DRAFT'}
+                  </Badge>
                   {isOpen ? (
-                    <ChevronUp size={11} className="text-[#0B5C54] shrink-0" aria-hidden="true" />
+                    <ChevronUp size={11} className="text-[#5B3E9B] shrink-0" aria-hidden="true" />
                   ) : (
-                    <Pencil
-                      size={11}
-                      className="text-[#8A938F] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hidden sm:inline-block"
-                      aria-hidden="true"
-                    />
+                    <ChevronDown size={11} className="text-secondary-text shrink-0" aria-hidden="true" />
                   )}
                 </button>
               )}
-            </ProjectMenu>
-          )}
+            </BranchPopover>
 
-          {/* RV-05b review round 1: dropped below sm along with the chevron so a
-              390px top bar has room for the project name, the branch icon and the
-              MAIN/DRAFT badge without any of them getting clipped. */}
-          <span className="hidden sm:inline text-[#C0C6C1] text-[11px] select-none shrink-0" aria-hidden="true">
-            /
-          </span>
-
-          <BranchPopover
-            project={project}
-            branches={branches}
-            currentBranchId={branchId}
-            onSwitchBranch={onSwitchBranch}
-            onCreateBranch={onCreateBranch}
-            onReopenBranch={onReopenBranch}
-            createDisabledReason={createBranchDisabledReason}
-            isSaving={isSaving}
-            onOpenHistory={onOpenHistory}
-          >
-            {(isOpen) => (
-              <button
-                type="button"
-                data-testid="breadcrumb-branch-btn"
-                className={cn(
-                  'group flex items-center gap-1.5 px-2 py-1 sm:py-[5px] sm:px-[9px] rounded-[6px] border text-[13px] font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
-                  isOpen
-                    ? 'bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]'
-                    : 'border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]',
-                )}
-                title={branchLabel}
-              >
-                <GitBranch size={12} className={cn('shrink-0', isOpen ? 'text-[#5B3E9B]' : 'text-[#7C5FC0]')} />
-                <span className="hidden sm:inline font-semibold truncate max-w-[110px] sm:max-w-[180px]">
-                  {branchLabel}
-                </span>
-                {isOpen ? (
-                  <ChevronUp size={11} className="text-[#5B3E9B] shrink-0" aria-hidden="true" />
-                ) : (
-                  <ChevronDown
-                    size={11}
-                    className="text-[#8A938F] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hidden sm:inline-block"
-                    aria-hidden="true"
-                  />
-                )}
-              </button>
+            {isRenaming && (
+              <div className="hidden sm:flex items-center gap-2 text-[10.5px] font-mono text-secondary-text select-none shrink-0 pl-2">
+                <span>↵ save</span>
+                <span>esc cancel</span>
+              </div>
             )}
-          </BranchPopover>
-
-          {isRenaming ? (
-            <div className="hidden sm:flex items-center gap-2 text-[10.5px] font-mono text-secondary-text select-none shrink-0 pl-1">
-              <span>↵ save</span>
-              <span>esc cancel</span>
-            </div>
-          ) : (
-            <Badge
-              data-testid="breadcrumb-branch-state"
-              variant={isMainBranch ? 'accent' : 'risk'}
-              className="text-[9.5px] font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
-            >
-              {isMainBranch ? 'MAIN' : 'DRAFT'}
-            </Badge>
-          )}
-        </div>
+          </div>
+        </RenamedNotice>
 
         {/* Save Status */}
         <span

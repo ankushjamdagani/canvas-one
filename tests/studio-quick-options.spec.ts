@@ -123,18 +123,13 @@ test.describe('Studio Quick options (RV-03q)', () => {
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
     await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
 
-    // history.checkpoint: the nested name step executes the registry command.
-    const label = `Quick checkpoint ${Date.now()}`;
+    // Checkpoints are not a user flow: Quick options offers commit, not "Save checkpoint".
     await page.keyboard.press('F2');
     await page.getByTestId('quick-options-input').fill('checkpoint');
-    await page.getByTestId('quick-option-history.checkpoint').click();
-    const nameInput = page.getByTestId('quick-options-checkpoint-input');
-    await nameInput.fill(label);
-    await nameInput.press('Enter');
-    await expect(page.getByTestId('quick-options')).toHaveCount(0);
-    await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+    await expect(page.getByTestId('quick-option-history.checkpoint')).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await page.getByTestId('topbar-history-btn').click();
-    await expect(page.getByTestId('history-ladder').getByText(label)).toBeVisible();
+    await expect(page.getByTestId('history-ladder')).toBeVisible();
 
     // An open configuration draft disables the history commands with one reason.
     await page.locator('[data-element-id="816fe039-76dd-5b7b-a787-4d7666ff8d62"]').click();

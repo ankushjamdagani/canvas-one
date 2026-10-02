@@ -118,6 +118,8 @@ Evidence from a read-only caller audit (2026-09-21). An imported symbol, a test-
 
 Three future directions are recorded here. The first two constrain today's design without adding code.
 
+**Git-backed history (22B–22F).** The History panel is aligned to 22A only. The commit/publish/behind-main/compare designs (22B save checkpoint/commit, 22C publish review, 22D published, 22E draft behind main, 22F compare and resolve) keep their current local behavior and are restyled to match when History is connected to git; the 22A "Stats" button and p95/burst evidence stay excluded (design-revalidation §2) until runs are tied to commits.
+
 **Hosted, self-hosted and sync (D18).** Local, hosted and self-hosted bundles share one core; GitHub/server sync and async review come first, live coediting later. Required now:
 - **IDs.** Project, document, element, branch and scenario IDs never depend on a provider or on names.
 - **Commands.** Typed domain commands with atomic change groups, expected revisions and origin metadata, instead of whole-project replacement.

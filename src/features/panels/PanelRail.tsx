@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   History as HistoryIcon,
   LayoutGrid,
+  SlidersHorizontal,
   ChevronsRight,
   ChevronsLeft,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ export interface PanelRailProps {
 const defaultIcons: Record<PanelId, React.ComponentType<{ className?: string }>> = {
   history: HistoryIcon,
   library: LayoutGrid,
+  inspector: SlidersHorizontal,
 };
 
 export const PanelRail: React.FC<PanelRailProps> = ({

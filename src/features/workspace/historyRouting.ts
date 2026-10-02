@@ -3,7 +3,7 @@
  *
  * HistoryLadder, CommitPanel and PublishFlow keep calling their controller's
  * action methods; the workspace hands them these facades so every one of those
- * calls runs the matching registry command (`history.checkpoint|commit|restore|
+ * calls runs the matching registry command (`history.commit|restore|
  * prepare-publish|resolve-conflict|publish`) and therefore its shared
  * availability. A disabled command surfaces its reason as an `invalid` result,
  * which the components already render as their inline error.
@@ -43,8 +43,6 @@ export function routeHistoryController(
     loadCommitPreview: () => controller.loadCommitPreview(),
     getCommitDiffSummary: (commitId) => controller.getCommitDiffSummary(commitId),
     getCommitsTouching: (elementIds) => controller.getCommitsTouching(elementIds),
-    saveCheckpoint: async (label) =>
-      unwrap<Awaited<ReturnType<HistoryController['saveCheckpoint']>>>(await run('history.checkpoint', { label })),
     restore: async (targetId, label) =>
       unwrap<Awaited<ReturnType<HistoryController['restore']>>>(await run('history.restore', { targetId, label })),
     // The commit form supplies the message; expected head/revision options stay

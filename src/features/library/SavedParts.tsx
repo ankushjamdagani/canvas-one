@@ -82,7 +82,15 @@ export function SavedParts({
   execute,
   searchQuery,
   view,
-}: SavedPartsProps & { searchQuery: string; view: LibraryView }) {
+  active = true,
+  onCountChange,
+}: SavedPartsProps & {
+  searchQuery: string;
+  view: LibraryView;
+  /** False while the Library shows another tab; the section stays mounted but hidden. */
+  active?: boolean;
+  onCountChange?: (count: number) => void;
+}) {
   const state = React.useSyncExternalStore(
     session.subscribe,
     session.getState,
@@ -171,6 +179,9 @@ export function SavedParts({
   for (const part of parts)
     if ((latest.get(part.id)?.revision ?? 0) < part.revision)
       latest.set(part.id, part);
+  React.useEffect(() => {
+    onCountChange?.(latest.size);
+  }, [latest.size, onCountChange]);
   const query = searchQuery.trim().toLocaleLowerCase();
   const visible = [...latest.values()]
     .filter((part) =>
@@ -306,16 +317,18 @@ export function SavedParts({
   return (
     <section
       aria-label="Saved parts"
-      className="border-b border-border p-3 space-y-3"
+      hidden={!active}
+      className="p-4 space-y-3"
       onKeyDown={(event) => {
         if (event.key !== "Escape") event.stopPropagation();
       }}
     >
+      <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-widest text-branch">
+        <span className="font-medium">Our parts</span>
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-[10px] text-secondary-text">{latest.size}</span>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-xs font-semibold mr-auto">
-          Saved parts{" "}
-          <span className="font-mono text-secondary-text">{latest.size}</span>
-        </h3>
         <Button
           size="sm"
           variant="outline"
@@ -437,7 +450,7 @@ export function SavedParts({
         {visible.map((part) => (
           <article
             key={part.id}
-            className="min-w-0 rounded-control border border-control-border p-2 text-xs"
+            className="min-w-0 rounded-lg border border-border bg-white p-2.5 text-xs"
           >
             <button
               type="button"
@@ -446,8 +459,8 @@ export function SavedParts({
               onClick={() => setSelected(selected === part.id ? null : part.id)}
             >
               {part.label}{" "}
-              <span className="text-secondary-text font-mono">
-                r{part.revision}
+              <span className="ml-1 rounded-tag border border-branch-edge bg-branch-tint px-1.5 font-mono text-[10px] font-semibold text-branch">
+                v{part.revision}
               </span>
             </button>
             {selected === part.id && (

@@ -2464,3 +2464,51 @@ This file is the cumulative, append-only, concise record of completed tasks in t
   - `npm run build`: Production TypeScript & Vite bundle built in 527ms.
   - `npm run build-storybook`: Storybook build passed in 3.05s.
   - `graphify update .`: AST updated cleanly.
+
+## 2026-10-02 — Top bar, branch popover, Quick options and History panel design alignment
+
+- **Outcome**: Top bar is white and 56px (workspace, loading bar and entry header). Project and branch toggles follow 13A sizing (h-7, 10px padding, chevron always visible); the DRAFT/MAIN badge sits inside the branch toggle before its chevron. New blank projects default to "Untitled". Renaming to a name another project uses shows the 13A "name taken" popover (Keep / Open existing / disabled Save; Enter blocked, also refused in `handleRenameProject`); a successful rename shows the "Renamed to … Undo" notice. Branch popover search is full width with the icon and ⌘B overlaid on the input. Quick options is 660px wide and search now matches whole words ("note" shows only Add note…) instead of cmdk's subsequence match. History panel restyled to 22A (branch pill, NOW · NOT COMMITTED card with Undo/Redo strip, commit cards with Current/Restore, Published on main row, Commit footer) and docks right by default; 22B–22F deferred as future scope (architecture.md §7, HANDOFF).
+- **Files**: `TopBar.tsx`, new `ProjectRenameFeedback.tsx`, `BranchPopover.tsx`, `QuickOptions.tsx`, `Workspace.tsx`, `HistoryLadder.tsx`, `panels.ts`, `EntryScreen.tsx`, `quickOptions.test.ts`, new `tests/studio-project-rename.spec.ts`, `HANDOFF.md`, `specs/revamp/architecture.md`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `npm test` 1,572 passed (+2 filter tests); `npm run build` clean; isolated-port Playwright: rename/quick-options/history/branch/panels/shell specs 24/24. Full run had 3 `specimen.spec.ts` failures that also fail on the untouched tree (stash check) and one `studio-authoring` connect-drag flake that passed alone. Browser-checked the rename conflict, saved notice, branch search and Quick options search. Storybook not rebuilt; Undo on the saved notice is covered by code path only (the notice auto-dismisses at 6 s and the pane was slow).
+- **Limitations**: Header height 56px follows 13A/14A (22A is 52px at its scale). Existing browsers keep a stored left History placement. "Open <project>" in the conflict popover opens the other project's default branch.
+- **Lesson**: cmdk's default filter is a loose subsequence match; give Command lists a word-prefix `filter` or short queries match everything.
+
+## 2026-10-02 — Remove checkpoint flow; History panel layout closer to 22A
+
+- **Outcome**: The user-facing checkpoint flow is gone: no "Save checkpoint" form or checkpoint list in History, no `history.checkpoint` command, Quick options row or nested step. Commit is the only save flow. Restore on commit cards stays (it still records its internal pre-restore checkpoint; persistence and `HistoryController.saveCheckpoint` are untouched). History layout now follows 22A: branch pill in a white sub-header under the panel title, warm panel body with white cards, teal Current badge, evidence strip, Published-on-main row with date, white footer. Added `Workspace/HistoryLadder` story with 22A data.
+- **Files**: `HistoryLadder.tsx`, `commands/registry.ts`, `QuickOptions.tsx`, `QuickOptionsTextStep.tsx`, `QuickOptionRow.tsx`, `Workspace.tsx`, `historyRouting.ts`, `controller.ts` (type pick), related unit tests, `tests/studio-history|panels|quick-options.spec.ts`, `src/stories/workspace/HistoryLadder.stories.tsx`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean; `npm test` 1,574 passed; `npm run build` clean; isolated-port Playwright (excluding the already-failing specimen spec) 101/101 after fixing one spec that relied on the removed checkpoint step to open History. Layout compared to 22A in Storybook.
+- **Limitations**: The 22A branch pill's divider/chevron is omitted (no branch switcher there); "this draft forked here" is not shown because no data backs it.
+- **Lesson**: `npx tsc --noEmit -p .` checks nothing in this repo (solution-style tsconfig); use `npx tsc -b`.
+
+## 2026-10-02 — History panel full-bleed fix; entry spec update
+
+- **Outcome**: The History ladder was inset by the dock wrapper's `p-4`, so its white header block and footer floated inside a warm frame. New `panelContentClass` gives History an edge-to-edge body (docked, floating and overlay); other panels keep padded scrolling. `PanelHeader` is now white with a semibold title (padding unchanged: a taller header made the connect-drag e2e fail more often). Ladder edit rows and Commit button enlarged to match 22A. `studio-entry.spec.ts` updated for the "Untitled" default (blank name no longer disables Create; the earlier run's one failure was this spec, misread as the checkpoint spec).
+- **Verification**: `tsc -b`, `npm test` 1,574 passed, build clean, isolated Playwright (excl. specimen) passes except `studio-authoring` connect-drag tests, which flake on this machine (same build: 12/0 then 10/2 across runs); checked in the live app.
+- **Lesson**: Read the failing test's name in the Playwright summary before attributing it; the first failure was a different spec.
+
+## 2026-10-02 — Library panel shell aligned to 12A; hover detail no longer clipped
+
+- **Outcome**: Library gets the same edge-to-edge body as History (`panelContentClass`); search + Standard tab + List/Grid sit in a white block with a bottom border, the catalog scrolls on the warm panel, footer is white (Place on canvas without the return glyph). The 12C hover detail card is portalled to `document.body` and positioned from viewport coordinates (toward the canvas), so the scroll/overflow wrapper can no longer clip it. History and Library are the only `PanelId`s; the inspector is not hosted by `PanelHost`, so it was not touched.
+- **Files**: `LibraryPanel.tsx`, `panelContentClass.ts`.
+- **Verification**: `tsc -b`, `npm test` 1,574 passed, build clean, isolated Playwright (excl. specimen) 101/101; hover card checked in the live app.
+- **Limitations**: Not done: the design's "Ours" tab, "+ New part" in the header and the OUR PARTS section; the existing Saved parts block (SavedParts.tsx) still renders above the catalog.
+
+## 2026-10-02 — Saved parts become the Library's "Ours" tab; the inspector becomes a hosted panel
+
+- **Outcome**: (1) Library has Standard / Ours tabs with counts. Saved parts (save as component, import, place, export) live under Ours, restyled as OUR PARTS cards with a `vN` chip; the section stays mounted when hidden so its count and a requested capture survive, and a capture request switches to Ours. (2) The node configuration panel and the scenario editor are now a third panel (`PanelId` `inspector`) hosted by `PanelHost` from 1200 px: same header, ⋯ menu (dock left/right, float, collapse, reset width), drag-to-dock, shared side width and stacking as Library and History; default docked right; title "Configuration" / "Scenario". Its `open` follows the draft through the new `SYNC_OPEN` action (no focus steal, no save, never persisted); closing goes through the existing guarded `inspector.close`. Below 1200 px the legacy 320 px dock and bottom sheet are unchanged. Reducer/layout generalized to three panels: occupancy no longer reserves a fixed 320 px, the inspector is never auto-collapsed, `PLACE` renumbers stacks, `DockColumn` stacks N panels with N−1 splitters. Stored preferences without `inspector` load with its default. Contract updated in `commands.md` §7.
+- **Files**: `LibraryPanel.tsx`, `SavedParts.tsx`, `library/types.ts`, `panels.ts`, `panelPreferences.ts`, `DockColumn.tsx`, `PanelHost.tsx`, `PanelHeader.tsx`, `PanelRail.tsx`, `PanelsPreview.tsx`, `panelContentClass.ts`, `InspectorPanel.tsx`, `ScenarioEditor.tsx`, `Workspace.tsx`, `commands/registry.ts`, `specs/revamp/contracts/commands.md`; tests: `panels.test.ts` (new inspector cases, 1225 px and auto-collapse cases updated for no fixed reservation), `panelPreferences.test.ts`, `studio-saved-parts`, `studio-scenarios`, `studio-inspector` specs.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b`, `npm test` 1,579 passed, build clean, isolated Playwright (excl. the already-failing specimen spec) 102/102; floating and docked inspector checked in the live app.
+- **Limitations**: Library header "+ New part" is not added (Save as component / Import part sit at the top of Ours). Selecting while the inspector is collapsed to the rail leaves it collapsed. Width reservation is gone, so at 1200 px two docked sides now fit where one used to auto-collapse.
+- **Lesson**: When a panel set grows, grep for literal `['library', 'history']` lists and `Record<PanelId, …>` first; the reducer had ten.
+
+## 2026-10-02 — Library cleanup: shared entry card and selection hook, dead code removed
+
+- **Outcome**: `LibraryPanel` and `LibraryPicker` now share `CatalogEntryCard` (row/card variants) and `useCatalogSelection` (selection, second-tap place, drag MIME, arrow/Enter/Escape keys). Removed unused `LibraryPreview`, the never-used non-hosted `LibraryPanel` header (`hosted` prop dropped; PanelHost supplies chrome), hex-fallback colour classes (now tokens), unused `containerRef`, invalid `py-0.2`, stale comments.
+- **Files**: `library/{CatalogEntryCard.tsx,useCatalogSelection.ts}` (new), `LibraryPanel.tsx`, `LibraryPicker.tsx`, `types.ts`, `index.ts`, `library.test.ts`, `workspace/Workspace.tsx`; deleted `LibraryPreview.tsx`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean, `npm test` 1,578 passed, build clean, isolated Playwright (library, panels, phone, entry, authoring) 41/41.
+- **Limitations**: Not run: full e2e suite, Storybook build. Picker `FILTER_CHIPS` and search input markup remain separate from the panel's (different layouts).

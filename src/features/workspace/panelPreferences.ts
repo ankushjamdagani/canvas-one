@@ -9,6 +9,7 @@ import {
   type PanelPreference,
   type WorkspacePanelPreferences,
   type WorkspacePanelState,
+  createInitialPanelState,
 } from './panels';
 import { DEFAULT_DOCK_CONFIG, readDockConfig, type DockConfig } from './dockConfig';
 
@@ -82,6 +83,8 @@ export function readWorkspacePanelPreferences(value: unknown): WorkspacePanelPre
   if (!isRecord(value) || !isRecord(value.panels) || !isRecord(value.sideWidths)) return null;
   const library = readPanelPreference(value.panels.library);
   const history = readPanelPreference(value.panels.history);
+  // Older stored values predate the inspector panel; it then keeps its default.
+  const inspector = readPanelPreference(value.panels.inspector);
   const { left, right } = value.sideWidths;
   if (
     !library ||
@@ -96,13 +99,21 @@ export function readWorkspacePanelPreferences(value: unknown): WorkspacePanelPre
     return null;
   }
   return {
-    panels: { library, history },
+    panels: { library, history, inspector: inspector ?? defaultInspectorPreference() },
     sideWidths: { left, right },
   };
 }
 
+function defaultInspectorPreference(): PanelPreference {
+  return createInitialPanelState().panels.inspector;
+}
+
 export function panelPreferencesFromState(state: WorkspacePanelState): WorkspacePanelPreferences {
-  return structuredClone({ panels: state.panels, sideWidths: state.sideWidths });
+  // The inspector's `open` follows the current draft and is never persisted.
+  return structuredClone({
+    panels: { ...state.panels, inspector: { ...state.panels.inspector, open: false } },
+    sideWidths: state.sideWidths,
+  });
 }
 
 export function isLatestPanelPreferenceRequest(
@@ -119,7 +130,11 @@ export function hydratePanelState(
 ): WorkspacePanelState {
   return {
     ...state,
-    panels: structuredClone(preferences.panels),
+    // Placement, size and collapse come from storage; visibility stays draft-driven.
+    panels: {
+      ...structuredClone(preferences.panels),
+      inspector: { ...structuredClone(preferences.panels.inspector), open: state.panels.inspector.open },
+    },
     sideWidths: structuredClone(preferences.sideWidths),
   };
 }

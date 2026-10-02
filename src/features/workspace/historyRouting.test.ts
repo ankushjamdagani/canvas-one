@@ -16,27 +16,23 @@ function fakeHistory() {
     subscribe: vi.fn(),
     loadCommitPreview: vi.fn(),
     getCommitDiffSummary: vi.fn(),
-    saveCheckpoint: vi.fn(),
     restore: vi.fn(),
     commit: vi.fn(),
   } as unknown as HistoryController;
 }
 
 describe('routeHistoryController', () => {
-  it('runs checkpoint, restore and commit as their registry commands', async () => {
+  it('runs restore and commit as their registry commands', async () => {
     const run = vi.fn(async () => ({ status: 'done', value: { status: 'applied' } }) as ExecuteResult);
     const controller = fakeHistory();
     const routed = routeHistoryController(controller, run as unknown as CommandRunner);
-    await expect(routed.saveCheckpoint('Before retries')).resolves.toEqual({ status: 'applied' });
     await routed.restore('cp-1', 'Pre-restore');
     await routed.commit('Ship it');
     expect(run.mock.calls).toEqual([
-      ['history.checkpoint', { label: 'Before retries' }],
       ['history.restore', { targetId: 'cp-1', label: 'Pre-restore' }],
       ['history.commit', { message: 'Ship it' }],
     ]);
     // Direct controller actions are never called by the facade.
-    expect(controller.saveCheckpoint).not.toHaveBeenCalled();
     expect(controller.commit).not.toHaveBeenCalled();
   });
 

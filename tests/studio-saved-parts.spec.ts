@@ -8,6 +8,12 @@ async function openLibrary(page: Page) {
   await expect(page.getByTestId("library-panel")).toBeVisible();
 }
 
+/** Saved parts live under the Library's "Ours" tab. */
+async function openOurs(page: Page) {
+  await openLibrary(page);
+  await page.getByTestId("library-tab-ours").click();
+}
+
 test("saved part survives reload, shares Library search, exports/imports, and places with one undo", async ({
   page,
 }) => {
@@ -17,7 +23,7 @@ test("saved part survives reload, shares Library search, exports/imports, and pl
   const nodes = page.locator(".component-node");
   const before = await nodes.count();
   await nodes.first().click();
-  await openLibrary(page);
+  await openOurs(page);
   await page
     .getByRole("button", { name: "Save as component", exact: true })
     .click();
@@ -65,7 +71,7 @@ test("saved part survives reload, shares Library search, exports/imports, and pl
   await page.reload();
   await page.getByRole("button", { name: "Open draft", exact: true }).click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
-  await openLibrary(page);
+  await openOurs(page);
   const placed = saved.getByRole("button", {
     name: "Place Reusable checkout 🧩",
     exact: true,
@@ -87,7 +93,7 @@ test("mobile Library supports saved-part preview and cancel without overflowing"
   await page.getByTestId("create-example-s03").click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
   await page.locator(".component-node").first().click();
-  await openLibrary(page);
+  await openOurs(page);
   await page
     .getByRole("button", { name: "Save as component", exact: true })
     .click();

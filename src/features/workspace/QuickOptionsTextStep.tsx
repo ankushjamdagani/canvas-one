@@ -5,7 +5,7 @@ import { Bookmark, GitCommitHorizontal, Group, StickyNote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-export type TextStepKind = 'group' | 'note' | 'checkpoint' | 'commit';
+export type TextStepKind = 'group' | 'note' | 'commit';
 
 export type TextStepOutcome = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
@@ -35,16 +35,6 @@ const DETAILS = {
     verb: 'add',
     Icon: StickyNote,
     hint: 'Places the note at the canvas centre',
-  },
-  checkpoint: {
-    label: 'Save checkpoint',
-    inputLabel: 'Checkpoint name',
-    placeholder: 'Name this checkpoint…',
-    maxLength: 80,
-    emptyReason: 'Enter a checkpoint name',
-    verb: 'save',
-    Icon: Bookmark,
-    hint: 'Saves the current work as a checkpoint on this branch',
   },
   commit: {
     label: 'Commit changes',

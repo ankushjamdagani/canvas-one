@@ -3,6 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { DockColumn, type DockedPanelItem } from './DockColumn';
 import { FloatingPanel } from './FloatingPanel';
+import { panelContentClass } from './panelContentClass';
 import { PanelRail, type PanelRailItemConfig } from './PanelRail';
 import { DropTargets } from './DropTargets';
 import { PanelHeader } from './PanelHeader';
@@ -12,6 +13,7 @@ import {
   clampFloatRect,
   effectiveLayout,
   computeEffectiveSideWidth,
+  PANEL_IDS,
   type PanelId,
   type WorkspacePanelState,
   type WorkspacePanelAction,
@@ -45,11 +47,13 @@ export interface PanelHostProps {
 const OVERLAY_RETURN_FOCUS: Record<PanelId, string> = {
   history: 'topbar-history-btn',
   library: 'dock-component-btn',
+  inspector: 'canvas-container',
 };
 
 const DEFAULT_TITLES: Record<PanelId, string> = {
   history: 'History',
   library: 'Library',
+  inspector: 'Configuration',
 };
 
 export const PanelHost: React.FC<PanelHostProps> = ({
@@ -172,7 +176,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
   const rightCollapsedItems: PanelRailItemConfig[] = [];
   const overlayPanelIds: PanelId[] = [];
 
-  for (const id of ['library', 'history'] as PanelId[]) {
+  for (const id of PANEL_IDS) {
     const mode = layout.panels[id];
     const pref = state.panels[id];
 
@@ -353,7 +357,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
               currentWidth={320}
               dispatch={dispatch}
             />
-            <div className="flex-1 overflow-y-auto p-4 text-ui">
+            <div className={panelContentClass(id, 'bg-transparent')}>
               {renderPanel(id)}
             </div>
           </DialogPrimitive.Content>

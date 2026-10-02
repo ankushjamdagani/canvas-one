@@ -81,21 +81,12 @@ async function publishMajor(page: Page, title: string) {
 }
 
 test.describe('RV-13b: History panel', () => {
-  test('22A/22B: a saved checkpoint appears in the ladder and Save needs a label', async ({ page }) => {
+  test('22A: an empty draft ladder shows no commits and no checkpoint form', async ({ page }) => {
     await openS04(page);
     const ladder = await openHistory(page);
-    await expect(ladder.getByText('CHECKPOINTS (0)')).toBeVisible();
     await expect(ladder.getByText('No commits on this branch yet')).toBeVisible();
-
-    const save = ladder.getByRole('button', { name: 'Save' });
-    await expect(save).toBeDisabled();
-    await ladder.getByPlaceholder('Save checkpoint label').fill('Before capacity change');
-    await save.click();
-
-    await expect(ladder.getByText('CHECKPOINTS (1)')).toBeVisible();
-    await expect(ladder.getByText('Before capacity change')).toBeVisible();
-    await expect(ladder.getByRole('button', { name: 'Restore' })).toBeEnabled();
-    await expect(ladder.getByPlaceholder('Save checkpoint label')).toHaveValue('');
+    await expect(ladder.getByText(/CHECKPOINTS/)).toHaveCount(0);
+    await expect(ladder.getByPlaceholder('Save checkpoint label')).toHaveCount(0);
   });
 
   test('Commit is disabled with its reason on main', async ({ page }) => {
@@ -290,9 +281,6 @@ test.describe('RV-13b: History panel', () => {
     await openS04(page);
     const ladder = await openHistory(page);
     await expect(ladder.getByRole('button', { name: /^Commit/ })).toBeVisible();
-    await ladder.getByPlaceholder('Save checkpoint label').fill('Mobile checkpoint');
-    await ladder.getByRole('button', { name: 'Save' }).click();
-    await expect(ladder.getByText('Mobile checkpoint')).toBeVisible();
     const overflows = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );

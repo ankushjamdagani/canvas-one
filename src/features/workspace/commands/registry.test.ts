@@ -401,7 +401,7 @@ describe('panel, results and inspector availability', () => {
 
   it('lists close rows in Quick options only while their surface is open', () => {
     const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'review')!;
-    const base = ['history.open', 'history.checkpoint', 'history.commit', 'history.prepare-publish', 'library.open', 'results.open'];
+    const base = ['history.open', 'history.commit', 'history.prepare-publish', 'library.open', 'results.open'];
     expect(idle.options.map((o) => o.id)).toEqual(base);
     const open = buildQuickOptions(makeContext({ panels: OPEN_PANELS, resultsVisible: true })).find((g) => g.group === 'review')!;
     expect(open.options.map((o) => o.id)).toEqual([...base, 'history.close', 'library.close', 'results.close']);
@@ -413,16 +413,14 @@ const PARTS_DRAFT_REASON = 'Apply or Cancel configuration changes before using s
 describe('history command availability', () => {
   const onMain = () => makeContext({ branchId: MAIN });
 
-  it('lets a clean draft branch checkpoint, commit, restore and prepare a publish', () => {
+  it('lets a clean draft branch commit, restore and prepare a publish', () => {
     const ctx = makeContext();
-    expect(getAvailability('history.checkpoint', ctx, { label: 'x' })).toEqual({ enabled: true });
     expect(getAvailability('history.commit', ctx, { message: 'x' })).toEqual({ enabled: true });
     expect(getAvailability('history.restore', ctx, { targetId: 'cp', label: 'x' })).toEqual({ enabled: true });
     expect(getAvailability('history.prepare-publish', ctx, {})).toEqual({ enabled: true });
   });
 
-  it('keeps main free of commits, restores and publishes but allows checkpoints', () => {
-    expect(getAvailability('history.checkpoint', onMain(), { label: 'x' })).toEqual({ enabled: true });
+  it('keeps main free of commits, restores and publishes', () => {
     expect(getAvailability('history.commit', onMain(), { message: 'x' })).toMatchObject({
       enabled: false,
       code: 'main-branch',
@@ -441,9 +439,6 @@ describe('history command availability', () => {
       enabled: false,
       code: 'draft-open',
       reason: 'Apply or Cancel configuration changes before committing.',
-    });
-    expect(getAvailability('history.checkpoint', dirty, { label: 'x' })).toMatchObject({
-      reason: 'Apply or Cancel configuration changes before saving a checkpoint.',
     });
     const closed = makeContext({
       branches: makeContext().branches.map((branch) => ({ ...branch, closed: branch.id === DRAFT })),
@@ -490,9 +485,6 @@ describe('history command availability', () => {
 
   it('runs the typed handler payloads through executeCommand', async () => {
     const handlers = makeHandlers();
-    expect(await executeCommand('history.checkpoint', { label: 'Before retries' }, makeContext(), handlers))
-      .toEqual({ status: 'done', value: undefined });
-    expect(handlers['history.checkpoint']).toHaveBeenCalledWith({ label: 'Before retries' });
     const dirty = makeContext({ draftState: 'dirty', draftId: 'e0000000-0000-4000-8000-000000000001' });
     expect(await executeCommand('history.commit', { message: 'Ship' }, dirty, handlers)).toMatchObject({
       status: 'disabled',

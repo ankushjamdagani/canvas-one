@@ -12,32 +12,21 @@
  */
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Search,
   List as ListIcon,
   LayoutGrid,
-  CornerDownLeft,
 } from 'lucide-react';
-import {
-  CATALOG_ENTRIES,
-  GROUP_STRIPE_COLORS,
-  type CatalogEntry,
-} from '../catalog/catalog';
-import { defaultsLine, libraryCaption } from '../catalog/caption';
+import { CATALOG_ENTRIES } from '../catalog/catalog';
+import { defaultsLine } from '../catalog/caption';
 import { getNodeIcon } from '../workspace/nodeVisuals';
-import {
-  CATALOG_ENTRY_MIME_TYPE,
-  type LibraryPanelProps,
-  type LibraryView,
-} from './types';
-import {
-  filterEntries,
-  groupCatalogEntries,
-  isUnmodeledEntry,
-  keyboardNavigationReducer,
-} from './viewModel';
+import type { LibraryPanelProps, LibraryTab } from './types';
+import { filterEntries, groupCatalogEntries } from './viewModel';
 import { EntryDetailCard } from './EntryDetailCard';
+import { CatalogEntryCard } from './CatalogEntryCard';
+import { useCatalogSelection } from './useCatalogSelection';
 import { cn } from '../../lib/utils';
 
 export function LibraryPanel({
@@ -49,161 +38,75 @@ export function LibraryPanel({
   onSelect,
   initialSearchQuery = '',
   className,
-  hosted = false,
   renderSavedParts,
+  captureRequested,
 }: LibraryPanelProps) {
   const [searchQuery, setSearchQuery] = React.useState(initialSearchQuery);
-  const [internalSelectedId, setInternalSelectedId] = React.useState<string | null>(
-    () => controlledSelectedEntryId ?? CATALOG_ENTRIES[0]?.entryId ?? null,
-  );
+  const [tab, setTab] = React.useState<LibraryTab>('standard');
+  const [oursCount, setOursCount] = React.useState(0);
+  const lastCaptureRequest = React.useRef(captureRequested ?? 0);
+  React.useEffect(() => {
+    if (captureRequested && captureRequested !== lastCaptureRequest.current) setTab('ours');
+    lastCaptureRequest.current = captureRequested ?? 0;
+  }, [captureRequested]);
   const [hoveredEntryId, setHoveredEntryId] = React.useState<string | null>(null);
-  const [popoverPosition, setPopoverPosition] = React.useState<{ top: number } | null>(null);
+  // The detail card is portalled to the body and positioned from viewport
+  // coordinates, so no scroll or overflow wrapper inside the panel can clip it.
+  const [popoverPosition, setPopoverPosition] = React.useState<{
+    top: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const listContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Sync controlled selection
-  React.useEffect(() => {
-    if (controlledSelectedEntryId !== undefined) {
-      setInternalSelectedId(controlledSelectedEntryId);
-    }
-  }, [controlledSelectedEntryId]);
+  const filteredEntries = React.useMemo(() => filterEntries(CATALOG_ENTRIES, searchQuery), [searchQuery]);
+  const groupedSections = React.useMemo(() => groupCatalogEntries(filteredEntries), [filteredEntries]);
 
-  // Filter entries based on search query
-  const filteredEntries = React.useMemo(() => {
-    return filterEntries(CATALOG_ENTRIES, searchQuery);
-  }, [searchQuery]);
+  const { selectedEntry, activate, onDragStart, onKeyDown } = useCatalogSelection({
+    entries: filteredEntries,
+    controlledSelectedId: controlledSelectedEntryId,
+    onSelect,
+    onPlace,
+    onClose,
+    columns: view === 'grid' ? 2 : 1,
+    searchInputRef,
+  });
 
-  // Group filtered entries by catalog group
-  const groupedSections = React.useMemo(() => {
-    return groupCatalogEntries(filteredEntries);
-  }, [filteredEntries]);
+  const activeDetailEntry = hoveredEntryId
+    ? CATALOG_ENTRIES.find((e) => e.entryId === hoveredEntryId) ?? null
+    : null;
 
-  // Effective selected entry
-  const selectedEntry = React.useMemo(() => {
-    if (internalSelectedId) {
-      const found = filteredEntries.find((e) => e.entryId === internalSelectedId);
-      if (found) return found;
-    }
-    return filteredEntries[0] ?? null;
-  }, [filteredEntries, internalSelectedId]);
-
-  const activeDetailEntry = React.useMemo(() => {
-    if (hoveredEntryId) {
-      return CATALOG_ENTRIES.find((e) => e.entryId === hoveredEntryId) ?? null;
-    }
-    return null;
-  }, [hoveredEntryId]);
-
-  const handleSelect = React.useCallback(
-    (entryId: string) => {
-      setInternalSelectedId(entryId);
-      onSelect?.(entryId);
-    },
-    [onSelect],
-  );
-
-  const handleEntryClick = React.useCallback(
-    (entry: CatalogEntry) => {
-      if (selectedEntry?.entryId === entry.entryId) {
-        // Second tap on the same selected entry places it
-        onPlace(entry.entryId);
-      } else {
-        handleSelect(entry.entryId);
-      }
-    },
-    [selectedEntry, handleSelect, onPlace],
-  );
-
-  const handleDragStart = React.useCallback(
-    (e: React.DragEvent, entryId: string) => {
-      e.dataTransfer.setData(CATALOG_ENTRY_MIME_TYPE, entryId);
-      e.dataTransfer.effectAllowed = 'copyMove';
-    },
-    [],
-  );
-
-  // Keyboard navigation
-  const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (filteredEntries.length === 0) return;
-
-      const currentIndex = filteredEntries.findIndex(
-        (entry) => entry.entryId === selectedEntry?.entryId,
-      );
-      const columns = view === 'grid' ? 2 : 1;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const next = keyboardNavigationReducer(
-          { selectedIndex: currentIndex },
-          { type: 'ARROW_DOWN', columns },
-          filteredEntries.length,
-        );
-        const nextEntry = filteredEntries[next.selectedIndex];
-        if (nextEntry) handleSelect(nextEntry.entryId);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prev = keyboardNavigationReducer(
-          { selectedIndex: currentIndex },
-          { type: 'ARROW_UP', columns },
-          filteredEntries.length,
-        );
-        const prevEntry = filteredEntries[prev.selectedIndex];
-        if (prevEntry) handleSelect(prevEntry.entryId);
-      } else if (e.key === 'ArrowRight' && view === 'grid') {
-        e.preventDefault();
-        const next = keyboardNavigationReducer(
-          { selectedIndex: currentIndex },
-          { type: 'ARROW_RIGHT' },
-          filteredEntries.length,
-        );
-        const nextEntry = filteredEntries[next.selectedIndex];
-        if (nextEntry) handleSelect(nextEntry.entryId);
-      } else if (e.key === 'ArrowLeft' && view === 'grid') {
-        e.preventDefault();
-        const prev = keyboardNavigationReducer(
-          { selectedIndex: currentIndex },
-          { type: 'ARROW_LEFT' },
-          filteredEntries.length,
-        );
-        const prevEntry = filteredEntries[prev.selectedIndex];
-        if (prevEntry) handleSelect(prevEntry.entryId);
-      } else if (e.key === 'Enter') {
-        // Place selected entry if not actively typing inside the search input
-        if (selectedEntry && document.activeElement !== searchInputRef.current) {
-          e.preventDefault();
-          onPlace(selectedEntry.entryId);
-        }
-      }
-    },
-    [filteredEntries, selectedEntry, view, handleSelect, onPlace, onClose],
-  );
-
-  const handleMouseEnterEntry = React.useCallback(
-    (e: React.MouseEvent<HTMLElement>, entryId: string) => {
+  const showDetail = React.useCallback(
+    (target: HTMLElement, entryId: string) => {
       setHoveredEntryId(entryId);
       if (containerRef.current) {
-        const targetRect = e.currentTarget.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
         const containerRect = containerRef.current.getBoundingClientRect();
-        setPopoverPosition({
-          top: Math.max(8, targetRect.top - containerRect.top),
-        });
+        const gap = 8;
+        const top = Math.min(Math.max(8, targetRect.top), Math.max(8, window.innerHeight - 340));
+        // Open toward the canvas: left of a right-docked panel, right of a left-docked one.
+        const dockedLeft = containerRect.left + containerRect.width / 2 < window.innerWidth / 2;
+        setPopoverPosition(
+          dockedLeft
+            ? { top, left: containerRect.right + gap }
+            : { top, right: window.innerWidth - containerRect.left + gap },
+        );
       }
     },
     [],
   );
 
-  const handleMouseLeaveEntry = React.useCallback(() => {
-    setHoveredEntryId(null);
-  }, []);
+  const hideDetail = React.useCallback(() => setHoveredEntryId(null), []);
+
+  const detailHandlers = (entryId: string): React.HTMLAttributes<HTMLDivElement> => ({
+    onMouseEnter: (e) => showDetail(e.currentTarget, entryId),
+    onMouseLeave: hideDetail,
+    onFocus: (e) => showDetail(e.currentTarget, entryId),
+    onBlur: hideDetail,
+  });
 
   return (
     <div
@@ -211,33 +114,19 @@ export function LibraryPanel({
       role="region"
       aria-label="Component Library"
       tabIndex={0}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onKeyDown}
       className={cn(
         'relative flex flex-col h-full w-full bg-panel text-foreground font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-        hosted ? 'min-w-0 max-w-none border-0' : 'min-w-[320px] max-w-[440px] border-l border-border',
+        'min-w-0 max-w-none border-0',
         className,
       )}
       data-testid="library-panel"
     >
-      {/* 1. Header (12A/12B): "Library" + Close Button */}
-      {!hosted && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground">Library</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close library"
-            className="p-1 rounded-control text-secondary-text hover:text-foreground hover:bg-sunken transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
+      <div className="shrink-0 bg-background border-b border-border">
       {/* 2. Search Field (12A/12B) */}
-      <div className="p-3 pb-2">
+      <div className="px-4 pt-1 pb-3">
         <div className="relative flex items-center">
-          <Search className="absolute left-2.5 w-4 h-4 text-[var(--color-secondary-text,#626D68)] pointer-events-none" />
+          <Search className="absolute left-2.5 w-4 h-4 text-secondary-text pointer-events-none" />
           <input
             ref={searchInputRef}
             type="search"
@@ -257,18 +146,18 @@ export function LibraryPanel({
             }}
             placeholder="Search parts, tags, models..."
             aria-label="Search components"
-            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-18 text-xs rounded-md bg-[var(--color-sunken,#F2EFE9)] border border-[var(--color-control-border,#DCD7CD)] text-[var(--color-foreground,#16201D)] placeholder:text-[var(--color-secondary-text,#626D68)] focus:border-[var(--color-control-border-strong,#948D80)] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[var(--color-primary,#0B5C54)] transition-all"
+            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-18 text-xs rounded-md bg-sunken border border-control-border text-foreground placeholder:text-secondary-text focus:border-control-border-strong focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary transition-all"
           />
           {searchQuery.trim().length > 0 && (
-            <div className="absolute right-2.5 flex items-center gap-1.5 text-[11px] font-mono text-[var(--color-secondary-text,#626D68)]">
+            <div className="absolute right-2.5 flex items-center gap-1.5 text-[11px] font-mono text-secondary-text">
               <span>
-                {renderSavedParts ? 'Search active' : `${filteredEntries.length} ${filteredEntries.length === 1 ? 'match' : 'matches'}`}
+                {tab === 'ours' ? 'Search active' : `${filteredEntries.length} ${filteredEntries.length === 1 ? 'match' : 'matches'}`}
               </span>
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 aria-label="Clear search query"
-                className="p-0.5 rounded hover:bg-[var(--color-border,#E7E3DB)] text-[var(--color-secondary-text,#626D68)]"
+                className="p-0.5 rounded hover:bg-border text-secondary-text"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -278,21 +167,46 @@ export function LibraryPanel({
       </div>
 
       {/* 3. Filter Bar & List/Grid Toggle (12A/12B) */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--color-border,#E7E3DB)]/60 text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="font-semibold text-[var(--color-foreground,#16201D)] pb-0.5 border-b-2 border-[var(--color-primary,#0B5C54)]">
-            Standard
-          </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[var(--color-primary,#0B5C54)] text-white font-medium">
-            {CATALOG_ENTRIES.length}
-          </span>
+      <div className="flex items-end justify-between px-4 pb-0 text-xs">
+        <div role="tablist" aria-label="Library source" className="flex items-end gap-4 -mb-px">
+          {(['standard', ...(renderSavedParts ? ['ours'] : [])] as LibraryTab[]).map((id) => {
+            const selectedTab = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={selectedTab}
+                data-testid={`library-tab-${id}`}
+                onClick={() => setTab(id)}
+                className={cn(
+                  'flex items-center gap-1.5 py-2 text-[13px] border-b-2 transition-colors cursor-pointer',
+                  selectedTab
+                    ? 'font-semibold text-primary border-primary'
+                    : 'font-medium text-secondary-text border-transparent hover:text-foreground',
+                )}
+              >
+                <span>{id === 'standard' ? 'Standard' : 'Ours'}</span>
+                <span
+                  className={cn(
+                    'font-mono text-[10px] rounded-full px-1.5 leading-4',
+                    selectedTab
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-sunken text-secondary-text border border-border',
+                  )}
+                >
+                  {id === 'standard' ? CATALOG_ENTRIES.length : oursCount}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* List / Grid segmented toggle */}
         <div
           role="group"
           aria-label="View mode toggle"
-          className="flex items-center p-0.5 rounded-md bg-[var(--color-sunken,#F2EFE9)] border border-[var(--color-control-border,#DCD7CD)]"
+          className="flex items-center p-0.5 mb-1.5 rounded-md bg-sunken border border-control-border"
         >
           <button
             type="button"
@@ -301,8 +215,8 @@ export function LibraryPanel({
             aria-pressed={view === 'list'}
             className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
               view === 'list'
-                ? 'bg-white text-[var(--color-foreground,#16201D)] shadow-sm'
-                : 'text-[var(--color-secondary-text,#626D68)] hover:text-[var(--color-foreground,#16201D)]'
+                ? 'bg-white text-foreground shadow-sm'
+                : 'text-secondary-text hover:text-foreground'
             }`}
           >
             <ListIcon className="w-3.5 h-3.5" />
@@ -315,8 +229,8 @@ export function LibraryPanel({
             aria-pressed={view === 'grid'}
             className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
               view === 'grid'
-                ? 'bg-white text-[var(--color-foreground,#16201D)] shadow-sm'
-                : 'text-[var(--color-secondary-text,#626D68)] hover:text-[var(--color-foreground,#16201D)]'
+                ? 'bg-white text-foreground shadow-sm'
+                : 'text-secondary-text hover:text-foreground'
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
@@ -325,27 +239,30 @@ export function LibraryPanel({
         </div>
       </div>
 
+      </div>
+
       {/* 4. Entries Scroll Area */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-      {renderSavedParts?.(searchQuery, view)}
+      {renderSavedParts?.({ searchQuery, view, active: tab === 'ours', onCountChange: setOursCount })}
       <div
         ref={listContainerRef}
         role="listbox"
+        hidden={tab !== 'standard'}
         aria-label="Component catalog entries"
         tabIndex={0}
-        className="p-3 space-y-4 focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary,#0B5C54)]"
+        className="p-4 space-y-4 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
       >
         {filteredEntries.length === 0 ? (
           /* Empty state: clear search way out */
           <div className="py-12 px-4 text-center">
-            <p className="text-xs text-[var(--color-secondary-text,#626D68)] mb-3">
+            <p className="text-xs text-secondary-text mb-3">
               No components match &ldquo;{searchQuery}&rdquo;
             </p>
             <button
               type="button"
               onClick={() => setSearchQuery('')}
               aria-label="Clear search"
-              className="px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--color-control-border,#DCD7CD)] bg-white hover:bg-[var(--color-sunken,#F2EFE9)] text-[var(--color-primary,#0B5C54)] shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:outline-none"
+              className="px-3 py-1.5 text-xs font-medium rounded-md border border-control-border bg-white hover:bg-sunken text-primary shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             >
               Clear search
             </button>
@@ -354,144 +271,33 @@ export function LibraryPanel({
           groupedSections.map((section) => (
             <div key={section.group} className="space-y-2">
               {/* Group header with line and count */}
-              <div className="flex items-center gap-2 text-[10.5px] font-mono uppercase tracking-widest text-[var(--color-secondary-text,#626D68)]">
+              <div className="flex items-center gap-2 text-[10.5px] font-mono uppercase tracking-widest text-secondary-text">
                 <span
                   style={section.stripeColor ? { color: section.stripeColor } : undefined}
                   className="font-medium"
                 >
                   {section.group.toUpperCase()}
                 </span>
-                <div className="flex-1 h-px bg-[var(--color-border,#E7E3DB)]" />
-                <span className="text-[10px] text-[var(--color-secondary-text,#626D68)]">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] text-secondary-text">
                   {section.count}
                 </span>
               </div>
 
-              {/* Entries: List view vs Grid view */}
-              {view === 'list' ? (
-                <div className="space-y-1.5">
-                  {section.entries.map((entry) => {
-                    const isSelected = selectedEntry?.entryId === entry.entryId;
-                    const unmodeled = isUnmodeledEntry(entry);
-                    const Icon = getNodeIcon(entry.visualKind);
-                    const stripeColor = GROUP_STRIPE_COLORS[entry.group];
-
-                    return (
-                      <div
-                        key={entry.entryId}
-                        role="option"
-                        aria-selected={isSelected}
-                        aria-label={`${entry.label}: ${libraryCaption(entry)}`}
-                        tabIndex={isSelected ? 0 : -1}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, entry.entryId)}
-                        onClick={() => handleEntryClick(entry)}
-                        onDoubleClick={() => onPlace(entry.entryId)}
-                        onMouseEnter={(e) => handleMouseEnterEntry(e, entry.entryId)}
-                        onMouseLeave={handleMouseLeaveEntry}
-                        onFocus={(e) => handleMouseEnterEntry(e as unknown as React.MouseEvent<HTMLElement>, entry.entryId)}
-                        onBlur={handleMouseLeaveEntry}
-                        className={`group relative flex items-center gap-2.5 p-2 rounded-lg border transition-all cursor-pointer select-none ${
-                          isSelected
-                            ? 'border-[var(--color-primary,#0B5C54)] bg-[var(--color-accent,#EAEFEC)]/60 ring-1 ring-[var(--color-primary,#0B5C54)]'
-                            : 'border-[var(--color-border,#E7E3DB)] bg-white hover:border-[var(--color-control-border-strong,#948D80)] hover:bg-[var(--color-sunken,#F2EFE9)]/50'
-                        }`}
-                        data-entry-id={entry.entryId}
-                      >
-                        {/* Kind Icon Box */}
-                        <div
-                          className="w-8 h-8 rounded-md bg-[var(--color-sunken,#F2EFE9)] border border-[var(--color-border,#E7E3DB)] flex items-center justify-center flex-shrink-0 text-[var(--color-foreground,#16201D)] relative overflow-hidden"
-                          style={stripeColor ? { borderLeftColor: stripeColor, borderLeftWidth: 3 } : undefined}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </div>
-
-                        {/* Label & Caption */}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-[var(--color-foreground,#16201D)] leading-tight truncate">
-                            {entry.label}
-                          </div>
-                          <div className="text-[11px] font-mono text-[var(--color-secondary-text,#626D68)] truncate mt-0.5">
-                            {entry.behaviorKind === 'unmodeled' ? entry.models : libraryCaption(entry)}
-                          </div>
-                        </div>
-
-                        {/* Unmodeled Tag & Drag Hint */}
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {unmodeled && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--color-sunken,#F2EFE9)] text-[var(--color-secondary-text,#626D68)] border border-[var(--color-border,#E7E3DB)]">
-                              Not simulated
-                            </span>
-                          )}
-                          <span className="text-[10px] font-mono text-[var(--color-secondary-text,#626D68)] opacity-0 group-hover:opacity-100 transition-opacity">
-                            drag
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 min-w-0">
-                  {section.entries.map((entry) => {
-                    const isSelected = selectedEntry?.entryId === entry.entryId;
-                    const unmodeled = isUnmodeledEntry(entry);
-                    const Icon = getNodeIcon(entry.visualKind);
-                    const stripeColor = GROUP_STRIPE_COLORS[entry.group];
-
-                    return (
-                      <div
-                        key={entry.entryId}
-                        role="option"
-                        aria-selected={isSelected}
-                        aria-label={`${entry.label}: ${libraryCaption(entry)}`}
-                        tabIndex={isSelected ? 0 : -1}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, entry.entryId)}
-                        onClick={() => handleEntryClick(entry)}
-                        onDoubleClick={() => onPlace(entry.entryId)}
-                        onMouseEnter={(e) => handleMouseEnterEntry(e, entry.entryId)}
-                        onMouseLeave={handleMouseLeaveEntry}
-                        onFocus={(e) => handleMouseEnterEntry(e as unknown as React.MouseEvent<HTMLElement>, entry.entryId)}
-                        onBlur={handleMouseLeaveEntry}
-                        className={`group relative flex flex-col min-w-0 p-2 rounded-lg border transition-all cursor-pointer select-none ${
-                          isSelected
-                            ? 'border-[var(--color-primary,#0B5C54)] bg-[var(--color-accent,#EAEFEC)]/60 ring-1 ring-[var(--color-primary,#0B5C54)]'
-                            : 'border-[var(--color-border,#E7E3DB)] bg-white hover:border-[var(--color-control-border-strong,#948D80)] hover:bg-[var(--color-sunken,#F2EFE9)]/50'
-                        }`}
-                        data-entry-id={entry.entryId}
-                      >
-                        {/* Visual Preview Box */}
-                        <div className="h-14 w-full rounded-md bg-[var(--color-sunken,#F2EFE9)] border border-[var(--color-border,#E7E3DB)]/60 flex items-center justify-center relative overflow-hidden mb-1.5">
-                          {stripeColor && (
-                            <div
-                              className="absolute top-0 left-0 right-0 h-[3px]"
-                              style={{ backgroundColor: stripeColor }}
-                            />
-                          )}
-                          <Icon className="w-5 h-5 text-[var(--color-foreground,#16201D)]/80" />
-                        </div>
-
-                        {/* Title and tags */}
-                        <div className="text-xs font-semibold text-[var(--color-foreground,#16201D)] truncate leading-tight">
-                          {entry.label}
-                        </div>
-                        <div className="text-[10px] font-mono text-[var(--color-secondary-text,#626D68)] truncate mt-0.5">
-                          {entry.behaviorKind === 'unmodeled' ? entry.models : libraryCaption(entry)}
-                        </div>
-
-                        {unmodeled && (
-                          <div className="mt-1">
-                            <span className="inline-block text-[9px] font-mono px-1 py-0.2 rounded bg-[var(--color-sunken,#F2EFE9)] text-[var(--color-secondary-text,#626D68)] border border-[var(--color-border,#E7E3DB)]">
-                              Not simulated
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <div className={view === 'list' ? 'space-y-1.5' : 'grid grid-cols-2 gap-2 min-w-0'}>
+                {section.entries.map((entry) => (
+                  <CatalogEntryCard
+                    key={entry.entryId}
+                    entry={entry}
+                    variant={view === 'list' ? 'row' : 'card'}
+                    selected={selectedEntry?.entryId === entry.entryId}
+                    onActivate={activate}
+                    onPlace={onPlace}
+                    onDragStart={onDragStart}
+                    rootProps={detailHandlers(entry.entryId)}
+                  />
+                ))}
+              </div>
             </div>
           ))
         )}
@@ -499,33 +305,37 @@ export function LibraryPanel({
 
       {/* Floating Hover/Focus Detail Popover (Screen 12C) */}
       </div>
-      {activeDetailEntry && (
-        <div
-          className="hidden md:block absolute right-[102%] z-50 pointer-events-none"
-          style={{ top: popoverPosition?.top ?? 60 }}
-        >
-          <EntryDetailCard entry={activeDetailEntry} />
-        </div>
-      )}
+      {activeDetailEntry &&
+        popoverPosition &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="hidden md:block fixed z-popover pointer-events-none"
+            style={{ top: popoverPosition.top, left: popoverPosition.left, right: popoverPosition.right }}
+          >
+            <EntryDetailCard entry={activeDetailEntry} />
+          </div>,
+          document.body,
+        )}
 
       {/* 5. Sticky Footer Bar (12A/12B/12C) */}
-      <div className="p-3 border-t border-[var(--color-border,#E7E3DB)] bg-[var(--color-panel,#F7F5F1)] flex items-center justify-between gap-3">
+      <div className="px-4 py-3 border-t border-border bg-background flex items-center justify-between gap-3">
         {selectedEntry ? (
           <>
             <div className="flex items-center gap-2 min-w-0 flex-1">
               {(() => {
                 const Icon = getNodeIcon(selectedEntry.visualKind);
                 return (
-                  <div className="w-7 h-7 rounded bg-white border border-[var(--color-border,#E7E3DB)] flex items-center justify-center flex-shrink-0 text-[var(--color-foreground,#16201D)]">
+                  <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 text-foreground">
                     <Icon className="w-3.5 h-3.5" />
                   </div>
                 );
               })()}
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-[var(--color-foreground,#16201D)] leading-tight truncate">
+                <div className="text-xs font-semibold text-foreground leading-tight truncate">
                   {selectedEntry.label}
                 </div>
-                <div className="text-[10.5px] font-mono text-[var(--color-secondary-text,#626D68)] truncate mt-0.5">
+                <div className="text-[10.5px] font-mono text-secondary-text truncate mt-0.5">
                   {defaultsLine(selectedEntry)}
                 </div>
               </div>
@@ -535,14 +345,13 @@ export function LibraryPanel({
               type="button"
               onClick={() => onPlace(selectedEntry.entryId)}
               aria-label={`Place ${selectedEntry.label} on canvas`}
-              className="px-3 py-1.5 pointer-coarse:min-h-11 rounded-md bg-[var(--color-primary,#0B5C54)] hover:bg-[var(--color-primary-hover,#0A4E47)] text-white text-xs font-medium shadow-xs transition-colors flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-primary,#0B5C54)] focus-visible:ring-offset-1 focus-visible:outline-none flex items-center gap-1.5"
+              className="px-4 py-2 pointer-coarse:min-h-11 rounded-control bg-primary hover:bg-primary-hover text-white text-xs font-medium shadow-xs transition-colors flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none flex items-center gap-1.5"
             >
               <span>Place on canvas</span>
-              <CornerDownLeft className="w-3 h-3 opacity-70" />
             </button>
           </>
         ) : (
-          <div className="text-xs text-[var(--color-secondary-text,#626D68)]">
+          <div className="text-xs text-secondary-text">
             Select an entry to place
           </div>
         )}

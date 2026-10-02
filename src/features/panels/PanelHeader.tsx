@@ -168,7 +168,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
       tabIndex={-1}
       aria-label={`${title} panel`}
       className={cn(
-        'group/header relative flex items-center justify-between px-3 py-2 border-b border-border bg-panel text-foreground select-none shrink-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+        'group/header relative flex items-center justify-between px-3 py-2 border-b border-border bg-background text-foreground select-none shrink-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
         onDragStart && 'cursor-grab active:cursor-grabbing',
         className
       )}
@@ -193,7 +193,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
 
       {/* Left: Title + optional badge */}
       <div className="flex items-center gap-2 min-w-0">
-        <h2 className="text-ui font-medium text-foreground truncate">
+        <h2 className="text-ui font-semibold text-foreground truncate">
           {title}
         </h2>
         {badge && (
@@ -314,6 +314,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
           className="size-7 rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken focus-visible:ring-1"
           onClick={handleClose}
           aria-label={`Close ${title}`}
+          data-testid={panelId === 'inspector' ? 'inspector-close' : undefined}
           data-slot="panel-close-button"
         >
           <X className="size-4" />

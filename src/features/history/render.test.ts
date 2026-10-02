@@ -14,7 +14,7 @@ import { PublishedNotice } from './PublishedNotice';
 import { readFileSync } from 'node:fs';
 import type { Document } from '../../domain/studio/model';
 const fixture: Document = JSON.parse(readFileSync('specs/revamp/fixtures/s02.json', 'utf8'));
-import type { CheckpointRecord, CommitRecord, PublicationRecord } from '../../persistence/studio';
+import type { CommitRecord, PublicationRecord } from '../../persistence/studio';
 import type { ScenarioWithStatus } from '../runs/scenarioStatus';
 import type { RecordChangeItem } from './types';
 
@@ -24,18 +24,6 @@ import type { RecordChangeItem } from './types';
 const EXCLUDED_TEXTS = ['no run', 'suggested from your edits', 'p95', 'p99', 'burst', 'bottleneck'];
 
 const testActor = { actorId: 'u1', kind: 'local-human' as const, displayName: 'Test User' };
-
-const checkpoints: readonly CheckpointRecord[] = [
-  {
-    projectId: 'proj-1',
-    id: 'cp-1',
-    snapshotId: 'snap-cp-1',
-    sourceBranchId: 'branch-1',
-    label: 'Before big change',
-    actor: testActor,
-    createdAt: Date.UTC(2026, 8, 11, 16, 20),
-  },
-];
 
 const commits: readonly CommitRecord[] = [
   {
@@ -108,14 +96,13 @@ describe('HistoryLadder static markup (22A)', () => {
       expect(html).not.toContain('Undo publish');
     }
   });
-  it('renders branch, working edits, checkpoints, commits, publications without excluded texts', () => {
+  it('renders branch, working edits, commits, publications without excluded texts', () => {
     const html = renderToStaticMarkup(
       React.createElement(HistoryLadder, {
         branchName: 'feature/checkout',
         isMain: false,
         aheadOfVersion: { aheadCount: 3, versionKey: '2.2.1' },
         workingEdits: ['Renamed queue to Order queue', 'Added retry policy'],
-        checkpoints,
         commits,
         publications,
         commitDiffSummaries: { 'commit-1': '2 fields changed' },
@@ -132,8 +119,8 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(html).toContain('NOW');
     expect(html).toContain('NOT COMMITTED');
     expect(html).toContain('Renamed queue to Order queue');
-    expect(html).toContain('CHECKPOINTS');
-    expect(html).toContain('Before big change');
+    expect(html).not.toContain('CHECKPOINTS');
+    expect(html).not.toContain('Save checkpoint');
     expect(html).toContain('COMMITS');
     expect(html).toContain('2 fields changed');
     expect(html).toContain('scenario');
@@ -157,7 +144,6 @@ describe('HistoryLadder static markup (22A)', () => {
         branchName: 'main',
         isMain: true,
         workingEdits: [],
-        checkpoints,
         commits: [],
         publications: [],
         onOpenCommit: vi.fn(),
@@ -174,7 +160,6 @@ describe('HistoryLadder static markup (22A)', () => {
         branchName: 'feature/checkout',
         isMain: false,
         workingEdits: [],
-        checkpoints: [],
         commits: [],
         publications: [],
         onOpenCommit: vi.fn(),
@@ -194,7 +179,6 @@ describe('HistoryLadder static markup (22A)', () => {
         branchName: 'async-fulfilment',
         isMain: false,
         workingEdits: [],
-        checkpoints: [],
         commits,
         publications: [],
         onOpenCommit: vi.fn(),
@@ -220,7 +204,6 @@ describe('HistoryLadder static markup (22A)', () => {
         isMain: false,
         aheadOfVersion: null,
         workingEdits: [],
-        checkpoints: [],
         commits,
         publications: [],
         commitDiffSummaries: { 'commit-1': null },
@@ -238,7 +221,6 @@ describe('HistoryLadder static markup (22A)', () => {
         // No branchName prop and no controller: there is no real branch name to show.
         isMain: false,
         workingEdits: [],
-        checkpoints: [],
         commits: [],
         publications: [],
         onOpenCommit: vi.fn(),

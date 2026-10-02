@@ -30,7 +30,7 @@ function writeImportFile(name: string, content: string): string {
 }
 
 test.describe('RV-13b: Entry screen', () => {
-  test('lists every template and requires a name for a blank project', async ({ page }) => {
+  test('lists every template and offers Untitled for a blank project', async ({ page }) => {
     await openEntry(page);
     await expect(page.getByTestId('no-projects-notice')).toBeVisible();
     for (const id of EXAMPLE_IDS) {
@@ -38,9 +38,10 @@ test.describe('RV-13b: Entry screen', () => {
       await expect(page.getByTestId(`create-example-${id}`)).toBeEnabled();
     }
     const create = page.getByTestId('create-blank-project-btn');
-    await expect(create).toBeDisabled();
+    await expect(page.getByRole('textbox', { name: 'Blank project name' })).toHaveAttribute('placeholder', 'Untitled');
+    await expect(create).toBeEnabled();
     await page.getByRole('textbox', { name: 'Blank project name' }).fill('   ');
-    await expect(create).toBeDisabled();
+    await expect(create).toBeEnabled();
     await page.getByRole('textbox', { name: 'Blank project name' }).fill('Named');
     await expect(create).toBeEnabled();
   });

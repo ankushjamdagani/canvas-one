@@ -19,11 +19,20 @@ export type LibraryView = 'list' | 'grid';
 /** Drag-and-drop MIME type for studio catalog entries */
 export const CATALOG_ENTRY_MIME_TYPE = 'application/x-studio-catalog-entry';
 
+export type LibraryTab = 'standard' | 'ours';
+
+export interface SavedPartsRenderContext {
+  readonly searchQuery: string;
+  readonly view: LibraryView;
+  readonly active: boolean;
+  readonly onCountChange: (count: number) => void;
+}
+
 /** Props for the full LibraryPanel (12A/12B/12C) */
 export interface LibraryPanelProps {
   /** Called when the user confirms placing a catalog entry */
   onPlace: (entryId: string) => void;
-  /** Called when the user clicks the close button or presses Escape */
+  /** Called when the user presses Escape */
   onClose: () => void;
   /** Current view mode: 'list' or 'grid' */
   view: LibraryView;
@@ -37,9 +46,13 @@ export interface LibraryPanelProps {
   initialSearchQuery?: string;
   /** Optional container class name */
   className?: string;
-  /** PanelHost already supplies the panel title, controls, and outer chrome. */
-  hosted?: boolean;
-  renderSavedParts?: (searchQuery: string, view: LibraryView) => import('react').ReactNode;
+  /**
+   * Renders the saved-parts ("Ours") content. It stays mounted while the Standard
+   * tab is showing (`active` false) so its count and a requested capture survive.
+   */
+  renderSavedParts?: (context: SavedPartsRenderContext) => import('react').ReactNode;
+  /** Increments when a capture is requested from outside; switches to the Ours tab. */
+  captureRequested?: number;
 }
 
 /**

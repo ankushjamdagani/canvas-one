@@ -39,13 +39,15 @@ export interface ScenarioEditorProps {
   readonly focusName?: boolean;
   /** A check to open expanded (flow probe added from the canvas). */
   readonly focusAssertionId?: string | null;
+  /** Inside PanelHost, which supplies the title bar and close button. */
+  readonly hosted?: boolean;
 }
 
 function sectionErrorCount(handle: ScenarioDraftHandle, section: ScenarioSection): number {
   return handle.issuesBySection[section].filter((i) => i.severity === 'error').length;
 }
 
-export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, onClose = onCancel, mintId, lastRunChecks, focusName = false, focusAssertionId = null }: ScenarioEditorProps) {
+export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, onClose = onCancel, mintId, lastRunChecks, focusName = false, focusAssertionId = null, hosted = false }: ScenarioEditorProps) {
   const scenario = handle.scenario;
   const [boundaryGuardsComplete, setBoundaryGuardsComplete] = React.useState(true);
 
@@ -79,12 +81,14 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
 
   return (
     <div data-testid="scenario-editor" className="flex flex-col h-full text-xs">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
-        <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Scenario</span>
-        <button type="button" onClick={onClose} aria-label="Close editor" className="inline-flex items-center justify-center text-secondary-text hover:text-foreground pointer-coarse:size-11">
-          <X className="size-4" aria-hidden="true" />
-        </button>
-      </div>
+      {hosted ? null : (
+        <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
+          <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Scenario</span>
+          <button type="button" onClick={onClose} aria-label="Close editor" className="inline-flex items-center justify-center text-secondary-text hover:text-foreground pointer-coarse:size-11">
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {/* Header */}

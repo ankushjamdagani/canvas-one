@@ -124,4 +124,25 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
       path: test.info().outputPath('rv05b-mobile-sheet.png'),
     });
   });
+
+  test('the inspector is a hosted panel: docks right, floats from its header menu, and closes with the draft', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s04').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await page.locator(`[data-element-id="${ROUTER_ELEMENT_ID}"]`).click();
+
+    const dock = page.locator('[data-slot="dock-column"][data-side="right"]');
+    await expect(dock.getByTestId('inspector-panel')).toBeVisible();
+    await expect(dock.locator('[data-slot="panel-header"]').getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible();
+
+    await dock.locator('[data-slot="panel-menu-trigger"]').click();
+    await page.getByRole('menuitem', { name: 'Float' }).click();
+    const floating = page.locator('[data-slot="floating-panel"][data-panel-id="inspector"]');
+    await expect(floating.getByTestId('inspector-panel')).toBeVisible();
+    await expect(page.locator('[data-slot="dock-column"]')).toHaveCount(0);
+
+    await page.getByTestId('inspector-close').click();
+    await expect(page.getByTestId('inspector-panel')).toHaveCount(0);
+    await expect(floating).toHaveCount(0);
+  });
 });

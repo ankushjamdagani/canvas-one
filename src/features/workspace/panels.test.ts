@@ -624,7 +624,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       // history is least-recently focused and collapses.
       const state = createInitialPanelState({
         viewport: { width: 1200, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         focusedPanel: 'library',
         lastFocusedSequence: { history: 1, library: 2 },
         panels: {
@@ -654,7 +654,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
     it('collapses library when library is least-recently focused', () => {
       const state = createInitialPanelState({
         viewport: { width: 1200, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         focusedPanel: 'history',
         lastFocusedSequence: { library: 1, history: 2 },
         panels: {
@@ -683,7 +683,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
     it('breaks ties deterministically by panel id (history collapses before library)', () => {
       const state = createInitialPanelState({
         viewport: { width: 1200, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         lastFocusedSequence: { library: 0, history: 0 }, // Tied
         panels: {
           library: {
@@ -714,7 +714,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       // Occupancy 860 + 320 + 320 = 1500 <= 1600
       const wideState = createInitialPanelState({
         viewport: { width: 1600, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         lastFocusedSequence: { history: 1, library: 2 },
         panels: {
           library: {
@@ -755,7 +755,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
     it('restoring width restores preferred state without emitting focus or save effects (§7)', () => {
       const collapsedState = createInitialPanelState({
         viewport: { width: 1200, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         lastFocusedSequence: { history: 1, library: 2 },
         panels: {
           library: {
@@ -830,7 +830,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
     it('1200 px (Desktop lower boundary): auto-collapses auxiliary panel when both sides open', () => {
       const state = createInitialPanelState({
         viewport: { width: 1200, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         lastFocusedSequence: { library: 2, history: 1 },
         panels: {
           library: {
@@ -1187,7 +1187,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
     it('keeps preferences deep-equal before and after auto-collapse override (1200 px)', () => {
       const state = createInitialPanelState({
         viewport: { width: 1600, height: 900 },
-        sideWidths: { left: 320, right: 320 },
+        sideWidths: { left: 440, right: 440 },
         panels: {
           library: {
             open: true,
@@ -1235,7 +1235,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
   // 12. Constrained Desktop Viewports (1225 px) & Effective Side Width
   // ==========================================================================
   describe('Constrained Desktop Viewports (1225 px) & Effective Side Width', () => {
-    it('computes effective side width clamped to available space at 1225 px', () => {
+    it('keeps the preferred side width at 1225 px (no fixed inspector reservation)', () => {
       const state = createInitialPanelState({
         viewport: { width: 1225, height: 773 },
         sideWidths: { left: 320, right: 380 },
@@ -1257,11 +1257,11 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
         },
       });
 
-      // At 1225 px: baseOccupancy = 480 (canvas) + 44 (rail) + 16 (gutters) + 320 (inspector) = 860 px
-      // Available width for right side = 1225 - 860 = 365 px
-      // Preferred width is 380 px, so effective width is clamped to 365 px
+      // At 1225 px: baseOccupancy = 480 (canvas) + 44 (rail) + 16 (gutters) = 540 px;
+      // the inspector is a hosted panel now, so it reserves no width of its own.
+      // Available width for right side = 1225 - 540 = 685 px, so 380 px is kept.
       const effectiveRight = computeEffectiveSideWidth('right', state, ['library']);
-      expect(effectiveRight).toBe(365);
+      expect(effectiveRight).toBe(380);
 
       // On wider screens (1440 px), preferred width 380 px is preserved
       const wideState = { ...state, viewport: { width: 1440, height: 900 } };
@@ -1363,5 +1363,78 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       expect(nextLayout.panels.library).toBe('docked-left');
       expect(nextLayout.panels.history).toBe('collapsed');
     });
+  });
+});
+
+describe('Inspector as a hosted panel', () => {
+  const wide = { width: 1600, height: 900 };
+
+  it('SYNC_OPEN follows the draft without focusing or saving', () => {
+    const state = createInitialPanelState({ viewport: wide });
+    const opened = panelReducer(state, { type: 'SYNC_OPEN', panel: 'inspector', open: true });
+    expect(opened.state.panels.inspector.open).toBe(true);
+    expect(opened.state.focusedPanel).toBeNull();
+    expect(opened.effects.filter((e) => e.type === 'save' || e.type === 'focus')).toEqual([]);
+    expect(panelReducer(opened.state, { type: 'SYNC_OPEN', panel: 'inspector', open: true }).state).toBe(opened.state);
+    expect(panelReducer(opened.state, { type: 'SYNC_OPEN', panel: 'inspector', open: false }).state.panels.inspector.open).toBe(false);
+  });
+
+  it('docks right by default on desktop and is hidden below 1200 px', () => {
+    const open = createInitialPanelState({ viewport: wide, panels: { inspector: { ...createInitialPanelState().panels.inspector, open: true } } });
+    expect(effectiveLayout(open).panels.inspector).toBe('docked-right');
+    expect(effectiveLayout({ ...open, viewport: { width: 1100, height: 900 } }).panels.inspector).toBe('hidden');
+    expect(effectiveLayout({ ...open, viewport: { width: 390, height: 844 } }).panels.inspector).toBe('hidden');
+  });
+
+  it('never auto-collapses the inspector; the other panels collapse instead', () => {
+    const base = createInitialPanelState({ viewport: { width: 1200, height: 900 }, sideWidths: { left: 440, right: 440 } });
+    const state = createInitialPanelState({
+      viewport: { width: 1200, height: 900 },
+      sideWidths: { left: 440, right: 440 },
+      lastFocusedSequence: { library: 5, history: 6, inspector: 1 },
+      panels: {
+        library: { ...base.panels.library, open: true, placement: 'left' },
+        history: { ...base.panels.history, open: true, placement: 'right' },
+        inspector: { ...base.panels.inspector, open: true, placement: 'right', stackOrder: 0 },
+      },
+    });
+    const layout = effectiveLayout(state);
+    expect(layout.panels.inspector).toBe('docked-right');
+    expect(layout.panels.library === 'collapsed' || layout.panels.history === 'collapsed').toBe(true);
+  });
+
+  it('PLACE keeps stack orders unique and contiguous with three panels on one side', () => {
+    const base = createInitialPanelState({ viewport: wide });
+    const state = createInitialPanelState({
+      viewport: wide,
+      panels: {
+        library: { ...base.panels.library, open: true, placement: 'right', stackOrder: 0 },
+        history: { ...base.panels.history, open: true, placement: 'right', stackOrder: 1 },
+        inspector: { ...base.panels.inspector, open: true, placement: 'left', stackOrder: 0 },
+      },
+    });
+    const next = panelReducer(state, { type: 'PLACE', panel: 'inspector', placement: 'right', index: 1 }).state;
+    const orders = (['library', 'inspector', 'history'] as const).map((id) => next.panels[id].stackOrder);
+    expect(orders).toEqual([0, 1, 2]);
+    const layout = effectiveLayout(next);
+    expect(layout.panels.library).toBe('docked-right');
+    expect(layout.panels.inspector).toBe('docked-right');
+    expect(layout.panels.history).toBe('docked-right');
+  });
+
+  it('collapses the least-recently-focused non-inspector panel when three stacked panels do not fit', () => {
+    const base = createInitialPanelState();
+    const state = createInitialPanelState({
+      viewport: { width: 1600, height: 560 },
+      lastFocusedSequence: { library: 1, history: 2, inspector: 3 },
+      panels: {
+        library: { ...base.panels.library, open: true, placement: 'right', stackOrder: 0 },
+        history: { ...base.panels.history, open: true, placement: 'right', stackOrder: 1 },
+        inspector: { ...base.panels.inspector, open: true, placement: 'right', stackOrder: 2 },
+      },
+    });
+    const layout = effectiveLayout(state);
+    expect(layout.panels.inspector).toBe('docked-right');
+    expect(layout.panels.library).toBe('collapsed');
   });
 });

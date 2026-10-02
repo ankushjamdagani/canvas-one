@@ -44,7 +44,7 @@ function branchLabel(project: ProjectRecord, branch: BranchRecord): string {
  * Implements specifications and aesthetics from Screen 13B (Branch switch):
  * - 392px width popover with subtle border and elevation shadow
  * - Top search bar with "Find or create a branch" and ⌘B hint
- * - "ON THIS BRANCH" section with current branch, status badge, last edited timestamp, and checkmark
+ * - "CURRENT BRANCH" section with current branch, status badge, last edited timestamp, and checkmark
  * - "SWITCH TO" section with branches list, last edited timestamp, and hover state
  * - Bottom action bar with "New branch from here" and "Manage branches"
  */
@@ -109,17 +109,23 @@ export function BranchPopover({
         sideOffset={6}
         className="w-[392px] max-w-[calc(100vw-24px)] p-0 rounded-popover border border-border bg-background shadow-popover overflow-hidden outline-none flex flex-col"
       >
-        <div className="px-3 py-2.5 border-b border-hairline flex items-center gap-2 bg-panel select-none">
-          <Search size={14} className="text-secondary-text shrink-0" aria-hidden="true" />
+        <div className="relative border-b border-hairline bg-panel select-none">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary-text"
+            aria-hidden="true"
+          />
           <Input
             data-testid="branch-find-input"
             aria-label="Find a branch"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Find or create a branch"
-            className="h-6 px-0 text-[12.5px] border-0 shadow-none bg-transparent placeholder:text-secondary-text/70 focus-visible:ring-0 focus-visible:ring-offset-0 flex-1 text-ink"
+            className="h-10 w-full rounded-none border-0 bg-transparent pl-9 pr-12 text-[13px] shadow-none text-ink placeholder:text-secondary-text/70 hover:bg-transparent focus-visible:bg-transparent focus-visible:outline-none [&[placeholder]:not(:placeholder-shown)]:bg-transparent"
           />
-          <Kbd className="font-mono text-[9.5px] text-secondary-text bg-transparent border-0 p-0">⌘B</Kbd>
+          <Kbd className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[9.5px] text-secondary-text bg-transparent border-0 p-0">
+            ⌘B
+          </Kbd>
         </div>
 
         {creating ? (
@@ -228,12 +234,12 @@ export function BranchPopover({
           </form>
         ) : (
           <>
-            {/* ON THIS BRANCH */}
+            {/* CURRENT BRANCH */}
             {current && (
               <div className="px-2 pt-2.5 pb-1.5 flex flex-col gap-1">
                 <div className="flex items-center gap-2 px-1.5 pb-1">
                   <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
-                    On this branch
+                    Current branch
                   </span>
                   <span className="flex-1 h-px bg-[#EFEBE3]" />
                 </div>
