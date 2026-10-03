@@ -17,7 +17,6 @@
 
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import type { Id } from '../../domain/studio/model';
 import { REFERENCE_EXAMPLES } from '../entry/fixtures';
 import { createStudioDatabase, DB_NAME } from '../../persistence/studio/db';
 import { LocalRepository } from '../../persistence/studio/repository';

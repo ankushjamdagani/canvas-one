@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mergeDocuments } from './merge';
 import { resolveConflict, ConflictResolutionError } from './resolve';
-import type { Document, Element, Connection } from '../studio/model';
+import type { Element, Connection } from '../studio/model';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 

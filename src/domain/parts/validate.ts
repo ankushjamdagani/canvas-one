@@ -1,8 +1,9 @@
 import { canonicalJson } from "../studio/canonical";
 import { validateDocument, type Issue } from "../studio/validate";
 import type { PartContent } from "./types";
+import { createIssue } from "../studio/issue";
 
-export const PART_CONTENT_BYTES = 512 * 1024;
+const PART_CONTENT_BYTES = 512 * 1024;
 export const PART_FILE_BYTES = PART_CONTENT_BYTES + 32 * 1024;
 export type SavedPart = {
   readonly id: string;
@@ -14,16 +15,6 @@ export type SavedPart = {
 type Result<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly issues: readonly Issue[] };
-const issue = (
-  message: string,
-  path: readonly (string | number)[] = [],
-): Issue => ({
-  code: "structural-rule",
-  severity: "error",
-  entityId: null,
-  message,
-  path,
-});
 const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 function closed(
@@ -56,14 +47,14 @@ export function validatePartContent(raw: unknown): Result<PartContent> {
   ) {
     return {
       ok: false,
-      issues: [issue("Expected closed studio-part-content/1 content.")],
+      issues: [createIssue("structural-rule", "Expected closed studio-part-content/1 content.")],
     };
   }
   if (
     !object(raw.view) ||
     !closed(raw.view, ["placements", "groups", "notes"])
   ) {
-    return { ok: false, issues: [issue("Invalid part view.", ["view"])] };
+    return { ok: false, issues: [createIssue("structural-rule", "Invalid part view.", ["view"])] };
   }
   for (const [key, max] of [
     ["elements", 50],
@@ -78,7 +69,8 @@ export function validatePartContent(raw: unknown): Result<PartContent> {
       return {
         ok: false,
         issues: [
-          issue(
+          createIssue(
+            "structural-rule",
             `Part ${key} must contain ${key === "elements" ? "1" : "0"}–${max} entries.`,
             [key],
           ),
@@ -90,7 +82,7 @@ export function validatePartContent(raw: unknown): Result<PartContent> {
     return {
       ok: false,
       issues: [
-        issue("A part may contain at most 50 notes.", ["view", "notes"]),
+        createIssue("structural-rule", "A part may contain at most 50 notes.", ["view", "notes"]),
       ],
     };
   }
@@ -136,7 +128,7 @@ export function validateSavedPart(raw: unknown): Result<SavedPart> {
   ) {
     return {
       ok: false,
-      issues: [issue("Expected a closed saved part record.")],
+      issues: [createIssue("structural-rule", "Expected a closed saved part record.")],
     };
   }
   if (
@@ -145,13 +137,13 @@ export function validateSavedPart(raw: unknown): Result<SavedPart> {
       raw.id,
     )
   ) {
-    return { ok: false, issues: [issue("Invalid part ID.", ["id"])] };
+    return { ok: false, issues: [createIssue("structural-rule", "Invalid part ID.", ["id"])] };
   }
   if (!Number.isSafeInteger(raw.revision) || (raw.revision as number) < 1) {
     return {
       ok: false,
       issues: [
-        issue("Part revision must be a positive safe integer.", ["revision"]),
+        createIssue("structural-rule", "Part revision must be a positive safe integer.", ["revision"]),
       ],
     };
   }
@@ -165,7 +157,8 @@ export function validateSavedPart(raw: unknown): Result<SavedPart> {
     return {
       ok: false,
       issues: [
-        issue(
+        createIssue(
+          "structural-rule",
           "Use a label of 1–80 characters and a description of at most 4,000 characters.",
         ),
       ],
@@ -191,7 +184,7 @@ export function parsePartFile(bytes: Uint8Array): Result<SavedPart> {
   if (bytes.byteLength > PART_FILE_BYTES)
     return {
       ok: false,
-      issues: [issue("Part file is too large. Select a smaller part.")],
+      issues: [createIssue("structural-rule", "Part file is too large. Select a smaller part.")],
     };
   let raw: unknown;
   try {
@@ -199,7 +192,7 @@ export function parsePartFile(bytes: Uint8Array): Result<SavedPart> {
   } catch {
     return {
       ok: false,
-      issues: [issue("Choose a valid UTF-8 part JSON file.")],
+      issues: [createIssue("structural-rule", "Choose a valid UTF-8 part JSON file.")],
     };
   }
   if (
@@ -210,7 +203,7 @@ export function parsePartFile(bytes: Uint8Array): Result<SavedPart> {
   ) {
     return {
       ok: false,
-      issues: [issue("Only system-studio-part version 1 is supported.")],
+      issues: [createIssue("structural-rule", "Only system-studio-part version 1 is supported.")],
     };
   }
   return validateSavedPart(raw.part);

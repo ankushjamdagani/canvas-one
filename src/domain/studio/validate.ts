@@ -38,6 +38,8 @@ import {
   ASSUMPTION_SOURCES,
   NOTE_TONES,
 } from './model';
+import { PROTOTYPE_KEYS, codePointLength, isSurrogateValid } from './text';
+import { errorIssue } from './issue';
 
 /**
  * Closed set of schema validation issue codes.
@@ -97,30 +99,9 @@ export type Issue = {
 /** Canonical lowercase UUID format: 8-4-4-4-12 lowercase hex with version 1-5 and variant [89ab]. */
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-const PROTOTYPE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-
 // ============================================================================
 // Iterative Helper Functions
 // ============================================================================
-
-function isSurrogateValid(str: string): boolean {
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      if (i + 1 >= str.length) return false;
-      const next = str.charCodeAt(i + 1);
-      if (next < 0xdc00 || next > 0xdfff) return false;
-      i++;
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function codePointLength(str: string): number {
-  return [...str].length;
-}
 
 /**
  * Checks raw container depth iteratively using an explicit stack.
@@ -142,13 +123,14 @@ function checkRawDepth(input: unknown, issues: Issue[], maxDepth = 32): void {
     const { node, depth, path } = stack.pop()!;
 
     if (depth > maxDepth) {
-      issues.push({
-        code: 'too-deep',
-        path,
-        entityId: null,
-        severity: 'error',
-        message: `Raw document depth ${depth} exceeds maximum limit of ${maxDepth}`,
-      });
+      issues.push(
+        errorIssue(
+          'too-deep',
+          path,
+          null,
+          `Raw document depth ${depth} exceeds maximum limit of ${maxDepth}`,
+        ),
+      );
       continue;
     }
 
@@ -191,13 +173,14 @@ function checkFixtureStrings(
     if (typeof root === 'string') {
       const bytes = new TextEncoder().encode(root).length;
       if (bytes > maxStringBytes) {
-        issues.push({
-          code: 'too-large',
-          path: basePath,
-          entityId: null,
-          severity: 'error',
-          message: `Fixture string value byte length ${bytes} exceeds maximum limit of 16 KiB (${maxStringBytes} bytes)`,
-        });
+        issues.push(
+          errorIssue(
+            'too-large',
+            basePath,
+            null,
+            `Fixture string value byte length ${bytes} exceeds maximum limit of 16 KiB (${maxStringBytes} bytes)`,
+          ),
+        );
       }
     }
     return;
@@ -212,13 +195,14 @@ function checkFixtureStrings(
     if (typeof val === 'string') {
       const bytes = encoder.encode(val).length;
       if (bytes > maxStringBytes) {
-        issues.push({
-          code: 'too-large',
-          path,
-          entityId: null,
-          severity: 'error',
-          message: `Fixture string value byte length ${bytes} exceeds maximum limit of 16 KiB (${maxStringBytes} bytes)`,
-        });
+        issues.push(
+          errorIssue(
+            'too-large',
+            path,
+            null,
+            `Fixture string value byte length ${bytes} exceeds maximum limit of 16 KiB (${maxStringBytes} bytes)`,
+          ),
+        );
       }
     } else if (val !== null && typeof val === 'object') {
       if (seen.has(val)) continue;
@@ -252,13 +236,14 @@ function checkRecord(
   recordName: string,
 ): obj is Record<string, unknown> {
   if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected object for ${recordName}, got ${obj === null ? 'null' : Array.isArray(obj) ? 'array' : typeof obj}`,
-    });
+    issues.push(
+      errorIssue(
+        'wrong-type',
+        path,
+        entityId,
+        `Expected object for ${recordName}, got ${obj === null ? 'null' : Array.isArray(obj) ? 'array' : typeof obj}`,
+      ),
+    );
     return false;
   }
 
@@ -268,13 +253,14 @@ function checkRecord(
   // Prototype keys
   for (const k of ownKeys) {
     if (PROTOTYPE_KEYS.has(k)) {
-      issues.push({
-        code: 'prototype-key',
-        path: [...path, k],
-        entityId,
-        severity: 'error',
-        message: `Disallowed prototype key '${k}' on ${recordName}`,
-      });
+      issues.push(
+        errorIssue(
+          'prototype-key',
+          [...path, k],
+          entityId,
+          `Disallowed prototype key '${k}' on ${recordName}`,
+        ),
+      );
     }
   }
 
@@ -282,26 +268,28 @@ function checkRecord(
   for (const k of ownKeys) {
     if (PROTOTYPE_KEYS.has(k)) continue;
     if (!allowedKeys.includes(k)) {
-      issues.push({
-        code: 'unknown-property',
-        path: [...path, k],
-        entityId,
-        severity: 'error',
-        message: `Unknown property '${k}' on ${recordName}`,
-      });
+      issues.push(
+        errorIssue(
+          'unknown-property',
+          [...path, k],
+          entityId,
+          `Unknown property '${k}' on ${recordName}`,
+        ),
+      );
     }
   }
 
   // Missing required properties
   for (const k of requiredKeys) {
     if (!Object.hasOwn(rec, k) || rec[k] === undefined) {
-      issues.push({
-        code: 'missing-property',
-        path: [...path, k],
-        entityId,
-        severity: 'error',
-        message: `Missing required property '${k}' on ${recordName}`,
-      });
+      issues.push(
+        errorIssue(
+          'missing-property',
+          [...path, k],
+          entityId,
+          `Missing required property '${k}' on ${recordName}`,
+        ),
+      );
     }
   }
 
@@ -318,46 +306,36 @@ function validateString(
   name: string,
 ): val is string {
   if (typeof val !== 'string') {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected string for ${name}, got ${typeof val}`,
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, `Expected string for ${name}, got ${typeof val}`));
     return false;
   }
 
   if (!isSurrogateValid(val)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `String for ${name} contains lone surrogates`,
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, `String for ${name} contains lone surrogates`));
     return false;
   }
 
   const len = codePointLength(val);
   if (len < minCodePoints) {
-    issues.push({
-      code: 'out-of-range',
-      path,
-      entityId,
-      severity: 'error',
-      message: `${name} length ${len} code points is less than minimum ${minCodePoints}`,
-    });
+    issues.push(
+      errorIssue(
+        'out-of-range',
+        path,
+        entityId,
+        `${name} length ${len} code points is less than minimum ${minCodePoints}`,
+      ),
+    );
     return false;
   }
   if (len > maxCodePoints) {
-    issues.push({
-      code: 'too-long',
-      path,
-      entityId,
-      severity: 'error',
-      message: `${name} length ${len} code points exceeds maximum ${maxCodePoints}`,
-    });
+    issues.push(
+      errorIssue(
+        'too-long',
+        path,
+        entityId,
+        `${name} length ${len} code points exceeds maximum ${maxCodePoints}`,
+      ),
+    );
     return false;
   }
 
@@ -371,24 +349,19 @@ function validateId(
   issues: Issue[],
 ): val is Id {
   if (typeof val !== 'string') {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected string for ID, got ${typeof val}`,
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, `Expected string for ID, got ${typeof val}`));
     return false;
   }
 
   if (!UUID_REGEX.test(val)) {
-    issues.push({
-      code: 'invalid-id',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Invalid ID '${val}': must be a lowercase canonical UUID`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-id',
+        path,
+        entityId,
+        `Invalid ID '${val}': must be a lowercase canonical UUID`,
+      ),
+    );
     return false;
   }
 
@@ -407,36 +380,32 @@ function validateNumber(
   minExclusive = false,
 ): val is number {
   if (typeof val !== 'number' || !Number.isFinite(val)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected finite number for ${name}, got ${String(val)}`,
-    });
+    issues.push(
+      errorIssue(
+        'wrong-type',
+        path,
+        entityId,
+        `Expected finite number for ${name}, got ${String(val)}`,
+      ),
+    );
     return false;
   }
 
   if (integerOnly && !Number.isSafeInteger(val)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected safe integer for ${name}, got ${val}`,
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, `Expected safe integer for ${name}, got ${val}`));
     return false;
   }
 
   const tooSmall = minExclusive ? val <= min : val < min;
   if (tooSmall || val > max) {
-    issues.push({
-      code: 'out-of-range',
-      path,
-      entityId,
-      severity: 'error',
-      message: `${name} ${val} is out of allowed range ${minExclusive ? `(${min}, ${max}]` : `[${min}, ${max}]`}`,
-    });
+    issues.push(
+      errorIssue(
+        'out-of-range',
+        path,
+        entityId,
+        `${name} ${val} is out of allowed range ${minExclusive ? `(${min}, ${max}]` : `[${min}, ${max}]`}`,
+      ),
+    );
     return false;
   }
 
@@ -451,13 +420,7 @@ function validateBoolean(
   name: string,
 ): val is boolean {
   if (typeof val !== 'boolean') {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected boolean for ${name}, got ${typeof val}`,
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, `Expected boolean for ${name}, got ${typeof val}`));
     return false;
   }
   return true;
@@ -472,24 +435,26 @@ function validateArray(
   name: string,
 ): val is unknown[] {
   if (!Array.isArray(val)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Expected array for ${name}, got ${val === null ? 'null' : typeof val}`,
-    });
+    issues.push(
+      errorIssue(
+        'wrong-type',
+        path,
+        entityId,
+        `Expected array for ${name}, got ${val === null ? 'null' : typeof val}`,
+      ),
+    );
     return false;
   }
 
   if (val.length > maxItems) {
-    issues.push({
-      code: 'too-many',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Array for ${name} count ${val.length} exceeds maximum limit of ${maxItems}`,
-    });
+    issues.push(
+      errorIssue(
+        'too-many',
+        path,
+        entityId,
+        `Array for ${name} count ${val.length} exceeds maximum limit of ${maxItems}`,
+      ),
+    );
   }
 
   return true;
@@ -502,13 +467,14 @@ function validatePath(
   issues: Issue[],
 ): val is readonly (string | number)[] {
   if (!Array.isArray(val)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Path must be an array of literal keys or non-negative list indices`,
-    });
+    issues.push(
+      errorIssue(
+        'wrong-type',
+        path,
+        entityId,
+        `Path must be an array of literal keys or non-negative list indices`,
+      ),
+    );
     return false;
   }
 
@@ -517,34 +483,37 @@ function validatePath(
     const itemPath = [...path, i];
     if (typeof item === 'string') {
       if (PROTOTYPE_KEYS.has(item)) {
-        issues.push({
-          code: 'prototype-key',
-          path: itemPath,
-          entityId,
-          severity: 'error',
-          message: `Disallowed prototype key in path: ${item}`,
-        });
+        issues.push(
+          errorIssue(
+            'prototype-key',
+            itemPath,
+            entityId,
+            `Disallowed prototype key in path: ${item}`,
+          ),
+        );
       } else {
         validateString(item, 1, 80, itemPath, entityId, issues, 'Path segment');
       }
     } else if (typeof item === 'number') {
       if (!Number.isSafeInteger(item) || item < 0) {
-        issues.push({
-          code: 'out-of-range',
-          path: itemPath,
-          entityId,
-          severity: 'error',
-          message: `Path index must be a non-negative integer`,
-        });
+        issues.push(
+          errorIssue(
+            'out-of-range',
+            itemPath,
+            entityId,
+            `Path index must be a non-negative integer`,
+          ),
+        );
       }
     } else {
-      issues.push({
-        code: 'wrong-type',
-        path: itemPath,
-        entityId,
-        severity: 'error',
-        message: `Path element must be a string or non-negative integer`,
-      });
+      issues.push(
+        errorIssue(
+          'wrong-type',
+          itemPath,
+          entityId,
+          `Path element must be a string or non-negative integer`,
+        ),
+      );
     }
   }
 
@@ -581,63 +550,54 @@ function validateJsonValue(
 
     if (typeof val === 'number') {
       if (!Number.isFinite(val)) {
-        issues.push({
-          code: 'wrong-type',
-          path,
-          entityId,
-          severity: 'error',
-          message: `Expected finite number in JSON value, got ${String(val)}`,
-        });
+        issues.push(
+          errorIssue(
+            'wrong-type',
+            path,
+            entityId,
+            `Expected finite number in JSON value, got ${String(val)}`,
+          ),
+        );
       }
       continue;
     }
 
     if (typeof val === 'string') {
       if (!isSurrogateValid(val)) {
-        issues.push({
-          code: 'wrong-type',
-          path,
-          entityId,
-          severity: 'error',
-          message: `JSON string contains lone surrogates`,
-        });
+        issues.push(errorIssue('wrong-type', path, entityId, `JSON string contains lone surrogates`));
       }
       continue;
     }
 
     if (Array.isArray(val)) {
       if (seenObjects.has(val)) {
-        issues.push({
-          code: 'structural-rule',
-          path,
-          entityId,
-          severity: 'error',
-          message: 'Circular structure in JSON value',
-        });
+        issues.push(errorIssue('structural-rule', path, entityId, 'Circular structure in JSON value'));
         continue;
       }
       seenObjects.add(val);
 
       const nextDepth = depth + 1;
       if (nextDepth > maxDepth) {
-        issues.push({
-          code: 'too-deep',
-          path,
-          entityId,
-          severity: 'error',
-          message: `Payload depth ${nextDepth} exceeds maximum limit of ${maxDepth}`,
-        });
+        issues.push(
+          errorIssue(
+            'too-deep',
+            path,
+            entityId,
+            `Payload depth ${nextDepth} exceeds maximum limit of ${maxDepth}`,
+          ),
+        );
         continue;
       }
 
       if (val.length > maxListItems) {
-        issues.push({
-          code: 'too-many',
-          path,
-          entityId,
-          severity: 'error',
-          message: `List items count ${val.length} exceeds maximum limit of ${maxListItems}`,
-        });
+        issues.push(
+          errorIssue(
+            'too-many',
+            path,
+            entityId,
+            `List items count ${val.length} exceeds maximum limit of ${maxListItems}`,
+          ),
+        );
       }
 
       for (let i = val.length - 1; i >= 0; i--) {
@@ -648,37 +608,26 @@ function validateJsonValue(
 
     if (typeof val === 'object') {
       if (Object.prototype.toString.call(val) !== '[object Object]') {
-        issues.push({
-          code: 'wrong-type',
-          path,
-          entityId,
-          severity: 'error',
-          message: `Expected plain object in JSON value`,
-        });
+        issues.push(errorIssue('wrong-type', path, entityId, `Expected plain object in JSON value`));
         continue;
       }
 
       if (seenObjects.has(val)) {
-        issues.push({
-          code: 'structural-rule',
-          path,
-          entityId,
-          severity: 'error',
-          message: 'Circular structure in JSON value',
-        });
+        issues.push(errorIssue('structural-rule', path, entityId, 'Circular structure in JSON value'));
         continue;
       }
       seenObjects.add(val);
 
       const nextDepth = depth + 1;
       if (nextDepth > maxDepth) {
-        issues.push({
-          code: 'too-deep',
-          path,
-          entityId,
-          severity: 'error',
-          message: `Payload depth ${nextDepth} exceeds maximum limit of ${maxDepth}`,
-        });
+        issues.push(
+          errorIssue(
+            'too-deep',
+            path,
+            entityId,
+            `Payload depth ${nextDepth} exceeds maximum limit of ${maxDepth}`,
+          ),
+        );
         continue;
       }
 
@@ -687,13 +636,14 @@ function validateJsonValue(
 
       for (const k of ownKeys) {
         if (PROTOTYPE_KEYS.has(k)) {
-          issues.push({
-            code: 'prototype-key',
-            path: [...path, k],
-            entityId,
-            severity: 'error',
-            message: `Disallowed prototype key in JSON value: ${k}`,
-          });
+          issues.push(
+            errorIssue(
+              'prototype-key',
+              [...path, k],
+              entityId,
+              `Disallowed prototype key in JSON value: ${k}`,
+            ),
+          );
         }
       }
 
@@ -704,13 +654,7 @@ function validateJsonValue(
       continue;
     }
 
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: `Disallowed JSON value type: ${typeof val}`,
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, `Disallowed JSON value type: ${typeof val}`));
   }
 }
 
@@ -737,24 +681,12 @@ function validateShape(
     const { node, depth, path } = stack.pop()!;
 
     if (depth > 8) {
-      issues.push({
-        code: 'too-deep',
-        path,
-        entityId,
-        severity: 'error',
-        message: `Shape depth ${depth} exceeds maximum limit of 8`,
-      });
+      issues.push(errorIssue('too-deep', path, entityId, `Shape depth ${depth} exceeds maximum limit of 8`));
       continue;
     }
 
     if (node === null || typeof node !== 'object' || Array.isArray(node)) {
-      issues.push({
-        code: 'wrong-type',
-        path,
-        entityId,
-        severity: 'error',
-        message: `Shape must be an object`,
-      });
+      issues.push(errorIssue('wrong-type', path, entityId, `Shape must be an object`));
       continue;
     }
 
@@ -762,34 +694,30 @@ function validateShape(
     const type = rec.type;
 
     if (typeof type !== 'string') {
-      issues.push({
-        code: 'wrong-type',
-        path: [...path, 'type'],
-        entityId,
-        severity: 'error',
-        message: `Shape type must be a string`,
-      });
+      issues.push(errorIssue('wrong-type', [...path, 'type'], entityId, `Shape type must be a string`));
       continue;
     }
 
     // Nullable is required on EVERY shape
     if (typeof rec.nullable !== 'boolean') {
       if (!Object.hasOwn(rec, 'nullable') || rec.nullable === undefined) {
-        issues.push({
-          code: 'missing-property',
-          path: [...path, 'nullable'],
-          entityId,
-          severity: 'error',
-          message: `Shape missing required boolean 'nullable'`,
-        });
+        issues.push(
+          errorIssue(
+            'missing-property',
+            [...path, 'nullable'],
+            entityId,
+            `Shape missing required boolean 'nullable'`,
+          ),
+        );
       } else {
-        issues.push({
-          code: 'wrong-type',
-          path: [...path, 'nullable'],
-          entityId,
-          severity: 'error',
-          message: `Shape 'nullable' must be boolean`,
-        });
+        issues.push(
+          errorIssue(
+            'wrong-type',
+            [...path, 'nullable'],
+            entityId,
+            `Shape 'nullable' must be boolean`,
+          ),
+        );
       }
     }
 
@@ -798,13 +726,14 @@ function validateShape(
     } else if (type === 'scalar-union') {
       if (checkRecord(rec, ['type', 'nullable', 'types'], ['type', 'types'], path, entityId, issues, 'scalar-union shape')) {
         if (!Array.isArray(rec.types)) {
-          issues.push({
-            code: 'wrong-type',
-            path: [...path, 'types'],
-            entityId,
-            severity: 'error',
-            message: `scalar-union 'types' must be an array`,
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              [...path, 'types'],
+              entityId,
+              `scalar-union 'types' must be an array`,
+            ),
+          );
         } else {
           const typesArr = rec.types as unknown[];
           const typeSet = new Set<string>();
@@ -815,13 +744,14 @@ function validateShape(
           for (let i = 0; i < typesArr.length; i++) {
             const t = typesArr[i];
             if (typeof t !== 'string' || !SCALAR_TYPES.includes(t as (typeof SCALAR_TYPES)[number])) {
-              issues.push({
-                code: 'invalid-literal',
-                path: [...path, 'types', i],
-                entityId,
-                severity: 'error',
-                message: `Invalid scalar-union type member: ${String(t)}`,
-              });
+              issues.push(
+                errorIssue(
+                  'invalid-literal',
+                  [...path, 'types', i],
+                  entityId,
+                  `Invalid scalar-union type member: ${String(t)}`,
+                ),
+              );
               validTypes = false;
             } else {
               if (t === 'number') hasNumber = true;
@@ -832,22 +762,24 @@ function validateShape(
 
           if (validTypes) {
             if (typesArr.length < 2 || typesArr.length > 4 || typeSet.size !== typesArr.length) {
-              issues.push({
-                code: 'structural-rule',
-                path: [...path, 'types'],
-                entityId,
-                severity: 'error',
-                message: `scalar-union must specify 2–4 distinct scalar types`,
-              });
+              issues.push(
+                errorIssue(
+                  'structural-rule',
+                  [...path, 'types'],
+                  entityId,
+                  `scalar-union must specify 2–4 distinct scalar types`,
+                ),
+              );
             }
             if (hasNumber && hasInteger) {
-              issues.push({
-                code: 'structural-rule',
-                path: [...path, 'types'],
-                entityId,
-                severity: 'error',
-                message: `scalar-union cannot combine 'number' and 'integer'`,
-              });
+              issues.push(
+                errorIssue(
+                  'structural-rule',
+                  [...path, 'types'],
+                  entityId,
+                  `scalar-union cannot combine 'number' and 'integer'`,
+                ),
+              );
             }
           }
         }
@@ -872,34 +804,37 @@ function validateShape(
               }
               if (typeof f.key === 'string') {
                 if (PROTOTYPE_KEYS.has(f.key)) {
-                  issues.push({
-                    code: 'prototype-key',
-                    path: [...fPath, 'key'],
-                    entityId,
-                    severity: 'error',
-                    message: `Disallowed prototype key in record field: ${f.key}`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'prototype-key',
+                      [...fPath, 'key'],
+                      entityId,
+                      `Disallowed prototype key in record field: ${f.key}`,
+                    ),
+                  );
                 } else if (validateString(f.key, 1, 80, [...fPath, 'key'], entityId, issues, 'Record field key')) {
                   if (fieldKeys.has(f.key)) {
-                    issues.push({
-                      code: 'duplicate-key',
-                      path: [...fPath, 'key'],
-                      entityId,
-                      severity: 'error',
-                      message: `Duplicate key '${f.key}' in record fields`,
-                    });
+                    issues.push(
+                      errorIssue(
+                        'duplicate-key',
+                        [...fPath, 'key'],
+                        entityId,
+                        `Duplicate key '${f.key}' in record fields`,
+                      ),
+                    );
                   } else {
                     fieldKeys.add(f.key);
                   }
                 }
               } else {
-                issues.push({
-                  code: 'wrong-type',
-                  path: [...fPath, 'key'],
-                  entityId,
-                  severity: 'error',
-                  message: `Record field key must be a string`,
-                });
+                issues.push(
+                  errorIssue(
+                    'wrong-type',
+                    [...fPath, 'key'],
+                    entityId,
+                    `Record field key must be a string`,
+                  ),
+                );
               }
               validateBoolean(f.optional, [...fPath, 'optional'], entityId, issues, 'Record field optional');
               stack.push({ node: f.shape, depth: depth + 1, path: [...fPath, 'shape'] });
@@ -908,13 +843,14 @@ function validateShape(
         }
       }
     } else {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'type'],
-        entityId,
-        severity: 'error',
-        message: `Unknown shape type: '${type}'`,
-      });
+      issues.push(
+        errorIssue(
+          'invalid-literal',
+          [...path, 'type'],
+          entityId,
+          `Unknown shape type: '${type}'`,
+        ),
+      );
     }
   }
 }
@@ -945,35 +881,38 @@ function validateExpression(
     nodeCount++;
 
     if (nodeCount > 1000) {
-      issues.push({
-        code: 'too-many',
-        path,
-        entityId,
-        severity: 'error',
-        message: `Expression tree exceeds maximum limit of 1,000 nodes`,
-      });
+      issues.push(
+        errorIssue(
+          'too-many',
+          path,
+          entityId,
+          `Expression tree exceeds maximum limit of 1,000 nodes`,
+        ),
+      );
       return;
     }
 
     if (depth > 8) {
-      issues.push({
-        code: 'too-deep',
-        path,
-        entityId,
-        severity: 'error',
-        message: `Expression depth ${depth} exceeds maximum limit of 8`,
-      });
+      issues.push(
+        errorIssue(
+          'too-deep',
+          path,
+          entityId,
+          `Expression depth ${depth} exceeds maximum limit of 8`,
+        ),
+      );
       continue;
     }
 
     if (node === null || typeof node !== 'object' || Array.isArray(node)) {
-      issues.push({
-        code: 'wrong-type',
-        path,
-        entityId,
-        severity: 'error',
-        message: `Expected object for ${isGuard ? 'Guard' : 'Value'}, got ${node === null ? 'null' : Array.isArray(node) ? 'array' : typeof node}`,
-      });
+      issues.push(
+        errorIssue(
+          'wrong-type',
+          path,
+          entityId,
+          `Expected object for ${isGuard ? 'Guard' : 'Value'}, got ${node === null ? 'null' : Array.isArray(node) ? 'array' : typeof node}`,
+        ),
+      );
       continue;
     }
 
@@ -982,13 +921,14 @@ function validateExpression(
     if (isGuard) {
       const op = rec.op;
       if (typeof op !== 'string' || !GUARD_OPS.includes(op as (typeof GUARD_OPS)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'op'],
-          entityId,
-          severity: 'error',
-          message: `Unknown Guard operator: '${String(op)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'op'],
+            entityId,
+            `Unknown Guard operator: '${String(op)}'`,
+          ),
+        );
         continue;
       }
 
@@ -1004,13 +944,14 @@ function validateExpression(
       } else if (op === 'all' || op === 'any') {
         if (checkRecord(rec, ['op', 'guards'], ['op', 'guards'], path, entityId, issues, `${op} guard`)) {
           if (!Array.isArray(rec.guards) || rec.guards.length === 0) {
-            issues.push({
-              code: 'out-of-range',
-              path: [...path, 'guards'],
-              entityId,
-              severity: 'error',
-              message: `${op} guard requires a non-empty array of guards`,
-            });
+            issues.push(
+              errorIssue(
+                'out-of-range',
+                [...path, 'guards'],
+                entityId,
+                `${op} guard requires a non-empty array of guards`,
+              ),
+            );
           } else {
             const guardsArr = rec.guards as unknown[];
             for (let i = guardsArr.length - 1; i >= 0; i--) {
@@ -1028,13 +969,14 @@ function validateExpression(
       // Value
       const kind = rec.kind;
       if (typeof kind !== 'string' || !VALUE_KINDS.includes(kind as (typeof VALUE_KINDS)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'kind'],
-          entityId,
-          severity: 'error',
-          message: `Unknown Value kind: '${String(kind)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'kind'],
+            entityId,
+            `Unknown Value kind: '${String(kind)}'`,
+          ),
+        );
         continue;
       }
 
@@ -1045,13 +987,14 @@ function validateExpression(
       } else if (kind === 'read') {
         if (checkRecord(rec, ['kind', 'source', 'path'], ['kind', 'source', 'path'], path, entityId, issues, 'read value')) {
           if (rec.source !== 'input' && rec.source !== 'context') {
-            issues.push({
-              code: 'invalid-literal',
-              path: [...path, 'source'],
-              entityId,
-              severity: 'error',
-              message: `Read value source must be 'input' or 'context'`,
-            });
+            issues.push(
+              errorIssue(
+                'invalid-literal',
+                [...path, 'source'],
+                entityId,
+                `Read value source must be 'input' or 'context'`,
+              ),
+            );
           }
           validatePath(rec.path, [...path, 'path'], entityId, issues);
         }
@@ -1060,13 +1003,14 @@ function validateExpression(
       } else if (kind === 'list') {
         if (checkRecord(rec, ['kind', 'items'], ['kind', 'items'], path, entityId, issues, 'list value')) {
           if (!Array.isArray(rec.items)) {
-            issues.push({
-              code: 'wrong-type',
-              path: [...path, 'items'],
-              entityId,
-              severity: 'error',
-              message: `List value items must be an array`,
-            });
+            issues.push(
+              errorIssue(
+                'wrong-type',
+                [...path, 'items'],
+                entityId,
+                `List value items must be an array`,
+              ),
+            );
           } else {
             const items = rec.items as unknown[];
             for (let i = items.length - 1; i >= 0; i--) {
@@ -1077,13 +1021,14 @@ function validateExpression(
       } else if (kind === 'record') {
         if (checkRecord(rec, ['kind', 'fields'], ['kind', 'fields'], path, entityId, issues, 'record value')) {
           if (!Array.isArray(rec.fields)) {
-            issues.push({
-              code: 'wrong-type',
-              path: [...path, 'fields'],
-              entityId,
-              severity: 'error',
-              message: `Record value fields must be an array`,
-            });
+            issues.push(
+              errorIssue(
+                'wrong-type',
+                [...path, 'fields'],
+                entityId,
+                `Record value fields must be an array`,
+              ),
+            );
           } else {
             const fields = rec.fields as unknown[];
             const fieldKeys = new Set<string>();
@@ -1094,34 +1039,37 @@ function validateExpression(
               if (checkRecord(f, ['key', 'value'], ['key', 'value'], fPath, entityId, issues, 'record value field')) {
                 if (typeof f.key === 'string') {
                   if (PROTOTYPE_KEYS.has(f.key)) {
-                    issues.push({
-                      code: 'prototype-key',
-                      path: [...fPath, 'key'],
-                      entityId,
-                      severity: 'error',
-                      message: `Disallowed prototype key in record value: ${f.key}`,
-                    });
+                    issues.push(
+                      errorIssue(
+                        'prototype-key',
+                        [...fPath, 'key'],
+                        entityId,
+                        `Disallowed prototype key in record value: ${f.key}`,
+                      ),
+                    );
                   } else if (validateString(f.key, 1, 80, [...fPath, 'key'], entityId, issues, 'Record value key')) {
                     if (fieldKeys.has(f.key)) {
-                      issues.push({
-                        code: 'duplicate-key',
-                        path: [...fPath, 'key'],
-                        entityId,
-                        severity: 'error',
-                        message: `Duplicate key '${f.key}' in record value fields`,
-                      });
+                      issues.push(
+                        errorIssue(
+                          'duplicate-key',
+                          [...fPath, 'key'],
+                          entityId,
+                          `Duplicate key '${f.key}' in record value fields`,
+                        ),
+                      );
                     } else {
                       fieldKeys.add(f.key);
                     }
                   }
                 } else {
-                  issues.push({
-                    code: 'wrong-type',
-                    path: [...fPath, 'key'],
-                    entityId,
-                    severity: 'error',
-                    message: `Record value field key must be a string`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'wrong-type',
+                      [...fPath, 'key'],
+                      entityId,
+                      `Record value field key must be a string`,
+                    ),
+                  );
                 }
                 stack.push({ node: f.value, depth: depth + 1, path: [...fPath, 'value'], isGuard: false });
               }
@@ -1140,13 +1088,7 @@ function registerId(
   issues: Issue[],
 ): void {
   if (allIds.has(id)) {
-    issues.push({
-      code: 'duplicate-id',
-      path,
-      entityId: id,
-      severity: 'error',
-      message: `Duplicate ID '${id}'`,
-    });
+    issues.push(errorIssue('duplicate-id', path, id, `Duplicate ID '${id}'`));
   } else {
     allIds.set(id, [...path]);
   }
@@ -1166,13 +1108,7 @@ export function validateDocument(
     return {
       ok: false,
       issues: [
-        {
-          code: 'wrong-type',
-          path: [],
-          entityId: null,
-          severity: 'error',
-          message: `Expected Document object, got ${input === null ? 'null' : Array.isArray(input) ? 'array' : typeof input}`,
-        },
+        errorIssue('wrong-type', [], null, `Expected Document object, got ${input === null ? 'null' : Array.isArray(input) ? 'array' : typeof input}`),
       ],
     };
   }
@@ -1217,13 +1153,14 @@ export function validateDocument(
     }
 
     if (aggregateFixtureBytes > maxFixtureAggregateBytes) {
-      issues.push({
-        code: 'too-large',
-        path: ['fixtures'],
-        entityId: null,
-        severity: 'error',
-        message: `Aggregate fixture values size ${aggregateFixtureBytes} bytes exceeds maximum limit of 1 MiB (${maxFixtureAggregateBytes} bytes)`,
-      });
+      issues.push(
+        errorIssue(
+          'too-large',
+          ['fixtures'],
+          null,
+          `Aggregate fixture values size ${aggregateFixtureBytes} bytes exceeds maximum limit of 1 MiB (${maxFixtureAggregateBytes} bytes)`,
+        ),
+      );
     }
   }
 
@@ -1235,13 +1172,14 @@ export function validateDocument(
 
   // Document schema literal check
   if (doc.schema !== 'studio-model/1') {
-    issues.push({
-      code: 'invalid-literal',
-      path: ['schema'],
-      entityId: null,
-      severity: 'error',
-      message: `Document schema must be 'studio-model/1', got '${String(doc.schema)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        ['schema'],
+        null,
+        `Document schema must be 'studio-model/1', got '${String(doc.schema)}'`,
+      ),
+    );
   }
 
   // Document ID
@@ -1330,13 +1268,14 @@ export function validateDocument(
         validateString(el.description, 0, 4000, [...elPath, 'description'], elId, issues, 'Element description');
 
         if (typeof el.visualKind !== 'string' || !VISUAL_KINDS.includes(el.visualKind as (typeof VISUAL_KINDS)[number])) {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...elPath, 'visualKind'],
-            entityId: elId,
-            severity: 'error',
-            message: `Invalid visualKind: '${String(el.visualKind)}'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...elPath, 'visualKind'],
+              elId,
+              `Invalid visualKind: '${String(el.visualKind)}'`,
+            ),
+          );
         }
 
         // Ports
@@ -1361,23 +1300,25 @@ export function validateDocument(
               validateString(p.label, 1, 80, [...pPath, 'label'], pId ?? elId, issues, 'Port label');
 
               if (typeof p.direction !== 'string' || !PORT_DIRECTIONS.includes(p.direction as (typeof PORT_DIRECTIONS)[number])) {
-                issues.push({
-                  code: 'invalid-literal',
-                  path: [...pPath, 'direction'],
-                  entityId: pId ?? elId,
-                  severity: 'error',
-                  message: `Invalid port direction: '${String(p.direction)}'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'invalid-literal',
+                    [...pPath, 'direction'],
+                    pId ?? elId,
+                    `Invalid port direction: '${String(p.direction)}'`,
+                  ),
+                );
               }
 
               if (typeof p.channel !== 'string' || !PORT_CHANNELS.includes(p.channel as (typeof PORT_CHANNELS)[number])) {
-                issues.push({
-                  code: 'invalid-literal',
-                  path: [...pPath, 'channel'],
-                  entityId: pId ?? elId,
-                  severity: 'error',
-                  message: `Invalid port channel: '${String(p.channel)}'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'invalid-literal',
+                    [...pPath, 'channel'],
+                    pId ?? elId,
+                    `Invalid port channel: '${String(p.channel)}'`,
+                  ),
+                );
               }
 
               pendingSchemaRefs.push({ schemaId: p.schemaId, path: [...pPath, 'schemaId'], entityId: pId ?? elId });
@@ -1385,25 +1326,27 @@ export function validateDocument(
               // Call ports need non-null responseSchemaId, other channels null
               if (p.channel === 'call') {
                 if (p.responseSchemaId === null || p.responseSchemaId === undefined) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...pPath, 'responseSchemaId'],
-                    entityId: pId ?? elId,
-                    severity: 'error',
-                    message: `Call ports must specify a non-null responseSchemaId`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'structural-rule',
+                      [...pPath, 'responseSchemaId'],
+                      pId ?? elId,
+                      `Call ports must specify a non-null responseSchemaId`,
+                    ),
+                  );
                 } else {
                   pendingSchemaRefs.push({ schemaId: p.responseSchemaId, path: [...pPath, 'responseSchemaId'], entityId: pId ?? elId });
                 }
               } else {
                 if (p.responseSchemaId !== null) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...pPath, 'responseSchemaId'],
-                    entityId: pId ?? elId,
-                    severity: 'error',
-                    message: `Non-call ports must have null responseSchemaId`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'structural-rule',
+                      [...pPath, 'responseSchemaId'],
+                      pId ?? elId,
+                      `Non-call ports must have null responseSchemaId`,
+                    ),
+                  );
                 }
               }
             }
@@ -1457,13 +1400,14 @@ export function validateDocument(
         validateString(c.label, 1, 80, [...cPath, 'label'], cId, issues, 'Connection label');
 
         if (typeof c.kind !== 'string' || !CONNECTION_KINDS.includes(c.kind as (typeof CONNECTION_KINDS)[number])) {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...cPath, 'kind'],
-            entityId: cId,
-            severity: 'error',
-            message: `Invalid connection kind: '${String(c.kind)}'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...cPath, 'kind'],
+              cId,
+              `Invalid connection kind: '${String(c.kind)}'`,
+            ),
+          );
         }
 
         // Endpoint source and target
@@ -1484,13 +1428,14 @@ export function validateDocument(
               'requestClassLabel' in resource && typeof resource.requestClassLabel === 'string') {
             const previous = requestClassLabels.get(resource.requestClassId);
             if (previous !== undefined && previous !== resource.requestClassLabel) {
-              issues.push({
-                code: 'structural-rule',
-                path: [...cPath, 'config', 'resource', 'requestClassLabel'],
-                entityId: cId,
-                severity: 'error',
-                message: 'Connections with the same request class must use the same label',
-              });
+              issues.push(
+                errorIssue(
+                  'structural-rule',
+                  [...cPath, 'config', 'resource', 'requestClassLabel'],
+                  cId,
+                  'Connections with the same request class must use the same label',
+                ),
+              );
             } else {
               requestClassLabels.set(resource.requestClassId, resource.requestClassLabel);
             }
@@ -1509,13 +1454,7 @@ export function validateDocument(
       const r = relations[rIdx];
       const rPath = ['relations', rIdx];
       if (r === null || typeof r !== 'object' || Array.isArray(r)) {
-        issues.push({
-          code: 'wrong-type',
-          path: rPath,
-          entityId: null,
-          severity: 'error',
-          message: 'Expected relation object',
-        });
+        issues.push(errorIssue('wrong-type', rPath, null, 'Expected relation object'));
         continue;
       }
 
@@ -1530,13 +1469,14 @@ export function validateDocument(
       validateString(rec.label, 1, 80, [...rPath, 'label'], rId, issues, 'Relation label');
 
       if (typeof rec.kind !== 'string' || !RELATION_KINDS.includes(rec.kind as (typeof RELATION_KINDS)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...rPath, 'kind'],
-          entityId: rId,
-          severity: 'error',
-          message: `Invalid relation kind: '${String(rec.kind)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...rPath, 'kind'],
+            rId,
+            `Invalid relation kind: '${String(rec.kind)}'`,
+          ),
+        );
         continue;
       }
 
@@ -1630,13 +1570,14 @@ export function validateDocument(
               }
               if (validateId(p.elementId, [...pPath, 'elementId'], pId ?? vId, issues)) {
                 if (placedSet.has(p.elementId)) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...pPath, 'elementId'],
-                    entityId: pId ?? vId,
-                    severity: 'error',
-                    message: `Element '${p.elementId}' placed more than once in view`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'structural-rule',
+                      [...pPath, 'elementId'],
+                      pId ?? vId,
+                      `Element '${p.elementId}' placed more than once in view`,
+                    ),
+                  );
                 } else {
                   placedSet.add(p.elementId);
                 }
@@ -1688,13 +1629,14 @@ export function validateDocument(
                   const ePath = [...gPath, 'elementIds', eIdx];
                   if (validateId(elemId, ePath, gId ?? vId, issues)) {
                     if (groupedInView.has(elemId)) {
-                      issues.push({
-                        code: 'structural-rule',
-                        path: ePath,
-                        entityId: gId ?? vId,
-                        severity: 'error',
-                        message: `Element '${elemId}' appears in multiple groups in view (groups must be non-overlapping)`,
-                      });
+                      issues.push(
+                        errorIssue(
+                          'structural-rule',
+                          ePath,
+                          gId ?? vId,
+                          `Element '${elemId}' appears in multiple groups in view (groups must be non-overlapping)`,
+                        ),
+                      );
                     } else {
                       groupedInView.add(elemId);
                     }
@@ -1723,13 +1665,14 @@ export function validateDocument(
               validateNumber(n.width, 80, 2000, [...nPath, 'width'], nId ?? vId, issues, 'Note width');
 
               if (typeof n.tone !== 'string' || !NOTE_TONES.includes(n.tone as (typeof NOTE_TONES)[number])) {
-                issues.push({
-                  code: 'invalid-literal',
-                  path: [...nPath, 'tone'],
-                  entityId: nId ?? vId,
-                  severity: 'error',
-                  message: `Invalid note tone: '${String(n.tone)}'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'invalid-literal',
+                    [...nPath, 'tone'],
+                    nId ?? vId,
+                    `Invalid note tone: '${String(n.tone)}'`,
+                  ),
+                );
               }
 
               if (validateArray(n.attachedElementIds, Number.MAX_SAFE_INTEGER, [...nPath, 'attachedElementIds'], nId ?? vId, issues, 'Note attachedElementIds')) {
@@ -1768,24 +1711,26 @@ export function validateDocument(
 
     if (typeof elemId === 'string' && UUID_REGEX.test(elemId)) {
       if (!elementsMap.has(elemId)) {
-        issues.push({
-          code: 'dangling-reference',
-          path: [...path, 'elementId'],
-          entityId,
-          severity: 'error',
-          message: `Endpoint elementId '${elemId}' does not exist`,
-        });
+        issues.push(
+          errorIssue(
+            'dangling-reference',
+            [...path, 'elementId'],
+            entityId,
+            `Endpoint elementId '${elemId}' does not exist`,
+          ),
+        );
       } else {
         const ports = elementPortsMap.get(elemId);
         if (typeof portId === 'string' && UUID_REGEX.test(portId)) {
           if (!ports || !ports.has(portId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...path, 'portId'],
-              entityId,
-              severity: 'error',
-              message: `Endpoint portId '${portId}' does not exist on element '${elemId}'`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...path, 'portId'],
+                entityId,
+                `Endpoint portId '${portId}' does not exist on element '${elemId}'`,
+              ),
+            );
           }
         }
       }
@@ -1796,13 +1741,14 @@ export function validateDocument(
   for (const { schemaId, path, entityId } of pendingSchemaRefs) {
     if (typeof schemaId === 'string' && UUID_REGEX.test(schemaId)) {
       if (!schemasMap.has(schemaId)) {
-        issues.push({
-          code: 'dangling-reference',
-          path,
-          entityId,
-          severity: 'error',
-          message: `Schema reference '${schemaId}' does not exist`,
-        });
+        issues.push(
+          errorIssue(
+            'dangling-reference',
+            path,
+            entityId,
+            `Schema reference '${schemaId}' does not exist`,
+          ),
+        );
       }
     }
   }
@@ -1811,13 +1757,14 @@ export function validateDocument(
   for (const { fixtureId, path, entityId } of pendingFixtureRefs) {
     if (typeof fixtureId === 'string' && UUID_REGEX.test(fixtureId)) {
       if (!fixturesMap.has(fixtureId)) {
-        issues.push({
-          code: 'dangling-reference',
-          path,
-          entityId,
-          severity: 'error',
-          message: `Fixture reference '${fixtureId}' does not exist`,
-        });
+        issues.push(
+          errorIssue(
+            'dangling-reference',
+            path,
+            entityId,
+            `Fixture reference '${fixtureId}' does not exist`,
+          ),
+        );
       }
     }
   }
@@ -1843,53 +1790,58 @@ export function validateDocument(
           const tgtPort = tgtPortInfo.rec;
 
           if (srcPort.direction !== 'out') {
-            issues.push({
-              code: 'structural-rule',
-              path: [...cPath, 'source'],
-              entityId: cId,
-              severity: 'error',
-              message: `Connection source port must have direction 'out'`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                [...cPath, 'source'],
+                cId,
+                `Connection source port must have direction 'out'`,
+              ),
+            );
           }
           if (tgtPort.direction !== 'in') {
-            issues.push({
-              code: 'structural-rule',
-              path: [...cPath, 'target'],
-              entityId: cId,
-              severity: 'error',
-              message: `Connection target port must have direction 'in'`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                [...cPath, 'target'],
+                cId,
+                `Connection target port must have direction 'in'`,
+              ),
+            );
           }
 
           if (srcPort.channel !== c.kind || tgtPort.channel !== c.kind) {
-            issues.push({
-              code: 'structural-rule',
-              path: [...cPath, 'kind'],
-              entityId: cId,
-              severity: 'error',
-              message: `Connection kind '${String(c.kind)}' must match source channel '${String(srcPort.channel)}' and target channel '${String(tgtPort.channel)}'`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                [...cPath, 'kind'],
+                cId,
+                `Connection kind '${String(c.kind)}' must match source channel '${String(srcPort.channel)}' and target channel '${String(tgtPort.channel)}'`,
+              ),
+            );
           }
 
           if (srcPort.channel === 'event' || tgtPort.channel === 'event') {
-            issues.push({
-              code: 'structural-rule',
-              path: cPath,
-              entityId: cId,
-              severity: 'error',
-              message: `Outbound event ports cannot be wired by connections`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                cPath,
+                cId,
+                `Outbound event ports cannot be wired by connections`,
+              ),
+            );
           }
 
           const pairKey = `${String(c.kind)}:${src.portId}:${tgt.portId}`;
           if (seenPairs.has(pairKey)) {
-            issues.push({
-              code: 'structural-rule',
-              path: cPath,
-              entityId: cId,
-              severity: 'error',
-              message: `Duplicate connection (kind, source port, target port)`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                cPath,
+                cId,
+                `Duplicate connection (kind, source port, target port)`,
+              ),
+            );
           } else {
             seenPairs.add(pairKey);
           }
@@ -1915,33 +1867,36 @@ export function validateDocument(
         const childId = r.childId as string;
 
         if (typeof parentId === 'string' && UUID_REGEX.test(parentId) && !elementsMap.has(parentId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...rPath, 'parentId'],
-            entityId: rId,
-            severity: 'error',
-            message: `Contains relation parentId '${parentId}' does not exist`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...rPath, 'parentId'],
+              rId,
+              `Contains relation parentId '${parentId}' does not exist`,
+            ),
+          );
         }
         if (typeof childId === 'string' && UUID_REGEX.test(childId) && !elementsMap.has(childId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...rPath, 'childId'],
-            entityId: rId,
-            severity: 'error',
-            message: `Contains relation childId '${childId}' does not exist`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...rPath, 'childId'],
+              rId,
+              `Contains relation childId '${childId}' does not exist`,
+            ),
+          );
         }
 
         if (typeof parentId === 'string' && typeof childId === 'string' && elementsMap.has(parentId) && elementsMap.has(childId)) {
           if (childToParent.has(childId)) {
-            issues.push({
-              code: 'structural-rule',
-              path: [...rPath, 'childId'],
-              entityId: rId,
-              severity: 'error',
-              message: `Element '${childId}' already has a parent in contains relations (single-parent forest required)`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                [...rPath, 'childId'],
+                rId,
+                `Element '${childId}' already has a parent in contains relations (single-parent forest required)`,
+              ),
+            );
           } else {
             childToParent.set(childId, { parentId, index: rIdx });
             // Cycle check
@@ -1949,13 +1904,14 @@ export function validateDocument(
             const visitedAncestors = new Set<Id>();
             while (curr) {
               if (curr === childId) {
-                issues.push({
-                  code: 'structural-rule',
-                  path: rPath,
-                  entityId: rId,
-                  severity: 'error',
-                  message: `Cycle detected in contains relations involving '${childId}'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'structural-rule',
+                    rPath,
+                    rId,
+                    `Cycle detected in contains relations involving '${childId}'`,
+                  ),
+                );
                 break;
               }
               if (visitedAncestors.has(curr)) break;
@@ -1969,33 +1925,36 @@ export function validateDocument(
         const hostId = r.hostId as string;
 
         if (typeof elemId === 'string' && UUID_REGEX.test(elemId) && !elementsMap.has(elemId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...rPath, 'elementId'],
-            entityId: rId,
-            severity: 'error',
-            message: `Deployed-on relation elementId '${elemId}' does not exist`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...rPath, 'elementId'],
+              rId,
+              `Deployed-on relation elementId '${elemId}' does not exist`,
+            ),
+          );
         }
         if (typeof hostId === 'string' && UUID_REGEX.test(hostId) && !elementsMap.has(hostId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...rPath, 'hostId'],
-            entityId: rId,
-            severity: 'error',
-            message: `Deployed-on relation hostId '${hostId}' does not exist`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...rPath, 'hostId'],
+              rId,
+              `Deployed-on relation hostId '${hostId}' does not exist`,
+            ),
+          );
         }
 
         if (typeof elemId === 'string' && typeof hostId === 'string') {
           if (elementToHost.has(elemId)) {
-            issues.push({
-              code: 'structural-rule',
-              path: [...rPath, 'elementId'],
-              entityId: rId,
-              severity: 'error',
-              message: `Element '${elemId}' already deployed on a host (at most one host allowed)`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                [...rPath, 'elementId'],
+                rId,
+                `Element '${elemId}' already deployed on a host (at most one host allowed)`,
+              ),
+            );
           } else {
             elementToHost.set(elemId, rIdx);
           }
@@ -2004,13 +1963,14 @@ export function validateDocument(
           if (hostInfo) {
             const hostBehavior = hostInfo.rec.behavior as Record<string, unknown> | undefined;
             if (hostBehavior?.kind !== 'host') {
-              issues.push({
-                code: 'wrong-reference-kind',
-                path: [...rPath, 'hostId'],
-                entityId: rId,
-                severity: 'error',
-                message: `Deployed-on host '${hostId}' must have behavior kind 'host'`,
-              });
+              issues.push(
+                errorIssue(
+                  'wrong-reference-kind',
+                  [...rPath, 'hostId'],
+                  rId,
+                  `Deployed-on host '${hostId}' must have behavior kind 'host'`,
+                ),
+              );
             }
           }
         }
@@ -2018,22 +1978,24 @@ export function validateDocument(
         const srcId = r.sourceId as string;
         const tgtId = r.targetId as string;
         if (typeof srcId === 'string' && UUID_REGEX.test(srcId) && !elementsMap.has(srcId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...rPath, 'sourceId'],
-            entityId: rId,
-            severity: 'error',
-            message: `Descriptive relation sourceId '${srcId}' does not exist`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...rPath, 'sourceId'],
+              rId,
+              `Descriptive relation sourceId '${srcId}' does not exist`,
+            ),
+          );
         }
         if (typeof tgtId === 'string' && UUID_REGEX.test(tgtId) && !elementsMap.has(tgtId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...rPath, 'targetId'],
-            entityId: rId,
-            severity: 'error',
-            message: `Descriptive relation targetId '${tgtId}' does not exist`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...rPath, 'targetId'],
+              rId,
+              `Descriptive relation targetId '${tgtId}' does not exist`,
+            ),
+          );
         }
       }
     }
@@ -2055,13 +2017,14 @@ export function validateDocument(
           const p = v.placements[pIdx] as Record<string, unknown>;
           if (p && typeof p.elementId === 'string' && UUID_REGEX.test(p.elementId)) {
             if (!elementsMap.has(p.elementId)) {
-              issues.push({
-                code: 'dangling-reference',
-                path: [...vPath, 'placements', pIdx, 'elementId'],
-                entityId: typeof p.id === 'string' ? p.id : vId,
-                severity: 'error',
-                message: `Placement elementId '${p.elementId}' does not exist`,
-              });
+              issues.push(
+                errorIssue(
+                  'dangling-reference',
+                  [...vPath, 'placements', pIdx, 'elementId'],
+                  typeof p.id === 'string' ? p.id : vId,
+                  `Placement elementId '${p.elementId}' does not exist`,
+                ),
+              );
             }
           }
         }
@@ -2073,13 +2036,14 @@ export function validateDocument(
           const cId = v.connectionIds[i];
           if (typeof cId === 'string' && UUID_REGEX.test(cId)) {
             if (!connectionsMap.has(cId)) {
-              issues.push({
-                code: 'dangling-reference',
-                path: [...vPath, 'connectionIds', i],
-                entityId: vId,
-                severity: 'error',
-                message: `View connectionId '${cId}' does not exist`,
-              });
+              issues.push(
+                errorIssue(
+                  'dangling-reference',
+                  [...vPath, 'connectionIds', i],
+                  vId,
+                  `View connectionId '${cId}' does not exist`,
+                ),
+              );
             }
           }
         }
@@ -2091,13 +2055,14 @@ export function validateDocument(
           const rId = v.relationIds[i];
           if (typeof rId === 'string' && UUID_REGEX.test(rId)) {
             if (!relationsMap.has(rId)) {
-              issues.push({
-                code: 'dangling-reference',
-                path: [...vPath, 'relationIds', i],
-                entityId: vId,
-                severity: 'error',
-                message: `View relationId '${rId}' does not exist`,
-              });
+              issues.push(
+                errorIssue(
+                  'dangling-reference',
+                  [...vPath, 'relationIds', i],
+                  vId,
+                  `View relationId '${rId}' does not exist`,
+                ),
+              );
             }
           }
         }
@@ -2113,21 +2078,23 @@ export function validateDocument(
               const elemId = g.elementIds[eIdx];
               if (typeof elemId === 'string' && UUID_REGEX.test(elemId)) {
                 if (!elementsMap.has(elemId)) {
-                  issues.push({
-                    code: 'dangling-reference',
-                    path: [...vPath, 'groups', gIdx, 'elementIds', eIdx],
-                    entityId: gId,
-                    severity: 'error',
-                    message: `Group elementId '${elemId}' does not exist`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'dangling-reference',
+                      [...vPath, 'groups', gIdx, 'elementIds', eIdx],
+                      gId,
+                      `Group elementId '${elemId}' does not exist`,
+                    ),
+                  );
                 } else if (!placedSet.has(elemId)) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...vPath, 'groups', gIdx, 'elementIds', eIdx],
-                    entityId: gId,
-                    severity: 'error',
-                    message: `Group element '${elemId}' must be placed in this view`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'structural-rule',
+                      [...vPath, 'groups', gIdx, 'elementIds', eIdx],
+                      gId,
+                      `Group element '${elemId}' must be placed in this view`,
+                    ),
+                  );
                 }
               }
             }
@@ -2145,21 +2112,23 @@ export function validateDocument(
               const elemId = n.attachedElementIds[eIdx];
               if (typeof elemId === 'string' && UUID_REGEX.test(elemId)) {
                 if (!elementsMap.has(elemId)) {
-                  issues.push({
-                    code: 'dangling-reference',
-                    path: [...vPath, 'notes', nIdx, 'attachedElementIds', eIdx],
-                    entityId: nId,
-                    severity: 'error',
-                    message: `Note attachedElementId '${elemId}' does not exist`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'dangling-reference',
+                      [...vPath, 'notes', nIdx, 'attachedElementIds', eIdx],
+                      nId,
+                      `Note attachedElementId '${elemId}' does not exist`,
+                    ),
+                  );
                 } else if (!placedSet.has(elemId)) {
-                  issues.push({
-                    code: 'structural-rule',
-                    path: [...vPath, 'notes', nIdx, 'attachedElementIds', eIdx],
-                    entityId: nId,
-                    severity: 'error',
-                    message: `Note attached element '${elemId}' must be placed in this view`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'structural-rule',
+                      [...vPath, 'notes', nIdx, 'attachedElementIds', eIdx],
+                      nId,
+                      `Note attached element '${elemId}' must be placed in this view`,
+                    ),
+                  );
                 }
               }
             }
@@ -2179,26 +2148,28 @@ export function validateDocument(
       const refId = typeof ref.id === 'string' ? ref.id : null;
 
       if (typeof ref.ownerElementId === 'string' && UUID_REGEX.test(ref.ownerElementId) && !elementsMap.has(ref.ownerElementId)) {
-        issues.push({
-          code: 'dangling-reference',
-          path: [...refPath, 'ownerElementId'],
-          entityId: refId,
-          severity: 'error',
-          message: `Refinement ownerElementId '${ref.ownerElementId}' does not exist`,
-        });
+        issues.push(
+          errorIssue(
+            'dangling-reference',
+            [...refPath, 'ownerElementId'],
+            refId,
+            `Refinement ownerElementId '${ref.ownerElementId}' does not exist`,
+          ),
+        );
       }
 
       if (Array.isArray(ref.memberElementIds)) {
         for (let mIdx = 0; mIdx < ref.memberElementIds.length; mIdx++) {
           const mId = ref.memberElementIds[mIdx];
           if (typeof mId === 'string' && UUID_REGEX.test(mId) && !elementsMap.has(mId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...refPath, 'memberElementIds', mIdx],
-              entityId: refId,
-              severity: 'error',
-              message: `Refinement memberElementId '${mId}' does not exist`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...refPath, 'memberElementIds', mIdx],
+                refId,
+                `Refinement memberElementId '${mId}' does not exist`,
+              ),
+            );
           }
         }
       }
@@ -2258,13 +2229,14 @@ export function validateDocument(
       }
 
       if (cyclic) {
-        issues.push({
-          code: 'structural-rule',
-          path: refPath,
-          entityId: refId,
-          severity: 'error',
-          message: `Recursive refinement ownership: element '${ownerId}' is transitively a member of a refinement it owns`,
-        });
+        issues.push(
+          errorIssue(
+            'structural-rule',
+            refPath,
+            refId,
+            `Recursive refinement ownership: element '${ownerId}' is transitively a member of a refinement it owns`,
+          ),
+        );
       }
     }
   }
@@ -2283,13 +2255,14 @@ export function validateDocument(
           const sel = s.refinementSelections[rIdx] as Record<string, unknown>;
           if (sel && typeof sel.refinementId === 'string' && UUID_REGEX.test(sel.refinementId)) {
             if (!refinementsMap.has(sel.refinementId)) {
-              issues.push({
-                code: 'dangling-reference',
-                path: [...sPath, 'refinementSelections', rIdx, 'refinementId'],
-                entityId: sId,
-                severity: 'error',
-                message: `Refinement selection '${sel.refinementId}' does not exist`,
-              });
+              issues.push(
+                errorIssue(
+                  'dangling-reference',
+                  [...sPath, 'refinementSelections', rIdx, 'refinementId'],
+                  sId,
+                  `Refinement selection '${sel.refinementId}' does not exist`,
+                ),
+              );
             }
           }
         }
@@ -2300,13 +2273,14 @@ export function validateDocument(
         for (let i = 0; i < s.scopeElementIds.length; i++) {
           const id = s.scopeElementIds[i];
           if (typeof id === 'string' && UUID_REGEX.test(id) && !elementsMap.has(id)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...sPath, 'scopeElementIds', i],
-              entityId: sId,
-              severity: 'error',
-              message: `Scenario scopeElementId '${id}' does not exist`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...sPath, 'scopeElementIds', i],
+                sId,
+                `Scenario scopeElementId '${id}' does not exist`,
+              ),
+            );
           }
         }
       }
@@ -2319,23 +2293,25 @@ export function validateDocument(
             const fId = typeof f.id === 'string' ? f.id : sId;
             const elInfo = elementsMap.get(f.hostId);
             if (!elInfo) {
-              issues.push({
-                code: 'dangling-reference',
-                path: [...sPath, 'faults', fIdx, 'hostId'],
-                entityId: fId,
-                severity: 'error',
-                message: `Fault hostId '${f.hostId}' does not exist`,
-              });
+              issues.push(
+                errorIssue(
+                  'dangling-reference',
+                  [...sPath, 'faults', fIdx, 'hostId'],
+                  fId,
+                  `Fault hostId '${f.hostId}' does not exist`,
+                ),
+              );
             } else {
               const b = elInfo.rec.behavior as Record<string, unknown> | undefined;
               if (b?.kind !== 'host') {
-                issues.push({
-                  code: 'wrong-reference-kind',
-                  path: [...sPath, 'faults', fIdx, 'hostId'],
-                  entityId: fId,
-                  severity: 'error',
-                  message: `Fault hostId '${f.hostId}' must reference an element with behavior kind 'host'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'wrong-reference-kind',
+                    [...sPath, 'faults', fIdx, 'hostId'],
+                    fId,
+                    `Fault hostId '${f.hostId}' must reference an element with behavior kind 'host'`,
+                  ),
+                );
               }
             }
           }
@@ -2348,13 +2324,14 @@ export function validateDocument(
           const ic = s.initialContexts[icIdx] as Record<string, unknown>;
           if (ic && typeof ic.elementId === 'string' && UUID_REGEX.test(ic.elementId)) {
             if (!elementsMap.has(ic.elementId)) {
-              issues.push({
-                code: 'dangling-reference',
-                path: [...sPath, 'initialContexts', icIdx, 'elementId'],
-                entityId: sId,
-                severity: 'error',
-                message: `Scenario initialContext elementId '${ic.elementId}' does not exist`,
-              });
+              issues.push(
+                errorIssue(
+                  'dangling-reference',
+                  [...sPath, 'initialContexts', icIdx, 'elementId'],
+                  sId,
+                  `Scenario initialContext elementId '${ic.elementId}' does not exist`,
+                ),
+              );
             }
           }
         }
@@ -2370,13 +2347,14 @@ export function validateDocument(
           if (subj && typeof subj === 'object') {
             if (typeof subj.elementId === 'string' && UUID_REGEX.test(subj.elementId)) {
               if (!elementsMap.has(subj.elementId)) {
-                issues.push({
-                  code: 'dangling-reference',
-                  path: [...sPath, 'assertions', aIdx, 'subject', 'elementId'],
-                  entityId: aId,
-                  severity: 'error',
-                  message: `Assertion subject elementId '${subj.elementId}' does not exist`,
-                });
+                issues.push(
+                  errorIssue(
+                    'dangling-reference',
+                    [...sPath, 'assertions', aIdx, 'subject', 'elementId'],
+                    aId,
+                    `Assertion subject elementId '${subj.elementId}' does not exist`,
+                  ),
+                );
               }
             }
           }
@@ -2417,13 +2395,7 @@ function validateBehavior(
 ): void {
   const entityId = elementId;
   if (b === null || typeof b !== 'object' || Array.isArray(b)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: 'Behavior must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, 'Behavior must be an object'));
     return;
   }
 
@@ -2431,24 +2403,26 @@ function validateBehavior(
   const kind = rec.kind;
 
   if (typeof kind !== 'string' || !BEHAVIOR_KINDS.includes(kind as (typeof BEHAVIOR_KINDS)[number])) {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'kind'],
-      entityId,
-      severity: 'error',
-      message: `Invalid behavior kind: '${String(kind)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'kind'],
+        entityId,
+        `Invalid behavior kind: '${String(kind)}'`,
+      ),
+    );
     return;
   }
 
   if (rec.version !== 1) {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'version'],
-      entityId,
-      severity: 'error',
-      message: `Behavior version must be 1, got ${String(rec.version)}`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'version'],
+        entityId,
+        `Behavior version must be 1, got ${String(rec.version)}`,
+      ),
+    );
   }
 
   if (kind === 'unmodeled') {
@@ -2461,13 +2435,14 @@ function validateBehavior(
     if (checkRecord(rec, ['kind', 'version', 'config', 'entryPortId'], ['kind', 'version', 'config', 'entryPortId'], path, entityId, issues, 'resource behavior')) {
       if (validateId(rec.entryPortId, [...path, 'entryPortId'], entityId, issues)) {
         if (!portsMap.has(rec.entryPortId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...path, 'entryPortId'],
-            entityId,
-            severity: 'error',
-            message: `Resource entryPortId '${rec.entryPortId}' does not exist on this element`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...path, 'entryPortId'],
+              entityId,
+              `Resource entryPortId '${rec.entryPortId}' does not exist on this element`,
+            ),
+          );
         }
       }
       validateResourceConfig(rec.config, [...path, 'config'], entityId, issues);
@@ -2488,13 +2463,7 @@ function validateResourceConfig(
   issues: Issue[],
 ): void {
   if (cfg === null || typeof cfg !== 'object' || Array.isArray(cfg)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: 'Resource config must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, 'Resource config must be an object'));
     return;
   }
 
@@ -2502,7 +2471,6 @@ function validateResourceConfig(
   const t = rec.type;
 
   const commonAllowed = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs', 'serviceTime', 'serviceTimeCv'];
-  const commonRequired = ['type', 'capacity', 'concurrency', 'queueLimit', 'failureRate', 'maxRetries', 'retryDelayMs'];
 
   let allowed = commonAllowed;
   if (t === 'storage') {
@@ -2516,13 +2484,14 @@ function validateResourceConfig(
   } else if (t === 'source' || t === 'processor') {
     allowed = commonAllowed;
   } else {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'type'],
-      entityId,
-      severity: 'error',
-      message: `Invalid resource config type: '${String(t)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'type'],
+        entityId,
+        `Invalid resource config type: '${String(t)}'`,
+      ),
+    );
     return;
   }
 
@@ -2531,24 +2500,26 @@ function validateResourceConfig(
     validateNumber(rec.capacity, 1, 100000, [...path, 'capacity'], entityId, issues, 'capacity');
     validateNumber(rec.concurrency, 1, 1024, [...path, 'concurrency'], entityId, issues, 'concurrency', true);
     if (rec.serviceTime !== undefined && rec.serviceTime !== 'fixed' && rec.serviceTime !== 'exponential' && rec.serviceTime !== 'lognormal') {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'serviceTime'],
-        entityId,
-        severity: 'error',
-        message: `serviceTime must be 'fixed', 'exponential' or 'lognormal'`,
-      });
+      issues.push(
+        errorIssue(
+          'invalid-literal',
+          [...path, 'serviceTime'],
+          entityId,
+          `serviceTime must be 'fixed', 'exponential' or 'lognormal'`,
+        ),
+      );
     }
     if (rec.serviceTime === 'lognormal') {
       validateNumber(rec.serviceTimeCv, 0.1, 10, [...path, 'serviceTimeCv'], entityId, issues, 'serviceTimeCv');
     } else if (rec.serviceTimeCv !== undefined) {
-      issues.push({
-        code: 'structural-rule',
-        path: [...path, 'serviceTimeCv'],
-        entityId,
-        severity: 'error',
-        message: 'serviceTimeCv applies to lognormal service time only',
-      });
+      issues.push(
+        errorIssue(
+          'structural-rule',
+          [...path, 'serviceTimeCv'],
+          entityId,
+          'serviceTimeCv applies to lognormal service time only',
+        ),
+      );
     }
     validateNumber(rec.queueLimit, 0, 10000, [...path, 'queueLimit'], entityId, issues, 'queueLimit', true);
     validateNumber(rec.failureRate, 0, 100, [...path, 'failureRate'], entityId, issues, 'failureRate');
@@ -2559,36 +2530,39 @@ function validateResourceConfig(
       validateNumber(rec.writeCapacity, 1, 100000, [...path, 'writeCapacity'], entityId, issues, 'writeCapacity');
     } else if (t === 'router') {
       if (rec.strategy !== 'round-robin' && rec.strategy !== 'weighted' && rec.strategy !== 'conditional') {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'strategy'],
-          entityId,
-          severity: 'error',
-          message: `Router strategy must be 'round-robin', 'weighted', or 'conditional'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'strategy'],
+            entityId,
+            `Router strategy must be 'round-robin', 'weighted', or 'conditional'`,
+          ),
+        );
       }
     } else if (t === 'cache') {
       if (rec.mode !== 'fixed' && rec.mode !== 'lru') {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'mode'],
-          entityId,
-          severity: 'error',
-          message: `Cache mode must be 'fixed' or 'lru'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'mode'],
+            entityId,
+            `Cache mode must be 'fixed' or 'lru'`,
+          ),
+        );
       }
       validateNumber(rec.hitRate, 0, 100, [...path, 'hitRate'], entityId, issues, 'hitRate');
       validateNumber(rec.entries, 1, 100000, [...path, 'entries'], entityId, issues, 'entries', true);
       validateNumber(rec.ttlMs, 1, 3600000, [...path, 'ttlMs'], entityId, issues, 'ttlMs');
     } else if (t === 'broker') {
       if (rec.delivery !== 'competing' && rec.delivery !== 'broadcast') {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'delivery'],
-          entityId,
-          severity: 'error',
-          message: `Broker delivery must be 'competing' or 'broadcast'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'delivery'],
+            entityId,
+            `Broker delivery must be 'competing' or 'broadcast'`,
+          ),
+        );
       }
     }
   }
@@ -2602,13 +2576,7 @@ function validateConnectionConfig(
   issues: Issue[],
 ): void {
   if (cfg === null || typeof cfg !== 'object' || Array.isArray(cfg)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: 'Connection config must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, 'Connection config must be an object'));
     return;
   }
 
@@ -2652,13 +2620,14 @@ function validateRouteCondition(
   if (checkRecord(cond, ['field', 'value'], ['field', 'value'], path, entityId, issues, 'RouteCondition')) {
     const rec = cond as Record<string, unknown>;
     if (typeof rec.field !== 'string' || !ROUTE_CONDITION_FIELDS.includes(rec.field as (typeof ROUTE_CONDITION_FIELDS)[number])) {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'field'],
-        entityId,
-        severity: 'error',
-        message: `RouteCondition field must be 'class', 'operation', or 'tag'`,
-      });
+      issues.push(
+        errorIssue(
+          'invalid-literal',
+          [...path, 'field'],
+          entityId,
+          `RouteCondition field must be 'class', 'operation', or 'tag'`,
+        ),
+      );
     }
     validateString(rec.value, 1, 80, [...path, 'value'], entityId, issues, 'RouteCondition value');
   }
@@ -2715,13 +2684,14 @@ function validateResourceCallMetadata(
     validateId(rec.requestClassId, [...path, 'requestClassId'], entityId, issues);
     validateString(rec.requestClassLabel, 1, 60, [...path, 'requestClassLabel'], entityId, issues, 'Request class label');
     if (rec.operation !== 'read' && rec.operation !== 'write') {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'operation'],
-        entityId,
-        severity: 'error',
-        message: `ResourceCallMetadata operation must be 'read' or 'write'`,
-      });
+      issues.push(
+        errorIssue(
+          'invalid-literal',
+          [...path, 'operation'],
+          entityId,
+          `ResourceCallMetadata operation must be 'read' or 'write'`,
+        ),
+      );
     }
     if (rec.key !== null) {
       validateString(rec.key, 1, 80, [...path, 'key'], entityId, issues, 'ResourceCallMetadata key');
@@ -2771,13 +2741,14 @@ function validateMachineBehavior(
   // initialStateId
   if (validateId(rec.initialStateId, [...path, 'initialStateId'], elementId, issues)) {
     if (!statesMap.has(rec.initialStateId)) {
-      issues.push({
-        code: 'dangling-reference',
-        path: [...path, 'initialStateId'],
-        entityId: elementId,
-        severity: 'error',
-        message: `Machine initialStateId '${rec.initialStateId}' does not exist in machine states`,
-      });
+      issues.push(
+        errorIssue(
+          'dangling-reference',
+          [...path, 'initialStateId'],
+          elementId,
+          `Machine initialStateId '${rec.initialStateId}' does not exist in machine states`,
+        ),
+      );
     }
   }
 
@@ -2799,37 +2770,40 @@ function validateMachineBehavior(
 
         if (validateId(t.fromStateId, [...tPath, 'fromStateId'], tId ?? elementId, issues)) {
           if (!statesMap.has(t.fromStateId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...tPath, 'fromStateId'],
-              entityId: tId ?? elementId,
-              severity: 'error',
-              message: `Transition fromStateId '${t.fromStateId}' does not exist in machine states`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...tPath, 'fromStateId'],
+                tId ?? elementId,
+                `Transition fromStateId '${t.fromStateId}' does not exist in machine states`,
+              ),
+            );
           }
         }
 
         if (validateId(t.toStateId, [...tPath, 'toStateId'], tId ?? elementId, issues)) {
           if (!statesMap.has(t.toStateId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...tPath, 'toStateId'],
-              entityId: tId ?? elementId,
-              severity: 'error',
-              message: `Transition toStateId '${t.toStateId}' does not exist in machine states`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...tPath, 'toStateId'],
+                tId ?? elementId,
+                `Transition toStateId '${t.toStateId}' does not exist in machine states`,
+              ),
+            );
           }
         }
 
         if (validateId(t.eventPortId, [...tPath, 'eventPortId'], tId ?? elementId, issues)) {
           if (!portsMap.has(t.eventPortId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...tPath, 'eventPortId'],
-              entityId: tId ?? elementId,
-              severity: 'error',
-              message: `Transition eventPortId '${t.eventPortId}' does not exist on this element`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...tPath, 'eventPortId'],
+                tId ?? elementId,
+                `Transition eventPortId '${t.eventPortId}' does not exist on this element`,
+              ),
+            );
           }
         }
 
@@ -2863,25 +2837,27 @@ function validateMachineBehavior(
 
         if (validateId(bnd.callPortId, [...bPath, 'callPortId'], bId ?? elementId, issues)) {
           if (!portsMap.has(bnd.callPortId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...bPath, 'callPortId'],
-              entityId: bId ?? elementId,
-              severity: 'error',
-              message: `ResponseBinding callPortId '${bnd.callPortId}' does not exist on this element`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...bPath, 'callPortId'],
+                bId ?? elementId,
+                `ResponseBinding callPortId '${bnd.callPortId}' does not exist on this element`,
+              ),
+            );
           }
         }
 
         if (validateId(bnd.eventPortId, [...bPath, 'eventPortId'], bId ?? elementId, issues)) {
           if (!portsMap.has(bnd.eventPortId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...bPath, 'eventPortId'],
-              entityId: bId ?? elementId,
-              severity: 'error',
-              message: `ResponseBinding eventPortId '${bnd.eventPortId}' does not exist on this element`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...bPath, 'eventPortId'],
+                bId ?? elementId,
+                `ResponseBinding eventPortId '${bnd.eventPortId}' does not exist on this element`,
+              ),
+            );
           }
         }
       }
@@ -2898,13 +2874,7 @@ function validateEffect(
   issues: Issue[],
 ): void {
   if (eff === null || typeof eff !== 'object' || Array.isArray(eff)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId: parentEntityId,
-      severity: 'error',
-      message: 'Effect must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, parentEntityId, 'Effect must be an object'));
     return;
   }
 
@@ -2929,13 +2899,14 @@ function validateEffect(
     if (checkRecord(rec, ['id', 'kind', 'portId', 'value', 'correlation'], ['id', 'kind', 'portId', 'value', 'correlation'], path, effId ?? parentEntityId, issues, 'emit effect')) {
       if (validateId(rec.portId, [...path, 'portId'], effId ?? parentEntityId, issues)) {
         if (!portsMap.has(rec.portId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...path, 'portId'],
-            entityId: effId ?? parentEntityId,
-            severity: 'error',
-            message: `Emit effect portId '${rec.portId}' does not exist on this element`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...path, 'portId'],
+              effId ?? parentEntityId,
+              `Emit effect portId '${rec.portId}' does not exist on this element`,
+            ),
+          );
         }
       }
       validateExpression(rec.value, [...path, 'value'], effId ?? parentEntityId, false, issues);
@@ -2945,13 +2916,14 @@ function validateEffect(
     if (checkRecord(rec, ['id', 'kind', 'value', 'outcome'], ['id', 'kind', 'value', 'outcome'], path, effId ?? parentEntityId, issues, 'reply effect')) {
       validateExpression(rec.value, [...path, 'value'], effId ?? parentEntityId, false, issues);
       if (typeof rec.outcome !== 'string' || !TRANSPORT_OUTCOMES.includes(rec.outcome as (typeof TRANSPORT_OUTCOMES)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'outcome'],
-          entityId: effId ?? parentEntityId,
-          severity: 'error',
-          message: `Invalid reply outcome: '${String(rec.outcome)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'outcome'],
+            effId ?? parentEntityId,
+            `Invalid reply outcome: '${String(rec.outcome)}'`,
+          ),
+        );
       }
     }
   } else if (kind === 'schedule-event') {
@@ -2959,13 +2931,14 @@ function validateEffect(
       validateNumber(rec.delayMs, 0, 600000, [...path, 'delayMs'], effId ?? parentEntityId, issues, 'delayMs');
       if (validateId(rec.eventPortId, [...path, 'eventPortId'], effId ?? parentEntityId, issues)) {
         if (!portsMap.has(rec.eventPortId)) {
-          issues.push({
-            code: 'dangling-reference',
-            path: [...path, 'eventPortId'],
-            entityId: effId ?? parentEntityId,
-            severity: 'error',
-            message: `Schedule-event effect eventPortId '${rec.eventPortId}' does not exist on this element`,
-          });
+          issues.push(
+            errorIssue(
+              'dangling-reference',
+              [...path, 'eventPortId'],
+              effId ?? parentEntityId,
+              `Schedule-event effect eventPortId '${rec.eventPortId}' does not exist on this element`,
+            ),
+          );
         }
       }
       validateExpression(rec.value, [...path, 'value'], effId ?? parentEntityId, false, issues);
@@ -2975,13 +2948,14 @@ function validateEffect(
       validateString(rec.code, 1, 80, [...path, 'code'], effId ?? parentEntityId, issues, 'Trace code');
     }
   } else {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'kind'],
-      entityId: effId ?? parentEntityId,
-      severity: 'error',
-      message: `Unknown effect kind: '${String(kind)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'kind'],
+        effId ?? parentEntityId,
+        `Unknown effect kind: '${String(kind)}'`,
+      ),
+    );
   }
 }
 
@@ -2992,13 +2966,7 @@ function validateEmitCorrelation(
   issues: Issue[],
 ): void {
   if (corr === null || typeof corr !== 'object' || Array.isArray(corr)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId,
-      severity: 'error',
-      message: 'Emit correlation must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, entityId, 'Emit correlation must be an object'));
     return;
   }
 
@@ -3010,13 +2978,14 @@ function validateEmitCorrelation(
       validatePath(rec.path, [...path, 'path'], entityId, issues);
     }
   } else {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'kind'],
-      entityId,
-      severity: 'error',
-      message: `Unknown emit correlation kind: '${String(rec.kind)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'kind'],
+        entityId,
+        `Unknown emit correlation kind: '${String(rec.kind)}'`,
+      ),
+    );
   }
 }
 
@@ -3040,13 +3009,14 @@ function validatePipelineBehavior(
   for (const portField of ['inputPortId', 'outputPortId', 'errorPortId'] as const) {
     if (validateId(rec[portField], [...path, portField], elementId, issues)) {
       if (!portsMap.has(rec[portField] as string)) {
-        issues.push({
-          code: 'dangling-reference',
-          path: [...path, portField],
-          entityId: elementId,
-          severity: 'error',
-          message: `Pipeline ${portField} '${rec[portField]}' does not exist on this element`,
-        });
+        issues.push(
+          errorIssue(
+            'dangling-reference',
+            [...path, portField],
+            elementId,
+            `Pipeline ${portField} '${rec[portField]}' does not exist on this element`,
+          ),
+        );
       }
     }
   }
@@ -3069,13 +3039,7 @@ function validateOperation(
   issues: Issue[],
 ): void {
   if (op === null || typeof op !== 'object' || Array.isArray(op)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId: elementId,
-      severity: 'error',
-      message: 'Operation must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, elementId, 'Operation must be an object'));
     return;
   }
 
@@ -3088,13 +3052,14 @@ function validateOperation(
 
   const kind = rec.kind;
   if (typeof kind !== 'string' || !OPERATION_KINDS.includes(kind as (typeof OPERATION_KINDS)[number])) {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'kind'],
-      entityId: opId ?? elementId,
-      severity: 'error',
-      message: `Invalid operation kind: '${String(kind)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'kind'],
+        opId ?? elementId,
+        `Invalid operation kind: '${String(kind)}'`,
+      ),
+    );
     return;
   }
 
@@ -3135,34 +3100,37 @@ function validateOperation(
             }
             if (typeof f.targetKey === 'string') {
               if (PROTOTYPE_KEYS.has(f.targetKey)) {
-                issues.push({
-                  code: 'prototype-key',
-                  path: [...fPath, 'targetKey'],
-                  entityId: fId ?? opId ?? elementId,
-                  severity: 'error',
-                  message: `Disallowed prototype key in MapOperationField: ${f.targetKey}`,
-                });
+                issues.push(
+                  errorIssue(
+                    'prototype-key',
+                    [...fPath, 'targetKey'],
+                    fId ?? opId ?? elementId,
+                    `Disallowed prototype key in MapOperationField: ${f.targetKey}`,
+                  ),
+                );
               } else if (validateString(f.targetKey, 1, 80, [...fPath, 'targetKey'], fId ?? opId ?? elementId, issues, 'targetKey')) {
                 if (targetKeys.has(f.targetKey)) {
-                  issues.push({
-                    code: 'duplicate-key',
-                    path: [...fPath, 'targetKey'],
-                    entityId: fId ?? opId ?? elementId,
-                    severity: 'error',
-                    message: `Duplicate targetKey '${f.targetKey}' in map operation`,
-                  });
+                  issues.push(
+                    errorIssue(
+                      'duplicate-key',
+                      [...fPath, 'targetKey'],
+                      fId ?? opId ?? elementId,
+                      `Duplicate targetKey '${f.targetKey}' in map operation`,
+                    ),
+                  );
                 } else {
                   targetKeys.add(f.targetKey);
                 }
               }
             } else {
-              issues.push({
-                code: 'wrong-type',
-                path: [...fPath, 'targetKey'],
-                entityId: fId ?? opId ?? elementId,
-                severity: 'error',
-                message: 'MapOperationField targetKey must be a string',
-              });
+              issues.push(
+                errorIssue(
+                  'wrong-type',
+                  [...fPath, 'targetKey'],
+                  fId ?? opId ?? elementId,
+                  'MapOperationField targetKey must be a string',
+                ),
+              );
             }
             validateExpression(f.value, [...fPath, 'value'], fId ?? opId ?? elementId, false, issues);
           }
@@ -3189,13 +3157,14 @@ function validateDecisionBehavior(
 
   if (validateId(rec.inputPortId, [...path, 'inputPortId'], elementId, issues)) {
     if (!portsMap.has(rec.inputPortId)) {
-      issues.push({
-        code: 'dangling-reference',
-        path: [...path, 'inputPortId'],
-        entityId: elementId,
-        severity: 'error',
-        message: `Decision inputPortId '${rec.inputPortId}' does not exist on this element`,
-      });
+      issues.push(
+        errorIssue(
+          'dangling-reference',
+          [...path, 'inputPortId'],
+          elementId,
+          `Decision inputPortId '${rec.inputPortId}' does not exist on this element`,
+        ),
+      );
     }
   }
 
@@ -3214,13 +3183,14 @@ function validateDecisionBehavior(
         validateExpression(c.guard, [...cPath, 'guard'], cId ?? elementId, true, issues);
         if (validateId(c.outputPortId, [...cPath, 'outputPortId'], cId ?? elementId, issues)) {
           if (!portsMap.has(c.outputPortId)) {
-            issues.push({
-              code: 'dangling-reference',
-              path: [...cPath, 'outputPortId'],
-              entityId: cId ?? elementId,
-              severity: 'error',
-              message: `Decision case outputPortId '${c.outputPortId}' does not exist on this element`,
-            });
+            issues.push(
+              errorIssue(
+                'dangling-reference',
+                [...cPath, 'outputPortId'],
+                cId ?? elementId,
+                `Decision case outputPortId '${c.outputPortId}' does not exist on this element`,
+              ),
+            );
           }
         }
         validateExpression(c.value, [...cPath, 'value'], cId ?? elementId, false, issues);
@@ -3233,13 +3203,14 @@ function validateDecisionBehavior(
     const fb = rec.fallback as Record<string, unknown>;
     if (validateId(fb.outputPortId, [...path, 'fallback', 'outputPortId'], elementId, issues)) {
       if (!portsMap.has(fb.outputPortId)) {
-        issues.push({
-          code: 'dangling-reference',
-          path: [...path, 'fallback', 'outputPortId'],
-          entityId: elementId,
-          severity: 'error',
-          message: `Decision fallback outputPortId '${fb.outputPortId}' does not exist on this element`,
-        });
+        issues.push(
+          errorIssue(
+            'dangling-reference',
+            [...path, 'fallback', 'outputPortId'],
+            elementId,
+            `Decision fallback outputPortId '${fb.outputPortId}' does not exist on this element`,
+          ),
+        );
       }
     }
     validateExpression(fb.value, [...path, 'fallback', 'value'], elementId, false, issues);
@@ -3276,13 +3247,14 @@ function validateScenario(
 
   const mode = rec.mode;
   if (mode !== 'logical' && mode !== 'timed') {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...sPath, 'mode'],
-      entityId: sId,
-      severity: 'error',
-      message: `Scenario mode must be 'logical' or 'timed'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...sPath, 'mode'],
+        sId,
+        `Scenario mode must be 'logical' or 'timed'`,
+      ),
+    );
   }
 
   // ScopeElementIds
@@ -3394,24 +3366,26 @@ function validateScenario(
 
         if (typeof f.downAtMs === 'number' && typeof f.upAtMs === 'number') {
           if (f.upAtMs <= f.downAtMs) {
-            issues.push({
-              code: 'structural-rule',
-              path: [...fPath, 'upAtMs'],
-              entityId: fId ?? sId,
-              severity: 'error',
-              message: `Fault upAtMs must be strictly greater than downAtMs`,
-            });
+            issues.push(
+              errorIssue(
+                'structural-rule',
+                [...fPath, 'upAtMs'],
+                fId ?? sId,
+                `Fault upAtMs must be strictly greater than downAtMs`,
+              ),
+            );
           } else if (typeof f.hostId === 'string') {
             const intervals = hostIntervals.get(f.hostId) ?? [];
             for (const existing of intervals) {
               if (Math.max(f.downAtMs, existing.down) < Math.min(f.upAtMs, existing.up)) {
-                issues.push({
-                  code: 'structural-rule',
-                  path: fPath,
-                  entityId: fId ?? sId,
-                  severity: 'error',
-                  message: `Overlapping fault intervals on host '${f.hostId}'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'structural-rule',
+                    fPath,
+                    fId ?? sId,
+                    `Overlapping fault intervals on host '${f.hostId}'`,
+                  ),
+                );
                 break;
               }
             }
@@ -3421,31 +3395,34 @@ function validateScenario(
         }
 
         if (f.activePolicy !== 'fail') {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...fPath, 'activePolicy'],
-            entityId: fId ?? sId,
-            severity: 'error',
-            message: `Fault activePolicy must be 'fail'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...fPath, 'activePolicy'],
+              fId ?? sId,
+              `Fault activePolicy must be 'fail'`,
+            ),
+          );
         }
         if (f.queuedPolicy !== 'reject') {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...fPath, 'queuedPolicy'],
-            entityId: fId ?? sId,
-            severity: 'error',
-            message: `Fault queuedPolicy must be 'reject'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...fPath, 'queuedPolicy'],
+              fId ?? sId,
+              `Fault queuedPolicy must be 'reject'`,
+            ),
+          );
         }
         if (f.routeReset !== 'first-healthy') {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...fPath, 'routeReset'],
-            entityId: fId ?? sId,
-            severity: 'error',
-            message: `Fault routeReset must be 'first-healthy'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...fPath, 'routeReset'],
+              fId ?? sId,
+              `Fault routeReset must be 'first-healthy'`,
+            ),
+          );
         }
       }
     }
@@ -3510,25 +3487,27 @@ function validateScenario(
               if (r.afterInputId !== null) {
                 if (validateId(r.afterInputId, [...rPath, 'afterInputId'], rId ?? bId ?? sId, issues)) {
                   if (!scenarioInputIds.has(r.afterInputId)) {
-                    issues.push({
-                      code: 'dangling-reference',
-                      path: [...rPath, 'afterInputId'],
-                      entityId: rId ?? bId ?? sId,
-                      severity: 'error',
-                      message: `Boundary response afterInputId '${r.afterInputId}' does not exist in this scenario`,
-                    });
+                    issues.push(
+                      errorIssue(
+                        'dangling-reference',
+                        [...rPath, 'afterInputId'],
+                        rId ?? bId ?? sId,
+                        `Boundary response afterInputId '${r.afterInputId}' does not exist in this scenario`,
+                      ),
+                    );
                   }
                 }
               }
 
               if (typeof r.outcome !== 'string' || !TRANSPORT_OUTCOMES.includes(r.outcome as (typeof TRANSPORT_OUTCOMES)[number])) {
-                issues.push({
-                  code: 'invalid-literal',
-                  path: [...rPath, 'outcome'],
-                  entityId: rId ?? bId ?? sId,
-                  severity: 'error',
-                  message: `Invalid boundary response outcome: '${String(r.outcome)}'`,
-                });
+                issues.push(
+                  errorIssue(
+                    'invalid-literal',
+                    [...rPath, 'outcome'],
+                    rId ?? bId ?? sId,
+                    `Invalid boundary response outcome: '${String(r.outcome)}'`,
+                  ),
+                );
               }
             }
           }
@@ -3546,13 +3525,14 @@ function validateScenario(
       if (checkRecord(sel, ['refinementId', 'mode'], ['refinementId', 'mode'], selPath, sId, issues, 'Selection')) {
         validateId(sel.refinementId, [...selPath, 'refinementId'], sId, issues);
         if (sel.mode !== 'aggregate' && sel.mode !== 'refined') {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...selPath, 'mode'],
-            entityId: sId,
-            severity: 'error',
-            message: `Selection mode must be 'aggregate' or 'refined'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...selPath, 'mode'],
+              sId,
+              `Selection mode must be 'aggregate' or 'refined'`,
+            ),
+          );
         }
       }
     }
@@ -3585,13 +3565,14 @@ function validateScenario(
         }
         validateString(a.label, 1, 80, [...aPath, 'label'], aId ?? sId, issues, 'Assertion label');
         if (typeof a.operator !== 'string' || !ASSERTION_OPERATORS.includes(a.operator as (typeof ASSERTION_OPERATORS)[number])) {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...aPath, 'operator'],
-            entityId: aId ?? sId,
-            severity: 'error',
-            message: `Invalid assertion operator: '${String(a.operator)}'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...aPath, 'operator'],
+              aId ?? sId,
+              `Invalid assertion operator: '${String(a.operator)}'`,
+            ),
+          );
         }
         validateJsonValue(a.expected, [...aPath, 'expected'], aId ?? sId, issues);
         validateAssertionSubject(a.subject, [...aPath, 'subject'], aId ?? sId, pendingEndpoints, issues);
@@ -3621,44 +3602,48 @@ function validateScenario(
         }
         if (typeof asm.key === 'string') {
           if (PROTOTYPE_KEYS.has(asm.key)) {
-            issues.push({
-              code: 'prototype-key',
-              path: [...aPath, 'key'],
-              entityId: asmId ?? sId,
-              severity: 'error',
-              message: `Disallowed prototype key in assumption: ${asm.key}`,
-            });
+            issues.push(
+              errorIssue(
+                'prototype-key',
+                [...aPath, 'key'],
+                asmId ?? sId,
+                `Disallowed prototype key in assumption: ${asm.key}`,
+              ),
+            );
           } else if (validateString(asm.key, 1, 80, [...aPath, 'key'], asmId ?? sId, issues, 'Assumption key')) {
             if (assumptionKeys.has(asm.key)) {
-              issues.push({
-                code: 'duplicate-key',
-                path: [...aPath, 'key'],
-                entityId: asmId ?? sId,
-                severity: 'error',
-                message: `Duplicate assumption key '${asm.key}' in scenario`,
-              });
+              issues.push(
+                errorIssue(
+                  'duplicate-key',
+                  [...aPath, 'key'],
+                  asmId ?? sId,
+                  `Duplicate assumption key '${asm.key}' in scenario`,
+                ),
+              );
             } else {
               assumptionKeys.add(asm.key);
             }
           }
         } else {
-          issues.push({
-            code: 'wrong-type',
-            path: [...aPath, 'key'],
-            entityId: asmId ?? sId,
-            severity: 'error',
-            message: 'Assumption key must be a string',
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              [...aPath, 'key'],
+              asmId ?? sId,
+              'Assumption key must be a string',
+            ),
+          );
         }
         validateJsonValue(asm.value, [...aPath, 'value'], asmId ?? sId, issues);
         if (typeof asm.source !== 'string' || !ASSUMPTION_SOURCES.includes(asm.source as (typeof ASSUMPTION_SOURCES)[number])) {
-          issues.push({
-            code: 'invalid-literal',
-            path: [...aPath, 'source'],
-            entityId: asmId ?? sId,
-            severity: 'error',
-            message: `Invalid assumption source: '${String(asm.source)}'`,
-          });
+          issues.push(
+            errorIssue(
+              'invalid-literal',
+              [...aPath, 'source'],
+              asmId ?? sId,
+              `Invalid assumption source: '${String(asm.source)}'`,
+            ),
+          );
         }
         validateString(asm.description, 0, 4000, [...aPath, 'description'], asmId ?? sId, issues, 'Assumption description');
       }
@@ -3678,13 +3663,14 @@ function validateResourceMetadata(
     // requestClassId is a classification token, not a reference
     validateId(rec.requestClassId, [...path, 'requestClassId'], entityId, issues);
     if (rec.operation !== 'read' && rec.operation !== 'write') {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'operation'],
-        entityId,
-        severity: 'error',
-        message: `ResourceMetadata operation must be 'read' or 'write'`,
-      });
+      issues.push(
+        errorIssue(
+          'invalid-literal',
+          [...path, 'operation'],
+          entityId,
+          `ResourceMetadata operation must be 'read' or 'write'`,
+        ),
+      );
     }
     if (rec.key !== null) {
       validateString(rec.key, 1, 80, [...path, 'key'], entityId, issues, 'ResourceMetadata key');
@@ -3729,13 +3715,14 @@ function validateWorkload(
   validateNumber(rec.timeoutMs, 1, 3600000, [...path, 'timeoutMs'], wId ?? scenarioId, issues, 'Workload timeoutMs');
 
   if (rec.intervalMs !== null) {
-    issues.push({
-      code: 'structural-rule',
-      path: [...path, 'intervalMs'],
-      entityId: wId ?? scenarioId,
-      severity: 'error',
-      message: `Workload intervalMs must be null`,
-    });
+    issues.push(
+      errorIssue(
+        'structural-rule',
+        [...path, 'intervalMs'],
+        wId ?? scenarioId,
+        `Workload intervalMs must be null`,
+      ),
+    );
   }
 
   // Classes (storage.md §6: 20 classes per workload)
@@ -3768,13 +3755,14 @@ function validateRequestClass(
   validateNumber(rec.weight, 0, Number.MAX_VALUE, [...path, 'weight'], cId ?? workloadId, issues, 'RequestClass weight', false, true);
 
   if (rec.operation !== 'read' && rec.operation !== 'write') {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'operation'],
-      entityId: cId ?? workloadId,
-      severity: 'error',
-      message: `RequestClass operation must be 'read' or 'write'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'operation'],
+        cId ?? workloadId,
+        `RequestClass operation must be 'read' or 'write'`,
+      ),
+    );
   }
 
   if (validateArray(rec.tags, 20, [...path, 'tags'], cId ?? workloadId, issues, 'RequestClass tags')) {
@@ -3788,13 +3776,14 @@ function validateRequestClass(
   if (checkRecord(rec.keyDistribution, ['kind', 'catalogSize', 'hotSubset', 'hotShare'], ['kind', 'catalogSize', 'hotSubset', 'hotShare'], [...path, 'keyDistribution'], cId ?? workloadId, issues, 'KeyDistribution')) {
     const kd = rec.keyDistribution as Record<string, unknown>;
     if (kd.kind !== 'uniform' && kd.kind !== 'hot') {
-      issues.push({
-        code: 'invalid-literal',
-        path: [...path, 'keyDistribution', 'kind'],
-        entityId: cId ?? workloadId,
-        severity: 'error',
-        message: `KeyDistribution kind must be 'uniform' or 'hot'`,
-      });
+      issues.push(
+        errorIssue(
+          'invalid-literal',
+          [...path, 'keyDistribution', 'kind'],
+          cId ?? workloadId,
+          `KeyDistribution kind must be 'uniform' or 'hot'`,
+        ),
+      );
     }
     validateNumber(kd.catalogSize, 1, 100000, [...path, 'keyDistribution', 'catalogSize'], cId ?? workloadId, issues, 'catalogSize', true);
     const catSize = typeof kd.catalogSize === 'number' ? kd.catalogSize : 100000;
@@ -3811,13 +3800,7 @@ function validateAssertionSubject(
   issues: Issue[],
 ): void {
   if (subj === null || typeof subj !== 'object' || Array.isArray(subj)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId: assertionId,
-      severity: 'error',
-      message: 'Assertion subject must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, assertionId, 'Assertion subject must be an object'));
     return;
   }
 
@@ -3825,13 +3808,14 @@ function validateAssertionSubject(
   const kind = rec.kind;
 
   if (typeof kind !== 'string' || !ASSERTION_SUBJECT_KINDS.includes(kind as (typeof ASSERTION_SUBJECT_KINDS)[number])) {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'kind'],
-      entityId: assertionId,
-      severity: 'error',
-      message: `Invalid assertion subject kind: '${String(kind)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'kind'],
+        assertionId,
+        `Invalid assertion subject kind: '${String(kind)}'`,
+      ),
+    );
     return;
   }
 
@@ -3854,25 +3838,27 @@ function validateAssertionSubject(
   } else if (kind === 'count') {
     if (checkRecord(rec, ['kind', 'scope', 'elementId', 'outcome'], ['kind', 'scope', 'elementId', 'outcome'], path, assertionId, issues, 'count subject')) {
       if (typeof rec.scope !== 'string' || !COUNT_SUBJECT_SCOPES.includes(rec.scope as (typeof COUNT_SUBJECT_SCOPES)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'scope'],
-          entityId: assertionId,
-          severity: 'error',
-          message: `Invalid count scope: '${String(rec.scope)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'scope'],
+            assertionId,
+            `Invalid count scope: '${String(rec.scope)}'`,
+          ),
+        );
       }
       if (rec.elementId !== null) {
         validateId(rec.elementId, [...path, 'elementId'], assertionId, issues);
       }
       if (typeof rec.outcome !== 'string' || !COUNT_SUBJECT_OUTCOMES.includes(rec.outcome as (typeof COUNT_SUBJECT_OUTCOMES)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'outcome'],
-          entityId: assertionId,
-          severity: 'error',
-          message: `Invalid count outcome: '${String(rec.outcome)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'outcome'],
+            assertionId,
+            `Invalid count outcome: '${String(rec.outcome)}'`,
+          ),
+        );
       }
     }
   } else if (kind === 'trace-count') {
@@ -3884,13 +3870,14 @@ function validateAssertionSubject(
     if (checkRecord(rec, ['kind', 'elementId', 'key'], ['kind', 'elementId', 'key'], path, assertionId, issues, 'metric subject')) {
       validateId(rec.elementId, [...path, 'elementId'], assertionId, issues);
       if (typeof rec.key !== 'string' || !METRIC_SUBJECT_KEYS.includes(rec.key as (typeof METRIC_SUBJECT_KEYS)[number])) {
-        issues.push({
-          code: 'invalid-literal',
-          path: [...path, 'key'],
-          entityId: assertionId,
-          severity: 'error',
-          message: `Invalid metric subject key: '${String(rec.key)}'`,
-        });
+        issues.push(
+          errorIssue(
+            'invalid-literal',
+            [...path, 'key'],
+            assertionId,
+            `Invalid metric subject key: '${String(rec.key)}'`,
+          ),
+        );
       }
     }
   }
@@ -3920,13 +3907,7 @@ function validateCompletionPolicy(
   issues: Issue[],
 ): void {
   if (completion === null || typeof completion !== 'object' || Array.isArray(completion)) {
-    issues.push({
-      code: 'wrong-type',
-      path,
-      entityId: scenarioId,
-      severity: 'error',
-      message: 'Completion policy must be an object',
-    });
+    issues.push(errorIssue('wrong-type', path, scenarioId, 'Completion policy must be an object'));
     return;
   }
 
@@ -3934,13 +3915,14 @@ function validateCompletionPolicy(
   const kind = rec.kind;
 
   if (typeof kind !== 'string' || !COMPLETION_KINDS.includes(kind as (typeof COMPLETION_KINDS)[number])) {
-    issues.push({
-      code: 'invalid-literal',
-      path: [...path, 'kind'],
-      entityId: scenarioId,
-      severity: 'error',
-      message: `Invalid completion policy kind: '${String(kind)}'`,
-    });
+    issues.push(
+      errorIssue(
+        'invalid-literal',
+        [...path, 'kind'],
+        scenarioId,
+        `Invalid completion policy kind: '${String(kind)}'`,
+      ),
+    );
     return;
   }
 
@@ -3962,13 +3944,14 @@ function validateCompletionPolicy(
       validateNumber(rec.deadlineMs, 1000, 600000, [...path, 'deadlineMs'], scenarioId, issues, 'deadlineMs');
       if (typeof rec.arrivalHorizonMs === 'number' && typeof rec.deadlineMs === 'number') {
         if (rec.deadlineMs <= rec.arrivalHorizonMs) {
-          issues.push({
-            code: 'structural-rule',
-            path: [...path, 'deadlineMs'],
-            entityId: scenarioId,
-            severity: 'error',
-            message: `Drain deadlineMs (${rec.deadlineMs}) must be strictly greater than arrivalHorizonMs (${rec.arrivalHorizonMs})`,
-          });
+          issues.push(
+            errorIssue(
+              'structural-rule',
+              [...path, 'deadlineMs'],
+              scenarioId,
+              `Drain deadlineMs (${rec.deadlineMs}) must be strictly greater than arrivalHorizonMs (${rec.arrivalHorizonMs})`,
+            ),
+          );
         }
       }
     }

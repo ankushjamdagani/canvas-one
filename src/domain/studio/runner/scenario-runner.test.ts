@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runScenario, ScenarioRunner, handleSettlementEvent } from './scenario-runner';
 import type { SettlementState } from './scenario-runner';
-import type { Document, Element, ResourceBehavior } from '../model';
+import type { Document, ResourceBehavior } from '../model';
 import type { TraceEvent } from './types';
 import { canonicalJson } from '../canonical';
 

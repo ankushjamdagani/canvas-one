@@ -6,7 +6,6 @@
  * Dialog (focus trap, title, description, focus return) per commands.md §7.
  */
 
-import * as React from 'react';
 import {
   Dialog,
   DialogContent,

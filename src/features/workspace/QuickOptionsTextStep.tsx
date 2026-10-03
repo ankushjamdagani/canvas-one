@@ -1,7 +1,7 @@
 /** Generic nested text-entry step for parameterized Quick options commands. */
 
 import * as React from 'react';
-import { Bookmark, GitCommitHorizontal, Group, StickyNote } from 'lucide-react';
+import { GitCommitHorizontal, Group, StickyNote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 

@@ -16,7 +16,7 @@
 
 import * as React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Document, Workload } from '../../domain/studio/model';
+import type { Document } from '../../domain/studio/model';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';

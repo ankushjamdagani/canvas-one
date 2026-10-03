@@ -1,18 +1,14 @@
 import * as React from "react";
 import {
   Settings,
-  Search,
   Plus,
-  Minus,
   Sparkles,
   SlidersHorizontal,
-  ChevronRight,
   MousePointer,
   Hand,
   Library,
   StickyNote,
   Maximize2,
-  Check,
   Copy,
   Download,
   Trash2,
@@ -48,7 +44,6 @@ import {
   DropdownMenuFooter,
   DropdownMenuItem,
   DropdownMenuShortcut,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
@@ -70,7 +65,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { Kbd, KbdGroup, KeyHint } from "@/components/ui/kbd";
+import { KeyHint } from "@/components/ui/kbd";
 import {
   Select,
   SelectContent,
@@ -83,8 +78,6 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Breadcrumb,
   BreadcrumbList,

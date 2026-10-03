@@ -2,6 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { PanelHeader } from './PanelHeader';
 import { panelContentClass } from './panelContentClass';
+import { trackPanelGesture, trackPointerGesture } from './pointerGesture';
 import {
   computeResizedSideWidth,
   computeStackSplit,
@@ -68,48 +69,18 @@ export const DockColumn: React.FC<DockColumnProps> = ({
     const startX = e.clientX;
     const startWidth = width;
 
-    dispatch({ type: 'BEGIN_GESTURE', kind: `resize-side-${side}` });
     setIsResizingSide(true);
 
-    const onPointerMove = (moveEvt: PointerEvent) => {
-      const deltaX = moveEvt.clientX - startX;
-      const nextWidth = computeResizedSideWidth(side, startWidth, deltaX);
-
-      dispatch({
-        type: 'PREVIEW_GESTURE',
-        action: { type: 'RESIZE_SIDE', side, width: nextWidth },
-      });
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerCancel);
-      window.removeEventListener('keydown', onKeyDown);
-      setIsResizingSide(false);
-    };
-
-    const onPointerUp = () => {
-      cleanup();
-      dispatch({ type: 'COMMIT_GESTURE' });
-    };
-
-    const onPointerCancel = () => {
-      cleanup();
-      dispatch({ type: 'CANCEL_GESTURE' });
-    };
-
-    const onKeyDown = (keyEvt: KeyboardEvent) => {
-      if (keyEvt.key === 'Escape') {
-        cleanup();
-        dispatch({ type: 'CANCEL_GESTURE' });
-      }
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerCancel);
-    window.addEventListener('keydown', onKeyDown);
+    trackPanelGesture(dispatch, `resize-side-${side}`, {
+      onMove: (moveEvt) => {
+        const deltaX = moveEvt.clientX - startX;
+        dispatch({
+          type: 'PREVIEW_GESTURE',
+          action: { type: 'RESIZE_SIDE', side, width: computeResizedSideWidth(side, startWidth, deltaX) },
+        });
+      },
+      onSettle: () => setIsResizingSide(false),
+    });
   };
 
   // Keyboard navigation on side resize handle
@@ -154,23 +125,12 @@ export const DockColumn: React.FC<DockColumnProps> = ({
     const startY = e.clientY;
     const startRatios = [...ratios];
 
-    const onPointerMove = (moveEvt: PointerEvent) => {
-      moveSplitter(index, startRatios, moveEvt.clientY - startY, totalHeight);
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', cleanup);
-    };
-
-    const onPointerUp = () => {
-      cleanup();
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', cleanup);
+    trackPointerGesture({
+      onMove: (moveEvt) => moveSplitter(index, startRatios, moveEvt.clientY - startY, totalHeight),
+      onUp: () => {},
+      onCancel: () => {},
+      cancelOnEscape: false,
+    });
   };
 
   const handleSplitterKeyDown = (index: number) => (e: React.KeyboardEvent) => {

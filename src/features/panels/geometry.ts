@@ -25,11 +25,7 @@ export {
   MIN_FLOAT_WIDTH,
   MIN_FLOAT_HEIGHT,
   STACK_MIN_EXPANDED_HEIGHT,
-  DEFAULT_SIDE_WIDTH,
 };
-
-/** Default threshold in px from edge to activate docking drop target */
-export const DEFAULT_DROP_THRESHOLD = 200;
 
 /**
  * Computes whether pointer is within the left or right dock drop target zone.

@@ -37,20 +37,8 @@ function portSchemaId(document: Document, elementId: string, portId: string): st
   return document.elements.find((e) => e.id === elementId)?.ports.find((p) => p.id === portId)?.schemaId ?? null;
 }
 
-export function reorderInputs(inputs: readonly Input[], sourceId: string, targetId: string): readonly Input[] {
-  if (sourceId === targetId) return inputs;
-  const sourceIndex = inputs.findIndex((input) => input.id === sourceId);
-  const targetIndex = inputs.findIndex((input) => input.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0) return inputs;
-  const reordered = [...inputs];
-  const [moved] = reordered.splice(sourceIndex, 1);
-  reordered.splice(targetIndex, 0, moved);
-  return reordered;
-}
-
 export function StepsSection({ document, scenario, onChange, mintId, issues = [], _defaultExpandedId }: StepsSectionProps) {
   const [expandedId, setExpandedId] = React.useState<string | null>(_defaultExpandedId ?? null);
-  const [draggedStepId, setDraggedStepId] = React.useState<string | null>(null);
   const entryOptions = React.useMemo(() => inboundEndpointOptions(document), [document]);
 
   const entriesWithFixtures = React.useMemo(
@@ -101,14 +89,6 @@ export function StepsSection({ document, scenario, onChange, mintId, issues = []
       const [moved] = inputs.splice(index, 1);
       inputs.splice(target, 0, moved);
       return { ...s, inputs };
-    });
-  };
-
-  const moveStepBefore = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
-    onChange((s) => {
-      const inputs = reorderInputs(s.inputs, sourceId, targetId);
-      return inputs === s.inputs ? s : { ...s, inputs };
     });
   };
 

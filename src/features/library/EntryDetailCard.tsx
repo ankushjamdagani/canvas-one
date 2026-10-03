@@ -10,7 +10,6 @@
  *   "Failures go to", Open docs)
  */
 
-import * as React from 'react';
 import type { CatalogEntry } from '../catalog/catalog';
 import { getFormattedEntryDetail } from './viewModel';
 

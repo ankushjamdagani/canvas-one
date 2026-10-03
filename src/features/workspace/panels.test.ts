@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type {
-  PanelId,
-  Placement,
-  WorkspacePanelState,
-  WorkspacePanelPreferences,
-} from './panels';
+import type { WorkspacePanelPreferences } from './panels';
 import {
   BREAKPOINT_MOBILE,
   BREAKPOINT_DESKTOP,

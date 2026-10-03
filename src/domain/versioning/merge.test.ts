@@ -2,14 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mergeDocuments, generateConflictId, convertIssuePathToIdPath } from './merge';
-import type {
-  Document,
-  Element,
-  Connection,
-  Port,
-  Placement,
-  Transition,
-} from '../studio/model';
+import type { Element, Connection } from '../studio/model';
 import { UUID_REGEX } from '../../persistence/studio/primitives';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');

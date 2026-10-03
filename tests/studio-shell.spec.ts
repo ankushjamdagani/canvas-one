@@ -46,7 +46,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
 
     // Reload returns to the entry screen (session state is in-memory only);
     // the rename is durable there.
-    await page.reload();
+    await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const renamedItem = page
       .getByTestId('existing-projects-list')
@@ -235,8 +235,12 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
 
     await expect(page.getByTestId('dock-zoom-value')).toBeVisible();
     await page.getByTestId('dock-more-btn').click();
-    for (const id of ['edit.undo', 'edit.redo', 'canvas.zoom-out', 'canvas.zoom-in', 'canvas.fit']) {
+    for (const id of ['edit.undo', 'edit.redo']) {
       await expect(page.getByTestId(`dock-overflow-${id}`)).toBeVisible();
+    }
+    // Zoom and fit are fixed dock controls, not pinnable tools.
+    for (const id of ['canvas.zoom-out', 'canvas.zoom-in', 'canvas.fit']) {
+      await expect(page.getByTestId(`dock-overflow-${id}`)).toHaveCount(0);
     }
     await expect(page.getByTestId('canvas-floating-dock')).toBeVisible();
   });

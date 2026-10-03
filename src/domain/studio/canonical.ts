@@ -12,6 +12,7 @@
  */
 
 import type { Issue } from './validate';
+import { errorIssue } from './issue';
 
 /**
  * Checks whether a string contains any unpaired Unicode surrogates.
@@ -103,26 +104,14 @@ export function canonicalJson(
     return {
       ok: false,
       issues: [
-        {
-          code: 'too-large',
-          path: [...basePath],
-          entityId: null,
-          severity: 'error',
-          message: `Canonical JSON byte length exceeds maximum limit of ${maxBytes} bytes`,
-        },
+        errorIssue('too-large', [...basePath], null, `Canonical JSON byte length exceeds maximum limit of ${maxBytes} bytes`),
       ],
     };
   }
 
   function processValue(val: unknown): 'ok' | 'too-large' | Issue {
     if (val === undefined) {
-      return {
-        code: 'wrong-type',
-        path: [...currentPath],
-        entityId: null,
-        severity: 'error',
-        message: 'Disallowed undefined value in canonical JSON',
-      };
+      return errorIssue('wrong-type', [...currentPath], null, 'Disallowed undefined value in canonical JSON');
     }
 
     if (val === null) {
@@ -137,13 +126,7 @@ export function canonicalJson(
 
     if (typeof val === 'number') {
       if (!Number.isFinite(val)) {
-        return {
-          code: 'wrong-type',
-          path: [...currentPath],
-          entityId: null,
-          severity: 'error',
-          message: `Disallowed non-finite number: ${val}`,
-        };
+        return errorIssue('wrong-type', [...currentPath], null, `Disallowed non-finite number: ${val}`);
       }
       const str = Object.is(val, -0) ? '0' : JSON.stringify(val);
       if (!appendToken(str)) return 'too-large';
@@ -152,13 +135,7 @@ export function canonicalJson(
 
     if (typeof val === 'string') {
       if (hasUnpairedSurrogate(val)) {
-        return {
-          code: 'wrong-type',
-          path: [...currentPath],
-          entityId: null,
-          severity: 'error',
-          message: 'String contains unpaired Unicode surrogates',
-        };
+        return errorIssue('wrong-type', [...currentPath], null, 'String contains unpaired Unicode surrogates');
       }
       const str = JSON.stringify(val);
       if (!appendToken(str)) return 'too-large';
@@ -166,56 +143,26 @@ export function canonicalJson(
     }
 
     if (typeof val === 'bigint') {
-      return {
-        code: 'wrong-type',
-        path: [...currentPath],
-        entityId: null,
-        severity: 'error',
-        message: 'Disallowed BigInt value in canonical JSON',
-      };
+      return errorIssue('wrong-type', [...currentPath], null, 'Disallowed BigInt value in canonical JSON');
     }
 
     if (typeof val === 'symbol') {
-      return {
-        code: 'wrong-type',
-        path: [...currentPath],
-        entityId: null,
-        severity: 'error',
-        message: 'Disallowed Symbol value in canonical JSON',
-      };
+      return errorIssue('wrong-type', [...currentPath], null, 'Disallowed Symbol value in canonical JSON');
     }
 
     if (typeof val === 'function') {
-      return {
-        code: 'wrong-type',
-        path: [...currentPath],
-        entityId: null,
-        severity: 'error',
-        message: 'Disallowed Function value in canonical JSON',
-      };
+      return errorIssue('wrong-type', [...currentPath], null, 'Disallowed Function value in canonical JSON');
     }
 
     if (typeof val === 'object') {
       if (activeAncestors.has(val)) {
-        return {
-          code: 'structural-rule',
-          path: [...currentPath],
-          entityId: null,
-          severity: 'error',
-          message: 'Circular structure detected in canonical JSON value',
-        };
+        return errorIssue('structural-rule', [...currentPath], null, 'Circular structure detected in canonical JSON value');
       }
 
       if (Array.isArray(val)) {
         for (let i = 0; i < val.length; i++) {
           if (!Object.hasOwn(val, i)) {
-            return {
-              code: 'wrong-type',
-              path: [...currentPath, i],
-              entityId: null,
-              severity: 'error',
-              message: `Sparse array with hole at index ${i} is not allowed`,
-            };
+            return errorIssue('wrong-type', [...currentPath, i], null, `Sparse array with hole at index ${i} is not allowed`);
           }
         }
 
@@ -232,23 +179,11 @@ export function canonicalJson(
       } else {
         const proto = Object.getPrototypeOf(val);
         if (proto !== Object.prototype && proto !== null) {
-          return {
-            code: 'wrong-type',
-            path: [...currentPath],
-            entityId: null,
-            severity: 'error',
-            message: 'Disallowed non-plain object in canonical JSON',
-          };
+          return errorIssue('wrong-type', [...currentPath], null, 'Disallowed non-plain object in canonical JSON');
         }
 
         if (Object.getOwnPropertySymbols(val).length > 0) {
-          return {
-            code: 'wrong-type',
-            path: [...currentPath],
-            entityId: null,
-            severity: 'error',
-            message: 'Disallowed Symbol property in canonical JSON object',
-          };
+          return errorIssue('wrong-type', [...currentPath], null, 'Disallowed Symbol property in canonical JSON object');
         }
 
         const keys = Object.keys(val as Record<string, unknown>);
@@ -257,13 +192,7 @@ export function canonicalJson(
 
         for (const k of keys) {
           if (hasUnpairedSurrogate(k)) {
-            return {
-              code: 'wrong-type',
-              path: [...currentPath, k],
-              entityId: null,
-              severity: 'error',
-              message: `Object key '${k}' contains unpaired Unicode surrogates`,
-            };
+            return errorIssue('wrong-type', [...currentPath, k], null, `Object key '${k}' contains unpaired Unicode surrogates`);
           }
         }
 
@@ -286,13 +215,7 @@ export function canonicalJson(
       }
     }
 
-    return {
-      code: 'wrong-type',
-      path: [...currentPath],
-      entityId: null,
-      severity: 'error',
-      message: `Disallowed value of type ${typeof val} in canonical JSON`,
-    };
+    return errorIssue('wrong-type', [...currentPath], null, `Disallowed value of type ${typeof val} in canonical JSON`);
   }
 
   // Process root value
@@ -409,8 +332,12 @@ export function canonicalJson(
  * Computes lowercase hex SHA-256 digest of UTF-8 encoded text using Web Crypto API.
  */
 export async function sha256Hex(text: string): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    throw new Error('Web Crypto (crypto.subtle) is unavailable');
+  }
   const bytes = new TextEncoder().encode(text);
-  const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  const hashBuffer = await subtle.digest('SHA-256', bytes);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }

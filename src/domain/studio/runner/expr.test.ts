@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ExprEvaluator, defaultEvaluator, readPath } from './expr';
-import { isMissing, missingValue, type EvalScope } from './expr-api';
+import { defaultEvaluator, readPath } from './expr';
+import { isMissing, type EvalScope } from './expr-api';
 import type { Guard, Value } from '../model';
 
 describe('expr: readPath', () => {

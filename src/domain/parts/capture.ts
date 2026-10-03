@@ -10,6 +10,7 @@ import type {
 } from '../studio/model';
 import type { Issue } from '../studio/validate';
 import type { CapturePreview, CaptureResult, CaptureSelection, PartContent } from './types';
+import { createIssue } from '../studio/issue';
 
 const PART_LIMITS = {
   elements: 50,
@@ -19,12 +20,8 @@ const PART_LIMITS = {
   bytes: 512 * 1024,
 } as const;
 
-function issue(code: Issue['code'], message: string, path: readonly (string | number)[] = []): Issue {
-  return { code, path, entityId: null, severity: 'error', message };
-}
-
 function smallerSelectionIssue(kind: string, actual: number, maximum: number): Issue {
-  return issue(
+  return createIssue(
     'too-many',
     `The captured part has ${actual} ${kind}, exceeding the limit of ${maximum}. Select a smaller set of elements.`,
     [kind],
@@ -76,11 +73,11 @@ export function captureSelection(
   selection: CaptureSelection,
 ): CaptureResult {
   const view = document.views.find((candidate) => candidate.id === viewId);
-  if (!view) return { ok: false, issues: [issue('dangling-reference', 'The active view no longer exists.', ['viewId'])] };
+  if (!view) return { ok: false, issues: [createIssue('dangling-reference', 'The active view no longer exists.', ['viewId'])] };
 
   const selectedIds = uniqueInOrder(selection.elementIds);
   if (selectedIds.length === 0) {
-    return { ok: false, issues: [issue('structural-rule', 'Select at least one element to capture.', ['selection', 'elementIds'])] };
+    return { ok: false, issues: [createIssue('structural-rule', 'Select at least one element to capture.', ['selection', 'elementIds'])] };
   }
 
   const elementsById = new Map(document.elements.map((element) => [element.id, element]));
@@ -98,14 +95,14 @@ export function captureSelection(
   for (let index = 0; index < selectedIds.length; index++) {
     const elementId = selectedIds[index];
     if (!elementsById.has(elementId)) {
-      issues.push(issue('dangling-reference', 'A selected element no longer exists.', ['selection', 'elementIds', index]));
+      issues.push(createIssue('dangling-reference', 'A selected element no longer exists.', ['selection', 'elementIds', index]));
     } else if (!placementsByElementId.has(elementId)) {
-      issues.push(issue('dangling-reference', 'A selected element is not placed in the active view.', ['selection', 'elementIds', index]));
+      issues.push(createIssue('dangling-reference', 'A selected element is not placed in the active view.', ['selection', 'elementIds', index]));
     }
   }
   for (let index = 0; index < selection.noteIds.length; index++) {
     if (!notesById.has(selection.noteIds[index])) {
-      issues.push(issue('dangling-reference', 'A selected note no longer exists in the active view.', ['selection', 'noteIds', index]));
+      issues.push(createIssue('dangling-reference', 'A selected note no longer exists in the active view.', ['selection', 'noteIds', index]));
     }
   }
   if (issues.length > 0) return { ok: false, issues };
@@ -130,7 +127,7 @@ export function captureSelection(
     const ownerRefinement = refinementByMember.get(elementId);
     if (ownerRefinement && !includedElementIds.has(ownerRefinement.ownerElementId)) {
       issues.push(
-        issue(
+        createIssue(
           'dangling-reference',
           'The selection contains an internal refinement member without its owner. Expand the selection to include the full refinement or cancel.',
           ['selection', 'elementIds'],
@@ -141,7 +138,7 @@ export function captureSelection(
 
   for (const elementId of includedElementIds) {
     if (!elementsById.has(elementId)) {
-      issues.push(issue('dangling-reference', 'A refinement member required by the selection is missing.', ['refinements']));
+      issues.push(createIssue('dangling-reference', 'A refinement member required by the selection is missing.', ['refinements']));
     }
   }
 
@@ -158,7 +155,7 @@ export function captureSelection(
       requiredFixtureIds.add(element.behavior.initialContextFixtureId);
       if (!fixturesById.has(element.behavior.initialContextFixtureId)) {
         issues.push(
-          issue(
+          createIssue(
             'dangling-reference',
             'A selected machine is missing its required initial context fixture.',
             ['elements', document.elements.indexOf(element), 'behavior', 'initialContextFixtureId'],
@@ -172,7 +169,7 @@ export function captureSelection(
   requiredFixtures.forEach((fixture) => requiredSchemaIds.add(fixture.schemaId));
   for (const schemaId of requiredSchemaIds) {
     if (!schemasById.has(schemaId)) {
-      issues.push(issue('dangling-reference', 'A selected element or fixture is missing a required payload schema.', ['schemas']));
+      issues.push(createIssue('dangling-reference', 'A selected element or fixture is missing a required payload schema.', ['schemas']));
     }
   }
 
@@ -207,7 +204,7 @@ export function captureSelection(
   }
   if (excludedRelations.some((relation) => relation.kind === 'deployed-on')) {
     issues.push(
-      issue(
+      createIssue(
         'dangling-reference',
         'A deployed-on relationship crosses the selection boundary. Include both the deployed element and its host or cancel.',
         ['relations'],

@@ -17,14 +17,7 @@
 
 import { canonicalJson } from '../canonical';
 import type { Guard, Json, Path, Value } from '../model';
-import type {
-  Evaluator,
-  EvalError,
-  EvalResult,
-  EvalScope,
-  GuardOutcome,
-  ValueOutcome,
-} from './expr-api';
+import type { Evaluator, EvalResult, EvalScope, GuardOutcome, ValueOutcome } from './expr-api';
 import { isMissing, missingValue } from './expr-api';
 
 /**
@@ -63,7 +56,7 @@ export function readPath(root: unknown, path: Path): EvalResult {
   return current as Json;
 }
 
-export class ExprEvaluator implements Evaluator {
+class ExprEvaluator implements Evaluator {
   evalValue(value: Value, scope: EvalScope): ValueOutcome {
     switch (value.kind) {
       case 'literal':

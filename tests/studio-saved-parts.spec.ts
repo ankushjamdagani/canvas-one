@@ -68,7 +68,7 @@ test("saved part survives reload, shares Library search, exports/imports, and pl
       exact: true,
     }),
   ).toHaveCount(2);
-  await page.reload();
+  await page.goto("/");
   await page.getByRole("button", { name: "Open draft", exact: true }).click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
   await openOurs(page);

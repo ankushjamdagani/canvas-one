@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { StatusDot } from '@/components/ui/status-dot';
 
 const meta: Meta<typeof StatusDot> = {

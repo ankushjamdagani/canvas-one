@@ -229,7 +229,7 @@ export interface CommandPayloads {
 
 export type CommandGroup = 'project' | 'branch' | 'run' | 'review' | 'export' | 'selection' | 'edit';
 
-export const COMMAND_GROUP_LABELS: Readonly<Record<CommandGroup, string>> = {
+const COMMAND_GROUP_LABELS: Readonly<Record<CommandGroup, string>> = {
   project: 'Project',
   branch: 'Switch branch',
   run: 'Run',
@@ -1609,7 +1609,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
 // Rename (nested in Quick options)
 // ============================================================================
 
-export const PROJECT_TITLE_MAX_LENGTH = 80;
+const PROJECT_TITLE_MAX_LENGTH = 80;
 
 export type ProjectTitleCheck =
   | { readonly ok: true; readonly title: string }

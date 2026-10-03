@@ -10,7 +10,7 @@ function containsId(value: unknown, ids: ReadonlySet<Id>): boolean {
   return false;
 }
 
-export function touchesElement(
+function touchesElement(
   diff: RecordDiff,
   parent: Document | null,
   child: Document,

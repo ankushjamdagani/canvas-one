@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
   Trash2,
   Ungroup,
+  type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -106,6 +107,71 @@ const OVERFLOW_PRIMARY: readonly { readonly id: OverflowCommandId; readonly labe
 const OVERFLOW_SECONDARY: readonly { readonly id: OverflowCommandId; readonly label: string }[] = [
   { id: 'selection.export', label: 'Export selection' },
 ];
+
+const HORIZONTAL_ALIGN_ITEMS = [
+  { value: 'left', label: 'Align left', Icon: AlignLeft },
+  { value: 'center-x', label: 'Align center horizontally', Icon: AlignCenterHorizontal },
+  { value: 'right', label: 'Align right', Icon: AlignRight },
+] as const;
+
+const VERTICAL_ALIGN_ITEMS = [
+  { value: 'top', label: 'Align top', Icon: AlignStartVertical },
+  { value: 'center-y', label: 'Align center vertically', Icon: AlignCenterVertical },
+  { value: 'bottom', label: 'Align bottom', Icon: AlignEndVertical },
+] as const;
+
+const DISTRIBUTE_ITEMS = [
+  { value: 'x', label: 'Distribute horizontally', Icon: AlignHorizontalDistributeCenter },
+  { value: 'y', label: 'Distribute vertically', Icon: AlignVerticalDistributeCenter },
+] as const;
+
+
+type AlignItem<V extends string> = { readonly value: V; readonly label: string; readonly Icon: LucideIcon };
+
+function AlignSection<V extends string>({
+  title,
+  items,
+  testIdPrefix,
+  availabilityOf,
+  onSelect,
+}: {
+  readonly title: string;
+  readonly items: readonly AlignItem<V>[];
+  readonly testIdPrefix: string;
+  readonly availabilityOf: (value: V) => ReturnType<typeof getAvailability>;
+  readonly onSelect: (value: V) => void;
+}) {
+  return (
+    <div>
+      <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
+        {title}
+      </DropdownMenuLabel>
+      <div className="flex items-center gap-1 px-1 py-0.5">
+        {items.map(({ value, label, Icon }) => {
+          const availability = availabilityOf(value);
+          return (
+            <Tooltip key={value}>
+              <TooltipTrigger asChild>
+                <DropdownMenuItem
+                  data-testid={`${testIdPrefix}-${value}`}
+                  disabled={!availability.enabled}
+                  onSelect={() => onSelect(value)}
+                  className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
+                  aria-label={label}
+                >
+                  <Icon className="size-4 shrink-0 text-foreground" />
+                </DropdownMenuItem>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {availability.enabled ? label : `${label} (${availability.reason})`}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function SelectionToolbar({ context, executeCommand, mintId, className, style: customStyle }: SelectionToolbarProps) {
   const [groupOpen, setGroupOpen] = React.useState(false);
@@ -263,23 +329,6 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
       setWrapError(commandError(result));
     }
   }
-
-  const horizontalAlignItems = [
-    { edge: 'left', label: 'Align left', Icon: AlignLeft },
-    { edge: 'center-x', label: 'Align center horizontally', Icon: AlignCenterHorizontal },
-    { edge: 'right', label: 'Align right', Icon: AlignRight },
-  ] as const;
-
-  const verticalAlignItems = [
-    { edge: 'top', label: 'Align top', Icon: AlignStartVertical },
-    { edge: 'center-y', label: 'Align center vertically', Icon: AlignCenterVertical },
-    { edge: 'bottom', label: 'Align bottom', Icon: AlignEndVertical },
-  ] as const;
-
-  const distributeItems = [
-    { axis: 'x', label: 'Distribute horizontally', Icon: AlignHorizontalDistributeCenter },
-    { axis: 'y', label: 'Distribute vertically', Icon: AlignVerticalDistributeCenter },
-  ] as const;
 
   const runOverflow = async (id: OverflowCommandId) => {
     setOverflowError(null);
@@ -462,99 +511,33 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
         <DropdownMenuContent align="end" className="w-auto min-w-[152px] p-0 overflow-hidden shadow-popover">
           <DropdownMenuHeader className="px-3 py-2 text-secondary-text">ALIGN & DISTRIBUTE</DropdownMenuHeader>
           <div className="p-1.5 bg-background space-y-1">
-            {/* Horizontal Alignment Section */}
-            <div>
-              <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
-                Horizontal Alignment
-              </DropdownMenuLabel>
-              <div className="flex items-center gap-1 px-1 py-0.5">
-                {horizontalAlignItems.map(({ edge, label, Icon }) => {
-                  const availability = getAvailability('selection.align', context, { edge });
-                  return (
-                    <Tooltip key={edge}>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuItem
-                          data-testid={`selection-align-${edge}`}
-                          disabled={!availability.enabled}
-                          onSelect={() => void executeCommand('selection.align', { edge })}
-                          className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
-                          aria-label={label}
-                        >
-                          <Icon className="size-4 shrink-0 text-foreground" />
-                        </DropdownMenuItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        {availability.enabled ? label : `${label} (${availability.reason})`}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
+            <AlignSection
+              title="Horizontal Alignment"
+              items={HORIZONTAL_ALIGN_ITEMS}
+              testIdPrefix="selection-align"
+              availabilityOf={(edge) => getAvailability('selection.align', context, { edge })}
+              onSelect={(edge) => void executeCommand('selection.align', { edge })}
+            />
 
             <DropdownMenuSeparator className="my-1" />
 
-            {/* Vertical Alignment Section */}
-            <div>
-              <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
-                Vertical Alignment
-              </DropdownMenuLabel>
-              <div className="flex items-center gap-1 px-1 py-0.5">
-                {verticalAlignItems.map(({ edge, label, Icon }) => {
-                  const availability = getAvailability('selection.align', context, { edge });
-                  return (
-                    <Tooltip key={edge}>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuItem
-                          data-testid={`selection-align-${edge}`}
-                          disabled={!availability.enabled}
-                          onSelect={() => void executeCommand('selection.align', { edge })}
-                          className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
-                          aria-label={label}
-                        >
-                          <Icon className="size-4 shrink-0 text-foreground" />
-                        </DropdownMenuItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        {availability.enabled ? label : `${label} (${availability.reason})`}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
+            <AlignSection
+              title="Vertical Alignment"
+              items={VERTICAL_ALIGN_ITEMS}
+              testIdPrefix="selection-align"
+              availabilityOf={(edge) => getAvailability('selection.align', context, { edge })}
+              onSelect={(edge) => void executeCommand('selection.align', { edge })}
+            />
 
             <DropdownMenuSeparator className="my-1" />
 
-            {/* Distribute Section */}
-            <div>
-              <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
-                Distribute
-              </DropdownMenuLabel>
-              <div className="flex items-center gap-1 px-1 py-0.5">
-                {distributeItems.map(({ axis, label, Icon }) => {
-                  const availability = getAvailability('selection.distribute', context, { axis });
-                  return (
-                    <Tooltip key={axis}>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuItem
-                          data-testid={`selection-distribute-${axis}`}
-                          disabled={!availability.enabled}
-                          onSelect={() => void executeCommand('selection.distribute', { axis })}
-                          className="size-8 p-0 flex items-center justify-center rounded-control cursor-pointer text-foreground hover:bg-sunken focus:bg-sunken disabled:pointer-events-none disabled:opacity-40"
-                          aria-label={label}
-                        >
-                          <Icon className="size-4 shrink-0 text-foreground" />
-                        </DropdownMenuItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        {availability.enabled ? label : `${label} (${availability.reason})`}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
+            <AlignSection
+              title="Distribute"
+              items={DISTRIBUTE_ITEMS}
+              testIdPrefix="selection-distribute"
+              availabilityOf={(axis) => getAvailability('selection.distribute', context, { axis })}
+              onSelect={(axis) => void executeCommand('selection.distribute', { axis })}
+            />
           </div>
         </DropdownMenuContent>
       </DropdownMenu>

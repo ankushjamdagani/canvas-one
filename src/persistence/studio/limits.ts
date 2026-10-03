@@ -45,7 +45,7 @@ export type AccountedBytes = {
 /**
  * Computes the total accounted local bytes and export envelope bytes for a given project.
  */
-export async function getProjectAccountedBytes(
+async function getProjectAccountedBytes(
   db: StudioDatabase,
   projectId: string,
 ): Promise<AccountedBytes> {

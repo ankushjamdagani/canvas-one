@@ -28,7 +28,6 @@ import type {
   HistoryLoadResult,
   HistoryRestoreCommand,
   PublicationRecord,
-  RunRecord,
   StudioRepository,
 } from '../../persistence/studio';
 import {
@@ -49,7 +48,6 @@ import {
 } from './diffSummary';
 import type {
   CommitActionOptions,
-  CommitIneligibleResult,
   CommitPreview,
   CommitResult,
   HistoryControllerOptions,
@@ -456,18 +454,7 @@ export class HistoryController {
       },
     };
 
-    try {
-      const res = await this.repository.execute(command);
-      if (res.status === 'applied') {
-        // Adopt restored Document and reload workingRevision in session
-        await this.session.openProject(sessionState.projectId, sessionState.branchId);
-        // Reload history to reflect the pre-restore checkpoint
-        await this.loadHistory();
-      }
-      return res;
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    return this.executeAndReload(command, sessionState.projectId, sessionState.branchId);
   }
 
   // ==========================================================================
@@ -672,18 +659,7 @@ export class HistoryController {
       },
     };
 
-    try {
-      const res = await this.repository.execute(command);
-      if (res.status === 'applied') {
-        // Reload session to adopt new head snapshot & reset undo stack
-        await this.session.openProject(sessionState.projectId, sessionState.branchId);
-        // Reload history to update ladder commits
-        await this.loadHistory();
-      }
-      return res;
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    return this.executeAndReload(command, sessionState.projectId, sessionState.branchId);
   }
 
   // ==========================================================================
@@ -824,6 +800,27 @@ export class HistoryController {
     return matching;
   }
 
+
+  // ==========================================================================
+  // Shared
+  // ==========================================================================
+
+  /**
+   * Executes a history command; when applied, re-opens the branch in the session (adopting
+   * the restored or committed document and resetting undo) and reloads the history ladder.
+   */
+  private async executeAndReload(command: HistoryRestoreCommand | HistoryCommitCommand, projectId: Id, branchId: Id) {
+    try {
+      const res = await this.repository.execute(command);
+      if (res.status === 'applied') {
+        await this.session.openProject(projectId, branchId);
+        await this.loadHistory();
+      }
+      return res;
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
 }
 
 /**

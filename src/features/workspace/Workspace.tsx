@@ -1,10 +1,14 @@
-import * as React from 'react';
-import type { SessionController } from '../session/controller';
-import { formatStudioError } from '../session/formatError';
-import { TopBar } from './TopBar';
-import type { BranchActionOutcome } from './BranchPopover';
-import { CanvasView, type CanvasSelectionRequest, type CanvasViewHandle } from './CanvasView';
-import { buildMoveChange } from './projection';
+import * as React from "react";
+import type { SessionController } from "../session/controller";
+import { formatStudioError } from "../session/formatError";
+import { TopBar } from "./TopBar";
+import type { BranchActionOutcome } from "./BranchPopover";
+import {
+  CanvasView,
+  type CanvasSelectionRequest,
+  type CanvasViewHandle,
+} from "./CanvasView";
+import { buildMoveChange } from "./projection";
 import {
   BREAKPOINT_DESKTOP,
   createInitialPanelState,
@@ -12,60 +16,76 @@ import {
   type PanelId,
   type WorkspacePanelState,
   type WorkspacePanelAction,
-} from './panels';
+} from "./panels";
 import {
   hydratePanelState,
   isLatestPanelPreferenceRequest,
   panelPreferencesFromState,
   WorkspacePanelPreferenceStore,
-} from './panelPreferences';
-import { PanelHost, type PanelCommandRoutes } from '../panels';
-import { HistoryController } from '../history/controller';
-import { PublishController } from '../history/publishController';
-import { DraftBehindMainBanner } from '../history/DraftBehindMainBanner';
-import { HistoryLadder, CommitPanel, PublishFlow, ScenarioEditor, preloadLazyViews } from './lazyViews';
-import { whenIdle } from '@/lib/lazyComponent';
-import { LibraryPanel, type LibraryView } from '../library';
-import { downloadSavedPart, SavedParts } from '../library/SavedParts';
+} from "./panelPreferences";
+import { PanelHost, type PanelCommandRoutes } from "../panels";
+import { HistoryController } from "../history/controller";
+import { PublishController } from "../history/publishController";
+import { DraftBehindMainBanner } from "../history/DraftBehindMainBanner";
+import {
+  HistoryLadder,
+  CommitPanel,
+  PublishFlow,
+  ScenarioEditor,
+  preloadLazyViews,
+} from "./lazyViews";
+import { whenIdle } from "@/lib/lazyComponent";
+import { LibraryPanel, type LibraryView } from "../library";
+import { downloadSavedPart, SavedParts } from "../library/SavedParts";
 import type {
   BranchRecord,
   ProjectRecord,
   StudioRepository,
-} from '../../persistence/studio/types';
-import { createCandidateController, createIssue, type Actor } from '../../persistence/studio';
-import type { Id, Note } from '../../domain/studio/model';
-import { captureSelection } from '../../domain/parts/capture';
-import { planPlacement } from '../../domain/parts/place';
-import type { PartContent } from '../../domain/parts/types';
+} from "../../persistence/studio/types";
+import {
+  createCandidateController,
+  createIssue,
+  type Actor,
+} from "../../persistence/studio";
+import type { Id, Note } from "../../domain/studio/model";
+import { captureSelection } from "../../domain/parts/capture";
+import { planPlacement } from "../../domain/parts/place";
+import type { PartContent } from "../../domain/parts/types";
 import {
   loadScenarioStatuses,
   RunController,
   ResultsRegion,
   WorkerTransport,
   type ScenariosStatusResult,
-} from '../runs';
+} from "../runs";
 import {
   applyScenarioDraft,
   changeScenarioDraft,
   deleteScenario,
   openScenarioDraft,
-} from '../scenarios/draft';
-import { DeleteScenarioDialog } from '../scenarios/DeleteScenarioDialog';
-import { NewScenarioDialog, type NewScenarioDialogProps } from '../scenarios/NewScenarioDialog';
-import { ScenarioSwitcher, type ScenarioSwitcherEntry } from '../scenarios/ScenarioSwitcher';
-import type { ScenarioDraftHandle } from '../scenarios/types';
-import { createBrowserDownloadSink, useTransferActions } from '../transfer';
-import { sanitizeFilenameStem } from '../transfer/filename';
-import { createSelectionExport } from './exportSelection';
-import { planAddProbe } from './addProbePlan';
-import { planReplacePart } from './replacePlan';
-import { ReplacePartDialog } from './ReplacePartDialog';
+} from "../scenarios/draft";
+import { DeleteScenarioDialog } from "../scenarios/DeleteScenarioDialog";
+import {
+  NewScenarioDialog,
+  type NewScenarioDialogProps,
+} from "../scenarios/NewScenarioDialog";
+import {
+  ScenarioSwitcher,
+  type ScenarioSwitcherEntry,
+} from "../scenarios/ScenarioSwitcher";
+import type { ScenarioDraftHandle } from "../scenarios/types";
+import { createBrowserDownloadSink, useTransferActions } from "../transfer";
+import { sanitizeFilenameStem } from "../transfer/filename";
+import { createSelectionExport } from "./exportSelection";
+import { planAddProbe } from "./addProbePlan";
+import { planReplacePart } from "./replacePlan";
+import { ReplacePartDialog } from "./ReplacePartDialog";
 import {
   computeSessionRunDisabledReason,
   readScenarioSelection,
   resolveSelectedScenarioId,
   writeScenarioSelection,
-} from './runWiring';
+} from "./runWiring";
 import {
   applyDraft,
   cancelDraft,
@@ -79,8 +99,11 @@ import {
   type DraftHandle,
   type DraftSession,
   type DraftTarget,
-} from '../inspector';
-import { buildTransferSessionState, createScenarioDraftSession } from './integrationState';
+} from "../inspector";
+import {
+  buildTransferSessionState,
+  createScenarioDraftSession,
+} from "./integrationState";
 import {
   buildQuickOptions,
   COMMAND_DEFINITIONS,
@@ -98,13 +121,16 @@ import {
   type ExecuteResult,
   type QuickOption,
   type ShortcutEvent,
-} from './commands/registry';
-import { QuickOptionsDialog, type RenameOutcome } from './QuickOptions';
-import type { TextStepKind } from './QuickOptionsTextStep';
-import { routeHistoryController, routePublishController } from './historyRouting';
-import { DEFAULT_DOCK_CONFIG, type DockConfig } from './dockConfig';
-import { findRunAllDisabledReason } from '../runs';
-import type { SessionRenameResult } from '../session/types';
+} from "./commands/registry";
+import { QuickOptionsDialog, type RenameOutcome } from "./QuickOptions";
+import type { TextStepKind } from "./QuickOptionsTextStep";
+import {
+  routeHistoryController,
+  routePublishController,
+} from "./historyRouting";
+import { DEFAULT_DOCK_CONFIG, type DockConfig } from "./dockConfig";
+import { findRunAllDisabledReason } from "../runs";
+import type { SessionRenameResult } from "../session/types";
 import {
   planAddNote,
   planAlign,
@@ -112,10 +138,10 @@ import {
   planGroup,
   planUngroup,
   type SelectionPlan,
-} from './selectionPlans';
-import { expansionStateOf, planExpansion } from './expandPlans';
-import { planWrapInBoundary, wrapBoundaryCrossingEndpoints } from './wrapPlan';
-import { Button } from '@/components/ui/button';
+} from "./selectionPlans";
+import { expansionStateOf, planExpansion } from "./expandPlans";
+import { planWrapInBoundary, wrapBoundaryCrossingEndpoints } from "./wrapPlan";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -123,48 +149,56 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 
 const MOBILE_BREAKPOINT_PX = 768;
 
 const IS_MAC =
-  typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+  typeof navigator !== "undefined" &&
+  /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
 /** RV-03q: the nested Quick options rename reports the session's own reason. */
 function renameOutcome(result: SessionRenameResult): RenameOutcome {
   switch (result.status) {
-    case 'applied':
+    case "applied":
       return { ok: true };
-    case 'busy':
-    case 'unsupported':
+    case "busy":
+    case "unsupported":
       return { ok: false, message: result.message };
-    case 'invalid':
-      return { ok: false, message: result.issues[0]?.message ?? 'That name is not valid' };
-    case 'stale':
-      return { ok: false, message: 'This project changed elsewhere. Reopen it and try again.' };
+    case "invalid":
+      return {
+        ok: false,
+        message: result.issues[0]?.message ?? "That name is not valid",
+      };
+    case "stale":
+      return {
+        ok: false,
+        message: "This project changed elsewhere. Reopen it and try again.",
+      };
     default:
-      return { ok: false, message: 'Rename failed. Try again.' };
+      return { ok: false, message: "Rename failed. Try again." };
   }
 }
 
 type DuplicateDialogState =
   | {
-      readonly kind: 'confirm';
+      readonly kind: "confirm";
       readonly content: PartContent;
       readonly anchor: { readonly x: number; readonly y: number };
       readonly items: readonly string[];
       readonly warnings: readonly string[];
     }
-  | { readonly kind: 'error'; readonly messages: readonly string[] };
+  | { readonly kind: "error"; readonly messages: readonly string[] };
 
-const UUID_IN_MESSAGE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/g;
+const UUID_IN_MESSAGE =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/g;
 
 function duplicateIssueMessages(
   issues: readonly { readonly message: string }[],
   fallback: string,
 ): readonly string[] {
   const messages = issues.map((issue) =>
-    issue.message.replace(UUID_IN_MESSAGE, 'the referenced item'),
+    issue.message.replace(UUID_IN_MESSAGE, "the referenced item"),
   );
   return messages.length > 0 ? messages : [fallback];
 }
@@ -178,28 +212,31 @@ function duplicateConfirmationItems(preview: {
 }): readonly string[] {
   const items = [...preview.notices];
   const addFallback = (count: number, keyword: string, message: string) => {
-    if (count > 0 && !items.some((item) => item.toLowerCase().includes(keyword))) {
+    if (
+      count > 0 &&
+      !items.some((item) => item.toLowerCase().includes(keyword))
+    ) {
       items.push(message);
     }
   };
   addFallback(
     preview.excludedConnectionIds.length,
-    'connection',
+    "connection",
     `${preview.excludedConnectionIds.length} external connection(s) will not be duplicated.`,
   );
   addFallback(
     preview.excludedRelationIds.length,
-    'relation',
+    "relation",
     `${preview.excludedRelationIds.length} external relation(s) will not be duplicated.`,
   );
   addFallback(
     preview.omittedPartialGroupIds.length,
-    'group',
+    "group",
     `${preview.omittedPartialGroupIds.length} partially selected group(s) will not be duplicated.`,
   );
   addFallback(
     preview.excludedNoteIds.length,
-    'note',
+    "note",
     `${preview.excludedNoteIds.length} note(s) with mixed or external attachments will not be duplicated.`,
   );
   return Array.from(new Set(items));
@@ -207,13 +244,13 @@ function duplicateConfirmationItems(preview: {
 
 function useViewportWidth(): number {
   const [width, setWidth] = React.useState<number>(() =>
-    typeof window === 'undefined' ? 1280 : window.innerWidth,
+    typeof window === "undefined" ? 1280 : window.innerWidth,
   );
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const onResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
   return width;
 }
@@ -254,7 +291,8 @@ export function Workspace({
   // metadata (transactions.md §4), separate from the per-branch Document, so
   // they're loaded from the repository rather than read off the session's
   // Document.
-  const [projectRecord, setProjectRecord] = React.useState<ProjectRecord | null>(null);
+  const [projectRecord, setProjectRecord] =
+    React.useState<ProjectRecord | null>(null);
   const [branches, setBranches] = React.useState<readonly BranchRecord[]>([]);
 
   // History, Commit, Publish and the scenario editor load on demand; warm them once idle.
@@ -269,18 +307,25 @@ export function Workspace({
     }
     void (async () => {
       try {
-        const history = await repository.loadHistory(sessionState.projectId as string);
+        const history = await repository.loadHistory(
+          sessionState.projectId as string,
+        );
         if (cancelled) return;
         setProjectRecord(history.project);
         setBranches(history.branches);
       } catch (err) {
-        console.error('Failed to load project/branch info for top bar:', err);
+        console.error("Failed to load project/branch info for top bar:", err);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [repository, sessionState.projectId, sessionState.projectRevision, sessionState.branchId]);
+  }, [
+    repository,
+    sessionState.projectId,
+    sessionState.projectRevision,
+    sessionState.branchId,
+  ]);
 
   const document = sessionState.document;
   const [activeViewId, setActiveViewId] = React.useState<string | null>(() => {
@@ -291,7 +336,10 @@ export function Workspace({
   React.useEffect(() => {
     if (!document || !document.views || document.views.length === 0) {
       setActiveViewId(null);
-    } else if (!activeViewId || !document.views.some((v) => v.id === activeViewId)) {
+    } else if (
+      !activeViewId ||
+      !document.views.some((v) => v.id === activeViewId)
+    ) {
       setActiveViewId(document.views[0].id);
     }
   }, [document, activeViewId]);
@@ -304,9 +352,13 @@ export function Workspace({
   const isMobileInspector = viewportWidth < MOBILE_BREAKPOINT_PX;
 
   const [draft, setDraft] = React.useState<DraftHandle | null>(null);
-  const [selectedNoteIds, setSelectedNoteIds] = React.useState<ReadonlySet<Id>>(new Set());
-  const [scenarioDraft, setScenarioDraft] = React.useState<ScenarioDraftHandle | null>(null);
-  const [scenarioEditorFocusName, setScenarioEditorFocusName] = React.useState(false);
+  const [selectedNoteIds, setSelectedNoteIds] = React.useState<ReadonlySet<Id>>(
+    new Set(),
+  );
+  const [scenarioDraft, setScenarioDraft] =
+    React.useState<ScenarioDraftHandle | null>(null);
+  const [scenarioEditorFocusName, setScenarioEditorFocusName] =
+    React.useState(false);
   const [focusFieldId, setFocusFieldId] = React.useState<string | null>(null);
   const [guardOpen, setGuardOpen] = React.useState(false);
   const [guardApplying, setGuardApplying] = React.useState(false);
@@ -323,8 +375,8 @@ export function Workspace({
       },
       apply: async (changes, label) => {
         const result = await session.apply(changes, label);
-        if (result.status === 'busy' || result.status === 'unsupported') {
-          return { status: 'failed', code: 'unavailable', issues: [] };
+        if (result.status === "busy" || result.status === "unsupported") {
+          return { status: "failed", code: "unavailable", issues: [] };
         }
         return result;
       },
@@ -339,13 +391,24 @@ export function Workspace({
   // Stable handle on the registry executor (defined further down with the
   // handler table) so panel/inspector callbacks built earlier route through it.
   const commandRunnerRef = React.useRef<
-    (<K extends CommandId>(id: K, payload: CommandPayloads[K]) => Promise<ExecuteResult>) | null
+    | (<K extends CommandId>(
+        id: K,
+        payload: CommandPayloads[K],
+      ) => Promise<ExecuteResult>)
+    | null
   >(null);
   const runCommand = React.useCallback(
-    <K extends CommandId>(id: K, payload: CommandPayloads[K]): Promise<ExecuteResult> =>
+    <K extends CommandId>(
+      id: K,
+      payload: CommandPayloads[K],
+    ): Promise<ExecuteResult> =>
       commandRunnerRef.current
         ? commandRunnerRef.current(id, payload)
-        : Promise.resolve({ status: 'disabled', reason: 'The workspace is still loading', code: 'busy' }),
+        : Promise.resolve({
+            status: "disabled",
+            reason: "The workspace is still loading",
+            code: "busy",
+          }),
     [],
   );
 
@@ -356,14 +419,14 @@ export function Workspace({
    */
   const runGuarded = React.useCallback(
     (action: () => void, onCancel?: () => void) => {
-      if (scenarioDraft?.status === 'saving') {
+      if (scenarioDraft?.status === "saving") {
         onCancel?.();
         return;
       }
       const hasUnsavedScenarioDraft = Boolean(
         scenarioDraft && (scenarioDraft.dirty || scenarioDraft.isNew),
       );
-      if (decideNavigation(draft) === 'proceed' && !hasUnsavedScenarioDraft) {
+      if (decideNavigation(draft) === "proceed" && !hasUnsavedScenarioDraft) {
         action();
         return;
       }
@@ -387,7 +450,12 @@ export function Workspace({
       // never removed.
       const live = session.getState();
       if (!live.document || live.workingRevision === null) return;
-      const handle = openDraft(mintId(), target, live.workingRevision, live.document);
+      const handle = openDraft(
+        mintId(),
+        target,
+        live.workingRevision,
+        live.document,
+      );
       setScenarioDraft(null);
       setDraft(handle);
       setFocusFieldId(null);
@@ -404,7 +472,7 @@ export function Workspace({
 
   const handleRequestSelection = React.useCallback(
     (request: CanvasSelectionRequest) => {
-      if (request.kind === 'mixed') {
+      if (request.kind === "mixed") {
         const nextNoteIds = request.additive
           ? new Set([...selectedNoteIds, ...request.noteIds])
           : new Set(request.noteIds);
@@ -412,10 +480,14 @@ export function Workspace({
 
         if (request.elementIds.length > 0) {
           const nextElementIds =
-            request.additive && draft && draft.target.kind === 'element'
-              ? Array.from(new Set([...draft.target.ids, ...request.elementIds]))
+            request.additive && draft && draft.target.kind === "element"
+              ? Array.from(
+                  new Set([...draft.target.ids, ...request.elementIds]),
+                )
               : [...request.elementIds];
-          runGuarded(() => openInspectorFor({ kind: 'element', ids: nextElementIds }));
+          runGuarded(() =>
+            openInspectorFor({ kind: "element", ids: nextElementIds }),
+          );
         } else {
           runGuarded(() => {
             setDraft(null);
@@ -426,8 +498,8 @@ export function Workspace({
         return;
       }
 
-      if (request.kind === 'note') {
-        const requestedIds = 'ids' in request ? request.ids : [request.id];
+      if (request.kind === "note") {
+        const requestedIds = "ids" in request ? request.ids : [request.id];
         if (request.additive) {
           const nextNoteIds = new Set(selectedNoteIds);
           for (const id of requestedIds) {
@@ -450,7 +522,7 @@ export function Workspace({
         setSelectedNoteIds(new Set());
       }
 
-      const requestedIds = 'ids' in request ? request.ids : [request.id];
+      const requestedIds = "ids" in request ? request.ids : [request.id];
       if (requestedIds.length === 0) {
         runGuarded(closeInspector);
         return;
@@ -460,11 +532,12 @@ export function Workspace({
         request.additive && draft && draft.target.kind === request.kind
           ? {
               kind: request.kind,
-              ids: 'ids' in request
-                ? Array.from(new Set([...draft.target.ids, ...requestedIds]))
-                : draft.target.ids.includes(request.id)
-                ? draft.target.ids.filter((id) => id !== request.id)
-                : [...draft.target.ids, request.id],
+              ids:
+                "ids" in request
+                  ? Array.from(new Set([...draft.target.ids, ...requestedIds]))
+                  : draft.target.ids.includes(request.id)
+                    ? draft.target.ids.filter((id) => id !== request.id)
+                    : [...draft.target.ids, request.id],
             }
           : { kind: request.kind, ids: [...requestedIds] };
 
@@ -494,9 +567,12 @@ export function Workspace({
     runGuarded(closeInspector);
   }, [draft, scenarioDraft, runGuarded, closeInspector]);
 
-  const handleChangeField = React.useCallback((fieldId: string, raw: string) => {
-    setDraft((prev) => (prev ? changeDraftField(prev, fieldId, raw) : prev));
-  }, []);
+  const handleChangeField = React.useCallback(
+    (fieldId: string, raw: string) => {
+      setDraft((prev) => (prev ? changeDraftField(prev, fieldId, raw) : prev));
+    },
+    [],
+  );
 
   const handleApplyDraft = React.useCallback(async () => {
     if (!draft) return;
@@ -534,11 +610,14 @@ export function Workspace({
     if (scenarioDraft) {
       setGuardApplying(true);
       setScenarioDraft((current) =>
-        current ? Object.freeze({ ...current, status: 'saving' }) : current,
+        current ? Object.freeze({ ...current, status: "saving" }) : current,
       );
-      const next = await applyScenarioDraft(scenarioDraft, scenarioDraftSession);
+      const next = await applyScenarioDraft(
+        scenarioDraft,
+        scenarioDraftSession,
+      );
       setGuardApplying(false);
-      if (next.status === 'clean') {
+      if (next.status === "clean") {
         const action = pendingActionRef.current;
         pendingActionRef.current = null;
         setGuardOpen(false);
@@ -557,7 +636,7 @@ export function Workspace({
     setGuardApplying(true);
     const result = await applyDraft(draft, draftSession);
     setGuardApplying(false);
-    if (result.handle.status === 'clean') {
+    if (result.handle.status === "clean") {
       const action = pendingActionRef.current;
       pendingActionRef.current = null;
       setGuardOpen(false);
@@ -574,11 +653,15 @@ export function Workspace({
   }, [draft, draftSession, scenarioDraft, scenarioDraftSession]);
 
   const selectedElementIds = React.useMemo(
-    () => new Set(draft && draft.target.kind === 'element' ? draft.target.ids : []),
+    () =>
+      new Set(draft && draft.target.kind === "element" ? draft.target.ids : []),
     [draft],
   );
   const selectedConnectionIds = React.useMemo(
-    () => new Set(draft && draft.target.kind === 'connection' ? draft.target.ids : []),
+    () =>
+      new Set(
+        draft && draft.target.kind === "connection" ? draft.target.ids : [],
+      ),
     [draft],
   );
   const activeView = React.useMemo(
@@ -589,21 +672,32 @@ export function Workspace({
     const totalCount = selectedElementIds.size + selectedNoteIds.size;
     if (!activeView || totalCount <= 1) return [];
     return activeView.groups
-      .filter((group) =>
-        group.elementIds.length > 0 &&
-        group.elementIds.every((elementId) => selectedElementIds.has(elementId)),
+      .filter(
+        (group) =>
+          group.elementIds.length > 0 &&
+          group.elementIds.every((elementId) =>
+            selectedElementIds.has(elementId),
+          ),
       )
       .map((group) => group.id);
   }, [activeView, selectedElementIds, selectedNoteIds]);
   const selectionWhollyUngrouped = React.useMemo(() => {
     if (!activeView || selectedElementIds.size === 0) return false;
-    const grouped = new Set(activeView.groups.flatMap((group) => group.elementIds));
-    return Array.from(selectedElementIds).every((elementId) => !grouped.has(elementId));
+    const grouped = new Set(
+      activeView.groups.flatMap((group) => group.elementIds),
+    );
+    return Array.from(selectedElementIds).every(
+      (elementId) => !grouped.has(elementId),
+    );
   }, [activeView, selectedElementIds]);
   const selectionHasRefinementMember = React.useMemo(() => {
     if (!document || selectedElementIds.size === 0) return false;
-    const memberIds = new Set(document.refinements.flatMap((refinement) => refinement.memberElementIds));
-    return Array.from(selectedElementIds).some((elementId) => memberIds.has(elementId));
+    const memberIds = new Set(
+      document.refinements.flatMap((refinement) => refinement.memberElementIds),
+    );
+    return Array.from(selectedElementIds).some((elementId) =>
+      memberIds.has(elementId),
+    );
   }, [document, selectedElementIds]);
 
   // ==========================================================================
@@ -613,12 +707,16 @@ export function Workspace({
   // One RunController per session, backed by a real Web Worker transport.
   // Disposed on unmount (Workspace unmounts on "back to projects" / project
   // switch, since App only renders it while a project is open).
-  const [runController, setRunController] = React.useState<RunController | null>(null);
+  const [runController, setRunController] =
+    React.useState<RunController | null>(null);
 
   React.useEffect(() => {
-    const worker = new Worker(new URL('../runs/runner.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const worker = new Worker(
+      new URL("../runs/runner.worker.ts", import.meta.url),
+      {
+        type: "module",
+      },
+    );
     const transport = new WorkerTransport(worker);
     const controller = new RunController({
       repository,
@@ -634,19 +732,17 @@ export function Workspace({
 
   const runControllerState = React.useSyncExternalStore(
     React.useCallback(
-      (onStoreChange: () => void) => (runController ? runController.subscribe(onStoreChange) : () => {}),
+      (onStoreChange: () => void) =>
+        runController ? runController.subscribe(onStoreChange) : () => {},
       [runController],
     ),
-    React.useCallback(
-      () => runController?.getState() ?? null,
-      [runController],
-    ),
+    React.useCallback(() => runController?.getState() ?? null, [runController]),
   );
 
   // Results displays the controller's current run. It becomes a selectable
   // immutable CSV source only after the repository save succeeds.
   const selectedSavedRunId: Id | null =
-    runControllerState?.current?.saveStatus === 'saved'
+    runControllerState?.current?.saveStatus === "saved"
       ? runControllerState.current.runId
       : null;
   React.useEffect(() => {
@@ -669,7 +765,12 @@ export function Workspace({
     [projectRecord?.revision, sessionState.document, sessionState.projectId],
   );
   const transferSession = React.useMemo(
-    () => buildTransferSessionState(transferSessionSource, activeViewId, selectedSavedRunId),
+    () =>
+      buildTransferSessionState(
+        transferSessionSource,
+        activeViewId,
+        selectedSavedRunId,
+      ),
     [transferSessionSource, activeViewId, selectedSavedRunId],
   );
   const downloadSink = React.useMemo(() => createBrowserDownloadSink(), []);
@@ -682,13 +783,14 @@ export function Workspace({
 
   // loadScenarioStatuses for the current document; recomputed after every
   // document change and after every saved run (commands.md "Scenarios (D41)").
-  const [scenarioStatusResult, setScenarioStatusResult] = React.useState<ScenariosStatusResult | null>(null);
+  const [scenarioStatusResult, setScenarioStatusResult] =
+    React.useState<ScenariosStatusResult | null>(null);
   const [statusRefreshToken, setStatusRefreshToken] = React.useState(0);
   const lastRefreshedRunIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     if (
-      runControllerState?.current?.saveStatus === 'saved' &&
+      runControllerState?.current?.saveStatus === "saved" &&
       runControllerState.current.runId !== lastRefreshedRunIdRef.current
     ) {
       lastRefreshedRunIdRef.current = runControllerState.current.runId;
@@ -704,10 +806,14 @@ export function Workspace({
     }
     void (async () => {
       try {
-        const result = await loadScenarioStatuses(repository, sessionState.projectId as string, document);
+        const result = await loadScenarioStatuses(
+          repository,
+          sessionState.projectId as string,
+          document,
+        );
         if (!cancelled) setScenarioStatusResult(result);
       } catch (err) {
-        console.error('Failed to load scenario statuses:', err);
+        console.error("Failed to load scenario statuses:", err);
       }
     })();
     return () => {
@@ -721,23 +827,34 @@ export function Workspace({
   // D41 scenario.select: per-browser preference keyed by project + branch;
   // missing/deleted selection falls back to the first scenario in document
   // order; none -> no selection. Never an authored change.
-  const [selectedScenarioId, setSelectedScenarioId] = React.useState<Id | null>(null);
+  const [selectedScenarioId, setSelectedScenarioId] = React.useState<Id | null>(
+    null,
+  );
 
   React.useEffect(() => {
     if (!sessionState.projectId || !sessionState.branchId) {
       setSelectedScenarioId(null);
       return;
     }
-    const stored = readScenarioSelection(sessionState.projectId, sessionState.branchId);
+    const stored = readScenarioSelection(
+      sessionState.projectId,
+      sessionState.branchId,
+    );
     const scenarioIdsInOrder = scenariosWithStatus.map((s) => s.scenario.id);
-    setSelectedScenarioId(resolveSelectedScenarioId(stored, scenarioIdsInOrder));
+    setSelectedScenarioId(
+      resolveSelectedScenarioId(stored, scenarioIdsInOrder),
+    );
   }, [sessionState.projectId, sessionState.branchId, scenariosWithStatus]);
 
   const handleSelectScenario = React.useCallback(
     (scenarioId: Id) => {
       setSelectedScenarioId(scenarioId);
       if (sessionState.projectId && sessionState.branchId) {
-        writeScenarioSelection(sessionState.projectId, sessionState.branchId, scenarioId);
+        writeScenarioSelection(
+          sessionState.projectId,
+          sessionState.branchId,
+          scenarioId,
+        );
       }
     },
     [sessionState.projectId, sessionState.branchId],
@@ -748,7 +865,9 @@ export function Workspace({
   // working snapshot has moved on (a canvas layout edit is presentation-only
   // per run-identity.md and doesn't change the scenario fingerprint, but the
   // run result is still from an earlier snapshot).
-  const [lastRunSnapshotId, setLastRunSnapshotId] = React.useState<string | null>(null);
+  const [lastRunSnapshotId, setLastRunSnapshotId] = React.useState<
+    string | null
+  >(null);
 
   const handleRunScenario = React.useCallback(
     async (scenarioId: Id) => {
@@ -770,7 +889,13 @@ export function Workspace({
         scenarioId,
       });
     },
-    [runController, document, sessionState.projectId, sessionState.branchId, sessionState.workingSnapshotId],
+    [
+      runController,
+      document,
+      sessionState.projectId,
+      sessionState.branchId,
+      sessionState.workingSnapshotId,
+    ],
   );
 
   const handleRunAll = React.useCallback(async () => {
@@ -791,15 +916,23 @@ export function Workspace({
       document,
       scenarioIds: document.scenarios.map((s) => s.id),
     });
-  }, [runController, document, sessionState.projectId, sessionState.branchId, sessionState.workingSnapshotId]);
+  }, [
+    runController,
+    document,
+    sessionState.projectId,
+    sessionState.branchId,
+    sessionState.workingSnapshotId,
+  ]);
 
   const handleResetRun = React.useCallback(() => {
     runController?.reset();
     setLastRunSnapshotId(null);
   }, [runController]);
 
-  const [newScenarioDialogOpen, setNewScenarioDialogOpen] = React.useState(false);
-  const [initialCopySourceId, setInitialCopySourceId] = React.useState<Id | null>(null);
+  const [newScenarioDialogOpen, setNewScenarioDialogOpen] =
+    React.useState(false);
+  const [initialCopySourceId, setInitialCopySourceId] =
+    React.useState<Id | null>(null);
   const [deleteScenarioTarget, setDeleteScenarioTarget] = React.useState<{
     readonly id: Id;
     readonly label: string;
@@ -827,7 +960,7 @@ export function Workspace({
       setScenarioDraft(
         openScenarioDraft({
           draftId: mintId(),
-          target: { kind: 'edit', scenarioId },
+          target: { kind: "edit", scenarioId },
           document: live.document,
           baseWorkingRevision: live.workingRevision,
           mintId,
@@ -848,7 +981,8 @@ export function Workspace({
 
   const handleDuplicateScenario = React.useCallback(
     (scenarioId: Id) => {
-      if (!document?.scenarios.some((scenario) => scenario.id === scenarioId)) return;
+      if (!document?.scenarios.some((scenario) => scenario.id === scenarioId))
+        return;
       runGuarded(() => {
         closeInspector();
         setInitialCopySourceId(scenarioId);
@@ -859,7 +993,7 @@ export function Workspace({
   );
 
   const handleCreateScenario = React.useCallback(
-    (params: Parameters<NewScenarioDialogProps['onCreate']>[0]) => {
+    (params: Parameters<NewScenarioDialogProps["onCreate"]>[0]) => {
       const live = session.getState();
       if (!live.document || live.workingRevision === null) return;
       setNewScenarioDialogOpen(false);
@@ -870,7 +1004,12 @@ export function Workspace({
       setScenarioDraft(
         openScenarioDraft({
           draftId: mintId(),
-          target: { kind: 'new', mode: params.mode, from: params.from, label: params.label },
+          target: {
+            kind: "new",
+            mode: params.mode,
+            from: params.from,
+            label: params.label,
+          },
           document: live.document,
           baseWorkingRevision: live.workingRevision,
           mintId,
@@ -893,7 +1032,9 @@ export function Workspace({
 
   const handleRequestDeleteScenario = React.useCallback(
     (scenarioId: Id) => {
-      const scenario = document?.scenarios.find((candidate) => candidate.id === scenarioId);
+      const scenario = document?.scenarios.find(
+        (candidate) => candidate.id === scenarioId,
+      );
       if (!scenario) return;
       runGuarded(() => {
         closeInspector();
@@ -912,7 +1053,7 @@ export function Workspace({
       scenarioDraftSession,
     );
     setDeletingScenario(false);
-    if (result.status === 'applied') setDeleteScenarioTarget(null);
+    if (result.status === "applied") setDeleteScenarioTarget(null);
   }, [deleteScenarioTarget, scenarioDraftSession]);
 
   const handleChangeScenarioDraft = React.useCallback(
@@ -927,12 +1068,12 @@ export function Workspace({
   );
 
   const handleApplyScenarioDraft = React.useCallback(async () => {
-    if (!scenarioDraft || scenarioDraft.status === 'saving') return;
+    if (!scenarioDraft || scenarioDraft.status === "saving") return;
     const wasNew = scenarioDraft.isNew;
-    setScenarioDraft(Object.freeze({ ...scenarioDraft, status: 'saving' }));
+    setScenarioDraft(Object.freeze({ ...scenarioDraft, status: "saving" }));
     const next = await applyScenarioDraft(scenarioDraft, scenarioDraftSession);
     setScenarioDraft(next);
-    if (next.status === 'clean' && wasNew && next.sourceScenarioId) {
+    if (next.status === "clean" && wasNew && next.sourceScenarioId) {
       handleSelectScenario(next.sourceScenarioId);
     }
   }, [handleSelectScenario, scenarioDraft, scenarioDraftSession]);
@@ -958,12 +1099,15 @@ export function Workspace({
   const sessionRunDisabledReason =
     draft?.dirty || scenarioDraft?.dirty || scenarioDraft?.isNew
       ? RUN_DISABLED_DIRTY_DRAFT_REASON
-      : computeSessionRunDisabledReason(sessionState.status, sessionState.needsReload);
+      : computeSessionRunDisabledReason(
+          sessionState.status,
+          sessionState.needsReload,
+        );
 
   const scenarioRunPhase =
-    runControllerState?.phase === 'done'
-      ? 'idle'
-      : (runControllerState?.phase ?? 'idle');
+    runControllerState?.phase === "done"
+      ? "idle"
+      : (runControllerState?.phase ?? "idle");
 
   const runControlSlot = (
     <ScenarioSwitcher
@@ -998,24 +1142,44 @@ export function Workspace({
   const runningOrSelectedScenario = React.useMemo(() => {
     const runningId = runControllerState?.current?.scenarioId ?? null;
     const targetId = runningId ?? selectedScenarioId;
-    return scenariosWithStatus.find((s) => s.scenario.id === targetId)?.scenario ?? null;
+    return (
+      scenariosWithStatus.find((s) => s.scenario.id === targetId)?.scenario ??
+      null
+    );
   }, [runControllerState, selectedScenarioId, scenariosWithStatus]);
 
   // RV-05b MEASURED · LAST RUN: only for an element target, from the latest saved
   // run of the currently selected scenario (already exposed by loadScenarioStatuses
   // as ScenarioWithStatus.latestRun -- no separate runs-lane lookup needed).
   const measuredSection = React.useMemo(() => {
-    if (!draft || draft.multi || draft.missing || draft.target.kind !== 'element') return null;
+    if (
+      !draft ||
+      draft.multi ||
+      draft.missing ||
+      draft.target.kind !== "element"
+    )
+      return null;
     const elementId = draft.target.ids[0];
-    const selected = scenariosWithStatus.find((s) => s.scenario.id === selectedScenarioId) ?? null;
-    if (!selected) return selectMeasuredSection(elementId, null, 'this scenario', 'timed');
-    return selectMeasuredSection(elementId, selected.latestRun, selected.scenario.label, selected.scenario.mode);
+    const selected =
+      scenariosWithStatus.find((s) => s.scenario.id === selectedScenarioId) ??
+      null;
+    if (!selected)
+      return selectMeasuredSection(elementId, null, "this scenario", "timed");
+    return selectMeasuredSection(
+      elementId,
+      selected.latestRun,
+      selected.scenario.label,
+      selected.scenario.mode,
+    );
   }, [draft, scenariosWithStatus, selectedScenarioId]);
 
   const scenarioEditorChecks = React.useMemo(() => {
-    const scenarioId = scenarioDraft?.sourceScenarioId ?? scenarioDraft?.scenario?.id ?? null;
+    const scenarioId =
+      scenarioDraft?.sourceScenarioId ?? scenarioDraft?.scenario?.id ?? null;
     if (!scenarioId) return null;
-    const latestRun = scenariosWithStatus.find((item) => item.scenario.id === scenarioId)?.latestRun;
+    const latestRun = scenariosWithStatus.find(
+      (item) => item.scenario.id === scenarioId,
+    )?.latestRun;
     if (!latestRun) return null;
     return new Map(latestRun.checks.map((check) => [check.assertionId, check]));
   }, [scenarioDraft, scenariosWithStatus]);
@@ -1037,40 +1201,51 @@ export function Workspace({
   // results.close hides the region until results.open or the next run starts.
   const [resultsDismissed, setResultsDismissed] = React.useState(false);
   const resultsRegionRef = React.useRef<HTMLDivElement>(null);
-  const showResultsRegion = !resultsDismissed && (runningOrSelectedScenario !== null || resultsRequested);
-  const runPhaseForResults = runControllerState?.phase ?? 'idle';
+  const showResultsRegion =
+    !resultsDismissed &&
+    (runningOrSelectedScenario !== null || resultsRequested);
+  const runPhaseForResults = runControllerState?.phase ?? "idle";
   React.useEffect(() => {
-    if (runPhaseForResults === 'compiling' || runPhaseForResults === 'running') setResultsDismissed(false);
+    if (runPhaseForResults === "compiling" || runPhaseForResults === "running")
+      setResultsDismissed(false);
   }, [runPhaseForResults]);
 
   const staleRun = Boolean(
     runControllerState?.current?.terminal &&
-      lastRunSnapshotId !== null &&
-      sessionState.workingSnapshotId !== null &&
-      lastRunSnapshotId !== sessionState.workingSnapshotId,
+    lastRunSnapshotId !== null &&
+    sessionState.workingSnapshotId !== null &&
+    lastRunSnapshotId !== sessionState.workingSnapshotId,
   );
 
-  const isSaving = sessionState.status === 'saving';
+  const isSaving = sessionState.status === "saving";
   const hasError = Boolean(sessionState.lastError);
   // Only repository write failures block history/part commands; a rejected
   // edit (invalid, stale, ineligible) also lands in lastError but isn't storage.
   const storageFailed = (() => {
-    const error = sessionState.lastError as { status?: unknown; code?: unknown } | null;
-    return error?.status === 'failed' && (error.code === 'quota' || error.code === 'unavailable');
+    const error = sessionState.lastError as {
+      status?: unknown;
+      code?: unknown;
+    } | null;
+    return (
+      error?.status === "failed" &&
+      (error.code === "quota" || error.code === "unavailable")
+    );
   })();
 
   // Compute save status text without raw exception text
   const saveStatusText = React.useMemo(() => {
-    if (isSaving) return 'Saving…';
+    if (isSaving) return "Saving…";
     if (sessionState.lastError) {
-      return formatStudioError(sessionState.lastError, 'Save failed');
+      return formatStudioError(sessionState.lastError, "Save failed");
     }
-    if (sessionState.status === 'ready') return 'Saved';
-    return '';
+    if (sessionState.status === "ready") return "Saved";
+    return "";
   }, [isSaving, sessionState.lastError, sessionState.status]);
 
   // Other projects, so renaming can refuse a name another project already uses (13A "name taken").
-  const [otherProjects, setOtherProjects] = React.useState<readonly { id: string; title: string }[]>([]);
+  const [otherProjects, setOtherProjects] = React.useState<
+    readonly { id: string; title: string }[]
+  >([]);
   const currentProjectId = sessionState.projectId;
   const currentProjectTitle = projectRecord?.title;
   React.useEffect(() => {
@@ -1078,7 +1253,9 @@ export function Workspace({
     void repository.listProjects().then((list) => {
       if (cancelled) return;
       setOtherProjects(
-        list.filter((p) => p.id !== currentProjectId).map((p) => ({ id: p.id, title: p.title })),
+        list
+          .filter((p) => p.id !== currentProjectId)
+          .map((p) => ({ id: p.id, title: p.title })),
       );
     });
     return () => {
@@ -1092,8 +1269,14 @@ export function Workspace({
       const wanted = newTitle.trim().toLowerCase();
       if (otherProjects.some((p) => p.title.trim().toLowerCase() === wanted)) {
         return {
-          status: 'invalid',
-          issues: [createIssue('structural-rule', `Your team already has a project called ${newTitle.trim()}.`, [])],
+          status: "invalid",
+          issues: [
+            createIssue(
+              "structural-rule",
+              `Your team already has a project called ${newTitle.trim()}.`,
+              [],
+            ),
+          ],
         };
       }
       return session.renameProject(newTitle);
@@ -1128,10 +1311,13 @@ export function Workspace({
   // busy/failed/unsupported result returns false so the caller leaves nothing
   // destructive on screen and the user can retry (commands.md "busy").
   const handleApplyChanges = React.useCallback(
-    async (changes: Parameters<SessionController['apply']>[0], label: string): Promise<boolean> => {
+    async (
+      changes: Parameters<SessionController["apply"]>[0],
+      label: string,
+    ): Promise<boolean> => {
       if (!document || isSaving) return false;
       const result = await session.apply(changes, label);
-      return result.status === 'applied';
+      return result.status === "applied";
     },
     [document, isSaving, session],
   );
@@ -1149,8 +1335,8 @@ export function Workspace({
       const change = buildMoveChange(currentView, movedNodes);
       if (!change) return true; // No actual coordinate changes
 
-      const res = await session.apply([change], 'Move');
-      return res.status === 'applied';
+      const res = await session.apply([change], "Move");
+      return res.status === "applied";
     },
     [document, activeViewId, isSaving, session],
   );
@@ -1165,7 +1351,9 @@ export function Workspace({
   const [historyController] = React.useState(
     () => new HistoryController({ repository, session, mintId, actor }),
   );
-  const [candidateController] = React.useState(() => createCandidateController({ mintId }));
+  const [candidateController] = React.useState(() =>
+    createCandidateController({ mintId }),
+  );
   const [publishController] = React.useState(
     () =>
       new PublishController({
@@ -1177,7 +1365,8 @@ export function Workspace({
         // Reuses CandidateController's own already-tested runner (RV-11b) --
         // never a bespoke one, matching the exact pattern in
         // publishController.test.ts.
-        runScenario: (params) => candidateController.startCandidateRun(repository, params),
+        runScenario: (params) =>
+          candidateController.startCandidateRun(repository, params),
       }),
   );
 
@@ -1210,14 +1399,20 @@ export function Workspace({
   // repository revision, outside project content and workingRevision.
   const [panelState, setPanelState] = React.useState<WorkspacePanelState>(() =>
     createInitialPanelState(
-      typeof window === 'undefined'
+      typeof window === "undefined"
         ? undefined
-        : { viewport: { width: window.innerWidth, height: window.innerHeight } },
+        : {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+          },
     ),
   );
   const panelStateRef = React.useRef(panelState);
-  const initialPanelPreferencesRef = React.useRef(panelPreferencesFromState(panelState));
-  const durablePanelPreferencesRef = React.useRef(initialPanelPreferencesRef.current);
+  const initialPanelPreferencesRef = React.useRef(
+    panelPreferencesFromState(panelState),
+  );
+  const durablePanelPreferencesRef = React.useRef(
+    initialPanelPreferencesRef.current,
+  );
   const panelPreferencesLoadedRef = React.useRef(false);
   const queuedPanelActionsRef = React.useRef<WorkspacePanelAction[]>([]);
   const panelPreferenceMountedRef = React.useRef(true);
@@ -1225,49 +1420,61 @@ export function Workspace({
   const latestPanelPreferenceRequestRef = React.useRef(0);
   const panelPreferenceFailedRef = React.useRef(false);
   const [panelPreferenceState, setPanelPreferenceState] = React.useState<
-    'loading' | 'ready' | 'saving' | 'failed'
-  >('loading');
+    "loading" | "ready" | "saving" | "failed"
+  >("loading");
   const [panelPreferenceStore] = React.useState(
     () => new WorkspacePanelPreferenceStore(repository),
   );
-  const [dockConfig, setDockConfig] = React.useState<DockConfig>(DEFAULT_DOCK_CONFIG);
+  const [dockConfig, setDockConfig] =
+    React.useState<DockConfig>(DEFAULT_DOCK_CONFIG);
   const durableDockRef = React.useRef<DockConfig>(DEFAULT_DOCK_CONFIG);
-  const [dockPreferenceState, setDockPreferenceState] = React.useState<'loading' | 'ready' | 'saving' | 'failed'>('loading');
+  const [dockPreferenceState, setDockPreferenceState] = React.useState<
+    "loading" | "ready" | "saving" | "failed"
+  >("loading");
 
-  const persistDockConfig = React.useCallback((requested: DockConfig) => {
-    if (!panelPreferencesLoadedRef.current) return;
-    setDockConfig(requested);
-    setDockPreferenceState('saving');
-    void panelPreferenceStore.saveDock(requested).then((result) => {
-      if (!panelPreferenceMountedRef.current) return;
-      if (result.status === 'applied') {
-        durableDockRef.current = requested;
-        setDockPreferenceState('ready');
-      } else if (result.status === 'stale') {
-        durableDockRef.current = result.dock;
-        setDockConfig(result.dock);
-        if (result.preferences) {
-          durablePanelPreferencesRef.current = result.preferences;
-          const hydrated = hydratePanelState(panelStateRef.current, result.preferences);
-          panelStateRef.current = hydrated;
-          setPanelState(hydrated);
-        }
-        panelPreferenceStore.acknowledgeCurrentDisplayed();
-        setDockPreferenceState('ready');
-      } else if (result.status === 'superseded') {
-        setDockConfig(durableDockRef.current);
-        setDockPreferenceState('ready');
-      } else {
-        setDockConfig(durableDockRef.current);
-        setDockPreferenceState('failed');
-      }
-    }).catch((error: unknown) => {
-      if (!panelPreferenceMountedRef.current) return;
-      console.error('Failed to save dock preferences:', error);
-      setDockConfig(durableDockRef.current);
-      setDockPreferenceState('failed');
-    });
-  }, [panelPreferenceStore]);
+  const persistDockConfig = React.useCallback(
+    (requested: DockConfig) => {
+      if (!panelPreferencesLoadedRef.current) return;
+      setDockConfig(requested);
+      setDockPreferenceState("saving");
+      void panelPreferenceStore
+        .saveDock(requested)
+        .then((result) => {
+          if (!panelPreferenceMountedRef.current) return;
+          if (result.status === "applied") {
+            durableDockRef.current = requested;
+            setDockPreferenceState("ready");
+          } else if (result.status === "stale") {
+            durableDockRef.current = result.dock;
+            setDockConfig(result.dock);
+            if (result.preferences) {
+              durablePanelPreferencesRef.current = result.preferences;
+              const hydrated = hydratePanelState(
+                panelStateRef.current,
+                result.preferences,
+              );
+              panelStateRef.current = hydrated;
+              setPanelState(hydrated);
+            }
+            panelPreferenceStore.acknowledgeCurrentDisplayed();
+            setDockPreferenceState("ready");
+          } else if (result.status === "superseded") {
+            setDockConfig(durableDockRef.current);
+            setDockPreferenceState("ready");
+          } else {
+            setDockConfig(durableDockRef.current);
+            setDockPreferenceState("failed");
+          }
+        })
+        .catch((error: unknown) => {
+          if (!panelPreferenceMountedRef.current) return;
+          console.error("Failed to save dock preferences:", error);
+          setDockConfig(durableDockRef.current);
+          setDockPreferenceState("failed");
+        });
+    },
+    [panelPreferenceStore],
+  );
 
   const persistPanelState = React.useCallback(
     (state: WorkspacePanelState) => {
@@ -1275,25 +1482,29 @@ export function Workspace({
       const requestSequence = ++latestPanelPreferenceRequestRef.current;
       pendingPanelPreferenceSavesRef.current += 1;
       panelPreferenceFailedRef.current = false;
-      setPanelPreferenceState('saving');
+      setPanelPreferenceState("saving");
       void panelPreferenceStore
         .save(requested)
         .then((result) => {
           if (!panelPreferenceMountedRef.current) return;
-          if (result.status === 'applied') {
+          if (result.status === "applied") {
             durablePanelPreferencesRef.current = requested;
             panelPreferenceFailedRef.current = false;
-          } else if (result.status === 'stale') {
+          } else if (result.status === "stale") {
             durableDockRef.current = panelPreferenceStore.currentDock();
             setDockConfig(durableDockRef.current);
-            const durable = result.preferences ?? initialPanelPreferencesRef.current;
+            const durable =
+              result.preferences ?? initialPanelPreferencesRef.current;
             durablePanelPreferencesRef.current = durable;
             const hydrated = hydratePanelState(panelStateRef.current, durable);
             panelStateRef.current = hydrated;
             setPanelState(hydrated);
             panelPreferenceStore.acknowledgeCurrentDisplayed();
             panelPreferenceFailedRef.current = false;
-          } else if (result.status === 'failed' || result.status === 'invalid-stored-value') {
+          } else if (
+            result.status === "failed" ||
+            result.status === "invalid-stored-value"
+          ) {
             if (
               !isLatestPanelPreferenceRequest(
                 requestSequence,
@@ -1303,7 +1514,7 @@ export function Workspace({
               return;
             }
             const durable =
-              result.status === 'failed' && result.preferences
+              result.status === "failed" && result.preferences
                 ? result.preferences
                 : durablePanelPreferencesRef.current;
             const hydrated = hydratePanelState(panelStateRef.current, durable);
@@ -1314,7 +1525,7 @@ export function Workspace({
         })
         .catch((error: unknown) => {
           if (!panelPreferenceMountedRef.current) return;
-          console.error('Failed to save panel preferences:', error);
+          console.error("Failed to save panel preferences:", error);
           if (
             !isLatestPanelPreferenceRequest(
               requestSequence,
@@ -1336,10 +1547,15 @@ export function Workspace({
             0,
             pendingPanelPreferenceSavesRef.current - 1,
           );
-          if (!panelPreferenceMountedRef.current || pendingPanelPreferenceSavesRef.current > 0) {
+          if (
+            !panelPreferenceMountedRef.current ||
+            pendingPanelPreferenceSavesRef.current > 0
+          ) {
             return;
           }
-          setPanelPreferenceState(panelPreferenceFailedRef.current ? 'failed' : 'ready');
+          setPanelPreferenceState(
+            panelPreferenceFailedRef.current ? "failed" : "ready",
+          );
         });
     },
     [panelPreferenceStore],
@@ -1347,23 +1563,34 @@ export function Workspace({
 
   const applyPanelAction = React.useCallback(
     (action: WorkspacePanelAction) => {
-      const { state: next, effects } = panelReducer(panelStateRef.current, action);
+      const { state: next, effects } = panelReducer(
+        panelStateRef.current,
+        action,
+      );
       panelStateRef.current = next;
       setPanelState(next);
-      if (effects.some((effect) => effect.type === 'save')) {
+      if (effects.some((effect) => effect.type === "save")) {
         persistPanelState(next);
       }
       // commands.md: opening a panel "expands and focuses" it. Only OPEN/EXPAND move focus,
       // and never away from something already inside that panel (clicks there emit FOCUS too).
-      if (action.type === 'OPEN' || action.type === 'EXPAND') {
+      if (action.type === "OPEN" || action.type === "EXPAND") {
         for (const effect of effects) {
-          if (effect.type !== 'focus') continue;
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            const header = window.document.querySelector<HTMLElement>(`[data-slot="panel-header"][data-panel-id="${effect.target}"]`);
-            const region = header?.parentElement;
-            if (!header || (region && region.contains(window.document.activeElement))) return;
-            header.focus();
-          }));
+          if (effect.type !== "focus") continue;
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              const header = window.document.querySelector<HTMLElement>(
+                `[data-slot="panel-header"][data-panel-id="${effect.target}"]`,
+              );
+              const region = header?.parentElement;
+              if (
+                !header ||
+                (region && region.contains(window.document.activeElement))
+              )
+                return;
+              header.focus();
+            }),
+          );
         }
       }
     },
@@ -1385,9 +1612,14 @@ export function Workspace({
   // opened and closed by the selection; below that it keeps its own dock or sheet.
   const inspectorHosted = panelState.viewport.width >= BREAKPOINT_DESKTOP;
   const inspectorWanted =
-    inspectorHosted && Boolean((draft && !draft.multi) || (scenarioDraft && document));
+    inspectorHosted &&
+    Boolean((draft && !draft.multi) || (scenarioDraft && document));
   React.useEffect(() => {
-    panelDispatch({ type: 'SYNC_OPEN', panel: 'inspector', open: inspectorWanted });
+    panelDispatch({
+      type: "SYNC_OPEN",
+      panel: "inspector",
+      open: inspectorWanted,
+    });
   }, [inspectorWanted, panelDispatch]);
 
   React.useEffect(() => {
@@ -1399,21 +1631,24 @@ export function Workspace({
         if (cancelled) return;
         if (loaded.preferences) {
           durablePanelPreferencesRef.current = loaded.preferences;
-          const hydrated = hydratePanelState(panelStateRef.current, loaded.preferences);
+          const hydrated = hydratePanelState(
+            panelStateRef.current,
+            loaded.preferences,
+          );
           panelStateRef.current = hydrated;
           setPanelState(hydrated);
         }
         durableDockRef.current = loaded.dock;
         setDockConfig(loaded.dock);
-        setDockPreferenceState('ready');
-        setPanelPreferenceState('ready');
+        setDockPreferenceState("ready");
+        setPanelPreferenceState("ready");
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         panelPreferenceFailedRef.current = true;
-        setPanelPreferenceState('failed');
-        setDockPreferenceState('failed');
-        console.error('Failed to load panel preferences:', error);
+        setPanelPreferenceState("failed");
+        setDockPreferenceState("failed");
+        console.error("Failed to load panel preferences:", error);
       })
       .finally(() => {
         if (cancelled) return;
@@ -1430,34 +1665,43 @@ export function Workspace({
 
   React.useEffect(() => {
     const syncViewport = () => {
-      panelDispatch({ type: 'VIEWPORT_CHANGED', width: window.innerWidth, height: window.innerHeight });
+      panelDispatch({
+        type: "VIEWPORT_CHANGED",
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
     };
-    window.addEventListener('resize', syncViewport);
-    return () => window.removeEventListener('resize', syncViewport);
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
   }, [panelDispatch]);
 
   // History panel's own view: the ladder (22A), or the commit gate (scenario
   // "commit_gate" screen) swapped in when the ladder's Commit action fires.
-  const [historyView, setHistoryView] = React.useState<'ladder' | 'commit'>('ladder');
+  const [historyView, setHistoryView] = React.useState<"ladder" | "commit">(
+    "ladder",
+  );
   React.useEffect(() => {
-    if (!panelState.panels.history.open) setHistoryView('ladder');
+    if (!panelState.panels.history.open) setHistoryView("ladder");
   }, [panelState.panels.history.open]);
 
   // Returns to the ladder once a commit really lands (the controller's own
   // commits list grows), rather than assuming success from a click.
-  const prevCommitCountRef = React.useRef(historyControllerState.commits.length);
+  const prevCommitCountRef = React.useRef(
+    historyControllerState.commits.length,
+  );
   React.useEffect(() => {
     const len = historyControllerState.commits.length;
-    if (historyView === 'commit' && len > prevCommitCountRef.current) {
-      setHistoryView('ladder');
+    if (historyView === "commit" && len > prevCommitCountRef.current) {
+      setHistoryView("ladder");
     }
     prevCommitCountRef.current = len;
   }, [historyControllerState.commits.length, historyView]);
 
-  const [libraryView, setLibraryView] = React.useState<LibraryView>('list');
+  const [libraryView, setLibraryView] = React.useState<LibraryView>("list");
 
   const [publishOpen, setPublishOpen] = React.useState(false);
-  const [behindMainBannerDismissed, setBehindMainBannerDismissed] = React.useState(false);
+  const [behindMainBannerDismissed, setBehindMainBannerDismissed] =
+    React.useState(false);
 
   // 22E "draft behind main": proactively prepares a real publish candidate
   // against main so the real conflict count is known before the user opens
@@ -1475,7 +1719,12 @@ export function Workspace({
   // draft branch, and the user opening History or Publish -- never on a
   // timer and never per document edit/keystroke.
   const mainBranchId = projectRecord?.mainBranchId ?? null;
-  const isOnDraftBranch = Boolean(sessionState.projectId && sessionState.branchId && mainBranchId && sessionState.branchId !== mainBranchId);
+  const isOnDraftBranch = Boolean(
+    sessionState.projectId &&
+    sessionState.branchId &&
+    mainBranchId &&
+    sessionState.branchId !== mainBranchId,
+  );
 
   const refreshBehindMainCheck = React.useCallback(() => {
     if (!isOnDraftBranch) return;
@@ -1484,7 +1733,8 @@ export function Workspace({
   }, [isOnDraftBranch, publishController]);
 
   React.useEffect(() => {
-    if (!sessionState.projectId || !sessionState.branchId || !mainBranchId) return;
+    if (!sessionState.projectId || !sessionState.branchId || !mainBranchId)
+      return;
     if (sessionState.branchId === mainBranchId) {
       // Main's head only ever moves (in this local, single-actor app)
       // through this session's own publish, which already reloads the
@@ -1496,7 +1746,7 @@ export function Workspace({
       // keep the controller and overlay so PublishedNotice shows until the user
       // dismisses it or navigates to another branch.
       const publishStatus = publishController.getState().status;
-      if (publishStatus !== 'publishing' && publishStatus !== 'published') {
+      if (publishStatus !== "publishing" && publishStatus !== "published") {
         publishController.reset();
         setPublishOpen(false);
       }
@@ -1504,7 +1754,7 @@ export function Workspace({
       return;
     }
     // Opened/switched to a draft branch: a previous publish's notice is over.
-    if (publishController.getState().status === 'published') {
+    if (publishController.getState().status === "published") {
       publishController.reset();
       setPublishOpen(false);
     }
@@ -1515,10 +1765,12 @@ export function Workspace({
   // A real conflict count from a successful prepare() -- never invented; the
   // banner and the ladder's own behind-main callout both read this.
   const behindMainInfo =
-    publishControllerState.status === 'review' && publishControllerState.conflicts.length > 0
+    publishControllerState.status === "review" &&
+    publishControllerState.conflicts.length > 0
       ? {
           conflictCount: publishControllerState.conflicts.length,
-          versionsPublishedSinceFork: publishControllerState.versionsPublishedSinceFork,
+          versionsPublishedSinceFork:
+            publishControllerState.versionsPublishedSinceFork,
           forkVersionKey: publishControllerState.forkVersionKey,
         }
       : null;
@@ -1526,18 +1778,28 @@ export function Workspace({
   const canvasViewRef = React.useRef<CanvasViewHandle>(null);
 
   const openLibraryPanel = React.useCallback(() => {
-    runGuarded(() => panelDispatch({ type: 'OPEN', panel: 'library' }));
+    runGuarded(() => panelDispatch({ type: "OPEN", panel: "library" }));
   }, [panelDispatch, runGuarded]);
 
-  const placeSavedPart = React.useCallback(async (content: PartContent, label: string) => {
-    const live = session.getState().document;
-    if (!live || !activeViewId || !canvasViewRef.current) return false;
-    const plan = planPlacement(live, activeViewId, content, canvasViewRef.current.getVisibleCentre(), mintId);
-    if (!plan.ok) throw { status: 'invalid', issues: plan.issues };
-    const applied = await handleApplyChanges(plan.changes, `Place ${label}`);
-    if (applied) openInspectorFor({ kind: 'element', ids: [...plan.newElementIds] });
-    return applied;
-  }, [session, activeViewId, mintId, handleApplyChanges, openInspectorFor]);
+  const placeSavedPart = React.useCallback(
+    async (content: PartContent, label: string) => {
+      const live = session.getState().document;
+      if (!live || !activeViewId || !canvasViewRef.current) return false;
+      const plan = planPlacement(
+        live,
+        activeViewId,
+        content,
+        canvasViewRef.current.getVisibleCentre(),
+        mintId,
+      );
+      if (!plan.ok) throw { status: "invalid", issues: plan.issues };
+      const applied = await handleApplyChanges(plan.changes, `Place ${label}`);
+      if (applied)
+        openInspectorFor({ kind: "element", ids: [...plan.newElementIds] });
+      return applied;
+    },
+    [session, activeViewId, mintId, handleApplyChanges, openInspectorFor],
+  );
 
   const handleSwitchBranch = React.useCallback(
     (branchId: string) => {
@@ -1563,46 +1825,58 @@ export function Workspace({
   const [captureRequested, setCaptureRequested] = React.useState<number>(0);
   const [historyFilter, setHistoryFilter] = React.useState<readonly Id[]>([]);
   const [replaceTargetId, setReplaceTargetId] = React.useState<Id | null>(null);
-  const [scenarioEditorFocusAssertionId, setScenarioEditorFocusAssertionId] = React.useState<Id | null>(null);
-  const [duplicateDialog, setDuplicateDialog] = React.useState<DuplicateDialogState | null>(null);
+  const [scenarioEditorFocusAssertionId, setScenarioEditorFocusAssertionId] =
+    React.useState<Id | null>(null);
+  const [duplicateDialog, setDuplicateDialog] =
+    React.useState<DuplicateDialogState | null>(null);
   const [duplicateApplying, setDuplicateApplying] = React.useState(false);
 
   const openHistoryPanel = React.useCallback(() => {
-    panelDispatch({ type: 'OPEN', panel: 'history' });
+    panelDispatch({ type: "OPEN", panel: "history" });
     refreshBehindMainCheck();
   }, [panelDispatch, refreshBehindMainCheck]);
 
   // Board scenario_traffic_editor: while a scenario is edited, its enabled workloads'
   // entry elements carry a "Traffic enters here" tag on the canvas.
-  const trafficEntryElementIds = React.useMemo((): ReadonlySet<Id> | undefined => {
+  const trafficEntryElementIds = React.useMemo(():
+    ReadonlySet<Id> | undefined => {
     const workloads = scenarioDraft?.scenario?.workloads;
     if (!workloads || workloads.length === 0) return undefined;
-    return new Set(workloads.filter((w) => w.enabled).map((w) => w.entry.elementId));
+    return new Set(
+      workloads.filter((w) => w.enabled).map((w) => w.entry.elementId),
+    );
   }, [scenarioDraft]);
 
   // Open inspector / scenario draft as the registry sees it (commands.md §1).
-  const draftContext = React.useMemo((): { readonly id: Id | null; readonly state: CommandDraftState } => {
+  const draftContext = React.useMemo((): {
+    readonly id: Id | null;
+    readonly state: CommandDraftState;
+  } => {
     if (scenarioDraft) {
       const state: CommandDraftState =
-        scenarioDraft.status === 'saving'
-          ? 'saving'
-          : scenarioDraft.status === 'stale' || scenarioDraft.status === 'missing'
-            ? 'stale'
+        scenarioDraft.status === "saving"
+          ? "saving"
+          : scenarioDraft.status === "stale" ||
+              scenarioDraft.status === "missing"
+            ? "stale"
             : scenarioDraft.dirty || scenarioDraft.isNew
-              ? 'dirty'
-              : 'clean';
+              ? "dirty"
+              : "clean";
       return { id: scenarioDraft.draftId, state };
     }
     if (draft) {
       const state: CommandDraftState =
-        draft.status === 'saving' || draft.status === 'invalid' || draft.status === 'stale' || draft.status === 'validating'
+        draft.status === "saving" ||
+        draft.status === "invalid" ||
+        draft.status === "stale" ||
+        draft.status === "validating"
           ? draft.status
           : draft.dirty
-            ? 'dirty'
-            : 'clean';
+            ? "dirty"
+            : "clean";
       return { id: draft.draftId, state };
     }
-    return { id: null, state: 'clean' };
+    return { id: null, state: "clean" };
   }, [draft, scenarioDraft]);
 
   // 16D overflow availability inputs: the single selected element and the scenario a
@@ -1622,7 +1896,9 @@ export function Workspace({
   const commandContext: CommandContext = React.useMemo(() => {
     const mainId = projectRecord?.mainBranchId ?? null;
     const selectedEntry =
-      scenarioEntries.find((entry) => entry.id === selectedScenarioId) ?? scenarioEntries[0] ?? null;
+      scenarioEntries.find((entry) => entry.id === selectedScenarioId) ??
+      scenarioEntries[0] ??
+      null;
     return {
       projectId: sessionState.projectId,
       projectTitle: projectRecord?.title ?? null,
@@ -1630,11 +1906,11 @@ export function Workspace({
       activeViewId,
       branches: branches.map((branch) => ({
         id: branch.id,
-        label: branch.id === mainId ? 'main' : branch.label,
+        label: branch.id === mainId ? "main" : branch.label,
         isMain: branch.id === mainId,
-        closed: branch.state === 'closed',
+        closed: branch.state === "closed",
       })),
-      storageState: isSaving ? 'saving' : storageFailed ? 'failed' : 'ready',
+      storageState: isSaving ? "saving" : storageFailed ? "failed" : "ready",
       draftState: draftContext.state,
       draftId: draftContext.id,
       panels: {
@@ -1658,8 +1934,8 @@ export function Workspace({
         eligible: publishControllerState.eligible,
         conflictCount: publishControllerState.conflicts.length,
       },
-      canUndo: sessionState.canUndo && sessionState.status === 'ready',
-      canRedo: sessionState.canRedo && sessionState.status === 'ready',
+      canUndo: sessionState.canUndo && sessionState.status === "ready",
+      canRedo: sessionState.canRedo && sessionState.status === "ready",
       selectedElementIds: Array.from(selectedElementIds),
       selectedConnectionIds: Array.from(selectedConnectionIds),
       selectedNoteIds: Array.from(selectedNoteIds),
@@ -1670,10 +1946,12 @@ export function Workspace({
       activeViewNoteCount: activeView?.notes.length ?? 0,
       expansionState: activeView ? expansionStateOf(activeView) : {},
       selectedPlacementIds: activeView
-        ? activeView.placements.filter((p) => selectedElementIds.has(p.elementId)).map((p) => p.id)
+        ? activeView.placements
+            .filter((p) => selectedElementIds.has(p.elementId))
+            .map((p) => p.id)
         : [],
       runBlockedReason: sessionRunDisabledReason,
-      runPhase: runControllerState?.phase ?? 'idle',
+      runPhase: runControllerState?.phase ?? "idle",
       hasRunDisplay: Boolean(runControllerState?.current),
       scenarioCount: scenarioEntries.length,
       selectedScenario: selectedEntry
@@ -1681,30 +1959,36 @@ export function Workspace({
             id: selectedEntry.id,
             label: selectedEntry.label,
             notReadyReason:
-              selectedEntry.status.kind === 'not-ready'
-                ? (selectedEntry.status.issues[0]?.message ?? "Can't run this scenario")
+              selectedEntry.status.kind === "not-ready"
+                ? (selectedEntry.status.issues[0]?.message ??
+                  "Can't run this scenario")
                 : null,
           }
         : null,
       runAllBlockedReason: findRunAllDisabledReason(scenarioEntries),
       exportDisabledReasons: {
-        png: transferActions.getDisabledReason('png'),
-        svg: transferActions.getDisabledReason('svg'),
-        json: transferActions.getDisabledReason('json'),
-        csv: transferActions.getDisabledReason('csv'),
-        mermaid: transferActions.getDisabledReason('mermaid'),
+        png: transferActions.getDisabledReason("png"),
+        svg: transferActions.getDisabledReason("svg"),
+        json: transferActions.getDisabledReason("json"),
+        csv: transferActions.getDisabledReason("csv"),
+        mermaid: transferActions.getDisabledReason("mermaid"),
       },
       selectionHasRefinement: Boolean(
         singleSelectedElement &&
-          document?.refinements.some(
-            (r) => r.ownerElementId === singleSelectedElement.id || r.memberElementIds.includes(singleSelectedElement.id),
-          ),
+        document?.refinements.some(
+          (r) =>
+            r.ownerElementId === singleSelectedElement.id ||
+            r.memberElementIds.includes(singleSelectedElement.id),
+        ),
       ),
       selectedElementScenarioScope: Boolean(
-        singleSelectedElement && probeScenario?.scopeElementIds.includes(singleSelectedElement.id),
+        singleSelectedElement &&
+        probeScenario?.scopeElementIds.includes(singleSelectedElement.id),
       ),
       selectedElementHasOutPort: Boolean(
-        singleSelectedElement?.ports.some((p) => p.direction === 'out' && p.channel !== 'event'),
+        singleSelectedElement?.ports.some(
+          (p) => p.direction === "out" && p.channel !== "event",
+        ),
       ),
       selectedScenarioMode: probeScenario?.mode ?? null,
     };
@@ -1747,7 +2031,9 @@ export function Workspace({
     async (plan: SelectionPlan): Promise<RenameOutcome> => {
       if (!plan.ok) return { ok: false, message: plan.reason };
       const applied = await handleApplyChanges(plan.changes, plan.label);
-      return applied ? { ok: true } : { ok: false, message: 'Could not save this canvas change' };
+      return applied
+        ? { ok: true }
+        : { ok: false, message: "Could not save this canvas change" };
     },
     [handleApplyChanges],
   );
@@ -1759,198 +2045,261 @@ export function Workspace({
     ): Promise<RenameOutcome> => {
       const liveDocument = session.getState().document;
       if (!liveDocument || !activeViewId) {
-        const message = 'No canvas view is open';
-        setDuplicateDialog({ kind: 'error', messages: [message] });
+        const message = "No canvas view is open";
+        setDuplicateDialog({ kind: "error", messages: [message] });
         return { ok: false, message };
       }
-      const placement = planPlacement(liveDocument, activeViewId, content, anchor, mintId);
+      const placement = planPlacement(
+        liveDocument,
+        activeViewId,
+        content,
+        anchor,
+        mintId,
+      );
       if (!placement.ok) {
         const messages = duplicateIssueMessages(
           placement.issues,
-          'Could not duplicate this selection',
+          "Could not duplicate this selection",
         );
-        setDuplicateDialog({ kind: 'error', messages });
-        return { ok: false, message: messages[0] ?? 'Could not duplicate this selection' };
+        setDuplicateDialog({ kind: "error", messages });
+        return {
+          ok: false,
+          message: messages[0] ?? "Could not duplicate this selection",
+        };
       }
-      const applied = await handleApplyChanges(placement.changes, 'Duplicate selection');
+      const applied = await handleApplyChanges(
+        placement.changes,
+        "Duplicate selection",
+      );
       if (!applied) {
-        const message = 'Could not save the duplicated selection';
-        setDuplicateDialog({ kind: 'error', messages: [message] });
+        const message = "Could not save the duplicated selection";
+        setDuplicateDialog({ kind: "error", messages: [message] });
         return { ok: false, message };
       }
       setDuplicateDialog(null);
       if (placement.newElementIds.length > 0) {
-        openInspectorFor({ kind: 'element', ids: [...placement.newElementIds] });
+        openInspectorFor({
+          kind: "element",
+          ids: [...placement.newElementIds],
+        });
       }
       return { ok: true };
     },
     [activeViewId, handleApplyChanges, mintId, openInspectorFor, session],
   );
 
-  const handleDuplicateSelection = React.useCallback(async (): Promise<RenameOutcome> => {
-    if (!document || !activeView || !activeViewId) {
-      const message = 'No canvas view is open';
-      setDuplicateDialog({ kind: 'error', messages: [message] });
-      return { ok: false, message };
-    }
-    const selectedIds = Array.from(selectedElementIds);
-    const selectedNoteIdsList = Array.from(selectedNoteIds);
-
-    if (selectedIds.length === 0 && selectedNoteIdsList.length > 0) {
-      const notesToDup = activeView.notes.filter((n) => selectedNoteIdsList.includes(n.id));
-      if (notesToDup.length === 0) {
-        const message = 'The selected notes no longer exist';
-        setDuplicateDialog({ kind: 'error', messages: [message] });
+  const handleDuplicateSelection =
+    React.useCallback(async (): Promise<RenameOutcome> => {
+      if (!document || !activeView || !activeViewId) {
+        const message = "No canvas view is open";
+        setDuplicateDialog({ kind: "error", messages: [message] });
         return { ok: false, message };
       }
-      const newNotes: Note[] = notesToDup.map((n) => ({
-        ...n,
-        id: mintId(),
-        x: n.x + 24,
-        y: n.y + 24,
-      }));
-      const plan: SelectionPlan = {
-        ok: true,
-        label: 'Duplicate notes',
-        changes: [
-          {
-            kind: 'replace',
-            value: {
-              recordKind: 'view',
-              record: { ...activeView, notes: [...activeView.notes, ...newNotes] },
-            },
-          },
-        ],
-      };
-      const outcome = await applySelectionPlan(plan);
-      if (outcome.ok) {
-        setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
-      }
-      return outcome;
-    }
+      const selectedIds = Array.from(selectedElementIds);
+      const selectedNoteIdsList = Array.from(selectedNoteIds);
 
-    const selected = new Set(selectedIds);
-    const sourcePlacements = activeView.placements.filter((placement) => selected.has(placement.elementId));
-    if (sourcePlacements.length !== selectedIds.length) {
-      const message = 'Every selected component must be placed in the active view';
-      setDuplicateDialog({ kind: 'error', messages: [message] });
-      return { ok: false, message };
-    }
-    const captured = captureSelection(document, activeViewId, {
-      elementIds: selectedIds,
-      noteIds: selectedNoteIdsList,
-    });
-    if (!captured.ok) {
-      const messages = duplicateIssueMessages(
-        captured.issues,
-        'Could not capture this selection',
+      if (selectedIds.length === 0 && selectedNoteIdsList.length > 0) {
+        const notesToDup = activeView.notes.filter((n) =>
+          selectedNoteIdsList.includes(n.id),
+        );
+        if (notesToDup.length === 0) {
+          const message = "The selected notes no longer exist";
+          setDuplicateDialog({ kind: "error", messages: [message] });
+          return { ok: false, message };
+        }
+        const newNotes: Note[] = notesToDup.map((n) => ({
+          ...n,
+          id: mintId(),
+          x: n.x + 24,
+          y: n.y + 24,
+        }));
+        const plan: SelectionPlan = {
+          ok: true,
+          label: "Duplicate notes",
+          changes: [
+            {
+              kind: "replace",
+              value: {
+                recordKind: "view",
+                record: {
+                  ...activeView,
+                  notes: [...activeView.notes, ...newNotes],
+                },
+              },
+            },
+          ],
+        };
+        const outcome = await applySelectionPlan(plan);
+        if (outcome.ok) {
+          setSelectedNoteIds(new Set(newNotes.map((n) => n.id)));
+        }
+        return outcome;
+      }
+
+      const selected = new Set(selectedIds);
+      const sourcePlacements = activeView.placements.filter((placement) =>
+        selected.has(placement.elementId),
       );
-      setDuplicateDialog({ kind: 'error', messages });
-      return { ok: false, message: messages[0] ?? 'Could not capture this selection' };
-    }
-    const anchor = {
-      x: Math.min(...sourcePlacements.map((placement) => placement.x)) + 24,
-      y: Math.min(...sourcePlacements.map((placement) => placement.y)) + 24,
-    };
-    const items = duplicateConfirmationItems(captured.preview);
-    if (items.length > 0) {
-      setDuplicateDialog({
-        kind: 'confirm',
-        content: captured.content,
-        anchor,
-        items,
-        warnings: captured.preview.warnings,
+      if (sourcePlacements.length !== selectedIds.length) {
+        const message =
+          "Every selected component must be placed in the active view";
+        setDuplicateDialog({ kind: "error", messages: [message] });
+        return { ok: false, message };
+      }
+      const captured = captureSelection(document, activeViewId, {
+        elementIds: selectedIds,
+        noteIds: selectedNoteIdsList,
       });
-      return { ok: true };
-    }
-    return applyDuplicate(captured.content, anchor);
-  }, [activeView, activeViewId, applyDuplicate, applySelectionPlan, selectedElementIds, selectedNoteIds, document, mintId]);
+      if (!captured.ok) {
+        const messages = duplicateIssueMessages(
+          captured.issues,
+          "Could not capture this selection",
+        );
+        setDuplicateDialog({ kind: "error", messages });
+        return {
+          ok: false,
+          message: messages[0] ?? "Could not capture this selection",
+        };
+      }
+      const anchor = {
+        x: Math.min(...sourcePlacements.map((placement) => placement.x)) + 24,
+        y: Math.min(...sourcePlacements.map((placement) => placement.y)) + 24,
+      };
+      const items = duplicateConfirmationItems(captured.preview);
+      if (items.length > 0) {
+        setDuplicateDialog({
+          kind: "confirm",
+          content: captured.content,
+          anchor,
+          items,
+          warnings: captured.preview.warnings,
+        });
+        return { ok: true };
+      }
+      return applyDuplicate(captured.content, anchor);
+    }, [
+      activeView,
+      activeViewId,
+      applyDuplicate,
+      applySelectionPlan,
+      selectedElementIds,
+      selectedNoteIds,
+      document,
+      mintId,
+    ]);
 
   // Exhaustive over CommandId: keyboard and Quick options share these.
   const commandHandlers: CommandHandlers = React.useMemo(
     () => ({
-      'commands.open': () => setQuickOptionsOpen(true),
-      'project.rename': ({ title }) => handleRenameProject(title),
-      'project.switch': () => handleBackToProjects(),
-      'branch.switch': ({ branchId }) => handleSwitchBranch(branchId),
-      'branch.create': ({ label, source }) => session.createBranch(label, source),
-      'branch.reopen': ({ branchId }) => session.reopenBranch(branchId),
-      'run.start': ({ scenarioId }) => handleRunScenario(scenarioId),
-      'run.start-all': () => handleRunAll(),
-      'run.pause': () => runController?.pause(),
-      'run.resume': () => runController?.resume(),
-      'run.cancel': () => runController?.cancel(),
-      'run.reset': () => handleResetRun(),
-      'history.open': () => openHistoryPanel(),
-      'history.close': () => panelDispatch({ type: 'CLOSE', panel: 'history' }),
-      'history.commit': ({ message }) => historyController.commit(message),
-      'history.restore': ({ targetId, label }) => historyController.restore(targetId, label),
+      "commands.open": () => setQuickOptionsOpen(true),
+      "project.rename": ({ title }) => handleRenameProject(title),
+      "project.switch": () => handleBackToProjects(),
+      "branch.switch": ({ branchId }) => handleSwitchBranch(branchId),
+      "branch.create": ({ label, source }) =>
+        session.createBranch(label, source),
+      "branch.reopen": ({ branchId }) => session.reopenBranch(branchId),
+      "run.start": ({ scenarioId }) => handleRunScenario(scenarioId),
+      "run.start-all": () => handleRunAll(),
+      "run.pause": () => runController?.pause(),
+      "run.resume": () => runController?.resume(),
+      "run.cancel": () => runController?.cancel(),
+      "run.reset": () => handleResetRun(),
+      "history.open": () => openHistoryPanel(),
+      "history.close": () => panelDispatch({ type: "CLOSE", panel: "history" }),
+      "history.commit": ({ message }) => historyController.commit(message),
+      "history.restore": ({ targetId, label }) =>
+        historyController.restore(targetId, label),
       // Opens the review overlay first so its "preparing" state is visible.
-      'history.prepare-publish': () => {
+      "history.prepare-publish": () => {
         setBehindMainBannerDismissed(false);
         setPublishOpen(true);
         return publishController.prepare();
       },
-      'history.resolve-conflict': ({ conflictId, resolution }) =>
+      "history.resolve-conflict": ({ conflictId, resolution }) =>
         publishController.resolveConflict(conflictId, resolution),
-      'history.publish': ({ metadata, keepSourceOpen }) =>
+      "history.publish": ({ metadata, keepSourceOpen }) =>
         publishController.publish(metadata, keepSourceOpen),
-      'library.open': () => openLibraryPanel(),
-      'library.close': () => panelDispatch({ type: 'CLOSE', panel: 'library' }),
-      'results.open': () => {
+      "library.open": () => openLibraryPanel(),
+      "library.close": () => panelDispatch({ type: "CLOSE", panel: "library" }),
+      "results.open": () => {
         setResultsDismissed(false);
         setResultsRequested(true);
         requestAnimationFrame(() => resultsRegionRef.current?.focus());
       },
-      'results.close': () => setResultsDismissed(true),
-      'panel.place': ({ panelId, placement, index }) =>
-        panelDispatch({ type: 'PLACE', panel: panelId, placement, index }),
-      'panel.collapse': ({ panelId }) => panelDispatch({ type: 'COLLAPSE', panel: panelId }),
-      'panel.expand': ({ panelId }) => panelDispatch({ type: 'EXPAND', panel: panelId }),
+      "results.close": () => setResultsDismissed(true),
+      "panel.place": ({ panelId, placement, index }) =>
+        panelDispatch({ type: "PLACE", panel: panelId, placement, index }),
+      "panel.collapse": ({ panelId }) =>
+        panelDispatch({ type: "COLLAPSE", panel: panelId }),
+      "panel.expand": ({ panelId }) =>
+        panelDispatch({ type: "EXPAND", panel: panelId }),
       // A docked panel resets its own side's shared width; a floating one keeps
       // the header menu's existing behaviour (right side).
-      'panel.reset-width': ({ panelId }) =>
+      "panel.reset-width": ({ panelId }) =>
         panelDispatch({
-          type: 'RESET_SIDE',
-          side: panelStateRef.current.panels[panelId].placement === 'left' ? 'left' : 'right',
+          type: "RESET_SIDE",
+          side:
+            panelStateRef.current.panels[panelId].placement === "left"
+              ? "left"
+              : "right",
         }),
-      'inspector.apply': ({ draftId }) =>
-        scenarioDraft?.draftId === draftId ? handleApplyScenarioDraft() : handleApplyDraft(),
-      'inspector.cancel': ({ draftId }) =>
-        scenarioDraft?.draftId === draftId ? handleCancelScenarioDraft() : handleCancelDraft(),
-      'inspector.close': () => handleCloseInspector(),
-      'canvas.select-tool': () => canvasViewRef.current?.setToolMode('select'),
-      'canvas.pan-tool': () => canvasViewRef.current?.setToolMode('pan'),
-      'canvas.zoom-out': () => canvasViewRef.current?.zoomOut(),
-      'canvas.zoom-in': () => canvasViewRef.current?.zoomIn(),
-      'canvas.fit': () => canvasViewRef.current?.fitView(),
-      'dock.configure': (config) => persistDockConfig(config),
-      'dock.restore-defaults': () => persistDockConfig(DEFAULT_DOCK_CONFIG),
-      'export.png': () => transferActions.exportPng(),
-      'export.svg': () => transferActions.exportSvg(),
-      'project.export-json': () => transferActions.exportJson(),
-      'export.csv': () => transferActions.exportCsv(),
-      'export.mermaid': () => transferActions.exportMermaid(),
-      'edit.undo': () => handleUndo(),
-      'edit.redo': () => handleRedo(),
-      'selection.duplicate': () => handleDuplicateSelection(),
-      'selection.delete': () => canvasViewRef.current?.deleteSelection(),
-      'selection.group': async ({ label }) => {
-        if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+      "inspector.apply": ({ draftId }) =>
+        scenarioDraft?.draftId === draftId
+          ? handleApplyScenarioDraft()
+          : handleApplyDraft(),
+      "inspector.cancel": ({ draftId }) =>
+        scenarioDraft?.draftId === draftId
+          ? handleCancelScenarioDraft()
+          : handleCancelDraft(),
+      "inspector.close": () => handleCloseInspector(),
+      "canvas.select-tool": () => canvasViewRef.current?.setToolMode("select"),
+      "canvas.pan-tool": () => canvasViewRef.current?.setToolMode("pan"),
+      "canvas.zoom-out": () => canvasViewRef.current?.zoomOut(),
+      "canvas.zoom-in": () => canvasViewRef.current?.zoomIn(),
+      "canvas.fit": () => canvasViewRef.current?.fitView(),
+      "dock.configure": (config) => persistDockConfig(config),
+      "dock.restore-defaults": () => persistDockConfig(DEFAULT_DOCK_CONFIG),
+      "export.png": () => transferActions.exportPng(),
+      "export.svg": () => transferActions.exportSvg(),
+      "project.export-json": () => transferActions.exportJson(),
+      "export.csv": () => transferActions.exportCsv(),
+      "export.mermaid": () => transferActions.exportMermaid(),
+      "edit.undo": () => handleUndo(),
+      "edit.redo": () => handleRedo(),
+      "selection.duplicate": () => handleDuplicateSelection(),
+      "selection.delete": () => canvasViewRef.current?.deleteSelection(),
+      "selection.group": async ({ label }) => {
+        if (!document || !activeViewId)
+          return { ok: false, message: "No canvas view is open" };
         const result = await applySelectionPlan(
-          planGroup(document, activeViewId, Array.from(selectedElementIds), mintId(), label, Array.from(selectedNoteIds)),
+          planGroup(
+            document,
+            activeViewId,
+            Array.from(selectedElementIds),
+            mintId(),
+            label,
+            Array.from(selectedNoteIds),
+          ),
         );
         if (result.ok) {
           closeInspector();
         }
         return result;
       },
-      'selection.wrap-in-boundary': ({ viewId, elementIds, ownerElementId, refinementId, label }) => {
-        if (!document) return { ok: false, message: 'No canvas view is open' };
-        const portIds = wrapBoundaryCrossingEndpoints(document, elementIds).map(() => ({
-          ownerPortId: mintId(),
-          mappingId: mintId(),
-        }));
+      "selection.wrap-in-boundary": ({
+        viewId,
+        elementIds,
+        ownerElementId,
+        refinementId,
+        label,
+      }) => {
+        if (!document) return { ok: false, message: "No canvas view is open" };
+        const portIds = wrapBoundaryCrossingEndpoints(document, elementIds).map(
+          () => ({
+            ownerPortId: mintId(),
+            mappingId: mintId(),
+          }),
+        );
         return applySelectionPlan(
           planWrapInBoundary(
             document,
@@ -1966,39 +2315,62 @@ export function Workspace({
           ),
         );
       },
-      'selection.ungroup': ({ groupIds }) =>
+      "selection.ungroup": ({ groupIds }) =>
         document && activeViewId
           ? applySelectionPlan(planUngroup(document, activeViewId, groupIds))
-          : { ok: false, message: 'No canvas view is open' },
-      'selection.align': ({ edge }) =>
+          : { ok: false, message: "No canvas view is open" },
+      "selection.align": ({ edge }) =>
         document && activeViewId
-          ? applySelectionPlan(planAlign(document, activeViewId, Array.from(selectedElementIds), edge, canvasViewRef.current?.getMeasuredHeights(), Array.from(selectedNoteIds)))
-          : { ok: false, message: 'No canvas view is open' },
+          ? applySelectionPlan(
+              planAlign(
+                document,
+                activeViewId,
+                Array.from(selectedElementIds),
+                edge,
+                canvasViewRef.current?.getMeasuredHeights(),
+                Array.from(selectedNoteIds),
+              ),
+            )
+          : { ok: false, message: "No canvas view is open" },
       // 16D overflow (commands.md "Selection-scoped actions", D46).
-      'selection.save-as-component': () => {
+      "selection.save-as-component": () => {
         openLibraryPanel();
         setCaptureRequested((n) => n + 1);
         return { ok: true };
       },
-      'history.show-changes': () => {
+      "history.show-changes": () => {
         const ids = [...selectedElementIds];
-        if (ids.length === 0) return { ok: false, message: 'Select one or more components first' };
+        if (ids.length === 0)
+          return { ok: false, message: "Select one or more components first" };
         setHistoryFilter(ids);
-        runGuarded(() => panelDispatch({ type: 'OPEN', panel: 'history' }));
+        runGuarded(() => panelDispatch({ type: "OPEN", panel: "history" }));
         return { ok: true };
       },
-      'selection.add-probe': () => {
+      "selection.add-probe": () => {
         const live = session.getState();
         const element = singleSelectedElement;
-        if (!live.document || live.workingRevision === null || !element || !probeScenario) {
-          return { ok: false, message: 'Select one component and a scenario first' };
+        if (
+          !live.document ||
+          live.workingRevision === null ||
+          !element ||
+          !probeScenario
+        ) {
+          return {
+            ok: false,
+            message: "Select one component and a scenario first",
+          };
         }
-        const plan = planAddProbe(live.document, probeScenario, element.id, mintId);
+        const plan = planAddProbe(
+          live.document,
+          probeScenario,
+          element.id,
+          mintId,
+        );
         if (!plan.ok) return { ok: false, message: plan.reason };
         runGuarded(() => {
           const opened = openScenarioDraft({
             draftId: mintId(),
-            target: { kind: 'edit', scenarioId: probeScenario.id },
+            target: { kind: "edit", scenarioId: probeScenario.id },
             document: live.document!,
             baseWorkingRevision: live.workingRevision!,
             mintId,
@@ -2008,74 +2380,116 @@ export function Workspace({
           setFocusFieldId(null);
           setScenarioEditorFocusName(false);
           setScenarioEditorFocusAssertionId(plan.check.id);
-          setScenarioDraft(changeScenarioDraft(opened, live.document!, plan.patch));
+          setScenarioDraft(
+            changeScenarioDraft(opened, live.document!, plan.patch),
+          );
         });
         return { ok: true };
       },
-      'selection.replace-part': () => {
-        if (!singleSelectedElement) return { ok: false, message: 'Select exactly one component to replace' };
+      "selection.replace-part": () => {
+        if (!singleSelectedElement)
+          return {
+            ok: false,
+            message: "Select exactly one component to replace",
+          };
         setReplaceTargetId(singleSelectedElement.id);
         return { ok: true };
       },
-      'selection.export': () => {
-        if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+      "selection.export": () => {
+        if (!document || !activeViewId)
+          return { ok: false, message: "No canvas view is open" };
         const ids = [...selectedElementIds];
         const noteIds = [...selectedNoteIds];
-        if (ids.length === 0 && noteIds.length === 0) return { ok: false, message: 'Select one or more components or notes first' };
-        const label = ids.length === 1
-          ? document.elements.find((e) => e.id === ids[0])?.label ?? 'Selection'
-          : `${ids.length + noteIds.length} items`;
-        const exported = createSelectionExport(document, activeViewId, ids, noteIds, mintId(), label);
+        if (ids.length === 0 && noteIds.length === 0)
+          return {
+            ok: false,
+            message: "Select one or more components or notes first",
+          };
+        const label =
+          ids.length === 1
+            ? (document.elements.find((e) => e.id === ids[0])?.label ??
+              "Selection")
+            : `${ids.length + noteIds.length} items`;
+        const exported = createSelectionExport(
+          document,
+          activeViewId,
+          ids,
+          noteIds,
+          mintId(),
+          label,
+        );
         if (!exported.ok) return { ok: false, message: exported.message };
         createBrowserDownloadSink()(
-          new Blob([exported.bytes.slice().buffer as ArrayBuffer], { type: 'application/json;charset=utf-8' }),
+          new Blob([exported.bytes.slice().buffer as ArrayBuffer], {
+            type: "application/json;charset=utf-8",
+          }),
           `${sanitizeFilenameStem(label)}.system-studio-part.json`,
         );
         return { ok: true };
       },
-      'selection.distribute': ({ axis }) =>
+      "selection.distribute": ({ axis }) =>
         document && activeViewId
-          ? applySelectionPlan(planDistribute(document, activeViewId, Array.from(selectedElementIds), axis, canvasViewRef.current?.getMeasuredHeights(), Array.from(selectedNoteIds)))
-          : { ok: false, message: 'No canvas view is open' },
-      'canvas.expand': ({ viewId, target }) =>
+          ? applySelectionPlan(
+              planDistribute(
+                document,
+                activeViewId,
+                Array.from(selectedElementIds),
+                axis,
+                canvasViewRef.current?.getMeasuredHeights(),
+                Array.from(selectedNoteIds),
+              ),
+            )
+          : { ok: false, message: "No canvas view is open" },
+      "canvas.expand": ({ viewId, target }) =>
         document
-          ? applySelectionPlan(planExpansion(document, viewId, target, 'expand'))
-          : { ok: false, message: 'No canvas view is open' },
-      'canvas.collapse': ({ viewId, target }) =>
+          ? applySelectionPlan(
+              planExpansion(document, viewId, target, "expand"),
+            )
+          : { ok: false, message: "No canvas view is open" },
+      "canvas.collapse": ({ viewId, target }) =>
         document
-          ? applySelectionPlan(planExpansion(document, viewId, target, 'collapse'))
-          : { ok: false, message: 'No canvas view is open' },
-      'canvas.add-note': ({ text }) => {
-        if (!document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+          ? applySelectionPlan(
+              planExpansion(document, viewId, target, "collapse"),
+            )
+          : { ok: false, message: "No canvas view is open" },
+      "canvas.add-note": ({ text }) => {
+        if (!document || !activeViewId)
+          return { ok: false, message: "No canvas view is open" };
         const view = document.views.find((v) => v.id === activeViewId);
-        const selectedId = commandContext.selectedElementIds.length === 1
-          ? commandContext.selectedElementIds[0]
-          : null;
-        const selectedPlacement = selectedId && view
-          ? view.placements.find((p) => p.elementId === selectedId)
-          : null;
+        const selectedId =
+          commandContext.selectedElementIds.length === 1
+            ? commandContext.selectedElementIds[0]
+            : null;
+        const selectedPlacement =
+          selectedId && view
+            ? view.placements.find((p) => p.elementId === selectedId)
+            : null;
 
         const point = selectedPlacement
-          ? { x: selectedPlacement.x + selectedPlacement.width + 24, y: selectedPlacement.y }
+          ? {
+              x: selectedPlacement.x + selectedPlacement.width + 24,
+              y: selectedPlacement.y,
+            }
           : canvasViewRef.current?.getVisibleCentre();
 
-        if (!point) return { ok: false, message: 'No canvas view is open' };
+        if (!point) return { ok: false, message: "No canvas view is open" };
 
         return applySelectionPlan(
           planAddNote(
             document,
             activeViewId,
             mintId(),
-            text || 'New note',
+            text || "New note",
             point,
             selectedPlacement ? [selectedPlacement.elementId] : [],
           ),
         );
       },
-      'part.capture': ({ command }) => session.savePart(command),
-      'part.place': ({ content, label }) => placeSavedPart(content, label),
-      'part.export': (part) => downloadSavedPart(repository, session.getState().projectId as Id, part),
-      'part.import': ({ command }) => session.savePart(command),
+      "part.capture": ({ command }) => session.savePart(command),
+      "part.place": ({ content, label }) => placeSavedPart(content, label),
+      "part.export": (part) =>
+        downloadSavedPart(repository, session.getState().projectId as Id, part),
+      "part.import": ({ command }) => session.savePart(command),
     }),
     [
       handleBackToProjects,
@@ -2114,59 +2528,87 @@ export function Workspace({
   );
 
   const runGuardedBranchCommand = React.useCallback(
-    <K extends 'branch.create' | 'branch.reopen'>(
+    <K extends "branch.create" | "branch.reopen">(
       id: K,
       payload: CommandHandlers[K] extends (arg: infer P) => unknown ? P : never,
     ): Promise<BranchActionOutcome> =>
       new Promise((resolve) => {
         const run = async () => {
           try {
-            const result = await executeCommand(id, payload as never, commandContext, commandHandlers);
-            if (result.status === 'disabled') {
-              resolve({ status: 'failed', message: result.reason });
+            const result = await executeCommand(
+              id,
+              payload as never,
+              commandContext,
+              commandHandlers,
+            );
+            if (result.status === "disabled") {
+              resolve({ status: "failed", message: result.reason });
               return;
             }
             const value = result.value as { readonly status?: string } | null;
-            if (value?.status === 'applied') {
-              resolve({ status: 'done' });
+            if (value?.status === "applied") {
+              resolve({ status: "done" });
             } else {
               resolve({
-                status: 'failed',
-                message: formatStudioError(value, id === 'branch.create' ? 'Could not create this branch' : 'Could not reopen this branch'),
+                status: "failed",
+                message: formatStudioError(
+                  value,
+                  id === "branch.create"
+                    ? "Could not create this branch"
+                    : "Could not reopen this branch",
+                ),
               });
             }
           } catch {
-            resolve({ status: 'failed', message: id === 'branch.create' ? 'Could not create this branch' : 'Could not reopen this branch' });
+            resolve({
+              status: "failed",
+              message:
+                id === "branch.create"
+                  ? "Could not create this branch"
+                  : "Could not reopen this branch",
+            });
           }
         };
         runGuarded(
           () => void run(),
-          () => resolve({ status: 'cancelled' }),
+          () => resolve({ status: "cancelled" }),
         );
       }),
     [commandContext, commandHandlers, runGuarded],
   );
 
   const createBranchDisabledReason = React.useMemo(() => {
-    const availability = COMMAND_DEFINITIONS['branch.create'].availability(commandContext, {
-      label: 'Branch',
-      source: 'working',
-    });
+    const availability = COMMAND_DEFINITIONS["branch.create"].availability(
+      commandContext,
+      {
+        label: "Branch",
+        source: "working",
+      },
+    );
     return availability.enabled ? null : availability.reason;
   }, [commandContext]);
 
   const executeCanvasCommand = React.useCallback(
-    <K extends CommandId>(id: K, payload: CommandPayloads[K]) => executeCommand(id, payload, commandContext, commandHandlers),
+    <K extends CommandId>(id: K, payload: CommandPayloads[K]) =>
+      executeCommand(id, payload, commandContext, commandHandlers),
     [commandContext, commandHandlers],
   );
 
   // History panel buttons show the registry's reason instead of failing on click.
   const reasonOf = (availability: ReturnType<typeof getAvailability>) =>
     availability.enabled ? null : availability.reason;
-  const commitBlockedReason = reasonOf(getAvailability('history.commit', commandContext, { message: '' }));
-  const publishBlockedReason = reasonOf(getAvailability('history.prepare-publish', commandContext, {}));
-  const partsBlockedReason = reasonOf(getPayloadFreeAvailability('part.import', commandContext));
-  const captureBlockedReason = reasonOf(getPayloadFreeAvailability('part.capture', commandContext));
+  const commitBlockedReason = reasonOf(
+    getAvailability("history.commit", commandContext, { message: "" }),
+  );
+  const publishBlockedReason = reasonOf(
+    getAvailability("history.prepare-publish", commandContext, {}),
+  );
+  const partsBlockedReason = reasonOf(
+    getPayloadFreeAvailability("part.import", commandContext),
+  );
+  const captureBlockedReason = reasonOf(
+    getPayloadFreeAvailability("part.capture", commandContext),
+  );
 
   const [historyNotice, setHistoryNotice] = React.useState<string | null>(null);
   // D40: main never holds edits. "Start a new draft" / "Edit main directly" on
@@ -2175,36 +2617,41 @@ export function Workspace({
   // head, so 'head' and 'working' copy the same document; "Edit main directly"
   // uses 'working' to match the auto-draft-on-first-edit rule.
   const startDraftFromMain = React.useCallback(
-    async (source: 'working' | 'head') => {
+    async (source: "working" | "head") => {
       setHistoryNotice(null);
       const taken = new Set(branches.map((branch) => branch.label));
-      let label = 'Draft from main';
+      let label = "Draft from main";
       for (let n = 2; taken.has(label); n += 1) label = `Draft from main ${n}`;
-      const outcome = await runGuardedBranchCommand('branch.create', { label, source });
-      if (outcome.status === 'failed') setHistoryNotice(outcome.message);
+      const outcome = await runGuardedBranchCommand("branch.create", {
+        label,
+        source,
+      });
+      if (outcome.status === "failed") setHistoryNotice(outcome.message);
     },
     [branches, runGuardedBranchCommand],
   );
   const openPublishFlow = React.useCallback(async () => {
     setHistoryNotice(null);
-    const result = await runCommand('history.prepare-publish', {});
-    if (result.status === 'disabled') setHistoryNotice(result.reason);
+    const result = await runCommand("history.prepare-publish", {});
+    if (result.status === "disabled") setHistoryNotice(result.reason);
   }, [runCommand]);
 
   // Inspector / scenario editor buttons run the registry commands for the open draft.
   const inspectorApply = React.useCallback(() => {
-    if (draftContext.id) void runCommand('inspector.apply', { draftId: draftContext.id });
+    if (draftContext.id)
+      void runCommand("inspector.apply", { draftId: draftContext.id });
   }, [draftContext.id, runCommand]);
   const inspectorCancel = React.useCallback(() => {
-    if (draftContext.id) void runCommand('inspector.cancel', { draftId: draftContext.id });
+    if (draftContext.id)
+      void runCommand("inspector.cancel", { draftId: draftContext.id });
   }, [draftContext.id, runCommand]);
   const inspectorClose = React.useCallback(() => {
-    void runCommand('inspector.close', { draftId: draftContext.id });
+    void runCommand("inspector.close", { draftId: draftContext.id });
   }, [draftContext.id, runCommand]);
 
   const renderPanel = React.useCallback(
     (panelId: PanelId): React.ReactNode => {
-      if (panelId === 'inspector') {
+      if (panelId === "inspector") {
         if (scenarioDraft && document) {
           return (
             <ScenarioEditor
@@ -2231,7 +2678,7 @@ export function Workspace({
               onApply={inspectorApply}
               onCancel={inspectorCancel}
               onClose={inspectorClose}
-              saving={draft.status === 'saving'}
+              saving={draft.status === "saving"}
               focusFieldId={focusFieldId}
               variant="hosted"
             />
@@ -2239,14 +2686,14 @@ export function Workspace({
         }
         return null;
       }
-      if (panelId === 'history') {
-        if (historyView === 'commit') {
+      if (panelId === "history") {
+        if (historyView === "commit") {
           return (
             <CommitPanel
               hosted
               controller={routedHistoryController}
               refreshToken={statusRefreshToken}
-              onCancel={() => setHistoryView('ladder')}
+              onCancel={() => setHistoryView("ladder")}
               onRunScenario={(scenarioId) => void handleRunScenario(scenarioId)}
               onRunAll={() => void handleRunAll()}
             />
@@ -2256,11 +2703,11 @@ export function Workspace({
           <HistoryLadder
             hosted
             controller={routedHistoryController}
-            canUndo={sessionState.canUndo && sessionState.status === 'ready'}
-            canRedo={sessionState.canRedo && sessionState.status === 'ready'}
+            canUndo={sessionState.canUndo && sessionState.status === "ready"}
+            canRedo={sessionState.canRedo && sessionState.status === "ready"}
             onUndo={() => void handleUndo()}
             onRedo={() => void handleRedo()}
-            onOpenCommit={() => setHistoryView('commit')}
+            onOpenCommit={() => setHistoryView("commit")}
             commitBlockedReason={commitBlockedReason}
             publishBlockedReason={publishBlockedReason}
             onOpenPublish={() => void openPublishFlow()}
@@ -2270,14 +2717,15 @@ export function Workspace({
               behindMainInfo
                 ? {
                     conflictCount: behindMainInfo.conflictCount,
-                    versionsPublishedSinceFork: behindMainInfo.versionsPublishedSinceFork,
+                    versionsPublishedSinceFork:
+                      behindMainInfo.versionsPublishedSinceFork,
                   }
                 : null
             }
             onReviewAndResolve={() => void openPublishFlow()}
-            onStartDraft={() => void startDraftFromMain('head')}
-            onEditMain={() => void startDraftFromMain('working')}
-            onClose={() => void runCommand('history.close', {})}
+            onStartDraft={() => void startDraftFromMain("head")}
+            onEditMain={() => void startDraftFromMain("working")}
+            onClose={() => void runCommand("history.close", {})}
           />
         );
       }
@@ -2286,17 +2734,29 @@ export function Workspace({
           view={libraryView}
           onViewChange={setLibraryView}
           captureRequested={captureRequested}
-          renderSavedParts={({ searchQuery, view, active, onCountChange }) => <SavedParts
-            repository={repository} session={session} actor={actor} mintId={mintId}
-            viewId={activeViewId} elementIds={[...selectedElementIds]} noteIds={[...selectedNoteIds]}
-            blockedReason={partsBlockedReason}
-            captureBlockedReason={captureBlockedReason}
-            captureRequested={captureRequested}
-            execute={runCommand} searchQuery={searchQuery} view={view}
-            active={active} onCountChange={onCountChange}
-          />}
-          onPlace={(entryId) => void canvasViewRef.current?.placeAtCentre(entryId)}
-          onClose={() => void runCommand('library.close', {})}
+          renderSavedParts={({ searchQuery, view, active, onCountChange }) => (
+            <SavedParts
+              repository={repository}
+              session={session}
+              actor={actor}
+              mintId={mintId}
+              viewId={activeViewId}
+              elementIds={[...selectedElementIds]}
+              noteIds={[...selectedNoteIds]}
+              blockedReason={partsBlockedReason}
+              captureBlockedReason={captureBlockedReason}
+              captureRequested={captureRequested}
+              execute={runCommand}
+              searchQuery={searchQuery}
+              view={view}
+              active={active}
+              onCountChange={onCountChange}
+            />
+          )}
+          onPlace={(entryId) =>
+            void canvasViewRef.current?.placeAtCentre(entryId)
+          }
+          onClose={() => void runCommand("library.close", {})}
         />
       );
     },
@@ -2333,8 +2793,14 @@ export function Workspace({
       sessionState.canUndo,
       sessionState.canRedo,
       sessionState.status,
-      repository, session, actor, mintId, activeViewId, selectedElementIds,
-      historyFilter, captureRequested,
+      repository,
+      session,
+      actor,
+      mintId,
+      activeViewId,
+      selectedElementIds,
+      historyFilter,
+      captureRequested,
     ],
   );
 
@@ -2344,13 +2810,20 @@ export function Workspace({
 
   const panelCommandRoutes: PanelCommandRoutes = React.useMemo(
     () => ({
-      place: (panelId, placement) => void runCommand('panel.place', { panelId, placement, index: 0 }),
-      collapse: (panelId) => void runCommand('panel.collapse', { panelId }),
-      expand: (panelId) => void runCommand('panel.expand', { panelId }),
-      resetWidth: (panelId) => void runCommand('panel.reset-width', { panelId }),
+      place: (panelId, placement) =>
+        void runCommand("panel.place", { panelId, placement, index: 0 }),
+      collapse: (panelId) => void runCommand("panel.collapse", { panelId }),
+      expand: (panelId) => void runCommand("panel.expand", { panelId }),
+      resetWidth: (panelId) =>
+        void runCommand("panel.reset-width", { panelId }),
       close: (panelId) => {
-        if (panelId === 'inspector') void runCommand('inspector.close', { draftId: draftContext.id });
-        else void runCommand(panelId === 'history' ? 'history.close' : 'library.close', {});
+        if (panelId === "inspector")
+          void runCommand("inspector.close", { draftId: draftContext.id });
+        else
+          void runCommand(
+            panelId === "history" ? "history.close" : "library.close",
+            {},
+          );
       },
     }),
     [runCommand, draftContext.id],
@@ -2363,15 +2836,26 @@ export function Workspace({
 
   const handleQuickOption = React.useCallback(
     (option: QuickOption) => {
-      void executeCommand(option.id, option.payload as never, commandContext, commandHandlers);
+      void executeCommand(
+        option.id,
+        option.payload as never,
+        commandContext,
+        commandHandlers,
+      );
     },
     [commandContext, commandHandlers],
   );
 
   const handleQuickRename = React.useCallback(
     async (title: string): Promise<RenameOutcome> => {
-      const result = await executeCommand('project.rename', { title }, commandContext, commandHandlers);
-      if (result.status === 'disabled') return { ok: false, message: result.reason };
+      const result = await executeCommand(
+        "project.rename",
+        { title },
+        commandContext,
+        commandHandlers,
+      );
+      if (result.status === "disabled")
+        return { ok: false, message: result.reason };
       const outcome = renameOutcome(result.value as SessionRenameResult);
       if (outcome.ok) setQuickOptionsOpen(false);
       return outcome;
@@ -2382,20 +2866,39 @@ export function Workspace({
   const handleQuickTextCommand = React.useCallback(
     async (kind: TextStepKind, value: string): Promise<RenameOutcome> => {
       const result =
-        kind === 'group'
-          ? await executeCommand('selection.group', { label: value }, commandContext, commandHandlers)
-          : kind === 'note'
-            ? await executeCommand('canvas.add-note', { text: value }, commandContext, commandHandlers)
-            : await executeCommand('history.commit', { message: value }, commandContext, commandHandlers);
-      if (result.status === 'disabled') return { ok: false, message: result.reason };
+        kind === "group"
+          ? await executeCommand(
+              "selection.group",
+              { label: value },
+              commandContext,
+              commandHandlers,
+            )
+          : kind === "note"
+            ? await executeCommand(
+                "canvas.add-note",
+                { text: value },
+                commandContext,
+                commandHandlers,
+              )
+            : await executeCommand(
+                "history.commit",
+                { message: value },
+                commandContext,
+                commandHandlers,
+              );
+      if (result.status === "disabled")
+        return { ok: false, message: result.reason };
       let outcome: RenameOutcome;
-      if (kind === 'commit') {
+      if (kind === "commit") {
         // History commands return the controller's authored result.
         const authored = result.value as { readonly status?: string } | null;
         outcome =
-          authored?.status === 'applied'
+          authored?.status === "applied"
             ? { ok: true }
-            : { ok: false, message: formatStudioError(authored, 'Could not commit') };
+            : {
+                ok: false,
+                message: formatStudioError(authored, "Could not commit"),
+              };
       } else {
         outcome = result.value as RenameOutcome;
       }
@@ -2421,12 +2924,14 @@ export function Workspace({
           isComposing: e.isComposing,
           inEditableField: Boolean(
             target &&
-              (target.tagName === 'INPUT' ||
-                target.tagName === 'TEXTAREA' ||
-                target.tagName === 'SELECT' ||
-                target.isContentEditable),
+            (target.tagName === "INPUT" ||
+              target.tagName === "TEXTAREA" ||
+              target.tagName === "SELECT" ||
+              target.isContentEditable),
           ),
-          inDialog: Boolean(target?.closest('[role="dialog"], [role="alertdialog"]')),
+          inDialog: Boolean(
+            target?.closest('[role="dialog"], [role="alertdialog"]'),
+          ),
         },
         IS_MAC,
         commandContext,
@@ -2434,21 +2939,27 @@ export function Workspace({
       );
       if (matched) e.preventDefault();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [commandContext, commandHandlers]);
 
   // Canvas-scope shortcut (Delete/Backspace): CanvasView forwards key events
   // from canvas focus only; true means an enabled command matched.
   const handleCanvasShortcut = React.useCallback(
     (event: ShortcutEvent) =>
-      runCanvasShortcut(event, IS_MAC, commandContext, commandHandlers) !== null,
+      runCanvasShortcut(event, IS_MAC, commandContext, commandHandlers) !==
+      null,
     [commandContext, commandHandlers],
   );
 
-  const quickOptionsShortcut = formatShortcut(COMMAND_DEFINITIONS['commands.open'].shortcut!, IS_MAC);
+  const quickOptionsShortcut = formatShortcut(
+    COMMAND_DEFINITIONS["commands.open"].shortcut!,
+    IS_MAC,
+  );
   const currentBranchLabel =
-    commandContext.branches.find((branch) => branch.id === commandContext.branchId)?.label ?? '';
+    commandContext.branches.find(
+      (branch) => branch.id === commandContext.branchId,
+    )?.label ?? "";
 
   // Escape closes an overlay first, never a dirty draft directly (commands.md §6).
   // The guard dialog is itself a shadcn Dialog and handles its own Escape (-> Stay).
@@ -2457,15 +2968,22 @@ export function Workspace({
   React.useEffect(() => {
     if (!draft && !scenarioDraft) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || guardOpen || quickOptionsOpen) return;
+      if (e.key !== "Escape" || guardOpen || quickOptionsOpen) return;
       if (!draft?.dirty && !scenarioDraft?.dirty && !scenarioDraft?.isNew) {
         e.preventDefault();
-        void runCommand('inspector.close', { draftId: draftContext.id });
+        void runCommand("inspector.close", { draftId: draftContext.id });
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [draft, scenarioDraft, guardOpen, quickOptionsOpen, runCommand, draftContext.id]);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    draft,
+    scenarioDraft,
+    guardOpen,
+    quickOptionsOpen,
+    runCommand,
+    draftContext.id,
+  ]);
 
   return (
     <div
@@ -2485,10 +3003,10 @@ export function Workspace({
           onOpenProject={handleOpenProject}
           onSwitchBranch={handleSwitchBranch}
           onCreateBranch={(label, source) =>
-            runGuardedBranchCommand('branch.create', { label, source })
+            runGuardedBranchCommand("branch.create", { label, source })
           }
           onReopenBranch={(branchId) =>
-            runGuardedBranchCommand('branch.reopen', { branchId })
+            runGuardedBranchCommand("branch.reopen", { branchId })
           }
           createBranchDisabledReason={createBranchDisabledReason}
           onAllProjects={handleBackToProjects}
@@ -2499,14 +3017,21 @@ export function Workspace({
           transferActions={transferActions}
           onOpenHistory={openHistoryPanel}
           historyActive={panelState.panels.history.open}
-          onOpenQuickOptions={() => void executeCommand('commands.open', {}, commandContext, commandHandlers)}
+          onOpenQuickOptions={() =>
+            void executeCommand(
+              "commands.open",
+              {},
+              commandContext,
+              commandHandlers,
+            )
+          }
           quickOptionsShortcut={quickOptionsShortcut}
           quickOptionsActive={quickOptionsOpen}
         />
       ) : (
         <header
           data-testid="workspace-topbar-loading"
-          className="shrink-0 h-14 min-h-14 border-b border-border bg-background"
+          className="shrink-0 h-12 min-h-12 border-b border-border bg-background"
         />
       )}
 
@@ -2525,11 +3050,13 @@ export function Workspace({
               dispatch={panelDispatch}
               commands={panelCommandRoutes}
               renderPanel={renderPanel}
-              panelTitles={{ inspector: scenarioDraft ? 'Scenario' : 'Configuration' }}
+              panelTitles={{
+                inspector: scenarioDraft ? "Scenario" : "Configuration",
+              }}
               panelBadges={{
                 history:
                   historyControllerState.workingEdits.length > 0
-                    ? `${historyControllerState.workingEdits.length} edit${historyControllerState.workingEdits.length === 1 ? '' : 's'}`
+                    ? `${historyControllerState.workingEdits.length} edit${historyControllerState.workingEdits.length === 1 ? "" : "s"}`
                     : undefined,
               }}
               canvas={
@@ -2540,10 +3067,6 @@ export function Workspace({
                     activeViewId={activeViewId}
                     onSelectView={setActiveViewId}
                     isSaving={isSaving}
-                    canUndo={sessionState.canUndo && sessionState.status === 'ready'}
-                    canRedo={sessionState.canRedo && sessionState.status === 'ready'}
-                    onUndo={handleUndo}
-                    onRedo={handleRedo}
                     onMoveNodes={handleMoveNodes}
                     selectedElementIds={selectedElementIds}
                     selectedConnectionIds={selectedConnectionIds}
@@ -2557,10 +3080,27 @@ export function Workspace({
                     onCanvasShortcut={handleCanvasShortcut}
                     dockConfig={dockConfig}
                     dockPreferenceState={dockPreferenceState}
-                    onConfigureDock={(config) => void executeCommand('dock.configure', config, commandContext, commandHandlers)}
-                    onRestoreDockDefaults={() => void executeCommand('dock.restore-defaults', {}, commandContext, commandHandlers)}
+                    onConfigureDock={(config) =>
+                      void executeCommand(
+                        "dock.configure",
+                        config,
+                        commandContext,
+                        commandHandlers,
+                      )
+                    }
+                    onRestoreDockDefaults={() =>
+                      void executeCommand(
+                        "dock.restore-defaults",
+                        {},
+                        commandContext,
+                        commandHandlers,
+                      )
+                    }
                     trafficEntryElementIds={trafficEntryElementIds}
-                    runWaitsForScenarioDraft={Boolean(scenarioDraft && (scenarioDraft.dirty || scenarioDraft.isNew))}
+                    runWaitsForScenarioDraft={Boolean(
+                      scenarioDraft &&
+                      (scenarioDraft.dirty || scenarioDraft.isNew),
+                    )}
                   />
 
                   {/* 22E draft behind main: a real conflict count from
@@ -2569,13 +3109,19 @@ export function Workspace({
                     <div className="absolute top-3 left-3 right-3 z-dock">
                       <DraftBehindMainBanner
                         conflictCount={behindMainInfo.conflictCount}
-                        versionsPublishedSinceFork={behindMainInfo.versionsPublishedSinceFork}
+                        versionsPublishedSinceFork={
+                          behindMainInfo.versionsPublishedSinceFork
+                        }
                         forkVersionKey={behindMainInfo.forkVersionKey}
                         onLater={() => setBehindMainBannerDismissed(true)}
                         onReviewAndResolve={() => void openPublishFlow()}
                       />
                       {historyNotice && (
-                        <p role="status" data-testid="history-command-notice" className="mt-1 rounded-control border border-control-border bg-panel px-3 py-1.5 text-xs text-secondary-text">
+                        <p
+                          role="status"
+                          data-testid="history-command-notice"
+                          className="mt-1 rounded-control border border-control-border bg-panel px-3 py-1.5 text-xs text-secondary-text"
+                        >
                           {historyNotice}
                         </p>
                       )}
@@ -2594,23 +3140,24 @@ export function Workspace({
               // 22D published is a non-modal notice (the canvas and History stay
               // usable); every other publish state is the modal review.
               className={
-                publishControllerState.status === 'published'
-                  ? 'pointer-events-none fixed inset-x-0 top-14 z-modal flex justify-center p-4'
-                  : 'fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4'
+                publishControllerState.status === "published"
+                  ? "pointer-events-none fixed inset-x-0 top-14 z-modal flex justify-center p-4"
+                  : "fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4"
               }
             >
               <div
                 className={
-                  publishControllerState.status === 'published'
-                    ? 'pointer-events-auto w-full max-w-md rounded-panel border border-border bg-card p-3 shadow-lg'
-                    : 'w-full max-w-2xl max-h-[85vh] overflow-hidden'
+                  publishControllerState.status === "published"
+                    ? "pointer-events-auto w-full max-w-md rounded-panel border border-border bg-card p-3 shadow-lg"
+                    : "w-full max-w-2xl max-h-[85vh] overflow-hidden"
                 }
               >
                 <PublishFlow
                   controller={routedPublishController}
                   onClose={() => {
                     setPublishOpen(false);
-                    if (publishController.getState().status === 'published') publishController.reset();
+                    if (publishController.getState().status === "published")
+                      publishController.reset();
                   }}
                 />
               </div>
@@ -2619,22 +3166,38 @@ export function Workspace({
 
           {/* Results region sits below the canvas; explicit open can show its empty state. */}
           {showResultsRegion && (
-            <div ref={resultsRegionRef} tabIndex={-1} aria-label="Results" className="outline-none">
-            {runningOrSelectedScenario ? (
-            <ResultsRegion
-              scenarioName={runningOrSelectedScenario.label}
-              scenarioMode={runningOrSelectedScenario.mode}
-              runId={runControllerState?.current?.runId ?? null}
-              runPhase={runControllerState?.phase ?? 'idle'}
-              terminal={runControllerState?.current?.terminal ?? null}
-              events={runControllerState?.events ?? []}
-              saveStatus={runControllerState?.current?.saveStatus ?? 'unsaved'}
-              onRetrySave={() => void runController?.retrySave()}
-              elementLabels={elementLabels}
-              assertionLabels={assertionLabels}
-              staleRun={staleRun}
-            />
-            ) : <section data-testid="results-empty" role="region" aria-label="Results" className="border-t border-border bg-panel p-4 text-sm text-secondary-text">No run selected yet.</section>}
+            <div
+              ref={resultsRegionRef}
+              tabIndex={-1}
+              aria-label="Results"
+              className="outline-none"
+            >
+              {runningOrSelectedScenario ? (
+                <ResultsRegion
+                  scenarioName={runningOrSelectedScenario.label}
+                  scenarioMode={runningOrSelectedScenario.mode}
+                  runId={runControllerState?.current?.runId ?? null}
+                  runPhase={runControllerState?.phase ?? "idle"}
+                  terminal={runControllerState?.current?.terminal ?? null}
+                  events={runControllerState?.events ?? []}
+                  saveStatus={
+                    runControllerState?.current?.saveStatus ?? "unsaved"
+                  }
+                  onRetrySave={() => void runController?.retrySave()}
+                  elementLabels={elementLabels}
+                  assertionLabels={assertionLabels}
+                  staleRun={staleRun}
+                />
+              ) : (
+                <section
+                  data-testid="results-empty"
+                  role="region"
+                  aria-label="Results"
+                  className="border-t border-border bg-panel p-4 text-sm text-secondary-text"
+                >
+                  No run selected yet.
+                </section>
+              )}
             </div>
           )}
         </main>
@@ -2651,7 +3214,7 @@ export function Workspace({
             onApply={inspectorApply}
             onCancel={inspectorCancel}
             onClose={inspectorClose}
-            saving={draft.status === 'saving'}
+            saving={draft.status === "saving"}
             focusFieldId={focusFieldId}
             variant="dock"
           />
@@ -2678,7 +3241,11 @@ export function Workspace({
         ) : null}
       </div>
 
-      {draft && !draft.multi && isMobileInspector && panelState.activeOverlay !== 'library' && panelState.activeOverlay !== 'history' ? (
+      {draft &&
+      !draft.multi &&
+      isMobileInspector &&
+      panelState.activeOverlay !== "library" &&
+      panelState.activeOverlay !== "history" ? (
         <div
           data-testid="inspector-sheet-overlay"
           // RV-05b review round 1: an explicit h-[70vh] (not just max-h) gives the
@@ -2696,14 +3263,18 @@ export function Workspace({
             onApply={inspectorApply}
             onCancel={inspectorCancel}
             onClose={inspectorClose}
-            saving={draft.status === 'saving'}
+            saving={draft.status === "saving"}
             focusFieldId={focusFieldId}
             variant="sheet"
           />
         </div>
       ) : null}
 
-      {scenarioDraft && document && isMobileInspector && panelState.activeOverlay !== 'library' && panelState.activeOverlay !== 'history' ? (
+      {scenarioDraft &&
+      document &&
+      isMobileInspector &&
+      panelState.activeOverlay !== "library" &&
+      panelState.activeOverlay !== "history" ? (
         <div
           data-testid="scenario-inspector-sheet-overlay"
           className="fixed inset-x-0 bottom-0 z-modal h-[70vh] max-h-[70vh] overflow-hidden shadow-md rounded-t-lg border-t border-control-border bg-panel"
@@ -2718,7 +3289,7 @@ export function Workspace({
             mintId={mintId}
             lastRunChecks={scenarioEditorChecks}
             focusName={scenarioEditorFocusName}
-              focusAssertionId={scenarioEditorFocusAssertionId}
+            focusAssertionId={scenarioEditorFocusAssertionId}
           />
         </div>
       ) : null}
@@ -2736,22 +3307,41 @@ export function Workspace({
         onOpenChange={(open) => {
           if (!open && !deletingScenario) setDeleteScenarioTarget(null);
         }}
-        scenarioLabel={deleteScenarioTarget?.label ?? ''}
+        scenarioLabel={deleteScenarioTarget?.label ?? ""}
         remainingCount={Math.max((document?.scenarios.length ?? 0) - 1, 0)}
         onConfirm={() => void handleConfirmDeleteScenario()}
         confirming={deletingScenario}
       />
 
       <ReplacePartDialog
-        targetLabel={replaceTargetId ? (document?.elements.find((e) => e.id === replaceTargetId)?.label ?? null) : null}
+        targetLabel={
+          replaceTargetId
+            ? (document?.elements.find((e) => e.id === replaceTargetId)
+                ?.label ?? null)
+            : null
+        }
         plan={(entryId) =>
           document && activeViewId && replaceTargetId
-            ? planReplacePart(document, activeViewId, replaceTargetId, entryId, mintId)
-            : { ok: false, reason: 'The component to replace is no longer on the canvas' }
+            ? planReplacePart(
+                document,
+                activeViewId,
+                replaceTargetId,
+                entryId,
+                mintId,
+              )
+            : {
+                ok: false,
+                reason: "The component to replace is no longer on the canvas",
+              }
         }
         onConfirm={async (plan) => {
-          const applied = await handleApplyChanges([...plan.changes], 'Replace part');
-          return applied ? { ok: true } : { ok: false, message: 'Could not save the replacement' };
+          const applied = await handleApplyChanges(
+            [...plan.changes],
+            "Replace part",
+          );
+          return applied
+            ? { ok: true }
+            : { ok: false, message: "Could not save the replacement" };
         }}
         onClose={() => setReplaceTargetId(null)}
       />
@@ -2759,7 +3349,7 @@ export function Workspace({
         open={quickOptionsOpen}
         onOpenChange={setQuickOptionsOpen}
         groups={quickOptionGroups}
-        projectTitle={projectRecord?.title ?? ''}
+        projectTitle={projectRecord?.title ?? ""}
         branchLabel={currentBranchLabel}
         isMac={IS_MAC}
         onRun={handleQuickOption}
@@ -2775,45 +3365,56 @@ export function Workspace({
       >
         <DialogContent
           data-testid={
-            duplicateDialog?.kind === 'confirm'
-              ? 'duplicate-confirm-dialog'
-              : 'duplicate-error-dialog'
+            duplicateDialog?.kind === "confirm"
+              ? "duplicate-confirm-dialog"
+              : "duplicate-error-dialog"
           }
           className="sm:max-w-md"
         >
           <DialogHeader>
             <DialogTitle>
-              {duplicateDialog?.kind === 'confirm'
-                ? 'Duplicate this selection?'
-                : 'Can’t duplicate selection'}
+              {duplicateDialog?.kind === "confirm"
+                ? "Duplicate this selection?"
+                : "Can’t duplicate selection"}
             </DialogTitle>
             <DialogDescription>
-              {duplicateDialog?.kind === 'confirm'
-                ? 'Some content crosses the selection boundary and will be left behind.'
-                : 'The selection was not changed.'}
+              {duplicateDialog?.kind === "confirm"
+                ? "Some content crosses the selection boundary and will be left behind."
+                : "The selection was not changed."}
             </DialogDescription>
           </DialogHeader>
-          {duplicateDialog?.kind === 'confirm' ? (
+          {duplicateDialog?.kind === "confirm" ? (
             <div className="space-y-3 text-sm text-ink">
               <ul className="list-disc space-y-1 pl-5">
-                {duplicateDialog.items.map((item) => <li key={item}>{item}</li>)}
+                {duplicateDialog.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
               </ul>
               {duplicateDialog.warnings.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-secondary-text">Also note</p>
+                  <p className="text-xs font-semibold text-secondary-text">
+                    Also note
+                  </p>
                   <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-secondary-text">
-                    {duplicateDialog.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                    {duplicateDialog.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
                   </ul>
                 </div>
               )}
             </div>
-          ) : duplicateDialog?.kind === 'error' ? (
-            <ul role="alert" className="list-disc space-y-1 pl-5 text-sm text-destructive">
-              {duplicateDialog.messages.map((message) => <li key={message}>{message}</li>)}
+          ) : duplicateDialog?.kind === "error" ? (
+            <ul
+              role="alert"
+              className="list-disc space-y-1 pl-5 text-sm text-destructive"
+            >
+              {duplicateDialog.messages.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
             </ul>
           ) : null}
           <DialogFooter className="flex-row justify-end gap-2">
-            {duplicateDialog?.kind === 'confirm' ? (
+            {duplicateDialog?.kind === "confirm" ? (
               <>
                 <Button
                   type="button"
@@ -2829,19 +3430,26 @@ export function Workspace({
                   variant="tint"
                   disabled={duplicateApplying}
                   onClick={() => {
-                    if (duplicateDialog.kind !== 'confirm') return;
+                    if (duplicateDialog.kind !== "confirm") return;
                     const pending = duplicateDialog;
                     setDuplicateApplying(true);
-                    void applyDuplicate(pending.content, pending.anchor).finally(() => {
+                    void applyDuplicate(
+                      pending.content,
+                      pending.anchor,
+                    ).finally(() => {
                       setDuplicateApplying(false);
                     });
                   }}
                 >
-                  {duplicateApplying ? 'Duplicating…' : 'Duplicate'}
+                  {duplicateApplying ? "Duplicating…" : "Duplicate"}
                 </Button>
               </>
             ) : (
-              <Button type="button" variant="ghost" onClick={() => setDuplicateDialog(null)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setDuplicateDialog(null)}
+              >
                 Close
               </Button>
             )}

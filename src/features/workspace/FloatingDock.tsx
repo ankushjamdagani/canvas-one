@@ -25,7 +25,6 @@ const IS_MAC =
 
 const FIXED_LEFT_COMMANDS = ['canvas.select-tool', 'canvas.pan-tool'] as const;
 const FIXED_RIGHT_COMMANDS = ['canvas.zoom-out', 'canvas.zoom-in', 'canvas.fit'] as const;
-const FIXED_LEFT_SET = new Set<DockCommandId>(FIXED_LEFT_COMMANDS);
 const FIXED_RIGHT_SET = new Set<DockCommandId>(FIXED_RIGHT_COMMANDS);
 const FIXED_SET = new Set<DockCommandId>([...FIXED_LEFT_COMMANDS, ...FIXED_RIGHT_COMMANDS]);
 
@@ -152,8 +151,8 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   const mobileCenterVisible = centerCommandIds.filter((id) => id === 'library.open');
 
   // All tools outside left-fixed (Select, Pan) for the 16B more popover
-  const allNonStickyOrdered = config.orderedCommandIds.filter((id) => !FIXED_LEFT_SET.has(id));
-  const allNonStickyHidden = config.hiddenCommandIds.filter((id) => !FIXED_LEFT_SET.has(id));
+  const allNonStickyOrdered = config.orderedCommandIds.filter((id) => !FIXED_SET.has(id));
+  const allNonStickyHidden = config.hiddenCommandIds.filter((id) => !FIXED_SET.has(id));
   const allNonSticky = [...allNonStickyOrdered, ...allNonStickyHidden];
 
   // Dismiss popovers when clicking outside on the canvas
@@ -478,7 +477,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
               onDragLeave={() => setDropTarget(null)}
               onDrop={(event) => acceptDrop(event)}
             >
-              {centerCommandIds.map((id, index) => {
+              {centerCommandIds.map((id) => {
                 const def = COMMAND_DEFINITIONS[id];
                 const state = availability(id, context);
                 const Icon = ICONS[id];

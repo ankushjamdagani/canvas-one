@@ -11,7 +11,7 @@ import {
   createState23E,
   createState23F,
   createState23G,
-} from './PanelsPreview';
+} from './panelStates.fixtures';
 import type { PanelId } from '@/features/workspace/panels';
 
 describe('PanelHost and Panels System Components (RV-03p)', () => {

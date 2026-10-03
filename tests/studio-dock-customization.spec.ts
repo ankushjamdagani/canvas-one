@@ -17,7 +17,7 @@ test('dock customization reorders, hides, restores and persists across reload', 
   await tray.getByRole('button', { name: 'Hide Add note…' }).click();
   await expect(workspace).toHaveAttribute('data-dock-preference-state', 'ready');
   await expect(dock.getByTestId('dock-note-btn')).toHaveCount(0);
-  await page.reload();
+  await page.goto('/');
   const project = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]').first();
   await project.getByRole('button', { name: 'Open draft' }).click();
   await expect(workspace).toHaveAttribute('data-dock-preference-state', 'ready');

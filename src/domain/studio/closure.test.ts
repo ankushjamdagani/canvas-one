@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { describe, expect, it } from 'vitest';
-import type { Document, Element, Connection, Scenario, Port, Refinement } from './model';
+import type { Document, Element, Connection, Port, Refinement } from './model';
 import { computeClosure } from './closure';
 
 function loadFixture(filename: string): Document {

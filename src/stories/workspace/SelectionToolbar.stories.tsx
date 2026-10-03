@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { SelectionToolbar } from '@/features/workspace/SelectionToolbar';
 import { mockCommandContext } from './mockContext';

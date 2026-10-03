@@ -19,7 +19,6 @@ import type {
   CallConnection,
   Connection,
   Element,
-  Json,
   MessageConnection,
   ResourceConfig,
 } from '../../domain/studio/model';

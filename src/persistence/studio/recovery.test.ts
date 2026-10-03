@@ -44,7 +44,7 @@ async function createTestProject(repo: LocalRepository) {
   return { projectId, mainBranchId, draftBranchId };
 }
 
-async function prepareRunSave(repo: LocalRepository, projectId: Id, doc: Document, scenarioId: Id) {
+async function prepareRunSave(projectId: Id, doc: Document, scenarioId: Id) {
   const snapshotId = await computeSnapshotId(doc);
   const prep = await prepareScenario(
     { id: snapshotId, document: doc },
@@ -68,7 +68,7 @@ async function prepareRunSave(repo: LocalRepository, projectId: Id, doc: Documen
 }
 
 async function runAndSaveScenario(repo: LocalRepository, projectId: Id, doc: Document, scenarioId: Id) {
-  const prepared = await prepareRunSave(repo, projectId, doc, scenarioId);
+  const prepared = await prepareRunSave(projectId, doc, scenarioId);
   const saveRes = await repo.saveRun(prepared.token, prepared.terminalResult, prepared.chunks, { projectId, document: doc });
   if (saveRes.status !== 'applied') throw new Error(`saveRun failed: ${JSON.stringify(saveRes)}`);
   return prepared.runId;
@@ -90,7 +90,7 @@ describe('Recovery journeys (RV-16b)', () => {
 
     // The 21st unpinned run fails typed with 'limit' (storage.md §7: "Before storing a
     // 21st, offer an explicit prune").
-    const prepared21 = await prepareRunSave(repo, projectId, s01Doc, scenarioId);
+    const prepared21 = await prepareRunSave(projectId, s01Doc, scenarioId);
     const firstAttempt = await repo.saveRun(prepared21.token, prepared21.terminalResult, prepared21.chunks, {
       projectId,
       document: s01Doc,

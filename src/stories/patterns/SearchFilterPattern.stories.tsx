@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { NativeSelect } from '@/components/ui/native-select';
-import { Filter, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Patterns/Search & Filter Bar',
@@ -21,7 +21,7 @@ export const CatalogSearchRecipe: StoryObj = {
   name: 'Catalog Search & Filter Bar',
   render: () => {
     const [search, setSearch] = React.useState('');
-    const [filterCount, setFilterCount] = React.useState(2);
+    const [filterCount] = React.useState(2);
 
     return (
       <div className="w-[580px] rounded-card border border-border bg-shell p-3 space-y-3 shadow-raised">

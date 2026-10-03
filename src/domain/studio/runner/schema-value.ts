@@ -14,26 +14,8 @@
 
 import type { Id, Shape, ScalarType } from '../model';
 import type { Issue } from '../validate';
-
-const PROTOTYPE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
-
-/**
- * Checks whether a string contains any unpaired Unicode surrogates.
- */
-function isSurrogateValid(str: string): boolean {
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      if (i + 1 >= str.length) return false;
-      const next = str.charCodeAt(i + 1);
-      if (next < 0xdc00 || next > 0xdfff) return false;
-      i++;
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      return false;
-    }
-  }
-  return true;
-}
+import { PROTOTYPE_KEYS, isSurrogateValid } from '../text';
+import { errorIssue } from '../issue';
 
 function matchesScalarType(value: unknown, scalarType: ScalarType): boolean {
   switch (scalarType) {
@@ -62,25 +44,13 @@ export function validateSchemaValue(
 
   function validate(val: unknown, currentShape: Shape, path: readonly (string | number)[]): void {
     if (val === undefined) {
-      issues.push({
-        code: 'wrong-type',
-        path,
-        entityId,
-        severity: 'error',
-        message: 'Expected a defined JSON value, got undefined',
-      });
+      issues.push(errorIssue('wrong-type', path, entityId, 'Expected a defined JSON value, got undefined'));
       return;
     }
 
     if (val === null) {
       if (!currentShape.nullable) {
-        issues.push({
-          code: 'wrong-type',
-          path,
-          entityId,
-          severity: 'error',
-          message: 'Expected non-null value for non-nullable schema',
-        });
+        issues.push(errorIssue('wrong-type', path, entityId, 'Expected non-null value for non-nullable schema'));
       }
       return;
     }
@@ -88,60 +58,44 @@ export function validateSchemaValue(
     switch (currentShape.type) {
       case 'string': {
         if (typeof val !== 'string') {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Expected string, got ${typeof val}`,
-          });
+          issues.push(errorIssue('wrong-type', path, entityId, `Expected string, got ${typeof val}`));
         } else if (!isSurrogateValid(val)) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: 'String contains unpaired Unicode surrogates',
-          });
+          issues.push(errorIssue('wrong-type', path, entityId, 'String contains unpaired Unicode surrogates'));
         }
         break;
       }
 
       case 'boolean': {
         if (typeof val !== 'boolean') {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Expected boolean, got ${typeof val}`,
-          });
+          issues.push(errorIssue('wrong-type', path, entityId, `Expected boolean, got ${typeof val}`));
         }
         break;
       }
 
       case 'number': {
         if (typeof val !== 'number' || !Number.isFinite(val)) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Expected finite number, got ${typeof val === 'number' ? String(val) : typeof val}`,
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              path,
+              entityId,
+              `Expected finite number, got ${typeof val === 'number' ? String(val) : typeof val}`,
+            ),
+          );
         }
         break;
       }
 
       case 'integer': {
         if (typeof val !== 'number' || !Number.isSafeInteger(val)) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Expected safe integer, got ${typeof val === 'number' ? String(val) : typeof val}`,
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              path,
+              entityId,
+              `Expected safe integer, got ${typeof val === 'number' ? String(val) : typeof val}`,
+            ),
+          );
         }
         break;
       }
@@ -149,51 +103,55 @@ export function validateSchemaValue(
       case 'scalar-union': {
         const matches = currentShape.types.some((t) => matchesScalarType(val, t));
         if (!matches) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Value does not match any of scalar union types: [${currentShape.types.join(', ')}]`,
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              path,
+              entityId,
+              `Value does not match any of scalar union types: [${currentShape.types.join(', ')}]`,
+            ),
+          );
         }
         break;
       }
 
       case 'list': {
         if (!Array.isArray(val)) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Expected array for list shape, got ${typeof val}`,
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              path,
+              entityId,
+              `Expected array for list shape, got ${typeof val}`,
+            ),
+          );
           return;
         }
 
         // Check for holes in array
         for (let i = 0; i < val.length; i++) {
           if (!Object.hasOwn(val, i)) {
-            issues.push({
-              code: 'wrong-type',
-              path: [...path, i],
-              entityId,
-              severity: 'error',
-              message: `Sparse array hole at index ${i} is disallowed`,
-            });
+            issues.push(
+              errorIssue(
+                'wrong-type',
+                [...path, i],
+                entityId,
+                `Sparse array hole at index ${i} is disallowed`,
+              ),
+            );
             return;
           }
         }
 
         if (val.length > currentShape.maxItems) {
-          issues.push({
-            code: 'too-many',
-            path,
-            entityId,
-            severity: 'error',
-            message: `List length ${val.length} exceeds maxItems ceiling of ${currentShape.maxItems}`,
-          });
+          issues.push(
+            errorIssue(
+              'too-many',
+              path,
+              entityId,
+              `List length ${val.length} exceeds maxItems ceiling of ${currentShape.maxItems}`,
+            ),
+          );
         }
 
         for (let i = 0; i < val.length; i++) {
@@ -204,36 +162,25 @@ export function validateSchemaValue(
 
       case 'record': {
         if (typeof val !== 'object' || val === null || Array.isArray(val)) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: `Expected plain object for record shape, got ${Array.isArray(val) ? 'array' : typeof val}`,
-          });
+          issues.push(
+            errorIssue(
+              'wrong-type',
+              path,
+              entityId,
+              `Expected plain object for record shape, got ${Array.isArray(val) ? 'array' : typeof val}`,
+            ),
+          );
           return;
         }
 
         const proto = Object.getPrototypeOf(val);
         if (proto !== Object.prototype && proto !== null) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: 'Non-plain object disallowed in record payload',
-          });
+          issues.push(errorIssue('wrong-type', path, entityId, 'Non-plain object disallowed in record payload'));
           return;
         }
 
         if (Object.getOwnPropertySymbols(val).length > 0) {
-          issues.push({
-            code: 'wrong-type',
-            path,
-            entityId,
-            severity: 'error',
-            message: 'Disallowed Symbol property in record payload',
-          });
+          issues.push(errorIssue('wrong-type', path, entityId, 'Disallowed Symbol property in record payload'));
           return;
         }
 
@@ -243,13 +190,14 @@ export function validateSchemaValue(
         // Check prototype pollution keys
         for (const k of keys) {
           if (PROTOTYPE_KEYS.has(k)) {
-            issues.push({
-              code: 'prototype-key',
-              path: [...path, k],
-              entityId,
-              severity: 'error',
-              message: `Disallowed prototype key '${k}' in payload`,
-            });
+            issues.push(
+              errorIssue(
+                'prototype-key',
+                [...path, k],
+                entityId,
+                `Disallowed prototype key '${k}' in payload`,
+              ),
+            );
           }
         }
 
@@ -261,13 +209,14 @@ export function validateSchemaValue(
 
         for (const k of keys) {
           if (!declaredFields.has(k)) {
-            issues.push({
-              code: 'unknown-property',
-              path: [...path, k],
-              entityId,
-              severity: 'error',
-              message: `Unknown property '${k}' on closed record`,
-            });
+            issues.push(
+              errorIssue(
+                'unknown-property',
+                [...path, k],
+                entityId,
+                `Unknown property '${k}' on closed record`,
+              ),
+            );
           }
         }
 
@@ -276,13 +225,14 @@ export function validateSchemaValue(
           if (Object.hasOwn(obj, f.key)) {
             validate(obj[f.key], f.shape, [...path, f.key]);
           } else if (!f.optional) {
-            issues.push({
-              code: 'missing-property',
-              path: [...path, f.key],
-              entityId,
-              severity: 'error',
-              message: `Missing required property '${f.key}'`,
-            });
+            issues.push(
+              errorIssue(
+                'missing-property',
+                [...path, f.key],
+                entityId,
+                `Missing required property '${f.key}'`,
+              ),
+            );
           }
         }
         break;

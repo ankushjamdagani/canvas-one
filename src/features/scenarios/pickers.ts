@@ -17,11 +17,11 @@ export type EndpointOption = {
   readonly direction: Port['direction'];
 };
 
-export function elementLabel(document: Document, elementId: Id): string | null {
+function elementLabel(document: Document, elementId: Id): string | null {
   return document.elements.find((e) => e.id === elementId)?.label ?? null;
 }
 
-export function portLabel(document: Document, elementId: Id, portId: Id): string | null {
+function portLabel(document: Document, elementId: Id, portId: Id): string | null {
   const element = document.elements.find((e) => e.id === elementId);
   return element?.ports.find((p) => p.id === portId)?.label ?? null;
 }

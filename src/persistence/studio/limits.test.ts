@@ -1,11 +1,10 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
-import Dexie from 'dexie';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createStudioDatabase } from './db';
 import { LocalRepository } from './repository';
-import { STORAGE_LIMITS, type Actor, type BranchCreateCommand, type ProjectCreateCommand } from './types';
+import { type Actor, type BranchCreateCommand, type ProjectCreateCommand } from './types';
 import type { Document } from '../../domain/studio/model';
 
 const s01Doc = JSON.parse(

@@ -68,7 +68,6 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
     );
   }
 
-  const modeLabel = scenario.mode === 'timed' ? 'Traffic over time' : 'Step by step';
   const modeSubtitle =
     scenario.mode === 'timed' ? 'Traffic over time — measures latency, throughput and failures.' : 'Step by step — checks states and outputs; no timing.';
 

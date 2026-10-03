@@ -16,7 +16,7 @@ import { cn } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import type { Document } from '../../domain/studio/model';
-import type { ScenarioStatus, ScenarioWithStatus } from '../runs/scenarioStatus';
+import { scenarioStatusLabel, type ScenarioWithStatus } from '../runs/scenarioStatus';
 import type { HistoryControllerLike } from './controller';
 import { computeChangesList } from './diffSummary';
 import type { RecordChangeItem } from './types';
@@ -42,21 +42,6 @@ export interface CommitPanelProps {
    * scenario statuses without being closed and reopened.
    */
   readonly refreshToken?: number;
-}
-
-function getScenarioStatusLabel(status: ScenarioStatus): string {
-  switch (status.kind) {
-    case 'passed':
-      return 'Passed on exactly this version';
-    case 'needs-rerun':
-      return 'Ran on an earlier version';
-    case 'failed':
-      return `Failed · ${status.passedChecks} of ${status.totalChecks} checks`;
-    case 'not-run':
-      return 'Not run yet';
-    case 'not-ready':
-      return `Can't run · ${status.issues.length} issue${status.issues.length === 1 ? '' : 's'}`;
-  }
 }
 
 export function CommitPanel({
@@ -301,7 +286,7 @@ export function CommitPanel({
               scenarioList.map(({ scenario, status }) => {
                 const isPassed = status.kind === 'passed';
                 const isNotReady = status.kind === 'not-ready';
-                const statusText = getScenarioStatusLabel(status);
+                const statusText = scenarioStatusLabel(status);
 
                 return (
                   <div

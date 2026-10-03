@@ -12,6 +12,7 @@ import { canonicalJson, sha256Hex } from '../canonical';
 import type { Id, Json } from '../model';
 import type { MetricSample, RunUpdate, TerminalStatus, TraceEvent, TraceEventKind, TransportOutcome } from './types';
 import { TERMINAL_STATUSES } from './types';
+import { deepFreeze } from '../freeze';
 
 // ============================================================================
 // ID derivation
@@ -43,25 +44,6 @@ export function rootId(sourceId: Id, ordinal: number): string {
 // ============================================================================
 
 export type PayloadRef = string;
-
-/**
- * Recursively freezes a parsed-JSON value in place and returns it, so a table entry can
- * never be mutated after it's stored (§8: "immutable per-run content-addressed payload
- * table"). Safe over `Json`: only plain objects, arrays and primitives ever appear.
- */
-function deepFreeze<T>(value: T): T {
-  if (Array.isArray(value)) {
-    for (const item of value) deepFreeze(item);
-    return Object.freeze(value) as T;
-  }
-  if (value !== null && typeof value === 'object') {
-    for (const key of Object.keys(value as Record<string, unknown>)) {
-      deepFreeze((value as Record<string, unknown>)[key]);
-    }
-    return Object.freeze(value) as T;
-  }
-  return value;
-}
 
 /**
  * Computes a payload's content-addressed ref (`sha256:` + hex SHA-256 of its

@@ -1,7 +1,7 @@
 import type { Id } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio';
 import type { SessionApplyResult, SessionState } from '../session/types';
-import type { ScenarioDraftSession } from '../scenarios';
+import type { ScenarioDraftSession } from '../scenarios/types';
 import type { TransferSessionState } from '../transfer';
 
 type TransferSessionSource = Pick<

@@ -1,22 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/status-dot';
-import {
-  Layers,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Sparkles,
-  GitBranch,
-  Boxes,
-  HelpCircle,
-  FileCheck,
-} from 'lucide-react';
+import { CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Design System/Foundation-First Architecture',

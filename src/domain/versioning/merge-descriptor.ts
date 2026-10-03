@@ -14,7 +14,6 @@
  * - atomic: whole field conflicts; used for every order-semantic list
  */
 
-import type { Document } from '../studio/model';
 import { canonicalJson } from '../studio/canonical';
 
 // ============================================================================

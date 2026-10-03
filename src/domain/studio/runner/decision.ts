@@ -53,10 +53,6 @@ export type DecisionFailureResult = {
 
 export type DecisionResult = DecisionSuccessResult | DecisionFailureResult;
 
-export function isDecisionSuccess(result: DecisionResult): result is DecisionSuccessResult {
-  return result.ok;
-}
-
 export type RunDecisionOptions = {
   readonly evaluator?: Evaluator;
   readonly schemas?: ReadonlyMap<Id, Shape | PayloadSchema> | readonly PayloadSchema[];

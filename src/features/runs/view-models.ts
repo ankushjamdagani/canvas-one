@@ -7,14 +7,13 @@
  * - Progress bar calculation for timed simulations.
  */
 
-import type { Id } from '../../domain/studio/model';
 import type {
   CheckResult,
   Counts,
   ElementMetric,
   TerminalStatus,
 } from '../../domain/studio/runner/types';
-import type { RunPhase, SaveStatus } from './RunController';
+import type { RunPhase } from './RunController';
 import type { ScenarioStatus } from './scenarioStatus';
 
 export type StatusColorToken = {

@@ -1,20 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StatusDot } from '@/components/ui/status-dot';
-import {
-  Palette,
-  Type,
-  Layers,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  Box,
-  Compass,
-} from 'lucide-react';
+import { Palette, Layers, ShieldCheck } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Design System/Overview',

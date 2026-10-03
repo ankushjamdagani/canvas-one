@@ -30,16 +30,12 @@
  * itself a reported issue, never silently skipped.
  */
 
-import { canonicalJson } from '../../domain/studio/canonical';
-import { validateDocument, type Issue, type IssueCode } from '../../domain/studio/validate';
+import { validateDocument, type Issue } from '../../domain/studio/validate';
 import type { Document, Id } from '../../domain/studio/model';
 import { computeSnapshotId } from './primitives';
 import { validateActor } from './primitives';
 import { validateSavedPart } from '../../domain/parts/validate';
-import {
-  computePinClosure,
-  type PinClosureState,
-} from '../../domain/versioning/pin-closure';
+import { computePinClosure } from '../../domain/versioning/pin-closure';
 import {
   compareSemanticVersions,
   deriveVersionKey,
@@ -58,21 +54,14 @@ import {
   type BundleSnapshotRecord,
   type ProjectBundle,
 } from './types';
+import { createIssue } from '../../domain/studio/issue';
+import { toPinClosureState } from './pin-state';
 
 export const TRANSFER_LIMITS = {
   maxFileBytes: 64 * 1024 * 1024,
   maxContainers: 100_000,
   maxRawDepth: 40,
 } as const;
-
-function issue(
-  code: IssueCode,
-  message: string,
-  path: readonly (string | number)[] = [],
-  entityId: string | null = null,
-): Issue {
-  return { code, path: [...path], entityId, severity: 'error', message };
-}
 
 export type BundleValidationOk = { readonly ok: true; readonly bundle: ProjectBundle };
 export type BundleValidationFailure = { readonly ok: false; readonly issues: readonly Issue[] };
@@ -128,7 +117,7 @@ function scanContainersAndDepth(
       if (containers > TRANSFER_LIMITS.maxContainers) {
         return {
           ok: false,
-          issue: issue(
+          issue: createIssue(
             'too-many',
             `Portable file has more than ${TRANSFER_LIMITS.maxContainers} containers`,
             [],
@@ -138,7 +127,7 @@ function scanContainersAndDepth(
       if (depth > TRANSFER_LIMITS.maxRawDepth) {
         return {
           ok: false,
-          issue: issue(
+          issue: createIssue(
             'too-deep',
             `Portable file raw depth exceeds ${TRANSFER_LIMITS.maxRawDepth} (root = 1)`,
             [],
@@ -170,7 +159,7 @@ function checkClosedKeys(
   const allowedSet = new Set(allowed);
   for (const key of Object.keys(obj)) {
     if (!allowedSet.has(key)) {
-      issues.push(issue('unknown-property', `Unknown property '${key}'`, [...path, key]));
+      issues.push(createIssue('unknown-property', `Unknown property '${key}'`, [...path, key]));
     }
   }
 }
@@ -183,7 +172,7 @@ function requireString(
 ): string | null {
   const v = obj[key];
   if (typeof v !== 'string') {
-    issues.push(issue('wrong-type', `${key} must be a string`, [...path, key]));
+    issues.push(createIssue('wrong-type', `${key} must be a string`, [...path, key]));
     return null;
   }
   return v;
@@ -197,7 +186,7 @@ function requireNumber(
 ): number | null {
   const v = obj[key];
   if (typeof v !== 'number' || !Number.isFinite(v)) {
-    issues.push(issue('wrong-type', `${key} must be a finite number`, [...path, key]));
+    issues.push(createIssue('wrong-type', `${key} must be a finite number`, [...path, key]));
     return null;
   }
   return v;
@@ -211,7 +200,7 @@ function requireArray(
 ): unknown[] | null {
   const v = obj[key];
   if (!Array.isArray(v)) {
-    issues.push(issue('wrong-type', `${key} must be an array`, [...path, key]));
+    issues.push(createIssue('wrong-type', `${key} must be an array`, [...path, key]));
     return null;
   }
   return v;
@@ -226,13 +215,13 @@ function checkEvidenceRefs(
 ): { scenarioId: string; fingerprint: string; runId: string }[] {
   const out: { scenarioId: string; fingerprint: string; runId: string }[] = [];
   if (!Array.isArray(value)) {
-    issues.push(issue('wrong-type', 'evidence must be an array', path));
+    issues.push(createIssue('wrong-type', 'evidence must be an array', path));
     return out;
   }
   value.forEach((entry, i) => {
     const p = [...path, i];
     if (!isPlainObject(entry)) {
-      issues.push(issue('wrong-type', 'evidence entry must be an object', p));
+      issues.push(createIssue('wrong-type', 'evidence entry must be an object', p));
       return;
     }
     checkClosedKeys(entry, EVIDENCE_REF_KEYS, p, issues);
@@ -328,7 +317,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       ok: false,
       kind: 'invalid',
       issues: [
-        issue(
+        createIssue(
           'too-large',
           `Portable file is ${bytes.byteLength} bytes, exceeding the ${TRANSFER_LIMITS.maxFileBytes}-byte (64 MiB) transfer cap`,
           [],
@@ -344,7 +333,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     return {
       ok: false,
       kind: 'invalid',
-      issues: [issue('wrong-type', 'Portable file is not valid UTF-8', [])],
+      issues: [createIssue('wrong-type', 'Portable file is not valid UTF-8', [])],
     };
   }
 
@@ -359,11 +348,11 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { ok: false, kind: 'invalid', issues: [issue('wrong-type', 'Portable file is not valid JSON', [])] };
+    return { ok: false, kind: 'invalid', issues: [createIssue('wrong-type', 'Portable file is not valid JSON', [])] };
   }
 
   if (!isPlainObject(parsed)) {
-    return { ok: false, kind: 'invalid', issues: [issue('wrong-type', 'Portable file must be a JSON object', [])] };
+    return { ok: false, kind: 'invalid', issues: [createIssue('wrong-type', 'Portable file must be a JSON object', [])] };
   }
 
   const format = parsed.format;
@@ -373,7 +362,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       ok: false,
       kind: 'unsupported-version',
       issues: [
-        issue(
+        createIssue(
           'invalid-literal',
           typeof format === 'string'
             ? `Unsupported portable format '${format}'`
@@ -388,7 +377,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       ok: false,
       kind: 'unsupported-version',
       issues: [
-        issue(
+        createIssue(
           'invalid-literal',
           `Unsupported portable file version '${String(version)}'; only version ${PORTABLE_VERSION} is supported`,
           ['version'],
@@ -403,7 +392,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     return {
       ok: false,
       kind: 'invalid',
-      issues: [...issues, issue('wrong-type', 'project must be an object', ['project'])],
+      issues: [...issues, createIssue('wrong-type', 'project must be an object', ['project'])],
     };
   }
   const rawBundle = parsed.project;
@@ -430,26 +419,26 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
 
   // §6 Local project count limits, checked on the bundle's own record counts.
   if (rawBranches.length > STORAGE_LIMITS.maxBranchesPerProject) {
-    issues.push(issue('too-many', 'branches exceed the 100-branch project limit', ['project', 'branches']));
+    issues.push(createIssue('too-many', 'branches exceed the 100-branch project limit', ['project', 'branches']));
   }
   if (rawCommits.length > STORAGE_LIMITS.maxCommitsPerProject) {
-    issues.push(issue('too-many', 'commits exceed the 1,000-commit project limit', ['project', 'commits']));
+    issues.push(createIssue('too-many', 'commits exceed the 1,000-commit project limit', ['project', 'commits']));
   }
   if (rawCheckpoints.length > STORAGE_LIMITS.maxCheckpointsPerProject) {
-    issues.push(issue('too-many', 'checkpoints exceed the 100-checkpoint project limit', ['project', 'checkpoints']));
+    issues.push(createIssue('too-many', 'checkpoints exceed the 100-checkpoint project limit', ['project', 'checkpoints']));
   }
   if (rawRuns.length > STORAGE_LIMITS.maxRunSummariesPerProject) {
-    issues.push(issue('too-many', 'runs exceed the 200-run-summary project limit', ['project', 'runs']));
+    issues.push(createIssue('too-many', 'runs exceed the 200-run-summary project limit', ['project', 'runs']));
   }
   if (rawParts.length > STORAGE_LIMITS.maxPartRevisionsPerProject) {
-    issues.push(issue('too-many', 'parts exceed the 100-part-revision project limit', ['project', 'parts']));
+    issues.push(createIssue('too-many', 'parts exceed the 100-part-revision project limit', ['project', 'parts']));
   }
 
   const branches: BundleBranchRecord[] = [];
   rawBranches.forEach((raw, i) => {
     const p = ['project', 'branches', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'branch must be an object', p));
+      issues.push(createIssue('wrong-type', 'branch must be an object', p));
       return;
     }
     checkClosedKeys(raw, BRANCH_KEYS, p, issues);
@@ -457,11 +446,11 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const label = requireString(raw, 'label', p, issues);
     const state = raw.state;
     if (state !== 'open' && state !== 'closed') {
-      issues.push(issue('invalid-literal', "branch.state must be 'open' or 'closed'", [...p, 'state']));
+      issues.push(createIssue('invalid-literal', "branch.state must be 'open' or 'closed'", [...p, 'state']));
     }
     const headCommitId = raw.headCommitId;
     if (headCommitId !== null && typeof headCommitId !== 'string') {
-      issues.push(issue('wrong-type', 'branch.headCommitId must be a string or null', [...p, 'headCommitId']));
+      issues.push(createIssue('wrong-type', 'branch.headCommitId must be a string or null', [...p, 'headCommitId']));
     }
     const workingSnapshotId = requireString(raw, 'workingSnapshotId', p, issues);
     const workingRevision = requireNumber(raw, 'workingRevision', p, issues);
@@ -491,7 +480,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   rawSnapshots.forEach((raw, i) => {
     const p = ['project', 'snapshots', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'snapshot must be an object', p));
+      issues.push(createIssue('wrong-type', 'snapshot must be an object', p));
       return;
     }
     checkClosedKeys(raw, SNAPSHOT_KEYS, p, issues);
@@ -511,7 +500,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   rawCommits.forEach((raw, i) => {
     const p = ['project', 'commits', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'commit must be an object', p));
+      issues.push(createIssue('wrong-type', 'commit must be an object', p));
       return;
     }
     checkClosedKeys(raw, COMMIT_KEYS, p, issues);
@@ -521,17 +510,17 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const parentIds: string[] = [];
     parentIdsRaw.forEach((pid, j) => {
       if (typeof pid !== 'string') {
-        issues.push(issue('wrong-type', 'parentIds entries must be strings', [...p, 'parentIds', j]));
+        issues.push(createIssue('wrong-type', 'parentIds entries must be strings', [...p, 'parentIds', j]));
       } else {
         parentIds.push(pid);
       }
     });
     if (parentIds.length > 2) {
-      issues.push(issue('too-many', 'a commit may have at most 2 parents', [...p, 'parentIds']));
+      issues.push(createIssue('too-many', 'a commit may have at most 2 parents', [...p, 'parentIds']));
     }
     if (parentIds.length === 2 && parentIds[0] === parentIds[1]) {
       issues.push(
-        issue(
+        createIssue(
           'structural-rule',
           'identical merge parents must be deduplicated to a single-parent commit',
           [...p, 'parentIds'],
@@ -540,7 +529,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     }
     const evidence = checkEvidenceRefs(raw.evidence, [...p, 'evidence'], issues);
     if (raw.evidenceManifest !== undefined && !isPlainObject(raw.evidenceManifest)) {
-      issues.push(issue('wrong-type', 'evidenceManifest must be an object when present', [...p, 'evidenceManifest']));
+      issues.push(createIssue('wrong-type', 'evidenceManifest must be an object when present', [...p, 'evidenceManifest']));
     }
     const actorIssues = validateActor(raw.actor);
     if (actorIssues) {
@@ -572,7 +561,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   rawPublications.forEach((raw, i) => {
     const p = ['project', 'publications', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'publication must be an object', p));
+      issues.push(createIssue('wrong-type', 'publication must be an object', p));
       return;
     }
     checkClosedKeys(raw, PUBLICATION_KEYS, p, issues);
@@ -581,7 +570,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const sourceBranchId = requireString(raw, 'sourceBranchId', p, issues);
     const previousMainHeadId = raw.previousMainHeadId;
     if (previousMainHeadId !== null && typeof previousMainHeadId !== 'string') {
-      issues.push(issue('wrong-type', 'previousMainHeadId must be a string or null', [...p, 'previousMainHeadId']));
+      issues.push(createIssue('wrong-type', 'previousMainHeadId must be a string or null', [...p, 'previousMainHeadId']));
     }
     const ordinal = requireNumber(raw, 'ordinal', p, issues);
     const actorIssues = validateActor(raw.actor);
@@ -608,7 +597,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       const derivedKey = deriveVersionKey(metadata.version);
       if (derivedKey !== versionKey) {
         issues.push(
-          issue(
+          createIssue(
             'structural-rule',
             `versionKey '${versionKey}' does not match metadata.version ('${derivedKey}')`,
             [...p, 'versionKey'],
@@ -634,7 +623,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   rawCheckpoints.forEach((raw, i) => {
     const p = ['project', 'checkpoints', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'checkpoint must be an object', p));
+      issues.push(createIssue('wrong-type', 'checkpoint must be an object', p));
       return;
     }
     checkClosedKeys(raw, CHECKPOINT_KEYS, p, issues);
@@ -670,7 +659,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   rawRuns.forEach((raw, i) => {
     const p = ['project', 'runs', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'run must be an object', p));
+      issues.push(createIssue('wrong-type', 'run must be an object', p));
       return;
     }
     checkClosedKeys(raw, RUN_KEYS, p, issues);
@@ -680,17 +669,17 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const status = requireString(raw, 'status', p, issues);
     const provenance = raw.provenance;
     if (provenance !== 'local' && provenance !== 'imported-unverified') {
-      issues.push(issue('invalid-literal', "provenance must be 'local' or 'imported-unverified'", [...p, 'provenance']));
+      issues.push(createIssue('invalid-literal', "provenance must be 'local' or 'imported-unverified'", [...p, 'provenance']));
     }
     if (!Array.isArray(raw.checks)) {
-      issues.push(issue('wrong-type', 'checks must be an array', [...p, 'checks']));
+      issues.push(createIssue('wrong-type', 'checks must be an array', [...p, 'checks']));
     }
     if (!isPlainObject(raw.summary)) {
-      issues.push(issue('wrong-type', 'summary must be an object', [...p, 'summary']));
+      issues.push(createIssue('wrong-type', 'summary must be an object', [...p, 'summary']));
     }
     const traceState = raw.traceState;
     if (traceState !== 'complete' && traceState !== 'pruned' && traceState !== 'not-saved') {
-      issues.push(issue('invalid-literal', "traceState must be 'complete', 'pruned' or 'not-saved'", [...p, 'traceState']));
+      issues.push(createIssue('invalid-literal', "traceState must be 'complete', 'pruned' or 'not-saved'", [...p, 'traceState']));
     }
     const createdAtR = requireNumber(raw, 'createdAt', p, issues);
     const completedAt = requireNumber(raw, 'completedAt', p, issues);
@@ -727,7 +716,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   rawParts.forEach((raw, i) => {
     const p = ['project', 'parts', i];
     if (!isPlainObject(raw)) {
-      issues.push(issue('wrong-type', 'part must be an object', p));
+      issues.push(createIssue('wrong-type', 'part must be an object', p));
       return;
     }
     checkClosedKeys(raw, PART_KEYS, p, issues);
@@ -738,7 +727,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const createdAtPart = requireNumber(raw, 'createdAt', p, issues);
     if (pid !== null && revision !== null && label !== null && description !== null && createdAtPart !== null) {
       const key = `${pid}:${revision}`;
-      if (partRevisionKeys.has(key)) issues.push(issue('duplicate-id', 'Duplicate part revision.', p));
+      if (partRevisionKeys.has(key)) issues.push(createIssue('duplicate-id', 'Duplicate part revision.', p));
       partRevisionKeys.add(key);
       const validated = validateSavedPart({ id: pid, revision, label, description, content: raw.content });
       if (!validated.ok) issues.push(...validated.issues.map((entry) => ({ ...entry, path: [...p, ...entry.path] })));
@@ -756,12 +745,12 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     try {
       recomputed = await computeSnapshotId(snapshot.document);
     } catch {
-      issues.push(issue('structural-rule', `snapshot '${snapshot.id}' failed to canonicalize`, ['project', 'snapshots'], snapshot.id));
+      issues.push(createIssue('structural-rule', `snapshot '${snapshot.id}' failed to canonicalize`, ['project', 'snapshots'], snapshot.id));
       continue;
     }
     if (recomputed !== snapshot.id) {
       issues.push(
-        issue(
+        createIssue(
           'structural-rule',
           `snapshot id '${snapshot.id}' does not match its recomputed content hash '${recomputed}'`,
           ['project', 'snapshots'],
@@ -775,12 +764,12 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   // the snapshots array by itself -- see its own CONTRACT GAP comment).
   const snapshotIds = new Set(snapshots.map((s) => s.id));
   if (initialSnapshotId !== null && !snapshotIds.has(initialSnapshotId)) {
-    issues.push(issue('dangling-reference', `initialSnapshotId '${initialSnapshotId}' has no matching snapshot`, ['project', 'initialSnapshotId'], initialSnapshotId));
+    issues.push(createIssue('dangling-reference', `initialSnapshotId '${initialSnapshotId}' has no matching snapshot`, ['project', 'initialSnapshotId'], initialSnapshotId));
   }
   for (const branch of branches) {
     if (!snapshotIds.has(branch.workingSnapshotId)) {
       issues.push(
-        issue(
+        createIssue(
           'dangling-reference',
           `branch '${branch.id}' workingSnapshotId '${branch.workingSnapshotId}' has no matching snapshot`,
           ['project', 'branches'],
@@ -792,49 +781,39 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   for (const commit of commits) {
     if (!snapshotIds.has(commit.snapshotId)) {
       issues.push(
-        issue('dangling-reference', `commit '${commit.id}' snapshotId '${commit.snapshotId}' has no matching snapshot`, ['project', 'commits'], commit.id),
+        createIssue('dangling-reference', `commit '${commit.id}' snapshotId '${commit.snapshotId}' has no matching snapshot`, ['project', 'commits'], commit.id),
       );
     }
   }
   for (const checkpoint of checkpoints) {
     if (!snapshotIds.has(checkpoint.snapshotId)) {
       issues.push(
-        issue('dangling-reference', `checkpoint '${checkpoint.id}' snapshotId '${checkpoint.snapshotId}' has no matching snapshot`, ['project', 'checkpoints'], checkpoint.id),
+        createIssue('dangling-reference', `checkpoint '${checkpoint.id}' snapshotId '${checkpoint.snapshotId}' has no matching snapshot`, ['project', 'checkpoints'], checkpoint.id),
       );
     }
   }
   for (const run of runs) {
     if (!snapshotIds.has(run.snapshotId)) {
       issues.push(
-        issue('dangling-reference', `run '${run.id}' snapshotId '${run.snapshotId}' has no matching snapshot`, ['project', 'runs'], run.id),
+        createIssue('dangling-reference', `run '${run.id}' snapshotId '${run.snapshotId}' has no matching snapshot`, ['project', 'runs'], run.id),
       );
     }
   }
 
   // Branch heads, commit parents, publication commits, commit evidence runs (dangling only
   // -- computePinClosure is the single shared authority for this walk).
-  const closureState: PinClosureState = {
+  const closureState = toPinClosureState({
     project: { initialSnapshotId: initialSnapshotId ?? '', mainBranchId: mainBranchId ?? '' },
-    branches: branches.map((b) => ({
-      id: b.id,
-      state: b.state,
-      headCommitId: b.headCommitId,
-      workingSnapshotId: b.workingSnapshotId,
-    })),
-    commits: commits.map((c) => ({
-      id: c.id,
-      snapshotId: c.snapshotId,
-      parentIds: c.parentIds,
-      evidence: c.evidence,
-    })),
-    publications: publications.map((p) => ({ id: p.id, commitId: p.commitId })),
-    checkpoints: checkpoints.map((cp) => ({ id: cp.id, snapshotId: cp.snapshotId })),
-    runs: runs.map((r) => ({ id: r.id, snapshotId: r.snapshotId })),
-  };
+    branches,
+    commits,
+    publications,
+    checkpoints,
+    runs,
+  });
   const closure = computePinClosure(closureState);
   for (const dangling of closure.dangling) {
     issues.push(
-      issue(
+      createIssue(
         'dangling-reference',
         `dangling ${dangling.kind} reference '${dangling.id}' from ${dangling.referencedBy.kind} '${dangling.referencedBy.id}'`,
         ['project'],
@@ -845,7 +824,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
 
   // Step 7: commit DAG acyclic (iterative DFS with a color map; never recursive).
   const commitById = new Map(commits.map((c) => [c.id, c]));
-  const WHITE = 0;
+  // Unvisited commits have no color entry (white).
   const GRAY = 1;
   const BLACK = 2;
   const color = new Map<string, number>();
@@ -875,7 +854,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       }
     }
     if (cyclic) {
-      issues.push(issue('structural-rule', 'commit ancestry contains a cycle', ['project', 'commits'], commit.id));
+      issues.push(createIssue('structural-rule', 'commit ancestry contains a cycle', ['project', 'commits'], commit.id));
       break;
     }
   }
@@ -883,7 +862,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
   // Step 8: mainBranchId and initialSnapshotId exist.
   const branchIds = new Set(branches.map((b) => b.id));
   if (mainBranchId !== null && !branchIds.has(mainBranchId)) {
-    issues.push(issue('dangling-reference', `mainBranchId '${mainBranchId}' has no matching branch`, ['project', 'mainBranchId'], mainBranchId));
+    issues.push(createIssue('dangling-reference', `mainBranchId '${mainBranchId}' has no matching branch`, ['project', 'mainBranchId'], mainBranchId));
   }
 
   // Step 9: publications ordinals/versions.
@@ -892,7 +871,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     const expectedOrdinal = i + 1;
     if (pub.ordinal !== expectedOrdinal) {
       issues.push(
-        issue(
+        createIssue(
           'structural-rule',
           `publication ordinals must be 1..n contiguous; expected ${expectedOrdinal} at position ${i}, got ${pub.ordinal}`,
           ['project', 'publications'],
@@ -904,7 +883,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       const prev = sortedPubs[i - 1];
       if (compareSemanticVersions(pub.metadata.version, prev.metadata.version) <= 0) {
         issues.push(
-          issue(
+          createIssue(
             'structural-rule',
             `publication '${pub.id}' version must strictly increase over the previous ordinal`,
             ['project', 'publications'],
@@ -929,7 +908,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
       }
       if (run.fingerprint !== ref.fingerprint) {
         issues.push(
-          issue(
+          createIssue(
             'structural-rule',
             `evidence run '${ref.runId}' fingerprint '${run.fingerprint}' does not match commit evidence fingerprint '${ref.fingerprint}'`,
             ['project', 'commits'],
@@ -941,7 +920,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
         ?.id;
       if (typeof manifestScenarioId !== 'string') {
         issues.push(
-          issue(
+          createIssue(
             'missing-property',
             `evidence run '${ref.runId}' manifest is missing a string scenario.id`,
             ['project', 'runs'],
@@ -950,7 +929,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
         );
       } else if (manifestScenarioId !== ref.scenarioId) {
         issues.push(
-          issue(
+          createIssue(
             'structural-rule',
             `evidence run '${ref.runId}' manifest scenario '${manifestScenarioId}' does not match commit evidence scenarioId '${ref.scenarioId}'`,
             ['project', 'commits'],

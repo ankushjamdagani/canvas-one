@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,7 @@ import {
 import { InlineAlert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Patterns/Destructive Prompt Dialog',

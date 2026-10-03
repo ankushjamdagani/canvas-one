@@ -1,20 +1,34 @@
-import * as React from 'react';
-import { Plus, ArrowRight, FolderOpen, LayoutTemplate, Upload } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import type { SessionController } from '../session/controller';
-import { formatStudioError } from '../session/formatError';
-import { importProjectJson } from '../transfer';
-import { formatImportError } from './importError';
+import * as React from "react";
+import {
+  Plus,
+  ArrowRight,
+  FolderOpen,
+  LayoutTemplate,
+  Upload,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import type { SessionController } from "../session/controller";
+import { formatStudioError } from "../session/formatError";
+import { importProjectJson } from "../transfer";
+import { formatImportError } from "./importError";
 
-function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+function pluralize(
+  count: number,
+  singular: string,
+  plural = `${singular}s`,
+): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
-import type { Actor, StudioRepository, ProjectRecord } from '../../persistence/studio/types';
-import type { Document, Id } from '../../domain/studio/model';
-import { EXAMPLE_CATALOG, type ExampleCatalogEntry } from './exampleCatalog';
+import type {
+  Actor,
+  StudioRepository,
+  ProjectRecord,
+} from "../../persistence/studio/types";
+import type { Document, Id } from "../../domain/studio/model";
+import { EXAMPLE_CATALOG, type ExampleCatalogEntry } from "./exampleCatalog";
 
 export interface EntryScreenProps {
   session: SessionController;
@@ -33,12 +47,12 @@ export type OpenBranchChoice = {
 
 export type ProjectRowItem = {
   readonly project: ProjectRecord;
-  readonly status: 'loading' | 'ready' | 'error';
+  readonly status: "loading" | "ready" | "error";
   readonly branches?: readonly OpenBranchChoice[];
   readonly errorMessage?: string;
 };
 
-const DEFAULT_PROJECT_TITLE = 'Untitled';
+const DEFAULT_PROJECT_TITLE = "Untitled";
 
 /**
  * 2A "new system" entry screen: two columns.
@@ -50,10 +64,18 @@ const DEFAULT_PROJECT_TITLE = 'Untitled';
  * contracted project.import flow (JSON v9 bundle only) and surfaces its typed
  * errors, same one the Export submenu's "System as JSON" writes.
  */
-export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor }: EntryScreenProps) {
-  const [projectRows, setProjectRows] = React.useState<readonly ProjectRowItem[]>([]);
+export function EntryScreen({
+  session,
+  repository,
+  mintId,
+  onOpenSuccess,
+  actor,
+}: EntryScreenProps) {
+  const [projectRows, setProjectRows] = React.useState<
+    readonly ProjectRowItem[]
+  >([]);
   const [loadingProjects, setLoadingProjects] = React.useState(true);
-  const [blankProjectName, setBlankProjectName] = React.useState('');
+  const [blankProjectName, setBlankProjectName] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isImporting, setIsImporting] = React.useState(false);
@@ -70,10 +92,10 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
           try {
             const history = await repository.loadHistory(project.id);
             const openBranches = history.branches
-              .filter((b) => b.state === 'open')
+              .filter((b) => b.state === "open")
               .map((b) => ({
                 id: b.id,
-                label: b.id === project.mainBranchId ? 'main' : b.label,
+                label: b.id === project.mainBranchId ? "main" : b.label,
                 isMain: b.id === project.mainBranchId,
               }));
 
@@ -86,15 +108,21 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
 
             return {
               project,
-              status: 'ready',
+              status: "ready",
               branches: openBranches,
             };
           } catch (err) {
-            console.error(`Failed to load history for project ${project.id}:`, err);
+            console.error(
+              `Failed to load history for project ${project.id}:`,
+              err,
+            );
             return {
               project,
-              status: 'error',
-              errorMessage: formatStudioError(err, 'Failed to load project history'),
+              status: "error",
+              errorMessage: formatStudioError(
+                err,
+                "Failed to load project history",
+              ),
             };
           }
         }),
@@ -102,8 +130,8 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
 
       setProjectRows(rows);
     } catch (err) {
-      console.error('Failed to list projects:', err);
-      setErrorMessage(formatStudioError(err, 'Failed to load projects list'));
+      console.error("Failed to list projects:", err);
+      setErrorMessage(formatStudioError(err, "Failed to load projects list"));
     } finally {
       setLoadingProjects(false);
     }
@@ -115,7 +143,8 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
 
   // An empty field creates "Untitled"; the name can be changed from the top bar.
   const trimmedBlankName = blankProjectName.trim() || DEFAULT_PROJECT_TITLE;
-  const isBlankNameValid = trimmedBlankName.length >= 1 && trimmedBlankName.length <= 80;
+  const isBlankNameValid =
+    trimmedBlankName.length >= 1 && trimmedBlankName.length <= 80;
 
   // Blank project creator ("Open an empty canvas")
   const handleCreateBlankProject = async (e?: React.FormEvent) => {
@@ -126,7 +155,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
     setErrorMessage(null);
 
     const blankDoc: Document = {
-      schema: 'studio-model/1',
+      schema: "studio-model/1",
       id: mintId(),
       title: trimmedBlankName,
       elements: [],
@@ -144,14 +173,16 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
         title: trimmedBlankName,
         initialDocument: blankDoc,
       });
-      if (res.status === 'applied') {
+      if (res.status === "applied") {
         onOpenSuccess?.();
       } else {
-        setErrorMessage(formatStudioError(res, 'Failed to create blank project'));
+        setErrorMessage(
+          formatStudioError(res, "Failed to create blank project"),
+        );
       }
     } catch (err) {
-      console.error('Unexpected error creating blank project:', err);
-      setErrorMessage('An unexpected error occurred while creating project');
+      console.error("Unexpected error creating blank project:", err);
+      setErrorMessage("An unexpected error occurred while creating project");
     } finally {
       setIsSubmitting(false);
     }
@@ -170,14 +201,18 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
         title: fixture.title,
         initialDocument: fixture,
       });
-      if (res.status === 'applied') {
+      if (res.status === "applied") {
         onOpenSuccess?.();
       } else {
-        setErrorMessage(formatStudioError(res, 'Failed to create example project'));
+        setErrorMessage(
+          formatStudioError(res, "Failed to create example project"),
+        );
       }
     } catch (err) {
-      console.error('Unexpected error creating example project:', err);
-      setErrorMessage('An unexpected error occurred while creating example project');
+      console.error("Unexpected error creating example project:", err);
+      setErrorMessage(
+        "An unexpected error occurred while creating example project",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -192,14 +227,14 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
 
     try {
       const res = await session.openProject(projectId, branchId);
-      if (res.status === 'ready') {
+      if (res.status === "ready") {
         onOpenSuccess?.();
       } else {
-        setErrorMessage(formatStudioError(res, 'Failed to open project'));
+        setErrorMessage(formatStudioError(res, "Failed to open project"));
       }
     } catch (err) {
-      console.error('Unexpected error opening project:', err);
-      setErrorMessage('An unexpected error occurred while opening project');
+      console.error("Unexpected error opening project:", err);
+      setErrorMessage("An unexpected error occurred while opening project");
     } finally {
       setIsSubmitting(false);
     }
@@ -230,17 +265,21 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
         setErrorMessage(formatImportError(result));
       }
     } catch (err) {
-      console.error('Unexpected error importing project:', err);
-      setErrorMessage('An unexpected error occurred while importing the project');
+      console.error("Unexpected error importing project:", err);
+      setErrorMessage(
+        "An unexpected error occurred while importing the project",
+      );
     } finally {
       setIsImporting(false);
     }
   };
 
-  const handleImportFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0] ?? null;
     // Reset so selecting the same file again still fires onChange.
-    e.target.value = '';
+    e.target.value = "";
     if (file) void handleImportFile(file);
   };
 
@@ -250,7 +289,7 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
       className="min-h-screen w-full max-w-full overflow-x-hidden bg-shell text-ink flex flex-col items-center select-none"
     >
       {/* Top Header */}
-      <header className="w-full h-14 border-b border-border bg-background px-4 sm:px-8 flex items-center justify-between shrink-0">
+      <header className="w-full h-12 border-b border-border bg-background px-4 sm:px-8 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <svg
             className="size-5 shrink-0"
@@ -260,12 +299,23 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
             aria-hidden="true"
           >
             <defs>
-              <linearGradient id="entry-brand-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient
+                id="entry-brand-gradient"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
                 <stop offset="0%" stopColor="#0B5C54" />
                 <stop offset="100%" stopColor="#2E7D6B" />
               </linearGradient>
             </defs>
-            <rect width="20" height="20" rx="5" fill="url(#entry-brand-gradient)" />
+            <rect
+              width="20"
+              height="20"
+              rx="5"
+              fill="url(#entry-brand-gradient)"
+            />
           </svg>
           <span className="font-semibold text-sm">System studio</span>
         </div>
@@ -288,11 +338,14 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
           <div className="flex flex-col gap-8">
             <section aria-labelledby="existing-projects-heading">
               <div className="flex items-center justify-between mb-3">
-                <h2 id="existing-projects-heading" className="text-base font-semibold text-ink">
+                <h2
+                  id="existing-projects-heading"
+                  className="text-base font-semibold text-ink"
+                >
                   Your projects
                 </h2>
                 <span className="text-xs text-secondary-text">
-                  {pluralize(projectRows.length, 'saved project')}
+                  {pluralize(projectRows.length, "saved project")}
                 </span>
               </div>
 
@@ -305,12 +358,20 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                   data-testid="no-projects-notice"
                   className="p-8 text-center text-xs text-secondary-text bg-background rounded-card border border-border"
                 >
-                  <FolderOpen size={24} className="mx-auto text-secondary-text/70 mb-2" />
+                  <FolderOpen
+                    size={24}
+                    className="mx-auto text-secondary-text/70 mb-2"
+                  />
                   <p className="font-medium text-ink">No saved projects yet</p>
-                  <p className="mt-0.5">Start from a template, or open an empty canvas.</p>
+                  <p className="mt-0.5">
+                    Start from a template, or open an empty canvas.
+                  </p>
                 </div>
               ) : (
-                <div data-testid="existing-projects-list" className="flex flex-col gap-2">
+                <div
+                  data-testid="existing-projects-list"
+                  className="flex flex-col gap-2"
+                >
                   {projectRows.map((row) => (
                     <div
                       key={row.project.id}
@@ -322,16 +383,19 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                           {row.project.title}
                         </h3>
                         <p className="text-[11px] text-secondary-text mt-0.5 font-mono">
-                          ID: {row.project.id.slice(0, 8)}… · Rev {row.project.revision}
+                          ID: {row.project.id.slice(0, 8)}… · Rev{" "}
+                          {row.project.revision}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        {row.status === 'loading' && (
-                          <span className="text-xs text-secondary-text">Loading branches…</span>
+                        {row.status === "loading" && (
+                          <span className="text-xs text-secondary-text">
+                            Loading branches…
+                          </span>
                         )}
 
-                        {row.status === 'error' && (
+                        {row.status === "error" && (
                           <span
                             data-testid={`project-error-${row.project.id}`}
                             className="text-xs text-destructive font-medium"
@@ -341,23 +405,29 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                           </span>
                         )}
 
-                        {row.status === 'ready' && row.branches && (
+                        {row.status === "ready" && row.branches && (
                           <div className="flex items-center gap-2 flex-wrap">
                             {row.branches.length === 0 ? (
-                              <span className="text-xs text-secondary-text">No open branches</span>
+                              <span className="text-xs text-secondary-text">
+                                No open branches
+                              </span>
                             ) : (
                               row.branches.map((branch) => (
                                 <Button
                                   key={branch.id}
-                                  data-testid={`open-branch-${row.project.id}-${branch.isMain ? 'main' : branch.label}`}
+                                  data-testid={`open-branch-${row.project.id}-${branch.isMain ? "main" : branch.label}`}
                                   data-branch-id={branch.id}
                                   data-branch-label={branch.label}
                                   type="button"
-                                  variant={branch.isMain ? 'outline' : 'default'}
+                                  variant={
+                                    branch.isMain ? "outline" : "default"
+                                  }
                                   size="sm"
                                   className="h-8 px-3 text-xs font-semibold shrink-0"
                                   disabled={isSubmitting}
-                                  onClick={() => handleOpenProject(row.project.id, branch.id)}
+                                  onClick={() =>
+                                    handleOpenProject(row.project.id, branch.id)
+                                  }
                                 >
                                   Open {branch.label}
                                 </Button>
@@ -373,12 +443,18 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
             </section>
 
             <section aria-labelledby="blank-canvas-heading">
-              <h2 id="blank-canvas-heading" className="text-base font-semibold text-ink mb-3">
+              <h2
+                id="blank-canvas-heading"
+                className="text-base font-semibold text-ink mb-3"
+              >
                 Open an empty canvas
               </h2>
               <Card className="border border-border bg-background shadow-none">
                 <CardContent className="p-4 sm:p-5">
-                  <form onSubmit={handleCreateBlankProject} className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+                  <form
+                    onSubmit={handleCreateBlankProject}
+                    className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center"
+                  >
                     <Input
                       data-testid="blank-project-name-input"
                       aria-label="Blank project name"
@@ -407,14 +483,18 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
             </section>
 
             <section aria-labelledby="import-project-heading">
-              <h2 id="import-project-heading" className="text-base font-semibold text-ink mb-3">
+              <h2
+                id="import-project-heading"
+                className="text-base font-semibold text-ink mb-3"
+              >
                 Import a project
               </h2>
               <Card className="border border-border bg-background shadow-none">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
                     <p className="flex-1 text-xs text-secondary-text">
-                      Import a project exported as JSON (<code>.system-studio.json</code>).
+                      Import a project exported as JSON (
+                      <code>.system-studio.json</code>).
                     </p>
                     <input
                       ref={importFileInputRef}
@@ -435,7 +515,9 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                       onClick={() => importFileInputRef.current?.click()}
                     >
                       <Upload size={14} />
-                      <span>{isImporting ? 'Importing…' : 'Import project'}</span>
+                      <span>
+                        {isImporting ? "Importing…" : "Import project"}
+                      </span>
                     </Button>
                   </div>
                 </CardContent>
@@ -446,7 +528,10 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
           {/* Right column: Start from a template */}
           <div className="flex flex-col gap-8">
             <section aria-labelledby="templates-heading">
-              <h2 id="templates-heading" className="text-base font-semibold text-ink mb-3">
+              <h2
+                id="templates-heading"
+                className="text-base font-semibold text-ink mb-3"
+              >
                 Start from a template
               </h2>
               <div data-testid="templates-list" className="flex flex-col gap-2">
@@ -463,10 +548,16 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                         share one generic template icon rather than inventing
                         a per-template kind mapping.
                       */}
-                      <LayoutTemplate size={16} className="text-secondary-text shrink-0" />
+                      <LayoutTemplate
+                        size={16}
+                        className="text-secondary-text shrink-0"
+                      />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0">
+                          <Badge
+                            variant="secondary"
+                            className="font-mono text-[10px] px-1.5 py-0"
+                          >
                             {example.key}
                           </Badge>
                           <span className="text-sm font-semibold text-ink truncate">
@@ -474,8 +565,8 @@ export function EntryScreen({ session, repository, mintId, onOpenSuccess, actor 
                           </span>
                         </div>
                         <p className="font-mono text-[10px] text-secondary-text mt-0.5">
-                          {pluralize(example.componentCount, 'component')} ·{' '}
-                          {pluralize(example.scenarioCount, 'scenario')}
+                          {pluralize(example.componentCount, "component")} ·{" "}
+                          {pluralize(example.scenarioCount, "scenario")}
                         </p>
                       </div>
                     </div>

@@ -16,7 +16,6 @@ import {
 import {
   DEFAULT_BUILD_VERSIONS,
   type Actor,
-  type HistoryCommitCommand,
   type SnapshotRecord,
   type CommitRecord,
 } from './types';

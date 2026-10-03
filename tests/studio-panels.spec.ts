@@ -188,7 +188,7 @@ test.describe('RV-12h: History and Library panels', () => {
       'ready',
     );
 
-    await page.reload();
+    await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const project = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]').first();
     await expect(project).toBeVisible();

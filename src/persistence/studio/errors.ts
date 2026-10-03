@@ -8,8 +8,11 @@
  */
 
 import Dexie from 'dexie';
-import type { Issue, IssueCode } from '../../domain/studio/validate';
+import type { Issue } from '../../domain/studio/validate';
+import { createIssue } from '../../domain/studio/issue';
 import type { FailedCode, FailedResult, StorageErrorCode } from './types';
+
+export { createIssue };
 
 export type StorageErrorDetail = {
   readonly code: StorageErrorCode;
@@ -36,25 +39,6 @@ export class RepositoryError extends Error {
 }
 
 /**
- * Creates a structured Issue object conforming to model-and-runner.md §8 / validate.ts.
- */
-export function createIssue(
-  code: IssueCode,
-  message: string,
-  path: readonly (string | number)[] = [],
-  entityId: string | null = null,
-  severity: 'error' | 'warning' = 'error',
-): Issue {
-  return {
-    code,
-    path: [...path],
-    entityId,
-    severity,
-    message,
-  };
-}
-
-/**
  * Checks if an error is a browser storage quota exceeded error.
  */
 export function isQuotaExceededError(err: unknown): boolean {
@@ -67,7 +51,7 @@ export function isQuotaExceededError(err: unknown): boolean {
 /**
  * Checks if an error indicates that the database is unavailable, blocked, or closed.
  */
-export function isUnavailableError(err: unknown): boolean {
+function isUnavailableError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   if (
     err instanceof Dexie.DatabaseClosedError ||

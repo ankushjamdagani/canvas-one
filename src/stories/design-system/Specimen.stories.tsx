@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Specimen } from '@/components/studio/specimen/Specimen';
 
 const meta: Meta<typeof Specimen> = {

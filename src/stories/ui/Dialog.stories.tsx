@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { within, userEvent, expect } from 'storybook/test';
 import {
   Dialog,

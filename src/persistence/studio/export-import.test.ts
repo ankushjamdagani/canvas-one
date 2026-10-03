@@ -23,7 +23,6 @@ import { createStudioDatabase, DB_NAME } from './db';
 import { computeSnapshotId } from './primitives';
 import { LocalRepository } from './repository';
 import { mintRunStartToken } from './token';
-import { FileTokenRegistry } from './file-tokens';
 import { CandidateController, createCandidateController } from './candidates';
 import {
   DEFAULT_BUILD_VERSIONS,
@@ -187,13 +186,6 @@ async function buildHistory(): Promise<{ repo: LocalRepository; db: ReturnType<t
   await publishBranch(repo, controller, projectId, draftBranchId, s01Doc, metadata);
 
   return { repo, db, projectId };
-}
-
-async function exportAndGetBytes(repo: LocalRepository, projectId: Id): Promise<Uint8Array> {
-  const project = (await repo.loadProject(projectId))!;
-  const res = await repo.exportProject({ projectId, expectedProjectRevision: project.revision });
-  if (res.status !== 'done') throw new Error(`export failed: ${JSON.stringify(res)}`);
-  return res.bytes;
 }
 
 describe('Export/import round trip and rejections (RV-16b, storage.md §4/§9)', () => {

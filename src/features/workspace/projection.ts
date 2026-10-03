@@ -221,7 +221,7 @@ export type ProjectionResult = {
  * canvas's measured card heights when available, and this rendered-card
  * estimate for cards that haven't been measured yet.
  */
-export const ESTIMATED_ELEMENT_NODE_HEIGHT = 76;
+const ESTIMATED_ELEMENT_NODE_HEIGHT = 76;
 
 /** Measured rendered height per placement id (presentation only; never persisted). */
 export type MeasuredHeights = ReadonlyMap<Id, number>;
@@ -229,11 +229,11 @@ export type MeasuredHeights = ReadonlyMap<Id, number>;
 export function placementHeight(placement: Placement, heights?: MeasuredHeights): number {
   return heights?.get(placement.id) ?? ESTIMATED_ELEMENT_NODE_HEIGHT;
 }
-export const GROUP_PADDING = 24;
+const GROUP_PADDING = 24;
 /** Compact boundary node a collapsed group renders as (RV-04g). */
-export const COLLAPSED_GROUP_WIDTH = 184;
-export const COLLAPSED_GROUP_HEIGHT = 44;
-export const BOUNDARY_FRAME_PADDING = 24;
+const COLLAPSED_GROUP_WIDTH = 184;
+const COLLAPSED_GROUP_HEIGHT = 44;
+const BOUNDARY_FRAME_PADDING = 24;
 
 function refinementDescendants(
   refinement: Refinement,

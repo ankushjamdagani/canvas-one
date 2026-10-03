@@ -8,8 +8,6 @@
  * - specs/revamp/decisions.md (D19: old format-7/8 dropped with clear message)
  */
 
-import type { Id } from '../../domain/studio/model';
-import type { Issue } from '../../domain/studio/validate';
 import { TRANSFER_LIMITS, validatePortableBundle } from '../../persistence/studio/bundle-validate';
 import { FileTokenRegistry } from '../../persistence/studio/file-tokens';
 import type { ProjectImportCommand } from '../../persistence/studio/types';
@@ -22,14 +20,7 @@ import type {
   ImportProjectJsonResult,
   RepositoryWithFileTokens,
 } from './types';
-
-function createIssue(
-  code: Issue['code'],
-  message: string,
-  path: readonly (string | number)[] = [],
-): Issue {
-  return { code, path: [...path], entityId: null, severity: 'error', message };
-}
+import { createIssue } from '../../domain/studio/issue';
 
 function hasFileTokens(
   repo: ImportProjectJsonParams['repository'],

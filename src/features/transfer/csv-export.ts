@@ -117,7 +117,7 @@ export function formatCsvTextCell(text: string | null | undefined): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-export function formatCsvNumberCell(
+function formatCsvNumberCell(
   value: number | null | undefined,
   available: boolean,
 ): string {
@@ -127,14 +127,14 @@ export function formatCsvNumberCell(
   return `"${value}"`;
 }
 
-export function formatCsvBooleanCell(value: boolean): string {
+function formatCsvBooleanCell(value: boolean): string {
   return `"${value ? 'true' : 'false'}"`;
 }
 
 /**
  * Derives check_status: 'passing' | 'failing' | 'no-checks' | 'incomplete'
  */
-export function deriveCheckStatus(
+function deriveCheckStatus(
   runStatus: string,
   checks: readonly { status: string }[] | undefined,
 ): 'passing' | 'failing' | 'no-checks' | 'incomplete' {

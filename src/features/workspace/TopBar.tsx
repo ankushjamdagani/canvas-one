@@ -1,20 +1,23 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   ChevronDown,
   ChevronUp,
   Command as CommandIcon,
   GitBranch,
   History as HistoryIcon,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Kbd } from '@/components/ui/kbd';
-import { cn } from '@/lib/utils';
-import type { BranchRecord, ProjectRecord } from '../../persistence/studio/types';
-import { ProjectMenu } from './ProjectMenu';
-import { RenameConflictPopover, RenamedNotice } from './ProjectRenameFeedback';
-import { BranchPopover, type BranchActionOutcome } from './BranchPopover';
-import type { TransferActions } from '../transfer';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Kbd } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
+import type {
+  BranchRecord,
+  ProjectRecord,
+} from "../../persistence/studio/types";
+import { ProjectMenu } from "./ProjectMenu";
+import { RenameConflictPopover, RenamedNotice } from "./ProjectRenameFeedback";
+import { BranchPopover, type BranchActionOutcome } from "./BranchPopover";
+import type { TransferActions } from "../transfer";
 
 export interface TopBarProps {
   project: ProjectRecord;
@@ -25,7 +28,10 @@ export interface TopBarProps {
   otherProjects?: readonly { readonly id: string; readonly title: string }[];
   onOpenProject?: (projectId: string) => void;
   onSwitchBranch: (branchId: string) => void;
-  onCreateBranch: (label: string, source: 'working' | 'head') => Promise<BranchActionOutcome>;
+  onCreateBranch: (
+    label: string,
+    source: "working" | "head",
+  ) => Promise<BranchActionOutcome>;
   onReopenBranch: (branchId: string) => Promise<BranchActionOutcome>;
   createBranchDisabledReason?: string | null;
   onAllProjects: () => void;
@@ -98,12 +104,12 @@ export function TopBar({
   // Global ⌘R / Ctrl+R shortcut to rename project (13A annotation)
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'r') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
         const target = event.target as HTMLElement | null;
         const isInput =
           target &&
-          (target.tagName === 'INPUT' ||
-            target.tagName === 'TEXTAREA' ||
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
             target.isContentEditable);
         if (!isInput) {
           event.preventDefault();
@@ -111,19 +117,22 @@ export function TopBar({
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const currentBranch = branches.find((b) => b.id === branchId) ?? null;
   const isMainBranch = branchId === project.mainBranchId;
   const branchLabel = currentBranch
     ? isMainBranch
-      ? 'main'
+      ? "main"
       : currentBranch.label
-    : '';
+    : "";
 
-  const [renamedNotice, setRenamedNotice] = React.useState<{ from: string; to: string } | null>(null);
+  const [renamedNotice, setRenamedNotice] = React.useState<{
+    from: string;
+    to: string;
+  } | null>(null);
   React.useEffect(() => {
     if (!renamedNotice) return;
     const timer = window.setTimeout(() => setRenamedNotice(null), 6000);
@@ -133,7 +142,9 @@ export function TopBar({
   const normalizedDraft = titleDraft.trim().toLowerCase();
   const nameConflict =
     isRenaming && normalizedDraft.length > 0
-      ? (otherProjects.find((p) => p.title.trim().toLowerCase() === normalizedDraft) ?? null)
+      ? (otherProjects.find(
+          (p) => p.title.trim().toLowerCase() === normalizedDraft,
+        ) ?? null)
       : null;
 
   const cancelRename = () => {
@@ -147,10 +158,14 @@ export function TopBar({
       cancelRename();
       return;
     }
-    if (trimmed.length > 0 && trimmed.length <= 80 && trimmed !== project.title) {
+    if (
+      trimmed.length > 0 &&
+      trimmed.length <= 80 &&
+      trimmed !== project.title
+    ) {
       const previous = project.title;
       const result = await onRenameProject(trimmed);
-      if ((result as { status?: string } | null)?.status === 'applied') {
+      if ((result as { status?: string } | null)?.status === "applied") {
         setRenamedNotice({ from: previous, to: trimmed });
       }
     } else {
@@ -170,8 +185,8 @@ export function TopBar({
     <header
       data-testid="workspace-topbar"
       className={cn(
-        'relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-14 min-h-14',
-        'border-b border-border bg-background select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2',
+        "relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-12 min-h-12",
+        "border-b border-border bg-background select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2",
       )}
       role="banner"
     >
@@ -189,23 +204,37 @@ export function TopBar({
             aria-hidden="true"
           >
             <defs>
-              <linearGradient id="brand-mark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient
+                id="brand-mark-gradient"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
                 <stop offset="0%" stopColor="#0B5C54" />
                 <stop offset="100%" stopColor="#2E7D6B" />
               </linearGradient>
             </defs>
-            <rect width="20" height="20" rx="5" fill="url(#brand-mark-gradient)" />
+            <rect
+              width="20"
+              height="20"
+              rx="5"
+              fill="url(#brand-mark-gradient)"
+            />
           </svg>
           <span className="hidden sm:inline">System studio</span>
         </div>
 
         {/* Vertical divider from brand mark */}
-        <div className="hidden sm:block w-px h-[22px] bg-border shrink-0 mx-0.5" aria-hidden="true" />
+        <div
+          className="hidden sm:block w-px h-[22px] bg-border shrink-0 mx-0.5"
+          aria-hidden="true"
+        />
 
         {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] (13A toggle sizing) */}
         <RenamedNotice
           open={renamedNotice !== null && !isRenaming}
-          title={renamedNotice?.to ?? ''}
+          title={renamedNotice?.to ?? ""}
           onUndo={() => void undoRename()}
           onDismiss={() => setRenamedNotice(null)}
         >
@@ -216,7 +245,7 @@ export function TopBar({
             {isRenaming ? (
               <RenameConflictPopover
                 open={nameConflict !== null}
-                conflictTitle={nameConflict?.title ?? ''}
+                conflictTitle={nameConflict?.title ?? ""}
                 currentTitle={project.title}
                 onKeep={cancelRename}
                 onOpenExisting={() => {
@@ -231,20 +260,20 @@ export function TopBar({
                   aria-label="Project title"
                   aria-invalid={nameConflict !== null || undefined}
                   className={cn(
-                    'h-7 px-2.5 text-[13px] font-medium text-ink bg-background border rounded-[6px] outline-none focus:outline-none w-28 sm:w-44 truncate',
+                    "h-7 px-2.5 text-[13px] font-medium text-ink bg-background border rounded-[6px] outline-none focus:outline-none w-28 sm:w-44 truncate",
                     nameConflict
-                      ? 'border-risk-text shadow-[0_0_0_2px_rgba(176,72,40,0.15)]'
-                      : 'border-primary shadow-[0_0_0_2px_rgba(11,92,84,0.15)]',
+                      ? "border-risk-text shadow-[0_0_0_2px_rgba(176,72,40,0.15)]"
+                      : "border-primary shadow-[0_0_0_2px_rgba(11,92,84,0.15)]",
                   )}
                   value={titleDraft}
                   maxLength={80}
                   onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       if (nameConflict) return;
                       e.currentTarget.blur();
-                    } else if (e.key === 'Escape') {
+                    } else if (e.key === "Escape") {
                       cancelRename();
                       e.currentTarget.blur();
                     }
@@ -265,18 +294,26 @@ export function TopBar({
                     type="button"
                     data-testid="breadcrumb-project-btn"
                     className={cn(
-                      'group flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
+                      "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                       isOpen
-                        ? 'bg-accent border-selected-edge text-primary'
-                        : 'border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]',
+                        ? "bg-accent border-selected-edge text-primary"
+                        : "border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]",
                     )}
                     title={project.title}
                   >
                     <span className="truncate">{project.title}</span>
                     {isOpen ? (
-                      <ChevronUp size={11} className="text-primary shrink-0" aria-hidden="true" />
+                      <ChevronUp
+                        size={11}
+                        className="text-primary shrink-0"
+                        aria-hidden="true"
+                      />
                     ) : (
-                      <ChevronDown size={11} className="text-secondary-text shrink-0" aria-hidden="true" />
+                      <ChevronDown
+                        size={11}
+                        className="text-secondary-text shrink-0"
+                        aria-hidden="true"
+                      />
                     )}
                   </button>
                 )}
@@ -285,7 +322,10 @@ export function TopBar({
 
             {/* RV-05b review round 1: dropped below sm so a 390px top bar has room
                 for the project name and the branch toggle without clipping. */}
-            <span className="hidden sm:inline text-[#C0C6C1] text-[11px] select-none shrink-0" aria-hidden="true">
+            <span
+              className="hidden sm:inline text-[#C0C6C1] text-[11px] select-none shrink-0"
+              aria-hidden="true"
+            >
               /
             </span>
 
@@ -305,28 +345,42 @@ export function TopBar({
                   type="button"
                   data-testid="breadcrumb-branch-btn"
                   className={cn(
-                    'group flex items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11',
+                    "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                     isOpen
-                      ? 'bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]'
-                      : 'border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]',
+                      ? "bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]"
+                      : "border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]",
                   )}
                   title={branchLabel}
                 >
-                  <GitBranch size={12} className={cn('shrink-0', isOpen ? 'text-[#5B3E9B]' : 'text-[#7C5FC0]')} />
+                  <GitBranch
+                    size={12}
+                    className={cn(
+                      "shrink-0",
+                      isOpen ? "text-[#5B3E9B]" : "text-[#7C5FC0]",
+                    )}
+                  />
                   <span className="hidden sm:inline font-semibold truncate max-w-[110px] sm:max-w-[180px]">
                     {branchLabel}
                   </span>
                   <Badge
                     data-testid="breadcrumb-branch-state"
-                    variant={isMainBranch ? 'accent' : 'risk'}
+                    variant={isMainBranch ? "accent" : "risk"}
                     className="text-[9.5px] font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
                   >
-                    {isMainBranch ? 'MAIN' : 'DRAFT'}
+                    {isMainBranch ? "MAIN" : "DRAFT"}
                   </Badge>
                   {isOpen ? (
-                    <ChevronUp size={11} className="text-[#5B3E9B] shrink-0" aria-hidden="true" />
+                    <ChevronUp
+                      size={11}
+                      className="text-[#5B3E9B] shrink-0"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <ChevronDown size={11} className="text-secondary-text shrink-0" aria-hidden="true" />
+                    <ChevronDown
+                      size={11}
+                      className="text-secondary-text shrink-0"
+                      aria-hidden="true"
+                    />
                   )}
                 </button>
               )}
@@ -344,7 +398,7 @@ export function TopBar({
         {/* Save Status */}
         <span
           data-testid="save-status"
-          data-state={isSaving ? 'saving' : 'idle'}
+          data-state={isSaving ? "saving" : "idle"}
           className="text-xs text-secondary-text hidden md:flex items-center gap-1.5 ml-1 shrink-0 whitespace-nowrap"
           role="status"
           aria-label={saveStatusText}
@@ -353,8 +407,12 @@ export function TopBar({
           <span
             aria-hidden="true"
             className={cn(
-              'inline-block size-1.5 rounded-full shrink-0',
-              isSaving ? 'bg-primary animate-pulse' : hasError ? 'bg-risk' : 'bg-primary',
+              "inline-block size-1.5 rounded-full shrink-0",
+              isSaving
+                ? "bg-primary animate-pulse"
+                : hasError
+                  ? "bg-risk"
+                  : "bg-primary",
             )}
           />
           <span className="truncate max-w-[160px]">{saveStatusText}</span>
@@ -362,12 +420,15 @@ export function TopBar({
       </div>
 
       {/* D38: Run + scenario switcher slot, owned by the runs lane */}
-      <div data-slot="run-control" className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink">
+      <div
+        data-slot="run-control"
+        className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink"
+      >
         {onOpenQuickOptions && (
           <Button
             type="button"
             data-testid="topbar-quick-options-btn"
-            variant={quickOptionsActive ? 'tint' : 'outline'}
+            variant={quickOptionsActive ? "tint" : "outline"}
             size="sm"
             className="h-7 px-2.5 text-xs font-medium shrink-0 pointer-coarse:min-w-11"
             aria-label="Quick options"
@@ -377,7 +438,9 @@ export function TopBar({
             <CommandIcon className="size-3.5 sm:mr-1" aria-hidden="true" />
             <span className="hidden sm:inline">Quick options</span>
             {quickOptionsShortcut && (
-              <Kbd className="hidden lg:inline-flex ml-1.5 h-4 text-[10px]">{quickOptionsShortcut}</Kbd>
+              <Kbd className="hidden lg:inline-flex ml-1.5 h-4 text-[10px]">
+                {quickOptionsShortcut}
+              </Kbd>
             )}
           </Button>
         )}
@@ -385,7 +448,7 @@ export function TopBar({
           <Button
             type="button"
             data-testid="topbar-history-btn"
-            variant={historyActive ? 'tint' : 'outline'}
+            variant={historyActive ? "tint" : "outline"}
             size="sm"
             // Below 390 px the bar can't hold every control at 320 px (WCAG 1.4.10), so
             // History steps back to Quick options, where it is always listed.

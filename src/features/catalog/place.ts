@@ -22,6 +22,7 @@ import type {
 import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
 import { getEntry } from './catalog';
+import { createIssue } from '../../domain/studio/issue';
 
 export type PlaceEntryParams = {
   readonly document: Document;
@@ -42,21 +43,6 @@ export type PlaceEntryResult =
       readonly ok: false;
       readonly issues: readonly Issue[];
     };
-
-function createIssue(
-  code: string,
-  message: string,
-  path: readonly (string | number)[],
-  entityId: Id | null = null,
-): Issue {
-  return {
-    code: code as any,
-    message,
-    path,
-    entityId,
-    severity: 'error',
-  };
-}
 
 /**
  * Compiles placing a catalog entry into a single model.apply-records batch of RecordChanges.

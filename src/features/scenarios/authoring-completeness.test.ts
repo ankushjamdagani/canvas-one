@@ -7,7 +7,7 @@ import { makeCounterMintId, buildMockDocument } from './mockDocument';
 import { SchemaPathPicker, schemaPathTemplates } from './SchemaPathPicker';
 import { GuardBuilder } from './GuardBuilder';
 import { BoundariesSection } from './BoundariesSection';
-import { StepsSection, reorderInputs } from './StepsSection';
+import { StepsSection } from './StepsSection';
 
 const nestedShape: Shape = {
   type: 'record',
@@ -224,9 +224,5 @@ describe('scenario authoring completeness', () => {
     expect(html).toContain('aria-label="Drag step 1; use arrow keys to reorder"');
     expect(html).toContain('aria-label="Move step up"');
     expect(html).toContain('aria-label="Move step down"');
-    expect(reorderInputs(scenario.inputs, scenario.inputs[0].id, scenario.inputs[1].id).map((input) => input.id)).toEqual([
-      scenario.inputs[1].id,
-      scenario.inputs[0].id,
-    ]);
   });
 });

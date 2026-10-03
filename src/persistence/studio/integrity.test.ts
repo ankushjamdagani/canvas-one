@@ -46,20 +46,6 @@ async function createTestProject(repo: LocalRepository, doc: Document = s01Doc) 
   return { projectId, mainBranchId, draftBranchId };
 }
 
-async function commitOnDraft(repo: LocalRepository, projectId: Id, draftBranchId: Id) {
-  const commitId = crypto.randomUUID();
-  const res = await repo.execute({
-    commandId: 'history.commit',
-    operationId: crypto.randomUUID(),
-    projectId,
-    branchId: draftBranchId,
-    expectedWorkingRevision: 0,
-    actor: testActor,
-    payload: { commitId, expectedHeadId: null, message: 'evidence-free commit for integrity tests', evidence: [] },
-  });
-  return { commitId, res };
-}
-
 describe('loadHistory (RV-08f)', () => {
   it('loads project, branches, commits, publications and per-branch history in one transaction', async () => {
     const db = createStudioDatabase(`test-history-load-${crypto.randomUUID()}`);

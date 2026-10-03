@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, AlertTriangle, ShieldAlert, GitBranch } from 'lucide-react';
 

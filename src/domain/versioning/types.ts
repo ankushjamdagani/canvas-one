@@ -8,13 +8,12 @@
 
 import type { Id } from '../studio/model';
 import type { CheckResult, RunSummary, TerminalStatus } from '../studio/runner/types';
-import type { EvidenceManifest } from '../studio/runner/evidence';
 
 // ============================================================================
 // Reason codes for run qualification (§5)
 // ============================================================================
 
-export const QUALIFICATION_REASON_CODES = [
+const QUALIFICATION_REASON_CODES = [
   'status-not-completed',
   'provenance-not-local',
   'fingerprint-mismatch',

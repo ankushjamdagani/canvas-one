@@ -195,7 +195,7 @@ function validateBehavior(b: unknown, id: string, issues: ValidationIssue[]): vo
   }
 }
 
-function validateProfile(p: unknown, dur: number, id: string, issues: ValidationIssue[]): void {
+function validateProfile(p: unknown, dur: number, issues: ValidationIssue[]): void {
   if (!isObj(p)) return err(issues, 'INVALID_PROFILE', 'profile must be object', undefined);
   if (p.kind === 'steady') return;
   if (p.kind === 'ramp') {
@@ -212,7 +212,7 @@ function validateProfile(p: unknown, dur: number, id: string, issues: Validation
   }
 }
 
-function validateClasses(classes: unknown, wId: string, issues: ValidationIssue[]): void {
+function validateClasses(classes: unknown, issues: ValidationIssue[]): void {
   if (!Array.isArray(classes) || classes.length === 0 || classes.length > 20) {
     return err(issues, 'INVALID_CLASSES_COUNT', 'classes must be array of 1..20 items', undefined);
   }
@@ -344,8 +344,8 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
     if (!isNum(w.rate, 1, 10000)) err(issues, 'INVALID_WORKLOAD_RATE', 'rate must be 1..10000');
     if (!isNum(w.timeoutMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_TIMEOUT', 'timeoutMs must be 1..3600000');
     if (w.intervalMs !== undefined && !isNum(w.intervalMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_INTERVAL', 'intervalMs must be 1..3600000');
-    if (w.profile !== undefined) validateProfile(w.profile, dur, isStr(w.id) ? w.id : '', issues);
-    validateClasses(w.classes, isStr(w.id) ? w.id : '', issues);
+    if (w.profile !== undefined) validateProfile(w.profile, dur, issues);
+    validateClasses(w.classes, issues);
   }
 
   if (issues.length > 0) return { issues };

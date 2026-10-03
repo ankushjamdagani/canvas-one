@@ -17,7 +17,7 @@ import type { AheadOfVersionInfo, RecordChangeItem } from './types';
 // Record label lookup
 // ============================================================================
 
-export function findRecordLabel(doc: Document | null, recordKind: string, id: Id): string | null {
+function findRecordLabel(doc: Document | null, recordKind: string, id: Id): string | null {
   if (!doc) return null;
 
   switch (recordKind) {
@@ -51,7 +51,7 @@ export function findRecordLabel(doc: Document | null, recordKind: string, id: Id
  * payload schema's label when the schema is still resolvable, or by kind alone —
  * never by its raw id.
  */
-export function describeFixtureLabel(doc: Document | null, id: Id): string | null {
+function describeFixtureLabel(doc: Document | null, id: Id): string | null {
   if (!doc) return null;
   const fixture = doc.fixtures.find((f) => f.id === id);
   if (!fixture) return null;
@@ -64,7 +64,7 @@ export function describeFixtureLabel(doc: Document | null, id: Id): string | nul
  * has no label. Describe it by its owning element's label when resolvable, or by
  * kind alone — never by its raw id.
  */
-export function describeRefinementLabel(doc: Document | null, id: Id): string | null {
+function describeRefinementLabel(doc: Document | null, id: Id): string | null {
   if (!doc) return null;
   const refinement = doc.refinements.find((r) => r.id === id);
   if (!refinement) return null;

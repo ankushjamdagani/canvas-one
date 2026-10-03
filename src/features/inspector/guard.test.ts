@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decideEscape, decideNavigation, RUN_DISABLED_DIRTY_DRAFT_REASON } from './guard';
+import { decideNavigation, RUN_DISABLED_DIRTY_DRAFT_REASON } from './guard';
 import type { DraftHandle } from './types';
 
 function draft(overrides: Partial<DraftHandle> = {}): DraftHandle {
@@ -34,17 +34,6 @@ describe('decideNavigation', () => {
 
   it('dirty draft -> ask', () => {
     expect(decideNavigation(draft({ dirty: true }))).toBe('ask');
-  });
-});
-
-describe('decideEscape', () => {
-  it('closes an overlay first, regardless of draft state', () => {
-    expect(decideEscape(draft({ dirty: true }), true)).toBe('close-overlay');
-    expect(decideEscape(null, true)).toBe('close-overlay');
-  });
-
-  it('does nothing to a dirty draft when no overlay is open (Stay/Discard/Apply only)', () => {
-    expect(decideEscape(draft({ dirty: true }), false)).toBe('none');
   });
 });
 

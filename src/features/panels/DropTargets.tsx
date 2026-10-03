@@ -1,19 +1,17 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import type { SideWidths, Viewport } from '@/features/workspace/panels';
+import type { SideWidths } from '@/features/workspace/panels';
 import { clampSideWidth } from './geometry';
 
 export interface DropTargetsProps {
   activeTarget: 'left' | 'right' | null;
   sideWidths: SideWidths;
-  viewport: Viewport;
   className?: string;
 }
 
 export const DropTargets: React.FC<DropTargetsProps> = ({
   activeTarget,
   sideWidths,
-  viewport,
   className,
 }) => {
   const leftWidth = clampSideWidth(sideWidths.left);

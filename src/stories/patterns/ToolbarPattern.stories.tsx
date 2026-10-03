@@ -4,18 +4,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
-import {
-  MousePointer,
-  Hand,
-  Play,
-  RotateCcw,
-  Sparkles,
-  Maximize2,
-  ZoomIn,
-  ZoomOut,
-  Grid,
-} from 'lucide-react';
+import { MousePointer, Hand, Play, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Patterns/Toolbar & Action Bar',

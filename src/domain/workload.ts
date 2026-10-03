@@ -10,7 +10,7 @@ export interface ArrivalSettings {
   profile?: TrafficProfile;
 }
 
-export function rateAt(settings: ArrivalSettings, time: number): number {
+function rateAt(settings: ArrivalSettings, time: number): number {
   const p = settings.profile,
     t = Math.max(0, Math.min(time, settings.duration));
   if (p?.kind === "burst")

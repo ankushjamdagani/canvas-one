@@ -3,7 +3,6 @@
  */
 
 export type * from './protocol';
-export { createEmptySummary } from './summary';
 export * from './transport';
 export * from './RunController';
 export * from './scenarioStatus';

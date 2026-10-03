@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import * as React from 'react';
 import { FloatingDock } from '@/features/workspace/FloatingDock';
 import { DEFAULT_DOCK_CONFIG, type DockConfig } from '@/features/workspace/dockConfig';
-import type { CommandContext } from '@/features/workspace/commands/registry';
 
 import { mockCommandContext } from './mockContext';
 

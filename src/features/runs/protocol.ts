@@ -10,7 +10,7 @@
  * - Handles die on cancel/terminal/worker restart.
  */
 
-import type { Document, Id } from '../../domain/studio/model';
+import type { Id } from '../../domain/studio/model';
 import type { BuildManifestVersions, ExecutionManifest } from '../../domain/studio/manifest';
 import {
   prepareScenario,
@@ -21,11 +21,9 @@ import type {
   AuthoredSnapshot,
   CheckResult,
   RunControl,
-  RunState,
   RunSummary,
   RunUpdate,
   TerminalStatus,
-  TraceEvent,
 } from '../../domain/studio/runner/types';
 
 // ============================================================================

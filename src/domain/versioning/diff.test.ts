@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { diffDocuments } from './diff';
-import type { Document, Element, Connection } from '../studio/model';
+import type { Element } from '../studio/model';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 

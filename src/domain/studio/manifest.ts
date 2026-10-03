@@ -70,7 +70,7 @@ import type {
   WorkloadProfile,
 } from './model';
 import { checkReadiness, type ReadinessIssue } from './readiness';
-import { canonicalJson } from './canonical';
+import { canonicalJson, sha256Hex } from './canonical';
 
 // ============================================================================
 // Execution manifest v1 shape (run-identity.md §3, "Manifest shape (D31)")
@@ -269,25 +269,6 @@ const SCENARIO_KEYS = [
 
 function byId(a: { readonly id: Id }, b: { readonly id: Id }): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
-
-function endpointKey(ep: Endpoint): string {
-  return `${ep.elementId}:${ep.portId}`;
-}
-
-async function sha256Hex(text: string): Promise<string> {
-  const subtle = globalThis.crypto?.subtle;
-  if (!subtle) {
-    throw new Error('Web Crypto (crypto.subtle) is unavailable');
-  }
-  const bytes = new TextEncoder().encode(text);
-  const digest = await subtle.digest('SHA-256', bytes);
-  const view = new Uint8Array(digest);
-  let hex = '';
-  for (let i = 0; i < view.length; i++) {
-    hex += view[i].toString(16).padStart(2, '0');
-  }
-  return hex;
 }
 
 /**

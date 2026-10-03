@@ -18,7 +18,6 @@ import {
 import type { TerminalStatus } from '../studio/runner/types';
 import type {
   CandidateScenario,
-  CandidateScenarioStatus,
   EvaluateCandidateResult,
   QualificationReasonCode,
   RunCandidate,
@@ -43,7 +42,7 @@ import type {
  * - trace-count: elementId
  * - metric: elementId
  */
-export function extractAssertionSubjectElementIds(manifest: unknown): readonly Id[] {
+function extractAssertionSubjectElementIds(manifest: unknown): readonly Id[] {
   if (!manifest || typeof manifest !== 'object') {
     return [];
   }
@@ -361,13 +360,6 @@ export function buildEvidenceManifest(
 ): EvidenceManifest {
   const scenarioIds = candidateScenarios.map((c) => c.scenarioId);
   const entries: EvidenceEntry[] = [];
-
-  const runMap: ReadonlyMap<string, RunCandidate> =
-    runs instanceof Map
-      ? (runs as ReadonlyMap<string, RunCandidate>)
-      : new Map(
-          (runs as readonly RunCandidate[]).map((r) => [r.id, r]),
-        );
 
   for (const candidate of candidateScenarios) {
     // Find qualifying or matching run

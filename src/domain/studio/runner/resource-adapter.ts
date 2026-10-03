@@ -57,8 +57,8 @@ import { VALID_KINDS } from '../../execution';
 import { traceEventId } from './trace';
 
 /** Root and journey used only by host fault/detection trace events, which belong to no request. */
-export const SYSTEM_FAULT_ROOT_ID = 'fault';
-export const SYSTEM_FAULT_JOURNEY_ID = 'system';
+const SYSTEM_FAULT_ROOT_ID = 'fault';
+const SYSTEM_FAULT_JOURNEY_ID = 'system';
 import type { ResourceMetrics } from '../../../simulation/open/kernel';
 
 type MutableCounts = {

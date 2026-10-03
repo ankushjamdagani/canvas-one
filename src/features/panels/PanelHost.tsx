@@ -9,6 +9,7 @@ import { DropTargets } from './DropTargets';
 import { PanelHeader } from './PanelHeader';
 import { PanelCommandsContext, type PanelCommandRoutes } from './panelCommands';
 import { computeDropTarget } from './geometry';
+import { trackPanelGesture } from './pointerGesture';
 import {
   clampFloatRect,
   effectiveLayout,
@@ -93,42 +94,31 @@ export const PanelHost: React.FC<PanelHostProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
-    dispatch({ type: 'BEGIN_GESTURE', kind: `drag-panel-${panelId}` });
     setInternalDragging(true);
     setDraggingPanelId(panelId);
     setDragPointer({ x: e.clientX, y: e.clientY });
 
-    const initialTarget = computeDropTarget(e.clientX, currentViewport.width, state.sideWidths);
-    setActiveDropTarget(initialTarget);
+    const dropTargetAt = (clientX: number) =>
+      computeDropTarget(clientX, currentViewport.width, state.sideWidths);
+    setActiveDropTarget(dropTargetAt(e.clientX));
 
-    const onPointerMove = (moveEvt: PointerEvent) => {
-      setDragPointer({ x: moveEvt.clientX, y: moveEvt.clientY });
-      const target = computeDropTarget(moveEvt.clientX, currentViewport.width, state.sideWidths);
-      setActiveDropTarget(target);
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerCancel);
-      window.removeEventListener('keydown', onKeyDown);
-      setInternalDragging(false);
-      setDraggingPanelId(null);
-      setActiveDropTarget(null);
-      setDragPointer(null);
-    };
-
-    const onPointerUp = (upEvt: PointerEvent) => {
-      const dropTarget = computeDropTarget(upEvt.clientX, currentViewport.width, state.sideWidths);
-      cleanup();
-
-      if (dropTarget === 'left') {
-        dispatch({ type: 'PLACE', panel: panelId, placement: 'left', index: 0 });
-        dispatch({ type: 'COMMIT_GESTURE' });
-      } else if (dropTarget === 'right') {
-        dispatch({ type: 'PLACE', panel: panelId, placement: 'right', index: 0 });
-        dispatch({ type: 'COMMIT_GESTURE' });
-      } else {
+    trackPanelGesture(dispatch, `drag-panel-${panelId}`, {
+      onMove: (moveEvt) => {
+        setDragPointer({ x: moveEvt.clientX, y: moveEvt.clientY });
+        setActiveDropTarget(dropTargetAt(moveEvt.clientX));
+      },
+      onSettle: () => {
+        setInternalDragging(false);
+        setDraggingPanelId(null);
+        setActiveDropTarget(null);
+        setDragPointer(null);
+      },
+      onUp: (upEvt) => {
+        const dropTarget = dropTargetAt(upEvt.clientX);
+        if (dropTarget === 'left' || dropTarget === 'right') {
+          dispatch({ type: 'PLACE', panel: panelId, placement: dropTarget, index: 0 });
+          return;
+        }
         // Dropped into canvas space
         const currentPref = state.panels[panelId];
         if (currentPref.placement === 'floating') {
@@ -141,31 +131,12 @@ export const PanelHost: React.FC<PanelHostProps> = ({
               y: Math.max(54, upEvt.clientY - 20),
             },
           });
-          dispatch({ type: 'COMMIT_GESTURE' });
         } else {
           // Transitioned from docked to floating
           dispatch({ type: 'PLACE', panel: panelId, placement: 'floating', index: 0 });
-          dispatch({ type: 'COMMIT_GESTURE' });
         }
-      }
-    };
-
-    const onPointerCancel = () => {
-      cleanup();
-      dispatch({ type: 'CANCEL_GESTURE' });
-    };
-
-    const onKeyDown = (keyEvt: KeyboardEvent) => {
-      if (keyEvt.key === 'Escape') {
-        cleanup();
-        dispatch({ type: 'CANCEL_GESTURE' });
-      }
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerCancel);
-    window.addEventListener('keydown', onKeyDown);
+      },
+    });
   };
 
   // Partition panels by effective mode
@@ -262,7 +233,6 @@ export const PanelHost: React.FC<PanelHostProps> = ({
           <DropTargets
             activeTarget={currentDropTarget}
             sideWidths={state.sideWidths}
-            viewport={currentViewport}
           />
         )}
       </div>

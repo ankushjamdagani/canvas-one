@@ -1,7 +1,6 @@
 import type {
   CallRetryPolicy,
   ExecutionGraph,
-  ExecutionNode,
   ExecutionEdge,
   WorkloadDefinition,
   RequestClass,
@@ -190,7 +189,7 @@ export interface SimEvent {
   run: () => void;
 }
 
-export class SimpleEventHeap {
+class SimpleEventHeap {
   private heap: SimEvent[] = [];
 
   get size(): number {
@@ -264,7 +263,7 @@ export class SimpleEventHeap {
   }
 }
 
-export function hashString(str: string): number {
+function hashString(str: string): number {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);

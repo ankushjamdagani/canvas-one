@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateDocument, ISSUE_CODES } from './validate';
-import type { Issue } from './validate';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 

@@ -1,6 +1,6 @@
 import type { DraftAssertion, DraftRequestClass } from './draftScenario';
 import type { Boundary, Fault, Input, Document } from '../../domain/studio/model';
-import { endpointLabel, allElementOptions } from './pickers';
+import { endpointLabel } from './pickers';
 
 export function summarizeWorkloadMix(classes: readonly DraftRequestClass[]): string {
   if (classes.length === 0) return 'No request classes';

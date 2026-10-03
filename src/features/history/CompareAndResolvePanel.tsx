@@ -564,8 +564,6 @@ export function CompareAndResolvePanel({
     setFocusedConflictId(next.id);
   };
 
-  const listedRecords = filter === 'open' ? unresolvedRecords : [...unresolvedRecords, ...autoMergedRecords];
-
   return (
     <div
       data-testid="compare-and-resolve-panel"

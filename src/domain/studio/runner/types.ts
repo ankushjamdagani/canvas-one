@@ -41,7 +41,7 @@ export interface RunHandle {
 // TraceEvent (§8)
 // ============================================================================
 
-export const TRACE_EVENT_KINDS = [
+const TRACE_EVENT_KINDS = [
   'input',
   'dispatch',
   'queued',
@@ -55,7 +55,7 @@ export const TRACE_EVENT_KINDS = [
 export type TraceEventKind = (typeof TRACE_EVENT_KINDS)[number];
 
 /** Transport outcome (also reused as `TraceEvent.outcome`, non-null case). */
-export const TRANSPORT_OUTCOMES = ['succeeded', 'rejected', 'failed', 'expired'] as const;
+const TRANSPORT_OUTCOMES = ['succeeded', 'rejected', 'failed', 'expired'] as const;
 export type TransportOutcome = (typeof TRANSPORT_OUTCOMES)[number];
 
 export type TraceEvent = {

@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useStore } from '@xyflow/react';
 
 export interface SelectionBoxProps {

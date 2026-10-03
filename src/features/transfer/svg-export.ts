@@ -18,7 +18,7 @@
  * - Bounding box = content + 32 px padding
  */
 
-import type { Connection, Document, Element, Group, Id, Note, Placement, View } from '../../domain/studio/model';
+import type { Connection, Document, Element, Id, Placement, View } from '../../domain/studio/model';
 import { getNodeCaption } from '../workspace/nodeVisuals';
 import { CATALOG_LAYER_COLORS, getCatalogLayer } from '../workspace/projection';
 
@@ -233,7 +233,6 @@ export function renderDiagramSvg(document: Document, viewId?: string | null): st
   }
 
   // 4. Edge shapes (connections)
-  const connectionById = new Map<Id, Connection>(document.connections.map((c) => [c.id, c]));
   const activeConnectionIds = new Set(view.connectionIds);
 
   // Filter connections: in activeConnectionIds (or present between placed endpoints)

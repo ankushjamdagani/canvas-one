@@ -9,14 +9,12 @@
  */
 
 import type { Document, Id } from '../../domain/studio/model';
-import type { ElementMetric } from '../../domain/studio/runner/types';
 import type { Issue } from '../../domain/studio/validate';
 import type { FileTokenRegistry } from '../../persistence/studio/file-tokens';
 import type { LocalRepository } from '../../persistence/studio/repository';
 import type {
   Actor,
   AppliedResult,
-  ProjectBundle,
   RunRecord,
   StudioRepository,
 } from '../../persistence/studio/types';

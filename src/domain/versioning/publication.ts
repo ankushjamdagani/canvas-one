@@ -20,7 +20,7 @@ import type { PublicationMetadata, SemanticVersion } from '../../persistence/stu
 export const MAX_VERSION_PART = 999999;
 export const MAX_TITLE_CODE_POINTS = 80;
 export const MAX_RATIONALE_CODE_POINTS = 4000;
-export const MAX_TICKET_URL_CHARS = 2048;
+const MAX_TICKET_URL_CHARS = 2048;
 
 export type VersionBumpKind = 'major' | 'minor' | 'patch';
 

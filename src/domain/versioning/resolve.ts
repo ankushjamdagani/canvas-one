@@ -22,14 +22,12 @@ import {
   lookupRecordById,
   COLLECTION_KEY_TO_KIND,
   deepClone,
-  deepFreeze,
   type ConflictSide,
   type MergeConflict,
   type MergeResult,
 } from './merge';
 import type { DiffRecordKind } from './diff';
-
-export { deepClone, deepFreeze };
+import { deepFreeze } from '../studio/freeze';
 
 // ============================================================================
 // Types
@@ -72,7 +70,7 @@ const KIND_TO_COLLECTION_KEY: Record<RecordKind, keyof Document> = {
 // Record Kind Verification
 // ============================================================================
 
-export function isRecordOfKind(record: unknown, recordKind: DiffRecordKind): boolean {
+function isRecordOfKind(record: unknown, recordKind: DiffRecordKind): boolean {
   if (record === null || typeof record !== 'object' || Array.isArray(record)) {
     return false;
   }

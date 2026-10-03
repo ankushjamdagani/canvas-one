@@ -26,10 +26,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Id } from '../../domain/studio/model';
-import type {
-  CheckResult,
-  TraceEvent,
-} from '../../domain/studio/runner/types';
+import type { TraceEvent } from '../../domain/studio/runner/types';
 import { Separator } from '../../components/ui/separator';
 import type { RunPhase, SaveStatus, TerminalResult } from './RunController';
 import {

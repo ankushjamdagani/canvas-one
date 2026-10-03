@@ -11,6 +11,7 @@
 
 import type { Document, Id } from '../../domain/studio/model';
 import type { ExpectedHead } from './types';
+import { deepFreeze } from '../../domain/studio/freeze';
 
 export type MintPublishTicketParams = {
   readonly candidateId: Id;
@@ -54,24 +55,6 @@ export type PublishTicketBinding = {
   readonly operationId: Id;
   readonly createdAt: number;
 };
-
-function deepFreeze<T>(obj: T, seen = new WeakSet<object>()): T {
-  if (obj === null || typeof obj !== 'object' || Object.isFrozen(obj)) {
-    return obj;
-  }
-  if (seen.has(obj as object)) {
-    return obj;
-  }
-  seen.add(obj as object);
-  Object.freeze(obj);
-  for (const key of Object.getOwnPropertyNames(obj)) {
-    const val = (obj as any)[key];
-    if (val !== null && typeof val === 'object') {
-      deepFreeze(val, seen);
-    }
-  }
-  return obj;
-}
 
 /**
  * Module-private WeakMap registry.

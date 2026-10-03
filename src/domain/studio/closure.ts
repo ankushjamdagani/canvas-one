@@ -13,14 +13,11 @@
 import type {
   Document,
   Id,
-  Endpoint,
-  Connection,
   Relation,
   Refinement,
   MachineBehavior,
   PipelineBehavior,
   DecisionBehavior,
-  ResourceBehavior,
 } from './model';
 import type { Issue } from './validate';
 import { resolveRefinementRouting } from './refinementRouting';
@@ -33,7 +30,7 @@ import { resolveRefinementRouting } from './refinementRouting';
  * Documented issue codes specific to scenario scope closure and readiness.
  * (run-identity.md §3, model-and-runner.md §6, §9)
  */
-export const CLOSURE_ISSUE_CODES = [
+const CLOSURE_ISSUE_CODES = [
   'unresolved-crossing',
   'missing-target',
   'recursive-refinement',

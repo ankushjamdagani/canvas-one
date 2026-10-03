@@ -20,7 +20,7 @@
  * - Output format: UTF-8 without BOM, LF newline, final LF, <= 2 MiB.
  */
 
-import type { Connection, Document, Element, Group, Id, Relation, View } from '../../domain/studio/model';
+import type { Document, Element, Group, Id, Relation, View } from '../../domain/studio/model';
 import { mermaidFileName } from './filename';
 import { MERMAID_EXPORT_LIMITATIONS } from './limitations';
 import type { MermaidExportResult } from './types';

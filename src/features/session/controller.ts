@@ -15,6 +15,8 @@ import {
   type Actor,
   type AuthoredResult,
   type BranchCreateCommand,
+  type FailedResult,
+  type InvalidResult,
   type BranchReopenCommand,
   type BranchRecord,
   type MissingResult,
@@ -59,6 +61,14 @@ const INITIAL_SESSION_STATE: SessionState = Object.freeze({
 });
 
 const MAX_UNDO_STACK_SIZE = 100;
+
+type OpenBranch = {
+  readonly projectId: Id;
+  readonly branchId: Id;
+  readonly workingRevision: number;
+  readonly projectRevision: number;
+  readonly document: Document;
+};
 
 export class SessionController {
   private readonly repository: StudioRepository;
@@ -147,6 +157,111 @@ export class SessionController {
       return { ok: false, missing: { status: 'missing', ids: [branch.workingSnapshotId] } };
     }
     return { ok: true, branch, snapshot };
+  }
+
+  /** The open branch's identity and revisions, or null when no project is open. */
+  private currentOpenBranch(): OpenBranch | null {
+    const { projectId, branchId, workingRevision, projectRevision, document } = this.state;
+    if (
+      !projectId ||
+      !branchId ||
+      workingRevision === null ||
+      projectRevision === null ||
+      !document
+    ) {
+      return null;
+    }
+    return { projectId, branchId, workingRevision, projectRevision, document };
+  }
+
+  /** Busy / needs-reload / nothing-open checks shared by the branch-scoped commands. */
+  private openBranchOrReject(
+    reloadMessage: string,
+    noProjectMessage: string,
+  ): OpenBranch | BusyResult | InvalidResult {
+    if (this.isInFlight) {
+      return { status: 'busy', message: 'An operation is currently in flight' };
+    }
+    if (this.state.needsReload) {
+      return { status: 'invalid', issues: [createIssue('structural-rule', reloadMessage, [])] };
+    }
+    return (
+      (this.state.status === 'ready' ? this.currentOpenBranch() : null) ?? {
+        status: 'invalid',
+        issues: [createIssue('structural-rule', noProjectMessage, [])],
+      }
+    );
+  }
+
+  /** The envelope every command on the open branch carries. */
+  private branchEnvelope(open: OpenBranch) {
+    return {
+      operationId: this.mintId(),
+      projectId: open.projectId,
+      branchId: open.branchId,
+      expectedWorkingRevision: open.workingRevision,
+      actor: this.actor,
+    };
+  }
+
+  /**
+   * Runs `work` as the one in-flight operation: the session reads `saving` meanwhile and
+   * `ready` again after, and an unexpected error becomes a typed failed result (contract
+   * violations still throw).
+   */
+  private async runSaving<T>(work: () => Promise<T>): Promise<T | FailedResult> {
+    this.isInFlight = true;
+    this.updateState({ status: 'saving' });
+    try {
+      return await work();
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('Contract violation:')) {
+        throw err;
+      }
+      const failed = mapErrorToFailedResult(err);
+      this.updateState({ status: 'ready', lastError: failed });
+      return failed;
+    } finally {
+      this.isInFlight = false;
+    }
+  }
+
+  /**
+   * Executes a branch command and, when applied, adopts the reloaded working copy. A
+   * non-applied result leaves the document untouched and is recorded as `lastError`.
+   * `onApplied` runs once the reload succeeded (undo-stack bookkeeping) and returns any
+   * extra state to publish with the new revision.
+   */
+  private async executeAndAdopt(
+    command: ModelApplyRecordsCommand | ProjectRenameCommand,
+    onApplied: () => Partial<SessionState> = () => ({}),
+  ) {
+    const res = await this.repository.execute(command);
+    if (res.status !== 'applied') {
+      this.updateState({ status: 'ready', lastError: res });
+      return res;
+    }
+    if (res.branchRevision === null) {
+      throw new Error('Contract violation: Branch command returned applied with null branchRevision');
+    }
+
+    const reloaded = await this.reloadBranchAndSnapshot(command.projectId, command.branchId);
+    if (!reloaded.ok) {
+      this.updateState({ status: 'ready', lastError: reloaded.missing, needsReload: true });
+      return reloaded.missing;
+    }
+
+    this.updateState({
+      status: 'ready',
+      projectRevision: res.projectRevision,
+      workingRevision: reloaded.branch.workingRevision,
+      workingSnapshotId: reloaded.branch.workingSnapshotId,
+      document: reloaded.snapshot.document,
+      ...onApplied(),
+      lastError: null,
+      needsReload: false,
+    });
+    return res;
   }
 
   /**
@@ -489,99 +604,24 @@ export class SessionController {
     return opened.status === 'ready' ? result : opened;
   }
 
-  /**
-   * Renames the project and reloads the active branch Document and revision via repository.
-   */
   async renameProject(title: string): Promise<SessionRenameResult> {
-    if (this.isInFlight) {
-      return { status: 'busy', message: 'An operation is currently in flight' };
-    }
-
-    if (this.state.needsReload) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Session requires reload before renaming project', [])],
-      };
-    }
-
-    if (
-      this.state.status !== 'ready' ||
-      !this.state.projectId ||
-      !this.state.branchId ||
-      this.state.workingRevision === null ||
-      this.state.projectRevision === null ||
-      !this.state.document
-    ) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'No project is open to rename', [])],
-      };
-    }
+    const open = this.openBranchOrReject(
+      'Session requires reload before renaming project',
+      'No project is open to rename',
+    );
+    if ('status' in open) return open;
 
     const command: ProjectRenameCommand = {
       commandId: 'project.rename',
-      operationId: this.mintId(),
-      projectId: this.state.projectId,
-      branchId: this.state.branchId,
-      expectedWorkingRevision: this.state.workingRevision,
-      expectedProjectRevision: this.state.projectRevision,
-      actor: this.actor,
+      ...this.branchEnvelope(open),
+      expectedProjectRevision: open.projectRevision,
       payload: {
         title,
-        expectedProjectRevision: this.state.projectRevision,
+        expectedProjectRevision: open.projectRevision,
       },
     };
 
-    this.isInFlight = true;
-    this.updateState({ status: 'saving' });
-
-    try {
-      const res = await this.repository.execute(command);
-      if (res.status === 'applied') {
-        const reloaded = await this.reloadBranchAndSnapshot(
-          this.state.projectId,
-          this.state.branchId,
-        );
-        if (!reloaded.ok) {
-          this.updateState({
-            status: 'ready',
-            lastError: reloaded.missing,
-            needsReload: true,
-          });
-          return reloaded.missing;
-        }
-
-        this.updateState({
-          status: 'ready',
-          projectRevision: res.projectRevision,
-          workingRevision: reloaded.branch.workingRevision,
-          workingSnapshotId: reloaded.branch.workingSnapshotId,
-          document: reloaded.snapshot.document,
-          lastError: null,
-          needsReload: false,
-        });
-
-        return res;
-      }
-
-      this.updateState({
-        status: 'ready',
-        lastError: res,
-      });
-      return res;
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('Contract violation:')) {
-        throw err;
-      }
-      const failed = mapErrorToFailedResult(err);
-      this.updateState({
-        status: 'ready',
-        lastError: failed,
-      });
-      return failed;
-    } finally {
-      this.isInFlight = false;
-    }
+    return this.runSaving(() => this.executeAndAdopt(command));
   }
 
   /** Part artifacts advance project revision without changing content or undo history. */
@@ -593,19 +633,15 @@ export class SessionController {
     if (command.commandId === 'part.capture' && command.branchId !== this.state.branchId) {
       return { status: 'invalid', issues: [createIssue('structural-rule', 'The source branch changed. Review the selection again.', [])] };
     }
-    this.isInFlight = true;
-    this.updateState({ status: 'saving' });
-    try {
+    return this.runSaving(async () => {
       const result = await this.repository.execute(command);
-      this.updateState(result.status === 'applied'
-        ? { status: 'ready', projectRevision: result.projectRevision, lastError: null }
-        : { status: 'ready', lastError: result });
+      this.updateState(
+        result.status === 'applied'
+          ? { status: 'ready', projectRevision: result.projectRevision, lastError: null }
+          : { status: 'ready', lastError: result },
+      );
       return result;
-    } catch (error) {
-      const result = mapErrorToFailedResult(error);
-      this.updateState({ status: 'ready', lastError: result });
-      return result;
-    } finally { this.isInFlight = false; }
+    });
   }
 
   /**
@@ -725,34 +761,13 @@ export class SessionController {
    * so main never ends up holding unpublished edits.
    */
   async apply(changes: readonly RecordChange[], label: string): Promise<SessionApplyResult> {
-    if (this.isInFlight) {
-      return { status: 'busy', message: 'An operation is currently in flight' };
-    }
+    const initial = this.openBranchOrReject(
+      'Session requires reload before applying changes',
+      'Cannot apply changes: no project is open',
+    );
+    if ('status' in initial) return initial;
 
-    if (this.state.needsReload) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Session requires reload before applying changes', [])],
-      };
-    }
-
-    if (
-      this.state.status !== 'ready' ||
-      !this.state.projectId ||
-      !this.state.branchId ||
-      this.state.workingRevision === null ||
-      !this.state.document
-    ) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Cannot apply changes: no project is open', [])],
-      };
-    }
-
-    this.isInFlight = true;
-    this.updateState({ status: 'saving' });
-
-    try {
+    return this.runSaving(async () => {
       if (this.state.branchId === this.state.mainBranchId) {
         const drafted = await this.autoDraftFromMainIfNeeded();
         if (!drafted.ok) {
@@ -763,107 +778,39 @@ export class SessionController {
 
       // Re-read state: autoDraftFromMainIfNeeded may have switched branchId,
       // workingRevision and document to the new draft.
-      if (
-        !this.state.projectId ||
-        !this.state.branchId ||
-        this.state.workingRevision === null ||
-        !this.state.document
-      ) {
+      const open = this.currentOpenBranch();
+      if (!open) {
+        this.updateState({ status: 'ready' });
         return {
-          status: 'invalid',
+          status: 'invalid' as const,
           issues: [createIssue('structural-rule', 'Cannot apply changes: no project is open', [])],
         };
       }
 
       // Compute inverse changes from pre-apply Document before mutation
-      const inverseRes = computeInverseChanges(this.state.document, changes);
+      const inverseRes = computeInverseChanges(open.document, changes);
       if (!inverseRes.ok) {
         this.updateState({ status: 'ready' });
-        return {
-          status: 'invalid',
-          issues: inverseRes.issues,
-        };
+        return { status: 'invalid' as const, issues: inverseRes.issues };
       }
-      const inverseChanges = inverseRes.changes;
-      const forwardChanges = [...changes];
+      const undoEntry: UndoEntry = {
+        label,
+        inverseChanges: inverseRes.changes,
+        forwardChanges: [...changes],
+      };
 
       const command: ModelApplyRecordsCommand = {
         commandId: 'model.apply-records',
-        operationId: this.mintId(),
-        projectId: this.state.projectId,
-        branchId: this.state.branchId,
-        expectedWorkingRevision: this.state.workingRevision,
-        actor: this.actor,
-        payload: {
-          changes,
-        },
+        ...this.branchEnvelope(open),
+        payload: { changes },
       };
 
-      const res = await this.repository.execute(command);
-      if (res.status === 'applied') {
-        if (res.branchRevision === null) {
-          throw new Error('Contract violation: Branch command returned applied with null branchRevision');
-        }
-
-        const reloaded = await this.reloadBranchAndSnapshot(
-          this.state.projectId,
-          this.state.branchId,
-        );
-        if (!reloaded.ok) {
-          this.updateState({
-            status: 'ready',
-            lastError: reloaded.missing,
-            needsReload: true,
-          });
-          return reloaded.missing;
-        }
-
-        const undoEntry: UndoEntry = {
-          label,
-          inverseChanges,
-          forwardChanges,
-        };
-
-        this.undoStackInternal.push(undoEntry);
-        if (this.undoStackInternal.length > MAX_UNDO_STACK_SIZE) {
-          this.undoStackInternal.shift();
-        }
+      return this.executeAndAdopt(command, () => {
+        this.pushBounded(this.undoStackInternal, undoEntry);
         this.redoStackInternal.length = 0; // new apply clears redo
-
-        this.updateState({
-          status: 'ready',
-          projectRevision: res.projectRevision,
-          workingRevision: reloaded.branch.workingRevision,
-          workingSnapshotId: reloaded.branch.workingSnapshotId,
-          document: reloaded.snapshot.document,
-          canUndo: this.undoStackInternal.length > 0,
-          canRedo: false,
-          lastError: null,
-          needsReload: false,
-        });
-
-        return res;
-      }
-
-      // On invalid/stale/failed, state unchanged and typed result returned
-      this.updateState({
-        status: 'ready',
-        lastError: res,
+        return this.undoRedoAvailability();
       });
-      return res;
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('Contract violation:')) {
-        throw err;
-      }
-      const failed = mapErrorToFailedResult(err);
-      this.updateState({
-        status: 'ready',
-        lastError: failed,
-      });
-      return failed;
-    } finally {
-      this.isInFlight = false;
-    }
+    });
   }
 
   /**
@@ -872,110 +819,30 @@ export class SessionController {
    * On stale/failed: state and stacks unchanged.
    */
   async undo(): Promise<SessionUndoResult> {
-    if (this.isInFlight) {
-      return { status: 'busy', message: 'An operation is currently in flight' };
-    }
-
-    if (this.state.needsReload) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Session requires reload before undo', [])],
-      };
-    }
-
-    if (
-      this.state.status !== 'ready' ||
-      !this.state.projectId ||
-      !this.state.branchId ||
-      this.state.workingRevision === null ||
-      !this.state.document
-    ) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Cannot undo: no project is open', [])],
-      };
-    }
+    const open = this.openBranchOrReject(
+      'Session requires reload before undo',
+      'Cannot undo: no project is open',
+    );
+    if ('status' in open) return open;
 
     if (this.undoStackInternal.length === 0) {
       return { status: 'empty', message: 'Nothing to undo' };
     }
-
     const entry = this.undoStackInternal[this.undoStackInternal.length - 1];
 
     const command: ModelApplyRecordsCommand = {
       commandId: 'model.apply-records',
-      operationId: this.mintId(),
-      projectId: this.state.projectId,
-      branchId: this.state.branchId,
-      expectedWorkingRevision: this.state.workingRevision,
-      actor: this.actor,
-      payload: {
-        changes: entry.inverseChanges,
-      },
+      ...this.branchEnvelope(open),
+      payload: { changes: entry.inverseChanges },
     };
 
-    this.isInFlight = true;
-    this.updateState({ status: 'saving' });
-
-    try {
-      const res = await this.repository.execute(command);
-      if (res.status === 'applied') {
-        if (res.branchRevision === null) {
-          throw new Error('Contract violation: Branch command returned applied with null branchRevision');
-        }
-
-        const reloaded = await this.reloadBranchAndSnapshot(
-          this.state.projectId,
-          this.state.branchId,
-        );
-        if (!reloaded.ok) {
-          this.updateState({
-            status: 'ready',
-            lastError: reloaded.missing,
-            needsReload: true,
-          });
-          return reloaded.missing;
-        }
-
+    return this.runSaving(() =>
+      this.executeAndAdopt(command, () => {
         this.undoStackInternal.pop();
-        this.redoStackInternal.push(entry);
-        if (this.redoStackInternal.length > MAX_UNDO_STACK_SIZE) {
-          this.redoStackInternal.shift();
-        }
-
-        this.updateState({
-          status: 'ready',
-          projectRevision: res.projectRevision,
-          workingRevision: reloaded.branch.workingRevision,
-          workingSnapshotId: reloaded.branch.workingSnapshotId,
-          document: reloaded.snapshot.document,
-          canUndo: this.undoStackInternal.length > 0,
-          canRedo: this.redoStackInternal.length > 0,
-          lastError: null,
-          needsReload: false,
-        });
-
-        return res;
-      }
-
-      this.updateState({
-        status: 'ready',
-        lastError: res,
-      });
-      return res;
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('Contract violation:')) {
-        throw err;
-      }
-      const failed = mapErrorToFailedResult(err);
-      this.updateState({
-        status: 'ready',
-        lastError: failed,
-      });
-      return failed;
-    } finally {
-      this.isInFlight = false;
-    }
+        this.pushBounded(this.redoStackInternal, entry);
+        return this.undoRedoAvailability();
+      }),
+    );
   }
 
   /**
@@ -984,110 +851,44 @@ export class SessionController {
    * On stale/failed: state and stacks unchanged.
    */
   async redo(): Promise<SessionRedoResult> {
-    if (this.isInFlight) {
-      return { status: 'busy', message: 'An operation is currently in flight' };
-    }
-
-    if (this.state.needsReload) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Session requires reload before redo', [])],
-      };
-    }
-
-    if (
-      this.state.status !== 'ready' ||
-      !this.state.projectId ||
-      !this.state.branchId ||
-      this.state.workingRevision === null ||
-      !this.state.document
-    ) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('structural-rule', 'Cannot redo: no project is open', [])],
-      };
-    }
+    const open = this.openBranchOrReject(
+      'Session requires reload before redo',
+      'Cannot redo: no project is open',
+    );
+    if ('status' in open) return open;
 
     if (this.redoStackInternal.length === 0) {
       return { status: 'empty', message: 'Nothing to redo' };
     }
-
     const entry = this.redoStackInternal[this.redoStackInternal.length - 1];
 
     const command: ModelApplyRecordsCommand = {
       commandId: 'model.apply-records',
-      operationId: this.mintId(),
-      projectId: this.state.projectId,
-      branchId: this.state.branchId,
-      expectedWorkingRevision: this.state.workingRevision,
-      actor: this.actor,
-      payload: {
-        changes: entry.forwardChanges,
-      },
+      ...this.branchEnvelope(open),
+      payload: { changes: entry.forwardChanges },
     };
 
-    this.isInFlight = true;
-    this.updateState({ status: 'saving' });
-
-    try {
-      const res = await this.repository.execute(command);
-      if (res.status === 'applied') {
-        if (res.branchRevision === null) {
-          throw new Error('Contract violation: Branch command returned applied with null branchRevision');
-        }
-
-        const reloaded = await this.reloadBranchAndSnapshot(
-          this.state.projectId,
-          this.state.branchId,
-        );
-        if (!reloaded.ok) {
-          this.updateState({
-            status: 'ready',
-            lastError: reloaded.missing,
-            needsReload: true,
-          });
-          return reloaded.missing;
-        }
-
+    return this.runSaving(() =>
+      this.executeAndAdopt(command, () => {
         this.redoStackInternal.pop();
-        this.undoStackInternal.push(entry);
-        if (this.undoStackInternal.length > MAX_UNDO_STACK_SIZE) {
-          this.undoStackInternal.shift();
-        }
+        this.pushBounded(this.undoStackInternal, entry);
+        return this.undoRedoAvailability();
+      }),
+    );
+  }
 
-        this.updateState({
-          status: 'ready',
-          projectRevision: res.projectRevision,
-          workingRevision: reloaded.branch.workingRevision,
-          workingSnapshotId: reloaded.branch.workingSnapshotId,
-          document: reloaded.snapshot.document,
-          canUndo: this.undoStackInternal.length > 0,
-          canRedo: this.redoStackInternal.length > 0,
-          lastError: null,
-          needsReload: false,
-        });
-
-        return res;
-      }
-
-      this.updateState({
-        status: 'ready',
-        lastError: res,
-      });
-      return res;
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('Contract violation:')) {
-        throw err;
-      }
-      const failed = mapErrorToFailedResult(err);
-      this.updateState({
-        status: 'ready',
-        lastError: failed,
-      });
-      return failed;
-    } finally {
-      this.isInFlight = false;
+  private pushBounded(stack: UndoEntry[], entry: UndoEntry): void {
+    stack.push(entry);
+    if (stack.length > MAX_UNDO_STACK_SIZE) {
+      stack.shift();
     }
+  }
+
+  private undoRedoAvailability(): Pick<SessionState, 'canUndo' | 'canRedo'> {
+    return {
+      canUndo: this.undoStackInternal.length > 0,
+      canRedo: this.redoStackInternal.length > 0,
+    };
   }
 
   /**

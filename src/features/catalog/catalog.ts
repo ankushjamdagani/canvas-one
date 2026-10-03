@@ -7,7 +7,6 @@
  * - specs/revamp/contracts/model-and-runner.md (§1–§5)
  */
 
-import { VALID_KINDS, type ComponentKind } from '../../domain/execution';
 import type { BehaviorKind, VisualKind } from '../../domain/studio/model';
 
 // ============================================================================

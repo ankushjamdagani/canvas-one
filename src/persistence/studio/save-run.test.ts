@@ -6,7 +6,7 @@ import { createStudioDatabase } from './db';
 import { LocalRepository } from './repository';
 import { mintRunStartToken } from './token';
 import { computeSnapshotId } from './primitives';
-import type { Actor, ProjectCreateCommand, RunRecord } from './types';
+import type { Actor, ProjectCreateCommand } from './types';
 import type { Document } from '../../domain/studio/model';
 import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../domain/studio/runner/types';
 

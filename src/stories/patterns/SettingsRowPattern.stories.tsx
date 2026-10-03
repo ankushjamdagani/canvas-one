@@ -5,7 +5,6 @@ import { Switch } from '@/components/ui/switch';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Stepper } from '@/components/ui/stepper';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 
 const meta: Meta = {
   title: 'Patterns/Settings & Property Rows',

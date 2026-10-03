@@ -14,7 +14,6 @@ import type {
   Element,
   Fixture,
   Id,
-  Json,
   PayloadSchema,
   Refinement,
   Relation,
@@ -275,7 +274,7 @@ export type PreferenceRecord = {
  * "Errors: not-found | invalid | stale | referenced-artifact | quota | unavailable |
  *  unsupported-version | operation-id-reused | limit, with structured issue paths and IDs"
  */
-export const STORAGE_ERROR_CODES = [
+const STORAGE_ERROR_CODES = [
   'not-found',
   'invalid',
   'stale',

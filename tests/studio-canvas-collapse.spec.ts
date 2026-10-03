@@ -52,7 +52,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     await expect(nodes).toHaveCount(total - 2);
 
     // Persisted state survives a reload.
-    await page.reload();
+    await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await page
       .getByTestId('existing-projects-list')

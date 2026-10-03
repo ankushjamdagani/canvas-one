@@ -102,7 +102,7 @@ export function NewScenarioDialog({ open, onOpenChange, copySources, initialCopy
               onValueChange={(v) => setMode(v as ScenarioMode)}
               className="grid grid-cols-2 gap-2"
             >
-              <ModeOption
+              <RadioCardOption
                 id="mode-timed"
                 value="timed"
                 selected={effectiveMode === 'timed'}
@@ -111,7 +111,7 @@ export function NewScenarioDialog({ open, onOpenChange, copySources, initialCopy
                 title="Traffic over time"
                 description="Requests per second into an entry point. Measures latency, throughput and failures."
               />
-              <ModeOption
+              <RadioCardOption
                 id="mode-logical"
                 value="logical"
                 selected={effectiveMode === 'logical'}
@@ -130,7 +130,7 @@ export function NewScenarioDialog({ open, onOpenChange, copySources, initialCopy
               onValueChange={(v) => setStartFrom(v as 'copy' | 'empty')}
               className="grid grid-cols-2 gap-2"
             >
-              <StartFromOption
+              <RadioCardOption
                 id="start-copy"
                 value="copy"
                 selected={startFrom === 'copy'}
@@ -139,7 +139,7 @@ export function NewScenarioDialog({ open, onOpenChange, copySources, initialCopy
                 title={selectedSource ? `A copy of ${selectedSource.label}` : 'A copy'}
                 description="Same traffic, outages and checks. Change what differs."
               />
-              <StartFromOption
+              <RadioCardOption
                 id="start-empty"
                 value="empty"
                 selected={startFrom === 'empty'}
@@ -181,45 +181,7 @@ export function NewScenarioDialog({ open, onOpenChange, copySources, initialCopy
   );
 }
 
-function ModeOption({
-  id,
-  value,
-  selected,
-  disabled,
-  icon,
-  title,
-  description,
-}: {
-  readonly id: string;
-  readonly value: string;
-  readonly selected: boolean;
-  readonly disabled?: boolean;
-  readonly icon: React.ReactNode;
-  readonly title: string;
-  readonly description: string;
-}) {
-  return (
-    <label
-      htmlFor={id}
-      className={cn(
-        'flex items-start gap-2 rounded-control border p-3 text-xs cursor-pointer',
-        selected ? 'border-selected-edge bg-selected-tint/40' : 'border-control-border',
-        disabled && 'opacity-60 cursor-not-allowed',
-      )}
-    >
-      <RadioGroupItem id={id} value={value} disabled={disabled} className="mt-0.5" />
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5 font-semibold text-foreground">
-          {icon}
-          {title}
-        </div>
-        <p className="text-secondary-text">{description}</p>
-      </div>
-    </label>
-  );
-}
-
-function StartFromOption({
+function RadioCardOption({
   id,
   value,
   selected,

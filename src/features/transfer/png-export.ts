@@ -13,7 +13,7 @@
  */
 
 import { parseSvgDimensions } from './svg-export';
-import type { CanvasFactory, PngDimensions, RenderPngOptions } from './types';
+import type { PngDimensions, RenderPngOptions } from './types';
 
 /**
  * Computes PNG dimensions bounded to at most 8,192 px per side and 16,000,000 total pixels.

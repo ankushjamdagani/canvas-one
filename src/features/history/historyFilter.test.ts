@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { filterHistorySteps } from './historyFilter';
-import type { Document, Id } from '../../domain/studio/model';
+import type { Document } from '../../domain/studio/model';
 
 function emptyDoc(): Document {
   return { schema: 'studio-model/1', id: 'test', title: '', elements: [], connections: [], relations: [], schemas: [], fixtures: [], refinements: [], scenarios: [], views: [] };

@@ -12,7 +12,6 @@
  */
 
 import type { Document, Id } from '../../domain/studio/model';
-import type { Issue } from '../../domain/studio/validate';
 import type {
   Actor,
   AppliedResult,

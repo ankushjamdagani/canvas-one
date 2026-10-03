@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, ShieldCheck, Layers, Eye } from 'lucide-react';
+import { ShieldCheck, Layers, Eye } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Design System/Elevation & Contrast',

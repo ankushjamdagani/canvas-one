@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Document, Id } from '../../domain/studio/model';
+import type { Document } from '../../domain/studio/model';
 import { computeSnapshotId } from './primitives';
 import { createStudioDatabase } from './db';
 import { LocalRepository } from './repository';
@@ -12,7 +12,6 @@ import type {
   Actor,
   BranchReopenCommand,
   HistoryCheckpointCommand,
-  HistoryRestoreCommand,
   ModelApplyRecordsCommand,
   RecordChange,
 } from './types';

@@ -9,12 +9,7 @@
 
 import type { Document, Id } from '../studio/model';
 import type { RecordKind } from '../../persistence/studio/types';
-import {
-  canonicalEqual,
-  DOCUMENT_DESCRIPTOR,
-  getRecordDescriptor,
-  type FieldDescriptor,
-} from './merge-descriptor';
+import { canonicalEqual, getRecordDescriptor, type FieldDescriptor } from './merge-descriptor';
 
 export type DiffRecordKind = RecordKind | 'document';
 

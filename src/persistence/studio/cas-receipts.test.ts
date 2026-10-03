@@ -299,8 +299,6 @@ describe('CAS and Operation Receipts', () => {
       });
       expect(createRes.status).toBe('applied');
 
-      const project = await repo.loadProject(projectId);
-
       // Attempt to create a branch from main with wrong expectedWorkingRevision (99 instead of 0)
       const branchCmd: BranchCreateCommand = {
         commandId: 'branch.create',

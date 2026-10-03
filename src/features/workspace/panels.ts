@@ -22,7 +22,7 @@ export const PANEL_IDS: readonly PanelId[] = ['library', 'history', 'inspector']
  * inspector is draft-driven (it follows the selection) and keeps its own
  * dock/sheet below 1200 px.
  */
-export const AUXILIARY_PANEL_IDS: readonly PanelId[] = ['library', 'history'];
+const AUXILIARY_PANEL_IDS: readonly PanelId[] = ['library', 'history'];
 
 function hiddenPanelModes(): Record<PanelId, PanelMode> {
   return { library: 'hidden', history: 'hidden', inspector: 'hidden' };
@@ -238,14 +238,6 @@ export const KEYBOARD_RESIZE_STEP_FINE = 1;
 // Utilities
 // ============================================================================
 
-function clonePreferences(prefs: WorkspacePanelPreferences): WorkspacePanelPreferences {
-  return JSON.parse(JSON.stringify(prefs));
-}
-
-function cloneState(state: WorkspacePanelState): WorkspacePanelState {
-  return JSON.parse(JSON.stringify(state));
-}
-
 function arePreferencesEqual(
   a: { panels: Record<PanelId, PanelPreference>; sideWidths: SideWidths },
   b: { panels: Record<PanelId, PanelPreference>; sideWidths: SideWidths }
@@ -423,7 +415,7 @@ export function createInitialPanelState(
  * Responsive overrides never overwrite desktop preferences (§7).
  */
 export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
-  const { viewport, panels, sideWidths, activeOverlay, focusedPanel, lastFocusedSequence } = state;
+  const { viewport, panels, activeOverlay, focusedPanel, lastFocusedSequence } = state;
 
   // --------------------------------------------------------------------------
   // Tier 1: Mobile (< 768 px)
@@ -668,6 +660,55 @@ export interface ReducerResult {
 }
 
 /**
+ * Effects for a preference change: persist it unless a gesture is in flight (COMMIT_GESTURE
+ * saves), then announce any auxiliary panel the change auto-collapsed. `leading` effects
+ * (e.g. focus) come first.
+ */
+function preferenceEffects(
+  prev: WorkspacePanelState,
+  next: WorkspacePanelState,
+  leading: readonly PanelEffect[] = [],
+  announce = true,
+): PanelEffect[] {
+  const effects: PanelEffect[] = [...leading];
+  if (prev.gesture === null) {
+    effects.push({ type: 'save' });
+  }
+  if (announce) {
+    effects.push(...detectAutoCollapseAnnounce(prev, next));
+  }
+  return effects;
+}
+
+/** Last-focused sequence numbers with `panel` stamped as the most recently focused. */
+function stampFocus(state: WorkspacePanelState, panel: PanelId): Record<PanelId, number> {
+  return { ...state.lastFocusedSequence, [panel]: getNextSequence(state.lastFocusedSequence) };
+}
+
+/**
+ * Opens (if needed), expands and focuses `panel`; a no-op when it is already effectively
+ * expanded and focused. `revealOverlay` also makes it the active overlay below the desktop
+ * breakpoint.
+ */
+function expandAndFocus(state: WorkspacePanelState, panel: PanelId, revealOverlay: boolean): ReducerResult {
+  const current = state.panels[panel];
+  const layoutMode = effectiveLayout(state).panels[panel];
+  const isEffectivelyExpanded = layoutMode !== 'collapsed' && layoutMode !== 'hidden';
+  if (current.open && !current.collapsed && state.focusedPanel === panel && isEffectivelyExpanded) {
+    return { state, effects: [] };
+  }
+
+  const nextState: WorkspacePanelState = {
+    ...state,
+    panels: { ...state.panels, [panel]: { ...current, open: true, collapsed: false } },
+    focusedPanel: panel,
+    lastFocusedSequence: stampFocus(state, panel),
+    activeOverlay: revealOverlay && state.viewport.width < BREAKPOINT_DESKTOP ? panel : state.activeOverlay,
+  };
+  return { state: nextState, effects: preferenceEffects(state, nextState, [{ type: 'focus', target: panel }]) };
+}
+
+/**
  * Pure panel reducer: (state, action) => { state, effects }.
  * Effects are descriptors only:
  * - { type: 'save' } on committed preference changes
@@ -686,56 +727,8 @@ export function panelReducer(
     // §5: "Open on an already-expanded, focused panel is a no-op; otherwise it
     // expands and focuses the panel and never toggles it closed."
     // ------------------------------------------------------------------------
-    case 'OPEN': {
-      const panel = action.panel;
-      const current = state.panels[panel];
-      const currentLayout = effectiveLayout(state);
-      const isEffectivelyExpanded =
-        currentLayout.panels[panel] !== 'collapsed' &&
-        currentLayout.panels[panel] !== 'hidden';
-      if (current.open && !current.collapsed && state.focusedPanel === panel && isEffectivelyExpanded) {
-        return { state, effects: [] };
-      }
-
-      const nextPanels = {
-        ...state.panels,
-        [panel]: {
-          ...current,
-          open: true,
-          collapsed: false,
-        },
-      };
-
-      const nextSeq = getNextSequence(state.lastFocusedSequence);
-      const nextFocusedSequence = {
-        ...state.lastFocusedSequence,
-        [panel]: nextSeq,
-      };
-
-      const nextActiveOverlay =
-        state.viewport.width < BREAKPOINT_DESKTOP ? panel : state.activeOverlay;
-
-      const nextState: WorkspacePanelState = {
-        ...state,
-        panels: nextPanels,
-        focusedPanel: panel,
-        lastFocusedSequence: nextFocusedSequence,
-        activeOverlay: nextActiveOverlay,
-      };
-
-      const effects: PanelEffect[] = [];
-      effects.push({ type: 'focus', target: panel });
-
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      // Check if auto-collapse occurred on any other auxiliary panel
-      const autoAnnounces = detectAutoCollapseAnnounce(state, nextState);
-      effects.push(...autoAnnounces);
-
-      return { state: nextState, effects };
-    }
+    case 'OPEN':
+      return expandAndFocus(state, action.panel, true);
 
     // ------------------------------------------------------------------------
     // SYNC_OPEN(panel, open): draft-driven visibility, no focus and no save
@@ -777,12 +770,7 @@ export function panelReducer(
         activeOverlay: state.activeOverlay === panel ? null : state.activeOverlay,
       };
 
-      const effects: PanelEffect[] = [];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      return { state: nextState, effects };
+      return { state: nextState, effects: preferenceEffects(state, nextState, [], false) };
     }
 
     // ------------------------------------------------------------------------
@@ -794,16 +782,10 @@ export function panelReducer(
         return { state, effects: [] };
       }
 
-      const nextSeq = getNextSequence(state.lastFocusedSequence);
-      const nextFocusedSequence = {
-        ...state.lastFocusedSequence,
-        [panel]: nextSeq,
-      };
-
       const nextState: WorkspacePanelState = {
         ...state,
         focusedPanel: panel,
-        lastFocusedSequence: nextFocusedSequence,
+        lastFocusedSequence: stampFocus(state, panel),
         activeOverlay:
           state.viewport.width < BREAKPOINT_DESKTOP && state.panels[panel].open
             ? panel
@@ -862,28 +844,14 @@ export function panelReducer(
         });
       }
 
-      const nextSeq = getNextSequence(state.lastFocusedSequence);
-      const nextFocusedSequence = {
-        ...state.lastFocusedSequence,
-        [panel]: nextSeq,
-      };
-
       const nextState: WorkspacePanelState = {
         ...state,
         panels: nextPanels,
         focusedPanel: panel,
-        lastFocusedSequence: nextFocusedSequence,
+        lastFocusedSequence: stampFocus(state, panel),
       };
 
-      const effects: PanelEffect[] = [{ type: 'focus', target: panel }];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      const autoAnnounces = detectAutoCollapseAnnounce(state, nextState);
-      effects.push(...autoAnnounces);
-
-      return { state: nextState, effects };
+      return { state: nextState, effects: preferenceEffects(state, nextState, [{ type: 'focus', target: panel }]) };
     }
 
     // ------------------------------------------------------------------------
@@ -910,60 +878,14 @@ export function panelReducer(
         focusedPanel: state.focusedPanel === panel ? null : state.focusedPanel,
       };
 
-      const effects: PanelEffect[] = [];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      return { state: nextState, effects };
+      return { state: nextState, effects: preferenceEffects(state, nextState, [], false) };
     }
 
     // ------------------------------------------------------------------------
     // EXPAND(panel)
     // ------------------------------------------------------------------------
-    case 'EXPAND': {
-      const panel = action.panel;
-      const current = state.panels[panel];
-      const currentLayout = effectiveLayout(state);
-      const isEffectivelyExpanded =
-        currentLayout.panels[panel] !== 'collapsed' &&
-        currentLayout.panels[panel] !== 'hidden';
-      if (current.open && !current.collapsed && state.focusedPanel === panel && isEffectivelyExpanded) {
-        return { state, effects: [] };
-      }
-
-      const nextPanels = {
-        ...state.panels,
-        [panel]: {
-          ...current,
-          open: true,
-          collapsed: false,
-        },
-      };
-
-      const nextSeq = getNextSequence(state.lastFocusedSequence);
-      const nextFocusedSequence = {
-        ...state.lastFocusedSequence,
-        [panel]: nextSeq,
-      };
-
-      const nextState: WorkspacePanelState = {
-        ...state,
-        panels: nextPanels,
-        focusedPanel: panel,
-        lastFocusedSequence: nextFocusedSequence,
-      };
-
-      const effects: PanelEffect[] = [{ type: 'focus', target: panel }];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      const autoAnnounces = detectAutoCollapseAnnounce(state, nextState);
-      effects.push(...autoAnnounces);
-
-      return { state: nextState, effects };
-    }
+    case 'EXPAND':
+      return expandAndFocus(state, action.panel, false);
 
     // ------------------------------------------------------------------------
     // RESIZE_SIDE(side, width)
@@ -985,15 +907,7 @@ export function panelReducer(
         sideWidths: nextSideWidths,
       };
 
-      const effects: PanelEffect[] = [];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      const autoAnnounces = detectAutoCollapseAnnounce(state, nextState);
-      effects.push(...autoAnnounces);
-
-      return { state: nextState, effects };
+      return { state: nextState, effects: preferenceEffects(state, nextState) };
     }
 
     // ------------------------------------------------------------------------
@@ -1016,15 +930,7 @@ export function panelReducer(
         sideWidths: nextSideWidths,
       };
 
-      const effects: PanelEffect[] = [];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      const autoAnnounces = detectAutoCollapseAnnounce(state, nextState);
-      effects.push(...autoAnnounces);
-
-      return { state: nextState, effects };
+      return { state: nextState, effects: preferenceEffects(state, nextState) };
     }
 
     // ------------------------------------------------------------------------
@@ -1058,12 +964,7 @@ export function panelReducer(
         panels: nextPanels,
       };
 
-      const effects: PanelEffect[] = [];
-      if (state.gesture === null) {
-        effects.push({ type: 'save' });
-      }
-
-      return { state: nextState, effects };
+      return { state: nextState, effects: preferenceEffects(state, nextState, [], false) };
     }
 
     // ------------------------------------------------------------------------

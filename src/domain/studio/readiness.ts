@@ -71,7 +71,7 @@ import { resolveRefinementRouting } from './refinementRouting';
  * shape itself (model-and-runner.md §8: `{code,path,entityId,severity,message}`)
  * is reused unchanged.
  */
-export const READINESS_ISSUE_CODES = [
+const READINESS_ISSUE_CODES = [
   /** §3: "Call ports need a non-null response schema; other channels need null." */
   'call-port-missing-response-schema',
   /** §3: "other channels need null" (the converse of the above). */

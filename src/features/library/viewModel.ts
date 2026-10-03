@@ -10,12 +10,7 @@
  * - specs/revamp/decisions.md (D30, D35, D42)
  */
 
-import {
-  CATALOG_ENTRIES,
-  GROUP_STRIPE_COLORS,
-  type CatalogEntry,
-  type CatalogGroup,
-} from '../catalog/catalog';
+import { GROUP_STRIPE_COLORS, type CatalogEntry, type CatalogGroup } from '../catalog/catalog';
 import { defaultsLine } from '../catalog/caption';
 import type { CatalogGroupSection } from './types';
 

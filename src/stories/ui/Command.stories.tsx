@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import {
   Command,
   CommandInput,
@@ -10,16 +9,7 @@ import {
   CommandShortcut,
   CommandSeparator,
 } from '@/components/ui/command';
-import {
-  Search,
-  Plus,
-  Copy,
-  Trash2,
-  GitBranch,
-  Play,
-  RotateCcw,
-  Sliders,
-} from 'lucide-react';
+import { Plus, Copy, GitBranch, Play, RotateCcw } from 'lucide-react';
 
 const meta: Meta<typeof Command> = {
   title: 'UI/Command',

@@ -7,7 +7,6 @@
  * scenario_delete_scenario.png.
  */
 
-import * as React from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {

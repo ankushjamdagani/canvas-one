@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { NodeCard } from '@/features/workspace/NodeCard';
 import { nodeKindColor } from '@/components/studio/tokens';

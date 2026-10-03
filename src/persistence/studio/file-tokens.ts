@@ -57,10 +57,6 @@ export async function sha256HexOfBytes(bytes: Uint8Array): Promise<string> {
   return toHex(digest);
 }
 
-function deepFreezeShallow<T extends object>(obj: T): T {
-  return Object.freeze(obj);
-}
-
 /**
  * Controller-owned, in-memory registry of FileTokens. One instance's lifetime is the
  * "session" for transfer purposes: constructing a new registry (e.g. after a page reload)
@@ -76,14 +72,14 @@ export class FileTokenRegistry {
   async registerFile(bytes: Uint8Array, mintId: () => Id): Promise<FileToken> {
     const sha256 = await sha256HexOfBytes(bytes);
     const id = mintId();
-    const binding: FileTokenBinding = deepFreezeShallow({
+    const binding: FileTokenBinding = Object.freeze({
       id,
       bytes,
       sha256,
       size: bytes.byteLength,
       createdAt: Date.now(),
     });
-    const token: FileToken = deepFreezeShallow({ id });
+    const token: FileToken = Object.freeze({ id });
     this.registry.set(token, binding);
     return token;
   }

@@ -2,10 +2,12 @@ import * as React from 'react';
 import {
   openStudioRepository,
   SessionController,
+  formatStudioError,
 } from './features/session';
 import type { Actor, StudioRepository } from './persistence/studio';
 import { EntryScreen } from './features/entry';
 import { lazyComponent, whenIdle } from '@/lib/lazyComponent';
+import { navigate, useRoute } from '@/lib/router';
 
 // The workspace (canvas, panels, history, runs) is its own chunk: the entry screen renders
 // without it, and it is prefetched once the browser is idle so opening a project stays fast.
@@ -22,7 +24,7 @@ import { Button } from '@/components/ui/button';
 
 // Exported so the workspace can mint the same kind of id for its RunController
 // (RV-12d: "the app's mintId") instead of defining its own.
-export const MINT_ID = () => crypto.randomUUID();
+const MINT_ID = () => crypto.randomUUID();
 
 function getOrCreateActorId(): string {
   try {
@@ -171,31 +173,102 @@ function StudioShell({
     session.subscribe,
     session.getState,
   );
-  const [activeScreen, setActiveScreen] = React.useState<'entry' | 'workspace'>('entry');
+  const { route, known } = useRoute();
+  const [openError, setOpenError] = React.useState<{ projectId: string; message: string } | null>(null);
 
   React.useEffect(() => whenIdle(() => void Workspace.preload()), []);
 
-  // If a project is loaded and activeScreen is 'workspace', show Workspace
-  if (activeScreen === 'workspace' && sessionState.projectId) {
+  // Unknown paths fall back to the project list.
+  React.useEffect(() => {
+    if (!known) navigate({ kind: 'home' }, { replace: true });
+  }, [known]);
+
+  // URL -> session: a project route opens that project and branch when the session is elsewhere.
+  const routeProjectId = route.kind === 'project' ? route.projectId : null;
+  const routeBranchId = route.kind === 'project' ? route.branchId : null;
+  React.useEffect(() => {
+    if (!routeProjectId) return;
+    const current = session.getState();
+    const sameProject = current.projectId === routeProjectId;
+    const targetBranchId = routeBranchId ?? (sameProject ? current.mainBranchId : null);
+    if (sameProject && current.branchId === targetBranchId) return;
+    let cancelled = false;
+    setOpenError(null);
+    void session
+      .openProject(routeProjectId, targetBranchId)
+      .then((result) => {
+        if (cancelled || result.status === 'ready') return;
+        setOpenError({ projectId: routeProjectId, message: formatStudioError(result, 'Failed to open project') });
+      })
+      .catch((err) => {
+        console.error('Unexpected error opening project:', err);
+        if (!cancelled) setOpenError({ projectId: routeProjectId, message: 'An unexpected error occurred while opening the project' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session, routeProjectId, routeBranchId]);
+
+  // Session -> URL: opening, creating or switching a project or branch moves the address bar.
+  const { projectId, branchId, mainBranchId } = sessionState;
+  React.useEffect(() => {
+    if (!projectId || !branchId) return;
+    navigate({ kind: 'project', projectId, branchId: branchId === mainBranchId ? null : branchId });
+  }, [projectId, branchId, mainBranchId]);
+
+  const goToProject = React.useCallback(() => {
+    const state = session.getState();
+    if (!state.projectId || !state.branchId) return;
+    navigate({
+      kind: 'project',
+      projectId: state.projectId,
+      branchId: state.branchId === state.mainBranchId ? null : state.branchId,
+    });
+  }, [session]);
+
+  if (route.kind === 'project') {
+    if (sessionState.projectId === route.projectId) {
+      return (
+        <Workspace
+          session={session}
+          repository={repository}
+          onBackToProjects={() => navigate({ kind: 'home' })}
+          mintId={MINT_ID}
+          actor={actor}
+        />
+      );
+    }
+    if (openError?.projectId === route.projectId) {
+      return (
+        <div
+          data-testid="project-route-error"
+          className="min-h-screen w-full flex flex-col items-center justify-center gap-3 bg-shell text-ink p-6 text-center"
+        >
+          <h1 className="text-lg font-bold">Project unavailable</h1>
+          <p className="text-xs text-secondary-text max-w-md">{openError.message}</p>
+          <Button size="sm" onClick={() => navigate({ kind: 'home' })}>
+            All projects
+          </Button>
+        </div>
+      );
+    }
     return (
-      <Workspace
-        session={session}
-        repository={repository}
-        onBackToProjects={() => setActiveScreen('entry')}
-        mintId={MINT_ID}
-        actor={actor}
-      />
+      <div
+        data-testid="workspace-loading-screen"
+        className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
+      >
+        Opening project…
+      </div>
     );
   }
 
-  // Otherwise, show Entry screen
   return (
     <EntryScreen
       session={session}
       repository={repository}
       mintId={MINT_ID}
       actor={actor}
-      onOpenSuccess={() => setActiveScreen('workspace')}
+      onOpenSuccess={goToProject}
     />
   );
 }

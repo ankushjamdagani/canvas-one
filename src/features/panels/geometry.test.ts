@@ -11,7 +11,6 @@ import {
   MIN_FLOAT_WIDTH,
   MIN_FLOAT_HEIGHT,
   STACK_MIN_EXPANDED_HEIGHT,
-  DEFAULT_SIDE_WIDTH,
 } from './geometry';
 
 describe('Panel Geometry Helpers', () => {

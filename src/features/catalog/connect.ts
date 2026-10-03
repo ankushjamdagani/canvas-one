@@ -23,6 +23,7 @@ import type {
 import { shapesCompatible } from '../../domain/studio/readiness';
 import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
+import { createIssue } from '../../domain/studio/issue';
 
 export type PlanConnectionParams = {
   readonly document: Document;
@@ -78,21 +79,6 @@ export type CompleteConnectionResult =
       readonly kind: 'rejected';
       readonly issues: readonly Issue[];
     };
-
-function createIssue(
-  code: string,
-  message: string,
-  path: readonly (string | number)[],
-  entityId: Id | null = null,
-): Issue {
-  return {
-    code: code as any,
-    message,
-    path,
-    entityId,
-    severity: 'error',
-  };
-}
 
 /**
  * Checks whether adding a directed 'call' edge from sourceElementId to targetElementId

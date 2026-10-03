@@ -64,7 +64,7 @@ test.describe('RV-13b: Entry screen', () => {
     await expect(page.locator('.component-node')).toHaveCount(1);
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
-    await page.reload();
+    await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const list = page.getByTestId('existing-projects-list');
     await expect(list).toContainText('RV-13b blank');
@@ -136,5 +136,31 @@ test.describe('RV-13b: Entry screen', () => {
     await page.getByTestId('create-blank-project-btn').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
+  });
+});
+
+test.describe('routes', () => {
+  test('project URLs deep-link, survive reload, follow back/forward and reject unknown ids', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('create-example-s05').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await expect(page).toHaveURL(/\/project\/[^/]+(\/branch\/[^/]+)?$/);
+    const projectUrl = page.url();
+
+    await page.reload();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await expect(page).toHaveURL(projectUrl);
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+    await page.goForward();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+
+    await page.goto('/project/does-not-exist');
+    await expect(page.getByTestId('project-route-error')).toBeVisible();
+    await page.goto('/not-a-route');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   });
 });

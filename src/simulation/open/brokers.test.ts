@@ -123,7 +123,7 @@ function verifyConservation(nodes: Record<string, any>): void {
       m.waiting +
       m.retrying +
       m.reserved;
-    expect(accounted).toBe(m.arrived);
+    expect(accounted, `node ${id}`).toBe(m.arrived);
   }
 }
 

@@ -23,14 +23,3 @@ export function decideNavigation(draft: DraftHandle | null): GuardDecision {
   if (!draft) return 'proceed';
   return draft.dirty ? 'ask' : 'proceed';
 }
-
-/**
- * Escape closes an overlay (e.g. the scenario switcher popover, a dropdown menu)
- * first, never discards a dirty draft directly — commands.md §6 gives Stay/Discard/
- * Apply as the only ways to leave a dirty draft. Callers pass whether an overlay is
- * currently open; when one is, Escape's job is to close *that*, not to touch the draft.
- */
-export function decideEscape(draft: DraftHandle | null, overlayOpen: boolean): 'close-overlay' | 'none' {
-  if (overlayOpen) return 'close-overlay';
-  return 'none';
-}

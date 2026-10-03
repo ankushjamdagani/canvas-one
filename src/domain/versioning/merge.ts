@@ -26,7 +26,6 @@ import type { RecordKind } from '../../persistence/studio/types';
 import {
   canonicalEqual,
   assertDocumentKeysClassified,
-  DOCUMENT_DESCRIPTOR,
   ELEMENT_DESCRIPTOR,
   CONNECTION_DESCRIPTOR,
   RELATION_DESCRIPTOR,
@@ -41,6 +40,7 @@ import {
   type UnionFieldDescriptor,
 } from './merge-descriptor';
 import type { DiffRecordKind } from './diff';
+import { deepFreeze } from '../studio/freeze';
 
 // ============================================================================
 // Types
@@ -91,26 +91,6 @@ export function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T;
 }
 
-export function deepFreeze<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (Object.isFrozen(obj)) {
-    return obj;
-  }
-  Object.freeze(obj);
-  if (Array.isArray(obj)) {
-    for (const item of obj) {
-      deepFreeze(item);
-    }
-  } else {
-    for (const key of Object.keys(obj)) {
-      deepFreeze((obj as Record<string, unknown>)[key]);
-    }
-  }
-  return obj;
-}
-
 type RawConflict = Omit<MergeConflict, 'id'>;
 
 // ============================================================================
@@ -121,7 +101,7 @@ type RawConflict = Omit<MergeConflict, 'id'>;
  * Formats a 64-char lowercase SHA-256 hex string into a UUID v5 conforming to UUID_REGEX.
  * Version nibble 5 at index 12, variant nibble 8-b at index 16.
  */
-export function formatDeterministicUuid(sha256HexStr: string): Id {
+function formatDeterministicUuid(sha256HexStr: string): Id {
   const part1 = sha256HexStr.slice(0, 8);
   const part2 = sha256HexStr.slice(8, 12);
   const part3 = '5' + sha256HexStr.slice(13, 16);
@@ -152,7 +132,13 @@ export async function generateConflictId(
 // Internal 3-Way Merge Engine
 // ============================================================================
 
-function mergeScalar(
+/**
+ * Three-way merge of one field: a side that matches base yields to the other; competing
+ * changes conflict and hold ours. `kind` records whether a scalar or a whole atomic value
+ * conflicted.
+ */
+function mergeThreeWay(
+  kind: 'value' | 'atomic',
   b: unknown,
   o: unknown,
   t: unknown,
@@ -171,41 +157,8 @@ function mergeScalar(
     return o;
   }
 
-  // Competing scalars conflict: hold ours value
   conflicts.push({
-    kind: 'value',
-    recordKind,
-    recordId,
-    path,
-    base: { present: b !== undefined, value: b !== undefined ? b : null },
-    ours: { present: o !== undefined, value: o !== undefined ? o : null },
-    theirs: { present: t !== undefined, value: t !== undefined ? t : null },
-  });
-  return o;
-}
-
-function mergeAtomic(
-  b: unknown,
-  o: unknown,
-  t: unknown,
-  recordKind: DiffRecordKind,
-  recordId: Id,
-  path: readonly (string | number)[],
-  conflicts: RawConflict[],
-): unknown {
-  if (canonicalEqual(o, t)) {
-    return o;
-  }
-  if (canonicalEqual(o, b)) {
-    return t;
-  }
-  if (canonicalEqual(t, b)) {
-    return o;
-  }
-
-  // Atomic conflict: whole field conflicts; hold ours value
-  conflicts.push({
-    kind: 'atomic',
+    kind,
     recordKind,
     recordId,
     path,
@@ -563,9 +516,9 @@ function mergeField(
 ): unknown {
   switch (desc.type) {
     case 'scalar':
-      return mergeScalar(b, o, t, recordKind, recordId, path, conflicts);
+      return mergeThreeWay('value', b, o, t, recordKind, recordId, path, conflicts);
     case 'atomic':
-      return mergeAtomic(b, o, t, recordKind, recordId, path, conflicts);
+      return mergeThreeWay('atomic', b, o, t, recordKind, recordId, path, conflicts);
     case 'set':
       return mergeSet(b, o, t);
     case 'union':
@@ -704,7 +657,8 @@ export async function mergeDocuments(
   const rawConflicts: RawConflict[] = [];
 
   // Merge Document title
-  const mergedTitle = mergeScalar(
+  const mergedTitle = mergeThreeWay(
+    'value',
     base.title,
     ours.title,
     theirs.title,

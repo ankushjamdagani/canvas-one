@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  assertDocumentKeysClassified,
-  canonicalEqual,
-  DOCUMENT_DESCRIPTOR,
-  assertClosedKeys,
-} from './merge-descriptor';
+import { assertDocumentKeysClassified, canonicalEqual } from './merge-descriptor';
 import type { Document } from '../studio/model';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');

@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CheckResult, RunSummary, TerminalStatus } from '../studio/runner/types';
-import type { Id } from '../studio/model';
-import {
-  buildEvidenceManifest,
-  evaluateCandidate,
-  extractAssertionSubjectElementIds,
-  runQualifies,
-  sortQualifyingRuns,
-} from './eligibility';
+import { buildEvidenceManifest, evaluateCandidate, runQualifies } from './eligibility';
 import type { CandidateScenario, RunCandidate, RunQualifiesExpected } from './types';
 
 function createMockSummary(overrides: Partial<RunSummary> = {}): RunSummary {

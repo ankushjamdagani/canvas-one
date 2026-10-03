@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { VALID_KINDS } from '../../domain/execution';
 import { VISUAL_KINDS } from '../../domain/studio/model';
-import {
-  CATALOG_ENTRIES,
-  GROUP_STRIPE_COLORS,
-  STRIPE_COLORS,
-  getEntry,
-  groupOf,
-  type CatalogGroup,
-} from './catalog';
+import { CATALOG_ENTRIES, GROUP_STRIPE_COLORS, STRIPE_COLORS, getEntry, groupOf } from './catalog';
 
 describe('catalog.ts', () => {
   describe('catalog completeness', () => {

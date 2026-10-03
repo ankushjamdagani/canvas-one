@@ -18,13 +18,15 @@ import {
   enforceRunRetentionLimits,
 } from './limits';
 import {
-  checkOperationReceipt,
   computeRequestHash,
   computeSnapshotId,
   insertImmutable,
   isValidUuid,
   recordOperationReceipt,
+  replayedResult,
   validateActor,
+  validateCommandEnvelope,
+  validateEvidenceRefs,
   validateRevision,
   validateUuid,
 } from './primitives';
@@ -43,11 +45,10 @@ import {
 import { buildManifest, type BuildManifestVersions } from '../../domain/studio/manifest';
 import {
   buildEvidenceManifest,
-  evaluateCandidate,
   runQualifies,
   type CandidateScenario,
 } from '../../domain/versioning';
-import type { EvidenceRef } from '../../domain/studio/runner/evidence';
+import type { EvidenceManifest, EvidenceRef } from '../../domain/studio/runner/evidence';
 import {
   DEFAULT_BUILD_VERSIONS,
   PREFERENCES_SCHEMA,
@@ -59,6 +60,9 @@ import {
   type BranchReopenCommand,
   type CheckpointRecord,
   type CommitRecord,
+  type FailedResult,
+  type InvalidResult,
+  type MissingResult,
   type DeleteProjectResult,
   type ExpectedHead,
   type ExportProjectParams,
@@ -76,7 +80,6 @@ import {
   type ProjectImportCommand,
   type ProjectRecord,
   type ProjectRenameCommand,
-  type PruneSelection,
   type PruneUnreferencedParams,
   type PruneUnreferencedResult,
   type PublicationRecord,
@@ -86,6 +89,7 @@ import {
   type SavePreferencesResult,
   type SaveRunResult,
   type SnapshotRecord,
+  type StaleResult,
   type StudioRepository,
   type TraceChunkRecord,
   type UnsupportedResult,
@@ -93,6 +97,8 @@ import {
   PORTABLE_VERSION,
   STORAGE_LIMITS,
 } from './types';
+import { manifestFailureIssues } from './manifest-issues';
+import { toPinClosureState } from './pin-state';
 
 /**
  * Orders a branch's commit ancestry newest-first by DAG order from the head (never by
@@ -478,6 +484,30 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
+   * Inside a command transaction: the branch the command targets, or `missing` / `stale`
+   * when it is gone or no longer at the working revision the command was authored against.
+   */
+  private async loadBranchAtRevision(command: {
+    readonly projectId: Id;
+    readonly branchId: Id;
+    readonly expectedWorkingRevision: number;
+  }): Promise<BranchRecord | MissingResult | StaleResult> {
+    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+    if (!branch) {
+      return { status: 'missing', ids: [command.branchId] };
+    }
+    if (branch.workingRevision !== command.expectedWorkingRevision) {
+      return {
+        status: 'stale',
+        scope: 'branch',
+        expected: command.expectedWorkingRevision,
+        actual: branch.workingRevision,
+      };
+    }
+    return branch;
+  }
+
+  /**
    * project.create:
    * Validated blank or template document -> creation snapshot, main branch, draft branch, receipt.
    */
@@ -654,18 +684,8 @@ export class LocalRepository implements StudioRepository {
         getProjectTables(this.db),
         async () => {
           // Check receipt FIRST before any other checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Check if project already exists
           const existingProject = await this.db.projects.get(projectId);
@@ -725,36 +745,8 @@ export class LocalRepository implements StudioRepository {
   private async handleProjectRename(
     command: ProjectRenameCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     const projectRevIssue = validateRevision(
       command.expectedProjectRevision,
@@ -851,19 +843,8 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Compare-and-set check on project revision
           const currentProject = await this.db.projects.get(command.projectId);
@@ -881,19 +862,8 @@ export class LocalRepository implements StudioRepository {
           }
 
           // Compare-and-set check on active branch workingRevision
-          const currentBranch = await this.db.branches.get([command.projectId, command.branchId]);
-          if (!currentBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
-
-          if (currentBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: currentBranch.workingRevision,
-            };
-          }
+          const currentBranch = await this.loadBranchAtRevision(command);
+          if ('status' in currentBranch) return currentBranch;
 
           // Check limits before mutation
           const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
@@ -960,36 +930,8 @@ export class LocalRepository implements StudioRepository {
   private async handleBranchCreate(
     command: BranchCreateCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     // 3. Validate payload
     const label = command.payload?.label?.trim() ?? '';
@@ -1043,19 +985,8 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Load project and source branch
           const project = await this.db.projects.get(command.projectId);
@@ -1209,36 +1140,8 @@ export class LocalRepository implements StudioRepository {
   private async handleModelApplyRecords(
     command: ModelApplyRecordsCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     // 3. Validate payload
     if (!command.payload || typeof command.payload !== 'object') {
@@ -1323,34 +1226,12 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Compare-and-set check on branch workingRevision
-          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
-          if (!curBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
-
-          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: curBranch.workingRevision,
-            };
-          }
+          const curBranch = await this.loadBranchAtRevision(command);
+          if ('status' in curBranch) return curBranch;
 
           const curProject = await this.db.projects.get(command.projectId);
           if (!curProject) {
@@ -1420,36 +1301,8 @@ export class LocalRepository implements StudioRepository {
   private async handleHistoryCheckpoint(
     command: HistoryCheckpointCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     // 3. Validate payload
     if (!command.payload || typeof command.payload !== 'object') {
@@ -1520,34 +1373,12 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Compare-and-set check on branch workingRevision
-          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
-          if (!curBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
-
-          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: curBranch.workingRevision,
-            };
-          }
+          const curBranch = await this.loadBranchAtRevision(command);
+          if ('status' in curBranch) return curBranch;
 
           const curProject = await this.db.projects.get(command.projectId);
           if (!curProject) {
@@ -1616,36 +1447,8 @@ export class LocalRepository implements StudioRepository {
   private async handleHistoryRestore(
     command: HistoryRestoreCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     // 3. Validate payload
     if (!command.payload || typeof command.payload !== 'object') {
@@ -1752,19 +1555,8 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Verify project and non-main
           const curProject = await this.db.projects.get(command.projectId);
@@ -1786,19 +1578,8 @@ export class LocalRepository implements StudioRepository {
           }
 
           // Compare-and-set check on branch workingRevision
-          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
-          if (!curBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
-
-          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: curBranch.workingRevision,
-            };
-          }
+          const curBranch = await this.loadBranchAtRevision(command);
+          if ('status' in curBranch) return curBranch;
 
           // Re-verify target snapshot in transaction
           const curTarget = await this.db.snapshots.get([command.projectId, snapshotId]);
@@ -1874,36 +1655,8 @@ export class LocalRepository implements StudioRepository {
   private async handleBranchReopen(
     command: BranchReopenCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     // 3. Pre-read project & branch
     const project = await this.db.projects.get(command.projectId);
@@ -1954,19 +1707,8 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           const curProject = await this.db.projects.get(command.projectId);
           if (!curProject) {
@@ -2076,6 +1818,243 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
+   * Inside a transaction: a failed/ineligible result when a cited run is gone or its
+   * fingerprint, status, provenance or checks differ from the copy evaluated beforehand.
+   */
+  private async findChangedCitedRun(
+    projectId: Id,
+    evidence: readonly EvidenceRef[],
+    citedRuns: readonly RunRecord[],
+  ): Promise<FailedResult | null> {
+    const ineligible = (ref: EvidenceRef, message: string): FailedResult => ({
+      status: 'failed',
+      code: 'ineligible',
+      issues: [createIssue('structural-rule', message, ['evidence', ref.scenarioId], ref.runId)],
+    });
+
+    for (const ref of evidence) {
+      const cachedRun = citedRuns.find((r) => r.id === ref.runId);
+      const curRun = await this.db.runs.get([projectId, ref.runId]);
+      if (!curRun || !cachedRun) {
+        return ineligible(ref, `Cited evidence run '${ref.runId}' missing from database`);
+      }
+
+      const curChecks = canonicalJson(curRun.checks);
+      const cachedChecks = canonicalJson(cachedRun.checks);
+      if (
+        curRun.fingerprint !== cachedRun.fingerprint ||
+        curRun.status !== cachedRun.status ||
+        curRun.provenance !== cachedRun.provenance ||
+        !curChecks.ok ||
+        !cachedChecks.ok ||
+        curChecks.text !== cachedChecks.text
+      ) {
+        return ineligible(ref, `Cited evidence run '${ref.runId}' changed between evaluation and transaction`);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Validates cited evidence against `doc` outside any transaction (shared by commit and
+   * publish): refs are well formed per scenario, every scenario has one, each cited run
+   * exists and matches, and the run qualifies for a manifest built with the repository's
+   * current build versions (never taken from the evidence).
+   */
+  private async checkEvidence(
+    projectId: Id,
+    doc: Document,
+    evidence: readonly EvidenceRef[],
+    labels: { readonly document: 'working' | 'candidate'; readonly zeroScenarios: string },
+  ): Promise<
+    | { readonly status: 'ok'; readonly evidenceManifest: EvidenceManifest; readonly citedRuns: RunRecord[] }
+    | InvalidResult
+    | FailedResult
+  > {
+    if (!doc.scenarios || doc.scenarios.length === 0) {
+      return {
+        status: 'failed',
+        code: 'ineligible',
+        issues: [
+          createIssue(
+            'structural-rule',
+            labels.zeroScenarios,
+            ['scenarios'],
+          ),
+        ],
+      };
+    }
+
+    // Evidence ref validation against working document:
+    // at most one ref per scenarioId; a ref for a scenario that isn't in the working document -> invalid
+    const seenScenarioIds = new Set<Id>();
+    const docScenarioMap = new Map<Id, Scenario>(doc.scenarios.map((s) => [s.id, s]));
+    const refValidationIssues: Issue[] = [];
+
+    for (let i = 0; i < evidence.length; i++) {
+      const ref = evidence[i];
+      if (seenScenarioIds.has(ref.scenarioId)) {
+        refValidationIssues.push(
+          createIssue(
+            'duplicate-id',
+            `Duplicate evidence ref for scenario '${ref.scenarioId}'`,
+            ['payload', 'evidence', i],
+            ref.scenarioId,
+          ),
+        );
+      } else {
+        seenScenarioIds.add(ref.scenarioId);
+      }
+
+      if (!docScenarioMap.has(ref.scenarioId)) {
+        refValidationIssues.push(
+          createIssue(
+            'dangling-reference',
+            `Evidence ref cites scenario '${ref.scenarioId}' which does not exist in ${labels.document} document`,
+            ['payload', 'evidence', i],
+            ref.scenarioId,
+          ),
+        );
+      }
+    }
+
+    if (refValidationIssues.length > 0) {
+      return { status: 'invalid', issues: refValidationIssues };
+    }
+
+    // Every scenario in the document must have a ref
+    const refByScenarioId = new Map<Id, EvidenceRef>();
+    for (const ref of evidence) {
+      refByScenarioId.set(ref.scenarioId, ref);
+    }
+
+    for (const scenario of doc.scenarios) {
+      if (!refByScenarioId.has(scenario.id)) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Scenario '${scenario.id}' has no qualifying evidence run`,
+              ['evidence', scenario.id],
+              scenario.id,
+            ),
+          ],
+        };
+      }
+    }
+
+    // A ref whose run is missing -> failed/ineligible naming the run;
+    // run.scenarioId !== ref.scenarioId or run.fingerprint !== ref.fingerprint -> failed/ineligible
+    for (const ref of evidence) {
+      const runRec = await this.db.runs.get([projectId, ref.runId]);
+      if (!runRec) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' missing from database`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+
+      // The run's scenario comes from its stored manifest; a run without one can't back a ref.
+      const runScenarioId: unknown = (runRec.manifest as { scenario?: { id?: unknown } } | null)?.scenario?.id;
+      if (typeof runScenarioId !== 'string' || runScenarioId !== ref.scenarioId) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' scenarioId '${runScenarioId}' does not match ref scenarioId '${ref.scenarioId}'`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+
+      if (runRec.fingerprint !== ref.fingerprint) {
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `Cited evidence run '${ref.runId}' fingerprint '${runRec.fingerprint}' does not match ref fingerprint '${ref.fingerprint}'`,
+              ['evidence', ref.scenarioId],
+              ref.runId,
+            ),
+          ],
+        };
+      }
+    }
+
+    // 5. Eligibility computed OUTSIDE the transaction from the working snapshot:
+    // Build manifest and fingerprint for each scenario using the repository's current build versions (never from evidence)
+    // and verify that THAT ref's run qualifies (no other cited run stands in).
+    const candidateScenarios: CandidateScenario[] = [];
+    const citedRuns: RunRecord[] = [];
+
+    for (const scenario of doc.scenarios) {
+      const manifestRes = await buildManifest(doc, scenario.id, this.buildVersions);
+      if (manifestRes.status !== 'ok') {
+        const issues = manifestFailureIssues(scenario.id, manifestRes);
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues,
+        };
+      }
+
+      const ref = refByScenarioId.get(scenario.id)!;
+      const runRec = (await this.db.runs.get([projectId, ref.runId]))!;
+
+      const qualResult = runQualifies(runRec, {
+        scenarioId: scenario.id,
+        fingerprint: manifestRes.fingerprint,
+        compiledScopeElementIds: manifestRes.manifest.scope.includedElementIds,
+      });
+
+      if (!qualResult.qualifies) {
+        const message =
+          runRec.status === 'incomplete'
+            ? `Scenario '${scenario.id}' evidence run is incomplete`
+            : `Scenario '${scenario.id}' evidence run is not qualifying: ${qualResult.reasons.join(', ')}`;
+        return {
+          status: 'failed',
+          code: 'ineligible',
+          issues: [
+            createIssue(
+              'structural-rule',
+              message,
+              ['evidence', scenario.id],
+              scenario.id,
+            ),
+          ],
+        };
+      }
+
+      candidateScenarios.push({
+        scenarioId: scenario.id,
+        fingerprint: manifestRes.fingerprint,
+        scope: manifestRes.manifest.scope,
+      });
+      citedRuns.push(runRec);
+    }
+
+
+    return { status: 'ok', evidenceManifest: buildEvidenceManifest(candidateScenarios, citedRuns), citedRuns };
+  }
+
+  /**
    * history.commit:
    * Non-main branch; passing evidence for every scenario (run-identity.md §5).
    * Commit with parent = branch head (or [] when unborn); advance head; revision++.
@@ -2084,36 +2063,8 @@ export class LocalRepository implements StudioRepository {
   private async handleHistoryCommit(
     command: HistoryCommitCommand,
   ): Promise<AuthoredResult> {
-    // 1. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 2. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     // 3. Validate payload
     if (!command.payload || typeof command.payload !== 'object') {
@@ -2157,40 +2108,8 @@ export class LocalRepository implements StudioRepository {
       };
     }
 
-    if (!Array.isArray(command.payload.evidence)) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue('wrong-type', 'payload.evidence must be an array', ['payload', 'evidence']),
-        ],
-      };
-    }
-
-    // Validate shape of each ref: {scenarioId: UUID, fingerprint: string, runId: UUID}
-    const evidenceShapeIssues: Issue[] = [];
-    for (let i = 0; i < command.payload.evidence.length; i++) {
-      const ref = command.payload.evidence[i] as any;
-      if (
-        !ref ||
-        typeof ref !== 'object' ||
-        Array.isArray(ref) ||
-        !isValidUuid(ref.scenarioId) ||
-        typeof ref.fingerprint !== 'string' ||
-        ref.fingerprint.trim().length === 0 ||
-        !isValidUuid(ref.runId)
-      ) {
-        evidenceShapeIssues.push(
-          createIssue(
-            'wrong-type',
-            `Invalid evidence ref at index ${i}: expected {scenarioId: UUID, fingerprint: string, runId: UUID}`,
-            ['payload', 'evidence', i],
-          ),
-        );
-      }
-    }
-    if (evidenceShapeIssues.length > 0) {
-      return { status: 'invalid', issues: evidenceShapeIssues };
-    }
+    const evidenceInvalid = validateEvidenceRefs(command.payload.evidence);
+    if (evidenceInvalid) return evidenceInvalid;
 
     // 4. Compute request hash BEFORE transaction and check receipt first
     let requestHash: string;
@@ -2200,18 +2119,8 @@ export class LocalRepository implements StudioRepository {
       return mapErrorToFailedResult(err);
     }
 
-    const earlyReceipt = await checkOperationReceipt(
-      this.db,
-      command.projectId,
-      command.operationId,
-      requestHash,
-    );
-    if ('status' in earlyReceipt) {
-      return earlyReceipt;
-    }
-    if (earlyReceipt.isRetry) {
-      return earlyReceipt.result;
-    }
+    const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+    if (replay) return replay;
 
     // 5. Pre-read project & branch state outside transaction
     const project = await this.db.projects.get(command.projectId);
@@ -2290,204 +2199,13 @@ export class LocalRepository implements StudioRepository {
       return { status: 'missing', ids: [branch.workingSnapshotId] };
     }
 
-    const doc = workingSnapshot.document;
-    if (!doc.scenarios || doc.scenarios.length === 0) {
-      return {
-        status: 'failed',
-        code: 'ineligible',
-        issues: [
-          createIssue(
-            'structural-rule',
-            'Branch working document has zero scenarios; at least one qualified scenario is required to commit',
-            ['scenarios'],
-          ),
-        ],
-      };
-    }
-
-    // Evidence ref validation against working document:
-    // at most one ref per scenarioId; a ref for a scenario that isn't in the working document -> invalid
-    const seenScenarioIds = new Set<Id>();
-    const docScenarioMap = new Map<Id, Scenario>(doc.scenarios.map((s) => [s.id, s]));
-    const refValidationIssues: Issue[] = [];
-
-    for (let i = 0; i < command.payload.evidence.length; i++) {
-      const ref = command.payload.evidence[i];
-      if (seenScenarioIds.has(ref.scenarioId)) {
-        refValidationIssues.push(
-          createIssue(
-            'duplicate-id',
-            `Duplicate evidence ref for scenario '${ref.scenarioId}'`,
-            ['payload', 'evidence', i],
-            ref.scenarioId,
-          ),
-        );
-      } else {
-        seenScenarioIds.add(ref.scenarioId);
-      }
-
-      if (!docScenarioMap.has(ref.scenarioId)) {
-        refValidationIssues.push(
-          createIssue(
-            'dangling-reference',
-            `Evidence ref cites scenario '${ref.scenarioId}' which does not exist in working document`,
-            ['payload', 'evidence', i],
-            ref.scenarioId,
-          ),
-        );
-      }
-    }
-
-    if (refValidationIssues.length > 0) {
-      return { status: 'invalid', issues: refValidationIssues };
-    }
-
-    // Every scenario in the document must have a ref
-    const refByScenarioId = new Map<Id, EvidenceRef>();
-    for (const ref of command.payload.evidence) {
-      refByScenarioId.set(ref.scenarioId, ref);
-    }
-
-    for (const scenario of doc.scenarios) {
-      if (!refByScenarioId.has(scenario.id)) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Scenario '${scenario.id}' has no qualifying evidence run`,
-              ['evidence', scenario.id],
-              scenario.id,
-            ),
-          ],
-        };
-      }
-    }
-
-    // A ref whose run is missing -> failed/ineligible naming the run;
-    // run.scenarioId !== ref.scenarioId or run.fingerprint !== ref.fingerprint -> failed/ineligible
-    for (const ref of command.payload.evidence) {
-      const runRec = await this.db.runs.get([command.projectId, ref.runId]);
-      if (!runRec) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' missing from database`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-
-      // The run's scenario comes from its stored manifest; a run without one can't back a ref.
-      const runScenarioId: unknown = (runRec.manifest as { scenario?: { id?: unknown } } | null)?.scenario?.id;
-      if (typeof runScenarioId !== 'string' || runScenarioId !== ref.scenarioId) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' scenarioId '${runScenarioId}' does not match ref scenarioId '${ref.scenarioId}'`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-
-      if (runRec.fingerprint !== ref.fingerprint) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' fingerprint '${runRec.fingerprint}' does not match ref fingerprint '${ref.fingerprint}'`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-    }
-
-    // 5. Eligibility computed OUTSIDE the transaction from the working snapshot:
-    // Build manifest and fingerprint for each scenario using the repository's current build versions (never from evidence)
-    // and verify that THAT ref's run qualifies (no other cited run stands in).
-    const candidateScenarios: CandidateScenario[] = [];
-    const citedRuns: RunRecord[] = [];
-
-    for (const scenario of doc.scenarios) {
-      const manifestRes = await buildManifest(doc, scenario.id, this.buildVersions);
-      if (manifestRes.status !== 'ok') {
-        const issues =
-          manifestRes.status === 'not-ready'
-            ? manifestRes.issues.map((i) =>
-                createIssue(
-                  i.code as any,
-                  i.message,
-                  ['scenarios', scenario.id, ...i.path],
-                  scenario.id,
-                ),
-              )
-            : [
-                createIssue(
-                  'structural-rule',
-                  `Scenario '${scenario.id}' buildManifest failed with status '${manifestRes.status}'`,
-                  ['scenarios', scenario.id],
-                  scenario.id,
-                ),
-              ];
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues,
-        };
-      }
-
-      const ref = refByScenarioId.get(scenario.id)!;
-      const runRec = (await this.db.runs.get([command.projectId, ref.runId]))!;
-
-      const qualResult = runQualifies(runRec, {
-        scenarioId: scenario.id,
-        fingerprint: manifestRes.fingerprint,
-        compiledScopeElementIds: manifestRes.manifest.scope.includedElementIds,
-      });
-
-      if (!qualResult.qualifies) {
-        const message =
-          runRec.status === 'incomplete'
-            ? `Scenario '${scenario.id}' evidence run is incomplete`
-            : `Scenario '${scenario.id}' evidence run is not qualifying: ${qualResult.reasons.join(', ')}`;
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              message,
-              ['evidence', scenario.id],
-              scenario.id,
-            ),
-          ],
-        };
-      }
-
-      candidateScenarios.push({
-        scenarioId: scenario.id,
-        fingerprint: manifestRes.fingerprint,
-        scope: manifestRes.manifest.scope,
-      });
-      citedRuns.push(runRec);
-    }
-
-    const evidenceManifest = buildEvidenceManifest(candidateScenarios, citedRuns);
+    const evidenceCheck = await this.checkEvidence(command.projectId, workingSnapshot.document, command.payload.evidence, {
+      document: 'working',
+      zeroScenarios:
+        'Branch working document has zero scenarios; at least one qualified scenario is required to commit',
+    });
+    if (evidenceCheck.status !== 'ok') return evidenceCheck;
+    const { evidenceManifest, citedRuns } = evidenceCheck;
 
     const now = Date.now();
     const parentIds: readonly Id[] = branch.headCommitId !== null ? [branch.headCommitId] : [];
@@ -2511,19 +2229,8 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Recheck branch
           const curBranch = await this.db.branches.get([
@@ -2578,49 +2285,9 @@ export class LocalRepository implements StudioRepository {
             return { status: 'missing', ids: [command.projectId] };
           }
 
-          // INSIDE the transaction recheck that each cited run still exists with the same fingerprint, status, checks and provenance
-          for (const ref of command.payload.evidence) {
-            const cachedRun = citedRuns.find((r) => r.id === ref.runId);
-            const curRun = await this.db.runs.get([command.projectId, ref.runId]);
-            if (!curRun || !cachedRun) {
-              return {
-                status: 'failed',
-                code: 'ineligible',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    `Cited evidence run '${ref.runId}' missing from database`,
-                    ['evidence', ref.scenarioId],
-                    ref.runId,
-                  ),
-                ],
-              };
-            }
-
-            const curChecksCanon = canonicalJson(curRun.checks as any);
-            const cachedChecksCanon = canonicalJson(cachedRun.checks as any);
-            if (
-              curRun.fingerprint !== cachedRun.fingerprint ||
-              curRun.status !== cachedRun.status ||
-              curRun.provenance !== cachedRun.provenance ||
-              !curChecksCanon.ok ||
-              !cachedChecksCanon.ok ||
-              curChecksCanon.text !== cachedChecksCanon.text
-            ) {
-              return {
-                status: 'failed',
-                code: 'ineligible',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    `Cited evidence run '${ref.runId}' changed between evaluation and transaction`,
-                    ['evidence', ref.scenarioId],
-                    ref.runId,
-                  ),
-                ],
-              };
-            }
-          }
+          // Inside the transaction, recheck that each cited run is unchanged since evaluation
+          const changedRun = await this.findChangedCitedRun(command.projectId, command.payload.evidence, citedRuns);
+          if (changedRun) return changedRun;
 
           // Enforce 1,000-commit limit and storage limits
           const limitError = await enforceProjectLimits(this.db, {
@@ -2712,36 +2379,8 @@ export class LocalRepository implements StudioRepository {
       };
     }
 
-    // 2. Actor validation
-    const actorIssues = validateActor(command.actor);
-    if (actorIssues) {
-      return { status: 'invalid', issues: actorIssues };
-    }
-
-    // 3. Validate envelope IDs and revisions
-    const opIssue = validateUuid(command.operationId, ['operationId'], 'operationId');
-    if (opIssue) {
-      return { status: 'invalid', issues: [opIssue] };
-    }
-
-    const projIssue = validateUuid(command.projectId, ['projectId'], 'projectId');
-    if (projIssue) {
-      return { status: 'invalid', issues: [projIssue] };
-    }
-
-    const branchIssue = validateUuid(command.branchId, ['branchId'], 'branchId');
-    if (branchIssue) {
-      return { status: 'invalid', issues: [branchIssue] };
-    }
-
-    const workingRevIssue = validateRevision(
-      command.expectedWorkingRevision,
-      ['expectedWorkingRevision'],
-      'expectedWorkingRevision',
-    );
-    if (workingRevIssue) {
-      return { status: 'invalid', issues: [workingRevIssue] };
-    }
+    const envelopeInvalid = validateCommandEnvelope(command);
+    if (envelopeInvalid) return envelopeInvalid;
 
     if (!command.payload || typeof command.payload !== 'object') {
       return {
@@ -2877,233 +2516,17 @@ export class LocalRepository implements StudioRepository {
       };
     }
 
-    // 7. Validate evidence array
-    if (!Array.isArray(command.payload.evidence)) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue('wrong-type', 'payload.evidence must be an array', ['payload', 'evidence']),
-        ],
-      };
-    }
-
-    const evidenceShapeIssues: Issue[] = [];
-    for (let i = 0; i < command.payload.evidence.length; i++) {
-      const ref = command.payload.evidence[i] as any;
-      if (
-        !ref ||
-        typeof ref !== 'object' ||
-        Array.isArray(ref) ||
-        !isValidUuid(ref.scenarioId) ||
-        typeof ref.fingerprint !== 'string' ||
-        ref.fingerprint.trim().length === 0 ||
-        !isValidUuid(ref.runId)
-      ) {
-        evidenceShapeIssues.push(
-          createIssue(
-            'wrong-type',
-            `Invalid evidence ref at index ${i}: expected {scenarioId: UUID, fingerprint: string, runId: UUID}`,
-            ['payload', 'evidence', i],
-          ),
-        );
-      }
-    }
-    if (evidenceShapeIssues.length > 0) {
-      return { status: 'invalid', issues: evidenceShapeIssues };
-    }
+    const evidenceInvalid = validateEvidenceRefs(command.payload.evidence);
+    if (evidenceInvalid) return evidenceInvalid;
 
     // 8. Candidate document validation against evidence
-    const doc = ticketBinding.document;
-    if (!doc.scenarios || doc.scenarios.length === 0) {
-      return {
-        status: 'failed',
-        code: 'ineligible',
-        issues: [
-          createIssue(
-            'structural-rule',
-            'Candidate document has zero scenarios; at least one qualified scenario is required to publish',
-            ['scenarios'],
-          ),
-        ],
-      };
-    }
-
-    const seenScenarioIds = new Set<Id>();
-    const docScenarioMap = new Map<Id, Scenario>(doc.scenarios.map((s) => [s.id, s]));
-    const refValidationIssues: Issue[] = [];
-
-    for (let i = 0; i < command.payload.evidence.length; i++) {
-      const ref = command.payload.evidence[i];
-      if (seenScenarioIds.has(ref.scenarioId)) {
-        refValidationIssues.push(
-          createIssue(
-            'duplicate-id',
-            `Duplicate evidence ref for scenario '${ref.scenarioId}'`,
-            ['payload', 'evidence', i],
-            ref.scenarioId,
-          ),
-        );
-      } else {
-        seenScenarioIds.add(ref.scenarioId);
-      }
-
-      if (!docScenarioMap.has(ref.scenarioId)) {
-        refValidationIssues.push(
-          createIssue(
-            'dangling-reference',
-            `Evidence ref cites scenario '${ref.scenarioId}' which does not exist in candidate document`,
-            ['payload', 'evidence', i],
-            ref.scenarioId,
-          ),
-        );
-      }
-    }
-    if (refValidationIssues.length > 0) {
-      return { status: 'invalid', issues: refValidationIssues };
-    }
-
-    const refByScenarioId = new Map<Id, EvidenceRef>();
-    for (const ref of command.payload.evidence) {
-      refByScenarioId.set(ref.scenarioId, ref);
-    }
-
-    for (const scenario of doc.scenarios) {
-      if (!refByScenarioId.has(scenario.id)) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Scenario '${scenario.id}' has no qualifying evidence run`,
-              ['evidence', scenario.id],
-              scenario.id,
-            ),
-          ],
-        };
-      }
-    }
-
-    // 9. OUTSIDE the transaction: validate cited runs exist in DB and qualify
-    for (const ref of command.payload.evidence) {
-      const runRec = await this.db.runs.get([command.projectId, ref.runId]);
-      if (!runRec) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' missing from database`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-
-      const runScenarioId: unknown = (runRec.manifest as { scenario?: { id?: unknown } } | null)
-        ?.scenario?.id;
-      if (typeof runScenarioId !== 'string' || runScenarioId !== ref.scenarioId) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' scenarioId '${runScenarioId}' does not match ref scenarioId '${ref.scenarioId}'`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-
-      if (runRec.fingerprint !== ref.fingerprint) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' fingerprint '${runRec.fingerprint}' does not match ref fingerprint '${ref.fingerprint}'`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-    }
-
-    // Build every scenario's manifest from the candidate document with the repository's current build versions
-    const candidateScenarios: CandidateScenario[] = [];
-    const citedRuns: RunRecord[] = [];
-
-    for (const scenario of doc.scenarios) {
-      const manifestRes = await buildManifest(doc, scenario.id, this.buildVersions);
-      if (manifestRes.status !== 'ok') {
-        const issues =
-          manifestRes.status === 'not-ready'
-            ? manifestRes.issues.map((i) =>
-                createIssue(
-                  i.code as any,
-                  i.message,
-                  ['scenarios', scenario.id, ...i.path],
-                  scenario.id,
-                ),
-              )
-            : [
-                createIssue(
-                  'structural-rule',
-                  `Scenario '${scenario.id}' buildManifest failed with status '${manifestRes.status}'`,
-                  ['scenarios', scenario.id],
-                  scenario.id,
-                ),
-              ];
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues,
-        };
-      }
-
-      const ref = refByScenarioId.get(scenario.id)!;
-      const runRec = (await this.db.runs.get([command.projectId, ref.runId]))!;
-
-      const qualResult = runQualifies(runRec, {
-        scenarioId: scenario.id,
-        fingerprint: manifestRes.fingerprint,
-        compiledScopeElementIds: manifestRes.manifest.scope.includedElementIds,
-      });
-
-      if (!qualResult.qualifies) {
-        const message =
-          runRec.status === 'incomplete'
-            ? `Scenario '${scenario.id}' evidence run is incomplete`
-            : `Scenario '${scenario.id}' evidence run is not qualifying: ${qualResult.reasons.join(', ')}`;
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              message,
-              ['evidence', scenario.id],
-              scenario.id,
-            ),
-          ],
-        };
-      }
-
-      candidateScenarios.push({
-        scenarioId: scenario.id,
-        fingerprint: manifestRes.fingerprint,
-        scope: manifestRes.manifest.scope,
-      });
-      citedRuns.push(runRec);
-    }
-
-    const evidenceManifest = buildEvidenceManifest(candidateScenarios, citedRuns);
+    const evidenceCheck = await this.checkEvidence(command.projectId, ticketBinding.document, command.payload.evidence, {
+      document: 'candidate',
+      zeroScenarios:
+        'Candidate document has zero scenarios; at least one qualified scenario is required to publish',
+    });
+    if (evidenceCheck.status !== 'ok') return evidenceCheck;
+    const { evidenceManifest, citedRuns } = evidenceCheck;
 
     // 10. Compute request hash BEFORE transaction and check early receipt
     let requestHash: string;
@@ -3113,18 +2536,8 @@ export class LocalRepository implements StudioRepository {
       return mapErrorToFailedResult(err);
     }
 
-    const earlyReceipt = await checkOperationReceipt(
-      this.db,
-      command.projectId,
-      command.operationId,
-      requestHash,
-    );
-    if ('status' in earlyReceipt) {
-      return earlyReceipt;
-    }
-    if (earlyReceipt.isRetry) {
-      return earlyReceipt.result;
-    }
+    const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+    if (replay) return replay;
 
     // 11. Atomic transaction
     try {
@@ -3132,19 +2545,8 @@ export class LocalRepository implements StudioRepository {
         'rw',
         getProjectTables(this.db),
         async () => {
-          // Check receipt FIRST before stale checks
-          const receiptCheck = await checkOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-          );
-          if ('status' in receiptCheck) {
-            return receiptCheck;
-          }
-          if (receiptCheck.isRetry) {
-            return receiptCheck.result;
-          }
+          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+          if (replay) return replay;
 
           // Project check
           const curProject = await this.db.projects.get(command.projectId);
@@ -3279,49 +2681,9 @@ export class LocalRepository implements StudioRepository {
             }
           }
 
-          // Recheck each cited run inside the transaction
-          for (const ref of command.payload.evidence) {
-            const cachedRun = citedRuns.find((r) => r.id === ref.runId);
-            const curRun = await this.db.runs.get([command.projectId, ref.runId]);
-            if (!curRun || !cachedRun) {
-              return {
-                status: 'failed',
-                code: 'ineligible',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    `Cited evidence run '${ref.runId}' missing from database`,
-                    ['evidence', ref.scenarioId],
-                    ref.runId,
-                  ),
-                ],
-              };
-            }
-
-            const curChecksCanon = canonicalJson(curRun.checks as any);
-            const cachedChecksCanon = canonicalJson(cachedRun.checks as any);
-            if (
-              curRun.fingerprint !== cachedRun.fingerprint ||
-              curRun.status !== cachedRun.status ||
-              curRun.provenance !== cachedRun.provenance ||
-              !curChecksCanon.ok ||
-              !cachedChecksCanon.ok ||
-              curChecksCanon.text !== cachedChecksCanon.text
-            ) {
-              return {
-                status: 'failed',
-                code: 'ineligible',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    `Cited evidence run '${ref.runId}' changed between evaluation and transaction`,
-                    ['evidence', ref.scenarioId],
-                    ref.runId,
-                  ),
-                ],
-              };
-            }
-          }
+          // Inside the transaction, recheck that each cited run is unchanged since evaluation
+          const changedRun = await this.findChangedCitedRun(command.projectId, command.payload.evidence, citedRuns);
+          if (changedRun) return changedRun;
 
           // Check existing publications and version ordering
           const existingPublications = await this.db.publications
@@ -4505,19 +3867,8 @@ export class LocalRepository implements StudioRepository {
 
     try {
       return await this.db.transaction('rw', getProjectTables(this.db), async () => {
-        // 1. Receipt first, in the new namespace.
-        const receiptCheck = await checkOperationReceipt(
-          this.db,
-          newProjectId,
-          command.operationId,
-          requestHash,
-        );
-        if ('status' in receiptCheck) {
-          return receiptCheck;
-        }
-        if (receiptCheck.isRetry) {
-          return receiptCheck.result;
-        }
+        const replay = await replayedResult(this.db, newProjectId, command.operationId, requestHash);
+        if (replay) return replay;
 
         // 2. newProjectId already used by a different import -> rejected.
         const existingProject = await this.db.projects.get(newProjectId);
@@ -4615,24 +3966,9 @@ export class LocalRepository implements StudioRepository {
             this.db.runs.where('projectId').equals(projectId).toArray(),
           ]);
 
-          const closure = computePinClosure({
-            project: { initialSnapshotId: project.initialSnapshotId, mainBranchId: project.mainBranchId },
-            branches: branches.map((b) => ({
-              id: b.id,
-              state: b.state,
-              headCommitId: b.headCommitId,
-              workingSnapshotId: b.workingSnapshotId,
-            })),
-            commits: commits.map((c) => ({
-              id: c.id,
-              snapshotId: c.snapshotId,
-              parentIds: c.parentIds,
-              evidence: c.evidence,
-            })),
-            publications: publications.map((p) => ({ id: p.id, commitId: p.commitId })),
-            checkpoints: checkpoints.map((cp) => ({ id: cp.id, snapshotId: cp.snapshotId })),
-            runs: runs.map((r) => ({ id: r.id, snapshotId: r.snapshotId })),
-          });
+          const closure = computePinClosure(
+            toPinClosureState({ project, branches, commits, publications, checkpoints, runs }),
+          );
           const pinnedRunIds = new Set(closure.pinnedRunIds);
           const runById = new Map(runs.map((r) => [r.id, r]));
 
@@ -4648,24 +3984,9 @@ export class LocalRepository implements StudioRepository {
           // released"), while a snapshot still reachable via a branch, commit, checkpoint,
           // or a run NOT in `selection.runIds` stays pinned and rejected.
           const runsExcludingDeletions = runs.filter((r) => !selection.runIds.includes(r.id));
-          const closureExcludingDeletions = computePinClosure({
-            project: { initialSnapshotId: project.initialSnapshotId, mainBranchId: project.mainBranchId },
-            branches: branches.map((b) => ({
-              id: b.id,
-              state: b.state,
-              headCommitId: b.headCommitId,
-              workingSnapshotId: b.workingSnapshotId,
-            })),
-            commits: commits.map((c) => ({
-              id: c.id,
-              snapshotId: c.snapshotId,
-              parentIds: c.parentIds,
-              evidence: c.evidence,
-            })),
-            publications: publications.map((p) => ({ id: p.id, commitId: p.commitId })),
-            checkpoints: checkpoints.map((cp) => ({ id: cp.id, snapshotId: cp.snapshotId })),
-            runs: runsExcludingDeletions.map((r) => ({ id: r.id, snapshotId: r.snapshotId })),
-          });
+          const closureExcludingDeletions = computePinClosure(
+            toPinClosureState({ project, branches, commits, publications, checkpoints, runs: runsExcludingDeletions }),
+          );
           const releasableSnapshotPins = new Set(closureExcludingDeletions.pinnedSnapshotIds);
 
           // Any selected pinned run (full row deletion) or pinned snapshot -> referenced-

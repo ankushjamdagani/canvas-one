@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ShieldCheck, CheckCircle2, Box, Layers, RefreshCw } from 'lucide-react';
+import { Card, CardHeader } from '@/components/ui/card';
+import { CheckCircle2 } from 'lucide-react';
 
 const meta: Meta = {
   title: 'Design System/Component Health & Maturity',

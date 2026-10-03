@@ -9,11 +9,7 @@ import { computeSnapshotId } from '../../persistence/studio/primitives';
 import { mintRunStartToken } from '../../persistence/studio/token';
 import { buildManifest } from '../../domain/studio/manifest';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type ProjectCreateCommand } from '../../persistence/studio/types';
-import {
-  deriveScenarioStatus,
-  loadScenarioStatuses,
-  toRunCandidate,
-} from './scenarioStatus';
+import { deriveScenarioStatus, loadScenarioStatuses } from './scenarioStatus';
 
 const s01Doc = JSON.parse(
   readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),

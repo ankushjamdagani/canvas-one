@@ -2,6 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { PanelHeader } from './PanelHeader';
 import { panelContentClass } from './panelContentClass';
+import { trackPanelGesture } from './pointerGesture';
 import { computeResizedFloatRect } from './geometry';
 import type {
   PanelId,
@@ -51,49 +52,23 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
     const startY = e.clientY;
     const startRect = { ...floatRect };
 
-    dispatch({ type: 'BEGIN_GESTURE', kind: 'resize-float' });
     setResizing(true);
 
-    const onPointerMove = (moveEvt: PointerEvent) => {
-      const deltaX = moveEvt.clientX - startX;
-      const deltaY = moveEvt.clientY - startY;
-      const nextRect = computeResizedFloatRect(startRect, deltaX, deltaY, viewport);
-
-      dispatch({
-        type: 'PREVIEW_GESTURE',
-        action: { type: 'RESIZE_FLOAT', panel: panelId, rect: nextRect },
-      });
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerCancel);
-      window.removeEventListener('keydown', onKeyDown);
-      setResizing(false);
-    };
-
-    const onPointerUp = () => {
-      cleanup();
-      dispatch({ type: 'COMMIT_GESTURE' });
-    };
-
-    const onPointerCancel = () => {
-      cleanup();
-      dispatch({ type: 'CANCEL_GESTURE' });
-    };
-
-    const onKeyDown = (keyEvt: KeyboardEvent) => {
-      if (keyEvt.key === 'Escape') {
-        cleanup();
-        dispatch({ type: 'CANCEL_GESTURE' });
-      }
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    window.addEventListener('pointercancel', onPointerCancel);
-    window.addEventListener('keydown', onKeyDown);
+    trackPanelGesture(dispatch, 'resize-float', {
+      onMove: (moveEvt) => {
+        const deltaX = moveEvt.clientX - startX;
+        const deltaY = moveEvt.clientY - startY;
+        dispatch({
+          type: 'PREVIEW_GESTURE',
+          action: {
+            type: 'RESIZE_FLOAT',
+            panel: panelId,
+            rect: computeResizedFloatRect(startRect, deltaX, deltaY, viewport),
+          },
+        });
+      },
+      onSettle: () => setResizing(false),
+    });
   };
 
   // Keyboard resize on the resize corner

@@ -21,7 +21,6 @@ import type {
   View,
 } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio/types';
-import { placementHeight } from './projection';
 
 export type WrapBoundaryPortIds = {
   readonly ownerPortId: Id;
@@ -246,7 +245,6 @@ export function planWrapInBoundary(
   const minX = Math.min(...placements.map((placement) => placement.x));
   const minY = Math.min(...placements.map((placement) => placement.y));
   const maxX = Math.max(...placements.map((placement) => placement.x + placement.width));
-  const maxY = Math.max(...placements.map((placement) => placement.y + placementHeight(placement)));
   const ownerPlacement: Placement = {
     id: ids.placementId,
     elementId: owner.id,

@@ -162,7 +162,7 @@ export type NodeKindLayer = keyof typeof nodeKindColor;
  * Calculates the relative luminance of an sRGB color according to WCAG 2.2 specifications.
  * @see https://www.w3.org/TR/WCAG22/#dfn-relative-luminance
  */
-export function relativeLuminance(hex: string): number {
+function relativeLuminance(hex: string): number {
   const clean = hex.replace(/^#/, '');
   let r: number;
   let g: number;

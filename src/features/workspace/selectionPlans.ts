@@ -9,6 +9,7 @@
 import type { Document, Group, Id, Note, Placement, View } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio/types';
 import { placementHeight, type MeasuredHeights } from './projection';
+import { codePointLength } from '../../domain/studio/text';
 
 export type AlignEdge = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
 export type DistributeAxis = 'x' | 'y';
@@ -37,10 +38,6 @@ function replaceView(view: View, label: string): SelectionPlan {
     label,
     changes: [{ kind: 'replace', value: { recordKind: 'view', record: view } }],
   };
-}
-
-function codePointLength(value: string): number {
-  return Array.from(value).length;
 }
 
 function hasDuplicates(ids: readonly Id[]): boolean {
@@ -81,13 +78,6 @@ function selectedNotes(view: View, noteIds: readonly Id[]): Note[] | null {
     notes.push(note);
   }
   return notes;
-}
-
-function replacePlacements(view: View, replacements: ReadonlyMap<Id, Placement>): View {
-  return {
-    ...view,
-    placements: view.placements.map((placement) => replacements.get(placement.id) ?? placement),
-  };
 }
 
 /** Nonempty, wholly ungrouped selection; the caller supplies the user-entered label. */

@@ -14,7 +14,7 @@ import type { Document, Id } from '../../domain/studio/model';
 import type { Issue } from '../../domain/studio/validate';
 import type { StudioDatabase } from './db';
 import { createIssue, RepositoryError } from './errors';
-import type { Actor, AuthoredResult, FailedResult } from './types';
+import type { Actor, AuthoredResult, FailedResult, InvalidResult } from './types';
 
 /**
  * Canonical lowercase UUID format: 8-4-4-4-12 lowercase hex with version 1-5 and variant [89ab].
@@ -107,6 +107,69 @@ export function validateActor(actor: unknown): Issue[] | null {
   }
 
   return issues.length > 0 ? issues : null;
+}
+
+/**
+ * Validates the envelope shared by every branch-scoped authored command: actor, operation,
+ * project and branch ids, and the expected working revision (checked in that order; the
+ * first failure wins). Returns the `invalid` result to hand back, or null when well formed.
+ */
+export function validateCommandEnvelope(command: {
+  readonly actor: unknown;
+  readonly operationId: unknown;
+  readonly projectId: unknown;
+  readonly branchId: unknown;
+  readonly expectedWorkingRevision: unknown;
+}): InvalidResult | null {
+  const actorIssues = validateActor(command.actor);
+  if (actorIssues) return { status: 'invalid', issues: actorIssues };
+
+  const issue =
+    validateUuid(command.operationId, ['operationId'], 'operationId') ??
+    validateUuid(command.projectId, ['projectId'], 'projectId') ??
+    validateUuid(command.branchId, ['branchId'], 'branchId') ??
+    validateRevision(
+      command.expectedWorkingRevision,
+      ['expectedWorkingRevision'],
+      'expectedWorkingRevision',
+    );
+  return issue ? { status: 'invalid', issues: [issue] } : null;
+}
+
+/**
+ * Checks that `evidence` is an array of well-formed refs, `{scenarioId: UUID, fingerprint:
+ * non-empty string, runId: UUID}`. Whether the refs match the document is checked later.
+ */
+export function validateEvidenceRefs(evidence: unknown): InvalidResult | null {
+  if (!Array.isArray(evidence)) {
+    return {
+      status: 'invalid',
+      issues: [createIssue('wrong-type', 'payload.evidence must be an array', ['payload', 'evidence'])],
+    };
+  }
+
+  const issues: Issue[] = [];
+  evidence.forEach((ref: unknown, i) => {
+    const r = ref as Partial<Record<'scenarioId' | 'fingerprint' | 'runId', unknown>> | null;
+    if (
+      !r ||
+      typeof r !== 'object' ||
+      Array.isArray(r) ||
+      !isValidUuid(r.scenarioId) ||
+      typeof r.fingerprint !== 'string' ||
+      r.fingerprint.trim().length === 0 ||
+      !isValidUuid(r.runId)
+    ) {
+      issues.push(
+        createIssue(
+          'wrong-type',
+          `Invalid evidence ref at index ${i}: expected {scenarioId: UUID, fingerprint: string, runId: UUID}`,
+          ['payload', 'evidence', i],
+        ),
+      );
+    }
+  });
+  return issues.length > 0 ? { status: 'invalid', issues } : null;
 }
 
 /**
@@ -240,6 +303,22 @@ export async function checkOperationReceipt(
       ),
     ],
   };
+}
+
+/**
+ * The result to hand back instead of executing again: the original durable result for an
+ * exact retry, or the operation-id-reused failure; null on first execution. Call it before
+ * any compare-and-set check.
+ */
+export async function replayedResult(
+  db: StudioDatabase,
+  projectId: string,
+  operationId: string,
+  requestHash: string,
+): Promise<AuthoredResult | null> {
+  const receipt = await checkOperationReceipt(db, projectId, operationId, requestHash);
+  if ('status' in receipt) return receipt;
+  return receipt.isRetry ? receipt.result : null;
 }
 
 /**

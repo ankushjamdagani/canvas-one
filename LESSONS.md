@@ -15,6 +15,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 
 - **Treat headless `agy` exit 0 with empty output as a failure.** In plan mode it auto-denies `read_file`/`command` and exits silently. Why: 2026-09-23 EXEC-PREFLIGHT.
 - **Don't retry `agy` in a restricted sandbox.** It needs localhost binding and writes under `~/.gemini/antigravity-cli/`; request elevated permissions once or record the task as blocked. Why: 2026-09-10, three failed retries.
+- **Never pass `--noEmit false` to `tsc`.** The root config is `noEmit`; overriding it writes a `.js` beside every source file. Typecheck with `npx tsc -b`; for unused-symbol sweeps use a throwaway tsconfig extending the root with `noUnusedLocals`. Why: 2026-10-02 quality sweep.
 - **Don't rely on `timeout` or `agy --print-timeout` on macOS.** Use `perl -e 'alarm N; exec @ARGV' <cmd>`. Why: 2026-09-23, 25s timeout ran 79s.
 - **`.claude/skills` and `.codex/skills` are symlinks into `.agents/skills`.** Check with `ls -l`; `diff -rq` follows the links and misleads. Why: 2026-09-16 wrong duplication finding.
 - **Production e2e needs localhost binding, and Codex's sandbox can't run Chromium.** Ask for elevation up front or keep browser checks with the lead; if denied, report the browser check as blocked. Why: 2026-09-10, 2026-09-12, 2026-09-27 RV-12f/RV-12g.

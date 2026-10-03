@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { AvatarStack } from '@/components/ui/avatar-stack';
 
 const meta: Meta<typeof AvatarStack> = {

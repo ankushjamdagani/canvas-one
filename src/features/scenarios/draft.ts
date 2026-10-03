@@ -367,27 +367,6 @@ export function changeScenarioDraft(
 }
 
 /**
- * commands.md §6 Cancel: "discards the draft and reloads accepted values." Returns the
- * draft to its base value; the caller then closes the editor (Cancel itself stores
- * nothing, per scenario.new/duplicate).
- */
-export function cancelScenarioDraft(handle: ScenarioDraftHandle): ScenarioDraftHandle {
-  return Object.freeze({
-    ...handle,
-    scenario: handle.baseScenario,
-    dirty: false,
-    status: handle.baseScenario === null ? 'missing' : 'clean',
-    issuesBySection: emptyIssuesBySection(),
-    allIssues: [],
-    generalIssue: null,
-  });
-}
-
-function hasBlockingIssues(handle: ScenarioDraftHandle): boolean {
-  return handle.allIssues.some((i) => i.severity === 'error');
-}
-
-/**
  * commands.md §6 Apply: "parses, validates the candidate and revision, persists one
  * compound command, clears dirty state and adds one undo entry." "While pending,
  * duplicate submits and navigation are blocked" is the caller's (ScenarioEditor's)
@@ -524,7 +503,7 @@ export async function applyScenarioDraft(
  * remove; one undo." Confirmation itself is the DeleteScenarioDialog component; this is
  * the compound command it submits once confirmed.
  */
-export function buildDeleteScenarioChange(scenarioId: Id): RecordChange {
+function buildDeleteScenarioChange(scenarioId: Id): RecordChange {
   return { kind: 'remove', recordKind: 'scenario', id: scenarioId };
 }
 
@@ -535,5 +514,3 @@ export async function deleteScenario(
 ): Promise<AuthoredResult> {
   return session.apply([buildDeleteScenarioChange(scenarioId)], `Delete scenario "${label}"`);
 }
-
-export { hasBlockingIssues };

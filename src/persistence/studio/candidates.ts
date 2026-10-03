@@ -10,7 +10,7 @@
  * Inject mintId for candidate IDs (it is an ephemeral controller handle, not a stored record; say so in a comment).
  */
 
-import type { Document, Id } from '../../domain/studio/model';
+import type { Id } from '../../domain/studio/model';
 import {
   computeSnapshotId,
   validateUuid,
@@ -22,11 +22,8 @@ import {
   findMergeBase,
   type MergeBaseResult,
 } from '../../domain/versioning/merge-base';
-import {
-  mergeDocuments,
-  deepFreeze,
-  type MergeResult,
-} from '../../domain/versioning/merge';
+import { mergeDocuments, type MergeResult } from '../../domain/versioning/merge';
+import { deepFreeze } from '../../domain/studio/freeze';
 import {
   resolveConflict as resolveConflictDomain,
   ConflictResolutionError,
@@ -60,6 +57,7 @@ import {
   type StudioRepository,
 } from './types';
 import type { Issue } from '../../domain/studio/validate';
+import { manifestFailureIssues } from './manifest-issues';
 
 // ============================================================================
 // Types
@@ -617,24 +615,7 @@ export class CandidateController {
     for (const scenario of doc.scenarios) {
       const manifestRes = await buildManifest(doc, scenario.id, versions);
       if (manifestRes.status !== 'ok') {
-        const issues =
-          manifestRes.status === 'not-ready'
-            ? manifestRes.issues.map((i) =>
-                createIssue(
-                  i.code as any,
-                  i.message,
-                  ['scenarios', scenario.id, ...i.path],
-                  scenario.id,
-                ),
-              )
-            : [
-                createIssue(
-                  'structural-rule',
-                  `Scenario '${scenario.id}' buildManifest failed with status '${manifestRes.status}'`,
-                  ['scenarios', scenario.id],
-                  scenario.id,
-                ),
-              ];
+        const issues = manifestFailureIssues(scenario.id, manifestRes);
         return {
           status: 'invalid',
           issues,

@@ -19,7 +19,6 @@ import {
   type Actor,
   type HistoryPublishCommand,
   type PublicationMetadata,
-  type RecordChange,
 } from './types';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
@@ -204,7 +203,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const snap = (await repo.loadSnapshot(projectId, branchRecord.workingSnapshotId))!;
 
     // 2. Commit with evidence
-    const { commitId, evidence } = await commitBranch(
+    const { commitId } = await commitBranch(
       repo,
       projectId,
       draftBranchId,
@@ -311,7 +310,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-keep-open-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -373,7 +372,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-receipt-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -444,7 +443,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-dup-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -542,7 +541,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-lower-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -714,7 +713,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-source-rev-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -797,7 +796,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-proj-stale-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -860,7 +859,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-candidate-lifecycle-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -1044,7 +1043,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     const db = createStudioDatabase(`test-pub-fingerprint-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-    const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+    const { projectId, draftBranchId } = await createTestProject(repo);
 
     const branch = (await repo.loadBranch(projectId, draftBranchId))!;
     const snap = (await repo.loadSnapshot(projectId, branch.workingSnapshotId))!;
@@ -1628,7 +1627,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
       const db = createStudioDatabase(`test-pub-strict-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
-      const { projectId, mainBranchId, draftBranchId } = await createTestProject(repo);
+      const { projectId, draftBranchId } = await createTestProject(repo);
 
       const commitRes = await commitBranch(repo, projectId, draftBranchId, s01Doc, null, 0);
       const prepRes = await controller.prepare(repo, {

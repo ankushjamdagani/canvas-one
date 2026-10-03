@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { ChevronsDownUp } from 'lucide-react';
 import type { ProjectedNodeData } from './projection';

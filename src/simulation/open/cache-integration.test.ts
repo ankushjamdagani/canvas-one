@@ -151,7 +151,7 @@ describe('OpenSimulation Cache and Router Integration', () => {
 
     class DeterministicOpSimulation extends OpenSimulation {
       private stepCount = 0;
-      protected drawRequestClassAndKey(wl: any, ordinal: number) {
+      protected drawRequestClassAndKey(wl: any, _ordinal: number) {
         const opType = this.stepCount === 1 ? 'write' : 'read';
         this.stepCount++;
         const reqClass = wl.classes.find((c: any) => c.operation === opType) || wl.classes[0];

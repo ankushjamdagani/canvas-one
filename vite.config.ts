@@ -15,7 +15,7 @@ export default defineConfig({
       output: {
         // Vendor code changes rarely: keep it in its own cacheable chunks so app chunks
         // stay small (React on the entry path, the canvas library in the workspace chunk).
-        advancedChunks: {
+        codeSplitting: {
           groups: [
             { name: "react-vendor", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: "canvas-vendor", test: /node_modules[\\/](@xyflow|d3-[a-z-]+)[\\/]/ },

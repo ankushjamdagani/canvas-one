@@ -36,7 +36,7 @@ import {
 } from './projection';
 import { planDelete, type DeletePlan } from './deletePlan';
 import { planAddNote, planUpdateNote, planDeleteNote } from './selectionPlans';
-export const NOTE_MIME_TYPE = 'application/x-system-studio-note';
+const NOTE_MIME_TYPE = 'application/x-system-studio-note';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Button } from '@/components/ui/button';
 import {
@@ -109,10 +109,6 @@ export interface CanvasViewProps {
   trafficEntryElementIds?: ReadonlySet<Id>;
   /** A dirty scenario draft blocks Run; the canvas says so (board scenario_traffic_editor). */
   runWaitsForScenarioDraft?: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
   onMoveNodes: (
     movedNodes: Array<{ id: string; position: { x: number; y: number } }>,
   ) => Promise<boolean>;
@@ -184,10 +180,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   activeViewId,
   onSelectView,
   isSaving,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
   onMoveNodes,
   selectedElementIds,
   selectedConnectionIds,
@@ -486,7 +478,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const dragStartPositionsRef = React.useRef<Map<string, { x: number; y: number }>>(new Map());
 
   const handleNodeDragStart: OnNodeDrag<Node<ProjectedNodeData>> = React.useCallback(
-    (_event, node, draggedNodes) => {
+    () => {
       const map = new Map<string, { x: number; y: number }>();
       for (const n of nodes) {
         map.set(n.id, { x: n.position.x, y: n.position.y });

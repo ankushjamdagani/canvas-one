@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { OpenSimulation, type SimLifecycleFact } from './kernel';
-import type { ExecutionGraph, ExecutionNode, ExecutionEdge } from '../../domain/execution';
+import type { ExecutionGraph, ExecutionNode } from '../../domain/execution';
 
 function makeGraph(): ExecutionGraph {
   const nodes: ExecutionNode[] = [

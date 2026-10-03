@@ -32,7 +32,7 @@ export type ComputeInverseResult = ComputeInverseSuccess | ComputeInverseFailure
 /**
  * Finds a record in the Document by kind and ID, returning it as an EditableRecord.
  */
-export function findPriorRecord(
+function findPriorRecord(
   doc: Document,
   recordKind: RecordKind,
   id: Id,

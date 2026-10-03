@@ -68,6 +68,22 @@ export type ScenarioStatus =
   | { readonly kind: 'not-run' }
   | { readonly kind: 'not-ready'; readonly issues: readonly ReadinessIssue[] };
 
+/** Plain-language status line shown beside a scenario in the commit and publish gates. */
+export function scenarioStatusLabel(status: ScenarioStatus): string {
+  switch (status.kind) {
+    case 'passed':
+      return 'Passed on exactly this version';
+    case 'needs-rerun':
+      return 'Ran on an earlier version';
+    case 'failed':
+      return `Failed · ${status.passedChecks} of ${status.totalChecks} checks`;
+    case 'not-run':
+      return 'Not run yet';
+    case 'not-ready':
+      return `Can't run · ${status.issues.length} issue${status.issues.length === 1 ? '' : 's'}`;
+  }
+}
+
 export type ScenarioWithStatus = {
   readonly scenario: Scenario;
   readonly status: ScenarioStatus;

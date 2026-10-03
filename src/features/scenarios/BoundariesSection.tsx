@@ -19,7 +19,6 @@ import type { MintId } from './types';
 import { GuardBuilder } from './GuardBuilder';
 import { SchemaPathPicker } from './SchemaPathPicker';
 import type { ScenarioIssue } from './types';
-import { summarizeBoundary } from './summaries';
 import { CompactRow } from './CompactRow';
 
 export interface BoundariesSectionProps {

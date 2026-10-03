@@ -19,7 +19,6 @@
 
 import * as React from 'react';
 import { Braces, ChevronRight, Download, FileCode, Image as ImageIcon, Table2, Workflow } from 'lucide-react';
-import { cn } from '../../../lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,

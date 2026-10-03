@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Document, Id, Scenario } from '../../domain/studio/model';
+import type { Document, Id } from '../../domain/studio/model';
 import { computeSnapshotId } from './primitives';
 import { createStudioDatabase } from './db';
 import { LocalRepository } from './repository';
@@ -11,13 +11,7 @@ import { prepareScenario } from '../../domain/studio/runner/compile';
 import { runScenario } from '../../domain/studio/runner/scenario-runner';
 import { buildManifest } from '../../domain/studio/manifest';
 import { CandidateController } from './candidates';
-import {
-  DEFAULT_BUILD_VERSIONS,
-  type Actor,
-  type CommitRecord,
-  type HistoryCommitCommand,
-  type SnapshotRecord,
-} from './types';
+import { DEFAULT_BUILD_VERSIONS, type Actor, type HistoryCommitCommand } from './types';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 

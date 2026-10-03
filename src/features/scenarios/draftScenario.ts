@@ -62,12 +62,12 @@ export type DraftCompletion =
 
 export const UNSET_COMPLETION: DraftCompletion = { kind: null };
 
-export function completionToDraft(completion: CompletionPolicy): DraftCompletion {
+function completionToDraft(completion: CompletionPolicy): DraftCompletion {
   return completion;
 }
 
 /** Returns the stored CompletionPolicy once every required field is filled, else null. */
-export function draftCompletionToStorable(completion: DraftCompletion): CompletionPolicy | null {
+function draftCompletionToStorable(completion: DraftCompletion): CompletionPolicy | null {
   if (completion.kind === null) return null;
   if (completion.kind === 'quiescent') return { kind: 'quiescent' };
   if (completion.kind === 'horizon') {
@@ -96,11 +96,11 @@ export const UNSET_KEY_DISTRIBUTION: DraftKeyDistribution = {
   hotShare: null,
 };
 
-export function keyDistributionToDraft(kd: KeyDistribution): DraftKeyDistribution {
+function keyDistributionToDraft(kd: KeyDistribution): DraftKeyDistribution {
   return kd;
 }
 
-export function draftKeyDistributionToStorable(kd: DraftKeyDistribution): KeyDistribution | null {
+function draftKeyDistributionToStorable(kd: DraftKeyDistribution): KeyDistribution | null {
   if (kd.kind === null || kd.catalogSize === null || kd.hotSubset === null || kd.hotShare === null) return null;
   return { kind: kd.kind, catalogSize: kd.catalogSize, hotSubset: kd.hotSubset, hotShare: kd.hotShare };
 }
@@ -118,7 +118,7 @@ export type DraftWorkloadProfile =
   | { readonly kind: 'burst'; readonly peakRate: number | null; readonly startMs: number | null; readonly endMs: number | null }
   | { readonly kind: 'ramp'; readonly endRate: number | null };
 
-export function draftProfileToStorable(p: DraftWorkloadProfile): WorkloadProfile | null {
+function draftProfileToStorable(p: DraftWorkloadProfile): WorkloadProfile | null {
   if (p.kind === 'burst') {
     if (p.peakRate === null || p.startMs === null || p.endMs === null) return null;
     return { kind: 'burst', peakRate: p.peakRate, startMs: p.startMs, endMs: p.endMs };

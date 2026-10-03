@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { Meter } from '@/components/ui/meter';
 
 const meta: Meta<typeof Meter> = {
