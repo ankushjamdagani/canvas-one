@@ -58,7 +58,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
       .getByTestId('existing-projects-list')
       .locator('[data-testid^="project-item-"]')
       .first()
-      .getByRole('button', { name: 'Open draft' })
+      .locator('[data-testid^="open-project-"]')
       .click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.locator('.component-node')).toHaveCount(total - 2);

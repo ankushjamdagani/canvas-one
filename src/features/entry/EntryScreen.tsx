@@ -7,10 +7,10 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { SearchField } from "@/components/ui/search-field";
+import { Segmented } from "@/components/ui/segmented";
 import type { SessionController } from "../session/controller";
 import { formatStudioError } from "../session/formatError";
 import { importProjectJson } from "../transfer";
@@ -30,6 +30,12 @@ import type {
 } from "../../persistence/studio/types";
 import type { Document, Id } from "../../domain/studio/model";
 import { EXAMPLE_CATALOG, type ExampleCatalogEntry } from "./exampleCatalog";
+import {
+  buildThumbnail,
+  resolveOpenTarget,
+  type OpenTarget,
+  type ProjectThumbnail,
+} from "./projectCard";
 
 export interface EntryScreenProps {
   session: SessionController;
@@ -40,22 +46,124 @@ export interface EntryScreenProps {
   actor: Actor;
 }
 
-export type OpenBranchChoice = {
-  readonly id: Id;
-  readonly label: string;
-  readonly isMain: boolean;
-};
-
 export type ProjectRowItem = {
   readonly project: ProjectRecord;
-  readonly status: "loading" | "ready" | "error";
-  readonly branches?: readonly OpenBranchChoice[];
+  readonly status: "ready" | "error";
+  /** The branch the card opens (newest open draft, else main). */
+  readonly target?: OpenTarget;
   /** Head commit of main, the compare-and-swap token for deleteProject. */
   readonly mainHeadId?: Id | null;
+  /** Preview of the opened branch's first view; null when nothing is placed. */
+  readonly thumbnail?: ProjectThumbnail | null;
   readonly errorMessage?: string;
 };
 
 const DEFAULT_PROJECT_TITLE = "Untitled";
+
+type ProjectSort = "recent" | "name";
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** "2 hours ago", "Yesterday", "Sep 21": the card's last-saved line. */
+export function formatUpdated(updatedAt: number, now: number): string {
+  const age = Math.max(0, now - updatedAt);
+  if (age < MINUTE) return "Just now";
+  if (age < HOUR) return pluralize(Math.floor(age / MINUTE), "minute") + " ago";
+  if (age < DAY) return pluralize(Math.floor(age / HOUR), "hour") + " ago";
+  if (age < 2 * DAY) return "Yesterday";
+  if (age < 7 * DAY) return `${Math.floor(age / DAY)} days ago`;
+  return new Date(updatedAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Stable 0..1 values from a project id, to vary each card's decorative preview. */
+function previewSeed(id: string, index: number): number {
+  let h = 2166136261 ^ index;
+  for (let i = 0; i < id.length; i += 1) {
+    h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  }
+  return ((h >>> 0) % 1000) / 1000;
+}
+
+const THUMB_ACCENTS = [
+  "var(--primary)",
+  "var(--purple)",
+  "#B5623F",
+  "#3A4A45",
+] as const;
+
+function accentFor(kind: string): string {
+  let h = 0;
+  for (let i = 0; i < kind.length; i += 1) h = (h * 31 + kind.charCodeAt(i)) >>> 0;
+  return THUMB_ACCENTS[h % THUMB_ACCENTS.length];
+}
+
+const DOT_BACKGROUND = {
+  backgroundImage:
+    "radial-gradient(circle, rgba(60,70,65,0.16) 1px, transparent 1px)",
+  backgroundSize: "18px 18px",
+} as const;
+
+/** The project's placed nodes and connections, scaled to the card. */
+function ProjectPreview({ thumbnail }: { thumbnail: ProjectThumbnail | null | undefined }) {
+  return (
+    <div
+      data-testid="project-thumbnail"
+      data-empty={thumbnail ? undefined : "true"}
+      aria-hidden="true"
+      className="h-[132px] overflow-hidden border-b border-hairline bg-canvas"
+      style={DOT_BACKGROUND}
+    >
+      {thumbnail && (
+        <svg
+          className="size-full"
+          viewBox={`${thumbnail.viewBox.x} ${thumbnail.viewBox.y} ${thumbnail.viewBox.width} ${thumbnail.viewBox.height}`}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {thumbnail.edges.map((e, i) => (
+            <line
+              key={i}
+              x1={e.x1}
+              y1={e.y1}
+              x2={e.x2}
+              y2={e.y2}
+              stroke="rgba(60,70,65,0.35)"
+              strokeWidth={3}
+              vectorEffect="non-scaling-stroke"
+              style={{ strokeWidth: 1.25 }}
+            />
+          ))}
+          {thumbnail.nodes.map((n, i) => (
+            <g key={i}>
+              <rect
+                x={n.x}
+                y={n.y}
+                width={n.width}
+                height={n.height}
+                rx={8}
+                fill="var(--background)"
+                stroke="var(--hairline)"
+                strokeWidth={2}
+              />
+              <rect
+                x={n.x}
+                y={n.y}
+                width={n.width}
+                height={6}
+                rx={3}
+                fill={accentFor(n.visualKind)}
+              />
+            </g>
+          ))}
+        </svg>
+      )}
+    </div>
+  );
+}
 
 /**
  * 2A "new system" entry screen: two columns.
@@ -83,6 +191,9 @@ export function EntryScreen({
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isImporting, setIsImporting] = React.useState(false);
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [query, setQuery] = React.useState("");
+  const [sort, setSort] = React.useState<ProjectSort>("recent");
+  const [dragActive, setDragActive] = React.useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = React.useState<Id | null>(null);
   const [deletingId, setDeletingId] = React.useState<Id | null>(null);
 
@@ -96,29 +207,25 @@ export function EntryScreen({
         list.map(async (project): Promise<ProjectRowItem> => {
           try {
             const history = await repository.loadHistory(project.id);
-            const openBranches = history.branches
-              .filter((b) => b.state === "open")
-              .map((b) => ({
-                id: b.id,
-                label: b.id === project.mainBranchId ? "main" : b.label,
-                isMain: b.id === project.mainBranchId,
-              }));
-
-            // Main marked "main" first, others sorted by branch label
-            openBranches.sort((a, b) => {
-              if (a.isMain && !b.isMain) return -1;
-              if (!a.isMain && b.isMain) return 1;
-              return a.label.localeCompare(b.label);
-            });
-
+            const target = resolveOpenTarget(project, history.branches);
             const main = history.branches.find(
               (b) => b.id === project.mainBranchId,
             );
+            const opened = history.branches.find(
+              (b) => b.id === target.branchId,
+            );
+            // A missing snapshot only costs the preview, never the card.
+            const snapshot = opened
+              ? await repository
+                  .loadSnapshot(project.id, opened.workingSnapshotId)
+                  .catch(() => null)
+              : null;
             return {
               project,
               status: "ready",
-              branches: openBranches,
+              target,
               mainHeadId: main?.headCommitId ?? null,
+              thumbnail: snapshot ? buildThumbnail(snapshot.document) : null,
             };
           } catch (err) {
             console.error(
@@ -321,13 +428,43 @@ export function EntryScreen({
     if (file) void handleImportFile(file);
   };
 
+  const visibleRows = React.useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const rows = needle
+      ? projectRows.filter((r) => r.project.title.toLowerCase().includes(needle))
+      : [...projectRows];
+    rows.sort((a, b) =>
+      sort === "name"
+        ? a.project.title.localeCompare(b.project.title)
+        : b.project.updatedAt - a.project.updatedAt,
+    );
+    return rows;
+  }, [projectRows, query, sort]);
+  const now = Date.now();
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) void handleImportFile(file);
+  };
+
   return (
     <div
       data-testid="entry-screen-root"
       className="min-h-screen w-full max-w-full overflow-x-hidden bg-shell text-ink flex flex-col items-center select-none"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          setDragActive(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setDragActive(false);
+      }}
+      onDrop={handleDrop}
     >
-      {/* Top Header */}
-      <header className="w-full h-12 border-b border-border bg-background px-4 sm:px-8 flex items-center justify-between shrink-0">
+      <header className="w-full h-12 border-b border-border bg-background px-4 sm:px-8 flex items-center shrink-0">
         <div className="flex items-center gap-2.5">
           <svg
             className="size-5 shrink-0"
@@ -359,8 +496,14 @@ export function EntryScreen({
         </div>
       </header>
 
-      {/* Two-column main content, per 2A new system */}
-      <main className="w-full max-w-6xl px-4 py-8 sm:py-12 flex flex-col gap-6">
+      <main className="w-full max-w-[1280px] px-4 sm:px-8 py-8 sm:py-12 flex flex-col gap-8">
+        <h1
+          className="text-[40px] leading-tight font-normal text-ink"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Start a project
+        </h1>
+
         {errorMessage && (
           <div
             data-testid="entry-error-banner"
@@ -371,121 +514,268 @@ export function EntryScreen({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left column: Your projects + Open an empty canvas */}
-          <div className="flex flex-col gap-8">
-            <section aria-labelledby="existing-projects-heading">
-              <div className="flex items-center justify-between mb-3">
-                <h2
-                  id="existing-projects-heading"
-                  className="text-base font-semibold text-ink"
-                >
-                  Your projects
-                </h2>
-                <span className="text-xs text-secondary-text">
-                  {pluralize(projectRows.length, "saved project")}
-                </span>
+        {/* Start tiles: empty project, starter templates, import */}
+        <section
+          aria-label="Start a project"
+          className="grid grid-cols-1 lg:grid-cols-[1fr_1.45fr_1fr] gap-5"
+        >
+          <form
+            onSubmit={handleCreateBlankProject}
+            className="relative flex min-h-[264px] flex-col justify-between rounded-[14px] bg-primary p-7 text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
+          >
+            <button
+              data-testid="create-blank-project-btn"
+              type="submit"
+              aria-label="Create empty project"
+              className="absolute inset-0 cursor-pointer rounded-[14px] outline-none disabled:cursor-not-allowed"
+              disabled={!isBlankNameValid || isSubmitting}
+            />
+            <span className="grid size-11 place-items-center rounded-[10px] bg-white/15">
+              <Plus size={18} aria-hidden="true" />
+            </span>
+            <div className="flex flex-col gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Empty project</h2>
+                <p className="mt-1 text-sm text-white/75">
+                  A blank canvas on main. Place parts from the library.
+                </p>
               </div>
+              <input
+                data-testid="blank-project-name-input"
+                aria-label="Blank project name"
+                type="text"
+                placeholder={DEFAULT_PROJECT_TITLE}
+                value={blankProjectName}
+                onChange={(e) => setBlankProjectName(e.target.value)}
+                maxLength={80}
+                disabled={isSubmitting}
+                className="relative z-10 h-9 pointer-coarse:h-11 w-full rounded-control border border-white/25 bg-white/10 px-3 text-xs text-white placeholder:text-white/55 outline-none focus-visible:border-white/70 focus-visible:bg-white focus-visible:text-ink focus-visible:placeholder:text-secondary-text"
+              />
+            </div>
+          </form>
 
-              {loadingProjects ? (
-                <div className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border">
-                  Loading projects…
-                </div>
-              ) : projectRows.length === 0 ? (
+          <div className="flex min-h-[264px] flex-col gap-3 rounded-[14px] border border-border bg-background p-5">
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-[10px] bg-purple-tint text-purple">
+                <LayoutTemplate size={18} aria-hidden="true" />
+              </span>
+              <h2
+                id="templates-heading"
+                className="flex-1 text-base font-semibold"
+              >
+                Starter template
+              </h2>
+              <span className="text-xs font-medium text-primary">
+                All {EXAMPLE_CATALOG.length}
+              </span>
+            </div>
+            <div
+              data-testid="templates-list"
+              role="list"
+              aria-labelledby="templates-heading"
+              className="max-h-[156px] overflow-y-auto rounded-card border border-hairline"
+            >
+              {EXAMPLE_CATALOG.map((example) => (
                 <div
-                  data-testid="no-projects-notice"
-                  className="p-8 text-center text-xs text-secondary-text bg-background rounded-card border border-border"
+                  key={example.id}
+                  role="listitem"
+                  data-testid={`template-row-${example.id}`}
+                  className="flex items-center gap-3 border-b border-hairline px-3 py-2.5 last:border-b-0"
                 >
-                  <FolderOpen
-                    size={24}
-                    className="mx-auto text-secondary-text/70 mb-2"
+                  <LayoutTemplate
+                    size={13}
+                    className="shrink-0 text-secondary-text"
+                    aria-hidden="true"
                   />
-                  <p className="font-medium text-ink">No saved projects yet</p>
-                  <p className="mt-0.5">
-                    Start from a template, or open an empty canvas.
-                  </p>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {example.title}
+                  </span>
+                  <span className="font-mono text-[10px] text-secondary-text">
+                    {pluralize(example.componentCount, "component")}
+                  </span>
+                  <Button
+                    data-testid={`create-example-${example.id}`}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs font-medium shrink-0"
+                    aria-label={`Create ${example.title}`}
+                    disabled={isSubmitting}
+                    onClick={() => handleCreateExample(example)}
+                  >
+                    <span>Create</span>
+                    <ArrowRight size={12} aria-hidden="true" />
+                  </Button>
                 </div>
-              ) : (
-                <div
-                  data-testid="existing-projects-list"
-                  className="flex flex-col gap-2"
-                >
-                  {projectRows.map((row) => (
-                    <div
-                      key={row.project.id}
-                      data-testid={`project-item-${row.project.id}`}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-card border border-border bg-background hover:border-hover-border transition-colors gap-3"
-                    >
-                      <div className="min-w-0 pr-3">
-                        <h3 className="text-sm font-semibold text-ink truncate">
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={cn(
+              "relative flex min-h-[264px] flex-col justify-between rounded-[14px] border border-dashed bg-background p-7 transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
+              dragActive
+                ? "border-primary bg-accent"
+                : "border-border hover:border-hover-border",
+            )}
+          >
+            <button
+              data-testid="import-project-btn"
+              type="button"
+              aria-label="Import project"
+              className="absolute inset-0 cursor-pointer rounded-[14px] outline-none disabled:cursor-wait"
+              disabled={isImporting}
+              onClick={() => importFileInputRef.current?.click()}
+            />
+            <span className="grid size-11 place-items-center rounded-[10px] bg-sunken text-secondary-text">
+              <Upload size={18} aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold">Import .json</h2>
+              <p className="mt-1 text-sm text-secondary-text">
+                Drop a Studio export anywhere on this page, or{" "}
+                <span className="font-medium text-primary">
+                  {isImporting ? "importing…" : "browse"}
+                </span>
+                .
+              </p>
+              <input
+                ref={importFileInputRef}
+                data-testid="import-project-file-input"
+                type="file"
+                accept=".json,application/json"
+                aria-label="Import project file"
+                className="hidden"
+                disabled={isImporting}
+                onChange={handleImportFileInputChange}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Your projects */}
+        <section aria-labelledby="existing-projects-heading">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h2
+              id="existing-projects-heading"
+              className="text-base font-semibold text-ink"
+            >
+              Your projects
+            </h2>
+            <span className="font-mono text-xs text-secondary-text">
+              {projectRows.length}
+            </span>
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <SearchField
+                aria-label="Search projects"
+                value={query}
+                placeholder="Search projects"
+                shortcut=""
+                onChange={setQuery}
+                onClear={() => setQuery("")}
+                className="w-full sm:w-[320px] bg-background"
+              />
+              <Segmented
+                aria-label="Sort projects"
+                value={sort}
+                onChange={(v) => setSort(v as ProjectSort)}
+                options={[
+                  { id: "recent", label: "Recent" },
+                  { id: "name", label: "A–Z" },
+                ]}
+              />
+            </div>
+          </div>
+
+          {loadingProjects ? (
+            <div className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border">
+              Loading projects…
+            </div>
+          ) : projectRows.length === 0 ? (
+            <div
+              data-testid="no-projects-notice"
+              className="p-8 text-center text-xs text-secondary-text bg-background rounded-card border border-border"
+            >
+              <FolderOpen
+                size={24}
+                className="mx-auto text-secondary-text/70 mb-2"
+              />
+              <p className="font-medium text-ink">No saved projects yet</p>
+              <p className="mt-0.5">
+                Start from a template, or open an empty canvas.
+              </p>
+            </div>
+          ) : visibleRows.length === 0 ? (
+            <p className="p-8 text-center text-xs text-secondary-text">
+              No projects match &ldquo;{query.trim()}&rdquo;.
+            </p>
+          ) : (
+            <div
+              data-testid="existing-projects-list"
+              className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4"
+            >
+              {visibleRows.map((row) => {
+                const confirming = confirmDeleteId === row.project.id;
+                return (
+                  <article
+                    key={row.project.id}
+                    data-testid={`project-item-${row.project.id}`}
+                    className="group relative flex flex-col overflow-hidden rounded-[12px] border border-border bg-background transition-colors hover:border-hover-border"
+                  >
+                    {row.status === "ready" && row.target && (
+                      <button
+                        type="button"
+                        data-testid={`open-project-${row.project.id}`}
+                        data-branch-id={row.target.branchId}
+                        aria-label={`Open ${row.project.title}`}
+                        disabled={isSubmitting}
+                        onClick={() =>
+                          handleOpenProject(
+                            row.project.id,
+                            row.target!.branchId,
+                          )
+                        }
+                        className="absolute inset-0 z-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait"
+                      />
+                    )}
+                    <ProjectPreview thumbnail={row.thumbnail} />
+                    <div className="flex flex-col gap-2.5 p-4">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="min-w-0 truncate text-[15px] font-semibold text-ink">
                           {row.project.title}
                         </h3>
-                        <p className="text-[11px] text-secondary-text mt-0.5 font-mono">
-                          ID: {row.project.id.slice(0, 8)}… · Rev{" "}
-                          {row.project.revision}
-                        </p>
+                        <span className="shrink-0 text-xs text-secondary-text">
+                          {formatUpdated(row.project.updatedAt, now)}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {row.status === "loading" && (
-                          <span className="text-xs text-secondary-text">
-                            Loading branches…
-                          </span>
-                        )}
+                      {row.status === "error" && (
+                        <span
+                          data-testid={`project-error-${row.project.id}`}
+                          className="text-xs text-destructive font-medium"
+                          role="alert"
+                        >
+                          {row.errorMessage}
+                        </span>
+                      )}
 
-                        {row.status === "error" && (
-                          <span
-                            data-testid={`project-error-${row.project.id}`}
-                            className="text-xs text-destructive font-medium"
-                            role="alert"
-                          >
-                            {row.errorMessage}
-                          </span>
-                        )}
-
-                        {row.status === "ready" && row.branches && (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {row.branches.length === 0 ? (
-                              <span className="text-xs text-secondary-text">
-                                No open branches
-                              </span>
-                            ) : (
-                              row.branches.map((branch) => (
-                                <Button
-                                  key={branch.id}
-                                  data-testid={`open-branch-${row.project.id}-${branch.isMain ? "main" : branch.label}`}
-                                  data-branch-id={branch.id}
-                                  data-branch-label={branch.label}
-                                  type="button"
-                                  variant={
-                                    branch.isMain ? "outline" : "default"
-                                  }
-                                  size="sm"
-                                  className="h-8 px-3 text-xs font-semibold shrink-0"
-                                  disabled={isSubmitting}
-                                  onClick={() =>
-                                    handleOpenProject(row.project.id, branch.id)
-                                  }
-                                >
-                                  Open {branch.label}
-                                </Button>
-                              ))
-                            )}
-                          </div>
-                        )}
-
-                        {confirmDeleteId === row.project.id ? (
+                      <div className="flex min-h-7 items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] uppercase text-secondary-text">
+                          {row.target?.isDraft ? "Draft · " : ""}Rev{" "}
+                          {row.project.revision}
+                        </span>
+                        {confirming ? (
                           <div
                             role="group"
                             aria-label={`Confirm delete ${row.project.title}`}
-                            className="flex items-center gap-1.5"
+                            className="relative z-10 flex items-center gap-1.5"
                           >
                             <Button
                               data-testid={`confirm-delete-project-${row.project.id}`}
                               type="button"
                               variant="destructive"
                               size="sm"
-                              className="h-8 px-3 text-xs font-semibold"
+                              className="h-7 px-2.5 text-xs font-semibold"
                               disabled={deletingId !== null}
                               onClick={() => void handleDeleteProject(row)}
                             >
@@ -497,7 +787,7 @@ export function EntryScreen({
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="h-8 px-3 text-xs"
+                              className="h-7 px-2.5 text-xs"
                               disabled={deletingId !== null}
                               onClick={() => setConfirmDeleteId(null)}
                             >
@@ -510,168 +800,23 @@ export function EntryScreen({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="size-8 text-secondary-text hover:text-destructive"
+                            className="relative z-10 size-7 text-secondary-text hover:text-destructive"
                             aria-label={`Delete ${row.project.title}`}
                             title="Delete project"
                             disabled={isSubmitting || deletingId !== null}
                             onClick={() => setConfirmDeleteId(row.project.id)}
                           >
-                            <Trash2 size={14} aria-hidden="true" />
+                            <Trash2 size={13} aria-hidden="true" />
                           </Button>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section aria-labelledby="blank-canvas-heading">
-              <h2
-                id="blank-canvas-heading"
-                className="text-base font-semibold text-ink mb-3"
-              >
-                Open an empty canvas
-              </h2>
-              <Card className="border border-border bg-background shadow-none">
-                <CardContent className="p-4 sm:p-5">
-                  <form
-                    onSubmit={handleCreateBlankProject}
-                    className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center"
-                  >
-                    <Input
-                      data-testid="blank-project-name-input"
-                      aria-label="Blank project name"
-                      type="text"
-                      placeholder={DEFAULT_PROJECT_TITLE}
-                      value={blankProjectName}
-                      onChange={(e) => setBlankProjectName(e.target.value)}
-                      maxLength={80}
-                      className="h-9 pointer-coarse:h-11 px-3 text-xs sm:flex-1"
-                      disabled={isSubmitting}
-                    />
-                    <Button
-                      data-testid="create-blank-project-btn"
-                      type="submit"
-                      variant="default"
-                      size="sm"
-                      className="h-9 px-4 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0"
-                      disabled={!isBlankNameValid || isSubmitting}
-                    >
-                      <Plus size={14} />
-                      <span>Create</span>
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </section>
-
-            <section aria-labelledby="import-project-heading">
-              <h2
-                id="import-project-heading"
-                className="text-base font-semibold text-ink mb-3"
-              >
-                Import a project
-              </h2>
-              <Card className="border border-border bg-background shadow-none">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
-                    <p className="flex-1 text-xs text-secondary-text">
-                      Import a project exported as JSON (
-                      <code>.system-studio.json</code>).
-                    </p>
-                    <input
-                      ref={importFileInputRef}
-                      data-testid="import-project-file-input"
-                      type="file"
-                      accept=".json,application/json"
-                      className="hidden"
-                      disabled={isImporting}
-                      onChange={handleImportFileInputChange}
-                    />
-                    <Button
-                      data-testid="import-project-btn"
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 px-4 text-xs font-semibold flex items-center justify-center gap-1.5 shrink-0"
-                      disabled={isImporting}
-                      onClick={() => importFileInputRef.current?.click()}
-                    >
-                      <Upload size={14} />
-                      <span>
-                        {isImporting ? "Importing…" : "Import project"}
-                      </span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-          </div>
-
-          {/* Right column: Start from a template */}
-          <div className="flex flex-col gap-8">
-            <section aria-labelledby="templates-heading">
-              <h2
-                id="templates-heading"
-                className="text-base font-semibold text-ink mb-3"
-              >
-                Start from a template
-              </h2>
-              <div data-testid="templates-list" className="flex flex-col gap-2">
-                {EXAMPLE_CATALOG.map((example) => (
-                  <div
-                    key={example.id}
-                    data-testid={`template-row-${example.id}`}
-                    className="flex items-center justify-between gap-3 p-3.5 rounded-card border border-border bg-background hover:border-hover-border transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/*
-                        CONTRACT GAP: templates don't have a single visualKind
-                        (each combines several component kinds), so they all
-                        share one generic template icon rather than inventing
-                        a per-template kind mapping.
-                      */}
-                      <LayoutTemplate
-                        size={16}
-                        className="text-secondary-text shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <Badge
-                            variant="secondary"
-                            className="font-mono text-[10px] px-1.5 py-0"
-                          >
-                            {example.key}
-                          </Badge>
-                          <span className="text-sm font-semibold text-ink truncate">
-                            {example.title}
-                          </span>
-                        </div>
-                        <p className="font-mono text-[10px] text-secondary-text mt-0.5">
-                          {pluralize(example.componentCount, "component")} ·{" "}
-                          {pluralize(example.scenarioCount, "scenario")}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      data-testid={`create-example-${example.id}`}
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-8 px-3 text-xs font-medium flex items-center justify-center gap-1.5 shrink-0"
-                      disabled={isSubmitting}
-                      onClick={() => handleCreateExample(example)}
-                    >
-                      <span>Create</span>
-                      <ArrowRight size={13} />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

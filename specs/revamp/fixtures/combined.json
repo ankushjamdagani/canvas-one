@@ -831,19 +831,7 @@
           "channel": "message",
           "protocol": "amqp",
           "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
-          "responseSchemaId": null,
-          "settings": {
-            "request": {
-              "requestClassId": "7480821d-f678-5d62-8290-e986ccffa5df",
-              "requestClassLabel": "Order",
-              "operation": "read",
-              "key": null,
-              "tags": [
-                "order"
-              ]
-            },
-            "deadlineDurationMs": 9000
-          }
+          "responseSchemaId": null
         }
       ],
       "behavior": {
@@ -1309,19 +1297,7 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
-          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
-          "settings": {
-            "request": {
-              "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
-              "requestClassLabel": "Order",
-              "operation": "read",
-              "key": null,
-              "tags": [
-                "order"
-              ]
-            },
-            "deadlineDurationMs": 9000
-          }
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         }
       ],
       "behavior": {
@@ -2087,19 +2063,7 @@
           "channel": "message",
           "protocol": "amqp",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
-          "responseSchemaId": null,
-          "settings": {
-            "request": {
-              "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
-              "requestClassLabel": "Order",
-              "operation": "read",
-              "key": null,
-              "tags": [
-                "order"
-              ]
-            },
-            "deadlineDurationMs": 9000
-          }
+          "responseSchemaId": null
         }
       ],
       "behavior": {

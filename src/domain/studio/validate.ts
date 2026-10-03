@@ -1418,32 +1418,6 @@ export function validateDocument(
     }
   }
 
-  // D53: ports that send the same request class must name it the same way.
-  if (Array.isArray(doc.elements)) {
-    const requestClassLabels = new Map<string, string>();
-    (doc.elements as unknown[]).forEach((el, elIdx) => {
-      const ports = (el as { ports?: unknown } | null)?.ports;
-      if (!Array.isArray(ports)) return;
-      (ports as unknown[]).forEach((port, pIdx) => {
-        const request = (port as { settings?: { request?: { requestClassId?: unknown; requestClassLabel?: unknown } } } | null)?.settings?.request;
-        if (typeof request?.requestClassId !== 'string' || typeof request.requestClassLabel !== 'string') return;
-        const previous = requestClassLabels.get(request.requestClassId);
-        if (previous !== undefined && previous !== request.requestClassLabel) {
-          issues.push(
-            errorIssue(
-              'structural-rule',
-              ['elements', elIdx, 'ports', pIdx, 'settings', 'request', 'requestClassLabel'],
-              (port as { id?: Id }).id ?? null,
-              'Ports with the same request class must use the same label',
-            ),
-          );
-        } else {
-          requestClassLabels.set(request.requestClassId, request.requestClassLabel);
-        }
-      });
-    });
-  }
-
   // ==========================================================================
   // Section D: Connections (§2 & §4)
   // ==========================================================================
@@ -2724,33 +2698,6 @@ function validateCallRetryPolicy(value: unknown, path: (string | number)[], enti
   }
 }
 
-function validateRequestMeta(
-  res: unknown,
-  path: readonly (string | number)[],
-  entityId: Id | null,
-  issues: Issue[],
-): void {
-  const keys = ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags'];
-  if (checkRecord(res, keys, keys, path, entityId, issues, 'RequestMeta')) {
-    const rec = res as Record<string, unknown>;
-    // requestClassId is a classification token, not a reference
-    validateId(rec.requestClassId, [...path, 'requestClassId'], entityId, issues);
-    validateString(rec.requestClassLabel, 1, 60, [...path, 'requestClassLabel'], entityId, issues, 'Request class label');
-    if (rec.operation !== 'read' && rec.operation !== 'write') {
-      issues.push(errorIssue('invalid-literal', [...path, 'operation'], entityId, `RequestMeta operation must be 'read' or 'write'`));
-    }
-    if (rec.key !== null) {
-      validateString(rec.key, 1, 80, [...path, 'key'], entityId, issues, 'RequestMeta key');
-    }
-    if (validateArray(rec.tags, 20, [...path, 'tags'], entityId, issues, 'RequestMeta tags')) {
-      const tags = rec.tags as unknown[];
-      for (let i = 0; i < tags.length; i++) {
-        validateString(tags[i], 0, 80, [...path, 'tags', i], entityId, issues, 'tag');
-      }
-    }
-  }
-}
-
 /** The simulated in-port settings only mean something on a node the runner simulates. */
 const SIMULATED_CALL_IN_KEYS = ['rateLimit', 'failureRate', 'serviceTimeMs', 'maxConcurrency', 'responseBytes'] as const;
 
@@ -2771,8 +2718,8 @@ function validatePortSettings(
   if (direction === 'in' && channel === 'call') keys = ['expectedP95Ms', 'availabilityPct', 'idempotent', ...SIMULATED_CALL_IN_KEYS];
   else if (direction === 'in' && channel === 'message') keys = ['ackDelayMs', 'messageTtlMs', 'delivery', 'ordering'];
   else if (direction === 'in' && channel === 'data') keys = ['throughputPerSec', 'maxStalenessMs'];
-  else if (direction === 'out' && channel === 'call') keys = ['deadlineDurationMs', 'retry', 'request', 'circuitBreaker', 'maxInFlight', 'hedge', 'requestBytes'];
-  else if (direction === 'out' && channel === 'message') keys = ['deadlineDurationMs', 'request', 'confirm', 'batch', 'requestBytes'];
+  else if (direction === 'out' && channel === 'call') keys = ['retry', 'circuitBreaker', 'maxInFlight', 'hedge', 'requestBytes'];
+  else if (direction === 'out' && channel === 'message') keys = ['confirm', 'batch', 'requestBytes'];
   else {
     issues.push(errorIssue('structural-rule', path, entityId, `A ${String(direction)} ${String(channel)} port has no settings`));
     return;
@@ -2809,7 +2756,6 @@ function validatePortSettings(
   }
   if (has('throughputPerSec')) validateNumber(rec.throughputPerSec, 0, 1e9, at('throughputPerSec'), entityId, issues, 'throughputPerSec', false, true);
   if (has('maxStalenessMs')) validateNumber(rec.maxStalenessMs, 0, 31_536_000_000, at('maxStalenessMs'), entityId, issues, 'maxStalenessMs', false, true);
-  if (has('deadlineDurationMs')) validateNumber(rec.deadlineDurationMs, 0, 600000, at('deadlineDurationMs'), entityId, issues, 'deadlineDurationMs', false, true);
   if (has('retry')) validateCallRetryPolicy(rec.retry, at('retry'), entityId, issues);
   if (has('responseBytes')) validateNumber(rec.responseBytes, 0, 1e12, at('responseBytes'), entityId, issues, 'responseBytes', true, true);
   if (has('requestBytes')) validateNumber(rec.requestBytes, 0, 1e12, at('requestBytes'), entityId, issues, 'requestBytes', true, true);
@@ -2834,8 +2780,11 @@ function validatePortSettings(
       validateNumber(b.windowMs, 1, 600000, [...at('batch'), 'windowMs'], entityId, issues, 'windowMs', false);
     }
   }
-  if (has('request')) validateRequestMeta(rec.request, at('request'), entityId, issues);
 
+  // Out-port settings drive the caller's behavior, so only a simulated caller has them.
+  if (!isResourceNode && direction === 'out') {
+    issues.push(errorIssue('structural-rule', path, entityId, 'Only a node the runner simulates can have out-port settings; the calls an unsimulated node makes use defaults'));
+  }
   if (!isResourceNode) {
     for (const key of SIMULATED_CALL_IN_KEYS) {
       if (has(key)) {

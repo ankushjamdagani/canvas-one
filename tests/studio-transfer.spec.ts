@@ -148,7 +148,7 @@ test.describe('Studio Transfer E2E (RV-10b)', () => {
     await expect(importedItem).toBeVisible();
 
     // The imported project can be opened.
-    const openButton = importedItem.locator('[data-testid^="open-branch-"]').first();
+    const openButton = importedItem.locator('[data-testid^="open-project-"]');
     await expect(openButton).toBeVisible();
     await openButton.click();
 

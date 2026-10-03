@@ -164,69 +164,6 @@ async function dragConnect(page: Page, sourceElementId: string, targetElementId:
 }
 
 test.describe('Studio Authoring E2E (RV-12e)', () => {
-  test('D43(b): creates Order and reuses its persisted class ID on a second connection', async ({ page }) => {
-    await openBlankProject(page, 'Request class labels');
-    // D53: the request class lives on the out-port of an unsimulated caller, so two clients send it.
-    const gateway = await placeAtFraction(page, 'client', 0.1, 0.2);
-    const clientB = await placeAtFraction(page, 'client', 0.1, 0.6);
-    const serviceA = await placeAtFraction(page, 'service', 0.4, 0.2);
-    const serviceB = await placeAtFraction(page, 'service', 0.4, 0.6);
-
-    async function readResources(connectionCount: number) {
-      await waitForIdle(page);
-      return page.evaluate(async (count) => {
-        const snapshots = await new Promise<SnapshotRecord[]>((resolve, reject) => {
-          const open = indexedDB.open('system-studio-local-v1');
-          open.onerror = () => reject(open.error);
-          open.onsuccess = () => {
-            const db = open.result;
-            const transaction = db.transaction('snapshots', 'readonly');
-            const request: IDBRequest<SnapshotRecord[]> = transaction.objectStore('snapshots').getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-            transaction.oncomplete = () => db.close();
-          };
-        });
-        const snapshot = snapshots.find((entry) => entry.document.connections.length === count);
-        if (!snapshot) throw new Error('Expected authored snapshot is missing');
-        return snapshot.document.elements.flatMap((element) =>
-          element.ports.flatMap((port) => {
-            const request = (port.settings as { request?: { requestClassId: string; requestClassLabel: string } } | undefined)?.request;
-            return request ? [request] : [];
-          }));
-      }, connectionCount);
-    }
-
-    expect(await dragConnect(page, gateway, serviceA)).toBe('form');
-    const classInput = page.getByTestId('connect-form-request-class');
-    await expect(classInput).toHaveValue('');
-    await expect(page.locator('datalist option')).toHaveCount(0);
-    await classInput.fill('Order');
-    await page.getByTestId('connect-form-op-read').check();
-    await page.getByTestId('connect-form-deadline').fill('250');
-    await page.getByTestId('connect-form-confirm').click();
-    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
-    const first = await readResources(1);
-    expect(first).toHaveLength(1);
-    expect(first[0].requestClassLabel).toBe('Order');
-    expect(first[0].requestClassId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/);
-
-    expect(await dragConnect(page, clientB, serviceB)).toBe('form');
-    await expect(classInput).toHaveValue('');
-    await expect(page.locator('datalist option')).toHaveAttribute('value', 'Order');
-    await classInput.fill('Order');
-    await page.getByTestId('connect-form-op-write').check();
-    await page.getByTestId('connect-form-deadline').fill('250');
-    await page.getByTestId('connect-form-confirm').click();
-    await expect(page.locator('.react-flow__edge')).toHaveCount(2);
-    const second = await readResources(2);
-    expect(second).toHaveLength(2);
-    expect(second.map((resource) => resource.requestClassLabel)).toEqual(['Order', 'Order']);
-    expect(second.map((resource) => resource.requestClassId)).toEqual([
-      first[0].requestClassId, first[0].requestClassId,
-    ]);
-  });
-
   test('delete preview lists the scenarios that reference the node', async ({ page }) => {
     await openS05Project(page);
     // "Checkout" is referenced by S05's scenarios, so Delete asks first
@@ -304,32 +241,23 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   });
 
-  test('connect into a resource: the form blocks until class, operation and a valid deadline', async ({ page }) => {
+  test('connect into a resource: the form asks for the connection type and path only, and Enter confirms (D54)', async ({ page }) => {
     await openBlankProject(page, 'Resource form');
-    // An unsimulated caller originates the traffic, so it states the class, operation and deadline (D53).
-    const serviceId = await placeAtFraction(page, 'client', 0.1, 0.3);
+    // An unsimulated caller has nothing to configure: no request class, operation or deadline.
+    const clientId = await placeAtFraction(page, 'client', 0.1, 0.3);
     const databaseId = await placeAtFraction(page, 'database', 0.4, 0.3);
-    expect(await dragConnect(page, serviceId, databaseId)).toBe('form');
+    expect(await dragConnect(page, clientId, databaseId)).toBe('form');
     await page.screenshot({ path: test.info().outputPath('rv12e-metadata-form.png') });
 
-    // No contracted default for operation or deadline (catalog.md resolution 8).
-    const confirm = page.getByTestId('connect-form-confirm');
-    await expect(confirm).toBeDisabled();
-    await page.getByTestId('connect-form-request-class').fill('read-profile');
-    await expect(confirm).toBeDisabled();
-    await page.getByTestId('connect-form-op-read').check();
-    await expect(confirm).toBeDisabled();
-    await page.getByTestId('connect-form-deadline').fill('0');
-    await expect(confirm).toBeDisabled();
-    // Enter runs the same validation as the (disabled) button.
-    await page.getByTestId('connect-form-deadline').press('Enter');
-    await expect(page.getByTestId('connect-form-error')).toBeVisible();
-    await expect(page.getByTestId('connect-resource-form')).toBeVisible();
+    await expect(page.getByTestId('connect-form-protocol')).toHaveValue('sql');
+    await expect(page.getByTestId('connect-form-request-class')).toHaveCount(0);
+    await expect(page.getByTestId('connect-form-deadline')).toHaveCount(0);
+    await expect(page.getByTestId('connect-form-confirm')).toBeEnabled();
     await expect(page.locator('.react-flow__edge')).toHaveCount(0);
 
-    await page.getByTestId('connect-form-deadline').fill('500');
-    await expect(confirm).toBeEnabled();
-    await confirm.click();
+    // The path field has focus, so Enter confirms.
+    await expect(page.getByTestId('connect-form-path')).toBeFocused();
+    await page.getByTestId('connect-form-path').press('Enter');
     await expect(page.getByTestId('connect-resource-form')).toHaveCount(0);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await page.screenshot({ path: test.info().outputPath('rv12e-after-connecting.png') });
@@ -388,6 +316,8 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
 
     // The connection is the link and the route: latency and weight, and the two ends' terms read-only.
     await page.locator('.react-flow__edge').first().click({ force: true });
+    // A selected connection has no parts to act on: the parts toolbar is for nodes and notes.
+    await expect(page.getByTestId('selection-toolbar')).toHaveCount(0);
     await expect(page.getByTestId('inspector-field-config.linkClass')).toHaveValue('same-az');
     await expect(page.getByTestId('inspector-field-config.latencyMs')).toHaveValue('2');
     await expect(page.locator('[data-testid^="inspector-field-config.retry"]')).toHaveCount(0);

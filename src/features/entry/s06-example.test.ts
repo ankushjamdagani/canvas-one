@@ -59,7 +59,7 @@ function buildS06(): Document {
       apply(r.changes);
       id = r.connectionId;
     } else {
-      const c = completeConnection(r.draft, { requestClassId: orderClass, requestClassLabel: 'Order', operation: 'write', deadlineDurationMs: 5000 });
+      const c = completeConnection(r.draft);
       if (!c.ok) throw new Error(JSON.stringify(c.issues));
       apply(c.changes);
       id = c.connectionId;

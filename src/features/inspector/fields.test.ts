@@ -356,15 +356,15 @@ describe('fieldsForConnection', () => {
   it('summarizes both ends and flags where the caller and the callee disagree (D53)', () => {
     const port = (id: string, direction: 'in' | 'out', settings?: Record<string, unknown>) =>
       ({ id, label: id, direction, channel: 'call', protocol: 'http', schemaId: 's', responseSchemaId: 'r', ...(settings ? { settings } : {}) }) as Element['ports'][number];
-    const caller = processorElement({ id: 'a', label: 'Caller', ports: [port('p-out', 'out', { deadlineDurationMs: 50, retry: { maxAttempts: 3, backoffMs: 1, backoffMultiplier: 1, maxBackoffMs: 1, jitter: false, attemptTimeoutMs: null } })] });
+    const caller = processorElement({ id: 'a', label: 'Caller', ports: [port('p-out', 'out', { retry: { maxAttempts: 3, backoffMs: 1, backoffMultiplier: 1, maxBackoffMs: 1, jitter: false, attemptTimeoutMs: 40 } })] });
     const callee = processorElement({ id: 'b', label: 'Callee', ports: [port('p-in', 'in', { expectedP95Ms: 80, idempotent: false })] });
     const conn = callConnection();
     const rows = fieldsForConnection(conn, { elements: [caller, callee] });
-    expect(rows.find((f) => f.id === 'ends.caller')!.toRaw(conn)).toBe('3 attempts · deadline 50 ms');
+    expect(rows.find((f) => f.id === 'ends.caller')!.toRaw(conn)).toBe('3 attempts · attempt timeout 40 ms');
     expect(rows.find((f) => f.id === 'ends.callee')!.toRaw(conn)).toBe('p95 80 ms · not idempotent');
     const advisories = rows.filter((f) => f.id.startsWith('ends.advisory')).map((f) => f.toRaw(conn));
     expect(advisories).toEqual([
-      "The caller's deadline (50 ms) is below the callee's expected p95 (80 ms).",
+      "The caller's attempt timeout (40 ms) is below the callee's expected p95 (80 ms).",
       'The caller retries an endpoint declared not idempotent.',
     ]);
   });
@@ -462,11 +462,15 @@ describe('fieldsForElement: port settings (D53)', () => {
     expect(fields.find((f) => f.id === 'config.jitterMs')!.parse('-1').ok).toBe(false);
   });
 
-  it('an unsimulated caller also has a deadline and a request class; a simulated one inherits them', () => {
+  it('an unsimulated caller is read-only: it has no caller settings to edit, only a note (D54)', () => {
     const client = processorElement({ ports: [outPort], behavior: { kind: 'unmodeled', version: 1, reason: 'x' } });
-    expect(fieldsForElement(client).some((f) => f.id === 'port.po.deadlineDurationMs')).toBe(true);
-    expect(fieldsForElement(client).find((f) => f.id === 'port.po.request.none')).toBeDefined();
-    expect(fieldsForElement(processorElement({ ports: [outPort] })).some((f) => f.id === 'port.po.deadlineDurationMs')).toBe(false);
+    const fields = fieldsForElement(client).filter((f) => f.group);
+    expect(fields.map((f) => f.id)).toEqual(['port.po.unsimulated']);
+    expect(fields[0].kind).toBe('readonly');
+    expect(fields[0].toRaw(client)).toBe('Not simulated');
+    expect(fields[0].apply(client, 'x')).toBe(client);
+    // A simulated caller edits its retries and policies.
+    expect(fieldsForElement(processorElement({ ports: [outPort] })).some((f) => f.id === 'port.po.retry.maxAttempts')).toBe(true);
   });
 });
 

@@ -4,6 +4,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   MiniMap,
   useNodesState,
   useEdgesState,
@@ -94,11 +95,6 @@ type ResourceFormState = {
   readonly draft: ConnectionDraft;
   readonly x: number;
   readonly y: number;
-  readonly requestClass: string;
-  // No contracted default (catalog.md resolution 8: "No default deadline" --
-  // the same applies to operation, which the form must not preselect).
-  readonly operation: 'read' | 'write' | null;
-  readonly deadlineMs: string;
   readonly error: string | null;
   /** D53: the endpoint path or name being typed; the draft is re-planned with it on confirm. */
   readonly path: string;
@@ -1021,9 +1017,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         setResourceForm({
           draft: result.draft,
           ...clientPoint,
-          requestClass: '',
-          operation: null,
-          deadlineMs: '',
           error: null,
           path: result.draft.path,
           plan: { sourceElementId: sourceElement.id, sourcePortId: sourcePort.id, targetElementId: targetElement.id, linkedExposures },
@@ -1060,54 +1053,10 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
   const cancelResourceForm = React.useCallback(() => setResourceForm(null), []);
 
-  const requestClasses = React.useMemo(() => {
-    const classes = new Map<Id, { requestClassId: Id; requestClassLabel: string }>();
-    if (!document) return [];
-    for (const element of document.elements) {
-      for (const port of element.ports) {
-        const request = (port.settings as { request?: { requestClassId: Id; requestClassLabel: string } } | undefined)?.request;
-        if (request) classes.set(request.requestClassId, { requestClassId: request.requestClassId, requestClassLabel: request.requestClassLabel });
-      }
-    }
-    return [...classes.values()];
-  }, [document]);
-  const requestClassListId = React.useId();
   const endpointPathListId = React.useId();
-
-  // catalog.md resolution 8: request class (text), read/write and deadline
-  // have no contracted default -- neither operation nor deadline is
-  // preselected, and Connect stays disabled until every field is filled in.
-  const resourceFormValid = React.useMemo(() => {
-    if (!resourceForm) return false;
-    // D53: a simulated caller's requests inherit the class, operation and deadline; only an unsimulated source asks for them.
-    if (!resourceForm.draft.needsRequest) return true;
-    const deadline = Number(resourceForm.deadlineMs);
-    return (
-      Array.from(resourceForm.requestClass).length > 0 &&
-      Array.from(resourceForm.requestClass).length <= 60 &&
-      resourceForm.operation !== null &&
-      resourceForm.deadlineMs.trim().length > 0 &&
-      Number.isFinite(deadline) &&
-      deadline > 0
-    );
-  }, [resourceForm]);
 
   const confirmResourceForm = React.useCallback(async () => {
     if (!resourceForm) return;
-    const needsRequest = resourceForm.draft.needsRequest;
-    if (needsRequest && (Array.from(resourceForm.requestClass).length === 0 || Array.from(resourceForm.requestClass).length > 60)) {
-      setResourceForm({ ...resourceForm, error: 'Request class must contain 1–60 characters.' });
-      return;
-    }
-    if (needsRequest && resourceForm.operation === null) {
-      setResourceForm({ ...resourceForm, error: 'Choose read or write.' });
-      return;
-    }
-    const deadline = Number(resourceForm.deadlineMs);
-    if (needsRequest && (resourceForm.deadlineMs.trim().length === 0 || !Number.isFinite(deadline) || deadline <= 0)) {
-      setResourceForm({ ...resourceForm, error: 'Deadline must be a positive number of ms.' });
-      return;
-    }
     // D53: the path decides which ports the connection uses, so plan again with it before completing.
     let draft = resourceForm.draft;
     if (document && projection.activeView && draft.protocol) {
@@ -1128,18 +1077,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       }
       if (replanned.kind === 'needs-resource-metadata') draft = replanned.draft;
     }
-    const existingClass = requestClasses.find((entry) => entry.requestClassLabel === resourceForm.requestClass);
-    const result = completeConnection(
-      draft,
-      needsRequest && resourceForm.operation !== null
-        ? {
-            requestClassId: existingClass ? existingClass.requestClassId : mintId(),
-            requestClassLabel: resourceForm.requestClass,
-            operation: resourceForm.operation,
-            deadlineDurationMs: deadline,
-          }
-        : undefined,
-    );
+    const result = completeConnection(draft);
     if (!result.ok) {
       if (result.issues.length === 0) {
         throw new Error('completeConnection: rejected result with no issues (contract violation)');
@@ -1149,7 +1087,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     }
     setResourceForm(null);
     await onApplyChanges(result.changes, 'Connect');
-  }, [resourceForm, requestClasses, onApplyChanges, mintId, document, projection.activeView]);
+  }, [resourceForm, onApplyChanges, mintId, document, projection.activeView]);
 
   // ==========================================================================
   // RV-12e: Delete -- Delete/Backspace on canvas focus, or the 16D toolbar
@@ -1172,6 +1110,9 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     currentSelection.elementIds.length > 0 ||
     currentSelection.connectionIds.length > 0 ||
     currentSelection.noteIds.length > 0;
+
+  // The parts toolbar is for nodes and notes; a selected connection has no parts to act on.
+  const hasPartSelection = currentSelection.elementIds.length > 0 || currentSelection.noteIds.length > 0;
 
   const runDeletePlan = React.useCallback(
     (plan: DeletePlan) => {
@@ -1333,7 +1274,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       )}
 
       {/* 16D selection-scoped actions. */}
-      {hasSelection && (
+      {hasPartSelection && (
         <SelectionToolbar
           context={commandContext}
           executeCommand={onExecuteCommand}
@@ -1388,9 +1329,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             ]}
           />
         </ViewportPortal>
-        {/* Dotted canvas background from design token CSS variable */}
-        {/* Design system canvas texture: #EFEBE3 dots on a 26px grid. */}
-        <Background color="var(--hairline-soft)" gap={26} size={1} />
+        {/* Dotted grid on the same 26px pitch as snap-to-grid; dots use the control border tone so they read on the white canvas. */}
+        <Background variant={BackgroundVariant.Dots} color="var(--control-border)" gap={26} size={1.6} />
         {showMinimap && (
           <MiniMap
             nodeColor="#0B5C54"
@@ -1455,6 +1395,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               <span className="block text-secondary-text mb-0.5">Path / name</span>
               <Input
                 data-testid="connect-form-path"
+                autoFocus
                 list={endpointPathListId}
                 placeholder="/orders, a topic, a procedure"
                 type="text"
@@ -1469,67 +1410,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
                 ))}
               </datalist>
             </label>
-          ) : null}
-
-          {resourceForm.draft.needsRequest ? (
-            <>
-          <label className="block mb-2">
-            <span className="block text-secondary-text mb-0.5">Request class</span>
-            <Input
-              data-testid="connect-form-request-class"
-              list={requestClassListId}
-              placeholder="Choose or name a class"
-              autoFocus
-              type="text"
-              value={resourceForm.requestClass}
-              onChange={(e) => setResourceForm({ ...resourceForm, requestClass: e.target.value, error: null })}
-              className="h-8 text-xs"
-            />
-            <datalist id={requestClassListId}>
-              {requestClasses.map((entry) => (
-                <option key={entry.requestClassId} value={entry.requestClassLabel} />
-              ))}
-            </datalist>
-          </label>
-
-          <fieldset className="mb-2">
-            <legend className="text-secondary-text mb-0.5">Operation</legend>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-1">
-                <input
-                  data-testid="connect-form-op-read"
-                  type="radio"
-                  name="operation"
-                  checked={resourceForm.operation === 'read'}
-                  onChange={() => setResourceForm({ ...resourceForm, operation: 'read', error: null })}
-                />
-                read
-              </label>
-              <label className="flex items-center gap-1">
-                <input
-                  data-testid="connect-form-op-write"
-                  type="radio"
-                  name="operation"
-                  checked={resourceForm.operation === 'write'}
-                  onChange={() => setResourceForm({ ...resourceForm, operation: 'write', error: null })}
-                />
-                write
-              </label>
-            </div>
-          </fieldset>
-
-          <label className="block mb-2">
-            <span className="block text-secondary-text mb-0.5">Deadline (ms)</span>
-            <Input
-              data-testid="connect-form-deadline"
-              type="number"
-              min={1}
-              value={resourceForm.deadlineMs}
-              onChange={(e) => setResourceForm({ ...resourceForm, deadlineMs: e.target.value, error: null })}
-              className="h-8 text-xs"
-            />
-          </label>
-            </>
           ) : null}
 
           {resourceForm.error && (
@@ -1547,7 +1427,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               type="button"
               variant="tint"
               size="sm"
-              disabled={!resourceFormValid}
+              autoFocus={!resourceForm.draft.protocol}
               onClick={() => void confirmResourceForm()}
             >
               Connect

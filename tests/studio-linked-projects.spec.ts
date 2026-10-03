@@ -171,9 +171,6 @@ test('the connect form offers a connection type and a service can be connected w
   await select.selectOption('grpc');
   await expect(select).toHaveValue('grpc');
   await page.getByTestId('connect-form-path').fill('/orders');
-  await page.getByTestId('connect-form-request-class').fill('Order');
-  await page.getByTestId('connect-form-op-read').check();
-  await page.getByTestId('connect-form-deadline').fill('500');
   await page.getByTestId('connect-form-confirm').click();
   await waitForIdle(page);
   await expect(page.locator('.react-flow__edge')).toHaveCount(edgesBefore + 1);

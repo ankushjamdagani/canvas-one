@@ -4,14 +4,16 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
   test('entry two columns, create S05, breadcrumb, project menu rename persists, branch popover switches, drag on main auto-drafts, dock zoom, no rail, mobile no scroll', async ({
     page,
   }) => {
-    // 1. Boot -> entry has two columns: "Your projects" + "Open an empty canvas" (left),
-    // "Start from a template" (right). No prompt box, no "Bring in what exists".
+    // 1. Boot -> entry has start tiles (empty project, starter template, import) above "Your projects".
+    // No prompt box, no "Bring in what exists".
     await page.goto('/');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await expect(page.getByTestId('no-projects-notice')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Open an empty canvas' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Start from a template' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Empty project' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Starter template' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Import .json' })).toBeVisible();
     await expect(page.getByTestId('templates-list')).toBeVisible();
     await expect(page.getByText('Describe the system')).toHaveCount(0);
     await expect(page.getByText('Bring in what exists')).toHaveCount(0);
@@ -52,7 +54,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
       .getByTestId('existing-projects-list')
       .locator('[data-testid^="project-item-"]', { hasText: 'Renamed Fullstack System' });
     await expect(renamedItem).toBeVisible();
-    await renamedItem.getByRole('button', { name: 'Open draft' }).click();
+    await renamedItem.locator('[data-testid^="open-project-"]').click();
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('Renamed Fullstack System');
@@ -99,11 +101,15 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     const item = projectList.locator('[data-testid^="project-item-"]', {
       hasText: 'Renamed Fullstack System',
     });
-    const openMainBtn = item.getByRole('button', { name: 'Open main' });
-    await expect(openMainBtn).toBeVisible();
-    await openMainBtn.click();
-
+    // The card opens the newest draft (the drag above auto-created one); switch to main.
+    await item.locator('[data-testid^="open-project-"]').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('MAIN');
+    await page.getByTestId('breadcrumb-branch-btn').click();
+    await page
+      .getByTestId('branch-switch-list')
+      .locator('[data-testid^="branch-switch-"]', { hasText: 'main' })
+      .click();
     await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
     // Fresh mount here (Workspace/CanvasView were unmounted while on the entry
     // screen) -> let the camera fit settle before reading positions.

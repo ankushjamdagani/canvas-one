@@ -22,6 +22,13 @@ async function openEntry(page: Page) {
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
 }
 
+/** Real pointer click at an element's centre; the card's stretched button sits above it. */
+async function clickCentre(page: Page, locator: ReturnType<Page['locator']>) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+}
+
 function writeImportFile(name: string, content: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'studio-entry-e2e-'));
   const path = join(dir, name);
@@ -69,9 +76,39 @@ test.describe('RV-13b: Entry screen', () => {
     const list = page.getByTestId('existing-projects-list');
     await expect(list).toContainText('RV-13b blank');
     // A new project opens on its draft branch, which holds the placed node.
-    await list.getByRole('button', { name: 'Open draft' }).click();
+    await list.locator('[data-testid^="open-project-"]').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.locator('.component-node')).toHaveCount(1);
+  });
+
+  test('project cards preview the real project and open from anywhere on the card; start tiles are fully clickable', async ({ page }) => {
+    await openEntry(page);
+    await page.getByTestId('create-example-s05').click();
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+    await waitForIdle(page);
+    await page.goto('/');
+
+    const card = page.locator('[data-testid^="project-item-"]').first();
+    // The thumbnail is drawn from the saved placements, one rect pair per node.
+    const thumb = card.getByTestId('project-thumbnail');
+    await expect(thumb).not.toHaveAttribute('data-empty', 'true');
+    expect(await thumb.locator('rect').count()).toBeGreaterThan(2);
+    await expect(card.getByRole('button', { name: /branch|^Open main$|^Open draft$/ })).toHaveCount(0);
+
+    // Clicking the title (not a button) opens the project.
+    await clickCentre(page, card.getByRole('heading'));
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+
+    // Empty project: clicking the tile text creates it.
+    await page.goto('/');
+    await clickCentre(page, page.getByRole('heading', { name: 'Empty project' }));
+    await expect(page.getByTestId('workspace-root')).toBeVisible();
+
+    // Import: clicking the tile text opens the file chooser.
+    await page.goto('/');
+    const chooser = page.waitForEvent('filechooser');
+    await clickCentre(page, page.getByRole('heading', { name: 'Import .json' }));
+    await chooser;
   });
 
   for (const id of EXAMPLE_IDS) {

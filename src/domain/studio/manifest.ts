@@ -46,7 +46,6 @@ import type {
   DataConnectionConfig,
   CallConnectionConfig,
   MessageConnectionConfig,
-  RequestMeta,
   PortSettings,
   Relation,
   Refinement,
@@ -255,8 +254,8 @@ const SETTINGS_KEPT: Readonly<Record<string, readonly string[]>> = {
   'in:call': ['rateLimit', 'failureRate', 'serviceTimeMs', 'maxConcurrency', 'responseBytes'],
   'in:message': ['ackDelayMs', 'messageTtlMs'],
   'in:data': [],
-  'out:call': ['deadlineDurationMs', 'retry', 'request', 'circuitBreaker', 'maxInFlight', 'hedge', 'requestBytes'],
-  'out:message': ['deadlineDurationMs', 'request', 'confirm', 'batch', 'requestBytes'],
+  'out:call': ['retry', 'circuitBreaker', 'maxInFlight', 'hedge', 'requestBytes'],
+  'out:message': ['confirm', 'batch', 'requestBytes'],
 };
 const SETTINGS_DROPPED: Readonly<Record<string, readonly string[]>> = {
   'in:call': ['expectedP95Ms', 'availabilityPct', 'idempotent'],
@@ -265,7 +264,6 @@ const SETTINGS_DROPPED: Readonly<Record<string, readonly string[]>> = {
   'out:call': [],
   'out:message': [],
 };
-const REQUEST_META_KEYS = ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags'] as const;
 
 function manifestSettings(port: Port): Record<string, unknown> | undefined {
   if (port.settings === undefined) return undefined;
@@ -276,15 +274,7 @@ function manifestSettings(port: Port): Record<string, unknown> | undefined {
   assertClosedKeys(settings, [...kept, ...dropped], 'PortSettings', port.id);
   const result: Record<string, unknown> = {};
   for (const key of kept) {
-    const value = settings[key];
-    if (value === undefined) continue;
-    if (key === 'request') {
-      const request = value as RequestMeta;
-      assertClosedKeys(request as unknown as Record<string, unknown>, REQUEST_META_KEYS, 'RequestMeta', port.id);
-      result.request = { requestClassId: request.requestClassId, operation: request.operation, key: request.key, tags: request.tags };
-    } else {
-      result[key] = value;
-    }
+    if (settings[key] !== undefined) result[key] = settings[key];
   }
   return Object.keys(result).length > 0 ? result : undefined;
 }

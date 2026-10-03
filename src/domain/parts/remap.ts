@@ -7,8 +7,6 @@
  */
 
 import type {
-  PortSettings,
-  RequestMeta,
   Behavior,
   Connection,
   DecisionBehavior,
@@ -90,10 +88,6 @@ function visitDefinitionIds(content: PartContent, visit: (id: Id) => void): void
     visit(element.id);
     element.ports.forEach((port) => {
       visit(port.id);
-      // A request class is a classification token rather than a document record,
-      // but it still has identity shared across copied ports that send it.
-      const request = (port.settings as { request?: { requestClassId: Id } } | undefined)?.request;
-      if (request) visit(request.requestClassId);
     });
     visitBehaviorIds(element.behavior, visit);
   }
@@ -247,13 +241,6 @@ function remapBehavior(behavior: Behavior, id: (oldId: Id) => Id): Behavior {
   }
 }
 
-/** A port's request class is a token shared by every port that sends it, so it follows the id mapping. */
-function remapPortSettings(settings: PortSettings, id: (oldId: Id) => Id): PortSettings {
-  const request = (settings as { request?: RequestMeta }).request;
-  if (!request) return structuredClone(settings);
-  return { ...structuredClone(settings), request: { ...request, requestClassId: id(request.requestClassId), tags: [...request.tags] } } as PortSettings;
-}
-
 function remapElement(element: Element, id: (oldId: Id) => Id): Element {
   return {
     ...element,
@@ -263,7 +250,7 @@ function remapElement(element: Element, id: (oldId: Id) => Id): Element {
       id: id(port.id),
       schemaId: id(port.schemaId),
       responseSchemaId: port.responseSchemaId === null ? null : id(port.responseSchemaId),
-      ...(port.settings ? { settings: remapPortSettings(port.settings, id) } : {}),
+      ...(port.settings ? { settings: structuredClone(port.settings) } : {}),
     })),
     behavior: remapBehavior(element.behavior, id),
   };

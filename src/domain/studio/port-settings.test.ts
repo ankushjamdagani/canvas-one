@@ -101,15 +101,15 @@ describe('reading and describing port settings', () => {
     const call = S05.connections.find((c) => c.kind === 'call' && callRetryOf(S05, c) === null)!;
     const retry = { maxAttempts: 2, backoffMs: 1, backoffMultiplier: 1, maxBackoffMs: 1, jitter: false, attemptTimeoutMs: 40 };
     const doc = withPortSettings(
-      withPortSettings(S05, (e, p) => e.id === call.source.elementId && p.id === call.source.portId, { retry, deadlineDurationMs: 30 }),
+      withPortSettings(S05, (e, p) => e.id === call.source.elementId && p.id === call.source.portId, { retry }),
       (e, p) => e.id === call.target.elementId && p.id === call.target.portId,
       { expectedP95Ms: 50, idempotent: false, rateLimit: { rps: 10, burst: 2 } },
     );
     const source = doc.elements.find((e) => e.id === call.source.elementId)!.ports.find((p) => p.id === call.source.portId)!;
     const target = doc.elements.find((e) => e.id === call.target.elementId)!.ports.find((p) => p.id === call.target.portId)!;
-    expect(describeCallerPolicy(source)).toBe('2 attempts · attempt timeout 40 ms · deadline 30 ms');
+    expect(describeCallerPolicy(source)).toBe('2 attempts · attempt timeout 40 ms');
     expect(describeCalleeContract(target)).toBe('p95 50 ms · not idempotent · limit 10/s (burst 2)');
-    expect(connectionAdvisories(doc, call)).toHaveLength(3);
+    expect(connectionAdvisories(doc, call)).toHaveLength(2); // attempt timeout below p95, retries on a not-idempotent endpoint
     expect(connectionAdvisories(S05, call)).toEqual([]);
   });
 });

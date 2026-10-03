@@ -133,7 +133,7 @@ describe('connect.ts', () => {
         });
         if (plan.kind === 'rejected') return plan;
         if (plan.kind === 'ready') { doc = applyChanges(doc, plan.changes); return plan; }
-        const done = completeConnection(plan.draft, { requestClassId: mintId(), requestClassLabel: 'R', operation: 'read', deadlineDurationMs: 500 });
+        const done = completeConnection(plan.draft);
         if (!done.ok) throw new Error(JSON.stringify(done));
         doc = applyChanges(doc, done.changes);
         return plan;
@@ -359,7 +359,7 @@ describe('connect.ts', () => {
     expect(validateDocument(finalDoc).ok).toBe(true);
   });
 
-  it('an unsimulated caller must give its request class, operation and deadline, which are stored on its out-port (D53)', () => {
+  it('an unsimulated caller (a client) connects with no request metadata: it cannot be configured (D54)', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);
 
@@ -383,49 +383,19 @@ describe('connect.ts', () => {
 
     expect(plan.kind).toBe('needs-resource-metadata');
     if (plan.kind !== 'needs-resource-metadata') return;
-    expect(plan.draft.needsRequest).toBe(true);
-
-    // Metadata is required, and invalid metadata is rejected
-    expect(completeConnection(plan.draft).ok).toBe(false);
-    expect(completeConnection(plan.draft, {
-      requestClassId: '',
-      requestClassLabel: 'Order',
-      operation: 'read',
-      deadlineDurationMs: 0,
-    }).ok).toBe(false);
-
-    const requestClassId = mintId();
-    for (const requestClassLabel of ['', '😀'.repeat(61)]) {
-      expect(completeConnection(plan.draft, {
-        requestClassId, requestClassLabel, operation: 'read', deadlineDurationMs: 500,
-      }).ok).toBe(false);
-    }
-    expect(completeConnection(plan.draft, {
-      requestClassId, requestClassLabel: '😀'.repeat(60), operation: 'read', deadlineDurationMs: 500,
-    }).ok).toBe(true);
-
-    const complete = completeConnection(plan.draft, {
-      requestClassId,
-      requestClassLabel: 'Order',
-      operation: 'read',
-      deadlineDurationMs: 500,
-    });
+    const complete = completeConnection(plan.draft);
     expect(complete.ok).toBe(true);
     if (!complete.ok) return;
 
     const connChange = complete.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'connection');
     expect('resource' in (connChange as any).value.record.config).toBe(false);
-
     const finalDoc = applyChanges(doc2, complete.changes);
-    const sentFrom = finalDoc.elements.find((e) => e.id === client.id)!.ports.find((p) => p.id === clientOut.id)!;
-    expect(sentFrom.settings).toEqual({
-      request: { requestClassId, requestClassLabel: 'Order', operation: 'read', key: null, tags: [] },
-      deadlineDurationMs: 500,
-    });
+    // Nothing is stored on the unsimulated caller's ports.
+    expect(finalDoc.elements.find((e) => e.id === client.id)!.ports.every((p) => p.settings === undefined)).toBe(true);
     expect(validateDocument(finalDoc).ok).toBe(true);
   });
 
-  it('a simulated caller inherits its request: no metadata is asked for and none is stored', () => {
+  it('a simulated caller connects the same way: nothing about its request is asked for or stored', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);
     const p1 = place(baseDoc, viewId, 'gateway', { x: 0, y: 0 }, mintId);
@@ -444,7 +414,6 @@ describe('connect.ts', () => {
     });
     expect(plan.kind).toBe('needs-resource-metadata');
     if (plan.kind !== 'needs-resource-metadata') return;
-    expect(plan.draft.needsRequest).toBe(false);
     const complete = completeConnection(plan.draft);
     expect(complete.ok).toBe(true);
     if (!complete.ok) return;
@@ -482,12 +451,7 @@ describe('connect.ts', () => {
     expect(plan1.kind).toBe('needs-resource-metadata');
     if (plan1.kind !== 'needs-resource-metadata') return;
 
-    const comp1 = completeConnection(plan1.draft, {
-      requestClassId: mintId(),
-      requestClassLabel: 'Order',
-      operation: 'read',
-      deadlineDurationMs: 200,
-    });
+    const comp1 = completeConnection(plan1.draft);
     expect(comp1.ok).toBe(true);
     if (!comp1.ok) return;
 
@@ -509,12 +473,7 @@ describe('connect.ts', () => {
     expect(plan2.draft.sourceElementReplacement).toBeDefined();
     expect(plan2.draft.sourceElementReplacement!.ports.length).toBe(3);
 
-    const comp2 = completeConnection(plan2.draft, {
-      requestClassId: mintId(),
-      requestClassLabel: 'Order',
-      operation: 'read',
-      deadlineDurationMs: 200,
-    });
+    const comp2 = completeConnection(plan2.draft);
     expect(comp2.ok).toBe(true);
     if (!comp2.ok) return;
 

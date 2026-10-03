@@ -115,7 +115,7 @@ class Arch {
       this.apply(r.changes);
       return r.connectionId;
     }
-    const c = completeConnection(r.draft, { requestClassId: this.readClass, requestClassLabel: 'read', operation: 'read', deadlineDurationMs: 30000 });
+    const c = completeConnection(r.draft);
     if (!c.ok) throw new Error(JSON.stringify(c.issues));
     this.apply(c.changes);
     return c.connectionId;

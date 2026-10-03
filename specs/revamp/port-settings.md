@@ -9,7 +9,7 @@ Those belong to different parties, so they now live where they are decided.
 | Owner | Holds | Why |
 | :--- | :--- | :--- |
 | Connection (link and route) | `latencyMs`, `returnLatencyMs` (calls), `linkClass`, `jitterMs`, `lossRate`, `bandwidthKbps`, `weight`, `condition`, `fallback` | The wire between two ends, and one route among several from a node. |
-| Out-port (the caller's contract for one downstream endpoint) | `retry`, and for traffic that originates here `request` and `deadlineDurationMs` | Governed by the downstream protocol and path, like the port itself. |
+| Out-port (the caller's contract for one downstream endpoint) | `retry`, `circuitBreaker`, `maxInFlight`, `hedge`, `requestBytes` (message ports: `confirm`, `batch`, `requestBytes`) | Governed by the downstream protocol and path, like the port itself. Simulated nodes only. |
 | In-port (the callee's contract and behavior for one endpoint) | declared expectations and simulated overrides (below) | What a callee promises or enforces on that endpoint. |
 | Node | capacity, concurrency, failure rate, service time, ... | Unchanged. |
 
@@ -43,8 +43,8 @@ what a run does and enter the manifest; "declared" settings are expectations sho
 | in, call | `expectedP95Ms`, `availabilityPct`, `idempotent` | `rateLimit {rps, burst}`, `failureRate`, `serviceTimeMs`, `maxConcurrency`, `responseBytes` (resource nodes only) |
 | in, message | `delivery` (at-most/at-least/exactly-once), `ordering` (none/per-key/global) | `ackDelayMs` (default 0), `messageTtlMs` (default 5 min) |
 | in, data | `throughputPerSec`, `maxStalenessMs` | none |
-| out, call | none | `retry`, `circuitBreaker`, `maxInFlight`, `hedge`, `requestBytes`; and `request`, `deadlineDurationMs` where traffic originates |
-| out, message | none | `confirm`, `batch`, `requestBytes`; and `request`, `deadlineDurationMs` where traffic originates |
+| out, call | none | `retry`, `circuitBreaker`, `maxInFlight`, `hedge`, `requestBytes` (resource nodes only) |
+| out, message | none | `confirm`, `batch`, `requestBytes` (resource nodes only) |
 
 Why the declared ones are not simulated: `expectedP95Ms` and `availabilityPct` are outcomes of a run (measured from the
 latencies and failures the inputs produce), so feeding them in would count the same thing twice; they are what a run is
@@ -72,12 +72,14 @@ and `maxStalenessMs` belong to the data channel, which has no run-time behavior.
   has passed since the first, then the batch travels as one hop (one latency draw, one loss draw, the transfer time of all
   its bytes, one acknowledgement time). Broker work is still per message, so batching trades latency for fewer hops, not
   for lighter broker load.
-- **Request and deadline** are needed only where traffic originates in a node the runner does not simulate (a client, a
-  state machine). A simulated caller's requests inherit them, so the connect form asks for class, operation and deadline
-  only for such a source. Ports that send the same class id must use the same label.
+- **Unsimulated callers are read-only.** A node the runner does not simulate (a client, a state machine, a scheduler)
+  has no out-port settings and no request to configure. Whatever it sends into the simulation is a read of the default
+  class with a 60 s deadline; to shape traffic, use a workload (which has its own named classes, operation, key and tags).
+  The connect form therefore asks only for the connection type and path. (There used to be a request class, operation
+  and deadline on the out-port; D54 removed them.)
 - **Node kinds.** Declared settings are valid on every connectable port; the simulated in-port settings only on
-  `resource` behaviors. Out-port `retry` is valid on any call out-port (a broker's route retry is its redelivery policy,
-  without an attempt timeout). Unmodeled nodes (clients, DNS, third parties, email, monitoring, analytics, secrets) can
+  `resource` behaviors. Out-port settings are valid only on `resource` behaviors, and `retry` on any of their call out-ports (a broker's
+  route retry is its redelivery policy, without an attempt timeout). Unmodeled nodes (clients, DNS, third parties, email, monitoring, analytics, secrets) can
   declare a contract but nothing changes in a run; the scenario's boundaries still decide their behavior.
 
 ## Advisories

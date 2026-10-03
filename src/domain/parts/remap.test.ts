@@ -42,14 +42,6 @@ describe('remapContent', () => {
     const mapFieldId = 'a0000000-0000-4000-8000-000000000005';
     const groupId = 'a0000000-0000-4000-8000-000000000006';
     const noteId = 'a0000000-0000-4000-8000-000000000007';
-    // D53: the request class lives on the out-port that sends it.
-    const requestPort = capture.content.elements.flatMap((element) => element.ports).find(
-      (port) => (port.settings as { request?: unknown } | undefined)?.request !== undefined,
-    )!;
-    const requestClassId = (requestPort.settings as { request: { requestClassId: string } }).request.requestClassId;
-    const resourceConnectionId = capture.content.connections.find(
-      (connection) => connection.kind !== 'data' && connection.source.portId === requestPort.id,
-    )!.id;
     const augmentedElements = capture.content.elements.map((element): Element => {
       if (element.id === machine.id && element.behavior.kind === 'machine') {
         return {
@@ -89,27 +81,6 @@ describe('remapContent', () => {
     const augmented = {
       ...capture.content,
       elements: augmentedElements,
-      connections: capture.content.connections.map((connection) => {
-        if (connection.id !== resourceConnectionId || connection.kind === 'data') return connection;
-        if (connection.kind === 'call') {
-          return {
-            ...connection,
-            kind: 'call' as const,
-            config: {
-              ...connection.config,
-              condition: { field: 'class' as const, value: requestClassId },
-            },
-          };
-        }
-        return {
-          ...connection,
-          kind: 'message' as const,
-          config: {
-            ...connection.config,
-            condition: { field: 'class' as const, value: requestClassId },
-          },
-        };
-      }),
       refinements: [{
         id: refinementId,
         ownerElementId: machine.id,

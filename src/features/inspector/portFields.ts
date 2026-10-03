@@ -5,7 +5,7 @@
  * the connection inspector only summarizes them.
  */
 
-import type { CallRetryPolicy, CircuitBreakerPolicy, Element, Port, RequestMeta } from '../../domain/studio/model';
+import type { CallRetryPolicy, CircuitBreakerPolicy, Element, Port } from '../../domain/studio/model';
 import { DELIVERY_GUARANTEES, MESSAGE_ORDERINGS } from '../../domain/studio/model';
 import { describeEndpoint } from '../../domain/studio/protocols';
 import { numberField, optionalNumberField, optionalSelectField, readonlyField, selectField, textField } from './fieldBuilders';
@@ -210,49 +210,15 @@ function retryFields(element: Element, port: Port): FieldSpec<Element>[] {
   return fields;
 }
 
-/** The caller's request class is set when the connection is made; here it can be edited, not invented. */
-function requestFields(element: Element, port: Port): FieldSpec<Element>[] {
-  const requestOf = (el: Element) => settingsOf(el, port.id).request as RequestMeta | undefined;
-  const id = (key: string) => `port.${port.id}.request.${key}`;
-  const withRequest = (el: Element, patch: (r: RequestMeta) => RequestMeta): Element => {
-    const r = requestOf(el);
-    return r ? withSetting(el, port.id, 'request', patch(r)) : el;
-  };
-  if (!requestOf(element)) {
-    return [readonlyField<Element>(id('none'), 'Request class', 'Not set', 'Chosen when a connection from this endpoint is made')];
-  }
+/** An unsimulated node has no caller behavior to edit: what it sends is fixed (D54). */
+function unsimulatedCallerFields(port: Port): FieldSpec<Element>[] {
   return [
-    textField<Element>({
-      id: id('requestClassLabel'), label: 'Request class', min: 1, max: 60,
-      get: (el) => requestOf(el)?.requestClassLabel ?? '', set: (el, value) => withRequest(el, (r) => ({ ...r, requestClassLabel: value })),
-    }),
-    optionalSelectField<Element>({
-      id: id('operation'), label: 'Operation',
-      options: [{ value: 'read', label: 'Read' }, { value: 'write', label: 'Write' }],
-      get: (el) => requestOf(el)?.operation,
-      set: (el, value) => withRequest(el, (r) => ({ ...r, operation: value === 'write' ? 'write' : 'read' })),
-    }),
-    textField<Element>({
-      id: id('key'), label: 'Key (blank = none)', min: 0, max: 80,
-      get: (el) => requestOf(el)?.key ?? '', set: (el, value) => withRequest(el, (r) => ({ ...r, key: value === '' ? null : value })),
-    }),
-    textField<Element>({
-      id: id('tags'), label: 'Tags (comma separated)', min: 0, max: 400,
-      get: (el) => (requestOf(el)?.tags ?? []).join(', '),
-      set: (el, value) => withRequest(el, (r) => ({ ...r, tags: value.split(',').map((t) => t.trim()).filter((t) => t !== '') })),
-    }),
-  ];
-}
-
-/** Traffic that originates in an unsimulated node needs a deadline and a request class; a simulated caller's requests inherit them. */
-function originatingFields(element: Element, port: Port): FieldSpec<Element>[] {
-  return [
-    optionalNumberField<Element>({
-      id: `port.${port.id}.deadlineDurationMs`, label: 'Deadline', unit: 'ms', note: 'Simulated: how long this caller waits for traffic it originates (default 60 s)',
-      min: 0, max: 600000, minExclusive: true,
-      get: (el) => num(settingsOf(el, port.id), 'deadlineDurationMs'), set: (el, value) => withSetting(el, port.id, 'deadlineDurationMs', value),
-    }),
-    ...requestFields(element, port),
+    readonlyField<Element>(
+      `port.${port.id}.unsimulated`,
+      'Calls from this node',
+      'Not simulated',
+      'It sends a default read request with a 60 s deadline. Shape traffic with a workload.',
+    ),
   ];
 }
 
@@ -355,9 +321,8 @@ function outMessagePolicyFields(element: Element, port: Port): FieldSpec<Element
 }
 
 function outCallFields(element: Element, port: Port): FieldSpec<Element>[] {
-  const fields = [...retryFields(element, port), ...callerPolicyFields(element, port)];
-  if (element.behavior.kind !== 'resource') fields.push(...originatingFields(element, port));
-  return fields;
+  if (element.behavior.kind !== 'resource') return unsimulatedCallerFields(port);
+  return [...retryFields(element, port), ...callerPolicyFields(element, port)];
 }
 
 /** Every connectable port of the node, grouped, with the settings that make sense for its direction and channel. */
@@ -370,7 +335,7 @@ export function portSettingsFields(element: Element): readonly FieldSpec<Element
     else if (port.direction === 'in' && port.channel === 'message') fields = inMessageFields(port);
     else if (port.direction === 'in' && port.channel === 'data') fields = inDataFields(port);
     else if (port.direction === 'out' && port.channel === 'call') fields = outCallFields(element, port);
-    else if (port.direction === 'out' && port.channel === 'message') fields = [...outMessagePolicyFields(element, port), ...(element.behavior.kind !== 'resource' ? originatingFields(element, port) : [])];
+    else if (port.direction === 'out' && port.channel === 'message') fields = element.behavior.kind === 'resource' ? outMessagePolicyFields(element, port) : unsimulatedCallerFields(port);
     result.push(...grouped(portGroup(element, port), fields));
   }
   return result;

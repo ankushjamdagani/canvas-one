@@ -21,7 +21,6 @@ import type {
   MessageConnectionConfig,
   PayloadSchema,
   PortSettings,
-  RequestMeta,
   Port,
   Shape,
   View,
@@ -97,19 +96,8 @@ export type ConnectionDraft = {
   /** D53: the endpoint path or name this draft was planned with, and the paths the target already has for the type. */
   readonly path: string;
   readonly pathOptions: readonly string[];
-  /** D53: the source is not simulated, so the caller's request class, operation and deadline are needed. */
-  readonly needsRequest: boolean;
   /** D53: schema inserts and element replacements for ports added by this connection. */
   readonly portChanges: readonly RecordChange[];
-};
-
-export type ResourceMetadataInput = {
-  readonly requestClassId: Id;
-  readonly requestClassLabel: string;
-  readonly operation: 'read' | 'write';
-  readonly deadlineDurationMs: number;
-  readonly key?: string | null;
-  readonly tags?: readonly string[];
 };
 
 export type PlanConnectionResult =
@@ -670,7 +658,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       protocolOptions,
       path: chosenPath,
       pathOptions,
-      needsRequest: sourceElement.behavior.kind !== 'resource',
       portChanges,
     };
     return {
@@ -731,90 +718,13 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 }
 
 /**
- * Completes a connection into a resource element. When the source is not simulated (`needsRequest`)
- * the caller's request class, operation and deadline are required and are stored on its out-port;
- * otherwise the metadata is ignored, because a simulated caller's requests inherit it.
+ * Completes a connection into a resource element once its type and path are confirmed. The
+ * caller's request, retries and other policies are not part of connecting: a simulated caller's
+ * requests inherit, and an unsimulated one's use defaults.
  */
-export function completeConnection(
-  draft: ConnectionDraft,
-  metadata?: ResourceMetadataInput,
-): CompleteConnectionResult {
-  let sourceElement: Element | undefined = draft.sourceElementReplacement ?? draft.document.elements.find((e) => e.id === draft.source.elementId);
-  let sourceChanged = draft.sourceElementReplacement !== undefined;
-
-  if (draft.needsRequest) {
-    if (!metadata || typeof metadata !== 'object') {
-      return {
-        ok: false,
-        kind: 'rejected',
-        issues: [createIssue('missing-property', 'Request metadata is required', ['metadata'])],
-      };
-    }
-
-    if (typeof metadata.requestClassId !== 'string' || metadata.requestClassId.trim().length === 0) {
-      return {
-        ok: false,
-        kind: 'rejected',
-        issues: [createIssue('missing-property', 'requestClassId is required', ['metadata', 'requestClassId'])],
-      };
-    }
-
-    if (typeof metadata.requestClassLabel !== 'string' ||
-        Array.from(metadata.requestClassLabel).length < 1 ||
-        Array.from(metadata.requestClassLabel).length > 60) {
-      return {
-        ok: false,
-        kind: 'rejected',
-        issues: [createIssue('out-of-range', 'Request class must contain 1–60 characters', ['metadata', 'requestClassLabel'])],
-      };
-    }
-
-    if (metadata.operation !== 'read' && metadata.operation !== 'write') {
-      return {
-        ok: false,
-        kind: 'rejected',
-        issues: [createIssue('invalid-literal', "operation must be 'read' or 'write'", ['metadata', 'operation'])],
-      };
-    }
-
-    if (
-      typeof metadata.deadlineDurationMs !== 'number' ||
-      !Number.isFinite(metadata.deadlineDurationMs) ||
-      metadata.deadlineDurationMs <= 0 ||
-      metadata.deadlineDurationMs > 600000
-    ) {
-      return {
-        ok: false,
-        kind: 'rejected',
-        issues: [
-          createIssue(
-            'out-of-range',
-            'deadlineDurationMs must be a positive number up to 600,000 ms',
-            ['metadata', 'deadlineDurationMs'],
-          ),
-        ],
-      };
-    }
-
-    const request: RequestMeta = {
-      requestClassId: metadata.requestClassId,
-      requestClassLabel: metadata.requestClassLabel,
-      operation: metadata.operation,
-      key: metadata.key ?? null,
-      tags: metadata.tags ?? [],
-    };
-    if (sourceElement) {
-      sourceElement = {
-        ...sourceElement,
-        ports: sourceElement.ports.map((port) =>
-          port.id === draft.source.portId
-            ? { ...port, settings: { ...(port.settings ?? {}), request, deadlineDurationMs: metadata.deadlineDurationMs } as PortSettings }
-            : port,
-        ),
-      };
-      sourceChanged = true;
-    }
-  }
+export function completeConnection(draft: ConnectionDraft): CompleteConnectionResult {
+  const sourceElement: Element | undefined = draft.sourceElementReplacement;
+  const sourceChanged = sourceElement !== undefined;
 
   const connection: Connection =
     draft.kind === 'call'

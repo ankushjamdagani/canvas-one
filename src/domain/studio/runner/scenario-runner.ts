@@ -16,7 +16,6 @@
  */
 
 import { canonicalJson, sha256Hex } from '../canonical';
-import { sourceSettings } from '../port-settings';
 import type {
   Boundary,
   BoundaryResponse,
@@ -370,6 +369,14 @@ class ScenarioEventRecorder {
 // ============================================================================
 // ScenarioRunner Class
 // ============================================================================
+
+/**
+ * What the calls and messages a node the runner does not simulate (a client, a state machine)
+ * send into the simulation look like: a read of the default class that waits 60 s. Such a node
+ * has no editable request; use a workload to shape traffic.
+ */
+const UNSIMULATED_CALL_DEADLINE_MS = 60000;
+const UNSIMULATED_CALL_REQUEST = { requestClassId: 'default-class', operation: 'read' as const, key: null, tags: [] as string[] };
 
 export class ScenarioRunner {
   private readonly document: Document;
@@ -967,8 +974,7 @@ export class ScenarioRunner {
         if (targetEl && targetEl.behavior.kind === 'resource') {
 
           // Message into resource entry: build ResourceInput from connection resource metadata
-          const outSettings = sourceSettings(this.document, conn);
-          const duration = outSettings.deadlineDurationMs ?? 60000;
+          const duration = UNSIMULATED_CALL_DEADLINE_MS;
           const arrivalMs = (atMs ?? 0) + (this.scenario.mode === 'timed' ? (conn.config.latencyMs ?? 0) : 0);
           const deadlineMs = arrivalMs + duration;
 
@@ -980,10 +986,7 @@ export class ScenarioRunner {
             journeyId: context.journeyId,
             parentEventId: context.parentEventId,
             entryElementId: conn.target.elementId,
-            requestClassId: outSettings.request?.requestClassId ?? 'default-class',
-            operation: outSettings.request?.operation ?? 'read',
-            key: outSettings.request?.key ?? null,
-            tags: outSettings.request?.tags ?? [],
+            ...UNSIMULATED_CALL_REQUEST,
             payloadRef,
             atMs: arrivalMs,
             deadlineMs,
@@ -1311,10 +1314,9 @@ export class ScenarioRunner {
           if (!this.adapter) {
             return { ok: false, error: 'Resource adapter not initialized for resource admission' };
           }
-          const resMeta = sourceSettings(this.document, targetConn).request;
           const latencyMs = targetConn.kind === 'call' ? targetConn.config.latencyMs : 0;
           const arrivalMs = (atMs ?? 0) + latencyMs;
-          const deadlineMs = arrivalMs + (sourceSettings(this.document, targetConn).deadlineDurationMs ?? 60000);
+          const deadlineMs = arrivalMs + UNSIMULATED_CALL_DEADLINE_MS;
           const canon = canonicalJson(emission.value);
           const payloadRef = canon.ok ? `sha256:${await sha256Hex(canon.text)}` : 'payload-call';
 
@@ -1323,10 +1325,7 @@ export class ScenarioRunner {
             journeyId: context.journeyId,
             parentEventId: appendRes.event?.id ?? context.parentEventId,
             entryElementId: targetEl.id,
-            requestClassId: resMeta?.requestClassId ?? 'default-class',
-            operation: resMeta?.operation ?? 'read',
-            key: resMeta?.key ?? null,
-            tags: resMeta?.tags ? [...resMeta.tags] : [],
+            ...UNSIMULATED_CALL_REQUEST,
             payloadRef,
             atMs: arrivalMs,
             deadlineMs,

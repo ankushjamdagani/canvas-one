@@ -192,7 +192,7 @@ test.describe('RV-12h: History and Library panels', () => {
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const project = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]').first();
     await expect(project).toBeVisible();
-    await project.getByRole('button', { name: /^Open / }).first().click();
+    await project.locator('[data-testid^="open-project-"]').click();
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);

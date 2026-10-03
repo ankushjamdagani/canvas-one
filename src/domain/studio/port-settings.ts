@@ -4,7 +4,7 @@
  * acknowledgement and TTL live on the target in-port. These helpers resolve them for a connection.
  */
 
-import type { CallRetryPolicy, Connection, Document, Element, Endpoint, Port, RequestMeta } from './model';
+import type { CallRetryPolicy, Connection, Document, Element, Endpoint, Port } from './model';
 
 /** A message acknowledges at once unless its receiving port says otherwise. */
 export const DEFAULT_ACK_DELAY_MS = 0;
@@ -19,8 +19,6 @@ export function findPort(document: Pick<Document, 'elements'>, endpoint: Endpoin
 
 type OutSettingsView = {
   readonly retry?: CallRetryPolicy;
-  readonly deadlineDurationMs?: number;
-  readonly request?: RequestMeta;
 };
 
 type InSettingsView = {
@@ -64,9 +62,6 @@ export function describeCallerPolicy(port: Pick<Port, 'settings'>): string {
   const retry = s.retry as CallRetryPolicy | undefined;
   if (retry && retry.maxAttempts > 1) parts.push(`${retry.maxAttempts} attempts`);
   if (retry?.attemptTimeoutMs != null) parts.push(`attempt timeout ${retry.attemptTimeoutMs} ms`);
-  if (num(s.deadlineDurationMs) !== undefined) parts.push(`deadline ${s.deadlineDurationMs} ms`);
-  const request = s.request as RequestMeta | undefined;
-  if (request) parts.push(`${request.operation} · ${request.requestClassLabel}`);
   const breaker = s.circuitBreaker as { failureThreshold: number } | undefined;
   if (breaker) parts.push(`breaker after ${breaker.failureThreshold} failures`);
   if (num(s.maxInFlight) !== undefined) parts.push(`max ${s.maxInFlight} in flight`);
@@ -113,11 +108,7 @@ export function connectionAdvisories(document: Pick<Document, 'elements'>, conne
   const into = (target.settings ?? {}) as Settings;
   const advisories: string[] = [];
   const p95 = num(into.expectedP95Ms);
-  const deadline = num(out.deadlineDurationMs);
   const retry = out.retry as CallRetryPolicy | undefined;
-  if (p95 !== undefined && deadline !== undefined && deadline < p95) {
-    advisories.push(`The caller's deadline (${deadline} ms) is below the callee's expected p95 (${p95} ms).`);
-  }
   if (p95 !== undefined && retry?.attemptTimeoutMs != null && retry.attemptTimeoutMs < p95) {
     advisories.push(`The caller's attempt timeout (${retry.attemptTimeoutMs} ms) is below the callee's expected p95 (${p95} ms).`);
   }

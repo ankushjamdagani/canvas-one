@@ -127,12 +127,11 @@ export type DataInSettings = {
 
 /**
  * An outbound call endpoint, the caller's contract for calling one downstream endpoint. Simulated:
- * retry, and (for traffic that originates here) request and deadlineDurationMs.
+ * retry, circuit breaker, in-flight limit, hedging and request size. Only simulated (resource) nodes have
+ * out-port settings; the calls an unsimulated node makes use a default read request with a 60 s deadline.
  */
 export type CallOutSettings = {
-  readonly deadlineDurationMs?: number;
   readonly retry?: CallRetryPolicy;
-  readonly request?: RequestMeta;
   /** After this many consecutive failures the caller stops calling for `openMs`, then probes. */
   readonly circuitBreaker?: CircuitBreakerPolicy;
   /** Calls beyond this many outstanding through this endpoint fail fast. */
@@ -156,8 +155,6 @@ export type CircuitBreakerPolicy = {
  * or `windowMs` has passed, then sends them over one hop.
  */
 export type MessageOutSettings = {
-  readonly deadlineDurationMs?: number;
-  readonly request?: RequestMeta;
   readonly confirm?: boolean;
   readonly batch?: { readonly size: number; readonly windowMs: number };
   readonly requestBytes?: number;
@@ -231,22 +228,6 @@ export type RouteConditionField = (typeof ROUTE_CONDITION_FIELDS)[number];
 export type RouteCondition = {
   readonly field: RouteConditionField;
   readonly value: string;
-};
-
-/**
- * D53: what a caller sends through an out-port: a named class of traffic with a read or write
- * operation, an optional key and tags. The kernel reads the operation (storage read vs write
- * capacity), conditional routes match class, operation and tags, and the key drives cache hits.
- * Only needed where traffic originates in a node the runner does not simulate (a client, a
- * state machine); a simulated caller's requests inherit it.
- */
-export type RequestMeta = {
-  readonly requestClassId: Id;
-  /** Presentation only; 1–60 Unicode code points. */
-  readonly requestClassLabel: string;
-  readonly operation: 'read' | 'write';
-  readonly key: string | null;
-  readonly tags: readonly string[];
 };
 
 /** D49: caller retry policy (model-and-runner.md §4). */

@@ -69,7 +69,7 @@ test("saved part survives reload, shares Library search, exports/imports, and pl
     }),
   ).toHaveCount(2);
   await page.goto("/");
-  await page.getByRole("button", { name: "Open draft", exact: true }).click();
+  await page.locator('[data-testid^="open-project-"]').first().click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
   await openOurs(page);
   const placed = saved.getByRole("button", {

@@ -53,7 +53,7 @@ function build(opts: {
       apply(r.changes);
       return r.connectionId;
     }
-    const c = completeConnection(r.draft, { requestClassId: mint(), requestClassLabel: 'R', operation: 'read', deadlineDurationMs: 30000 });
+    const c = completeConnection(r.draft);
     if (!c.ok) throw new Error(JSON.stringify(c.issues));
     apply(c.changes);
     return c.connectionId;
