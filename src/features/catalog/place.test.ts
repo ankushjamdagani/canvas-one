@@ -134,8 +134,7 @@ describe('place.ts', () => {
       expect(element.label).toBe('Orders system');
       expect(element.linkedProjectId).toBe(LINKED_PROJECT_ID);
       expect(element.ports.map((p) => p.direction)).toEqual(['in', 'in']);
-      // http is the default call protocol, so only gRPC is written.
-      expect(element.ports.map((p) => (p as { protocol?: string }).protocol)).toEqual([undefined, 'grpc']);
+      expect(element.ports.map((p) => (p as { protocol?: string }).protocol)).toEqual(['http', 'grpc']);
       expect(element.ports.map((p) => (p as { path?: string }).path)).toEqual([undefined, '/orders']);
     });
 

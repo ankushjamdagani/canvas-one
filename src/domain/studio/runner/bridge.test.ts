@@ -26,8 +26,8 @@ function makeResourceElement(id: string, config: ResourceConfig, entryPortId = `
     description: '',
     visualKind: 'service',
     ports: [
-      { id: entryPortId, label: 'in', direction: 'in', channel: 'call', schemaId: 'schema-1', responseSchemaId: 'schema-1' },
-      { id: `${id}-out`, label: 'out', direction: 'out', channel: 'call', schemaId: 'schema-1', responseSchemaId: 'schema-1' },
+      { id: entryPortId, label: 'in', direction: 'in', channel: 'call', protocol: 'http', schemaId: 'schema-1', responseSchemaId: 'schema-1' },
+      { id: `${id}-out`, label: 'out', direction: 'out', channel: 'call', protocol: 'http', schemaId: 'schema-1', responseSchemaId: 'schema-1' },
     ],
     behavior: { kind: 'resource', version: 1, config, entryPortId },
   };
@@ -41,7 +41,7 @@ function makeNonResourceElement(id: string): Element {
     label: id,
     description: '',
     visualKind: 'service',
-    ports: [{ id: `${id}-in`, label: 'in', direction: 'in', channel: 'call', schemaId: 'schema-1', responseSchemaId: 'schema-1' }],
+    ports: [{ id: `${id}-in`, label: 'in', direction: 'in', channel: 'call', protocol: 'http', schemaId: 'schema-1', responseSchemaId: 'schema-1' }],
     behavior: { kind: 'unmodeled', version: 1, reason: 'bridge target stub for RV-14f tests' },
   };
 }

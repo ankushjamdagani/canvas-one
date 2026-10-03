@@ -25,13 +25,11 @@ import type {
 import { shapesCompatible } from '../../domain/studio/readiness';
 import type { ProjectExposure } from '../../domain/studio/exposure';
 import {
-  defaultProtocol,
   describeEndpoint,
   normalizePath,
   PORT_PATH_MAX_LENGTH,
   PROTOCOL_LABELS,
   portPath,
-  portProtocol,
   protocolsFor,
   type Protocol,
 } from '../../domain/studio/protocols';
@@ -43,11 +41,6 @@ import { createIssue } from '../../domain/studio/issue';
 const clip = (text: string): string => Array.from(text).slice(0, 80).join('');
 
 const linkedLabel = (element: Element): string => `'${element.label}'`;
-
-/** D53: a port stores its protocol only when it differs from the node's default. */
-function withProtocol(port: Port, element: Element, protocol: Protocol): Port {
-  return protocol === defaultProtocol(element.visualKind, port.channel) ? port : { ...port, protocol };
-}
 
 export type PlanConnectionParams = {
   readonly document: Document;
@@ -319,16 +312,18 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   if ((isRouterOrBroker && hasExistingOutgoing) || publishesToBroker || brokerDeliversToCallEntry) {
     const newPortId = mintId();
     const acceptedChannel = targetPort.channel;
-    const acceptedProtocol = portProtocol(targetElement, targetPort);
+    const acceptedProtocol = targetPort.protocol;
     const routePort: Port = {
       id: newPortId,
       label: publishesToBroker ? 'publish' : 'out',
       direction: 'out',
       channel: acceptedChannel,
+      protocol: acceptedProtocol,
       schemaId: targetPort.schemaId,
       responseSchemaId: acceptedChannel === 'call' ? targetPort.responseSchemaId : null,
+      ...(targetPort.path ? { path: targetPort.path } : {}),
     };
-    const newPort = acceptedProtocol ? withProtocol(routePort, sourceElement, acceptedProtocol) : routePort;
+    const newPort = routePort;
 
     sourceElementReplacement = {
       ...sourceElement,
@@ -360,22 +355,22 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     const channel = effectiveSourcePort.channel;
     const isLinked = targetElement.linkedProjectId !== undefined;
     const exposures = (params.linkedExposures ?? []).filter((x) => x.channel === channel);
-    const targetDefault = portProtocol(targetElement, targetPort);
+    const targetDefault = targetPort.protocol;
     // A project can only be connected with the types it supports; any other node accepts every type of the channel.
     protocolOptions = isLinked
       ? [...new Set([
-          ...targetElement.ports.filter((p) => p.direction === 'in' && p.channel === channel).map((p) => portProtocol(targetElement, p)),
+          ...targetElement.ports.filter((p) => p.direction === 'in' && p.channel === channel).map((p) => p.protocol),
           ...exposures.map((x) => x.protocol),
         ].filter((x): x is Protocol => x !== null))]
       : protocolsFor(channel);
-    const protocol: Protocol | null = 'portId' in target ? targetDefault : (params.protocol ?? targetDefault ?? portProtocol(sourceElement, effectiveSourcePort));
+    const protocol: Protocol | null = 'portId' in target ? targetDefault : (params.protocol ?? targetDefault ?? effectiveSourcePort.protocol);
     chosenProtocol = protocol;
 
     // The paths the target already has for this type (for a linked project, the ones it exposes).
     const knownPaths = (protocolValue: Protocol | null): readonly string[] => [
       ...new Set([
         ...targetElement.ports
-          .filter((p) => p.direction === 'in' && p.channel === channel && portProtocol(targetElement, p) === protocolValue)
+          .filter((p) => p.direction === 'in' && p.channel === channel && p.protocol === protocolValue)
           .map(portPath),
         ...(isLinked ? exposures.filter((x) => x.protocol === protocolValue).map((x) => x.path) : []),
       ]),
@@ -403,7 +398,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
     if (protocol !== null) {
       const samePort = (el: Element, port: Port) =>
-        port.channel === channel && portProtocol(el, port) === protocol && portPath(port) === path;
+        port.channel === channel && port.protocol === protocol && portPath(port) === path;
       let sourceOut: Port | undefined =
         samePort(sourceElement, effectiveSourcePort) ? effectiveSourcePort : sourceElement.ports.find((p) => p.direction === 'out' && samePort(sourceElement, p));
       let targetIn: Port | undefined =
@@ -455,37 +450,31 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       if (!targetIn) {
         const ids = shared ?? newSchemaPair(labelFor(targetElement));
         shared = ids;
-        targetIn = withProtocol(
-          {
-            id: mintId(),
-            label: clip(describeEndpoint(protocol, path)),
-            direction: 'in',
-            channel,
-            schemaId: ids.schemaId,
-            responseSchemaId: ids.responseSchemaId,
-            ...(path ? { path } : {}),
-          },
-          targetElement,
+        targetIn = {
+          id: mintId(),
+          label: clip(describeEndpoint(protocol, path)),
+          direction: 'in',
+          channel,
           protocol,
-        );
+          schemaId: ids.schemaId,
+          responseSchemaId: ids.responseSchemaId,
+          ...(path ? { path } : {}),
+        };
         targetElementReplacement = { ...targetElement, ports: [...targetElement.ports, targetIn] };
         portChanges.push({ kind: 'replace', value: { recordKind: 'element', record: targetElementReplacement } });
       }
 
       if (!sourceOut) {
-        sourceOut = withProtocol(
-          {
-            id: mintId(),
-            label: clip(describeEndpoint(protocol, path)),
-            direction: 'out',
-            channel,
-            schemaId: targetIn.schemaId,
-            responseSchemaId: targetIn.responseSchemaId,
-            ...(path ? { path } : {}),
-          },
-          sourceElement,
+        sourceOut = {
+          id: mintId(),
+          label: clip(describeEndpoint(protocol, path)),
+          direction: 'out',
+          channel,
           protocol,
-        );
+          schemaId: targetIn.schemaId,
+          responseSchemaId: targetIn.responseSchemaId,
+          ...(path ? { path } : {}),
+        };
         sourceElementReplacement = { ...sourceElement, ports: [...sourceElement.ports, sourceOut] };
         newSourcePortChanges.push({ kind: 'replace', value: { recordKind: 'element', record: sourceElementReplacement } });
       }

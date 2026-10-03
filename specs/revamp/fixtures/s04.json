@@ -14,6 +14,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
           "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
         },
@@ -22,6 +23,7 @@
           "label": "A",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
           "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
         },
@@ -30,6 +32,7 @@
           "label": "B",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
           "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
         }
@@ -61,6 +64,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
           "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
         }
@@ -91,6 +95,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
           "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
         }
@@ -143,6 +148,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488",
           "responseSchemaId": "6e3fc1aa-247d-57ff-983b-b4e4d33c8488"
         }

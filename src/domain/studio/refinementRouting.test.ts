@@ -11,8 +11,8 @@ function element(id: string): Element {
     description: '',
     visualKind: 'service',
     ports: [
-      { id: `${id}-in`, label: 'in', direction: 'in', channel: 'data', schemaId, responseSchemaId: null },
-      { id: `${id}-out`, label: 'out', direction: 'out', channel: 'data', schemaId, responseSchemaId: null },
+      { id: `${id}-in`, label: 'in', direction: 'in', channel: 'data', protocol: 'jdbc', schemaId, responseSchemaId: null },
+      { id: `${id}-out`, label: 'out', direction: 'out', channel: 'data', protocol: 'jdbc', schemaId, responseSchemaId: null },
     ],
     behavior: { kind: 'unmodeled', version: 1, reason: 'routing-only fixture' },
   };

@@ -14,6 +14,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000006",
           "responseSchemaId": "00000000-0006-4000-8000-000000000007"
         },
@@ -22,6 +23,7 @@
           "label": "out",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000006",
           "responseSchemaId": "00000000-0006-4000-8000-000000000007"
         },
@@ -30,6 +32,7 @@
           "label": "out",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000012",
           "responseSchemaId": "00000000-0006-4000-8000-000000000013"
         }
@@ -62,6 +65,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000000c",
           "responseSchemaId": "00000000-0006-4000-8000-00000000000d"
         },
@@ -70,6 +74,7 @@
           "label": "out",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000000c",
           "responseSchemaId": "00000000-0006-4000-8000-00000000000d"
         },
@@ -87,6 +92,7 @@
           "label": "publish",
           "direction": "out",
           "channel": "message",
+          "protocol": "amqp",
           "schemaId": "00000000-0006-4000-8000-000000000028",
           "responseSchemaId": null
         }
@@ -118,6 +124,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000012",
           "responseSchemaId": "00000000-0006-4000-8000-000000000013"
         },
@@ -126,6 +133,7 @@
           "label": "out",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000012",
           "responseSchemaId": "00000000-0006-4000-8000-000000000013"
         },
@@ -143,6 +151,7 @@
           "label": "publish",
           "direction": "out",
           "channel": "message",
+          "protocol": "amqp",
           "schemaId": "00000000-0006-4000-8000-000000000028",
           "responseSchemaId": null
         }
@@ -174,6 +183,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "sql",
           "schemaId": "00000000-0006-4000-8000-000000000018",
           "responseSchemaId": "00000000-0006-4000-8000-000000000019"
         }
@@ -206,6 +216,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000001d",
           "responseSchemaId": "00000000-0006-4000-8000-00000000001e"
         },
@@ -214,6 +225,7 @@
           "label": "out",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000001d",
           "responseSchemaId": "00000000-0006-4000-8000-00000000001e"
         }
@@ -245,6 +257,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000023",
           "responseSchemaId": "00000000-0006-4000-8000-000000000024"
         }
@@ -266,6 +279,7 @@
           "label": "in",
           "direction": "in",
           "channel": "message",
+          "protocol": "amqp",
           "schemaId": "00000000-0006-4000-8000-000000000028",
           "responseSchemaId": null
         },
@@ -274,6 +288,7 @@
           "label": "out",
           "direction": "out",
           "channel": "message",
+          "protocol": "amqp",
           "schemaId": "00000000-0006-4000-8000-000000000028",
           "responseSchemaId": null
         },
@@ -282,6 +297,7 @@
           "label": "out",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000002d",
           "responseSchemaId": "00000000-0006-4000-8000-00000000002e"
         }
@@ -314,6 +330,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000002d",
           "responseSchemaId": "00000000-0006-4000-8000-00000000002e"
         }

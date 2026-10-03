@@ -19,7 +19,7 @@ const doc: Document = {
       description: 'Element 1',
       visualKind: 'client',
       ports: [
-        { id: P1_ID, direction: 'out', channel: 'event', label: 'P', schemaId: SCH_ID, responseSchemaId: null },
+        { id: P1_ID, direction: 'out', channel: 'event', protocol: null, label: 'P', schemaId: SCH_ID, responseSchemaId: null },
       ],
       behavior: { kind: 'unmodeled', version: 1, reason: 'test' },
     },

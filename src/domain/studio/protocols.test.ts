@@ -35,7 +35,7 @@ describe('protocols (D53)', () => {
     expect(isProtocolOf('event', 'http')).toBe(false);
   });
 
-  it('validates the port protocol and path: the protocol must fit the channel, the path is bounded', () => {
+  it('validates the port protocol and path: every connectable port has a protocol of its channel, the path is bounded', () => {
     const withPort = (patch: Record<string, unknown>) => {
       const el = S01.elements.find((e) => e.ports.some((p) => p.direction === 'in' && p.channel === 'call'))!;
       const port = el.ports.find((p) => p.direction === 'in' && p.channel === 'call')!;
@@ -46,6 +46,7 @@ describe('protocols (D53)', () => {
     };
     expect(validateDocument(withPort({ protocol: 'grpc' })).ok).toBe(true);
     expect(validateDocument(withPort({ protocol: 'kafka' })).ok).toBe(false);
+    expect(validateDocument(withPort({ protocol: null })).ok).toBe(false);
     expect(validateDocument(withPort({ path: '/orders' })).ok).toBe(true);
     expect(validateDocument(withPort({ path: '' })).ok).toBe(false);
     expect(validateDocument(withPort({ path: 'x'.repeat(121) })).ok).toBe(false);

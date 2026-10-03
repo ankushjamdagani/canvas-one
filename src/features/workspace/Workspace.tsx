@@ -39,7 +39,7 @@ import { LibraryPanel, type LibraryView } from "../library";
 import { downloadSavedPart, SavedParts } from "../library/SavedParts";
 import { LinkedProjects } from "../library/LinkedProjects";
 import { sameExposure, type ProjectExposure } from "../../domain/studio/exposure";
-import { portPath, portProtocol } from "../../domain/studio/protocols";
+import { portPath } from "../../domain/studio/protocols";
 import type { EndpointCandidate } from "./ExposedEndpointsDialog";
 import { projectDetails, projectExposures } from "../../persistence/studio/types";
 import type {
@@ -1355,7 +1355,7 @@ export function Workspace({
       if (element.linkedProjectId !== undefined) continue;
       for (const port of element.ports) {
         if (port.direction !== "in" || port.channel === "event") continue;
-        const protocol = portProtocol(element, port);
+        const protocol = port.protocol;
         if (protocol === null) continue;
         const path = portPath(port);
         const key = `${port.channel}:${protocol}:${path}`;

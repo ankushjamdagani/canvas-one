@@ -14,6 +14,7 @@
           "label": "submit",
           "direction": "in",
           "channel": "event",
+          "protocol": null,
           "schemaId": "5c15c734-060b-5974-beb9-f2b380732a37",
           "responseSchemaId": null
         },
@@ -22,6 +23,7 @@
           "label": "response",
           "direction": "in",
           "channel": "event",
+          "protocol": null,
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         },
@@ -30,6 +32,7 @@
           "label": "timeout",
           "direction": "in",
           "channel": "event",
+          "protocol": null,
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         },
@@ -38,6 +41,7 @@
           "label": "create order",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         }
@@ -576,6 +580,7 @@
           "label": "request",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         },
@@ -584,6 +589,7 @@
           "label": "validate",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
           "responseSchemaId": null
         }
@@ -643,6 +649,7 @@
           "label": "in",
           "direction": "in",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
           "responseSchemaId": null
         },
@@ -651,6 +658,7 @@
           "label": "valid",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
           "responseSchemaId": null
         },
@@ -659,6 +667,7 @@
           "label": "invalid",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
           "responseSchemaId": null
         }
@@ -692,6 +701,7 @@
           "label": "in",
           "direction": "in",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
           "responseSchemaId": null
         },
@@ -700,6 +710,7 @@
           "label": "allow",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         },
@@ -708,6 +719,7 @@
           "label": "deny",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         }
@@ -768,6 +780,7 @@
           "label": "accepted",
           "direction": "in",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         },
@@ -776,6 +789,7 @@
           "label": "denied",
           "direction": "in",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         },
@@ -784,6 +798,7 @@
           "label": "invalid",
           "direction": "in",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "ed35bff8-348f-5a97-bc63-76d7b48b9dee",
           "responseSchemaId": null
         },
@@ -792,6 +807,7 @@
           "label": "fulfill",
           "direction": "out",
           "channel": "message",
+          "protocol": "amqp",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         }
@@ -901,6 +917,7 @@
           "label": "in",
           "direction": "in",
           "channel": "message",
+          "protocol": "amqp",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": null
         },
@@ -909,6 +926,7 @@
           "label": "consumer",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         }
@@ -940,6 +958,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         }
@@ -970,6 +989,7 @@
           "label": "in",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         },
@@ -978,6 +998,7 @@
           "label": "business",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
           "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
         }

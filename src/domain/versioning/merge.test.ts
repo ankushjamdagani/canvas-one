@@ -534,7 +534,7 @@ describe('mergeDocuments: typed three-way merge', () => {
           id: '00000000-0000-5000-8000-000000000089',
           label: 'portE',
           direction: 'in',
-          channel: 'data',
+          channel: 'data', protocol: 'jdbc',
           schemaId: base.schemas[0].id,
           responseSchemaId: null,
         },

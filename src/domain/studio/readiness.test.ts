@@ -75,7 +75,7 @@ describe('checkReadiness reference fixtures', () => {
 const S_ID = 's-empty-record';
 
 function port(id: string, direction: Port['direction'], channel: Port['channel'], schemaId: string, responseSchemaId: string | null = null): Port {
-  return { id, label: id, direction, channel, schemaId, responseSchemaId };
+  return { id, label: id, direction, channel, protocol: channel === 'event' ? null : channel === 'message' ? 'amqp' : channel === 'data' ? 'jdbc' : 'http', schemaId, responseSchemaId };
 }
 
 function machineElement(

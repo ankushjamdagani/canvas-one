@@ -15,7 +15,7 @@ function makeTestDocument(): Document {
       description: 'Web client',
       visualKind: 'client',
       ports: [
-        { id: 'p1_out', label: 'out', direction: 'out', channel: 'call', schemaId: 's1', responseSchemaId: 's1' },
+        { id: 'p1_out', label: 'out', direction: 'out', channel: 'call', protocol: 'http', schemaId: 's1', responseSchemaId: 's1' },
       ],
       behavior: { kind: 'unmodeled', version: 1, reason: 'sketch' },
     },
@@ -25,8 +25,8 @@ function makeTestDocument(): Document {
       description: 'Core service',
       visualKind: 'service',
       ports: [
-        { id: 'p2_in', label: 'in', direction: 'in', channel: 'call', schemaId: 's1', responseSchemaId: 's1' },
-        { id: 'p2_msg_out', label: 'msg_out', direction: 'out', channel: 'message', schemaId: 's1', responseSchemaId: null },
+        { id: 'p2_in', label: 'in', direction: 'in', channel: 'call', protocol: 'http', schemaId: 's1', responseSchemaId: 's1' },
+        { id: 'p2_msg_out', label: 'msg_out', direction: 'out', channel: 'message', protocol: 'amqp', schemaId: 's1', responseSchemaId: null },
       ],
       behavior: { kind: 'unmodeled', version: 1, reason: 'sketch' },
     },
@@ -36,7 +36,7 @@ function makeTestDocument(): Document {
       description: 'Message queue',
       visualKind: 'queue',
       ports: [
-        { id: 'p3_msg_in', label: 'msg_in', direction: 'in', channel: 'message', schemaId: 's1', responseSchemaId: null },
+        { id: 'p3_msg_in', label: 'msg_in', direction: 'in', channel: 'message', protocol: 'amqp', schemaId: 's1', responseSchemaId: null },
       ],
       behavior: { kind: 'unmodeled', version: 1, reason: 'sketch' },
     },
@@ -380,7 +380,7 @@ describe('refinement boundary frames (D46)', () => {
       description: '',
       visualKind: 'custom',
       ports: [
-        { id: 'owner-in', label: 'Client · out', direction: 'in', channel: 'call', schemaId: 's1', responseSchemaId: 's1' },
+        { id: 'owner-in', label: 'Client · out', direction: 'in', channel: 'call', protocol: 'http', schemaId: 's1', responseSchemaId: 's1' },
       ],
       behavior: { kind: 'unmodeled', version: 1, reason: 'Aggregate behaviour not configured' },
     };

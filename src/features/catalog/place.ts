@@ -170,6 +170,7 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
       label: catalogPort.label,
       direction: catalogPort.direction,
       channel: catalogPort.channel,
+      protocol: defaultProtocol(entry.visualKind, catalogPort.channel),
       schemaId,
       responseSchemaId: respSchemaId,
     });
@@ -188,11 +189,12 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
       label,
       direction: 'in',
       channel: exposure.channel,
+      protocol: exposure.protocol,
       schemaId: requestId,
       responseSchemaId: responseId,
       ...(exposure.path ? { path: exposure.path } : {}),
     };
-    ports.push(exposure.protocol === defaultProtocol('linked-project', exposure.channel) ? base : { ...base, protocol: exposure.protocol });
+    ports.push({ ...base, protocol: exposure.protocol });
   }
 
   // Behavior self-references

@@ -1,8 +1,8 @@
 /**
  * Connection protocols (D53, specs/revamp/connection-protocols.md).
  *
- * A protocol is a label on a port; the runner ignores it. A port with no `protocol` has its node's
- * default for the channel, and the field is only written when it differs from that default.
+ * A protocol is a label on a port; the runner ignores it. Every connectable port carries one
+ * (`Port.protocol`; null on `event` ports); `defaultProtocol` only seeds new ports.
  */
 
 import type { Port, PortChannel, VisualKind } from './model';
@@ -65,7 +65,7 @@ const MESSAGE_DEFAULTS: Partial<Record<VisualKind, Protocol>> = {
   pubsub: 'google-pubsub',
 };
 
-/** The protocol a port has when it carries none. `event` ports have no protocol. */
+/** The protocol a new port of this node kind and channel starts with. `event` ports have none. */
 export function defaultProtocol(visualKind: VisualKind, channel: PortChannel): Protocol | null {
   if (channel === 'call') return CALL_DEFAULTS[visualKind] ?? 'http';
   if (channel === 'message') return MESSAGE_DEFAULTS[visualKind] ?? 'amqp';
@@ -73,9 +73,6 @@ export function defaultProtocol(visualKind: VisualKind, channel: PortChannel): P
   return null;
 }
 
-export function portProtocol(element: { readonly visualKind: VisualKind }, port: Port): Protocol | null {
-  return port.protocol ?? defaultProtocol(element.visualKind, port.channel);
-}
 
 /** The longest endpoint path or name (`Port.path`, `ProjectExposure.path`). */
 export const PORT_PATH_MAX_LENGTH = 120;

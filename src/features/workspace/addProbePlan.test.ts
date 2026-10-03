@@ -18,8 +18,8 @@ const document: Document = {
   elements: [{
     id: ids.element, label: 'Worker', description: '', visualKind: 'service',
     ports: [
-      { id: ids.eventPort, label: 'event', direction: 'out', channel: 'event', schemaId: ids.schema, responseSchemaId: null },
-      { id: ids.dataPort, label: 'data', direction: 'out', channel: 'data', schemaId: ids.schema, responseSchemaId: null },
+      { id: ids.eventPort, label: 'event', direction: 'out', channel: 'event', protocol: null, schemaId: ids.schema, responseSchemaId: null },
+      { id: ids.dataPort, label: 'data', direction: 'out', channel: 'data', protocol: 'jdbc', schemaId: ids.schema, responseSchemaId: null },
     ],
     behavior: { kind: 'unmodeled', version: 1, reason: 'Test' },
   }],

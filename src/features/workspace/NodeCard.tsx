@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
-import { describeEndpoint, portPath, portProtocol } from '../../domain/studio/protocols';
+import { describeEndpoint, portPath } from '../../domain/studio/protocols';
 import { getNodeCaption, getNodeIcon } from './nodeVisuals';
 
 export function NodeCard({ data, selected }: NodeProps) {
@@ -20,7 +20,7 @@ export function NodeCard({ data, selected }: NodeProps) {
       const labels = element.ports
         .filter((p) => p.direction === direction)
         .map((p) => {
-          const protocol = portProtocol(element, p);
+          const protocol = p.protocol;
           return protocol === null ? p.label : describeEndpoint(protocol, portPath(p));
         });
       return `${direction}: ${labels.length > 0 ? labels.join(', ') : 'none'}`;

@@ -14,6 +14,7 @@
           "label": "rows",
           "direction": "in",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
           "responseSchemaId": null
         },
@@ -22,6 +23,7 @@
           "label": "totals",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "8ed8a998-9d53-58cc-9e83-0dc7dab72e08",
           "responseSchemaId": null
         },
@@ -30,6 +32,7 @@
           "label": "errors",
           "direction": "out",
           "channel": "data",
+          "protocol": "jdbc",
           "schemaId": "be8d9af4-3a2e-549a-bb40-b9005ab708fb",
           "responseSchemaId": null
         }

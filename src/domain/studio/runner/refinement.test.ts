@@ -57,8 +57,8 @@ function decisionElement(id: string, inPort: string, outPort: string): Element {
     description: '',
     visualKind: 'service',
     ports: [
-      { id: inPort, label: 'in', direction: 'in', channel: 'data', schemaId: INT_SCHEMA_ID, responseSchemaId: null },
-      { id: outPort, label: 'out', direction: 'out', channel: 'data', schemaId: INT_SCHEMA_ID, responseSchemaId: null },
+      { id: inPort, label: 'in', direction: 'in', channel: 'data', protocol: 'jdbc', schemaId: INT_SCHEMA_ID, responseSchemaId: null },
+      { id: outPort, label: 'out', direction: 'out', channel: 'data', protocol: 'jdbc', schemaId: INT_SCHEMA_ID, responseSchemaId: null },
     ],
     behavior: {
       kind: 'decision',

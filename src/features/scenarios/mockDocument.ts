@@ -48,6 +48,7 @@ export function buildMockDocument(): Document {
     label: 'in',
     direction: 'in' as const,
     channel: 'call' as const,
+    protocol: 'http' as const,
     schemaId: requestSchema.id,
     responseSchemaId: responseSchema.id,
   };
@@ -57,6 +58,7 @@ export function buildMockDocument(): Document {
     label: 'checkout call',
     direction: 'out' as const,
     channel: 'call' as const,
+    protocol: 'http' as const,
     schemaId: requestSchema.id,
     responseSchemaId: responseSchema.id,
   };

@@ -148,7 +148,7 @@ describe('connect.ts', () => {
       const db1 = t.add('database', 300);
       const db2 = t.add('database', 600);
       t.connect(service, db1);
-      expect(t.ports(service, 'out').map((p) => p.protocol)).toEqual([undefined, 'sql']);
+      expect(t.ports(service, 'out').map((p) => p.protocol)).toEqual(['http', 'sql']);
       expect(t.ports(db1, 'in')).toHaveLength(1);
       // A second SQL dependency reuses the same out-port.
       t.connect(service, db2);
@@ -163,11 +163,11 @@ describe('connect.ts', () => {
       const c = t.add('service', 600);
       const plan = t.connect(a, b, { protocol: 'grpc' });
       expect(plan.kind).toBe('needs-resource-metadata');
-      expect(t.ports(b, 'in').map((p) => p.protocol)).toEqual([undefined, 'grpc']);
-      expect(t.ports(a, 'out').map((p) => p.protocol)).toEqual([undefined, 'grpc']);
+      expect(t.ports(b, 'in').map((p) => p.protocol)).toEqual(['http', 'grpc']);
+      expect(t.ports(a, 'out').map((p) => p.protocol)).toEqual(['http', 'grpc']);
       t.connect(a, c, { protocol: 'grpc' });
       expect(t.ports(a, 'out')).toHaveLength(2);
-      expect(t.ports(c, 'in').map((p) => p.protocol)).toEqual([undefined, 'grpc']);
+      expect(t.ports(c, 'in').map((p) => p.protocol)).toEqual(['http', 'grpc']);
       // The default type still uses the original ports.
       const d = t.add('service', 900);
       t.connect(a, d, { protocol: 'http' });
@@ -297,7 +297,7 @@ describe('connect.ts', () => {
         const live = [exposure('http'), exposure('thrift')];
         const plan = t.connect(t.caller, t.linked, { protocol: 'thrift', linkedExposures: live });
         expect(plan.kind).toBe('needs-resource-metadata');
-        expect(t.ports(t.linked, 'in').map((p) => p.protocol)).toEqual([undefined, 'thrift']);
+        expect(t.ports(t.linked, 'in').map((p) => p.protocol)).toEqual(['http', 'thrift']);
         expect(validateDocument(t.getDoc()).ok).toBe(true);
       });
 
@@ -669,6 +669,7 @@ describe('connect.ts', () => {
             label: 'out',
             direction: 'out' as const,
             channel: 'call' as const,
+            protocol: 'http' as const,
             schemaId: s1.ports[0].schemaId,
             responseSchemaId: s1.ports[0].responseSchemaId,
           },

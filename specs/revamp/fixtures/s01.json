@@ -14,6 +14,7 @@
           "label": "submit",
           "direction": "in",
           "channel": "event",
+          "protocol": null,
           "schemaId": "f512c088-8004-5e1f-a92c-b365adc73111",
           "responseSchemaId": null
         },
@@ -22,6 +23,7 @@
           "label": "response",
           "direction": "in",
           "channel": "event",
+          "protocol": null,
           "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
           "responseSchemaId": null
         },
@@ -30,6 +32,7 @@
           "label": "timeout",
           "direction": "in",
           "channel": "event",
+          "protocol": null,
           "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
           "responseSchemaId": null
         },
@@ -38,6 +41,7 @@
           "label": "create order",
           "direction": "out",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
           "responseSchemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995"
         }
@@ -576,6 +580,7 @@
           "label": "request",
           "direction": "in",
           "channel": "call",
+          "protocol": "http",
           "schemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995",
           "responseSchemaId": "27e5f5c4-acbb-50f2-9c5a-03cc10095995"
         }

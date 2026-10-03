@@ -238,8 +238,8 @@ describe('Scenario Scope Closure (computeClosure)', () => {
         scopeIds.push(elId);
 
         const ports: Port[] = [
-          { id: inPortId, label: 'in', direction: 'in', channel: 'message', schemaId, responseSchemaId: null },
-          { id: outPortId, label: 'out', direction: 'out', channel: 'message', schemaId, responseSchemaId: null },
+          { id: inPortId, label: 'in', direction: 'in', channel: 'message', protocol: 'amqp', schemaId, responseSchemaId: null },
+          { id: outPortId, label: 'out', direction: 'out', channel: 'message', protocol: 'amqp', schemaId, responseSchemaId: null },
         ];
 
         elements.push({
@@ -404,7 +404,7 @@ describe('Scenario Scope Closure (computeClosure)', () => {
             id: memberInPortId,
             label: 'entry',
             direction: 'in',
-            channel: 'call',
+            channel: 'call', protocol: 'http',
             schemaId: '82d08a0e-9949-5da7-92c9-bea29d236999', // Order schema
             responseSchemaId: '82d08a0e-9949-5da7-92c9-bea29d236999',
           },

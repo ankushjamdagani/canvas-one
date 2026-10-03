@@ -1303,7 +1303,7 @@ export function validateDocument(
           for (let pIdx = 0; pIdx < ports.length; pIdx++) {
             const p = ports[pIdx];
             const pPath = [...elPath, 'ports', pIdx];
-            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path'], ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
+            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path'], ['id', 'label', 'direction', 'channel', 'protocol', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
               let pId: Id | null = null;
               if (validateId(p.id, [...pPath, 'id'], elId, issues)) {
                 pId = p.id;
@@ -1335,18 +1335,19 @@ export function validateDocument(
                 );
               }
 
-              // D53: a protocol belongs to the port's channel.
-              if (p.protocol !== undefined && !isProtocolOf(p.channel as (typeof PORT_CHANNELS)[number], p.protocol)) {
+              // D53: every connectable port has a protocol of its channel; event ports have none.
+              if (p.channel === 'event' ? p.protocol !== null : !isProtocolOf(p.channel as (typeof PORT_CHANNELS)[number], p.protocol)) {
                 issues.push(
                   errorIssue(
                     'invalid-literal',
                     [...pPath, 'protocol'],
                     pId ?? elId,
-                    `Invalid protocol '${String(p.protocol)}' for a '${String(p.channel)}' port`,
+                    p.channel === 'event'
+                      ? 'An event port has no protocol (null)'
+                      : `Invalid protocol '${String(p.protocol)}' for a '${String(p.channel)}' port`,
                   ),
                 );
               }
-
               if (p.path !== undefined) {
                 validateString(p.path, 1, PORT_PATH_MAX_LENGTH, [...pPath, 'path'], pId ?? elId, issues, 'Port path');
               }
