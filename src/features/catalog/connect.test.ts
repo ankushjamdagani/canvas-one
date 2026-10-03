@@ -190,6 +190,69 @@ describe('connect.ts', () => {
     expect(shapesCompatible(targetSchema.shape, doc3.schemas.find((s) => s.id === outPort.schemaId)!.shape)).toBe(true);
   });
 
+  it('a linked-project node keeps one call-in port per caller contract and never rewrites a port in use (D52)', () => {
+    const mintId = createMintId();
+    const { document: baseDoc, viewId } = makeBlankDocument(mintId);
+    let doc = baseDoc;
+    const addService = (x: number, fieldKey: string | null) => {
+      const placed = place(doc, viewId, 'service', { x, y: 0 }, mintId);
+      doc = applyChanges(doc, placed.changes);
+      const el = doc.elements.find((e) => e.id === placed.elementId)!;
+      const out = el.ports.find((p) => p.direction === 'out' && p.channel === 'call')!;
+      if (fieldKey) {
+        const schema = doc.schemas.find((sc) => sc.id === out.schemaId)!;
+        doc = applyChanges(doc, [
+          {
+            kind: 'replace',
+            value: {
+              recordKind: 'schema',
+              record: { ...schema, shape: { type: 'record', nullable: false, fields: [{ id: mintId(), key: fieldKey, optional: false, shape: { type: 'string', nullable: false } }] } },
+            },
+          },
+        ] as never);
+      }
+      return { elementId: el.id, portId: out.id };
+    };
+    const linkedPlaced = placeEntry({
+      document: doc, viewId, entryId: 'linked-project', anchor: { x: 300, y: 0 }, mintId,
+      link: { projectId: '00000000-0000-4000-8000-0000000000aa', title: 'Orders system' },
+    });
+    if (!linkedPlaced.ok) throw new Error(JSON.stringify(linkedPlaced.issues));
+    doc = applyChanges(doc, linkedPlaced.changes);
+    const connect = (caller: { elementId: Id; portId: Id }) => {
+      const plan = planConnection({
+        document: doc, viewId,
+        source: { elementId: caller.elementId, portId: caller.portId },
+        target: { elementId: linkedPlaced.elementId },
+        mintId,
+      });
+      if (plan.kind !== 'needs-resource-metadata') throw new Error(`unexpected ${plan.kind}`);
+      const done = completeConnection(plan.draft, { requestClassId: mintId(), requestClassLabel: 'Order', operation: 'read', deadlineDurationMs: 500 });
+      if (!done.ok) throw new Error(JSON.stringify(done));
+      doc = applyChanges(doc, done.changes);
+      return doc.connections[doc.connections.length - 1].target.portId;
+    };
+    const linkedPorts = () => doc.elements.find((e) => e.id === linkedPlaced.elementId)!.ports.filter((p) => p.direction === 'in');
+
+    const a = addService(0, 'orderId');
+    const b = addService(0, 'sku');
+    const c = addService(0, 'sku');
+    const portA = connect(a);
+    const schemaAId = linkedPorts().find((p) => p.id === portA)!.schemaId;
+    const schemaABefore = doc.schemas.find((sc) => sc.id === schemaAId)!;
+    expect(linkedPorts()).toHaveLength(1);
+
+    const portB = connect(b);
+    expect(portB).not.toBe(portA);
+    expect(linkedPorts()).toHaveLength(2);
+    expect(doc.schemas.find((sc) => sc.id === schemaAId)).toEqual(schemaABefore);
+
+    // Same contract as B reuses B's port.
+    expect(connect(c)).toBe(portB);
+    expect(linkedPorts()).toHaveLength(2);
+    expect(validateDocument(doc).ok).toBe(true);
+  });
+
   it('connects to a non-resource element with ready and resource: null', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);

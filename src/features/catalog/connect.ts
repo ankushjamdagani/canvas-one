@@ -55,8 +55,8 @@ export type ConnectionDraft = {
   readonly target: Endpoint;
   readonly kind: 'call' | 'message';
   readonly sourceElementReplacement?: Element;
-  /** D52: a linked-project target adopts the caller's payload shapes. */
-  readonly targetSchemaReplacements?: readonly PayloadSchema[];
+  /** D52: schema/port changes that give a linked-project target a contract matching this caller. */
+  readonly targetChanges?: readonly RecordChange[];
 };
 
 export type ResourceMetadataInput = {
@@ -214,6 +214,8 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     }
   }
 
+  const resolvedTargetPort: Port = targetPort;
+
   // Contract §4: Event ports are never connectable
   if (sourcePort.channel === 'event') {
     return {
@@ -277,7 +279,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   if (
     (publishesToBroker || brokerDeliversToCallEntry) &&
     document.connections.some(
-      (c) => c.source.elementId === source.elementId && c.target.elementId === targetElement.id && c.target.portId === targetPort.id,
+      (c) => c.source.elementId === source.elementId && c.target.elementId === targetElement.id && c.target.portId === resolvedTargetPort.id,
     )
   ) {
     return {
@@ -317,6 +319,68 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     effectiveSourcePort = newPort;
   }
 
+  // D52: a linked project is a black box, so each caller gets a call-in port whose shapes match
+  // that caller. Reuse an in-port that already matches; else adopt the caller's shapes on the entry
+  // port while nothing is connected to it; else add a new in-port. Never rewrite a port that
+  // another connection already relies on.
+  const targetChanges: RecordChange[] = [];
+  if (
+    targetElement.linkedProjectId !== undefined &&
+    effectiveSourcePort.channel === 'call' &&
+    targetPort.channel === 'call' &&
+    effectiveSourcePort.responseSchemaId
+  ) {
+    const callerReq = document.schemas.find((x) => x.id === effectiveSourcePort.schemaId);
+    const callerRes = document.schemas.find((x) => x.id === effectiveSourcePort.responseSchemaId);
+    if (callerReq && callerRes) {
+      const matches = (port: Port): boolean => {
+        const req = document.schemas.find((x) => x.id === port.schemaId);
+        const res = document.schemas.find((x) => x.id === port.responseSchemaId);
+        return Boolean(req && res && shapesCompatible(callerReq.shape, req.shape) && shapesCompatible(callerRes.shape, res.shape));
+      };
+      const inCallPorts = targetElement.ports.filter((p) => p.direction === 'in' && p.channel === 'call');
+      const matching = matches(targetPort) ? targetPort : inCallPorts.find(matches);
+      if (matching) {
+        targetPort = matching;
+      } else {
+        const inUse = (port: Port) =>
+          document.connections.some((c) => c.target.elementId === targetElement.id && c.target.portId === port.id);
+        const reqSchema = document.schemas.find((x) => x.id === targetPort!.schemaId);
+        const resSchema = document.schemas.find((x) => x.id === targetPort!.responseSchemaId);
+        if (!inUse(targetPort) && reqSchema && resSchema) {
+          targetChanges.push(
+            { kind: 'replace', value: { recordKind: 'schema', record: { ...reqSchema, shape: cloneShapeWithFreshIds(callerReq.shape, mintId) } } },
+            { kind: 'replace', value: { recordKind: 'schema', record: { ...resSchema, shape: cloneShapeWithFreshIds(callerRes.shape, mintId) } } },
+          );
+        } else {
+          const reqId = mintId();
+          const resId = mintId();
+          const newPort: Port = {
+            id: mintId(),
+            label: `call in ${inCallPorts.length + 1}`,
+            direction: 'in',
+            channel: 'call',
+            schemaId: reqId,
+            responseSchemaId: resId,
+          };
+          targetChanges.push(
+            { kind: 'insert', value: { recordKind: 'schema', record: { id: reqId, label: `${targetElement.label} request ${inCallPorts.length + 1}`, shape: cloneShapeWithFreshIds(callerReq.shape, mintId) } } },
+            { kind: 'insert', value: { recordKind: 'schema', record: { id: resId, label: `${targetElement.label} response ${inCallPorts.length + 1}`, shape: cloneShapeWithFreshIds(callerRes.shape, mintId) } } },
+            { kind: 'replace', value: { recordKind: 'element', record: { ...targetElement, ports: [...targetElement.ports, newPort] } } },
+          );
+          targetPort = newPort;
+        }
+      }
+    }
+  }
+
+  const pendingSchemas = new Map<Id, PayloadSchema>();
+  for (const change of targetChanges) {
+    if (change.kind !== 'remove' && change.value.recordKind === 'schema') pendingSchemas.set(change.value.record.id, change.value.record);
+  }
+  const findTargetSchema = (id: Id | null | undefined): PayloadSchema | undefined =>
+    id ? (pendingSchemas.get(id) ?? document.schemas.find((x) => x.id === id)) : undefined;
+
   // Channel match
   if (effectiveSourcePort.channel !== targetPort.channel) {
     return {
@@ -335,7 +399,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
   // Shapes compatibility
   const sourceSchema = document.schemas.find((s) => s.id === effectiveSourcePort.schemaId);
-  const targetSchema = document.schemas.find((s) => s.id === targetPort.schemaId);
+  const targetSchema = findTargetSchema(targetPort.schemaId);
   if (!sourceSchema || !targetSchema) {
     return {
       kind: 'rejected',
@@ -343,15 +407,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     };
   }
 
-  // D52: a linked project is a black box that accepts whatever its caller sends, so its port
-  // schemas take the caller's shape instead of rejecting a mismatch.
-  const targetSchemaReplacements: PayloadSchema[] = [];
-  const adoptsCallerShapes = targetElement.linkedProjectId !== undefined;
-  if (adoptsCallerShapes && !shapesCompatible(sourceSchema.shape, targetSchema.shape)) {
-    targetSchemaReplacements.push({ ...targetSchema, shape: cloneShapeWithFreshIds(sourceSchema.shape, mintId) });
-  }
-
-  if (!adoptsCallerShapes && !shapesCompatible(sourceSchema.shape, targetSchema.shape)) {
+  if (!shapesCompatible(sourceSchema.shape, targetSchema.shape)) {
     return {
       kind: 'rejected',
       issues: [
@@ -392,7 +448,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     }
 
     const sourceRespSchema = document.schemas.find((s) => s.id === effectiveSourcePort.responseSchemaId);
-    const targetRespSchema = document.schemas.find((s) => s.id === targetPort.responseSchemaId);
+    const targetRespSchema = findTargetSchema(targetPort.responseSchemaId);
     if (!sourceRespSchema || !targetRespSchema) {
       return {
         kind: 'rejected',
@@ -400,11 +456,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       };
     }
 
-    if (adoptsCallerShapes && !shapesCompatible(sourceRespSchema.shape, targetRespSchema.shape)) {
-      targetSchemaReplacements.push({ ...targetRespSchema, shape: cloneShapeWithFreshIds(sourceRespSchema.shape, mintId) });
-    }
-
-    if (!adoptsCallerShapes && !shapesCompatible(sourceRespSchema.shape, targetRespSchema.shape)) {
+    if (!shapesCompatible(sourceRespSchema.shape, targetRespSchema.shape)) {
       return {
         kind: 'rejected',
         issues: [
@@ -470,7 +522,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       target: targetEndpoint,
       kind: connectionKind as 'call' | 'message',
       sourceElementReplacement,
-      ...(targetSchemaReplacements.length > 0 ? { targetSchemaReplacements } : {}),
+      ...(targetChanges.length > 0 ? { targetChanges } : {}),
     };
     return {
       kind: 'needs-resource-metadata',
@@ -536,7 +588,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
   const changes: RecordChange[] = [
     ...newSourcePortChanges,
-    ...targetSchemaReplacements.map((record): RecordChange => ({ kind: 'replace', value: { recordKind: 'schema', record } })),
+    ...targetChanges,
     { kind: 'insert', value: { recordKind: 'connection', record: connection } },
     { kind: 'replace', value: { recordKind: 'view', record: updatedView } },
   ];
@@ -670,9 +722,7 @@ export function completeConnection(
     connectionIds: [...(view?.connectionIds ?? []), draft.connectionId],
   };
 
-  const changes: RecordChange[] = (draft.targetSchemaReplacements ?? []).map(
-    (record): RecordChange => ({ kind: 'replace', value: { recordKind: 'schema', record } }),
-  );
+  const changes: RecordChange[] = [...(draft.targetChanges ?? [])];
   if (draft.sourceElementReplacement) {
     changes.push({
       kind: 'replace',
