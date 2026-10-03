@@ -25,7 +25,17 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000006",
-          "responseSchemaId": "00000000-0006-4000-8000-000000000007"
+          "responseSchemaId": "00000000-0006-4000-8000-000000000007",
+          "settings": {
+            "retry": {
+              "maxAttempts": 2,
+              "backoffMs": 0,
+              "backoffMultiplier": 2,
+              "maxBackoffMs": 1000,
+              "jitter": false,
+              "attemptTimeoutMs": null
+            }
+          }
         },
         {
           "id": "00000000-0006-4000-8000-000000000031",
@@ -34,7 +44,17 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000012",
-          "responseSchemaId": "00000000-0006-4000-8000-000000000013"
+          "responseSchemaId": "00000000-0006-4000-8000-000000000013",
+          "settings": {
+            "retry": {
+              "maxAttempts": 2,
+              "backoffMs": 0,
+              "backoffMultiplier": 2,
+              "maxBackoffMs": 1000,
+              "jitter": false,
+              "attemptTimeoutMs": null
+            }
+          }
         }
       ],
       "behavior": {
@@ -76,16 +96,26 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000000c",
-          "responseSchemaId": "00000000-0006-4000-8000-00000000000d"
+          "responseSchemaId": "00000000-0006-4000-8000-00000000000d",
+          "settings": {
+            "retry": {
+              "maxAttempts": 3,
+              "backoffMs": 50,
+              "backoffMultiplier": 2,
+              "maxBackoffMs": 1000,
+              "jitter": true,
+              "attemptTimeoutMs": null
+            }
+          }
         },
         {
           "id": "00000000-0006-4000-8000-000000000033",
           "label": "SQL",
           "direction": "out",
           "channel": "call",
+          "protocol": "sql",
           "schemaId": "00000000-0006-4000-8000-000000000018",
-          "responseSchemaId": "00000000-0006-4000-8000-000000000019",
-          "protocol": "sql"
+          "responseSchemaId": "00000000-0006-4000-8000-000000000019"
         },
         {
           "id": "00000000-0006-4000-8000-000000000036",
@@ -135,16 +165,26 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-000000000012",
-          "responseSchemaId": "00000000-0006-4000-8000-000000000013"
+          "responseSchemaId": "00000000-0006-4000-8000-000000000013",
+          "settings": {
+            "retry": {
+              "maxAttempts": 3,
+              "backoffMs": 50,
+              "backoffMultiplier": 2,
+              "maxBackoffMs": 1000,
+              "jitter": true,
+              "attemptTimeoutMs": null
+            }
+          }
         },
         {
           "id": "00000000-0006-4000-8000-000000000038",
           "label": "SQL",
           "direction": "out",
           "channel": "call",
+          "protocol": "sql",
           "schemaId": "00000000-0006-4000-8000-000000000018",
-          "responseSchemaId": "00000000-0006-4000-8000-000000000019",
-          "protocol": "sql"
+          "responseSchemaId": "00000000-0006-4000-8000-000000000019"
         },
         {
           "id": "00000000-0006-4000-8000-00000000003b",
@@ -227,7 +267,17 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "00000000-0006-4000-8000-00000000001d",
-          "responseSchemaId": "00000000-0006-4000-8000-00000000001e"
+          "responseSchemaId": "00000000-0006-4000-8000-00000000001e",
+          "settings": {
+            "retry": {
+              "maxAttempts": 2,
+              "backoffMs": 50,
+              "backoffMultiplier": 2,
+              "maxBackoffMs": 1000,
+              "jitter": true,
+              "attemptTimeoutMs": 1000
+            }
+          }
         }
       ],
       "behavior": {
@@ -367,25 +417,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": {
-          "maxAttempts": 2,
-          "backoffMs": 0,
-          "backoffMultiplier": 2,
-          "maxBackoffMs": 1000,
-          "jitter": false,
-          "attemptTimeoutMs": null
-        }
+        "fallback": false
       }
     },
     {
@@ -402,25 +437,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": {
-          "maxAttempts": 2,
-          "backoffMs": 0,
-          "backoffMultiplier": 2,
-          "maxBackoffMs": 1000,
-          "jitter": false,
-          "attemptTimeoutMs": null
-        }
+        "fallback": false
       }
     },
     {
@@ -437,18 +457,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": null
+        "fallback": false
       }
     },
     {
@@ -465,25 +477,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": {
-          "maxAttempts": 3,
-          "backoffMs": 50,
-          "backoffMultiplier": 2,
-          "maxBackoffMs": 1000,
-          "jitter": true,
-          "attemptTimeoutMs": null
-        }
+        "fallback": false
       }
     },
     {
@@ -499,19 +496,10 @@
       },
       "config": {
         "latencyMs": 2,
-        "ackDelayMs": 0,
-        "messageTtlMs": 300000,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        }
+        "fallback": false
       }
     },
     {
@@ -528,18 +516,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": null
+        "fallback": false
       }
     },
     {
@@ -556,25 +536,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": {
-          "maxAttempts": 3,
-          "backoffMs": 50,
-          "backoffMultiplier": 2,
-          "maxBackoffMs": 1000,
-          "jitter": true,
-          "attemptTimeoutMs": null
-        }
+        "fallback": false
       }
     },
     {
@@ -590,19 +555,10 @@
       },
       "config": {
         "latencyMs": 2,
-        "ackDelayMs": 0,
-        "messageTtlMs": 300000,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        }
+        "fallback": false
       }
     },
     {
@@ -619,18 +575,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "retry": {
-          "maxAttempts": 2,
-          "backoffMs": 50,
-          "backoffMultiplier": 2,
-          "maxBackoffMs": 1000,
-          "jitter": true,
-          "attemptTimeoutMs": 1000
-        }
+        "fallback": false
       }
     },
     {
@@ -647,18 +595,10 @@
       "config": {
         "latencyMs": 2,
         "returnLatencyMs": 2,
+        "linkClass": "same-az",
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "00000000-0006-4000-8000-000000000003",
-          "requestClassLabel": "Order",
-          "operation": "write",
-          "key": null,
-          "tags": [],
-          "deadlineDurationMs": 5000
-        },
-        "retry": null
+        "fallback": false
       }
     }
   ],

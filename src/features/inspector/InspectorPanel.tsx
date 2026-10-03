@@ -146,15 +146,24 @@ export function InspectorPanel({
                 Configuration
               </h3>
               <div className="flex flex-col gap-3">
-                {draft.fields.map((field) => (
-                  <FieldRow
-                    key={field.id}
-                    field={field}
-                    value={draft.values[field.id] ?? ''}
-                    error={draft.issues[field.id] ?? null}
-                    onChange={(raw) => onChangeField(field.id, raw)}
-                    registerRef={registerRef(field.id)}
-                  />
+                {draft.fields.map((field, index) => (
+                  <React.Fragment key={field.id}>
+                    {field.group && field.group !== draft.fields[index - 1]?.group ? (
+                      <h4
+                        data-testid="inspector-field-group"
+                        className="mt-2 border-t border-divider pt-3 text-[11px] font-mono font-medium text-secondary-text"
+                      >
+                        {field.group}
+                      </h4>
+                    ) : null}
+                    <FieldRow
+                      field={field}
+                      value={draft.values[field.id] ?? ''}
+                      error={draft.issues[field.id] ?? null}
+                      onChange={(raw) => onChangeField(field.id, raw)}
+                      registerRef={registerRef(field.id)}
+                    />
+                  </React.Fragment>
                 ))}
               </div>
               {generalIssue ? (

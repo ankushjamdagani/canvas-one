@@ -831,7 +831,19 @@
           "channel": "message",
           "protocol": "amqp",
           "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
-          "responseSchemaId": null
+          "responseSchemaId": null,
+          "settings": {
+            "request": {
+              "requestClassId": "7480821d-f678-5d62-8290-e986ccffa5df",
+              "requestClassLabel": "Order",
+              "operation": "read",
+              "key": null,
+              "tags": [
+                "order"
+              ]
+            },
+            "deadlineDurationMs": 9000
+          }
         }
       ],
       "behavior": {
@@ -941,7 +953,10 @@
           "channel": "message",
           "protocol": "amqp",
           "schemaId": "200e9451-f192-5712-a601-8460cfebcd4c",
-          "responseSchemaId": null
+          "responseSchemaId": null,
+          "settings": {
+            "messageTtlMs": 10000
+          }
         },
         {
           "id": "cb425f4f-9587-5934-a05e-d7c48eb1f53b",
@@ -1294,7 +1309,19 @@
           "channel": "call",
           "protocol": "http",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
-          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999"
+          "responseSchemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
+          "settings": {
+            "request": {
+              "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
+              "requestClassLabel": "Order",
+              "operation": "read",
+              "key": null,
+              "tags": [
+                "order"
+              ]
+            },
+            "deadlineDurationMs": 9000
+          }
         }
       ],
       "behavior": {
@@ -2060,7 +2087,19 @@
           "channel": "message",
           "protocol": "amqp",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
-          "responseSchemaId": null
+          "responseSchemaId": null,
+          "settings": {
+            "request": {
+              "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
+              "requestClassLabel": "Order",
+              "operation": "read",
+              "key": null,
+              "tags": [
+                "order"
+              ]
+            },
+            "deadlineDurationMs": 9000
+          }
         }
       ],
       "behavior": {
@@ -2170,7 +2209,10 @@
           "channel": "message",
           "protocol": "amqp",
           "schemaId": "82d08a0e-9949-5da7-92c9-bea29d236999",
-          "responseSchemaId": null
+          "responseSchemaId": null,
+          "settings": {
+            "messageTtlMs": 10000
+          }
         },
         {
           "id": "a0d26b12-2892-53ea-a949-c46626515c81",
@@ -2295,11 +2337,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -2380,21 +2422,10 @@
       },
       "config": {
         "latencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "7480821d-f678-5d62-8290-e986ccffa5df",
-          "requestClassLabel": "Order",
-          "operation": "read",
-          "key": null,
-          "tags": [
-            "order"
-          ],
-          "deadlineDurationMs": 9000
-        },
-        "ackDelayMs": 0,
-        "messageTtlMs": 10000
+        "fallback": false
       }
     },
     {
@@ -2410,11 +2441,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -2430,11 +2461,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -2450,11 +2481,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -2535,21 +2566,10 @@
       },
       "config": {
         "latencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
-          "requestClassLabel": "Order",
-          "operation": "read",
-          "key": null,
-          "tags": [
-            "order"
-          ],
-          "deadlineDurationMs": 9000
-        },
-        "ackDelayMs": 0,
-        "messageTtlMs": 10000
+        "fallback": false
       }
     },
     {
@@ -2565,11 +2585,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -2585,20 +2605,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": {
-          "requestClassId": "18990d84-e5f8-5786-9094-4552b8a0abfa",
-          "requestClassLabel": "Order",
-          "operation": "read",
-          "key": null,
-          "tags": [
-            "order"
-          ],
-          "deadlineDurationMs": 9000
-        },
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -2614,11 +2625,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     }
   ],

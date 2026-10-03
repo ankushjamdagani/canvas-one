@@ -194,11 +194,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     },
     {
@@ -214,11 +214,11 @@
       },
       "config": {
         "latencyMs": 0,
+        "returnLatencyMs": 0,
+        "linkClass": null,
         "weight": 1,
         "condition": null,
-        "fallback": false,
-        "resource": null,
-        "returnLatencyMs": 0
+        "fallback": false
       }
     }
   ],

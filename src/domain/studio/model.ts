@@ -79,6 +79,72 @@ export type PortDirection = (typeof PORT_DIRECTIONS)[number];
 export const PORT_CHANNELS = ['call', 'message', 'data', 'event'] as const;
 export type PortChannel = (typeof PORT_CHANNELS)[number];
 
+// ----------------------------------------------------------------------------
+// Port settings (D53)
+// ----------------------------------------------------------------------------
+
+export const DELIVERY_GUARANTEES = ['at-most-once', 'at-least-once', 'exactly-once'] as const;
+export type DeliveryGuarantee = (typeof DELIVERY_GUARANTEES)[number];
+
+export const MESSAGE_ORDERINGS = ['none', 'per-key', 'global'] as const;
+export type MessageOrdering = (typeof MESSAGE_ORDERINGS)[number];
+
+/**
+ * An inbound call endpoint. Declared (shown to callers, checked by advisories, never simulated):
+ * expectedP95Ms, availabilityPct, idempotent, maxConcurrency. Simulated (resource nodes only, they
+ * override the node's own behavior for this endpoint): rateLimit, failureRate, serviceTimeMs.
+ */
+export type CallInSettings = {
+  readonly expectedP95Ms?: number;
+  readonly availabilityPct?: number;
+  readonly idempotent?: boolean;
+  readonly maxConcurrency?: number;
+  readonly rateLimit?: { readonly rps: number; readonly burst: number };
+  readonly failureRate?: number;
+  readonly serviceTimeMs?: number;
+};
+
+/**
+ * An inbound message endpoint. Simulated: ackDelayMs (the receiver confirms a delivery this long
+ * after it arrives; default 0) and messageTtlMs (a message expires this long after it was published;
+ * default 5 minutes). Declared: delivery and ordering.
+ */
+export type MessageInSettings = {
+  readonly ackDelayMs?: number;
+  readonly messageTtlMs?: number;
+  readonly delivery?: DeliveryGuarantee;
+  readonly ordering?: MessageOrdering;
+};
+
+/** An inbound data endpoint. Declared only. */
+export type DataInSettings = {
+  readonly throughputPerSec?: number;
+  readonly maxStalenessMs?: number;
+};
+
+/**
+ * An outbound call endpoint, the caller's contract for calling one downstream endpoint. Simulated:
+ * retry, and (for traffic that originates here) request and deadlineDurationMs.
+ */
+export type CallOutSettings = {
+  readonly deadlineDurationMs?: number;
+  readonly retry?: CallRetryPolicy;
+  readonly request?: RequestMeta;
+};
+
+/** An outbound message endpoint. Simulated for traffic that originates here: request and deadlineDurationMs. */
+export type MessageOutSettings = {
+  readonly deadlineDurationMs?: number;
+  readonly request?: RequestMeta;
+};
+
+export type PortSettings =
+  | CallInSettings
+  | MessageInSettings
+  | DataInSettings
+  | CallOutSettings
+  | MessageOutSettings;
+
 /**
  * Contract §2: Port
  * id, label, direction:'in'|'out', channel:'call'|'message'|'data'|'event', schemaId, responseSchemaId:Id|null
@@ -92,6 +158,8 @@ export type Port = {
   readonly responseSchemaId: Id | null;
   /** D53: how this port is spoken to; null only on `event` ports, which can't be connected. */
   readonly protocol: import('./protocols').Protocol | null;
+  /** D53: expectations and behavior of this endpoint (see PortSettings); absent when none are set. */
+  readonly settings?: PortSettings;
   /** D53: the endpoint path or name within the protocol (`/orders`, a topic, a procedure). Absent means none. */
   readonly path?: string;
 };
@@ -141,44 +209,19 @@ export type RouteCondition = {
 };
 
 /**
- * Contract §4 & §6: ResourceCallMetadata
- * Call/message edges from non-resource behavior into a resource need
- * ResourceCallMetadata={requestClassId:Id,requestClassLabel:string,operation:'read'|'write',key:string|null,tags:string[],deadlineDurationMs:number}
+ * D53: what a caller sends through an out-port: a named class of traffic with a read or write
+ * operation, an optional key and tags. The kernel reads the operation (storage read vs write
+ * capacity), conditional routes match class, operation and tags, and the key drives cache hits.
+ * Only needed where traffic originates in a node the runner does not simulate (a client, a
+ * state machine); a simulated caller's requests inherit it.
  */
-export type ResourceCallMetadata = {
+export type RequestMeta = {
   readonly requestClassId: Id;
   /** Presentation only; 1–60 Unicode code points. */
   readonly requestClassLabel: string;
   readonly operation: 'read' | 'write';
   readonly key: string | null;
   readonly tags: readonly string[];
-  readonly deadlineDurationMs: number;
-};
-
-/**
- * Contract §4: Connection config for data channel.
- * data: {}
- */
-export type DataConnectionConfig = {
-  // §4: data: {}
-};
-
-/**
- * Contract §4: Connection config for call channel.
- * call: {latencyMs,returnLatencyMs,weight,condition:RouteCondition|null,fallback:boolean,resource:ResourceCallMetadata|null}
- */
-export type CallConnectionConfig = {
-  readonly latencyMs: number;
-  readonly returnLatencyMs: number;
-  readonly weight: number;
-  readonly condition: RouteCondition | null;
-  readonly fallback: boolean;
-  readonly resource: ResourceCallMetadata | null;
-  /**
-   * D49: the caller's retry policy for this call. Absent or null means no retries
-   * (connections created before D49 have no field).
-   */
-  readonly retry?: CallRetryPolicy | null;
 };
 
 /** D49: caller retry policy (model-and-runner.md §4). */
@@ -191,18 +234,51 @@ export type CallRetryPolicy = {
   readonly attemptTimeoutMs: number | null;
 };
 
+// ----------------------------------------------------------------------------
+// Link classes (D53): where the two ends of a connection sit relative to each other.
+// ----------------------------------------------------------------------------
+
+export const LINK_CLASSES = ['same-host', 'same-az', 'cross-az', 'cross-region', 'internet'] as const;
+export type LinkClass = (typeof LINK_CLASSES)[number];
+
+/** One-way latency a link class stands for, in ms (assumptions, shown in the inspector). */
+export const LINK_CLASS_LATENCY_MS: Readonly<Record<LinkClass, number>> = {
+  'same-host': 1,
+  'same-az': 2,
+  'cross-az': 5,
+  'cross-region': 80,
+  internet: 120,
+};
+
 /**
- * Contract §4: Connection config for message channel.
- * message: {latencyMs,ackDelayMs,messageTtlMs,weight,condition:RouteCondition|null,fallback:boolean,resource:ResourceCallMetadata|null}
+ * Contract §4: Connection config for data channel.
+ * data: {}
  */
-export type MessageConnectionConfig = {
+export type DataConnectionConfig = {
+  // §4: data: {}
+};
+
+/**
+ * D53: a call connection is the link and the route: wire delay both ways, and how a node with several
+ * routes picks one. What the caller sends and how it retries live on its out-port; what the callee
+ * promises lives on its in-port. `linkClass` is the preset the latencies came from (null = custom).
+ */
+export type CallConnectionConfig = {
   readonly latencyMs: number;
-  readonly ackDelayMs: number;
-  readonly messageTtlMs: number;
+  readonly returnLatencyMs: number;
+  readonly linkClass: LinkClass | null;
   readonly weight: number;
   readonly condition: RouteCondition | null;
   readonly fallback: boolean;
-  readonly resource: ResourceCallMetadata | null;
+};
+
+/** D53: a message connection is the link and the route; acknowledgement and TTL live on the receiving in-port. */
+export type MessageConnectionConfig = {
+  readonly latencyMs: number;
+  readonly linkClass: LinkClass | null;
+  readonly weight: number;
+  readonly condition: RouteCondition | null;
+  readonly fallback: boolean;
 };
 
 export type ConnectionConfig =

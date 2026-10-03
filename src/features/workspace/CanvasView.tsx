@@ -1063,10 +1063,10 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const requestClasses = React.useMemo(() => {
     const classes = new Map<Id, { requestClassId: Id; requestClassLabel: string }>();
     if (!document) return [];
-    for (const connection of document.connections) {
-      if ((connection.kind === 'call' || connection.kind === 'message') && connection.config.resource) {
-        const { requestClassId, requestClassLabel } = connection.config.resource;
-        classes.set(requestClassId, { requestClassId, requestClassLabel });
+    for (const element of document.elements) {
+      for (const port of element.ports) {
+        const request = (port.settings as { request?: { requestClassId: Id; requestClassLabel: string } } | undefined)?.request;
+        if (request) classes.set(request.requestClassId, { requestClassId: request.requestClassId, requestClassLabel: request.requestClassLabel });
       }
     }
     return [...classes.values()];
@@ -1079,6 +1079,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   // preselected, and Connect stays disabled until every field is filled in.
   const resourceFormValid = React.useMemo(() => {
     if (!resourceForm) return false;
+    // D53: a simulated caller's requests inherit the class, operation and deadline; only an unsimulated source asks for them.
+    if (!resourceForm.draft.needsRequest) return true;
     const deadline = Number(resourceForm.deadlineMs);
     return (
       Array.from(resourceForm.requestClass).length > 0 &&
@@ -1092,16 +1094,17 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
   const confirmResourceForm = React.useCallback(async () => {
     if (!resourceForm) return;
-    if (Array.from(resourceForm.requestClass).length === 0 || Array.from(resourceForm.requestClass).length > 60) {
+    const needsRequest = resourceForm.draft.needsRequest;
+    if (needsRequest && (Array.from(resourceForm.requestClass).length === 0 || Array.from(resourceForm.requestClass).length > 60)) {
       setResourceForm({ ...resourceForm, error: 'Request class must contain 1–60 characters.' });
       return;
     }
-    if (resourceForm.operation === null) {
+    if (needsRequest && resourceForm.operation === null) {
       setResourceForm({ ...resourceForm, error: 'Choose read or write.' });
       return;
     }
     const deadline = Number(resourceForm.deadlineMs);
-    if (resourceForm.deadlineMs.trim().length === 0 || !Number.isFinite(deadline) || deadline <= 0) {
+    if (needsRequest && (resourceForm.deadlineMs.trim().length === 0 || !Number.isFinite(deadline) || deadline <= 0)) {
       setResourceForm({ ...resourceForm, error: 'Deadline must be a positive number of ms.' });
       return;
     }
@@ -1126,12 +1129,17 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       if (replanned.kind === 'needs-resource-metadata') draft = replanned.draft;
     }
     const existingClass = requestClasses.find((entry) => entry.requestClassLabel === resourceForm.requestClass);
-    const result = completeConnection(draft, {
-      requestClassId: existingClass ? existingClass.requestClassId : mintId(),
-      requestClassLabel: resourceForm.requestClass,
-      operation: resourceForm.operation,
-      deadlineDurationMs: deadline,
-    });
+    const result = completeConnection(
+      draft,
+      needsRequest && resourceForm.operation !== null
+        ? {
+            requestClassId: existingClass ? existingClass.requestClassId : mintId(),
+            requestClassLabel: resourceForm.requestClass,
+            operation: resourceForm.operation,
+            deadlineDurationMs: deadline,
+          }
+        : undefined,
+    );
     if (!result.ok) {
       if (result.issues.length === 0) {
         throw new Error('completeConnection: rejected result with no issues (contract violation)');
@@ -1463,6 +1471,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             </label>
           ) : null}
 
+          {resourceForm.draft.needsRequest ? (
+            <>
           <label className="block mb-2">
             <span className="block text-secondary-text mb-0.5">Request class</span>
             <Input
@@ -1519,6 +1529,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               className="h-8 text-xs"
             />
           </label>
+            </>
+          ) : null}
 
           {resourceForm.error && (
             <p data-testid="connect-form-error" className="text-destructive mb-2">

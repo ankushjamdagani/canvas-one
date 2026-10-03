@@ -64,7 +64,7 @@ function buildFieldsAndLabel(
   const record = findConnection(document, target.ids[0]);
   if (!record) return { fields: [], record: null, label: '', kindTag: '', notSimulated: false, layer: null, stripeColor: null };
   return {
-    fields: fieldsForConnection(record),
+    fields: fieldsForConnection(record, document),
     record,
     label: describeConnection(document, record),
     kindTag: kindTagForConnection(record),
@@ -322,7 +322,7 @@ export async function applyDraft(handle: DraftHandle, session: DraftSession): Pr
     const refreshedFields =
       handle.target.kind === 'element'
         ? fieldsForElement(updatedRecord as Element)
-        : fieldsForConnection(updatedRecord as Connection);
+        : fieldsForConnection(updatedRecord as Connection, document);
     for (const field of refreshedFields) {
       if (!(field.id in acceptedValues)) acceptedValues[field.id] = field.toRaw(updatedRecord as never);
     }

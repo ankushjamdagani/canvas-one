@@ -18,136 +18,18 @@
 import type {
   CallConnection,
   Connection,
+  Document,
   Element,
+  LinkClass,
   MessageConnection,
   ResourceConfig,
 } from '../../domain/studio/model';
-import type { FieldOption, FieldParseResult, FieldSpec } from './types';
+import { LINK_CLASSES, LINK_CLASS_LATENCY_MS } from '../../domain/studio/model';
+import { connectionAdvisories, describeCalleeContract, describeCallerPolicy, findPort } from '../../domain/studio/port-settings';
+import type { FieldOption, FieldSpec } from './types';
+import { portSettingsFields } from './portFields';
 import { RESOURCE_CONFIG_COPY } from '../catalog/resourceConfigCopy';
-
-// ============================================================================
-// Generic field builders
-// ============================================================================
-
-function parseTrimmedString(raw: string, min: number, max: number, name: string): FieldParseResult {
-  const value = raw;
-  const codePoints = Array.from(value).length;
-  if (codePoints < min) {
-    return {
-      ok: false,
-      message: min === 1 ? `${name} is required` : `${name} must be at least ${min} characters`,
-    };
-  }
-  if (codePoints > max) {
-    return { ok: false, message: `${name} must be ${max} characters or fewer` };
-  }
-  return { ok: true, value };
-}
-
-function parseNumber(
-  raw: string,
-  min: number,
-  max: number,
-  name: string,
-  opts: { readonly integer?: boolean; readonly minExclusive?: boolean } = {},
-): FieldParseResult {
-  const trimmed = raw.trim();
-  if (trimmed === '') {
-    return { ok: false, message: `${name} is required` };
-  }
-  const value = Number(trimmed);
-  if (!Number.isFinite(value)) {
-    return { ok: false, message: `${name} must be a number` };
-  }
-  if (opts.integer && !Number.isSafeInteger(value)) {
-    return { ok: false, message: `${name} must be a whole number` };
-  }
-  const tooSmall = opts.minExclusive ? value <= min : value < min;
-  if (tooSmall || value > max) {
-    const range = opts.minExclusive ? `(${min}, ${max}]` : `[${min}, ${max}]`;
-    return { ok: false, message: `${name} must be in range ${range}` };
-  }
-  return { ok: true, value };
-}
-
-function textField<TRecord>(opts: {
-  readonly id: string;
-  readonly label: string;
-  readonly kind?: 'text' | 'textarea';
-  readonly min: number;
-  readonly max: number;
-  readonly get: (record: TRecord) => string;
-  readonly set: (record: TRecord, value: string) => TRecord;
-}): FieldSpec<TRecord> {
-  return {
-    id: opts.id,
-    label: opts.label,
-    kind: opts.kind ?? 'text',
-    toRaw: opts.get,
-    parse: (raw) => parseTrimmedString(raw, opts.min, opts.max, opts.label),
-    apply: (record, value) => opts.set(record, value as string),
-  };
-}
-
-function numberField<TRecord>(opts: {
-  readonly id: string;
-  readonly label: string;
-  readonly unit?: string;
-  readonly min: number;
-  readonly max: number;
-  readonly integer?: boolean;
-  readonly minExclusive?: boolean;
-  readonly get: (record: TRecord) => number;
-  readonly set: (record: TRecord, value: number) => TRecord;
-}): FieldSpec<TRecord> {
-  return {
-    id: opts.id,
-    label: opts.label,
-    kind: 'number',
-    unit: opts.unit,
-    toRaw: (record) => String(opts.get(record)),
-    parse: (raw) =>
-      parseNumber(raw, opts.min, opts.max, opts.label, {
-        integer: opts.integer,
-        minExclusive: opts.minExclusive,
-      }),
-    apply: (record, value) => opts.set(record, value as number),
-  };
-}
-
-function selectField<TRecord>(opts: {
-  readonly id: string;
-  readonly label: string;
-  readonly options: readonly FieldOption[];
-  readonly get: (record: TRecord) => string;
-  readonly set: (record: TRecord, value: string) => TRecord;
-}): FieldSpec<TRecord> {
-  const validValues = new Set(opts.options.map((o) => o.value));
-  return {
-    id: opts.id,
-    label: opts.label,
-    kind: 'select',
-    options: opts.options,
-    toRaw: opts.get,
-    parse: (raw) =>
-      validValues.has(raw)
-        ? { ok: true, value: raw }
-        : { ok: false, message: `${opts.label} must be one of ${[...validValues].join(', ')}` },
-    apply: (record, value) => opts.set(record, value as string),
-  };
-}
-
-function readonlyField<TRecord>(id: string, label: string, text: string, note?: string): FieldSpec<TRecord> {
-  return {
-    id,
-    label,
-    kind: 'readonly',
-    note,
-    toRaw: () => text,
-    parse: () => ({ ok: true, value: text }),
-    apply: (record) => record,
-  };
-}
+import { numberField, readonlyField, selectField, textField } from './fieldBuilders';
 
 // ============================================================================
 // Element fields
@@ -434,7 +316,7 @@ function linkedProjectFields(element: Element): readonly FieldSpec<Element>[] {
 
 export function fieldsForElement(element: Element): readonly FieldSpec<Element>[] {
   if (element.visualKind === 'linked-project') return linkedProjectFields(element);
-  return [...elementLabelDescriptionFields(), ...behaviorFields(element)];
+  return [...elementLabelDescriptionFields(), ...behaviorFields(element), ...portSettingsFields(element)];
 }
 
 /** Uppercase kind tag(s) for the inspector header, per D42 caption words. */
@@ -466,228 +348,132 @@ export function kindTagForElement(element: Element): { readonly tag: string; rea
 /** D50: the variability a resource gets when its author chooses lognormal (an assumption, shown). */
 const LOGNORMAL_CV_WHEN_CHOSEN = 2;
 
-/**
- * D49: the policy a call gets when its author raises Attempts above 1. Each value is an
- * assumption shown in the inspector, not a hidden default.
- */
-const RETRY_WHEN_ENABLED = {
-  backoffMs: 100,
-  backoffMultiplier: 2,
-  maxBackoffMs: 10000,
-  jitter: true,
-  attemptTimeoutMs: null,
-} as const;
+const LINK_CLASS_LABELS: Readonly<Record<LinkClass, string>> = {
+  'same-host': 'Same host',
+  'same-az': 'Same availability zone',
+  'cross-az': 'Cross availability zone',
+  'cross-region': 'Cross region',
+  internet: 'Internet',
+};
 
-function retryFields(connection: Connection): FieldSpec<Connection>[] {
-  const retryOf = (c: Connection) => (c.kind === 'call' ? (c.config.retry ?? null) : null);
-  const withRetry = (c: Connection, patch: (r: NonNullable<CallConnection['config']['retry']>) => CallConnection['config']['retry']): Connection => {
-    const r = retryOf(c);
-    return c.kind === 'call' && r ? { ...c, config: { ...c.config, retry: patch(r) } } : c;
-  };
+const LINK_CLASS_OPTIONS: readonly FieldOption[] = [
+  ...LINK_CLASSES.map((c) => ({ value: c, label: `${LINK_CLASS_LABELS[c]} (${LINK_CLASS_LATENCY_MS[c]} ms each way)` })),
+  { value: 'custom', label: 'Custom' },
+];
+
+type LinkConfig = CallConnection['config'] | MessageConnection['config'];
+
+function withLinkConfig(c: Connection, patch: (config: LinkConfig) => LinkConfig): Connection {
+  return c.kind === 'call' || c.kind === 'message' ? ({ ...c, config: patch(c.config) } as Connection) : c;
+}
+
+function linkFields(kind: 'call' | 'message'): FieldSpec<Connection>[] {
+  const cfg = (c: Connection): LinkConfig | null => (c.kind === kind ? (c.config as LinkConfig) : null);
   const fields: FieldSpec<Connection>[] = [
-    numberField<Connection>({
-      id: 'config.retry.maxAttempts',
-      label: 'Attempts (1 = no retries)',
-      min: 1,
-      max: 10,
-      integer: true,
-      get: (c) => retryOf(c)?.maxAttempts ?? 1,
-      set: (c, value) => {
-        if (c.kind !== 'call') return c;
-        const r = retryOf(c);
-        const retry = value === 1 ? null : r ? { ...r, maxAttempts: value } : { ...RETRY_WHEN_ENABLED, maxAttempts: value };
-        return { ...c, config: { ...c.config, retry } };
-      },
+    selectField<Connection>({
+      id: 'config.linkClass',
+      label: 'Link',
+      options: LINK_CLASS_OPTIONS,
+      get: (c) => cfg(c)?.linkClass ?? 'custom',
+      set: (c, value) =>
+        withLinkConfig(c, (config) => {
+          if (value === 'custom') return { ...config, linkClass: null };
+          const preset = LINK_CLASS_LATENCY_MS[value as LinkClass];
+          return 'returnLatencyMs' in config
+            ? { ...config, linkClass: value as LinkClass, latencyMs: preset, returnLatencyMs: preset }
+            : { ...config, linkClass: value as LinkClass, latencyMs: preset };
+        }),
     }),
-  ];
-  if (!retryOf(connection)) return fields;
-  fields.push(
     numberField<Connection>({
-      id: 'config.retry.backoffMs',
-      label: 'Retry backoff',
+      id: 'config.latencyMs',
+      label: kind === 'call' ? 'Latency (request leg)' : 'Latency',
       unit: 'ms',
       min: 0,
       max: 60000,
-      get: (c) => retryOf(c)?.backoffMs ?? 0,
-      set: (c, value) => withRetry(c, (r) => ({ ...r, backoffMs: value })),
+      get: (c) => cfg(c)?.latencyMs ?? 0,
+      set: (c, value) =>
+        withLinkConfig(c, (config) => ({
+          ...config,
+          latencyMs: value,
+          linkClass: config.linkClass !== null && LINK_CLASS_LATENCY_MS[config.linkClass] === value ? config.linkClass : null,
+        })),
     }),
+  ];
+  if (kind === 'call') {
+    fields.push(
+      numberField<Connection>({
+        id: 'config.returnLatencyMs',
+        label: 'Return latency (response leg)',
+        unit: 'ms',
+        min: 0,
+        max: 60000,
+        get: (c) => (c.kind === 'call' ? c.config.returnLatencyMs : 0),
+        set: (c, value) =>
+          withLinkConfig(c, (config) => ({
+            ...config,
+            returnLatencyMs: value,
+            linkClass: config.linkClass !== null && LINK_CLASS_LATENCY_MS[config.linkClass] === value ? config.linkClass : null,
+          })),
+      }),
+    );
+  }
+  fields.push(
     numberField<Connection>({
-      id: 'config.retry.backoffMultiplier',
-      label: 'Backoff multiplier',
-      min: 1,
-      max: 10,
-      get: (c) => retryOf(c)?.backoffMultiplier ?? 1,
-      set: (c, value) => withRetry(c, (r) => ({ ...r, backoffMultiplier: value })),
-    }),
-    numberField<Connection>({
-      id: 'config.retry.maxBackoffMs',
-      label: 'Max backoff',
-      unit: 'ms',
+      id: 'config.weight',
+      label: 'Route weight',
       min: 0,
-      max: 600000,
-      get: (c) => retryOf(c)?.maxBackoffMs ?? 0,
-      set: (c, value) => withRetry(c, (r) => ({ ...r, maxBackoffMs: value })),
-    }),
-    selectField<Connection>({
-      id: 'config.retry.jitter',
-      label: 'Jitter',
-      options: [
-        { value: 'on', label: 'On (random up to the backoff)' },
-        { value: 'off', label: 'Off' },
-      ],
-      get: (c) => (retryOf(c)?.jitter ? 'on' : 'off'),
-      set: (c, value) => withRetry(c, (r) => ({ ...r, jitter: value === 'on' })),
-    }),
-    numberField<Connection>({
-      id: 'config.retry.attemptTimeoutMs',
-      label: 'Attempt timeout (0 = none)',
-      unit: 'ms',
-      min: 0,
-      max: 600000,
-      get: (c) => retryOf(c)?.attemptTimeoutMs ?? 0,
-      set: (c, value) => withRetry(c, (r) => ({ ...r, attemptTimeoutMs: value === 0 ? null : value })),
+      max: 1e6,
+      minExclusive: true,
+      get: (c) => cfg(c)?.weight ?? 0,
+      set: (c, value) => withLinkConfig(c, (config) => ({ ...config, weight: value })),
     }),
   );
   return fields;
 }
 
-function callFields(): readonly FieldSpec<Connection>[] {
-  const withConfig = (c: Connection, patch: (config: CallConnection['config']) => CallConnection['config']): Connection =>
-    c.kind === 'call' ? { ...c, config: patch(c.config) } : c;
-
-  const fields: FieldSpec<Connection>[] = [
-    numberField<Connection>({
-      id: 'config.latencyMs',
-      label: 'Latency',
-      unit: 'ms',
-      min: 0,
-      max: 60000,
-      get: (c) => (c.kind === 'call' ? c.config.latencyMs : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, latencyMs: value })),
-    }),
-    numberField<Connection>({
-      id: 'config.returnLatencyMs',
-      label: 'Return latency',
-      unit: 'ms',
-      min: 0,
-      max: 60000,
-      get: (c) => (c.kind === 'call' ? c.config.returnLatencyMs : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, returnLatencyMs: value })),
-    }),
-    numberField<Connection>({
-      id: 'config.weight',
-      label: 'Weight',
-      min: 0,
-      max: 1e6,
-      minExclusive: true,
-      get: (c) => (c.kind === 'call' ? c.config.weight : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, weight: value })),
-    }),
+/** Condition and fallback are shown only when the route actually uses them; never a placeholder row. */
+function routingReadonlyFields(): FieldSpec<Connection>[] {
+  const config = (c: Connection): LinkConfig | null => (c.kind === 'data' ? null : c.config);
+  return [
+    {
+      ...readonlyField<Connection>('config.condition', 'Route condition', ''),
+      toRaw: (c) => {
+        const cond = config(c)?.condition;
+        return cond ? `${cond.field} = ${cond.value}` : '';
+      },
+    },
+    {
+      ...readonlyField<Connection>('config.fallback', 'Fallback route', ''),
+      toRaw: (c) => (config(c)?.fallback ? 'Yes' : ''),
+    },
   ];
-  return [...fields, ...readOnlyRoutingFields((c) => (c.kind === 'call' ? c.config : null))];
 }
 
-function messageFields(): readonly FieldSpec<Connection>[] {
-  const withConfig = (
-    c: Connection,
-    patch: (config: MessageConnection['config']) => MessageConnection['config'],
-  ): Connection => (c.kind === 'message' ? { ...c, config: patch(c.config) } : c);
-
-  const fields: FieldSpec<Connection>[] = [
-    numberField<Connection>({
-      id: 'config.latencyMs',
-      label: 'Latency',
-      unit: 'ms',
-      min: 0,
-      max: 60000,
-      get: (c) => (c.kind === 'message' ? c.config.latencyMs : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, latencyMs: value })),
-    }),
-    numberField<Connection>({
-      id: 'config.ackDelayMs',
-      label: 'Ack delay',
-      unit: 'ms',
-      min: 0,
-      max: 60000,
-      get: (c) => (c.kind === 'message' ? c.config.ackDelayMs : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, ackDelayMs: value })),
-    }),
-    numberField<Connection>({
-      id: 'config.messageTtlMs',
-      label: 'Message TTL',
-      unit: 'ms',
-      min: 1,
-      max: 3600000,
-      get: (c) => (c.kind === 'message' ? c.config.messageTtlMs : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, messageTtlMs: value })),
-    }),
-    numberField<Connection>({
-      id: 'config.weight',
-      label: 'Weight',
-      min: 0,
-      max: 1e6,
-      minExclusive: true,
-      get: (c) => (c.kind === 'message' ? c.config.weight : 0),
-      set: (c, value) => withConfig(c, (cfg) => ({ ...cfg, weight: value })),
-    }),
-  ];
-  return [...fields, ...readOnlyRoutingFields((c) => (c.kind === 'message' ? c.config : null))];
-}
-
-/**
- * Brief §2: "condition/fallback shown read-only if present, resource metadata
- * class/operation/deadline". Only rendered when the connection actually carries
- * that data — never a fabricated placeholder row.
- */
-function readOnlyRoutingFields(
-  getConfig: (c: Connection) => CallConnection['config'] | MessageConnection['config'] | null,
-): readonly FieldSpec<Connection>[] {
+/** D53: what the two ends of the connection say about it, read-only here and edited on the nodes. */
+function endsFields(connection: Connection, document: Pick<Document, 'elements'> | undefined): FieldSpec<Connection>[] {
+  if (!document || connection.kind === 'data') return [];
+  const source = findPort(document, connection.source);
+  const target = findPort(document, connection.target);
   const fields: FieldSpec<Connection>[] = [];
-
-  fields.push(
-    readonlyField<Connection>('config.condition', 'Condition', ''),
-  );
-  fields[fields.length - 1] = {
-    ...fields[fields.length - 1],
-    toRaw: (c) => {
-      const cfg = getConfig(c);
-      if (!cfg || !cfg.condition) return '';
-      return `${cfg.condition.field} = ${cfg.condition.value}`;
-    },
+  const row = (id: string, label: string, text: string, note?: string) => {
+    if (text) fields.push(readonlyField<Connection>(id, label, text, note));
   };
-
-  fields.push(readonlyField<Connection>('config.fallback', 'Fallback route', ''));
-  fields[fields.length - 1] = {
-    ...fields[fields.length - 1],
-    toRaw: (c) => {
-      const cfg = getConfig(c);
-      return cfg?.fallback ? 'Yes' : 'No';
-    },
-  };
-
-  fields.push(readonlyField<Connection>('config.resource', 'Resource request', ''));
-  fields[fields.length - 1] = {
-    ...fields[fields.length - 1],
-    toRaw: (c) => {
-      const cfg = getConfig(c);
-      if (!cfg || !cfg.resource) return '';
-      const r = cfg.resource;
-      return `${r.operation} · deadline ${r.deadlineDurationMs} ms`;
-    },
-  };
-
-  // Drop rows with nothing to show (never render an empty read-only row).
-  return fields.filter((f) => f.toRaw as unknown);
+  if (source) row('ends.caller', `Caller · ${source.element.label}`, describeCallerPolicy(source.port), 'Edit on the node');
+  if (target) row('ends.callee', `Callee · ${target.element.label}`, describeCalleeContract(target.port), 'Edit on the node');
+  connectionAdvisories(document, connection).forEach((text, i) => row(`ends.advisory.${i}`, 'Advisory', text));
+  return fields;
 }
 
-export function fieldsForConnection(connection: Connection): readonly FieldSpec<Connection>[] {
-  if (connection.kind === 'call') {
-    return [...callFields().filter((f) => shouldShowReadonly(connection, f)), ...retryFields(connection)];
-  }
-  if (connection.kind === 'message') {
-    return [...messageFields().filter((f) => shouldShowReadonly(connection, f))];
-  }
-  return [];
+export function fieldsForConnection(
+  connection: Connection,
+  document?: Pick<Document, 'elements'>,
+): readonly FieldSpec<Connection>[] {
+  if (connection.kind === 'data') return [];
+  return [
+    ...linkFields(connection.kind),
+    ...routingReadonlyFields().filter((f) => shouldShowReadonly(connection, f)),
+    ...endsFields(connection, document),
+  ];
 }
 
 function shouldShowReadonly(connection: Connection, field: FieldSpec<Connection>): boolean {

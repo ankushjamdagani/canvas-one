@@ -64,8 +64,12 @@ function buildS06(): Document {
       apply(c.changes);
       id = c.connectionId;
     }
+    // D53: a caller's retries live on the out-port it calls through.
     const conn = doc.connections.find((x) => x.id === id)!;
-    apply([{ kind: 'replace', value: { recordKind: 'connection', record: { ...conn, config: { ...conn.config, ...patch } } as Connection } } as never]);
+    if (patch.retry) {
+      const from = el(conn.source.elementId);
+      apply([{ kind: 'replace', value: { recordKind: 'element', record: { ...from, ports: from.ports.map((p) => (p.id === conn.source.portId ? { ...p, settings: { ...(p.settings ?? {}), retry: patch.retry } } : p)) } } } as never]);
+    }
     return id;
   };
   const retry = (o: Partial<CallRetryPolicy>): CallRetryPolicy => ({

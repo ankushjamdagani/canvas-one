@@ -78,10 +78,32 @@ class Arch {
     this.replaceElement({ ...e, behavior: { ...e.behavior, config: { ...e.behavior.config, ...patch } as never } });
   }
 
-  /** Patches a connection's config, as the inspector does. */
+  /**
+   * Patches what the inspector would edit for a connection (D53): the link and route stay on the
+   * connection; a caller's retry goes on its out-port, a receiver's ack delay and TTL on its in-port.
+   */
   setConn(id: Id, patch: Record<string, unknown>): void {
     const c = this.doc.connections.find((x) => x.id === id)!;
-    this.apply([{ kind: 'replace', value: { recordKind: 'connection', record: { ...c, config: { ...c.config, ...patch } } as Connection } } as never]);
+    const { retry, messageTtlMs, ackDelayMs, ...link } = patch;
+    if (retry !== undefined) this.setPortSettings(c.source, { retry });
+    if (messageTtlMs !== undefined || ackDelayMs !== undefined) {
+      this.setPortSettings(c.target, {
+        ...(messageTtlMs !== undefined ? { messageTtlMs } : {}),
+        ...(ackDelayMs !== undefined ? { ackDelayMs } : {}),
+      });
+    }
+    if (Object.keys(link).length > 0) {
+      const current = this.doc.connections.find((x) => x.id === id)!;
+      this.apply([{ kind: 'replace', value: { recordKind: 'connection', record: { ...current, config: { ...current.config, ...link } } as Connection } } as never]);
+    }
+  }
+
+  private setPortSettings(endpoint: { elementId: Id; portId: Id }, patch: Record<string, unknown>): void {
+    const e = this.el(endpoint.elementId);
+    this.replaceElement({
+      ...e,
+      ports: e.ports.map((p) => (p.id === endpoint.portId ? { ...p, settings: { ...(p.settings ?? {}), ...patch } } : p)),
+    });
   }
 
   /** Connects the way the canvas does (CanvasView handleConnectEnd): planConnection from the source's first non-event out port to the target element. */

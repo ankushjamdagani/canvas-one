@@ -46,7 +46,8 @@ import type {
   DataConnectionConfig,
   CallConnectionConfig,
   MessageConnectionConfig,
-  ResourceCallMetadata,
+  RequestMeta,
+  PortSettings,
   Relation,
   Refinement,
   PortMapping,
@@ -87,6 +88,8 @@ export type ManifestPort = {
   readonly channel: PortChannel;
   readonly schemaId: Id;
   readonly responseSchemaId: Id | null;
+  /** D53: only the settings that change what a run does (see `manifestSettings`). */
+  readonly settings?: Record<string, unknown>;
 };
 
 export type ManifestElement = {
@@ -105,10 +108,7 @@ export type ManifestConnection = {
   readonly kind: ConnectionKind;
   readonly source: Endpoint;
   readonly target: Endpoint;
-  readonly config: DataConnectionConfig |
-    ((Omit<CallConnectionConfig, 'resource'> | Omit<MessageConnectionConfig, 'resource'>) & {
-      readonly resource: Omit<ResourceCallMetadata, 'requestClassLabel'> | null;
-    });
+  readonly config: DataConnectionConfig | Omit<CallConnectionConfig, 'linkClass'> | Omit<MessageConnectionConfig, 'linkClass'>;
 };
 
 export type ManifestStructuralConstraint =
@@ -247,7 +247,47 @@ function assertClosedKeys(obj: Record<string, unknown>, knownKeys: readonly stri
 // model-and-runner.md §7: "Element / Port | label, description, visualKind / label | everything else"
 // D52: `linkedProjectId` is a drop-class key too, so a link never changes a run's identity.
 const ELEMENT_KEYS = ['id', 'label', 'description', 'visualKind', 'ports', 'behavior', 'linkedProjectId'] as const;
-const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path'] as const;
+const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path', 'settings'] as const;
+
+// D53: port settings. E (kept in the manifest) changes what a run does; A (dropped) is a declared
+// expectation or presentation. Anything not listed here throws, like every other record.
+const SETTINGS_KEPT: Readonly<Record<string, readonly string[]>> = {
+  'in:call': ['rateLimit', 'failureRate', 'serviceTimeMs'],
+  'in:message': ['ackDelayMs', 'messageTtlMs'],
+  'in:data': [],
+  'out:call': ['deadlineDurationMs', 'retry', 'request'],
+  'out:message': ['deadlineDurationMs', 'request'],
+};
+const SETTINGS_DROPPED: Readonly<Record<string, readonly string[]>> = {
+  'in:call': ['expectedP95Ms', 'availabilityPct', 'idempotent', 'maxConcurrency'],
+  'in:message': ['delivery', 'ordering'],
+  'in:data': ['throughputPerSec', 'maxStalenessMs'],
+  'out:call': [],
+  'out:message': [],
+};
+const REQUEST_META_KEYS = ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags'] as const;
+
+function manifestSettings(port: Port): Record<string, unknown> | undefined {
+  if (port.settings === undefined) return undefined;
+  const group = `${port.direction}:${port.channel}`;
+  const kept = SETTINGS_KEPT[group] ?? [];
+  const dropped = SETTINGS_DROPPED[group] ?? [];
+  const settings = port.settings as Record<string, unknown>;
+  assertClosedKeys(settings, [...kept, ...dropped], 'PortSettings', port.id);
+  const result: Record<string, unknown> = {};
+  for (const key of kept) {
+    const value = settings[key];
+    if (value === undefined) continue;
+    if (key === 'request') {
+      const request = value as RequestMeta;
+      assertClosedKeys(request as unknown as Record<string, unknown>, REQUEST_META_KEYS, 'RequestMeta', port.id);
+      result.request = { requestClassId: request.requestClassId, operation: request.operation, key: request.key, tags: request.tags };
+    } else {
+      result[key] = value;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
 // §7: "PayloadSchema / fields | label | everything else, including IDs"
 const PAYLOAD_SCHEMA_KEYS = ['id', 'label', 'shape'] as const;
 // §7: "Connection / Relation | label; descriptive relations entirely | executable fields; ..."
@@ -322,12 +362,14 @@ export async function buildManifest(
     assertClosedKeys(el as unknown as Record<string, unknown>, ELEMENT_KEYS, 'Element', el.id);
     const ports: ManifestPort[] = el.ports.map((p: Port) => {
       assertClosedKeys(p as unknown as Record<string, unknown>, PORT_KEYS, 'Port', p.id);
+      const settings = manifestSettings(p);
       return {
         id: p.id,
         direction: p.direction,
         channel: p.channel,
         schemaId: p.schemaId,
         responseSchemaId: p.responseSchemaId,
+        ...(settings ? { settings } : {}),
       };
     });
     return { id: el.id, ports, behavior: el.behavior };
@@ -352,20 +394,11 @@ export async function buildManifest(
     const c = connectionsById.get(id);
     if (!c) throw new Error(`buildManifest: included connection '${id}' missing from document (invariant violated)`);
     assertClosedKeys(c as unknown as Record<string, unknown>, CONNECTION_KEYS, 'Connection', c.id);
+    // linkClass is the preset the latencies came from: presentation, dropped.
     let config: ManifestConnection['config'] = c.config;
-    if ((c.kind === 'call' || c.kind === 'message') && c.config.resource !== null) {
-      const resource = c.config.resource;
-      assertClosedKeys(resource, ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags', 'deadlineDurationMs'], 'ResourceCallMetadata', c.id);
-      config = {
-        ...c.config,
-        resource: {
-          requestClassId: resource.requestClassId,
-          operation: resource.operation,
-          key: resource.key,
-          tags: resource.tags,
-          deadlineDurationMs: resource.deadlineDurationMs,
-        },
-      };
+    if (c.kind !== 'data') {
+      const { linkClass: _linkClass, ...rest } = c.config;
+      config = rest;
     }
     return { id: c.id, kind: c.kind, source: c.source, target: c.target, config };
   }).sort(byId);

@@ -52,7 +52,7 @@ function makeCallConnection(id: string, sourceEl: string, targetEl: string, late
     kind: 'call',
     source: { elementId: sourceEl, portId: `${sourceEl}-out` },
     target: { elementId: targetEl, portId: `${targetEl}-in` },
-    config: { latencyMs, returnLatencyMs, weight: 1, condition: null, fallback: false, resource: null },
+    config: { latencyMs, returnLatencyMs, weight: 1, condition: null, fallback: false, linkClass: null },
   };
 }
 

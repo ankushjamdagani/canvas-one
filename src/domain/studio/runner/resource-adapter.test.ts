@@ -63,7 +63,7 @@ function makeCallConnection(
       weight: 1,
       condition: null,
       fallback: false,
-      resource: null,
+      linkClass: null,
     },
   };
 }

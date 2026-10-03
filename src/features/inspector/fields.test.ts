@@ -41,10 +41,10 @@ function callConnection(overrides: Partial<Connection> = {}): Connection {
     config: {
       latencyMs: 10,
       returnLatencyMs: 5,
+      linkClass: null,
       weight: 1,
       condition: null,
       fallback: false,
-      resource: null,
     },
     ...overrides,
   } as Connection;
@@ -277,22 +277,22 @@ describe('kindTagForElement', () => {
 });
 
 describe('fieldsForConnection', () => {
-  it('retries: Attempts 1 means none; raising it adds a policy and its detail fields (D49)', () => {
+  it('call: the link class sets both latencies, and editing a latency leaves the preset unless it matches one', () => {
     const conn = callConnection();
-    const attempts = fieldsForConnection(conn).find((f) => f.id === 'config.retry.maxAttempts')!;
-    expect(attempts.toRaw(conn)).toBe('1');
-    expect(fieldsForConnection(conn).some((f) => f.id === 'config.retry.backoffMs')).toBe(false);
-    const withRetry = attempts.apply(conn, 3);
-    expect(withRetry.kind === 'call' && withRetry.config.retry).toEqual({
-      maxAttempts: 3, backoffMs: 100, backoffMultiplier: 2, maxBackoffMs: 10000, jitter: true, attemptTimeoutMs: null,
-    });
-    const ids = fieldsForConnection(withRetry).map((f) => f.id);
-    expect(ids).toEqual(expect.arrayContaining(['config.retry.backoffMs', 'config.retry.jitter', 'config.retry.attemptTimeoutMs']));
-    const timeout = fieldsForConnection(withRetry).find((f) => f.id === 'config.retry.attemptTimeoutMs')!;
-    const timed = timeout.apply(withRetry, 250);
-    expect(timed.kind === 'call' && timed.config.retry?.attemptTimeoutMs).toBe(250);
-    const off = attempts.apply(timed, 1);
-    expect(off.kind === 'call' && off.config.retry).toBeNull();
+    const fields = fieldsForConnection(conn);
+    const link = fields.find((f) => f.id === 'config.linkClass')!;
+    expect(link.toRaw(conn)).toBe('custom');
+    const crossRegion = link.apply(conn, 'cross-region');
+    expect(crossRegion.kind === 'call' && crossRegion.config).toMatchObject({ linkClass: 'cross-region', latencyMs: 80, returnLatencyMs: 80 });
+    const latency = fields.find((f) => f.id === 'config.latencyMs')!;
+    const edited = latency.apply(crossRegion, 90);
+    expect(edited.kind === 'call' && edited.config.linkClass).toBeNull();
+    // Once custom, typing a preset's number stays custom: the author chose the numbers.
+    const back = latency.apply(edited, 80);
+    expect(back.kind === 'call' && back.config.linkClass).toBeNull();
+    const reset = latency.apply(crossRegion, 80);
+    expect(reset.kind === 'call' && reset.config.linkClass).toBe('cross-region');
+    expect((link.apply(crossRegion, 'custom') as { config: { linkClass: unknown; latencyMs: number } }).config).toMatchObject({ linkClass: null, latencyMs: 80 });
   });
 
   it('call: latencyMs/returnLatencyMs/weight editable with contract bounds', () => {
@@ -306,49 +306,38 @@ describe('fieldsForConnection', () => {
     expect(weight.parse('1000001').ok).toBe(false);
   });
 
-  it('call: condition/fallback/resource are shown read-only only when present', () => {
+  it('a connection carries no caller policy or receiver terms any more', () => {
+    const ids = fieldsForConnection(callConnection()).map((f) => f.id);
+    expect(ids.some((id) => id.includes('retry') || id.includes('ackDelay') || id.includes('messageTtl') || id.includes('resource'))).toBe(false);
+  });
+
+  it('call: condition and fallback are shown read-only only when the route uses them', () => {
     const withExtras = callConnection({
-      config: {
-        latencyMs: 1,
-        returnLatencyMs: 1,
-        weight: 1,
-        condition: { field: 'class', value: 'premium' },
-        fallback: true,
-        resource: { requestClassId: 'rc1', requestClassLabel: 'Order', operation: 'write', key: null, tags: [], deadlineDurationMs: 500 },
-      },
+      config: { latencyMs: 1, returnLatencyMs: 1, linkClass: null, weight: 1, condition: { field: 'class', value: 'premium' }, fallback: true },
     } as Partial<Connection>);
     const fields = fieldsForConnection(withExtras);
     const condition = fields.find((f) => f.id === 'config.condition')!;
     expect(condition.kind).toBe('readonly');
     expect(condition.toRaw(withExtras)).toBe('class = premium');
     expect(fields.find((f) => f.id === 'config.fallback')!.toRaw(withExtras)).toBe('Yes');
-    expect(fields.find((f) => f.id === 'config.resource')!.toRaw(withExtras)).toContain('write');
 
-    const plain = callConnection();
-    const plainFields = fieldsForConnection(plain);
+    const plainFields = fieldsForConnection(callConnection());
     expect(plainFields.some((f) => f.id === 'config.condition')).toBe(false);
-    expect(plainFields.some((f) => f.id === 'config.resource')).toBe(false);
+    expect(plainFields.some((f) => f.id === 'config.fallback')).toBe(false);
   });
 
-  it('message: latencyMs/ackDelayMs/messageTtlMs/weight with contract bounds', () => {
+  it('message: latency and weight with contract bounds, no return latency', () => {
     const conn: Connection = {
       id: 'c-2',
       kind: 'message',
       source: { elementId: 'a', portId: 'p-out' },
       target: { elementId: 'b', portId: 'p-in' },
-      config: {
-        latencyMs: 0,
-        ackDelayMs: 0,
-        messageTtlMs: 10000,
-        weight: 1,
-        condition: null,
-        fallback: false,
-        resource: null,
-      },
+      config: { latencyMs: 0, linkClass: null, weight: 1, condition: null, fallback: false },
     };
     const fields = fieldsForConnection(conn);
-    expect(fields.find((f) => f.id === 'config.messageTtlMs')!.parse('0').ok).toBe(false);
-    expect(fields.find((f) => f.id === 'config.messageTtlMs')!.parse('3600000').ok).toBe(true);
+    expect(fields.map((f) => f.id)).toEqual(['config.linkClass', 'config.latencyMs', 'config.weight']);
+    const preset = fields.find((f) => f.id === 'config.linkClass')!.apply(conn, 'cross-az');
+    expect(preset.kind === 'message' && preset.config).toMatchObject({ linkClass: 'cross-az', latencyMs: 5 });
   });
 
   it('data connections: no fields at all', () => {
@@ -359,8 +348,70 @@ describe('fieldsForConnection', () => {
       target: { elementId: 'b', portId: 'p-in' },
       config: {},
     };
-    const fields = fieldsForConnection(conn);
-    expect(fields).toEqual([]);
+    expect(fieldsForConnection(conn)).toEqual([]);
+  });
+
+  it('summarizes both ends and flags where the caller and the callee disagree (D53)', () => {
+    const port = (id: string, direction: 'in' | 'out', settings?: Record<string, unknown>) =>
+      ({ id, label: id, direction, channel: 'call', protocol: 'http', schemaId: 's', responseSchemaId: 'r', ...(settings ? { settings } : {}) }) as Element['ports'][number];
+    const caller = processorElement({ id: 'a', label: 'Caller', ports: [port('p-out', 'out', { deadlineDurationMs: 50, retry: { maxAttempts: 3, backoffMs: 1, backoffMultiplier: 1, maxBackoffMs: 1, jitter: false, attemptTimeoutMs: null } })] });
+    const callee = processorElement({ id: 'b', label: 'Callee', ports: [port('p-in', 'in', { expectedP95Ms: 80, idempotent: false })] });
+    const conn = callConnection();
+    const rows = fieldsForConnection(conn, { elements: [caller, callee] });
+    expect(rows.find((f) => f.id === 'ends.caller')!.toRaw(conn)).toBe('3 attempts · deadline 50 ms');
+    expect(rows.find((f) => f.id === 'ends.callee')!.toRaw(conn)).toBe('p95 80 ms · not idempotent');
+    const advisories = rows.filter((f) => f.id.startsWith('ends.advisory')).map((f) => f.toRaw(conn));
+    expect(advisories).toEqual([
+      "The caller's deadline (50 ms) is below the callee's expected p95 (80 ms).",
+      'The caller retries an endpoint declared not idempotent.',
+    ]);
+  });
+});
+
+describe('fieldsForElement: port settings (D53)', () => {
+  const outPort = { id: 'po', label: 'out', direction: 'out', channel: 'call', protocol: 'http', schemaId: 's', responseSchemaId: 'r' } as Element['ports'][number];
+  const inPort = { id: 'pi', label: 'in', direction: 'in', channel: 'call', protocol: 'grpc', path: '/orders', schemaId: 's', responseSchemaId: 'r' } as Element['ports'][number];
+
+  it('groups a node\'s fields per port, labelled by protocol and path', () => {
+    const el = processorElement({ ports: [inPort, outPort] });
+    const groups = [...new Set(fieldsForElement(el).map((f) => f.group).filter(Boolean))];
+    expect(groups).toEqual(['In · gRPC /orders', 'Out · HTTP / REST']);
+  });
+
+  it('the caller retries from its out-port: Attempts 1 removes the policy, raising it adds one', () => {
+    const el = processorElement({ ports: [outPort] });
+    const attempts = fieldsForElement(el).find((f) => f.id === 'port.po.retry.maxAttempts')!;
+    expect(attempts.toRaw(el)).toBe('1');
+    const withRetry = attempts.apply(el, 3) as Element;
+    expect(withRetry.ports[0].settings).toEqual({ retry: { maxAttempts: 3, backoffMs: 100, backoffMultiplier: 2, maxBackoffMs: 10000, jitter: true, attemptTimeoutMs: null } });
+    expect(fieldsForElement(withRetry).some((f) => f.id === 'port.po.retry.attemptTimeoutMs')).toBe(true);
+    const off = attempts.apply(withRetry, 1) as Element;
+    expect(off.ports[0].settings).toBeUndefined();
+  });
+
+  it('a callee declares its contract and, on a simulated node, behavior for the endpoint; blank removes a setting', () => {
+    const el = processorElement({ ports: [inPort] });
+    const fields = fieldsForElement(el);
+    const p95 = fields.find((f) => f.id === 'port.pi.expectedP95Ms')!;
+    expect(p95.toRaw(el)).toBe('');
+    const set = p95.apply(el, 80) as Element;
+    expect(set.ports[0].settings).toEqual({ expectedP95Ms: 80 });
+    expect((p95.apply(set, null) as Element).ports[0].settings).toBeUndefined();
+    expect(fields.some((f) => f.id === 'port.pi.rateLimit.rps')).toBe(true);
+    const limited = fields.find((f) => f.id === 'port.pi.rateLimit.rps')!.apply(el, 100) as Element;
+    expect(limited.ports[0].settings).toEqual({ rateLimit: { rps: 100, burst: 100 } });
+    expect(fieldsForElement(limited).some((f) => f.id === 'port.pi.rateLimit.burst')).toBe(true);
+    // Behavior overrides only exist on nodes the runner simulates.
+    const unmodeled = processorElement({ ports: [inPort], behavior: { kind: 'unmodeled', version: 1, reason: 'x' } });
+    expect(fieldsForElement(unmodeled).some((f) => f.id === 'port.pi.rateLimit.rps')).toBe(false);
+    expect(fieldsForElement(unmodeled).some((f) => f.id === 'port.pi.expectedP95Ms')).toBe(true);
+  });
+
+  it('an unsimulated caller also has a deadline and a request class; a simulated one inherits them', () => {
+    const client = processorElement({ ports: [outPort], behavior: { kind: 'unmodeled', version: 1, reason: 'x' } });
+    expect(fieldsForElement(client).some((f) => f.id === 'port.po.deadlineDurationMs')).toBe(true);
+    expect(fieldsForElement(client).find((f) => f.id === 'port.po.request.none')).toBeDefined();
+    expect(fieldsForElement(processorElement({ ports: [outPort] })).some((f) => f.id === 'port.po.deadlineDurationMs')).toBe(false);
   });
 });
 

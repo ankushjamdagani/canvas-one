@@ -311,7 +311,7 @@ describe('connect.ts', () => {
     });
   });
 
-  it('connects to a non-resource element with ready and resource: null', () => {
+  it('connects to a non-resource element with ready and the default link', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);
 
@@ -340,50 +340,53 @@ describe('connect.ts', () => {
     if (plan.kind !== 'ready') return;
 
     const connChange = plan.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'connection');
-    expect((connChange as any).value.record.config.resource).toBeNull();
-    expect((connChange as any).value.record.config.latencyMs).toBe(2); // D49 default
-    expect((connChange as any).value.record.config.retry).toBeNull();
-    expect((connChange as any).value.record.config.weight).toBe(1);
+    expect((connChange as any).value.record.config).toEqual({
+      latencyMs: 2, // D49 default
+      returnLatencyMs: 2,
+      linkClass: 'same-az',
+      weight: 1,
+      condition: null,
+      fallback: false,
+    });
 
     const finalDoc = applyChanges(doc2, plan.changes);
     expect(validateDocument(finalDoc).ok).toBe(true);
   });
 
-  it('connecting to a resource element requires interactive metadata (needs-resource-metadata)', () => {
+  it('an unsimulated caller must give its request class, operation and deadline, which are stored on its out-port (D53)', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);
 
-    // Gateway -> Service (resource)
-    const p1 = place(baseDoc, viewId, 'gateway', { x: 0, y: 0 }, mintId);
+    // Client (unmodeled) -> Service (resource)
+    const p1 = place(baseDoc, viewId, 'client', { x: 0, y: 0 }, mintId);
     const doc1 = applyChanges(baseDoc, p1.changes);
-
     const p2 = place(doc1, viewId, 'service', { x: 300, y: 0 }, mintId);
     const doc2 = applyChanges(doc1, p2.changes);
 
-    const gateway = doc2.elements.find((e) => e.id === p1.elementId)!;
+    const client = doc2.elements.find((e) => e.id === p1.elementId)!;
     const service = doc2.elements.find((e) => e.id === p2.elementId)!;
-    const gatewayOut = gateway.ports.find((p) => p.direction === 'out' && p.channel === 'call')!;
+    const clientOut = client.ports.find((p) => p.direction === 'out' && p.channel === 'call')!;
 
-    // Pass target as { elementId }
     const plan = planConnection({
       document: doc2,
       viewId,
-      source: { elementId: gateway.id, portId: gatewayOut.id },
+      source: { elementId: client.id, portId: clientOut.id },
       target: { elementId: service.id },
       mintId,
     });
 
     expect(plan.kind).toBe('needs-resource-metadata');
     if (plan.kind !== 'needs-resource-metadata') return;
+    expect(plan.draft.needsRequest).toBe(true);
 
-    // Reject invalid metadata
-    const badComplete = completeConnection(plan.draft, {
+    // Metadata is required, and invalid metadata is rejected
+    expect(completeConnection(plan.draft).ok).toBe(false);
+    expect(completeConnection(plan.draft, {
       requestClassId: '',
       requestClassLabel: 'Order',
       operation: 'read',
       deadlineDurationMs: 0,
-    });
-    expect(badComplete.ok).toBe(false);
+    }).ok).toBe(false);
 
     const requestClassId = mintId();
     for (const requestClassLabel of ['', '😀'.repeat(61)]) {
@@ -395,28 +398,52 @@ describe('connect.ts', () => {
       requestClassId, requestClassLabel: '😀'.repeat(60), operation: 'read', deadlineDurationMs: 500,
     }).ok).toBe(true);
 
-    // Complete with valid metadata
     const complete = completeConnection(plan.draft, {
       requestClassId,
       requestClassLabel: 'Order',
       operation: 'read',
       deadlineDurationMs: 500,
     });
-
     expect(complete.ok).toBe(true);
     if (!complete.ok) return;
 
     const connChange = complete.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'connection');
-    expect((connChange as any).value.record.config.resource).toEqual({
-      requestClassId,
-      requestClassLabel: 'Order',
-      operation: 'read',
-      key: null,
-      tags: [],
-      deadlineDurationMs: 500,
-    });
+    expect('resource' in (connChange as any).value.record.config).toBe(false);
 
     const finalDoc = applyChanges(doc2, complete.changes);
+    const sentFrom = finalDoc.elements.find((e) => e.id === client.id)!.ports.find((p) => p.id === clientOut.id)!;
+    expect(sentFrom.settings).toEqual({
+      request: { requestClassId, requestClassLabel: 'Order', operation: 'read', key: null, tags: [] },
+      deadlineDurationMs: 500,
+    });
+    expect(validateDocument(finalDoc).ok).toBe(true);
+  });
+
+  it('a simulated caller inherits its request: no metadata is asked for and none is stored', () => {
+    const mintId = createMintId();
+    const { document: baseDoc, viewId } = makeBlankDocument(mintId);
+    const p1 = place(baseDoc, viewId, 'gateway', { x: 0, y: 0 }, mintId);
+    const doc1 = applyChanges(baseDoc, p1.changes);
+    const p2 = place(doc1, viewId, 'service', { x: 300, y: 0 }, mintId);
+    const doc2 = applyChanges(doc1, p2.changes);
+    const gateway = doc2.elements.find((e) => e.id === p1.elementId)!;
+    const gatewayOut = gateway.ports.find((p) => p.direction === 'out' && p.channel === 'call')!;
+
+    const plan = planConnection({
+      document: doc2,
+      viewId,
+      source: { elementId: gateway.id, portId: gatewayOut.id },
+      target: { elementId: p2.elementId },
+      mintId,
+    });
+    expect(plan.kind).toBe('needs-resource-metadata');
+    if (plan.kind !== 'needs-resource-metadata') return;
+    expect(plan.draft.needsRequest).toBe(false);
+    const complete = completeConnection(plan.draft);
+    expect(complete.ok).toBe(true);
+    if (!complete.ok) return;
+    const finalDoc = applyChanges(doc2, complete.changes);
+    expect(finalDoc.elements.find((e) => e.id === gateway.id)!.ports.every((p) => p.settings === undefined)).toBe(true);
     expect(validateDocument(finalDoc).ok).toBe(true);
   });
 

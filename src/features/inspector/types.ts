@@ -47,6 +47,8 @@ export type FieldSpec<TRecord = Element | Connection> = {
   readonly id: string;
   readonly label: string;
   readonly kind: FieldKind;
+  /** D53: rows with the same group are shown under one sub-heading (port settings). */
+  readonly group?: string;
   readonly unit?: string;
   readonly options?: readonly FieldOption[];
   /** Static explanatory text shown under a readonly field (e.g. "Editing arrives later"). */

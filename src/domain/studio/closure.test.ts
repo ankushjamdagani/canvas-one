@@ -274,13 +274,11 @@ describe('Scenario Scope Closure (computeClosure)', () => {
             target: { elementId: elId, portId: inPortId },
             config: {
               latencyMs: 0,
-              ackDelayMs: 0,
-              messageTtlMs: 1000,
+              linkClass: null,
               weight: 1,
               condition: null,
               fallback: false,
-              resource: null,
-            },
+              },
           });
         }
       }

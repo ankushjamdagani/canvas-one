@@ -7,8 +7,10 @@
  * - specs/revamp/decisions.md (D36, D42)
  */
 
+import { LINK_CLASS_LATENCY_MS } from '../../domain/studio/model';
 import type {
   CallConnection,
+  CallConnectionConfig,
   Connection,
   DataConnection,
   Document,
@@ -16,10 +18,12 @@ import type {
   Endpoint,
   Id,
   MessageConnection,
+  MessageConnectionConfig,
   PayloadSchema,
+  PortSettings,
+  RequestMeta,
   Port,
   Shape,
-  ResourceCallMetadata,
   View,
 } from '../../domain/studio/model';
 import { shapesCompatible } from '../../domain/studio/readiness';
@@ -39,6 +43,23 @@ import { createIssue } from '../../domain/studio/issue';
 
 /** Port, schema and connection labels are limited to 80 characters; a long path must not break validation. */
 const clip = (text: string): string => Array.from(text).slice(0, 80).join('');
+
+/** A new connection starts as a same-AZ hop (assumption, catalog.md D49); the inspector changes the link class. */
+const DEFAULT_CALL_CONFIG: CallConnectionConfig = {
+  latencyMs: LINK_CLASS_LATENCY_MS['same-az'],
+  returnLatencyMs: LINK_CLASS_LATENCY_MS['same-az'],
+  linkClass: 'same-az',
+  weight: 1, // assumption (catalog.md)
+  condition: null,
+  fallback: false,
+};
+const DEFAULT_MESSAGE_CONFIG: MessageConnectionConfig = {
+  latencyMs: LINK_CLASS_LATENCY_MS['same-az'],
+  linkClass: 'same-az',
+  weight: 1, // assumption (catalog.md)
+  condition: null,
+  fallback: false,
+};
 
 const linkedLabel = (element: Element): string => `'${element.label}'`;
 
@@ -70,6 +91,8 @@ export type ConnectionDraft = {
   /** D53: the endpoint path or name this draft was planned with, and the paths the target already has for the type. */
   readonly path: string;
   readonly pathOptions: readonly string[];
+  /** D53: the source is not simulated, so the caller's request class, operation and deadline are needed. */
+  readonly needsRequest: boolean;
   /** D53: schema inserts and element replacements for ports added by this connection. */
   readonly portChanges: readonly RecordChange[];
 };
@@ -629,6 +652,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       protocolOptions,
       path: chosenPath,
       pathOptions,
+      needsRequest: sourceElement.behavior.kind !== 'resource',
       portChanges,
     };
     return {
@@ -654,15 +678,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       kind: 'call',
       source: sourceEndpoint,
       target: targetEndpoint,
-      config: {
-        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
-        returnLatencyMs: 2, // assumption (catalog.md, D49)
-        weight: 1, // assumption (catalog.md)
-        condition: null,
-        fallback: false,
-        resource: null,
-        retry: null, // D49: no caller retries unless the author adds a policy
-      },
+      config: DEFAULT_CALL_CONFIG,
     };
     connection = callConnection;
   } else {
@@ -672,15 +688,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       kind: 'message',
       source: sourceEndpoint,
       target: targetEndpoint,
-      config: {
-        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
-        ackDelayMs: 0, // assumption (catalog.md, resolution 5)
-        messageTtlMs: 300000, // assumption (catalog.md, D49): 5 minutes of retention
-        weight: 1, // assumption (catalog.md)
-        condition: null,
-        fallback: false,
-        resource: null,
-      },
+      config: DEFAULT_MESSAGE_CONFIG,
     };
     connection = messageConnection;
   }
@@ -705,110 +713,95 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 }
 
 /**
- * Completes a connection into a resource element once resource call metadata is provided.
+ * Completes a connection into a resource element. When the source is not simulated (`needsRequest`)
+ * the caller's request class, operation and deadline are required and are stored on its out-port;
+ * otherwise the metadata is ignored, because a simulated caller's requests inherit it.
  */
 export function completeConnection(
   draft: ConnectionDraft,
-  metadata: ResourceMetadataInput,
+  metadata?: ResourceMetadataInput,
 ): CompleteConnectionResult {
-  if (!metadata || typeof metadata !== 'object') {
-    return {
-      ok: false,
-      kind: 'rejected',
-      issues: [createIssue('missing-property', 'Resource metadata is required', ['metadata'])],
-    };
-  }
+  let sourceElement: Element | undefined = draft.sourceElementReplacement ?? draft.document.elements.find((e) => e.id === draft.source.elementId);
+  let sourceChanged = draft.sourceElementReplacement !== undefined;
 
-  if (typeof metadata.requestClassId !== 'string' || metadata.requestClassId.trim().length === 0) {
-    return {
-      ok: false,
-      kind: 'rejected',
-      issues: [createIssue('missing-property', 'requestClassId is required', ['metadata', 'requestClassId'])],
-    };
-  }
+  if (draft.needsRequest) {
+    if (!metadata || typeof metadata !== 'object') {
+      return {
+        ok: false,
+        kind: 'rejected',
+        issues: [createIssue('missing-property', 'Request metadata is required', ['metadata'])],
+      };
+    }
 
-  if (typeof metadata.requestClassLabel !== 'string' ||
-      Array.from(metadata.requestClassLabel).length < 1 ||
-      Array.from(metadata.requestClassLabel).length > 60) {
-    return {
-      ok: false,
-      kind: 'rejected',
-      issues: [createIssue('out-of-range', 'Request class must contain 1–60 characters', ['metadata', 'requestClassLabel'])],
-    };
-  }
+    if (typeof metadata.requestClassId !== 'string' || metadata.requestClassId.trim().length === 0) {
+      return {
+        ok: false,
+        kind: 'rejected',
+        issues: [createIssue('missing-property', 'requestClassId is required', ['metadata', 'requestClassId'])],
+      };
+    }
 
-  if (metadata.operation !== 'read' && metadata.operation !== 'write') {
-    return {
-      ok: false,
-      kind: 'rejected',
-      issues: [createIssue('invalid-literal', "operation must be 'read' or 'write'", ['metadata', 'operation'])],
-    };
-  }
+    if (typeof metadata.requestClassLabel !== 'string' ||
+        Array.from(metadata.requestClassLabel).length < 1 ||
+        Array.from(metadata.requestClassLabel).length > 60) {
+      return {
+        ok: false,
+        kind: 'rejected',
+        issues: [createIssue('out-of-range', 'Request class must contain 1–60 characters', ['metadata', 'requestClassLabel'])],
+      };
+    }
 
-  if (
-    typeof metadata.deadlineDurationMs !== 'number' ||
-    !Number.isFinite(metadata.deadlineDurationMs) ||
-    metadata.deadlineDurationMs <= 0 ||
-    metadata.deadlineDurationMs > 600000
-  ) {
-    return {
-      ok: false,
-      kind: 'rejected',
-      issues: [
-        createIssue(
-          'out-of-range',
-          'deadlineDurationMs must be a positive number up to 600,000 ms',
-          ['metadata', 'deadlineDurationMs'],
+    if (metadata.operation !== 'read' && metadata.operation !== 'write') {
+      return {
+        ok: false,
+        kind: 'rejected',
+        issues: [createIssue('invalid-literal', "operation must be 'read' or 'write'", ['metadata', 'operation'])],
+      };
+    }
+
+    if (
+      typeof metadata.deadlineDurationMs !== 'number' ||
+      !Number.isFinite(metadata.deadlineDurationMs) ||
+      metadata.deadlineDurationMs <= 0 ||
+      metadata.deadlineDurationMs > 600000
+    ) {
+      return {
+        ok: false,
+        kind: 'rejected',
+        issues: [
+          createIssue(
+            'out-of-range',
+            'deadlineDurationMs must be a positive number up to 600,000 ms',
+            ['metadata', 'deadlineDurationMs'],
+          ),
+        ],
+      };
+    }
+
+    const request: RequestMeta = {
+      requestClassId: metadata.requestClassId,
+      requestClassLabel: metadata.requestClassLabel,
+      operation: metadata.operation,
+      key: metadata.key ?? null,
+      tags: metadata.tags ?? [],
+    };
+    if (sourceElement) {
+      sourceElement = {
+        ...sourceElement,
+        ports: sourceElement.ports.map((port) =>
+          port.id === draft.source.portId
+            ? { ...port, settings: { ...(port.settings ?? {}), request, deadlineDurationMs: metadata.deadlineDurationMs } as PortSettings }
+            : port,
         ),
-      ],
-    };
+      };
+      sourceChanged = true;
+    }
   }
 
-  const resourceCallMetadata: ResourceCallMetadata = {
-    requestClassId: metadata.requestClassId,
-    requestClassLabel: metadata.requestClassLabel,
-    operation: metadata.operation,
-    key: metadata.key ?? null,
-    tags: metadata.tags ?? [],
-    deadlineDurationMs: metadata.deadlineDurationMs,
-  };
-
-  let connection: Connection;
-  if (draft.kind === 'call') {
-    const callConn: CallConnection = {
-      id: draft.connectionId,
-      kind: 'call',
-      source: draft.source,
-      target: draft.target,
-      config: {
-        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
-        returnLatencyMs: 2, // assumption (catalog.md, D49)
-        weight: 1, // assumption (catalog.md)
-        condition: null,
-        fallback: false,
-        resource: resourceCallMetadata,
-        retry: null, // D49: no caller retries unless the author adds a policy
-      },
-    };
-    connection = callConn;
-  } else {
-    const msgConn: MessageConnection = {
-      id: draft.connectionId,
-      kind: 'message',
-      source: draft.source,
-      target: draft.target,
-      config: {
-        latencyMs: 2, // assumption (catalog.md, D49): in-region hop
-        ackDelayMs: 0, // assumption (catalog.md, resolution 5)
-        messageTtlMs: 300000, // assumption (catalog.md, D49): 5 minutes of retention
-        weight: 1, // assumption (catalog.md)
-        condition: null,
-        fallback: false,
-        resource: resourceCallMetadata,
-      },
-    };
-    connection = msgConn;
-  }
+  const connection: Connection =
+    draft.kind === 'call'
+      ? { id: draft.connectionId, kind: 'call', source: draft.source, target: draft.target, config: DEFAULT_CALL_CONFIG }
+      : { id: draft.connectionId, kind: 'message', source: draft.source, target: draft.target, config: DEFAULT_MESSAGE_CONFIG };
 
   const view = draft.document.views.find((v) => v.id === draft.viewId);
   const updatedView: View = {
@@ -825,10 +818,10 @@ export function completeConnection(
   };
 
   const changes: RecordChange[] = [...draft.portChanges];
-  if (draft.sourceElementReplacement) {
+  if (sourceChanged && sourceElement) {
     changes.push({
       kind: 'replace',
-      value: { recordKind: 'element', record: draft.sourceElementReplacement },
+      value: { recordKind: 'element', record: sourceElement },
     });
   }
   changes.push({

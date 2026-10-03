@@ -124,6 +124,7 @@ export const PORT_DESCRIPTOR: ObjectFieldDescriptor = {
     responseSchemaId: { type: 'scalar' },
     protocol: { type: 'scalar' },
     path: { type: 'scalar' },
+    settings: { type: 'atomic' },
   },
 };
 
@@ -354,11 +355,10 @@ export const CONNECTION_DESCRIPTOR: UnionFieldDescriptor = {
           fields: {
             latencyMs: { type: 'scalar' },
             returnLatencyMs: { type: 'scalar' },
+            linkClass: { type: 'scalar' },
             weight: { type: 'scalar' },
             condition: { type: 'atomic' },
             fallback: { type: 'scalar' },
-            resource: { type: 'atomic' },
-            retry: { type: 'atomic' },
           },
         },
       },
@@ -374,12 +374,10 @@ export const CONNECTION_DESCRIPTOR: UnionFieldDescriptor = {
           type: 'object',
           fields: {
             latencyMs: { type: 'scalar' },
-            ackDelayMs: { type: 'scalar' },
-            messageTtlMs: { type: 'scalar' },
+            linkClass: { type: 'scalar' },
             weight: { type: 'scalar' },
             condition: { type: 'atomic' },
             fallback: { type: 'scalar' },
-            resource: { type: 'atomic' },
           },
         },
       },

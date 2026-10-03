@@ -25,6 +25,7 @@ import type {
   Relation,
   Fault,
 } from '../model';
+import { ackDelayOf, callRetryOf, messageTtlOf } from '../port-settings';
 import type {
   ResourceInput,
   Admission,
@@ -220,6 +221,7 @@ function buildExecutionGraph(opts: {
   const resourceElements = new Map<Id, Element>();
   const nodes: ExecutionNode[] = [];
   const allElementsById = new Map<Id, Element>();
+  const portLookup = { elements: opts.elements };
   for (const el of opts.elements) allElementsById.set(el.id, el);
 
   for (const el of opts.elements) {
@@ -291,7 +293,7 @@ function buildExecutionGraph(opts: {
           : undefined,
         fallback: callConn.config.fallback,
         // D49/D50: a caller's retries, or a broker route's redelivery policy.
-        ...(callConn.config.retry ? { retry: callConn.config.retry } : {}),
+        ...(callRetryOf(portLookup, conn) ? { retry: callRetryOf(portLookup, conn)! } : {}),
       });
     } else if (conn.kind === 'message') {
       const msgConn = conn as MessageConnection;
@@ -303,8 +305,8 @@ function buildExecutionGraph(opts: {
         transport: 'message',
         latencyMs: msgConn.config.latencyMs,
         returnLatencyMs: 0,
-        ackDelayMs: msgConn.config.ackDelayMs,
-        messageTtlMs: msgConn.config.messageTtlMs,
+        ackDelayMs: ackDelayOf(portLookup, conn),
+        messageTtlMs: messageTtlOf(portLookup, conn),
         weight: msgConn.config.weight,
         condition: msgConn.config.condition
           ? { field: msgConn.config.condition.field, value: String(msgConn.config.condition.value) }
@@ -513,7 +515,7 @@ export class ResourceAdapter {
     for (const [nodeId, conn] of bridgeConnByNode.entries()) {
       const returnLatencyMs = conn.kind === 'call' ? (conn as CallConnection).config.returnLatencyMs : 0;
       // D50: a resource's retries on a call that leaves the kernel (e.g. to a boundary).
-      const retry = conn.kind === 'call' ? ((conn as CallConnection).config.retry ?? null) : null;
+      const retry = callRetryOf({ elements }, conn);
       kernelBridges.push({ nodeId, returnLatencyMs, retry, connectionId: conn.id });
     }
 

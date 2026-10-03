@@ -413,13 +413,11 @@ describe('Decision D36: broadcast message roots', () => {
           },
           config: {
             latencyMs: 10,
-            ackDelayMs: 5,
-            messageTtlMs: 60000,
+            linkClass: null,
             weight: 1,
             condition: null,
             fallback: false,
-            resource: null,
-          },
+            },
         },
       ],
       scenarios: s02Doc.scenarios.map((sc) => {
@@ -513,13 +511,11 @@ describe('Decision D36: broadcast message roots', () => {
           },
           config: {
             latencyMs: 10,
-            ackDelayMs: 5,
-            messageTtlMs: 60000,
+            linkClass: null,
             weight: 1,
             condition: null,
             fallback: false,
-            resource: null,
-          },
+            },
         },
       ],
       scenarios: s02Doc.scenarios.map((sc) => {

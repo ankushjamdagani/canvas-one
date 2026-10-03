@@ -83,7 +83,7 @@ describe('diffSummary view-model helpers', () => {
             weight: 1,
             condition: null,
             fallback: false,
-            resource: null,
+            linkClass: null,
           },
         },
       ],

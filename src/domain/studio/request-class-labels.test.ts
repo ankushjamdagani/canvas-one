@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Document, ResourceCallMetadata } from './model';
+import type { Document, RequestMeta } from './model';
 import { validateDocument } from './validate';
 import { buildManifest } from './manifest';
 
@@ -15,13 +15,18 @@ function validationIssues(doc: unknown) {
   return result.issues;
 }
 
-function changeResources(doc: Document, change: (resource: ResourceCallMetadata) => unknown) {
+/** D53: request classes live on the out-ports that send them. */
+function changeResources(doc: Document, change: (request: RequestMeta) => unknown) {
   return {
     ...doc,
-    connections: doc.connections.map((connection) => {
-      if (connection.kind === 'data' || connection.config.resource === null) return connection;
-      return { ...connection, config: { ...connection.config, resource: change(connection.config.resource) } };
-    }),
+    elements: doc.elements.map((element) => ({
+      ...element,
+      ports: element.ports.map((port) => {
+        const request = (port.settings as { request?: RequestMeta } | undefined)?.request;
+        if (!request) return port;
+        return { ...port, settings: { ...port.settings, request: change(request) } };
+      }),
+    })),
   };
 }
 
@@ -42,7 +47,6 @@ describe('resource request class labels', () => {
       operation: resource.operation,
       key: resource.key,
       tags: resource.tags,
-      deadlineDurationMs: resource.deadlineDurationMs,
     }));
     expect(validationIssues(missing)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'missing-property', path: expect.arrayContaining(['requestClassLabel']) }),
@@ -53,12 +57,12 @@ describe('resource request class labels', () => {
     ]));
   });
 
-  it('rejects different labels for the same class across call and message connections', () => {
+  it('rejects different labels for the same class across ports', () => {
     let index = 0;
     const doc = changeResources(fixture(), (resource) => ({
       ...resource, requestClassLabel: index++ === 0 ? 'Order' : 'Different',
     }));
-    expect(index).toBe(2);
+    expect(index).toBeGreaterThanOrEqual(2);
     expect(validationIssues(doc)).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'structural-rule', path: expect.arrayContaining(['requestClassLabel']) }),
     ]));

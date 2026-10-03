@@ -133,7 +133,7 @@ const callConfig: CallConnectionConfig = {
   weight: 1,
   condition: null,
   fallback: false,
-  resource: null,
+  linkClass: null,
 };
 
 function baseDoc(elements: Element[], connections: Connection[], scenario: Scenario, extraSchemas: { id: string; label: string; shape: Shape }[] = []): Document {

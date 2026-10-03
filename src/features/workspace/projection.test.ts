@@ -56,28 +56,28 @@ function makeTestDocument(): Document {
       kind: 'call',
       source: { elementId: 'e1', portId: 'p1_out' },
       target: { elementId: 'e2', portId: 'p2_in' },
-      config: { latencyMs: 10, returnLatencyMs: 10, weight: 1, condition: null, fallback: false, resource: null },
+      config: { latencyMs: 10, returnLatencyMs: 10, linkClass: null, weight: 1, condition: null, fallback: false, },
     },
     {
       id: 'c2',
       kind: 'message',
       source: { elementId: 'e2', portId: 'p2_msg_out' },
       target: { elementId: 'e3', portId: 'p3_msg_in' },
-      config: { latencyMs: 5, ackDelayMs: 2, messageTtlMs: 5000, weight: 1, condition: null, fallback: false, resource: null },
+      config: { latencyMs: 5, linkClass: null, weight: 1, condition: null, fallback: false, },
     },
     {
       id: 'c3_to_unplaced',
       kind: 'call',
       source: { elementId: 'e2', portId: 'p2_in' },
       target: { elementId: 'e4_unplaced', portId: 'p4_in' },
-      config: { latencyMs: 1, returnLatencyMs: 1, weight: 1, condition: null, fallback: false, resource: null },
+      config: { latencyMs: 1, returnLatencyMs: 1, linkClass: null, weight: 1, condition: null, fallback: false, },
     },
     {
       id: 'c4_not_in_view',
       kind: 'call',
       source: { elementId: 'e1', portId: 'p1_out' },
       target: { elementId: 'e2', portId: 'p2_in' },
-      config: { latencyMs: 10, returnLatencyMs: 10, weight: 1, condition: null, fallback: false, resource: null },
+      config: { latencyMs: 10, returnLatencyMs: 10, weight: 1, condition: null, fallback: false, linkClass: null },
     },
   ];
 
@@ -449,7 +449,7 @@ describe('collapsed groups (RV-04g)', () => {
           kind: 'call',
           source: { elementId: 'e1', portId: 'p1_out' },
           target: { elementId: 'e3', portId: 'p3_msg_in' },
-          config: { latencyMs: 1, returnLatencyMs: 1, weight: 1, condition: null, fallback: false, resource: null },
+          config: { latencyMs: 1, returnLatencyMs: 1, weight: 1, condition: null, fallback: false, linkClass: null },
         },
       ],
       views: [

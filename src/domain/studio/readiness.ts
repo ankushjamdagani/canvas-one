@@ -59,6 +59,7 @@ import type { Issue } from './validate';
 import { canonicalJson } from './canonical';
 import { computeClosure, type ClosureResultOk } from './closure';
 import { resolveRefinementRouting } from './refinementRouting';
+import { callRetryOf } from './port-settings';
 
 // ============================================================================
 // Readiness issue codes
@@ -793,7 +794,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
     const src = elementsMap.get(conn.source.elementId);
     if (
       conn.kind === 'call' &&
-      conn.config.retry?.attemptTimeoutMs != null &&
+      callRetryOf(doc, conn)?.attemptTimeoutMs != null &&
       src?.behavior.kind === 'resource' &&
       src.behavior.config.type === 'broker' &&
       closure.includedConnectionIds.includes(conn.id)
@@ -801,7 +802,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
       issues.push(
         issue(
           'broker-route-attempt-timeout',
-          ['connections', ci, 'config', 'retry', 'attemptTimeoutMs'],
+          ['elements', doc.elements.findIndex((e) => e.id === conn.source.elementId), 'ports', (src?.ports.findIndex((p) => p.id === conn.source.portId) ?? 0), 'settings', 'retry', 'attemptTimeoutMs'],
           conn.id,
           `'${src.label}' redelivers after the backoff; a delivery route has no attempt timeout`,
         ),

@@ -16,6 +16,7 @@
  */
 
 import { canonicalJson, sha256Hex } from '../canonical';
+import { sourceSettings } from '../port-settings';
 import type {
   Boundary,
   BoundaryResponse,
@@ -966,7 +967,8 @@ export class ScenarioRunner {
         if (targetEl && targetEl.behavior.kind === 'resource') {
 
           // Message into resource entry: build ResourceInput from connection resource metadata
-          const duration = conn.config.resource?.deadlineDurationMs ?? 60000;
+          const outSettings = sourceSettings(this.document, conn);
+          const duration = outSettings.deadlineDurationMs ?? 60000;
           const arrivalMs = (atMs ?? 0) + (this.scenario.mode === 'timed' ? (conn.config.latencyMs ?? 0) : 0);
           const deadlineMs = arrivalMs + duration;
 
@@ -978,10 +980,10 @@ export class ScenarioRunner {
             journeyId: context.journeyId,
             parentEventId: context.parentEventId,
             entryElementId: conn.target.elementId,
-            requestClassId: conn.config.resource?.requestClassId ?? 'default-class',
-            operation: conn.config.resource?.operation ?? 'read',
-            key: conn.config.resource?.key ?? null,
-            tags: conn.config.resource?.tags ?? [],
+            requestClassId: outSettings.request?.requestClassId ?? 'default-class',
+            operation: outSettings.request?.operation ?? 'read',
+            key: outSettings.request?.key ?? null,
+            tags: outSettings.request?.tags ?? [],
             payloadRef,
             atMs: arrivalMs,
             deadlineMs,
@@ -1309,10 +1311,10 @@ export class ScenarioRunner {
           if (!this.adapter) {
             return { ok: false, error: 'Resource adapter not initialized for resource admission' };
           }
-          const resMeta = targetConn.kind === 'call' ? targetConn.config.resource : null;
+          const resMeta = sourceSettings(this.document, targetConn).request;
           const latencyMs = targetConn.kind === 'call' ? targetConn.config.latencyMs : 0;
           const arrivalMs = (atMs ?? 0) + latencyMs;
-          const deadlineMs = arrivalMs + (resMeta?.deadlineDurationMs ?? 60000);
+          const deadlineMs = arrivalMs + (sourceSettings(this.document, targetConn).deadlineDurationMs ?? 60000);
           const canon = canonicalJson(emission.value);
           const payloadRef = canon.ok ? `sha256:${await sha256Hex(canon.text)}` : 'payload-call';
 

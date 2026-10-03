@@ -26,6 +26,9 @@ import {
   SCALAR_TYPES,
   BEHAVIOR_KINDS,
   ROUTE_CONDITION_FIELDS,
+  LINK_CLASSES,
+  DELIVERY_GUARANTEES,
+  MESSAGE_ORDERINGS,
   GUARD_OPS,
   VALUE_KINDS,
   TRANSPORT_OUTCOMES,
@@ -1303,7 +1306,7 @@ export function validateDocument(
           for (let pIdx = 0; pIdx < ports.length; pIdx++) {
             const p = ports[pIdx];
             const pPath = [...elPath, 'ports', pIdx];
-            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path'], ['id', 'label', 'direction', 'channel', 'protocol', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
+            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path', 'settings'], ['id', 'label', 'direction', 'channel', 'protocol', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
               let pId: Id | null = null;
               if (validateId(p.id, [...pPath, 'id'], elId, issues)) {
                 pId = p.id;
@@ -1350,6 +1353,10 @@ export function validateDocument(
               }
               if (p.path !== undefined) {
                 validateString(p.path, 1, PORT_PATH_MAX_LENGTH, [...pPath, 'path'], pId ?? elId, issues, 'Port path');
+              }
+              if (p.settings !== undefined) {
+                const isResourceNode = (el.behavior as { kind?: unknown } | null)?.kind === 'resource';
+                validatePortSettings(p.settings, p.direction, p.channel, isResourceNode, [...pPath, 'settings'], pId ?? elId, issues);
               }
 
               pendingSchemaRefs.push({ schemaId: p.schemaId, path: [...pPath, 'schemaId'], entityId: pId ?? elId });
@@ -1411,11 +1418,36 @@ export function validateDocument(
     }
   }
 
+  // D53: ports that send the same request class must name it the same way.
+  if (Array.isArray(doc.elements)) {
+    const requestClassLabels = new Map<string, string>();
+    (doc.elements as unknown[]).forEach((el, elIdx) => {
+      const ports = (el as { ports?: unknown } | null)?.ports;
+      if (!Array.isArray(ports)) return;
+      (ports as unknown[]).forEach((port, pIdx) => {
+        const request = (port as { settings?: { request?: { requestClassId?: unknown; requestClassLabel?: unknown } } } | null)?.settings?.request;
+        if (typeof request?.requestClassId !== 'string' || typeof request.requestClassLabel !== 'string') return;
+        const previous = requestClassLabels.get(request.requestClassId);
+        if (previous !== undefined && previous !== request.requestClassLabel) {
+          issues.push(
+            errorIssue(
+              'structural-rule',
+              ['elements', elIdx, 'ports', pIdx, 'settings', 'request', 'requestClassLabel'],
+              (port as { id?: Id }).id ?? null,
+              'Ports with the same request class must use the same label',
+            ),
+          );
+        } else {
+          requestClassLabels.set(request.requestClassId, request.requestClassLabel);
+        }
+      });
+    });
+  }
+
   // ==========================================================================
   // Section D: Connections (§2 & §4)
   // ==========================================================================
   if (validateArray(doc.connections, 200, ['connections'], docId, issues, 'Document connections')) {
-    const requestClassLabels = new Map<string, string>();
     const connections = doc.connections as unknown[];
     for (let cIdx = 0; cIdx < connections.length; cIdx++) {
       const c = connections[cIdx];
@@ -1449,27 +1481,6 @@ export function validateDocument(
 
         // Connection config
         validateConnectionConfig(c.kind, c.config, [...cPath, 'config'], cId, issues);
-        if ((c.kind === 'call' || c.kind === 'message') &&
-            c.config !== null && typeof c.config === 'object' && 'resource' in c.config) {
-          const resource = c.config.resource;
-          if (resource !== null && typeof resource === 'object' &&
-              'requestClassId' in resource && typeof resource.requestClassId === 'string' &&
-              'requestClassLabel' in resource && typeof resource.requestClassLabel === 'string') {
-            const previous = requestClassLabels.get(resource.requestClassId);
-            if (previous !== undefined && previous !== resource.requestClassLabel) {
-              issues.push(
-                errorIssue(
-                  'structural-rule',
-                  [...cPath, 'config', 'resource', 'requestClassLabel'],
-                  cId,
-                  'Connections with the same request class must use the same label',
-                ),
-              );
-            } else {
-              requestClassLabels.set(resource.requestClassId, resource.requestClassLabel);
-            }
-          }
-        }
       }
     }
   }
@@ -2614,28 +2625,31 @@ function validateConnectionConfig(
   if (kind === 'data') {
     checkRecord(rec, [], [], path, entityId, issues, 'DataConnectionConfig');
   } else if (kind === 'call') {
-    const allowed = ['latencyMs', 'returnLatencyMs', 'weight', 'condition', 'fallback', 'resource', 'retry'];
-    const required = ['latencyMs', 'returnLatencyMs', 'weight', 'condition', 'fallback', 'resource'];
-    if (checkRecord(rec, allowed, required, path, entityId, issues, 'CallConnectionConfig')) {
-      validateCallRetryPolicy(rec.retry, [...path, 'retry'], entityId, issues);
+    const keys = ['latencyMs', 'returnLatencyMs', 'linkClass', 'weight', 'condition', 'fallback'];
+    if (checkRecord(rec, keys, keys, path, entityId, issues, 'CallConnectionConfig')) {
       validateNumber(rec.latencyMs, 0, 60000, [...path, 'latencyMs'], entityId, issues, 'latencyMs');
       validateNumber(rec.returnLatencyMs, 0, 60000, [...path, 'returnLatencyMs'], entityId, issues, 'returnLatencyMs');
+      validateLinkClass(rec.linkClass, [...path, 'linkClass'], entityId, issues);
       validateNumber(rec.weight, 0, 1e6, [...path, 'weight'], entityId, issues, 'weight', false, true);
       validateBoolean(rec.fallback, [...path, 'fallback'], entityId, issues, 'fallback');
       validateRouteCondition(rec.condition, [...path, 'condition'], entityId, issues);
-      validateResourceCallMetadata(rec.resource, [...path, 'resource'], entityId, issues);
     }
   } else if (kind === 'message') {
-    const allowed = ['latencyMs', 'ackDelayMs', 'messageTtlMs', 'weight', 'condition', 'fallback', 'resource'];
-    if (checkRecord(rec, allowed, allowed, path, entityId, issues, 'MessageConnectionConfig')) {
+    const keys = ['latencyMs', 'linkClass', 'weight', 'condition', 'fallback'];
+    if (checkRecord(rec, keys, keys, path, entityId, issues, 'MessageConnectionConfig')) {
       validateNumber(rec.latencyMs, 0, 60000, [...path, 'latencyMs'], entityId, issues, 'latencyMs');
-      validateNumber(rec.ackDelayMs, 0, 60000, [...path, 'ackDelayMs'], entityId, issues, 'ackDelayMs');
-      validateNumber(rec.messageTtlMs, 1, 3600000, [...path, 'messageTtlMs'], entityId, issues, 'messageTtlMs');
+      validateLinkClass(rec.linkClass, [...path, 'linkClass'], entityId, issues);
       validateNumber(rec.weight, 0, 1e6, [...path, 'weight'], entityId, issues, 'weight', false, true);
       validateBoolean(rec.fallback, [...path, 'fallback'], entityId, issues, 'fallback');
       validateRouteCondition(rec.condition, [...path, 'condition'], entityId, issues);
-      validateResourceCallMetadata(rec.resource, [...path, 'resource'], entityId, issues);
     }
+  }
+}
+
+function validateLinkClass(value: unknown, path: readonly (string | number)[], entityId: Id | null, issues: Issue[]): void {
+  if (value === null) return;
+  if (typeof value !== 'string' || !LINK_CLASSES.includes(value as (typeof LINK_CLASSES)[number])) {
+    issues.push(errorIssue('invalid-literal', path, entityId, `linkClass must be one of ${LINK_CLASSES.join(', ')}, or null for custom`));
   }
 }
 
@@ -2700,38 +2714,101 @@ function validateCallRetryPolicy(value: unknown, path: (string | number)[], enti
   }
 }
 
-function validateResourceCallMetadata(
+function validateRequestMeta(
   res: unknown,
   path: readonly (string | number)[],
   entityId: Id | null,
   issues: Issue[],
 ): void {
-  if (res === null) return;
-  if (checkRecord(res, ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags', 'deadlineDurationMs'], ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags', 'deadlineDurationMs'], path, entityId, issues, 'ResourceCallMetadata')) {
+  const keys = ['requestClassId', 'requestClassLabel', 'operation', 'key', 'tags'];
+  if (checkRecord(res, keys, keys, path, entityId, issues, 'RequestMeta')) {
     const rec = res as Record<string, unknown>;
     // requestClassId is a classification token, not a reference
     validateId(rec.requestClassId, [...path, 'requestClassId'], entityId, issues);
     validateString(rec.requestClassLabel, 1, 60, [...path, 'requestClassLabel'], entityId, issues, 'Request class label');
     if (rec.operation !== 'read' && rec.operation !== 'write') {
-      issues.push(
-        errorIssue(
-          'invalid-literal',
-          [...path, 'operation'],
-          entityId,
-          `ResourceCallMetadata operation must be 'read' or 'write'`,
-        ),
-      );
+      issues.push(errorIssue('invalid-literal', [...path, 'operation'], entityId, `RequestMeta operation must be 'read' or 'write'`));
     }
     if (rec.key !== null) {
-      validateString(rec.key, 1, 80, [...path, 'key'], entityId, issues, 'ResourceCallMetadata key');
+      validateString(rec.key, 1, 80, [...path, 'key'], entityId, issues, 'RequestMeta key');
     }
-    if (validateArray(rec.tags, 20, [...path, 'tags'], entityId, issues, 'ResourceCallMetadata tags')) {
+    if (validateArray(rec.tags, 20, [...path, 'tags'], entityId, issues, 'RequestMeta tags')) {
       const tags = rec.tags as unknown[];
       for (let i = 0; i < tags.length; i++) {
         validateString(tags[i], 0, 80, [...path, 'tags', i], entityId, issues, 'tag');
       }
     }
-    validateNumber(rec.deadlineDurationMs, 0, 600000, [...path, 'deadlineDurationMs'], entityId, issues, 'deadlineDurationMs', false, true);
+  }
+}
+
+/** The simulated in-port settings only mean something on a node the runner simulates. */
+const SIMULATED_CALL_IN_KEYS = ['rateLimit', 'failureRate', 'serviceTimeMs'] as const;
+
+/**
+ * D53: a port's settings, by direction and channel. Empty settings are not stored; the simulated
+ * in-port settings (rate limit, failure rate, service time) are allowed on resource nodes only.
+ */
+function validatePortSettings(
+  settings: unknown,
+  direction: unknown,
+  channel: unknown,
+  isResourceNode: boolean,
+  path: readonly (string | number)[],
+  entityId: Id | null,
+  issues: Issue[],
+): void {
+  let keys: readonly string[];
+  if (direction === 'in' && channel === 'call') keys = ['expectedP95Ms', 'availabilityPct', 'idempotent', 'maxConcurrency', ...SIMULATED_CALL_IN_KEYS];
+  else if (direction === 'in' && channel === 'message') keys = ['ackDelayMs', 'messageTtlMs', 'delivery', 'ordering'];
+  else if (direction === 'in' && channel === 'data') keys = ['throughputPerSec', 'maxStalenessMs'];
+  else if (direction === 'out' && channel === 'call') keys = ['deadlineDurationMs', 'retry', 'request'];
+  else if (direction === 'out' && channel === 'message') keys = ['deadlineDurationMs', 'request'];
+  else {
+    issues.push(errorIssue('structural-rule', path, entityId, `A ${String(direction)} ${String(channel)} port has no settings`));
+    return;
+  }
+  if (!checkRecord(settings, keys, [], path, entityId, issues, 'Port settings')) return;
+  const rec = settings as Record<string, unknown>;
+  if (Object.keys(rec).length === 0) {
+    issues.push(errorIssue('structural-rule', path, entityId, 'Empty port settings are not stored; omit them'));
+    return;
+  }
+  const has = (key: string) => rec[key] !== undefined;
+  const at = (key: string) => [...path, key];
+
+  if (has('expectedP95Ms')) validateNumber(rec.expectedP95Ms, 0, 600000, at('expectedP95Ms'), entityId, issues, 'expectedP95Ms', false, true);
+  if (has('availabilityPct')) validateNumber(rec.availabilityPct, 0, 100, at('availabilityPct'), entityId, issues, 'availabilityPct', false, true);
+  if (has('idempotent')) validateBoolean(rec.idempotent, at('idempotent'), entityId, issues, 'idempotent');
+  if (has('maxConcurrency')) validateNumber(rec.maxConcurrency, 1, 100000, at('maxConcurrency'), entityId, issues, 'maxConcurrency', true);
+  if (has('rateLimit')) {
+    if (checkRecord(rec.rateLimit, ['rps', 'burst'], ['rps', 'burst'], at('rateLimit'), entityId, issues, 'rateLimit')) {
+      const limit = rec.rateLimit as Record<string, unknown>;
+      validateNumber(limit.rps, 0, 1e6, [...at('rateLimit'), 'rps'], entityId, issues, 'rps', false, true);
+      validateNumber(limit.burst, 1, 1e6, [...at('rateLimit'), 'burst'], entityId, issues, 'burst', true);
+    }
+  }
+  if (has('failureRate')) validateNumber(rec.failureRate, 0, 100, at('failureRate'), entityId, issues, 'failureRate');
+  if (has('serviceTimeMs')) validateNumber(rec.serviceTimeMs, 0, 600000, at('serviceTimeMs'), entityId, issues, 'serviceTimeMs', false, true);
+  if (has('ackDelayMs')) validateNumber(rec.ackDelayMs, 0, 60000, at('ackDelayMs'), entityId, issues, 'ackDelayMs');
+  if (has('messageTtlMs')) validateNumber(rec.messageTtlMs, 1, 3600000, at('messageTtlMs'), entityId, issues, 'messageTtlMs');
+  if (has('delivery') && !DELIVERY_GUARANTEES.includes(rec.delivery as (typeof DELIVERY_GUARANTEES)[number])) {
+    issues.push(errorIssue('invalid-literal', at('delivery'), entityId, `delivery must be one of ${DELIVERY_GUARANTEES.join(', ')}`));
+  }
+  if (has('ordering') && !MESSAGE_ORDERINGS.includes(rec.ordering as (typeof MESSAGE_ORDERINGS)[number])) {
+    issues.push(errorIssue('invalid-literal', at('ordering'), entityId, `ordering must be one of ${MESSAGE_ORDERINGS.join(', ')}`));
+  }
+  if (has('throughputPerSec')) validateNumber(rec.throughputPerSec, 0, 1e9, at('throughputPerSec'), entityId, issues, 'throughputPerSec', false, true);
+  if (has('maxStalenessMs')) validateNumber(rec.maxStalenessMs, 0, 31_536_000_000, at('maxStalenessMs'), entityId, issues, 'maxStalenessMs', false, true);
+  if (has('deadlineDurationMs')) validateNumber(rec.deadlineDurationMs, 0, 600000, at('deadlineDurationMs'), entityId, issues, 'deadlineDurationMs', false, true);
+  if (has('retry')) validateCallRetryPolicy(rec.retry, at('retry'), entityId, issues);
+  if (has('request')) validateRequestMeta(rec.request, at('request'), entityId, issues);
+
+  if (!isResourceNode) {
+    for (const key of SIMULATED_CALL_IN_KEYS) {
+      if (has(key)) {
+        issues.push(errorIssue('structural-rule', at(key), entityId, `${key} changes simulated behavior, so it is only allowed on a node the runner simulates`));
+      }
+    }
   }
 }
 
