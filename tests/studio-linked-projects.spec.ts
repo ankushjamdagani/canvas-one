@@ -51,7 +51,7 @@ test('a project can be linked into another as a read-only node that shows live d
   await expect(page.getByTestId('breadcrumb-project-btn')).toContainText('Orders system');
 });
 
-test('a project can be dragged from the Library onto the canvas, connected to, and the logo returns home', async ({ page }) => {
+test('a project can be dragged from the Library onto the canvas, and the logo returns home', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('textbox', { name: 'Blank project name' }).fill('Billing system');
   await page.getByTestId('create-blank-project-btn').click();
@@ -70,20 +70,7 @@ test('a project can be dragged from the Library onto the canvas, connected to, a
   const node = page.locator('.component-node', { hasText: 'Billing system' });
   await expect(node).toBeVisible();
 
-  // Connecting an existing node to it must not fail on payload shapes.
-  const targetHandle = (await node.locator('[data-testid^="node-handle-target-"]').first().getAttribute('data-testid'))!;
-  const source = page.locator('[data-testid^="node-handle-source-"]').first();
-  const s = (await source.boundingBox())!;
-  const t = (await page.getByTestId(targetHandle).boundingBox())!;
-  await page.mouse.move(s.x + s.width / 2, s.y + s.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2, { steps: 15 });
-  await page.mouse.up();
-  await expect(page.getByTestId('connect-resource-form')).toBeVisible();
-  await expect(page.getByTestId('connect-rejected-message')).toHaveCount(0);
-
   // The logo goes to the project list.
-  await page.keyboard.press('Escape');
   await page.getByTestId('brand').click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId('existing-projects-list')).toBeVisible();

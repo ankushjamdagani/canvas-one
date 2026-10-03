@@ -2561,11 +2561,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Limitations**: Project description/team are not in the portable bundle (v9 unchanged), so an imported project starts empty. A linked node is not exercised by a full scenario run (connection and validation are tested; no run test). Dangling-link state has no e2e (no project delete in the UI). The manifest drop of `linkedProjectId` is covered by the closed-key list, not a dedicated test.
 - **Lesson**: Wrote the hover-hit-target rule into LESSONS (see 2026-10-03 comment bubbles).
 
-## 2026-10-03 — Linked-project fixes: drag, connect, logo
+## 2026-10-03 — Linked-project fixes: drag and logo (connect fix withdrawn)
 
-- **Outcome**: Rows in the Library's Projects tab are draggable onto the canvas (`LINKED_PROJECT_MIME_TYPE`, drop places at the pointer). Connecting a node to a linked project no longer fails with "Incompatible payload shapes": a linked node is a black box, so `planConnection` rewrites its request/response schemas to the caller's shape (fresh field ids) and carries the rewrite through `ConnectionDraft.targetSchemaReplacements`. The top-bar logo is now a button that goes to All projects (same guarded handler as the project menu).
-- **Files**: `features/catalog/connect.ts` (+ test), `features/library/{LinkedProjects,types}`, `features/workspace/{CanvasView,TopBar}`, `tests/studio-linked-projects.spec.ts`.
+- **Outcome**: Rows in the Library's Projects tab are draggable onto the canvas (`LINKED_PROJECT_MIME_TYPE`). The top-bar logo is a button that goes to All projects. The first attempt at the "Incompatible payload shapes" error (a linked node copying its caller's shapes), the follow-up per-caller in-ports, and the service fan-out ports (D53) were all reverted at the user's request: they were three overlapping strategies. The replacement is a protocol-based design, pending the user's answers. Until it lands, connecting to a linked node still fails on payload shapes when the caller's shape isn't the empty default.
+- **Files**: `features/library/{LinkedProjects,types}`, `features/workspace/{CanvasView,TopBar}`, `tests/studio-linked-projects.spec.ts`.
 - **Platform/subagents**: Claude, no subagents.
-- **Verification**: reproduced the rejection in a browser probe first; `tsc -b` clean, `npm test` 1,598 passed, Playwright linked-projects, shell, entry, panels, project-rename 23 passed. Full e2e suite and production build not run.
-- **Limitations**: A second caller with a different shape re-rewrites the linked node's schema, which can leave the earlier connection's shape mismatched; readiness would flag it. Regular components were not checked for the same payload-shape rejection.
-- **Lesson**: Record field ids are document-unique, so copying a shape between schemas needs fresh ids.
+- **Verification**: `tsc -b` clean, `npm test` 1,597 passed, linked-projects e2e 2 passed (drag, logo). Full e2e suite and production build not run.
+- **Lesson**: Don't patch a symptom of the port model in three places; the user's model (connection types / protocols per node) was the real fix.
