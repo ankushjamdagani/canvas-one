@@ -58,7 +58,7 @@ type Settings = Readonly<Record<string, unknown>>;
 const num = (value: unknown): number | undefined => (typeof value === 'number' ? value : undefined);
 
 /** The caller's terms for one endpoint, in one line, or '' when it sets none. */
-export function describeCallerPolicy(port: Port): string {
+export function describeCallerPolicy(port: Pick<Port, 'settings'>): string {
   const s = (port.settings ?? {}) as Settings;
   const parts: string[] = [];
   const retry = s.retry as CallRetryPolicy | undefined;
@@ -71,7 +71,7 @@ export function describeCallerPolicy(port: Port): string {
 }
 
 /** What the callee promises or enforces on one endpoint, in one line, or '' when it sets none. */
-export function describeCalleeContract(port: Port): string {
+export function describeCalleeContract(port: Pick<Port, 'settings'>): string {
   const s = (port.settings ?? {}) as Settings;
   const parts: string[] = [];
   if (num(s.expectedP95Ms) !== undefined) parts.push(`p95 ${s.expectedP95Ms} ms`);

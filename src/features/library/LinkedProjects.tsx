@@ -74,7 +74,7 @@ export function LinkedProjects({
                   ) : null}
                   <div data-testid={`linked-project-endpoints-${project.id}`} className="mt-1 text-[11px] text-secondary-text">
                     {linkable
-                      ? [...new Set(project.exposures.map((x) => describeEndpoint(x.protocol, x.path)))].join(' · ')
+                      ? project.exposures.map((x) => describeEndpoint(x.protocol, x.path)).join(' · ')
                       : 'Exposes no call connection type. Edit this project to expose one before linking it.'}
                   </div>
                 </div>

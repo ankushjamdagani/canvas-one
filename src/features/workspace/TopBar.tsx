@@ -16,8 +16,9 @@ import type {
 } from "../../persistence/studio/types";
 import { projectDetails } from "../../persistence/studio/types";
 import { ProjectMenu } from "./ProjectMenu";
-import { ProjectDetailsDialog, type ProjectDetails } from "./ProjectDetailsDialog";
-import { ExposedEndpointsDialog, type EndpointCandidate } from "./ExposedEndpointsDialog";
+import type { ProjectDetails } from "./ProjectDetailsDialog";
+import type { EndpointCandidate } from "./ExposedEndpointsDialog";
+import { lazyComponent } from "@/lib/lazyComponent";
 import { RenameConflictPopover, RenamedNotice } from "./ProjectRenameFeedback";
 import { BranchPopover, type BranchActionOutcome } from "./BranchPopover";
 import type { TransferActions } from "../transfer";
@@ -79,6 +80,16 @@ export interface TopBarProps {
  * - Violet family with live down caret on hover and flipped up caret while menu open for branch
  * - Inline rename with save (↵) and cancel (esc) hints
  */
+// Rarely opened dialogs load on demand so the workspace chunk stays under the size limit.
+const ProjectDetailsDialog = lazyComponent(
+  () => import("./ProjectDetailsDialog").then((m) => m.ProjectDetailsDialog),
+  null,
+);
+const ExposedEndpointsDialog = lazyComponent(
+  () => import("./ExposedEndpointsDialog").then((m) => m.ExposedEndpointsDialog),
+  null,
+);
+
 export function TopBar({
   project,
   branches,
@@ -415,21 +426,25 @@ export function TopBar({
           </div>
         </RenamedNotice>
 
-        <ProjectDetailsDialog
-          open={settingsOpen}
-          projectTitle={project.title}
-          initial={projectDetails(project)}
-          onSave={onUpdateProjectDetails}
-          onClose={() => setSettingsOpen(false)}
-        />
+        {settingsOpen ? (
+          <ProjectDetailsDialog
+            open
+            projectTitle={project.title}
+            initial={projectDetails(project)}
+            onSave={onUpdateProjectDetails}
+            onClose={() => setSettingsOpen(false)}
+          />
+        ) : null}
 
-        <ExposedEndpointsDialog
-          open={exposedOpen}
-          projectTitle={project.title}
-          candidates={endpointCandidates}
-          onToggle={onToggleEndpointExposed}
-          onClose={() => setExposedOpen(false)}
+        {exposedOpen ? (
+          <ExposedEndpointsDialog
+            open
+            projectTitle={project.title}
+            candidates={endpointCandidates}
+            onToggle={onToggleEndpointExposed}
+            onClose={() => setExposedOpen(false)}
         />
+        ) : null}
 
         {/* Save Status */}
         <span

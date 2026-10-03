@@ -193,6 +193,8 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
       schemaId: requestId,
       responseSchemaId: responseId,
       ...(exposure.path ? { path: exposure.path } : {}),
+      // The project's declared contract (what it promises), so a caller sees the real expectations.
+      ...(exposure.contract ? { settings: { ...exposure.contract } } : {}),
     };
     ports.push({ ...base, protocol: exposure.protocol });
   }

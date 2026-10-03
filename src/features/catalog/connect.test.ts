@@ -142,17 +142,17 @@ describe('connect.ts', () => {
       return { add, el, connect, ports, getDoc: () => doc, viewId, mintId, setDoc: (d: Document) => { doc = d; } };
     }
 
-    it("uses the target's type by default and adds the missing out-port on the source", () => {
+    it("uses the target's type by default; the source's unused default out-port takes that type", () => {
       const t = setup();
       const service = t.add('service', 0);
       const db1 = t.add('database', 300);
       const db2 = t.add('database', 600);
       t.connect(service, db1);
-      expect(t.ports(service, 'out').map((p) => p.protocol)).toEqual(['http', 'sql']);
+      expect(t.ports(service, 'out').map((p) => p.protocol)).toEqual(['sql']);
       expect(t.ports(db1, 'in')).toHaveLength(1);
       // A second SQL dependency reuses the same out-port.
       t.connect(service, db2);
-      expect(t.ports(service, 'out')).toHaveLength(2);
+      expect(t.ports(service, 'out')).toHaveLength(1);
       expect(validateDocument(t.getDoc()).ok).toBe(true);
     });
 
@@ -164,14 +164,15 @@ describe('connect.ts', () => {
       const plan = t.connect(a, b, { protocol: 'grpc' });
       expect(plan.kind).toBe('needs-resource-metadata');
       expect(t.ports(b, 'in').map((p) => p.protocol)).toEqual(['http', 'grpc']);
-      expect(t.ports(a, 'out').map((p) => p.protocol)).toEqual(['http', 'grpc']);
+      // The caller had not called anything yet, so its default out-port became the gRPC one.
+      expect(t.ports(a, 'out').map((p) => p.protocol)).toEqual(['grpc']);
       t.connect(a, c, { protocol: 'grpc' });
-      expect(t.ports(a, 'out')).toHaveLength(2);
+      expect(t.ports(a, 'out')).toHaveLength(1);
       expect(t.ports(c, 'in').map((p) => p.protocol)).toEqual(['http', 'grpc']);
-      // The default type still uses the original ports.
+      // Calling the default type next adds a second out-port; the target keeps its single default in-port.
       const d = t.add('service', 900);
       t.connect(a, d, { protocol: 'http' });
-      expect(t.ports(a, 'out')).toHaveLength(2);
+      expect(t.ports(a, 'out').map((p) => p.protocol)).toEqual(['grpc', 'http']);
       expect(t.ports(d, 'in')).toHaveLength(1);
       expect(validateDocument(t.getDoc()).ok).toBe(true);
     });
@@ -189,14 +190,14 @@ describe('connect.ts', () => {
       expect('label' in connection).toBe(false);
       expect(describeConnection(t.getDoc(), connection)).toBe('call · HTTP / REST /orders');
       expect(t.ports(b, 'in').map((p) => p.path)).toEqual([undefined, '/orders']);
-      expect(t.ports(a, 'out').map((p) => p.path)).toEqual([undefined, '/orders']);
+      expect(t.ports(a, 'out').map((p) => p.path)).toEqual(['/orders']);
       expect(t.ports(b, 'in')[1].label).toBe('HTTP / REST /orders');
 
       // The same path on another node adds that node's port; a second path adds a second port on the source.
       t.connect(a, c, { path: '/orders' });
-      expect(t.ports(a, 'out')).toHaveLength(2);
+      expect(t.ports(a, 'out')).toHaveLength(1);
       t.connect(a, c, { path: '/invoices' });
-      expect(t.ports(a, 'out').map((p) => p.path)).toEqual([undefined, '/orders', '/invoices']);
+      expect(t.ports(a, 'out').map((p) => p.path)).toEqual(['/orders', '/invoices']);
       expect(t.ports(c, 'in').map((p) => p.path)).toEqual([undefined, '/orders', '/invoices']);
       expect(validateDocument(t.getDoc()).ok).toBe(true);
     });
@@ -294,10 +295,12 @@ describe('connect.ts', () => {
 
       it('adds a type the project started exposing after the link', () => {
         const t = linkedSetup([exposure('http')]);
-        const live = [exposure('http'), exposure('thrift')];
+        const live = [exposure('http'), { ...exposure('thrift'), contract: { expectedP95Ms: 40 } }];
         const plan = t.connect(t.caller, t.linked, { protocol: 'thrift', linkedExposures: live });
         expect(plan.kind).toBe('needs-resource-metadata');
         expect(t.ports(t.linked, 'in').map((p) => p.protocol)).toEqual(['http', 'thrift']);
+        // The project's declared contract for the endpoint comes with the new in-port.
+        expect(t.ports(t.linked, 'in')[1].settings).toEqual({ expectedP95Ms: 40 });
         expect(validateDocument(t.getDoc()).ok).toBe(true);
       });
 

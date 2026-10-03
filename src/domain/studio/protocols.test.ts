@@ -3,7 +3,7 @@ import { PROTOCOLS, PROTOCOL_LABELS, defaultProtocol, isProtocolOf, protocolsFor
 import { VISUAL_KINDS } from './model';
 import { validateDocument } from './validate';
 import { buildManifest } from './manifest';
-import { isExposureList } from './exposure';
+import { declaredContractOf, isExposureList } from './exposure';
 import type { Document } from './model';
 import { DEFAULT_BUILD_VERSIONS } from '../../persistence/studio/types';
 import { readFileSync } from 'node:fs';
@@ -77,5 +77,15 @@ describe('protocols (D53)', () => {
     expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: ' /a ' }])).toBe(false);
     expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: 'x'.repeat(121) }])).toBe(false);
     expect(isExposureList('call')).toBe(false);
+    // A declared contract rides along; simulated settings and wrong channels' keys do not.
+    expect(isExposureList([{ channel: 'call', protocol: 'http', path: '/a', contract: { expectedP95Ms: 80, idempotent: true } }])).toBe(true);
+    expect(isExposureList([{ channel: 'message', protocol: 'kafka', path: 't', contract: { delivery: 'at-least-once', ordering: 'per-key' } }])).toBe(true);
+    expect(isExposureList([{ channel: 'call', protocol: 'http', path: '/a', contract: { failureRate: 5 } }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'http', path: '/a', contract: { delivery: 'at-least-once' } }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'http', path: '/a', contract: {} }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'http', path: '/a', contract: { expectedP95Ms: -1 } }])).toBe(false);
+    expect(declaredContractOf('call', { expectedP95Ms: 80, rateLimit: { rps: 1, burst: 1 }, failureRate: 3 })).toEqual({ expectedP95Ms: 80 });
+    expect(declaredContractOf('call', { failureRate: 3 })).toBeUndefined();
+    expect(declaredContractOf('call', undefined)).toBeUndefined();
   });
 });

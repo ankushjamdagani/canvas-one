@@ -36,9 +36,9 @@ import {
 } from "./lazyViews";
 import { whenIdle } from "@/lib/lazyComponent";
 import { LibraryPanel, type LibraryView } from "../library";
-import { downloadSavedPart, SavedParts } from "../library/SavedParts";
+import { lazyComponent } from "@/lib/lazyComponent";
 import { LinkedProjects } from "../library/LinkedProjects";
-import { sameExposure, type ProjectExposure } from "../../domain/studio/exposure";
+import { declaredContractOf, sameExposure, type ProjectExposure } from "../../domain/studio/exposure";
 import { portPath } from "../../domain/studio/protocols";
 import type { EndpointCandidate } from "./ExposedEndpointsDialog";
 import { projectDetails, projectExposures } from "../../persistence/studio/types";
@@ -276,6 +276,9 @@ export interface WorkspaceProps {
   /** D38 run-control slot; owned by the runs lane, empty until wired in. */
   runControl?: React.ReactNode;
 }
+
+// The Ours tab loads on demand, so the workspace chunk stays under the size limit.
+const SavedParts = lazyComponent(() => import("../library/SavedParts").then((m) => m.SavedParts), null);
 
 export function Workspace({
   session,
@@ -1367,13 +1370,15 @@ export function Workspace({
           path,
           exposed: exposedTypes.some((x) => x.channel === port.channel && x.protocol === protocol && x.path === path),
           nodeLabels: [...(existing?.nodeLabels ?? []), element.label],
+          // The first node that declares a contract for this endpoint speaks for it.
+          contract: existing?.contract ?? declaredContractOf(port.channel, port.settings),
         });
       }
     }
     // Types exposed earlier that no node accepts any more stay listed so they can be switched off.
     for (const x of exposedTypes) {
       const key = `${x.channel}:${x.protocol}:${x.path}`;
-      if (!byType.has(key)) byType.set(key, { key, channel: x.channel, protocol: x.protocol, path: x.path, exposed: true, nodeLabels: [] });
+      if (!byType.has(key)) byType.set(key, { key, channel: x.channel, protocol: x.protocol, path: x.path, exposed: true, nodeLabels: [], contract: x.contract });
     }
     return [...byType.values()];
   }, [document, exposedTypes]);
@@ -1382,7 +1387,9 @@ export function Workspace({
     async (candidate: EndpointCandidate, exposed: boolean): Promise<string | null> => {
       const current = projectRecord ? projectExposures(projectRecord) : [];
       const others = current.filter((x) => !sameExposure(x, candidate));
-      const next = exposed ? [...others, { channel: candidate.channel, protocol: candidate.protocol, path: candidate.path }] : others;
+      const next = exposed
+        ? [...others, { channel: candidate.channel, protocol: candidate.protocol, path: candidate.path, ...(candidate.contract ? { contract: candidate.contract } : {}) }]
+        : others;
       const result = await session.updateProjectDetails({
         ...(projectRecord ? projectDetails(projectRecord) : { description: "", team: "" }),
         exposures: next,
@@ -2558,7 +2565,9 @@ export function Workspace({
       "part.capture": ({ command }) => session.savePart(command),
       "part.place": ({ content, label }) => placeSavedPart(content, label),
       "part.export": (part) =>
-        downloadSavedPart(repository, session.getState().projectId as Id, part),
+        import("../library/SavedParts").then((m) =>
+          m.downloadSavedPart(repository, session.getState().projectId as Id, part),
+        ),
       "part.import": ({ command }) => session.savePart(command),
     }),
     [

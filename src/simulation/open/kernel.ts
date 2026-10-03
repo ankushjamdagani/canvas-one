@@ -1,6 +1,7 @@
 import type {
   CallRetryPolicy,
   ExecutionGraph,
+  EndpointBehavior,
   ExecutionEdge,
   WorkloadDefinition,
   RequestClass,
@@ -316,6 +317,8 @@ export interface Op {
   bridgeFrameId?: string;
   /** D50: deliveries of this broker op so far (redelivery counts). */
   deliveries?: number;
+  /** D53: the endpoint this op entered through; its overrides apply at this node. */
+  endpoint?: EndpointBehavior;
 }
 
 export interface NodeRuntime {
@@ -900,6 +903,7 @@ export class OpenSimulation {
       nodeId: wl.entryNodeId,
       path: wl.entryNodeId,
       phase: 'transit',
+      endpoint: wl.endpoint,
       done: false,
       attempt: 0,
       children: new Set(),
@@ -956,6 +960,7 @@ export class OpenSimulation {
     this.liveOpsCount++;
 
     const syntheticEdge: ExecutionEdge = {
+      endpoint: wl.endpoint,
       id: `__entry:${wl.id}`,
       source: wl.entryNodeId,
       target: wl.entryNodeId,
@@ -1023,12 +1028,29 @@ export class OpenSimulation {
     }
   }
 
+  private readonly endpointBuckets = new Map<string, { tokens: number; at: number }>();
+
+  /** D53: one token per admitted call; refills at `rps` up to `burst`, full at the start. */
+  private takeEndpointToken(endpoint: EndpointBehavior): boolean {
+    const limit = endpoint.rateLimit!;
+    const bucket = this.endpointBuckets.get(endpoint.key) ?? { tokens: limit.burst, at: this.currentTime };
+    bucket.tokens = Math.min(limit.burst, bucket.tokens + (this.currentTime - bucket.at) * limit.rps);
+    bucket.at = this.currentTime;
+    const allowed = bucket.tokens >= 1;
+    if (allowed) bucket.tokens -= 1;
+    this.endpointBuckets.set(endpoint.key, bucket);
+    return allowed;
+  }
+
   protected admitOp(op: Op, isRetry: boolean): boolean {
     const nr = this.nodesRuntime.get(op.nodeId)!;
     const node = this.plan.nodes.get(op.nodeId)!;
 
     const hostId = this.hostPlacement.get(op.nodeId);
-    if (hostId !== undefined && this.hostState.get(hostId) === false) {
+    const hostDown = hostId !== undefined && this.hostState.get(hostId) === false;
+    // D53: an endpoint's rate limit rejects calls beyond its token bucket; a retry already got in once.
+    const overRateLimit = !hostDown && !isRetry && op.endpoint?.rateLimit !== undefined && !this.takeEndpointToken(op.endpoint);
+    if (hostDown || overRateLimit) {
       // Admission to a host that is actually down is rejected immediately as unavailable,
       // whatever the router knows and regardless of whether this is a first attempt or a
       // retry landing during the outage (§6 Faults).
@@ -1251,7 +1273,9 @@ export class OpenSimulation {
     });
 
     let procTime: number;
-    if (node.behavior.type === 'storage') {
+    if (op.endpoint?.serviceTimeMs !== undefined) {
+      procTime = op.endpoint.serviceTimeMs / 1000;
+    } else if (node.behavior.type === 'storage') {
       const isWrite = op.unit.requestClass.operation === 'write';
       const cap = isWrite ? node.behavior.writeCapacity : node.behavior.capacity;
       procTime = 1 / cap;
@@ -1309,7 +1333,7 @@ export class OpenSimulation {
         op.attempt) >>>
         0
     );
-    const failed = failRng() * 100 < node.behavior.failureRate;
+    const failed = failRng() * 100 < (op.endpoint?.failureRate ?? node.behavior.failureRate);
 
     if (failed) {
       this.emitFact({
@@ -1615,6 +1639,7 @@ export class OpenSimulation {
       nodeId: edge.target,
       path: childPath,
       phase: 'transit',
+      endpoint: edge.endpoint,
       done: false,
       attempt: 0,
       children: new Set(),
@@ -1802,6 +1827,7 @@ export class OpenSimulation {
       nodeId: edge.target,
       path: msgOpPath,
       phase: 'transit',
+      endpoint: edge.endpoint,
       done: false,
       attempt: 0,
       children: new Set(),
@@ -2318,6 +2344,7 @@ export class OpenSimulation {
       nodeId: edge.target,
       path: childPath,
       phase: 'reserved',
+      endpoint: edge.endpoint,
       done: false,
       attempt: 0,
       children: new Set(),

@@ -19,13 +19,14 @@ import type {
   Element,
   Connection,
   CallConnection,
+  Endpoint,
   MessageConnection,
   Workload,
   RequestClass as StudioRequestClass,
   Relation,
   Fault,
 } from '../model';
-import { ackDelayOf, callRetryOf, messageTtlOf } from '../port-settings';
+import { ackDelayOf, callRetryOf, findPort, messageTtlOf } from '../port-settings';
 import type {
   ResourceInput,
   Admission,
@@ -49,6 +50,7 @@ import type {
   ExecutionGraph,
   ExecutionNode,
   ExecutionEdge,
+  EndpointBehavior,
   WorkloadDefinition,
   RequestClass as KernelRequestClass,
   BehaviorConfig,
@@ -222,6 +224,19 @@ function buildExecutionGraph(opts: {
   const nodes: ExecutionNode[] = [];
   const allElementsById = new Map<Id, Element>();
   const portLookup = { elements: opts.elements };
+  // D53: the simulated settings of the in-port a call enters through override the node's behavior for it.
+  const endpointOf = (endpoint: Endpoint): EndpointBehavior | undefined => {
+    const port = findPort(portLookup, endpoint)?.port;
+    const settings = port?.settings as { serviceTimeMs?: number; failureRate?: number; rateLimit?: { rps: number; burst: number } } | undefined;
+    if (!port || !settings) return undefined;
+    const behavior: EndpointBehavior = {
+      key: `${endpoint.elementId}:${endpoint.portId}`,
+      ...(settings.serviceTimeMs !== undefined ? { serviceTimeMs: settings.serviceTimeMs } : {}),
+      ...(settings.failureRate !== undefined ? { failureRate: settings.failureRate } : {}),
+      ...(settings.rateLimit ? { rateLimit: { ...settings.rateLimit } } : {}),
+    };
+    return Object.keys(behavior).length > 1 ? behavior : undefined;
+  };
   for (const el of opts.elements) allElementsById.set(el.id, el);
 
   for (const el of opts.elements) {
@@ -294,6 +309,7 @@ function buildExecutionGraph(opts: {
         fallback: callConn.config.fallback,
         // D49/D50: a caller's retries, or a broker route's redelivery policy.
         ...(callRetryOf(portLookup, conn) ? { retry: callRetryOf(portLookup, conn)! } : {}),
+        ...(endpointOf(conn.target) ? { endpoint: endpointOf(conn.target)! } : {}),
       });
     } else if (conn.kind === 'message') {
       const msgConn = conn as MessageConnection;
@@ -312,6 +328,7 @@ function buildExecutionGraph(opts: {
           ? { field: msgConn.config.condition.field, value: String(msgConn.config.condition.value) }
           : undefined,
         fallback: msgConn.config.fallback,
+        ...(endpointOf(conn.target) ? { endpoint: endpointOf(conn.target)! } : {}),
       });
     }
   }
@@ -326,6 +343,7 @@ function buildExecutionGraph(opts: {
     rate: w.rate,
     timeoutMs: w.timeoutMs,
     intervalMs: w.intervalMs ?? undefined,
+    ...(endpointOf(w.entry) ? { endpoint: endpointOf(w.entry)! } : {}),
     // D50: the ms<->s conversion lives only at this boundary.
     profile:
       w.profile.kind === 'burst'

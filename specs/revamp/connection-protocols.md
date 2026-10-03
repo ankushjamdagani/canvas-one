@@ -14,12 +14,10 @@ Accepted 2026-10-03. Replaces the earlier payload-shape workarounds for linked p
   | `message` | `amqp`, `kafka`, `mqtt`, `nats`, `stomp`, `sqs`, `sns`, `google-pubsub`, `azure-service-bus` |
   | `data` | `jdbc`, `s3`, `sftp`, `cdc`, `http-bulk` |
 
-- `Port.protocol?` is optional. A port with no `protocol` has its node's default for the
-  channel (`defaultProtocol(visualKind, channel)`: service and gateway `http`, database and warehouse `sql`, cache
-  `redis`, queue `amqp`, stream `kafka`, pub/sub `google-pubsub`, data pipeline `jdbc`, other call nodes `http`).
-  The field is written only when it differs from the default, so existing documents and hashes do not change.
-  The portable file stays at version 9: the field is optional, so every v9 file still imports; a file that uses it
-  will not import in an older build.
+- `Port.protocol` is required on call, message and data ports and null on event ports (D54: no backward compatibility
+  is kept; old files are not read). New ports start with the node's default for the channel (`defaultProtocol(visualKind,
+  channel)`: service and gateway `http`, database and warehouse `sql`, cache `redis`, queue `amqp`, stream `kafka`, pub/sub
+  `google-pubsub`, data pipeline `jdbc`, other call nodes `http`).
 - `Port.path?` is the endpoint path or name within the protocol (`/orders`, a topic, a procedure): free text, trimmed,
   1–120 characters, absent when blank. A node's ports are identified by (direction, channel, protocol, path); two
   in-ports of one node never share all four.

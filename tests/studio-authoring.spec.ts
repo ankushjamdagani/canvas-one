@@ -166,7 +166,9 @@ async function dragConnect(page: Page, sourceElementId: string, targetElementId:
 test.describe('Studio Authoring E2E (RV-12e)', () => {
   test('D43(b): creates Order and reuses its persisted class ID on a second connection', async ({ page }) => {
     await openBlankProject(page, 'Request class labels');
-    const gateway = await placeAtFraction(page, 'gateway', 0.1, 0.2);
+    // D53: the request class lives on the out-port of an unsimulated caller, so two clients send it.
+    const gateway = await placeAtFraction(page, 'client', 0.1, 0.2);
+    const clientB = await placeAtFraction(page, 'client', 0.1, 0.6);
     const serviceA = await placeAtFraction(page, 'service', 0.4, 0.2);
     const serviceB = await placeAtFraction(page, 'service', 0.4, 0.6);
 
@@ -187,8 +189,11 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
         });
         const snapshot = snapshots.find((entry) => entry.document.connections.length === count);
         if (!snapshot) throw new Error('Expected authored snapshot is missing');
-        return snapshot.document.connections.flatMap((connection) =>
-          connection.kind !== 'data' && connection.config.resource ? [connection.config.resource] : []);
+        return snapshot.document.elements.flatMap((element) =>
+          element.ports.flatMap((port) => {
+            const request = (port.settings as { request?: { requestClassId: string; requestClassLabel: string } } | undefined)?.request;
+            return request ? [request] : [];
+          }));
       }, connectionCount);
     }
 
@@ -206,7 +211,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     expect(first[0].requestClassLabel).toBe('Order');
     expect(first[0].requestClassId).toMatch(/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/);
 
-    expect(await dragConnect(page, gateway, serviceB)).toBe('form');
+    expect(await dragConnect(page, clientB, serviceB)).toBe('form');
     await expect(classInput).toHaveValue('');
     await expect(page.locator('datalist option')).toHaveAttribute('value', 'Order');
     await classInput.fill('Order');
@@ -301,7 +306,8 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
 
   test('connect into a resource: the form blocks until class, operation and a valid deadline', async ({ page }) => {
     await openBlankProject(page, 'Resource form');
-    const serviceId = await placeAtFraction(page, 'service', 0.1, 0.3);
+    // An unsimulated caller originates the traffic, so it states the class, operation and deadline (D53).
+    const serviceId = await placeAtFraction(page, 'client', 0.1, 0.3);
     const databaseId = await placeAtFraction(page, 'database', 0.4, 0.3);
     expect(await dragConnect(page, serviceId, databaseId)).toBe('form');
     await page.screenshot({ path: test.info().outputPath('rv12e-metadata-form.png') });
@@ -335,14 +341,13 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     const serviceAId = await placeAtFraction(page, 'service', 0.4, 0.15);
     const serviceBId = await placeAtFraction(page, 'service', 0.4, 0.6);
 
-    for (const [targetId, label, operation, edges] of [
-      [serviceAId, 'route-a', 'read', 1],
-      [serviceBId, 'route-b', 'write', 2],
+    for (const [targetId, edges] of [
+      [serviceAId, 1],
+      [serviceBId, 2],
     ] as const) {
       expect(await dragConnect(page, gatewayId, targetId)).toBe('form');
-      await page.getByTestId('connect-form-request-class').fill(label);
-      await page.getByTestId(`connect-form-op-${operation}`).check();
-      await page.getByTestId('connect-form-deadline').fill('250');
+      // A simulated caller inherits its request: the form asks for the connection type and path only.
+      await expect(page.getByTestId('connect-form-request-class')).toHaveCount(0);
       await page.getByTestId('connect-form-confirm').click();
       await expect(page.locator('.react-flow__edge')).toHaveCount(edges);
     }
@@ -360,9 +365,6 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
       [queueId, workerId, 2],
     ] as const) {
       expect(await dragConnect(page, sourceId, targetId)).toBe('form');
-      await page.getByTestId('connect-form-request-class').fill('order');
-      await page.getByTestId('connect-form-op-write').check();
-      await page.getByTestId('connect-form-deadline').fill('1000');
       await page.getByTestId('connect-form-confirm').click();
       await expect(page.locator('.react-flow__edge')).toHaveCount(edges);
     }
@@ -380,22 +382,26 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.getByTestId('inspector-field-config.concurrency')).toHaveValue('64');
 
     expect(await dragConnect(page, serviceId, databaseId)).toBe('form');
-    await page.getByTestId('connect-form-request-class').fill('read-order');
-    await page.getByTestId('connect-form-op-read').check();
-    await page.getByTestId('connect-form-deadline').fill('500');
     await page.getByTestId('connect-form-confirm').click();
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await waitForIdle(page);
 
+    // The connection is the link and the route: latency and weight, and the two ends' terms read-only.
     await page.locator('.react-flow__edge').first().click({ force: true });
-    const attempts = page.getByTestId('inspector-field-config.retry.maxAttempts');
+    await expect(page.getByTestId('inspector-field-config.linkClass')).toHaveValue('same-az');
+    await expect(page.getByTestId('inspector-field-config.latencyMs')).toHaveValue('2');
+    await expect(page.locator('[data-testid^="inspector-field-config.retry"]')).toHaveCount(0);
+
+    // The caller's retries belong to its out-port, edited on the node.
+    await page.locator(`[data-element-id="${serviceId}"]`).click();
+    const attempts = page.locator('[data-testid^="inspector-field-port."][data-testid$=".retry.maxAttempts"]');
     await expect(attempts).toHaveValue('1');
-    await expect(page.getByTestId('inspector-field-config.retry.backoffMs')).toHaveCount(0);
+    await expect(page.locator('[data-testid$=".retry.backoffMs"]')).toHaveCount(0);
     await attempts.fill('3');
     await page.getByTestId('inspector-apply').click();
     await waitForIdle(page);
-    await expect(page.getByTestId('inspector-field-config.retry.backoffMs')).toHaveValue('100');
-    await expect(page.getByTestId('inspector-field-config.retry.attemptTimeoutMs')).toHaveValue('0');
+    await expect(page.locator('[data-testid^="inspector-field-port."][data-testid$=".retry.backoffMs"]')).toHaveValue('100');
+    await expect(page.locator('[data-testid^="inspector-field-port."][data-testid$=".retry.attemptTimeoutMs"]')).toHaveValue('0');
     await page.screenshot({ path: test.info().outputPath('d49-retry-fields.png') });
   });
 

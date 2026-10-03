@@ -61,6 +61,20 @@ export interface RequestClass {
   };
 }
 
+/**
+ * D53: what one endpoint (an in-port) of a node overrides for the calls that enter through it.
+ * Absent fields fall back to the node's own behavior. `key` identifies the endpoint's rate limiter.
+ */
+export interface EndpointBehavior {
+  key: string;
+  /** Mean service time in ms; replaces 1 / capacity for this endpoint. */
+  serviceTimeMs?: number;
+  /** Percent of attempts that fail; replaces the node's failure rate. */
+  failureRate?: number;
+  /** Token bucket: calls beyond it are rejected at admission. */
+  rateLimit?: { rps: number; burst: number };
+}
+
 export interface WorkloadDefinition {
   id: string;
   entryNodeId: string;
@@ -70,6 +84,8 @@ export interface WorkloadDefinition {
   timeoutMs: number;
   intervalMs?: number;
   classes: RequestClass[];
+  /** D53: the entry endpoint's overrides. */
+  endpoint?: EndpointBehavior;
 }
 
 export interface ExecutionEdge {
@@ -90,6 +106,8 @@ export interface ExecutionEdge {
   needsReview?: boolean;
   /** Call edges only; absent or null means the caller never retries. */
   retry?: CallRetryPolicy | null;
+  /** D53: the target endpoint's overrides. */
+  endpoint?: EndpointBehavior;
 }
 
 export interface ExecutionNode {

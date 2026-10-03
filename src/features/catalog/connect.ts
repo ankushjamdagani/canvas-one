@@ -482,23 +482,35 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
           schemaId: ids.schemaId,
           responseSchemaId: ids.responseSchemaId,
           ...(path ? { path } : {}),
+          ...(exposure?.contract ? { settings: { ...exposure.contract } as PortSettings } : {}),
         };
         targetElementReplacement = { ...targetElement, ports: [...targetElement.ports, targetIn] };
         portChanges.push({ kind: 'replace', value: { recordKind: 'element', record: targetElementReplacement } });
       }
 
       if (!sourceOut) {
-        sourceOut = {
-          id: mintId(),
+        // A node ships with a default out-port; while nothing is connected through it, it takes the
+        // type and path of the first endpoint the node calls instead of staying behind unused.
+        const inUse = (port: Port) =>
+          document.connections.some((c) => c.source.elementId === sourceElement.id && c.source.portId === port.id);
+        const unused = [effectiveSourcePort, ...sourceElement.ports].find(
+          (p) => p.direction === 'out' && p.channel === channel && !inUse(p),
+        );
+        const endpointFields = {
           label: clip(describeEndpoint(protocol, path)),
-          direction: 'out',
-          channel,
           protocol,
           schemaId: targetIn.schemaId,
           responseSchemaId: targetIn.responseSchemaId,
-          ...(path ? { path } : {}),
         };
-        sourceElementReplacement = { ...sourceElement, ports: [...sourceElement.ports, sourceOut] };
+        if (unused) {
+          const { path: _oldPath, ...rest } = unused;
+          sourceOut = { ...rest, ...endpointFields, ...(path ? { path } : {}) };
+          const retyped = sourceOut;
+          sourceElementReplacement = { ...sourceElement, ports: sourceElement.ports.map((p) => (p.id === unused.id ? retyped : p)) };
+        } else {
+          sourceOut = { id: mintId(), direction: 'out', channel, ...endpointFields, ...(path ? { path } : {}) };
+          sourceElementReplacement = { ...sourceElement, ports: [...sourceElement.ports, sourceOut] };
+        }
         newSourcePortChanges.push({ kind: 'replace', value: { recordKind: 'element', record: sourceElementReplacement } });
       }
 

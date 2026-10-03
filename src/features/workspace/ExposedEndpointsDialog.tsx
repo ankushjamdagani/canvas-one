@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import type { ExposedContract } from '../../domain/studio/exposure';
+import { describeCalleeContract } from '../../domain/studio/port-settings';
 import { describeEndpoint, type Protocol } from '../../domain/studio/protocols';
 
 export type EndpointCandidate = {
@@ -9,6 +11,8 @@ export type EndpointCandidate = {
   readonly protocol: Protocol;
   readonly path: string;
   readonly exposed: boolean;
+  /** The declared contract published with the endpoint (what its nodes promise), if any. */
+  readonly contract?: ExposedContract;
   /** Nodes of this project that accept the type (empty when it is exposed but no node accepts it any more). */
   readonly nodeLabels: readonly string[];
 };
@@ -37,6 +41,8 @@ export function ExposedEndpointsDialog({ open, projectTitle, candidates, onToggl
           <DialogDescription>
             Projects that link {projectTitle} can connect only to the endpoints you expose here (type and path). An
             endpoint is listed once a node of this project accepts it: connect to a node with that type and path first.
+            The contract a node declares (expected p95, availability, and so on) is published with it; switch an
+            endpoint off and on to publish a change.
           </DialogDescription>
         </DialogHeader>
         {candidates.length === 0 ? (
@@ -53,6 +59,11 @@ export function ExposedEndpointsDialog({ open, projectTitle, candidates, onToggl
                   <div className="truncate font-mono text-[10px] text-secondary-text">
                     {candidate.channel} · {candidate.nodeLabels.length > 0 ? [...new Set(candidate.nodeLabels)].join(', ') : 'no node accepts it now'}
                   </div>
+                  {candidate.contract ? (
+                    <div className="truncate text-[11px] text-secondary-text">
+                      Publishes: {describeCalleeContract({ settings: candidate.contract })}
+                    </div>
+                  ) : null}
                 </div>
                 <Switch
                   data-testid={`expose-${candidate.key}`}

@@ -58,7 +58,7 @@ function makeBlankDocument(mintId: () => Id): { document: Document; viewId: Id }
 const LINKED_PROJECT_ID = '00000000-0000-4000-8000-0000000000aa';
 const LINKED_EXPOSURES: readonly ProjectExposure[] = [
   { channel: 'call', protocol: 'http', path: '' },
-  { channel: 'call', protocol: 'grpc', path: '/orders' },
+  { channel: 'call', protocol: 'grpc', path: '/orders', contract: { expectedP95Ms: 80, idempotent: true } },
 ];
 
 function linkFor(visualKind: string) {
@@ -136,6 +136,8 @@ describe('place.ts', () => {
       expect(element.ports.map((p) => p.direction)).toEqual(['in', 'in']);
       expect(element.ports.map((p) => (p as { protocol?: string }).protocol)).toEqual(['http', 'grpc']);
       expect(element.ports.map((p) => (p as { path?: string }).path)).toEqual([undefined, '/orders']);
+      // The project's declared contract arrives with the endpoint.
+      expect(element.ports.map((p) => (p as { settings?: unknown }).settings)).toEqual([undefined, { expectedP95Ms: 80, idempotent: true }]);
     });
 
     it('refuses to link a project that exposes no call connection type (D53)', () => {
