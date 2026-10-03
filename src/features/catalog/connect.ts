@@ -381,47 +381,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   const findTargetSchema = (id: Id | null | undefined): PayloadSchema | undefined =>
     id ? (pendingSchemas.get(id) ?? document.schemas.find((x) => x.id === id)) : undefined;
 
-  // D53: a service calls each dependency with that dependency's own payload. When the target's
-  // shapes differ from the source port's, reuse another out call port that matches, else add one
-  // that carries the target's schemas (shared, like router route ports). Never reject on shape.
-  if (
-    sourceElement.behavior.kind === 'resource' &&
-    resourceType(sourceElement) === 'processor' &&
-    sourceElementReplacement === undefined &&
-    effectiveSourcePort.channel === 'call' &&
-    targetPort.channel === 'call'
-  ) {
-    const targetReq = findTargetSchema(targetPort.schemaId);
-    const targetRes = findTargetSchema(targetPort.responseSchemaId);
-    const portMatchesTarget = (port: Port): boolean => {
-      const req = document.schemas.find((x) => x.id === port.schemaId);
-      const res = document.schemas.find((x) => x.id === port.responseSchemaId);
-      return Boolean(
-        req && res && targetReq && targetRes &&
-          shapesCompatible(req.shape, targetReq.shape) && shapesCompatible(res.shape, targetRes.shape),
-      );
-    };
-    if (targetReq && targetRes && targetPort.responseSchemaId && !portMatchesTarget(effectiveSourcePort)) {
-      const outCallPorts = sourceElement.ports.filter((p) => p.direction === 'out' && p.channel === 'call');
-      const matchingOut = outCallPorts.find(portMatchesTarget);
-      if (matchingOut) {
-        effectiveSourcePort = matchingOut;
-      } else {
-        const newPort: Port = {
-          id: mintId(),
-          label: `call out ${outCallPorts.length + 1}`,
-          direction: 'out',
-          channel: 'call',
-          schemaId: targetPort.schemaId,
-          responseSchemaId: targetPort.responseSchemaId,
-        };
-        sourceElementReplacement = { ...sourceElement, ports: [...sourceElement.ports, newPort] };
-        newSourcePortChanges.push({ kind: 'replace', value: { recordKind: 'element', record: sourceElementReplacement } });
-        effectiveSourcePort = newPort;
-      }
-    }
-  }
-
   // Channel match
   if (effectiveSourcePort.channel !== targetPort.channel) {
     return {

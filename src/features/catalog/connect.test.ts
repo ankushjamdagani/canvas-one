@@ -253,60 +253,6 @@ describe('connect.ts', () => {
     expect(validateDocument(doc).ok).toBe(true);
   });
 
-  it('a service reuses an out port whose shapes already match the next dependency (D53)', () => {
-    const mintId = createMintId();
-    const { document: baseDoc, viewId } = makeBlankDocument(mintId);
-    let doc = baseDoc;
-    const add = (kind: string, x: number) => {
-      const placed = place(doc, viewId, kind, { x, y: 0 }, mintId);
-      doc = applyChanges(doc, placed.changes);
-      return placed.elementId;
-    };
-    const svc = add('service', 0);
-    const t1 = add('service', 300);
-    const t2 = add('service', 600);
-    const t3 = add('service', 900);
-    const reshape = (elementId: Id, key: string) => {
-      const el = doc.elements.find((e) => e.id === elementId)!;
-      const inPort = el.ports.find((p) => p.direction === 'in')!;
-      const schema = doc.schemas.find((sc) => sc.id === inPort.schemaId)!;
-      doc = applyChanges(doc, [
-        {
-          kind: 'replace',
-          value: {
-            recordKind: 'schema',
-            record: { ...schema, shape: { type: 'record', nullable: false, fields: [{ id: mintId(), key, optional: false, shape: { type: 'string', nullable: false } }] } },
-          },
-        },
-      ] as never);
-    };
-    reshape(t1, 'a');
-    reshape(t2, 'b');
-    reshape(t3, 'b');
-    const connect = (target: Id) => {
-      const source = doc.elements.find((e) => e.id === svc)!;
-      const plan = planConnection({
-        document: doc, viewId,
-        source: { elementId: svc, portId: source.ports.find((p) => p.direction === 'out' && p.channel === 'call')!.id },
-        target: { elementId: target },
-        mintId,
-      });
-      if (plan.kind !== 'needs-resource-metadata') throw new Error(`unexpected ${plan.kind}`);
-      const done = completeConnection(plan.draft, { requestClassId: mintId(), requestClassLabel: 'R', operation: 'read', deadlineDurationMs: 500 });
-      if (!done.ok) throw new Error(JSON.stringify(done));
-      doc = applyChanges(doc, done.changes);
-      return doc.connections[doc.connections.length - 1].source.portId;
-    };
-    const p1 = connect(t1);
-    const p2 = connect(t2);
-    const p3 = connect(t3);
-    expect(p2).not.toBe(p1);
-    expect(p3).toBe(p2);
-    // The default out port stays unused; one port per distinct dependency contract.
-    expect(doc.elements.find((e) => e.id === svc)!.ports.filter((p) => p.direction === 'out' && p.channel === 'call')).toHaveLength(3);
-    expect(validateDocument(doc).ok).toBe(true);
-  });
-
   it('connects to a non-resource element with ready and resource: null', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);
@@ -686,72 +632,11 @@ describe('connect.ts', () => {
       expect(cyclePlan.kind).toBe('rejected');
     });
 
-    it('a service adds an out port instead of rejecting a dependency with another payload shape (D53)', () => {
-      const mintId = createMintId();
-      const { document: baseDoc, viewId } = makeBlankDocument(mintId);
-
-      const p1 = place(baseDoc, viewId, 'service', { x: 0, y: 0 }, mintId);
-      const p2 = place(baseDoc, viewId, 'thirdparty', { x: 300, y: 0 }, mintId);
-      let doc = applyChanges(baseDoc, p1.changes);
-      doc = applyChanges(doc, p2.changes);
-
-      // Mutate TP schema to incompatible shape
-      const s = doc.elements.find((e) => e.id === p1.elementId)!;
-      const tp = doc.elements.find((e) => e.id === p2.elementId)!;
-      const tpIn = tp.ports.find((p) => p.direction === 'in')!;
-
-      const incompatibleSchema: PayloadSchema = {
-        id: mintId(),
-        label: 'Incompatible',
-        shape: {
-          type: 'record',
-          nullable: false,
-          fields: [
-            {
-              id: mintId(),
-              key: 'amount',
-              optional: false,
-              shape: { type: 'number', nullable: false },
-            },
-          ],
-        },
-      };
-
-      const mutatedTpIn: Port = { ...tpIn, schemaId: incompatibleSchema.id };
-      doc = {
-        ...doc,
-        schemas: [...doc.schemas, incompatibleSchema],
-        elements: doc.elements.map((e) =>
-          e.id === tp.id
-            ? { ...e, ports: e.ports.map((p) => (p.id === tpIn.id ? mutatedTpIn : p)) }
-            : e,
-        ),
-      };
-
-      const sOut = s.ports.find((p) => p.direction === 'out')!;
-      const plan = planConnection({
-        document: doc,
-        viewId,
-        source: { elementId: s.id, portId: sOut.id },
-        target: { elementId: tp.id, portId: tpIn.id },
-        mintId,
-      });
-
-      expect(plan.kind).toBe('ready');
-      if (plan.kind !== 'ready') return;
-      const after = applyChanges(doc, plan.changes);
-      const sAfter = after.elements.find((e) => e.id === s.id)!;
-      const outs = sAfter.ports.filter((p) => p.direction === 'out' && p.channel === 'call');
-      expect(outs).toHaveLength(2);
-      expect(after.connections[after.connections.length - 1].source.portId).toBe(outs[1].id);
-      expect(validateDocument(after).ok).toBe(true);
-    });
-
     it('rejects incompatible payload shapes', () => {
       const mintId = createMintId();
       const { document: baseDoc, viewId } = makeBlankDocument(mintId);
 
-      const p1 = place(baseDoc, viewId, 'client', { x: 0, y: 0 }, mintId);
+      const p1 = place(baseDoc, viewId, 'service', { x: 0, y: 0 }, mintId);
       const p2 = place(baseDoc, viewId, 'thirdparty', { x: 300, y: 0 }, mintId);
       let doc = applyChanges(baseDoc, p1.changes);
       doc = applyChanges(doc, p2.changes);
