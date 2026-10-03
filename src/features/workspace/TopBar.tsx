@@ -17,6 +17,7 @@ import type {
 import { projectDetails } from "../../persistence/studio/types";
 import { ProjectMenu } from "./ProjectMenu";
 import { ProjectDetailsDialog, type ProjectDetails } from "./ProjectDetailsDialog";
+import { ExposedEndpointsDialog, type EndpointCandidate } from "./ExposedEndpointsDialog";
 import { RenameConflictPopover, RenamedNotice } from "./ProjectRenameFeedback";
 import { BranchPopover, type BranchActionOutcome } from "./BranchPopover";
 import type { TransferActions } from "../transfer";
@@ -39,6 +40,9 @@ export interface TopBarProps {
   onAllProjects: () => void;
   /** Saves the project's description and team; resolves to an error message, or null on success. */
   onUpdateProjectDetails: (details: ProjectDetails) => Promise<string | null>;
+  /** D53: inbound ports of this project and whether each is exposed to projects that link it. */
+  endpointCandidates: readonly EndpointCandidate[];
+  onToggleEndpointExposed: (candidate: EndpointCandidate, exposed: boolean) => Promise<string | null>;
   saveStatusText: string;
   isSaving: boolean;
   hasError: boolean;
@@ -88,6 +92,8 @@ export function TopBar({
   createBranchDisabledReason,
   onAllProjects,
   onUpdateProjectDetails,
+  endpointCandidates,
+  onToggleEndpointExposed,
   saveStatusText,
   isSaving,
   hasError,
@@ -101,6 +107,7 @@ export function TopBar({
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [exposedOpen, setExposedOpen] = React.useState(false);
   const [titleDraft, setTitleDraft] = React.useState(project.title);
 
   React.useEffect(() => {
@@ -298,6 +305,7 @@ export function TopBar({
                 team={projectDetails(project).team}
                 onRenameProject={() => setIsRenaming(true)}
                 onOpenSettings={() => setSettingsOpen(true)}
+                onOpenExposedEndpoints={() => setExposedOpen(true)}
                 onAllProjects={onAllProjects}
                 transferActions={transferActions}
               >
@@ -413,6 +421,14 @@ export function TopBar({
           initial={projectDetails(project)}
           onSave={onUpdateProjectDetails}
           onClose={() => setSettingsOpen(false)}
+        />
+
+        <ExposedEndpointsDialog
+          open={exposedOpen}
+          projectTitle={project.title}
+          candidates={endpointCandidates}
+          onToggle={onToggleEndpointExposed}
+          onClose={() => setExposedOpen(false)}
         />
 
         {/* Save Status */}

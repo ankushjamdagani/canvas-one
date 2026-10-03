@@ -12,6 +12,7 @@
  */
 
 import type { CatalogEntry, CatalogGroup } from '../catalog/catalog';
+import type { ProjectExposure } from '../../domain/studio/exposure';
 
 /** View mode for LibraryPanel: list rows vs 2-column cards */
 export type LibraryView = 'list' | 'grid';
@@ -30,6 +31,8 @@ export interface LinkedProjectSummary {
   readonly title: string;
   readonly team: string;
   readonly description: string;
+  /** D53: the connection types the project exposes; it can be linked only if one of them is a call type. */
+  readonly exposures: readonly ProjectExposure[];
 }
 
 export interface LinkedProjectsRenderContext {

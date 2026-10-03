@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PROTOCOL_LABELS } from '../../domain/studio/protocols';
 import { LINKED_PROJECT_MIME_TYPE, type LinkedProjectSummary } from './types';
 
 /** D52: other projects the user can place as read-only linked nodes. Stays mounted while hidden. */
@@ -40,7 +41,8 @@ export function LinkedProjects({
         <span className="text-[10px]">{visible.length}</span>
       </div>
       <p className="text-xs text-secondary-text">
-        Place another project as a read-only node. Its title, team and description stay in sync.
+        Place another project as a read-only node. Its title, team and description stay in sync, and you can connect to
+        the endpoints it exposes. To support another connection type, edit that project and expose it.
       </p>
       {visible.length === 0 ? (
         <p className="py-6 text-center text-xs text-secondary-text">
@@ -48,37 +50,48 @@ export function LinkedProjects({
         </p>
       ) : (
         <ul className="space-y-1.5">
-          {visible.map((project) => (
-            <li
-              key={project.id}
-              data-testid={`linked-project-row-${project.id}`}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(LINKED_PROJECT_MIME_TYPE, JSON.stringify({ projectId: project.id, title: project.title }));
-                e.dataTransfer.effectAllowed = 'copyMove';
-              }}
-              className="flex cursor-grab items-start gap-2 rounded-card border border-control-border bg-background p-2.5 active:cursor-grabbing"
-            >
-              <Link2 className="mt-0.5 size-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold text-ink">{project.title}</div>
-                {project.team ? <div className="font-mono text-[10px] text-secondary-text">{project.team}</div> : null}
-                {project.description ? (
-                  <div className="mt-0.5 line-clamp-2 text-xs text-secondary-text">{project.description}</div>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                data-testid={`linked-project-place-${project.id}`}
-                aria-label={`Link ${project.title}`}
-                onClick={() => onPlace(project)}
+          {visible.map((project) => {
+            const linkable = project.exposures.some((x) => x.channel === 'call');
+            return (
+              <li
+                key={project.id}
+                data-testid={`linked-project-row-${project.id}`}
+                draggable={linkable}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(LINKED_PROJECT_MIME_TYPE, JSON.stringify({ projectId: project.id, title: project.title }));
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                }}
+                className={`flex items-start gap-2 rounded-card border border-control-border bg-background p-2.5 ${
+                  linkable ? 'cursor-grab active:cursor-grabbing' : ''
+                }`}
               >
-                Link
-              </Button>
-            </li>
-          ))}
+                <Link2 className="mt-0.5 size-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-semibold text-ink">{project.title}</div>
+                  {project.team ? <div className="font-mono text-[10px] text-secondary-text">{project.team}</div> : null}
+                  {project.description ? (
+                    <div className="mt-0.5 line-clamp-2 text-xs text-secondary-text">{project.description}</div>
+                  ) : null}
+                  <div data-testid={`linked-project-endpoints-${project.id}`} className="mt-1 text-[11px] text-secondary-text">
+                    {linkable
+                      ? [...new Set(project.exposures.map((x) => PROTOCOL_LABELS[x.protocol]))].join(' · ')
+                      : 'Exposes no call connection type. Edit this project to expose one before linking it.'}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!linkable}
+                  data-testid={`linked-project-place-${project.id}`}
+                  aria-label={`Link ${project.title}`}
+                  onClick={() => onPlace(project)}
+                >
+                  Link
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

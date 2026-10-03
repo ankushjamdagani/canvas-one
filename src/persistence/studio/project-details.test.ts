@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createStudioDatabase } from './db';
 import { LocalRepository } from './repository';
-import { projectDetails, type Actor, type ProjectUpdateDetailsCommand } from './types';
+import { projectDetails, projectExposures, type Actor, type ProjectUpdateDetailsCommand } from './types';
 import type { Document } from '../../domain/studio/model';
 
 const s01Doc = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8')) as Document;
@@ -53,6 +53,24 @@ describe('project.update-details (D52)', () => {
     expect(project?.revision).toBe(1);
     expect(await db.branches.where('projectId').equals(projectId).toArray()).toEqual(branchesBefore);
     expect(await db.snapshots.where('projectId').equals(projectId).count()).toBe(snapshotsBefore);
+    db.close();
+  });
+
+  it('stores exposed connection types (D53) and rejects unknown, repeated or misplaced ones', async () => {
+    const { db, repo, projectId, command } = await setup();
+    const exposures = [{ channel: 'call', protocol: 'grpc' }, { channel: 'message', protocol: 'kafka' }] as const;
+    expect(await repo.execute(command({ payload: { description: '', team: '', exposures } }))).toMatchObject({ status: 'applied' });
+    expect(projectExposures((await repo.loadProject(projectId))!)).toEqual(exposures);
+
+    // A later update without exposures leaves them alone.
+    await repo.execute(command({ expectedProjectRevision: 1, payload: { description: 'x', team: '' } }));
+    expect(projectExposures((await repo.loadProject(projectId))!)).toEqual(exposures);
+
+    for (const bad of [[{ channel: 'call', protocol: 'kafka' }], [exposures[0], exposures[0]], [{ channel: 'event', protocol: 'grpc' }]]) {
+      const result = await repo.execute(command({ expectedProjectRevision: 2, payload: { description: '', team: '', exposures: bad as never } }));
+      expect(result.status).toBe('invalid');
+    }
+    expect((await repo.loadProject(projectId))?.revision).toBe(2);
     db.close();
   });
 

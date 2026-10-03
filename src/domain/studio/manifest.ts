@@ -247,7 +247,7 @@ function assertClosedKeys(obj: Record<string, unknown>, knownKeys: readonly stri
 // model-and-runner.md §7: "Element / Port | label, description, visualKind / label | everything else"
 // D52: `linkedProjectId` is a drop-class key too, so a link never changes a run's identity.
 const ELEMENT_KEYS = ['id', 'label', 'description', 'visualKind', 'ports', 'behavior', 'linkedProjectId'] as const;
-const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'] as const;
+const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol'] as const;
 // §7: "PayloadSchema / fields | label | everything else, including IDs"
 const PAYLOAD_SCHEMA_KEYS = ['id', 'label', 'shape'] as const;
 // §7: "Connection / Relation | label; descriptive relations entirely | executable fields; ..."

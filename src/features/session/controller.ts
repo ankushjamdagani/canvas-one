@@ -9,6 +9,7 @@
  */
 
 import type { Document, Id, View } from '../../domain/studio/model';
+import type { ProjectExposure } from '../../domain/studio/exposure';
 import {
   createIssue,
   mapErrorToFailedResult,
@@ -626,7 +627,11 @@ export class SessionController {
   }
 
   /** D52: description and team live on the project record, so no snapshot, undo entry or reload is involved. */
-  async updateProjectDetails(details: { readonly description: string; readonly team: string }): Promise<SessionRenameResult> {
+  async updateProjectDetails(details: {
+    readonly description: string;
+    readonly team: string;
+    readonly exposures?: readonly ProjectExposure[];
+  }): Promise<SessionRenameResult> {
     const open = this.openBranchOrReject(
       'Session requires reload before editing project details',
       'No project is open to edit',
@@ -639,7 +644,11 @@ export class SessionController {
       projectId: open.projectId,
       expectedProjectRevision: open.projectRevision,
       actor: this.actor,
-      payload: { description: details.description, team: details.team },
+      payload: {
+        description: details.description,
+        team: details.team,
+        ...(details.exposures ? { exposures: details.exposures } : {}),
+      },
     };
 
     return this.runSaving(async () => {

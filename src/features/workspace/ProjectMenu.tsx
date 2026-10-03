@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   Settings,
   FolderOpen,
+  Link2,
   Trash2,
 } from 'lucide-react';
 import {
@@ -26,6 +27,7 @@ export interface ProjectMenuProps {
   children: React.ReactNode | ((isOpen: boolean) => React.ReactNode);
   onRenameProject: () => void;
   onOpenSettings: () => void;
+  onOpenExposedEndpoints: () => void;
   onAllProjects: () => void;
   transferActions: TransferActions;
 }
@@ -47,6 +49,7 @@ export function ProjectMenu({
   children,
   onRenameProject,
   onOpenSettings,
+  onOpenExposedEndpoints,
   onAllProjects,
   transferActions,
 }: ProjectMenuProps) {
@@ -123,6 +126,17 @@ export function ProjectMenu({
         >
           <Settings size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
           <span>Project settings</span>
+        </DropdownMenuItem>
+
+        {/* Exposed endpoints (D53) */}
+        <DropdownMenuItem
+          data-testid="project-menu-exposed-endpoints"
+          onSelect={() => {
+            onOpenExposedEndpoints();
+          }}
+        >
+          <Link2 size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
+          <span>Exposed endpoints…</span>
         </DropdownMenuItem>
 
         {/* Export project (submenu opening to the right) */}

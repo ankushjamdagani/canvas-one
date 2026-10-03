@@ -20,6 +20,7 @@ import type {
   Scenario,
   View,
 } from '../../domain/studio/model';
+import type { ProjectExposure } from '../../domain/studio/exposure';
 import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../domain/studio/runner/types';
 import type { EvidenceRef, EvidenceManifest } from '../../domain/studio/runner/evidence';
 import type { Issue } from '../../domain/studio/validate';
@@ -112,6 +113,8 @@ export type ProjectRecord = {
   /** Free-text details other projects show when they link here (D52). Absent on older rows. */
   readonly description?: string;
   readonly team?: string;
+  /** D53: connection types other projects can connect to when they link here. Absent means none. */
+  readonly exposures?: readonly ProjectExposure[];
   readonly createdAt: number;
   readonly updatedAt: number;
 };
@@ -125,6 +128,11 @@ export function projectDetails(project: Pick<ProjectRecord, 'description' | 'tea
   readonly team: string;
 } {
   return { description: project.description ?? '', team: project.team ?? '' };
+}
+
+/** D53: a project's exposed connection types; absent reads as none. */
+export function projectExposures(project: Pick<ProjectRecord, 'exposures'>): readonly ProjectExposure[] {
+  return project.exposures ?? [];
 }
 
 /**
@@ -490,7 +498,7 @@ export type ProjectRenameCommand = {
   };
 };
 
-/** D52: edits the project record's description and team only; no snapshot or branch changes. */
+/** D52: edits the project record's description, team and (D53) exposed connection types only; no snapshot or branch changes. */
 export type ProjectUpdateDetailsCommand = {
   readonly commandId: 'project.update-details';
   readonly operationId: Id;
@@ -500,6 +508,8 @@ export type ProjectUpdateDetailsCommand = {
   readonly payload: {
     readonly description: string;
     readonly team: string;
+    /** D53: when present, replaces the project's exposed connection types. */
+    readonly exposures?: readonly ProjectExposure[];
   };
 };
 

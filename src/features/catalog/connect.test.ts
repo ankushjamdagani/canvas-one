@@ -4,6 +4,7 @@ import { validateDocument } from '../../domain/studio/validate';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import type { RecordChange } from '../../persistence/studio/types';
 import { completeConnection, planConnection } from './connect';
+import type { ProjectExposure } from '../../domain/studio/exposure';
 import { placeEntry } from './place';
 
 function createMintId(): () => Id {
@@ -110,36 +111,146 @@ describe('connect.ts', () => {
     expect(valRes.ok).toBe(true);
   });
 
-  it('connects a service to a linked-project node like any other call target (D52)', () => {
-    const mintId = createMintId();
-    const { document: baseDoc, viewId } = makeBlankDocument(mintId);
-    const p1 = place(baseDoc, viewId, 'service', { x: 0, y: 0 }, mintId);
-    const doc1 = applyChanges(baseDoc, p1.changes);
-    const linkedPlaced = placeEntry({
-      document: doc1, viewId, entryId: 'linked-project', anchor: { x: 300, y: 0 }, mintId,
-      link: { projectId: '00000000-0000-4000-8000-0000000000aa', title: 'Orders system' },
-    });
-    if (!linkedPlaced.ok) throw new Error(JSON.stringify(linkedPlaced.issues));
-    const doc2 = applyChanges(doc1, linkedPlaced.changes);
+  describe('connection types (D53)', () => {
+    const exposure = (protocol: ProjectExposure['protocol']): ProjectExposure => ({ channel: 'call', protocol });
 
-    const service = doc2.elements.find((e) => e.id === p1.elementId)!;
-    const linked = doc2.elements.find((e) => e.id === linkedPlaced.elementId)!;
-    const plan = planConnection({
-      document: doc2,
-      viewId,
-      source: { elementId: service.id, portId: service.ports.find((p) => p.direction === 'out')!.id },
-      target: { elementId: linked.id },
-      mintId,
+    function setup() {
+      const mintId = createMintId();
+      const { document: baseDoc, viewId } = makeBlankDocument(mintId);
+      let doc = baseDoc;
+      const add = (kind: string, x: number): Id => {
+        const placed = place(doc, viewId, kind, { x, y: 0 }, mintId);
+        doc = applyChanges(doc, placed.changes);
+        return placed.elementId;
+      };
+      const el = (id: Id) => doc.elements.find((e) => e.id === id)!;
+      const connect = (from: Id, to: Id, extra: { protocol?: ProjectExposure['protocol']; linkedExposures?: readonly ProjectExposure[] } = {}) => {
+        const plan = planConnection({
+          document: doc, viewId,
+          source: { elementId: from, portId: el(from).ports.find((p) => p.direction === 'out' && p.channel !== 'event')!.id },
+          target: { elementId: to }, mintId, ...extra,
+        });
+        if (plan.kind === 'rejected') return plan;
+        if (plan.kind === 'ready') { doc = applyChanges(doc, plan.changes); return plan; }
+        const done = completeConnection(plan.draft, { requestClassId: mintId(), requestClassLabel: 'R', operation: 'read', deadlineDurationMs: 500 });
+        if (!done.ok) throw new Error(JSON.stringify(done));
+        doc = applyChanges(doc, done.changes);
+        return plan;
+      };
+      const ports = (id: Id, direction: 'in' | 'out') => el(id).ports.filter((p) => p.direction === direction && p.channel === 'call');
+      return { add, el, connect, ports, getDoc: () => doc, viewId, mintId, setDoc: (d: Document) => { doc = d; } };
+    }
+
+    it("uses the target's type by default and adds the missing out-port on the source", () => {
+      const t = setup();
+      const service = t.add('service', 0);
+      const db1 = t.add('database', 300);
+      const db2 = t.add('database', 600);
+      t.connect(service, db1);
+      expect(t.ports(service, 'out').map((p) => p.protocol)).toEqual([undefined, 'sql']);
+      expect(t.ports(db1, 'in')).toHaveLength(1);
+      // A second SQL dependency reuses the same out-port.
+      t.connect(service, db2);
+      expect(t.ports(service, 'out')).toHaveLength(2);
+      expect(validateDocument(t.getDoc()).ok).toBe(true);
     });
-    // A linked node is a resource, so the call needs request metadata like any other resource.
-    expect(plan.kind).toBe('needs-resource-metadata');
-    if (plan.kind !== 'needs-resource-metadata') return;
-    const complete = completeConnection(plan.draft, {
-      requestClassId: mintId(), requestClassLabel: 'Order', operation: 'read', deadlineDurationMs: 500,
+
+    it('a new connection type adds the port to both nodes, and later connections of that type reuse it', () => {
+      const t = setup();
+      const a = t.add('service', 0);
+      const b = t.add('service', 300);
+      const c = t.add('service', 600);
+      const plan = t.connect(a, b, { protocol: 'grpc' });
+      expect(plan.kind).toBe('needs-resource-metadata');
+      expect(t.ports(b, 'in').map((p) => p.protocol)).toEqual([undefined, 'grpc']);
+      expect(t.ports(a, 'out').map((p) => p.protocol)).toEqual([undefined, 'grpc']);
+      t.connect(a, c, { protocol: 'grpc' });
+      expect(t.ports(a, 'out')).toHaveLength(2);
+      expect(t.ports(c, 'in').map((p) => p.protocol)).toEqual([undefined, 'grpc']);
+      // The default type still uses the original ports.
+      const d = t.add('service', 900);
+      t.connect(a, d, { protocol: 'http' });
+      expect(t.ports(a, 'out')).toHaveLength(2);
+      expect(t.ports(d, 'in')).toHaveLength(1);
+      expect(validateDocument(t.getDoc()).ok).toBe(true);
     });
-    expect(complete.ok).toBe(true);
-    if (!complete.ok) return;
-    expect(validateDocument(applyChanges(doc2, complete.changes)).ok).toBe(true);
+
+    it('rejects a type that is not valid for the channel, and shapes that conflict on an existing pair', () => {
+      const t = setup();
+      const a = t.add('service', 0);
+      const b = t.add('service', 300);
+      const bad = t.connect(a, b, { protocol: 'kafka' });
+      expect(bad.kind).toBe('rejected');
+
+      const inPort = t.ports(b, 'in')[0];
+      const schema = t.getDoc().schemas.find((x) => x.id === inPort.schemaId)!;
+      t.setDoc(applyChanges(t.getDoc(), [{
+        kind: 'replace',
+        value: { recordKind: 'schema', record: { ...schema, shape: { type: 'record', nullable: false, fields: [{ id: t.mintId(), key: 'x', optional: false, shape: { type: 'string', nullable: false } }] } } },
+      }] as never));
+      const conflict = t.connect(a, b);
+      expect(conflict.kind).toBe('rejected');
+      if (conflict.kind === 'rejected') expect(conflict.issues[0].message).toMatch(/Incompatible payload shapes/);
+    });
+
+    it('offers the channel types in the draft and the chosen one is recorded', () => {
+      const t = setup();
+      const a = t.add('service', 0);
+      const b = t.add('service', 300);
+      const plan = t.connect(a, b);
+      if (plan.kind !== 'needs-resource-metadata') throw new Error(plan.kind);
+      expect(plan.draft.protocol).toBe('http');
+      expect(plan.draft.protocolOptions).toContain('grpc');
+      expect(plan.draft.protocolOptions).not.toContain('kafka');
+    });
+
+    describe('linked projects', () => {
+      function linkedSetup(exposures: readonly ProjectExposure[]) {
+        const t = setup();
+        const caller = t.add('service', 0);
+        const placed = placeEntry({
+          document: t.getDoc(), viewId: t.viewId, entryId: 'linked-project', anchor: { x: 300, y: 0 }, mintId: t.mintId,
+          link: { projectId: '00000000-0000-4000-8000-0000000000aa', title: 'Orders system', exposures },
+        });
+        if (!placed.ok) throw new Error(JSON.stringify(placed.issues));
+        t.setDoc(applyChanges(t.getDoc(), placed.changes));
+        return { ...t, caller, linked: placed.elementId };
+      }
+
+      it('connects with an exposed type and validates', () => {
+        const t = linkedSetup([exposure('http'), exposure('grpc')]);
+        expect(t.connect(t.caller, t.linked, { linkedExposures: [exposure('http'), exposure('grpc')] }).kind).toBe('needs-resource-metadata');
+        expect(t.connect(t.caller, t.linked, { protocol: 'grpc', linkedExposures: [exposure('http'), exposure('grpc')] }).kind).toBe('needs-resource-metadata');
+        expect(t.ports(t.linked, 'in')).toHaveLength(2);
+        expect(validateDocument(t.getDoc()).ok).toBe(true);
+      });
+
+      it('never adds a type the project does not expose', () => {
+        const live = [exposure('http')];
+        const t = linkedSetup(live);
+        const res = t.connect(t.caller, t.linked, { protocol: 'grpc', linkedExposures: live });
+        expect(res.kind).toBe('rejected');
+        if (res.kind === 'rejected') expect(res.issues[0].message).toMatch(/doesn't expose gRPC/);
+        expect(t.ports(t.linked, 'in')).toHaveLength(1);
+      });
+
+      it('adds a type the project started exposing after the link', () => {
+        const t = linkedSetup([exposure('http')]);
+        const live = [exposure('http'), exposure('thrift')];
+        const plan = t.connect(t.caller, t.linked, { protocol: 'thrift', linkedExposures: live });
+        expect(plan.kind).toBe('needs-resource-metadata');
+        expect(t.ports(t.linked, 'in').map((p) => p.protocol)).toEqual([undefined, 'thrift']);
+        expect(validateDocument(t.getDoc()).ok).toBe(true);
+      });
+
+      it('offers only the exposed types in the form', () => {
+        const live = [exposure('http'), exposure('grpc')];
+        const t = linkedSetup(live);
+        const plan = t.connect(t.caller, t.linked, { linkedExposures: live });
+        if (plan.kind !== 'needs-resource-metadata') throw new Error(plan.kind);
+        expect([...plan.draft.protocolOptions].sort()).toEqual(['grpc', 'http']);
+      });
+    });
   });
 
   it('connects to a non-resource element with ready and resource: null', () => {

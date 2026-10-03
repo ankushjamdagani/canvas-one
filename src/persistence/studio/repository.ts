@@ -9,6 +9,7 @@
 import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
 import { validateDocument, type Issue } from '../../domain/studio/validate';
 import type { Document, Id, Scenario } from '../../domain/studio/model';
+import { isExposureList } from '../../domain/studio/exposure';
 import { TERMINAL_STATUSES, type TraceEvent } from '../../domain/studio/runner/types';
 import { codePointLength } from '../../domain/studio/text';
 import { createStudioDatabase, StudioDatabase } from './db';
@@ -956,9 +957,13 @@ export class LocalRepository implements StudioRepository {
     } else if (codePointLength(payload.team) > PROJECT_TEAM_MAX_LENGTH) {
       issues.push(createIssue('too-long', `Team must be ${PROJECT_TEAM_MAX_LENGTH} characters or fewer`, ['payload', 'team']));
     }
+    if (payload?.exposures !== undefined && !isExposureList(payload.exposures)) {
+      issues.push(createIssue('invalid-literal', 'exposures must list each connection type once, from the supported types', ['payload', 'exposures']));
+    }
     if (issues.length > 0) return { status: 'invalid', issues };
     const description = payload.description.trim();
     const team = payload.team.trim();
+    const exposures = payload.exposures;
 
     let requestHash: string;
     try {
@@ -985,7 +990,7 @@ export class LocalRepository implements StudioRepository {
 
         const now = Date.now();
         const nextProjectRev = project.revision + 1;
-        const updated: ProjectRecord = { ...project, description, team, revision: nextProjectRev, updatedAt: now };
+        const updated: ProjectRecord = { ...project, description, team, ...(exposures ? { exposures } : {}), revision: nextProjectRev, updatedAt: now };
         const limit = await enforceProjectLimits(this.db, {
           projectId: command.projectId,
           additionalReceipts: 1,
@@ -994,7 +999,7 @@ export class LocalRepository implements StudioRepository {
         });
         if (limit) return limit;
 
-        await this.db.projects.update(command.projectId, { description, team, revision: nextProjectRev, updatedAt: now });
+        await this.db.projects.update(command.projectId, { description, team, ...(exposures ? { exposures } : {}), revision: nextProjectRev, updatedAt: now });
 
         const appliedResult: AppliedResult = {
           status: 'applied',

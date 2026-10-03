@@ -49,6 +49,8 @@ import {
 } from '@/components/ui/dialog';
 import type { InspectorTargetKind } from '../inspector';
 import { CATALOG_ENTRY_MIME_TYPE, LINKED_PROJECT_MIME_TYPE } from '../library/types';
+import type { ProjectExposure } from '../../domain/studio/exposure';
+import { PROTOCOL_LABELS, type Protocol } from '../../domain/studio/protocols';
 import { getEntry } from '../catalog/catalog';
 import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
@@ -98,6 +100,13 @@ type ResourceFormState = {
   readonly operation: 'read' | 'write' | null;
   readonly deadlineMs: string;
   readonly error: string | null;
+  /** D53: what the planner needs to re-plan when the connection type changes. */
+  readonly plan: {
+    readonly sourceElementId: Id;
+    readonly sourcePortId: Id;
+    readonly targetElementId: Id;
+    readonly linkedExposures: readonly ProjectExposure[] | undefined;
+  };
 };
 
 export interface CanvasViewProps {
@@ -108,6 +117,8 @@ export interface CanvasViewProps {
   /** Elements a workload of the scenario being edited enters at (board scenario_traffic_editor). */
   trafficEntryElementIds?: ReadonlySet<Id>;
   /** D52: details of the projects linked-project nodes point at (absent id = unavailable). */
+  /** D53: reads what a project exposes right now (for linking and for connecting to a linked node). */
+  loadLinkedExposures?: (projectId: string) => Promise<readonly ProjectExposure[]>;
   linkedProjects?: ReadonlyMap<string, { readonly title: string; readonly team: string; readonly description: string }> | null;
   /** D52: opens a linked project (guarded navigation owned by the workspace). */
   onOpenLinkedProject?: (projectId: string) => void;
@@ -201,6 +212,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onRestoreDockDefaults,
   trafficEntryElementIds,
   linkedProjects,
+  loadLinkedExposures,
   onOpenLinkedProject,
   runWaitsForScenarioDraft,
 }: CanvasViewProps, ref) {
@@ -815,20 +827,32 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const applyPlacement = React.useCallback(
     async (entryId: string, anchor: { x: number; y: number }, link?: { projectId: string; title: string }) => {
       if (!document || !projection.activeView || isSaving) return;
+      // D53: a linked node gets its ports from what the project exposes right now.
+      const exposures = link ? ((await loadLinkedExposures?.(link.projectId)) ?? []) : [];
       const result = placeEntry({
         document,
         viewId: projection.activeView.id,
         entryId,
         anchor,
         mintId,
-        link,
+        link: link ? { ...link, exposures } : undefined,
       });
-      if (!result.ok) return;
+      if (!result.ok) {
+        if (link) {
+          const rect = containerRef.current?.getBoundingClientRect();
+          setRejectMessage({
+            text: result.issues[0]?.message ?? 'Could not link that project.',
+            x: (rect?.left ?? 0) + (rect?.width ?? 400) / 2,
+            y: (rect?.top ?? 0) + 80,
+          });
+        }
+        return;
+      }
       const applied = await onApplyChanges(result.changes, link ? 'Link project' : 'Add component');
       if (!applied) return;
       onRequestSelection?.({ kind: 'element', id: result.elementId, additive: false });
     },
-    [document, projection.activeView, isSaving, mintId, onApplyChanges, onRequestSelection],
+    [document, projection.activeView, isSaving, mintId, onApplyChanges, onRequestSelection, loadLinkedExposures],
   );
 
   const getVisibleCentre = React.useCallback(() => {
@@ -971,12 +995,17 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         return;
       }
 
+      // D53: a linked project is connected with the types it exposes right now.
+      const linkedExposures = targetElement.linkedProjectId
+        ? await loadLinkedExposures?.(targetElement.linkedProjectId)
+        : undefined;
       const result = planConnection({
         document,
         viewId: projection.activeView.id,
         source: { elementId: sourceElement.id, portId: sourcePort.id },
         target: { elementId: targetElement.id },
         mintId,
+        linkedExposures,
       });
 
       if (result.kind === 'rejected') {
@@ -994,12 +1023,36 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           operation: null,
           deadlineMs: '',
           error: null,
+          plan: { sourceElementId: sourceElement.id, sourcePortId: sourcePort.id, targetElementId: targetElement.id, linkedExposures },
         });
         return;
       }
       await onApplyChanges(result.changes, 'Connect');
     },
-    [document, projection.activeView, isSaving, nodes, mintId, onApplyChanges],
+    [document, projection.activeView, isSaving, nodes, mintId, onApplyChanges, loadLinkedExposures],
+  );
+
+  // D53: changing the connection type re-plans, because it decides which ports the connection uses.
+  const changeConnectionType = React.useCallback(
+    (protocol: Protocol) => {
+      if (!resourceForm || !document || !projection.activeView) return;
+      const { plan } = resourceForm;
+      const result = planConnection({
+        document,
+        viewId: projection.activeView.id,
+        source: { elementId: plan.sourceElementId, portId: plan.sourcePortId },
+        target: { elementId: plan.targetElementId },
+        mintId,
+        protocol,
+        linkedExposures: plan.linkedExposures,
+      });
+      if (result.kind === 'needs-resource-metadata') {
+        setResourceForm({ ...resourceForm, draft: result.draft, error: null });
+      } else if (result.kind === 'rejected') {
+        setResourceForm({ ...resourceForm, error: result.issues[0]?.message ?? 'That connection type is not available.' });
+      }
+    },
+    [resourceForm, document, projection.activeView, mintId],
   );
 
   const cancelResourceForm = React.useCallback(() => setResourceForm(null), []);
@@ -1346,6 +1399,24 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           }}
         >
           <div className="font-semibold text-ink mb-2">Connection details</div>
+
+          {resourceForm.draft.protocol ? (
+            <label className="block mb-2">
+              <span className="block text-secondary-text mb-0.5">Connection type</span>
+              <NativeSelect
+                data-testid="connect-form-protocol"
+                value={resourceForm.draft.protocol}
+                onChange={(e) => changeConnectionType(e.target.value as Protocol)}
+                className="h-8 text-xs"
+              >
+                {resourceForm.draft.protocolOptions.map((protocol) => (
+                  <option key={protocol} value={protocol}>
+                    {PROTOCOL_LABELS[protocol]}
+                  </option>
+                ))}
+              </NativeSelect>
+            </label>
+          ) : null}
 
           <label className="block mb-2">
             <span className="block text-secondary-text mb-0.5">Request class</span>

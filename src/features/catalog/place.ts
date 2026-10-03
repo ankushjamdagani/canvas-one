@@ -22,6 +22,8 @@ import type {
 import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
 import { getEntry } from './catalog';
+import type { ProjectExposure } from '../../domain/studio/exposure';
+import { defaultProtocol, PROTOCOL_LABELS } from '../../domain/studio/protocols';
 import { createIssue } from '../../domain/studio/issue';
 
 export type PlaceEntryParams = {
@@ -31,7 +33,7 @@ export type PlaceEntryParams = {
   readonly anchor: { readonly x: number; readonly y: number };
   readonly mintId: () => Id;
   /** D52: required for (and only valid with) the `linked-project` entry; `title` is the label until it is read live. */
-  readonly link?: { readonly projectId: Id; readonly title: string };
+  readonly link?: { readonly projectId: Id; readonly title: string; readonly exposures: readonly ProjectExposure[] };
 };
 
 export type PlaceEntryResult =
@@ -84,6 +86,23 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
           entry.visualKind === 'linked-project'
             ? 'A linked project needs the project to link to'
             : 'Only the linked-project entry can carry a link',
+          ['link'],
+        ),
+      ],
+    };
+  }
+
+  // D53: a linked node gets one in-port per endpoint the project exposes, and needs a call port as its entry.
+  const linkedExposures = link
+    ? [...link.exposures].sort((a, b) => Number(b.channel === 'call') - Number(a.channel === 'call'))
+    : [];
+  if (link && linkedExposures[0]?.channel !== 'call') {
+    return {
+      ok: false,
+      issues: [
+        createIssue(
+          'structural-rule',
+          `'${link.title}' exposes no call connection type. Edit that project to expose one, then link it.`,
           ['link'],
         ),
       ],
@@ -154,6 +173,18 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
       schemaId,
       responseSchemaId: respSchemaId,
     });
+  }
+
+  for (const exposure of linkedExposures) {
+    const requestId = mintId();
+    const responseId = exposure.channel === 'call' ? mintId() : null;
+    const label = PROTOCOL_LABELS[exposure.protocol];
+    changes.push({ kind: 'insert', value: { recordKind: 'schema', record: { id: requestId, label: `${label} request`, shape: { type: 'record', nullable: false, fields: [] } } } });
+    if (responseId) {
+      changes.push({ kind: 'insert', value: { recordKind: 'schema', record: { id: responseId, label: `${label} response`, shape: { type: 'record', nullable: false, fields: [] } } } });
+    }
+    const base: Port = { id: mintId(), label, direction: 'in', channel: exposure.channel, schemaId: requestId, responseSchemaId: responseId };
+    ports.push(exposure.protocol === defaultProtocol('linked-project', exposure.channel) ? base : { ...base, protocol: exposure.protocol });
   }
 
   // Behavior self-references

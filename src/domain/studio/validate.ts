@@ -11,6 +11,7 @@
  */
 
 import { canonicalJson } from './canonical';
+import { isProtocolOf } from './protocols';
 import type {
   Document,
   Id,
@@ -1302,7 +1303,7 @@ export function validateDocument(
           for (let pIdx = 0; pIdx < ports.length; pIdx++) {
             const p = ports[pIdx];
             const pPath = [...elPath, 'ports', pIdx];
-            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'], ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
+            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol'], ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
               let pId: Id | null = null;
               if (validateId(p.id, [...pPath, 'id'], elId, issues)) {
                 pId = p.id;
@@ -1330,6 +1331,18 @@ export function validateDocument(
                     [...pPath, 'channel'],
                     pId ?? elId,
                     `Invalid port channel: '${String(p.channel)}'`,
+                  ),
+                );
+              }
+
+              // D53: a protocol belongs to the port's channel.
+              if (p.protocol !== undefined && !isProtocolOf(p.channel as (typeof PORT_CHANNELS)[number], p.protocol)) {
+                issues.push(
+                  errorIssue(
+                    'invalid-literal',
+                    [...pPath, 'protocol'],
+                    pId ?? elId,
+                    `Invalid protocol '${String(p.protocol)}' for a '${String(p.channel)}' port`,
                   ),
                 );
               }

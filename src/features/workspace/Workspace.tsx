@@ -38,7 +38,10 @@ import { whenIdle } from "@/lib/lazyComponent";
 import { LibraryPanel, type LibraryView } from "../library";
 import { downloadSavedPart, SavedParts } from "../library/SavedParts";
 import { LinkedProjects } from "../library/LinkedProjects";
-import { projectDetails } from "../../persistence/studio/types";
+import type { ProjectExposure } from "../../domain/studio/exposure";
+import { portProtocol } from "../../domain/studio/protocols";
+import type { EndpointCandidate } from "./ExposedEndpointsDialog";
+import { projectDetails, projectExposures } from "../../persistence/studio/types";
 import type {
   BranchRecord,
   ProjectRecord,
@@ -1247,7 +1250,7 @@ export function Workspace({
   // Other projects, so renaming can refuse a name another project already uses (13A "name taken").
   const [projectsLoaded, setProjectsLoaded] = React.useState(false);
   const [otherProjects, setOtherProjects] = React.useState<
-    readonly { id: string; title: string; team: string; description: string }[]
+    readonly { id: string; title: string; team: string; description: string; exposures: readonly ProjectExposure[] }[]
   >([]);
   const currentProjectId = sessionState.projectId;
   const currentProjectTitle = projectRecord?.title;
@@ -1259,7 +1262,7 @@ export function Workspace({
       setOtherProjects(
         list
           .filter((p) => p.id !== currentProjectId)
-          .map((p) => ({ id: p.id, title: p.title, ...projectDetails(p) })),
+          .map((p) => ({ id: p.id, title: p.title, ...projectDetails(p), exposures: projectExposures(p) })),
       );
     });
     return () => {
@@ -1341,6 +1344,50 @@ export function Workspace({
       return result.status === "applied";
     },
     [document, isSaving, session],
+  );
+
+  // D53: the connection types this project accepts (from its nodes' in-ports) and which are exposed.
+  const exposedTypes = React.useMemo(() => (projectRecord ? projectExposures(projectRecord) : []), [projectRecord]);
+  const endpointCandidates = React.useMemo<readonly EndpointCandidate[]>(() => {
+    if (!document) return [];
+    const byType = new Map<string, EndpointCandidate>();
+    for (const element of document.elements) {
+      if (element.linkedProjectId !== undefined) continue;
+      for (const port of element.ports) {
+        if (port.direction !== "in" || port.channel === "event") continue;
+        const protocol = portProtocol(element, port);
+        if (protocol === null) continue;
+        const key = `${port.channel}:${protocol}`;
+        const existing = byType.get(key);
+        byType.set(key, {
+          key,
+          channel: port.channel,
+          protocol,
+          exposed: exposedTypes.some((x) => x.channel === port.channel && x.protocol === protocol),
+          nodeLabels: [...(existing?.nodeLabels ?? []), element.label],
+        });
+      }
+    }
+    // Types exposed earlier that no node accepts any more stay listed so they can be switched off.
+    for (const x of exposedTypes) {
+      const key = `${x.channel}:${x.protocol}`;
+      if (!byType.has(key)) byType.set(key, { key, channel: x.channel, protocol: x.protocol, exposed: true, nodeLabels: [] });
+    }
+    return [...byType.values()];
+  }, [document, exposedTypes]);
+
+  const handleToggleEndpointExposed = React.useCallback(
+    async (candidate: EndpointCandidate, exposed: boolean): Promise<string | null> => {
+      const current = projectRecord ? projectExposures(projectRecord) : [];
+      const others = current.filter((x) => !(x.channel === candidate.channel && x.protocol === candidate.protocol));
+      const next = exposed ? [...others, { channel: candidate.channel, protocol: candidate.protocol }] : others;
+      const result = await session.updateProjectDetails({
+        ...(projectRecord ? projectDetails(projectRecord) : { description: "", team: "" }),
+        exposures: next,
+      });
+      return result.status === "applied" ? null : formatStudioError(result, "Could not save exposed endpoints");
+    },
+    [projectRecord, session],
   );
 
   // Move nodes handler
@@ -3047,6 +3094,8 @@ export function Workspace({
           createBranchDisabledReason={createBranchDisabledReason}
           onAllProjects={handleBackToProjects}
           onUpdateProjectDetails={handleUpdateProjectDetails}
+          endpointCandidates={endpointCandidates}
+          onToggleEndpointExposed={handleToggleEndpointExposed}
           saveStatusText={saveStatusText}
           isSaving={isSaving}
           hasError={hasError}
@@ -3135,6 +3184,10 @@ export function Workspace({
                     }
                     trafficEntryElementIds={trafficEntryElementIds}
                     linkedProjects={linkedProjects}
+                    loadLinkedExposures={async (projectId) => {
+                      const record = await repository.loadProject(projectId);
+                      return record ? projectExposures(record) : [];
+                    }}
                     onOpenLinkedProject={handleOpenProject}
                     runWaitsForScenarioDraft={Boolean(
                       scenarioDraft &&

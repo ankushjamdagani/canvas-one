@@ -16,14 +16,25 @@ import type {
   Endpoint,
   Id,
   MessageConnection,
+  PayloadSchema,
   Port,
+  Shape,
   ResourceCallMetadata,
   View,
 } from '../../domain/studio/model';
 import { shapesCompatible } from '../../domain/studio/readiness';
+import type { ProjectExposure } from '../../domain/studio/exposure';
+import { defaultProtocol, PROTOCOL_LABELS, portProtocol, protocolsFor, type Protocol } from '../../domain/studio/protocols';
 import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
 import { createIssue } from '../../domain/studio/issue';
+
+const linkedLabel = (element: Element): string => `'${element.label}'`;
+
+/** D53: a port stores its protocol only when it differs from the node's default. */
+function withProtocol(port: Port, element: Element, protocol: Protocol): Port {
+  return protocol === defaultProtocol(element.visualKind, port.channel) ? port : { ...port, protocol };
+}
 
 export type PlanConnectionParams = {
   readonly document: Document;
@@ -31,6 +42,10 @@ export type PlanConnectionParams = {
   readonly source: Endpoint;
   readonly target: Endpoint | { readonly elementId: Id };
   readonly mintId: () => Id;
+  /** D53: the connection type chosen in the connect form; defaults to the target's entry protocol. */
+  readonly protocol?: Protocol;
+  /** D53: the connection types the project a linked-project target points at exposes right now. */
+  readonly linkedExposures?: readonly ProjectExposure[];
 };
 
 export type ConnectionDraft = {
@@ -41,6 +56,11 @@ export type ConnectionDraft = {
   readonly target: Endpoint;
   readonly kind: 'call' | 'message';
   readonly sourceElementReplacement?: Element;
+  /** D53: the connection type this draft was planned with, and the types the form may offer. */
+  readonly protocol: Protocol | null;
+  readonly protocolOptions: readonly Protocol[];
+  /** D53: schema inserts and element replacements for ports added by this connection. */
+  readonly portChanges: readonly RecordChange[];
 };
 
 export type ResourceMetadataInput = {
@@ -198,6 +218,8 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     }
   }
 
+  const resolvedTargetPort: Port = targetPort;
+
   // Contract §4: Event ports are never connectable
   if (sourcePort.channel === 'event') {
     return {
@@ -261,7 +283,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   if (
     (publishesToBroker || brokerDeliversToCallEntry) &&
     document.connections.some(
-      (c) => c.source.elementId === source.elementId && c.target.elementId === targetElement.id && c.target.portId === targetPort.id,
+      (c) => c.source.elementId === source.elementId && c.target.elementId === targetElement.id && c.target.portId === resolvedTargetPort.id,
     )
   ) {
     return {
@@ -279,7 +301,8 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   if ((isRouterOrBroker && hasExistingOutgoing) || publishesToBroker || brokerDeliversToCallEntry) {
     const newPortId = mintId();
     const acceptedChannel = targetPort.channel;
-    const newPort: Port = {
+    const acceptedProtocol = portProtocol(targetElement, targetPort);
+    const routePort: Port = {
       id: newPortId,
       label: publishesToBroker ? 'publish' : 'out',
       direction: 'out',
@@ -287,6 +310,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       schemaId: targetPort.schemaId,
       responseSchemaId: acceptedChannel === 'call' ? targetPort.responseSchemaId : null,
     };
+    const newPort = acceptedProtocol ? withProtocol(routePort, sourceElement, acceptedProtocol) : routePort;
 
     sourceElementReplacement = {
       ...sourceElement,
@@ -299,6 +323,130 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     });
 
     effectiveSourcePort = newPort;
+  }
+
+  // D53: connection types. A node is connected through a port per (direction, channel, protocol); a
+  // connection of type P reuses the source and target port of that type or adds the missing one, and a
+  // new port shares the schemas of the port on the other side (a fresh pair if both are new).
+  const portChanges: RecordChange[] = [];
+  const pendingSchemas = new Map<Id, PayloadSchema>();
+  const findSchema = (id: Id | null | undefined): PayloadSchema | undefined =>
+    id ? (pendingSchemas.get(id) ?? document.schemas.find((x) => x.id === id)) : undefined;
+  let protocolOptions: readonly Protocol[] = [];
+  let chosenProtocol: Protocol | null = null;
+  let targetElementReplacement: Element | undefined;
+
+  if (sourceElementReplacement === undefined && effectiveSourcePort.channel === targetPort.channel) {
+    const channel = effectiveSourcePort.channel;
+    const isLinked = targetElement.linkedProjectId !== undefined;
+    const exposures = (params.linkedExposures ?? []).filter((x) => x.channel === channel);
+    const targetDefault = portProtocol(targetElement, targetPort);
+    // A project can only be connected with the types it supports; any other node accepts every type of the channel.
+    protocolOptions = isLinked
+      ? [...new Set([
+          ...targetElement.ports.filter((p) => p.direction === 'in' && p.channel === channel).map((p) => portProtocol(targetElement, p)),
+          ...exposures.map((x) => x.protocol),
+        ].filter((x): x is Protocol => x !== null))]
+      : protocolsFor(channel);
+    const protocol: Protocol | null = 'portId' in target ? targetDefault : (params.protocol ?? targetDefault ?? portProtocol(sourceElement, effectiveSourcePort));
+    chosenProtocol = protocol;
+
+    if (protocol !== null && !protocolsFor(channel).includes(protocol)) {
+      return {
+        kind: 'rejected',
+        issues: [createIssue('invalid-literal', `'${protocol}' is not a ${channel} connection type`, ['protocol'])],
+      };
+    }
+
+    if (protocol !== null) {
+      const samePort = (el: Element, port: Port) => port.channel === channel && portProtocol(el, port) === protocol;
+      let sourceOut: Port | undefined =
+        samePort(sourceElement, effectiveSourcePort) ? effectiveSourcePort : sourceElement.ports.find((p) => p.direction === 'out' && samePort(sourceElement, p));
+      let targetIn: Port | undefined =
+        samePort(targetElement, targetPort) ? targetPort : targetElement.ports.find((p) => p.direction === 'in' && samePort(targetElement, p));
+
+      const exposure = exposures.find((x) => x.protocol === protocol);
+      if (!targetIn && isLinked && !exposure) {
+        const name = linkedLabel(targetElement);
+        return {
+          kind: 'rejected',
+          issues: [
+            createIssue(
+              'structural-rule',
+              `${name} doesn't expose ${PROTOCOL_LABELS[protocol]}. Edit that project to expose it, then connect.`,
+              ['protocol'],
+            ),
+          ],
+        };
+      }
+
+      const newSchemaPair = (label: string) => {
+        const request: PayloadSchema = {
+          id: mintId(),
+          label: `${label} request`,
+          shape: { type: 'record', nullable: false, fields: [] },
+        };
+        const response: PayloadSchema | null =
+          channel === 'call'
+            ? {
+                id: mintId(),
+                label: `${label} response`,
+                shape: { type: 'record', nullable: false, fields: [] },
+              }
+            : null;
+        for (const schema of [request, response]) {
+          if (!schema) continue;
+          pendingSchemas.set(schema.id, schema);
+          portChanges.push({ kind: 'insert', value: { recordKind: 'schema', record: schema } });
+        }
+        return { schemaId: request.id, responseSchemaId: response?.id ?? null };
+      };
+
+      const labelFor = (el: Element) => `${el.label} ${PROTOCOL_LABELS[protocol]}`;
+      let shared: { schemaId: Id; responseSchemaId: Id | null } | null =
+        targetIn ? { schemaId: targetIn.schemaId, responseSchemaId: targetIn.responseSchemaId }
+        : sourceOut ? { schemaId: sourceOut.schemaId, responseSchemaId: sourceOut.responseSchemaId }
+        : null;
+
+      if (!targetIn) {
+        const ids = shared ?? newSchemaPair(labelFor(targetElement));
+        shared = ids;
+        targetIn = withProtocol(
+          {
+            id: mintId(),
+            label: PROTOCOL_LABELS[protocol],
+            direction: 'in',
+            channel,
+            schemaId: ids.schemaId,
+            responseSchemaId: ids.responseSchemaId,
+          },
+          targetElement,
+          protocol,
+        );
+        targetElementReplacement = { ...targetElement, ports: [...targetElement.ports, targetIn] };
+        portChanges.push({ kind: 'replace', value: { recordKind: 'element', record: targetElementReplacement } });
+      }
+
+      if (!sourceOut) {
+        sourceOut = withProtocol(
+          {
+            id: mintId(),
+            label: PROTOCOL_LABELS[protocol],
+            direction: 'out',
+            channel,
+            schemaId: targetIn.schemaId,
+            responseSchemaId: targetIn.responseSchemaId,
+          },
+          sourceElement,
+          protocol,
+        );
+        sourceElementReplacement = { ...sourceElement, ports: [...sourceElement.ports, sourceOut] };
+        newSourcePortChanges.push({ kind: 'replace', value: { recordKind: 'element', record: sourceElementReplacement } });
+      }
+
+      effectiveSourcePort = sourceOut;
+      targetPort = targetIn;
+    }
   }
 
   // Channel match
@@ -318,8 +466,8 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   const connectionKind = effectiveSourcePort.channel as 'call' | 'message' | 'data';
 
   // Shapes compatibility
-  const sourceSchema = document.schemas.find((s) => s.id === effectiveSourcePort.schemaId);
-  const targetSchema = document.schemas.find((s) => s.id === targetPort.schemaId);
+  const sourceSchema = findSchema(effectiveSourcePort.schemaId);
+  const targetSchema = findSchema(targetPort.schemaId);
   if (!sourceSchema || !targetSchema) {
     return {
       kind: 'rejected',
@@ -367,8 +515,8 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       };
     }
 
-    const sourceRespSchema = document.schemas.find((s) => s.id === effectiveSourcePort.responseSchemaId);
-    const targetRespSchema = document.schemas.find((s) => s.id === targetPort.responseSchemaId);
+    const sourceRespSchema = findSchema(effectiveSourcePort.responseSchemaId);
+    const targetRespSchema = findSchema(targetPort.responseSchemaId);
     if (!sourceRespSchema || !targetRespSchema) {
       return {
         kind: 'rejected',
@@ -442,6 +590,9 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       target: targetEndpoint,
       kind: connectionKind as 'call' | 'message',
       sourceElementReplacement,
+      protocol: chosenProtocol,
+      protocolOptions,
+      portChanges,
     };
     return {
       kind: 'needs-resource-metadata',
@@ -506,6 +657,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   };
 
   const changes: RecordChange[] = [
+    ...portChanges,
     ...newSourcePortChanges,
     { kind: 'insert', value: { recordKind: 'connection', record: connection } },
     { kind: 'replace', value: { recordKind: 'view', record: updatedView } },
@@ -640,7 +792,7 @@ export function completeConnection(
     connectionIds: [...(view?.connectionIds ?? []), draft.connectionId],
   };
 
-  const changes: RecordChange[] = [];
+  const changes: RecordChange[] = [...draft.portChanges];
   if (draft.sourceElementReplacement) {
     changes.push({
       kind: 'replace',

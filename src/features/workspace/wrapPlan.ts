@@ -8,6 +8,7 @@
  */
 
 import { computeClosure } from '../../domain/studio/closure';
+import { defaultProtocol, portProtocol } from '../../domain/studio/protocols';
 import type {
   Connection,
   Document,
@@ -199,7 +200,7 @@ export function planWrapInBoundary(
     const source = portsByEndpoint.get(endpointKey(inner));
     if (!source) throw new Error(`Missing crossing port '${endpointKey(inner)}'`);
     const portIds = ids.portIds[index];
-    const ownerPort: Port = {
+    let ownerPort: Port = {
       id: portIds.ownerPortId,
       label: `${source.element.label} · ${source.port.label}`,
       direction: source.port.direction,
@@ -207,6 +208,11 @@ export function planWrapInBoundary(
       schemaId: source.port.schemaId,
       responseSchemaId: source.port.responseSchemaId,
     };
+    // D53: the owner is a custom node, so keep the inner port's protocol when it isn't the custom default.
+    const innerProtocol = portProtocol(source.element, source.port);
+    if (innerProtocol !== null && innerProtocol !== defaultProtocol('custom', source.port.channel)) {
+      ownerPort = { ...ownerPort, protocol: innerProtocol };
+    }
     ownerPorts.push(ownerPort);
     const outer = { elementId: ids.ownerElementId, portId: ownerPort.id };
     ownerByMemberEndpoint.set(endpointKey(inner), outer);

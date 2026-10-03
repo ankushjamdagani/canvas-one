@@ -1,0 +1,76 @@
+import * as React from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { PROTOCOL_LABELS, type Protocol } from '../../domain/studio/protocols';
+
+export type EndpointCandidate = {
+  readonly key: string;
+  readonly channel: 'call' | 'message' | 'data';
+  readonly protocol: Protocol;
+  readonly exposed: boolean;
+  /** Nodes of this project that accept the type (empty when it is exposed but no node accepts it any more). */
+  readonly nodeLabels: readonly string[];
+};
+
+export interface ExposedEndpointsDialogProps {
+  readonly open: boolean;
+  readonly projectTitle: string;
+  readonly candidates: readonly EndpointCandidate[];
+  /** Resolves to an error message when the change failed, or null on success. */
+  readonly onToggle: (candidate: EndpointCandidate, exposed: boolean) => Promise<string | null>;
+  readonly onClose: () => void;
+}
+
+/** D53: choose which inbound ports of this project other projects may connect to when they link it. */
+export function ExposedEndpointsDialog({ open, projectTitle, candidates, onToggle, onClose }: ExposedEndpointsDialogProps) {
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent data-testid="exposed-endpoints-dialog" className="max-w-[min(520px,calc(100vw-24px))] p-4 gap-3">
+        <DialogHeader>
+          <DialogTitle>Exposed endpoints</DialogTitle>
+          <DialogDescription>
+            Projects that link {projectTitle} can connect only with the connection types you expose here. A type is
+            listed once a node of this project accepts it: connect to a node with that type first.
+          </DialogDescription>
+        </DialogHeader>
+        {candidates.length === 0 ? (
+          <p className="py-4 text-center text-xs text-secondary-text">No node of this project accepts a connection yet.</p>
+        ) : (
+          <ul className="max-h-[50vh] space-y-1 overflow-y-auto">
+            {candidates.map((candidate) => (
+              <li
+                key={candidate.key}
+                className="flex items-center gap-2 rounded-card border border-control-border bg-background px-2.5 py-1.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-medium text-ink">{PROTOCOL_LABELS[candidate.protocol]}</div>
+                  <div className="truncate font-mono text-[10px] text-secondary-text">
+                    {candidate.channel} · {candidate.nodeLabels.length > 0 ? [...new Set(candidate.nodeLabels)].join(', ') : 'no node accepts it now'}
+                  </div>
+                </div>
+                <Switch
+                  data-testid={`expose-${candidate.key}`}
+                  aria-label={`Expose ${PROTOCOL_LABELS[candidate.protocol]}`}
+                  checked={candidate.exposed}
+                  onCheckedChange={(next) => {
+                    void onToggle(candidate, next).then(setError);
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        {error ? (
+          <p role="alert" className="text-xs text-destructive">
+            {error}
+          </p>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}

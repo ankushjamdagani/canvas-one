@@ -796,7 +796,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     category: 'Other',
     visualKind: 'linked-project',
     behaviorKind: 'resource',
-    ports: CALL_IN_PORT,
+    ports: [], // D53: in-ports come from the linked project's exposed endpoints (see place.ts)
     defaultConfig: LINKED_PROJECT_CONFIG,
     models: 'Another project as a black box: a fixed service that answers calls',
     doesNotModel: "The other project's real behavior, latency or failures; its configuration cannot be changed from here",

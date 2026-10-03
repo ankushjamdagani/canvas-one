@@ -6,6 +6,7 @@ import type { Document, Id } from '../../domain/studio/model';
 import { validateDocument } from '../../domain/studio/validate';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import { CATALOG_ENTRIES } from './catalog';
+import type { ProjectExposure } from '../../domain/studio/exposure';
 import { placeEntry } from './place';
 
 const FIXTURES_DIR = fileURLToPath(
@@ -55,8 +56,13 @@ function makeBlankDocument(mintId: () => Id): { document: Document; viewId: Id }
 
 // D52: the linked-project entry can only be placed with the project it links to.
 const LINKED_PROJECT_ID = '00000000-0000-4000-8000-0000000000aa';
+const LINKED_EXPOSURES: readonly ProjectExposure[] = [
+  { channel: 'call', protocol: 'http' },
+  { channel: 'call', protocol: 'grpc' },
+];
+
 function linkFor(visualKind: string) {
-  return visualKind === 'linked-project' ? { projectId: LINKED_PROJECT_ID, title: 'Orders system' } : undefined;
+  return visualKind === 'linked-project' ? { projectId: LINKED_PROJECT_ID, title: 'Orders system', exposures: LINKED_EXPOSURES } : undefined;
 }
 
 describe('place.ts', () => {
@@ -114,12 +120,12 @@ describe('place.ts', () => {
   });
 
   describe('linked-project placement (D52)', () => {
-    it('places a linked node with the link, the project title as label and a call-in port', () => {
+    it('places a linked node with the link, the project title as label and one in-port per exposed connection type', () => {
       const mintId = createMintId();
       const { document, viewId } = makeBlankDocument(mintId);
       const res = placeEntry({
         document, viewId, entryId: 'linked-project', anchor: { x: 10, y: 20 }, mintId,
-        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system' },
+        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system', exposures: LINKED_EXPOSURES },
       });
       expect(res.ok).toBe(true);
       if (!res.ok) return;
@@ -127,7 +133,20 @@ describe('place.ts', () => {
       const element = (inserted as unknown as { value: { record: { label: string; linkedProjectId?: string; ports: { direction: string }[] } } }).value.record;
       expect(element.label).toBe('Orders system');
       expect(element.linkedProjectId).toBe(LINKED_PROJECT_ID);
-      expect(element.ports.map((p) => p.direction)).toEqual(['in']);
+      expect(element.ports.map((p) => p.direction)).toEqual(['in', 'in']);
+      // http is the default call protocol, so only gRPC is written.
+      expect(element.ports.map((p) => (p as { protocol?: string }).protocol)).toEqual([undefined, 'grpc']);
+    });
+
+    it('refuses to link a project that exposes no call connection type (D53)', () => {
+      const mintId = createMintId();
+      const { document, viewId } = makeBlankDocument(mintId);
+      const res = placeEntry({
+        document, viewId, entryId: 'linked-project', anchor: { x: 0, y: 0 }, mintId,
+        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system', exposures: [] },
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.issues[0].message).toMatch(/exposes no call connection type/);
     });
 
     it('validates: the link is required on linked-project elements and forbidden elsewhere', () => {
@@ -135,7 +154,7 @@ describe('place.ts', () => {
       const { document, viewId } = makeBlankDocument(mintId);
       const placed = placeEntry({
         document, viewId, entryId: 'linked-project', anchor: { x: 0, y: 0 }, mintId,
-        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system' },
+        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system', exposures: LINKED_EXPOSURES },
       });
       expect(placed.ok).toBe(true);
       if (!placed.ok) return;
@@ -163,7 +182,7 @@ describe('place.ts', () => {
       expect(missing.ok).toBe(false);
       const extra = placeEntry({
         document, viewId, entryId: 'service', anchor: { x: 0, y: 0 }, mintId,
-        link: { projectId: LINKED_PROJECT_ID, title: 'x' },
+        link: { projectId: LINKED_PROJECT_ID, title: 'x', exposures: LINKED_EXPOSURES },
       });
       expect(extra.ok).toBe(false);
     });

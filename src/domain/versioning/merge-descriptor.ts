@@ -122,6 +122,7 @@ export const PORT_DESCRIPTOR: ObjectFieldDescriptor = {
     channel: { type: 'scalar' },
     schemaId: { type: 'scalar' },
     responseSchemaId: { type: 'scalar' },
+    protocol: { type: 'scalar' },
   },
 };
 
