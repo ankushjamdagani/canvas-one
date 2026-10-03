@@ -284,6 +284,19 @@ const DeleteProjectDialog = lazyComponent(
 );
 const SavedParts = lazyComponent(() => import("../library/SavedParts").then((m) => m.SavedParts), null);
 
+const RUN_SPEED_STORAGE_KEY = "studio.runSpeed";
+
+/** The stored run speed: a number of simulated seconds per real second, 0 for as fast as possible; real time when unset. */
+function readStoredRunSpeed(): number {
+  try {
+    const raw = window.localStorage.getItem(RUN_SPEED_STORAGE_KEY);
+    const value = raw === null ? Number.NaN : Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export function Workspace({
   session,
   repository,
@@ -936,6 +949,20 @@ export function Workspace({
     sessionState.workingSnapshotId,
   ]);
 
+  // D55: how fast simulated time passes against the wall clock; a per-browser preference, not part of the project.
+  const [runSpeed, setRunSpeed] = React.useState<number>(() => readStoredRunSpeed());
+  React.useEffect(() => {
+    runController?.setSpeed(runSpeed);
+  }, [runController, runSpeed]);
+  const handleRunSpeedChange = React.useCallback((speed: number) => {
+    setRunSpeed(speed);
+    try {
+      window.localStorage.setItem(RUN_SPEED_STORAGE_KEY, String(speed));
+    } catch {
+      // Storage can be unavailable (private windows); the choice still applies for this session.
+    }
+  }, []);
+
   const handleResetRun = React.useCallback(() => {
     runController?.reset();
     setLastRunSnapshotId(null);
@@ -1101,6 +1128,7 @@ export function Workspace({
         id: s.scenario.id,
         label: s.scenario.label,
         mode: s.scenario.mode,
+        completion: s.scenario.completion.kind,
         status: s.status,
       })),
     [scenariosWithStatus],
@@ -1133,6 +1161,10 @@ export function Workspace({
       onPause={() => runController?.pause()}
       onResume={() => runController?.resume()}
       onReset={handleResetRun}
+      onStop={() => runController?.stop()}
+      isStopping={runControllerState?.stopping ?? false}
+      runSpeed={runSpeed}
+      onRunSpeedChange={handleRunSpeedChange}
       onNew={handleNewScenario}
       onDuplicate={handleDuplicateScenario}
       onEdit={handleEditScenario}

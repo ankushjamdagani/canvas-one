@@ -30,7 +30,8 @@ export type RunState = (typeof RUN_STATES)[number];
 export const TERMINAL_STATUSES = ['completed', 'invalid', 'failed', 'cancelled', 'incomplete'] as const;
 export type TerminalStatus = (typeof TERMINAL_STATUSES)[number];
 
-export type RunControl = { readonly kind: 'pause' | 'resume' | 'cancel' };
+/** `stop` (D55): stop new arrivals and let work in flight finish, then complete (unlike `cancel`, which discards). */
+export type RunControl = { readonly kind: 'pause' | 'resume' | 'cancel' | 'stop' };
 
 export interface RunHandle {
   send(control: RunControl): void;

@@ -835,7 +835,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
     );
   } else if (scenario.mode === 'timed' && completion.kind === 'quiescent') {
     issues.push(
-      issue('completion-mode-mismatch', [...scenarioPath, 'completion', 'kind'], scenario.id, "Timed scenarios must use 'horizon' or 'drain' completion"),
+      issue('completion-mode-mismatch', [...scenarioPath, 'completion', 'kind'], scenario.id, "Timed scenarios must use 'horizon', 'drain', 'count' or 'open' completion"),
     );
   }
 

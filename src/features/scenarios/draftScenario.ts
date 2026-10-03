@@ -58,7 +58,9 @@ export type DraftCompletion =
   | { readonly kind: null }
   | { readonly kind: 'quiescent' }
   | { readonly kind: 'horizon'; readonly horizonMs: number | null }
-  | { readonly kind: 'drain'; readonly arrivalHorizonMs: number | null; readonly deadlineMs: number | null };
+  | { readonly kind: 'drain'; readonly arrivalHorizonMs: number | null; readonly deadlineMs: number | null }
+  | { readonly kind: 'count'; readonly requests: number | null; readonly deadlineMs: number | null }
+  | { readonly kind: 'open' };
 
 export const UNSET_COMPLETION: DraftCompletion = { kind: null };
 
@@ -72,6 +74,12 @@ function draftCompletionToStorable(completion: DraftCompletion): CompletionPolic
   if (completion.kind === 'quiescent') return { kind: 'quiescent' };
   if (completion.kind === 'horizon') {
     return completion.horizonMs === null ? null : { kind: 'horizon', horizonMs: completion.horizonMs };
+  }
+  if (completion.kind === 'open') return { kind: 'open' };
+  if (completion.kind === 'count') {
+    return completion.requests === null || completion.deadlineMs === null
+      ? null
+      : { kind: 'count', requests: completion.requests, deadlineMs: completion.deadlineMs };
   }
   return completion.arrivalHorizonMs === null || completion.deadlineMs === null
     ? null

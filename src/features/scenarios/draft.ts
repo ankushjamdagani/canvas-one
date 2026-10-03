@@ -165,6 +165,8 @@ function draftCompletenessIssues(draft: DraftScenario): ScenarioIssue[] {
     (draft.completion.arrivalHorizonMs === null || draft.completion.deadlineMs === null)
   ) {
     issues.push(draftIssue(draft.id, 'completion', 'Enter both drain fields'));
+  } else if (draft.completion.kind === 'count' && (draft.completion.requests === null || draft.completion.deadlineMs === null)) {
+    issues.push(draftIssue(draft.id, 'completion', 'Enter the number of requests and the deadline'));
   }
 
   for (const workload of draft.workloads) {

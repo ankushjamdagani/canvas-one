@@ -32,6 +32,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Square,
   Trash2,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -47,6 +48,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
+import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import {
   Tooltip,
   TooltipContent,
@@ -65,8 +67,20 @@ export interface ScenarioSwitcherEntry {
   readonly id: Id;
   readonly label: string;
   readonly mode: 'logical' | 'timed';
+  /** D55: how the run ends; an open-ended run needs a paced speed. */
+  readonly completion: 'quiescent' | 'horizon' | 'drain' | 'count' | 'open';
   readonly status: ScenarioStatus;
 }
+
+/** D55: how fast simulated time passes against the wall clock, in simulated seconds per real second (0 = as fast as possible). */
+export const RUN_SPEED_OPTIONS = [
+  { value: 1, label: 'Real time (1×)' },
+  { value: 2, label: '2×' },
+  { value: 5, label: '5×' },
+  { value: 10, label: '10×' },
+  { value: 50, label: '50×' },
+  { value: 0, label: 'Instant' },
+] as const;
 
 /** The run phases the switcher renders; a subset of RunController's RunPhase (no 'done'). */
 export type ScenarioSwitcherRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving';
@@ -82,6 +96,11 @@ export interface ScenarioSwitcherProps {
   readonly onPause?: () => void;
   readonly onResume?: () => void;
   readonly onReset?: () => void;
+  /** D55: stop a timed run gracefully, keeping its results; `isStopping` while it drains. */
+  readonly onStop?: () => void;
+  readonly isStopping?: boolean;
+  readonly runSpeed: number;
+  readonly onRunSpeedChange: (speed: number) => void;
   readonly onNew: () => void;
   readonly onDuplicate: (scenarioId: Id) => void;
   readonly onEdit: (scenarioId: Id) => void;
@@ -100,6 +119,10 @@ export function ScenarioSwitcher({
   onPause,
   onResume,
   onReset,
+  onStop,
+  isStopping,
+  runSpeed,
+  onRunSpeedChange,
   onNew,
   onDuplicate,
   onEdit,
@@ -288,6 +311,26 @@ export function ScenarioSwitcher({
             )}
           </div>
 
+          <label
+            data-testid="run-speed-row"
+            className="mx-2.5 mt-1.5 flex items-center justify-between gap-3 text-[11px] text-secondary-text"
+          >
+            <span>Run speed</span>
+            <NativeSelect
+              data-testid="run-speed-select"
+              aria-label="Run speed"
+              value={selectedScenario?.completion === 'open' && runSpeed === 0 ? 1 : runSpeed}
+              onChange={(e) => onRunSpeedChange(Number(e.target.value))}
+              className="h-7 w-auto min-w-[8.5rem] text-xs"
+            >
+              {RUN_SPEED_OPTIONS.map((option) => (
+                <NativeSelectOption key={option.value} value={option.value} disabled={option.value === 0 && selectedScenario?.completion === 'open'}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </label>
+
           {totalScenarios > 0 && (
             <div
               data-testid="scenario-commit-line"
@@ -375,6 +418,24 @@ export function ScenarioSwitcher({
               <span className="hidden sm:inline">Resume</span>
             </button>
           )}
+
+          {selectedScenario?.mode === 'timed' && onStop ? (
+            <>
+              <div className="w-px h-full bg-control-border shrink-0" />
+              <button
+                type="button"
+                data-testid="scenario-stop-btn"
+                onClick={onStop}
+                disabled={isStopping || runPhase === 'compiling' || runPhase === 'saving'}
+                className="h-full shrink-0 px-2 pointer-coarse:min-w-11 justify-center flex items-center gap-1 text-xs font-medium text-body hover:bg-sunken hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-secondary-text"
+                aria-label="Stop the run and keep its results"
+                title="Stop new requests, let work in flight finish, and keep the results"
+              >
+                <Square className="size-3 fill-current" aria-hidden="true" />
+                <span className="hidden sm:inline">{isStopping ? 'Stopping…' : 'Stop'}</span>
+              </button>
+            </>
+          ) : null}
 
           <div className="w-px h-full bg-control-border shrink-0" />
 

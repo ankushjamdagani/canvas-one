@@ -8,6 +8,8 @@ export default defineConfig({
     baseURL,
     browserName: "chromium",
     viewport: { width: 1512, height: 982 },
+    // D55: runs are paced against the wall clock by default; the suite runs them as fast as it can.
+    storageState: { cookies: [], origins: [{ origin: baseURL, localStorage: [{ name: "studio.runSpeed", value: "0" }] }] },
   },
   webServer: {
     command: production ? "npx vite preview --host 127.0.0.1 --port 5174" : "npm run dev -- --port 5173",

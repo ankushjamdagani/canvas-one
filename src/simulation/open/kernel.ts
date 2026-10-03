@@ -101,6 +101,8 @@ export interface OpenSimulationOptions {
    * deadline (model-and-runner.md §6 completion).
    */
   arrivalHorizonSeconds?: number;
+  /** D55: at most this many root arrivals are scheduled in total (a 'count' run); absent = no cap. */
+  maxRootArrivals?: number;
 }
 
 export interface KernelResourceInput {
@@ -382,6 +384,13 @@ export class OpenSimulation {
   protected currentTime = 0;
   protected duration: number;
   protected arrivalHorizon: number;
+  /** D55: a 'count' run's cap on root arrivals, and how many have been scheduled so far. */
+  protected maxRootArrivals: number | undefined;
+  protected scheduledArrivals = 0;
+  /** D55: arrivals scheduled and not yet fired. */
+  protected pendingArrivals = 0;
+  /** D55: set by stopArrivals(); no workload arrives after it. */
+  protected arrivalsStopped = false;
   protected seed: number;
   protected finished = false;
   protected incompleteReason?: string;
@@ -471,6 +480,7 @@ export class OpenSimulation {
 
     this.duration = this.plan.graph.settings.duration;
     this.arrivalHorizon = Math.min(options?.arrivalHorizonSeconds ?? this.duration, this.duration);
+    this.maxRootArrivals = options?.maxRootArrivals;
     this.seed = this.plan.graph.settings.seed;
 
     for (const node of this.plan.graph.nodes) {
@@ -805,8 +815,23 @@ export class OpenSimulation {
     this.traceHook?.(fact);
   }
 
+  /**
+   * D55: true when no operation is live and no workload arrival is pending, so nothing the run
+   * produced can still change an outcome. Housekeeping events (samples, expiry timers of settled
+   * units) do not count; that is why a stopped or counted run can end the moment its work is done.
+   */
+  isIdle(): boolean {
+    return this.liveOpsCount === 0 && this.pendingArrivals === 0;
+  }
+
+  /** D55: stop every workload from arriving again; what is in flight carries on. */
+  stopArrivals(): void {
+    this.arrivalsStopped = true;
+  }
+
   protected scheduleNextArrival(wl: WorkloadDefinition, afterTime: number): void {
-    if (this.disabledWorkloads.has(wl.id)) return;
+    if (this.disabledWorkloads.has(wl.id) || this.arrivalsStopped) return;
+    if (this.maxRootArrivals !== undefined && this.scheduledArrivals >= this.maxRootArrivals) return;
     const ordinal = this.workloadNextOrdinal.get(wl.id)!;
     this.workloadNextOrdinal.set(wl.id, ordinal + 1);
 
@@ -832,8 +857,11 @@ export class OpenSimulation {
 
     if (!Number.isFinite(arrTime) || arrTime > this.arrivalHorizon) return;
 
+    this.scheduledArrivals++;
+    this.pendingArrivals++;
     this.scheduleEvent(arrTime, 2, () => {
-      if (this.disabledWorkloads.has(wl.id)) return;
+      this.pendingArrivals--;
+      if (this.disabledWorkloads.has(wl.id) || this.arrivalsStopped) return;
       this.handleArrival(wl, ordinal, arrTime);
       this.scheduleNextArrival(wl, arrTime);
     });

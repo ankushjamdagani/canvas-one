@@ -298,7 +298,7 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
     err(issues, 'INVALID_SETTINGS', 'settings must be an object');
   } else {
     if (!isNum(raw.settings.seed, 0, 4294967295, true)) err(issues, 'INVALID_SEED', 'seed must be uint32');
-    if (!isNum(raw.settings.duration, 1, 300)) err(issues, 'INVALID_DURATION', 'duration must be 1..300');
+    if (!isNum(raw.settings.duration, 1, 86400)) err(issues, 'INVALID_DURATION', 'duration must be 1..86400 seconds');
   }
   const dur = isObj(raw.settings) && typeof raw.settings.duration === 'number' ? raw.settings.duration : 300;
 

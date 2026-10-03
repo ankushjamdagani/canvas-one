@@ -151,6 +151,10 @@ All operations preserve row provenance. Filtered and duplicate rows are explicit
 - `{kind:'quiescent'}`: logical only.
 - `{kind:'horizon',horizonMs}`: timed; in-flight work stays visible.
 - `{kind:'drain',arrivalHorizonMs,deadlineMs}`: timed; no new arrivals after the horizon, from inputs or workloads; completes when all causal work settles, or is incomplete at the deadline.
+- `{kind:'count',requests,deadlineMs}` (D55): timed; workloads send `requests` root requests in total (1–100000), then none; completes as soon as nothing is live and nothing will arrive, or is incomplete at `deadlineMs` (1–600 s of simulated time), and incomplete if the deadline came before every request had arrived.
+- `{kind:'open'}` (D55): timed; no end of its own. It runs until a **stop**, which stops workload and input arrivals and lets work in flight finish for up to 60 s of simulated time; it then completes (incomplete if work was still in flight after that). An open run's clock may reach 24 simulated hours and it is never unpaced (see Run pacing).
+
+**Stop and pace (D55).** `RunControl` gains `stop` next to `pause`, `resume` and `cancel`. Stop applies to any timed run at a step boundary: arrivals end, the run drains (a paused run resumes to drain), and the terminal status is `completed` with measured results; `cancel` still discards. A `start` message may carry `speed`, simulated seconds per real second (absent or 0 = as fast as the machine can; an open run is raised to at least 10). A paced run waits before an event until the wall clock reaches it, and reports what it has done as it goes. Speed is a per-browser preference, not part of the scenario or the run's identity.
 
 A finite-observation policy (horizon) may pass assertions that explicitly test its remaining in-flight work.
 

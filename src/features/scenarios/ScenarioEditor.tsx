@@ -152,7 +152,11 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                                 arrivalHorizonMs: null,
                                 deadlineMs: null,
                               }
-                            : { kind: null },
+                            : value === 'count'
+                              ? { kind: 'count', requests: null, deadlineMs: null }
+                              : value === 'open'
+                                ? { kind: 'open' }
+                                : { kind: null },
                     }));
                   }}
                   aria-label="Completion kind"
@@ -160,14 +164,16 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                   <NativeSelectOption value="" disabled>
                     Choose…
                   </NativeSelectOption>
-                  <NativeSelectOption value="horizon">Fixed horizon</NativeSelectOption>
-                  <NativeSelectOption value="drain">Drain</NativeSelectOption>
+                  <NativeSelectOption value="horizon">For a number of seconds</NativeSelectOption>
+                  <NativeSelectOption value="count">For a number of requests</NativeSelectOption>
+                  <NativeSelectOption value="open">Until I stop it</NativeSelectOption>
+                  <NativeSelectOption value="drain">Arrivals for a while, then drain</NativeSelectOption>
                 </NativeSelect>
               </label>
 
               {scenario.completion.kind === 'horizon' && (
                 <label className="space-y-1 text-[11px] text-secondary-text">
-                  Horizon (ms)
+                  Run for (ms)
                   <Input
                     type="number"
                     min={1000}
@@ -188,6 +194,58 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
                     }}
                   />
                 </label>
+              )}
+
+              {scenario.completion.kind === 'count' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 text-[11px] text-secondary-text">
+                    Requests
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100000}
+                      placeholder="—"
+                      aria-label="Requests"
+                      value={scenario.completion.requests ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const v = raw === '' ? null : Number(raw);
+                        onChange((s) =>
+                          s.completion.kind === 'count' && (v === null || Number.isFinite(v))
+                            ? { ...s, completion: { ...s.completion, requests: v } }
+                            : s,
+                        );
+                      }}
+                    />
+                  </label>
+                  <label className="space-y-1 text-[11px] text-secondary-text">
+                    Give up at (ms)
+                    <Input
+                      type="number"
+                      min={1000}
+                      max={600000}
+                      placeholder="—"
+                      aria-label="Count deadline"
+                      value={scenario.completion.deadlineMs ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const v = raw === '' ? null : Number(raw);
+                        onChange((s) =>
+                          s.completion.kind === 'count' && (v === null || Number.isFinite(v))
+                            ? { ...s, completion: { ...s.completion, deadlineMs: v } }
+                            : s,
+                        );
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+
+              {scenario.completion.kind === 'open' && (
+                <p data-testid="scenario-open-note" className="text-[11px] text-secondary-text">
+                  Runs until you press Stop, then stops new requests and lets work in flight finish (up to 60 s of
+                  simulated time). It is always paced: Instant is not available for it.
+                </p>
               )}
 
               {scenario.completion.kind === 'drain' && (

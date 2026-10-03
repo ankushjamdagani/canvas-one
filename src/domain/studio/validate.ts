@@ -4043,5 +4043,13 @@ function validateCompletionPolicy(
         }
       }
     }
+  } else if (kind === 'count') {
+    if (checkRecord(rec, ['kind', 'requests', 'deadlineMs'], ['kind', 'requests', 'deadlineMs'], path, scenarioId, issues, 'count completion policy')) {
+      // D55: N root requests (whole number), then a drain deadline of 1–600 s of simulated time.
+      validateNumber(rec.requests, 1, 100000, [...path, 'requests'], scenarioId, issues, 'requests', true);
+      validateNumber(rec.deadlineMs, 1000, 600000, [...path, 'deadlineMs'], scenarioId, issues, 'deadlineMs');
+    }
+  } else if (kind === 'open') {
+    checkRecord(rec, ['kind'], ['kind'], path, scenarioId, issues, 'open completion policy');
   }
 }

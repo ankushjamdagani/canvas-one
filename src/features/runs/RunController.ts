@@ -87,6 +87,8 @@ export type RunControllerState = {
    * the array so consumers can rely on reference identity for change checks).
    */
   readonly events: readonly TraceEvent[];
+  /** D55: Stop was pressed and the run is draining (stops arrivals, lets work in flight finish). */
+  readonly stopping: boolean;
 };
 
 export type RunParams = {
@@ -126,8 +128,10 @@ export class RunController {
     current: null,
     issues: [],
     events: [],
+    stopping: false,
   };
 
+  private speed = 0;
   private readonly listeners = new Set<(state: RunControllerState) => void>();
   private unsubscribeTransport: (() => void) | null = null;
 
@@ -249,6 +253,29 @@ export class RunController {
     });
   }
 
+  /**
+   * D55: how fast simulated time passes against the wall clock for the runs this controller starts, in
+   * simulated seconds per real second (1 = real time). 0 = as fast as the machine can.
+   */
+  setSpeed(speed: number): void {
+    this.speed = Number.isFinite(speed) && speed > 0 ? speed : 0;
+  }
+
+  getSpeed(): number {
+    return this.speed;
+  }
+
+  /**
+   * D55: Stop ends a timed run gracefully: no new requests arrive, work in flight finishes (up to 60 s of
+   * simulated time), and the run completes with its results. Unlike Reset it keeps what was measured.
+   */
+  stop(): void {
+    if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'paused') && !this.state.stopping) {
+      this.transport.postMessage({ type: 'control', runId: this.activeRunId, kind: 'stop' });
+      this.setState({ stopping: true, ...(this.state.phase === 'paused' ? { phase: 'running' as const } : {}) });
+    }
+  }
+
   pause(): void {
     if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'compiling')) {
       this.transport.postMessage({
@@ -310,6 +337,7 @@ export class RunController {
       current: null,
       issues: [],
       events: [],
+      stopping: false,
     });
   }
 
@@ -369,6 +397,7 @@ export class RunController {
       },
       issues: [],
       events: [],
+      stopping: false,
     });
 
     // 1. Request compilation in worker
@@ -403,7 +432,7 @@ export class RunController {
       };
       this.activeTerminal = terminalResult;
       this.setState({
-        phase: 'done',
+        phase: 'done', stopping: false,
         current: {
           scenarioId,
           runId,
@@ -437,6 +466,7 @@ export class RunController {
       snapshotId,
       planId: compileResult.plan.planId,
       workerSessionId: compileResult.plan.workerSessionId,
+      ...(this.speed > 0 ? { speed: this.speed } : {}),
     });
 
     // Wait until terminal completes
@@ -555,7 +585,7 @@ export class RunController {
       );
     } else {
       this.setState({
-        phase: 'done',
+        phase: 'done', stopping: false,
         current: {
           scenarioId: currentScenarioId,
           runId: currentRunId,
@@ -599,7 +629,7 @@ export class RunController {
 
       if (saveRes.status === 'applied') {
         this.setState({
-          phase: 'done',
+          phase: 'done', stopping: false,
           current: {
             ...this.state.current,
             saveStatus: 'saved',
@@ -608,7 +638,7 @@ export class RunController {
       } else {
         const failureCode = saveRes.status === 'failed' ? saveRes.code : saveRes.status;
         this.setState({
-          phase: 'done',
+          phase: 'done', stopping: false,
           current: {
             ...this.state.current,
             saveStatus: { failed: true, code: failureCode },
@@ -622,7 +652,7 @@ export class RunController {
       const failed = mapErrorToFailedResult(err);
       if (this.activeRunId === startToken.runId && this.state.current) {
         this.setState({
-          phase: 'done',
+          phase: 'done', stopping: false,
           current: {
             ...this.state.current,
             saveStatus: { failed: true, code: failed.code },

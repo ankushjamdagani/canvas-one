@@ -192,8 +192,13 @@ export interface ResourceAdapterOptions {
   durationMs?: number;
   /** Drain completion: workloads stop arriving here; the run continues to `durationMs`. */
   arrivalHorizonMs?: number;
+  /** D55: count completion: at most this many root requests arrive in total. */
+  maxRootArrivals?: number;
   disabledWorkloadIds?: Iterable<string>;
 }
+
+/** D55: how far an open-ended run's clock may go (24 simulated hours), far past any practical session. */
+export const OPEN_RUN_CEILING_MS = 86_400_000;
 
 export type ResourceAdapterInit =
   | ResourceAdapterOptions
@@ -478,6 +483,7 @@ export class ResourceAdapter {
     let seed: number | undefined;
     let durationMs: number | undefined;
     let arrivalHorizonMs: number | undefined;
+    let maxRootArrivals: number | undefined;
     let faults: readonly Fault[] | undefined;
     let relations: readonly Relation[] | undefined;
     const disabledWorkloadIds = new Set<string>(init.disabledWorkloadIds ?? []);
@@ -495,6 +501,11 @@ export class ResourceAdapter {
       } else if (scenario?.completion.kind === 'drain') {
         durationMs = scenario.completion.deadlineMs;
         arrivalHorizonMs = scenario.completion.arrivalHorizonMs;
+      } else if (scenario?.completion.kind === 'count') {
+        durationMs = scenario.completion.deadlineMs;
+        maxRootArrivals = scenario.completion.requests;
+      } else if (scenario?.completion.kind === 'open') {
+        durationMs = OPEN_RUN_CEILING_MS;
       }
 
       if (scenario) {
@@ -516,6 +527,7 @@ export class ResourceAdapter {
       seed = init.seed;
       durationMs = init.durationMs;
       arrivalHorizonMs = init.arrivalHorizonMs;
+      maxRootArrivals = init.maxRootArrivals;
       faults = init.faults;
       relations = init.relations;
     }
@@ -577,7 +589,18 @@ export class ResourceAdapter {
       faults: kernelFaults,
       bridges: kernelBridges,
       ...(arrivalHorizonMs !== undefined ? { arrivalHorizonSeconds: arrivalHorizonMs / 1000 } : {}),
+      ...(maxRootArrivals !== undefined ? { maxRootArrivals } : {}),
     });
+  }
+
+  /** D55: nothing is live in the kernel and no arrival is pending. */
+  isIdle(): boolean {
+    return this.sim.isIdle();
+  }
+
+  /** D55: no workload arrives again; work in flight carries on. */
+  stopArrivals(): void {
+    this.sim.stopArrivals();
   }
 
   private getEntryPortId(elementId: Id): Id | null {

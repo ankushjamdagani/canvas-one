@@ -580,6 +580,20 @@ export const COMPLETION_POLICY_DESCRIPTOR: UnionFieldDescriptor = {
         deadlineMs: { type: 'scalar' },
       },
     },
+    count: {
+      type: 'object',
+      fields: {
+        kind: { type: 'scalar' },
+        requests: { type: 'scalar' },
+        deadlineMs: { type: 'scalar' },
+      },
+    },
+    open: {
+      type: 'object',
+      fields: {
+        kind: { type: 'scalar' },
+      },
+    },
   },
 };
 

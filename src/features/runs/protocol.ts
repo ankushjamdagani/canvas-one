@@ -67,6 +67,12 @@ export type StartRequestMessage = {
   readonly snapshotId: string;
   readonly planId: string;
   readonly workerSessionId: string;
+  /**
+   * D55: how fast simulated time passes against the wall clock, in simulated seconds per real
+   * second (1 = real time, 10 = ten times faster). Absent or 0 runs as fast as the machine can,
+   * except that an open-ended run (which never ends by itself) is paced at least `OPEN_RUN_MIN_SPEED`.
+   */
+  readonly speed?: number;
 };
 
 export type ControlRequestMessage = {
@@ -127,7 +133,15 @@ type ActiveRun = {
   status: 'running' | 'paused' | 'cancelled';
   lastReportedEventCount: number;
   steppingPromise: Promise<void> | null;
+  /** D55: simulated seconds per real second; 0 = unpaced. */
+  readonly speed: number;
+  /** D55: the wall clock and the simulated clock at the moment pacing was last anchored. */
+  paceWallMs: number;
+  paceSimMs: number;
 };
+
+/** D55: an open-ended run never ends by itself, so it is never unpaced. */
+export const OPEN_RUN_MIN_SPEED = 10;
 
 // ============================================================================
 // Pure In-Process Worker Protocol Handler
@@ -398,6 +412,9 @@ export class WorkerProtocolHandler {
       return;
     }
 
+    const requestedSpeed = typeof msg.speed === 'number' && msg.speed > 0 ? msg.speed : 0;
+    const speed =
+      scenarioMode !== 'timed' ? 0 : scenario.completion.kind === 'open' ? Math.max(requestedSpeed, OPEN_RUN_MIN_SPEED) : requestedSpeed;
     const activeRun: ActiveRun = {
       runId,
       planId,
@@ -407,6 +424,9 @@ export class WorkerProtocolHandler {
       status: 'running',
       lastReportedEventCount: 0,
       steppingPromise: null,
+      speed,
+      paceWallMs: Date.now(),
+      paceSimMs: 0,
     };
     this.activeRuns.set(runId, activeRun);
 
@@ -446,6 +466,7 @@ export class WorkerProtocolHandler {
     } else if (kind === 'resume') {
       if (active.status === 'paused') {
         active.status = 'running';
+        this.anchorPacing(active);
         this.postMessageCallback({
           type: 'update',
           message: {
@@ -456,6 +477,15 @@ export class WorkerProtocolHandler {
         });
         this.scheduleStepping(runId);
       }
+    } else if (kind === 'stop') {
+      // D55: stop arrivals and drain; a paused run resumes to do so.
+      active.runner.requestStop();
+      if (active.status === 'paused') {
+        active.status = 'running';
+        this.anchorPacing(active);
+        this.postMessageCallback({ type: 'update', message: { kind: 'state', runId, state: 'running' } });
+        this.scheduleStepping(runId);
+      }
     } else if (kind === 'cancel') {
       active.status = 'cancelled';
       active.abortController.abort();
@@ -463,7 +493,7 @@ export class WorkerProtocolHandler {
     }
   }
 
-  private scheduleStepping(runId: string): void {
+  private scheduleStepping(runId: string, delayMs = 0): void {
     const active = this.activeRuns.get(runId);
     if (!active || active.status !== 'running') {
       return;
@@ -472,7 +502,22 @@ export class WorkerProtocolHandler {
     // Yield to the event loop so incoming control messages can be received
     setTimeout(() => {
       void this.stepRun(runId);
-    }, 0);
+    }, delayMs);
+  }
+
+  /** D55: measure paced simulated time from now (after a pause, or at the start). */
+  private anchorPacing(active: ActiveRun): void {
+    active.paceWallMs = Date.now();
+    active.paceSimMs = active.runner.simulatedMs;
+  }
+
+  /** D55: how long to wait before the next event is due on the paced clock; 0 when unpaced or already due. */
+  private paceDelayMs(active: ActiveRun): number {
+    if (active.speed <= 0) return 0;
+    const next = active.runner.nextEventAtMs();
+    if (next === null) return 0;
+    const dueWallMs = active.paceWallMs + (next - active.paceSimMs) / active.speed;
+    return Math.max(0, dueWallMs - Date.now());
   }
 
   private async stepRun(runId: string): Promise<void> {
@@ -484,8 +529,13 @@ export class WorkerProtocolHandler {
     try {
       let stepsInBatch = 0;
       let hasMore = true;
+      let waitMs = 0;
 
       while (stepsInBatch < this.stepBatchSize && active.status === 'running') {
+        // D55: a paced run waits until the next event is due on the wall clock, after reporting what it has done.
+        waitMs = this.paceDelayMs(active);
+        if (waitMs >= 1) break;
+        waitMs = 0;
         hasMore = await active.runner.step();
         stepsInBatch++;
         if (!hasMore) {
@@ -538,8 +588,9 @@ export class WorkerProtocolHandler {
         return;
       }
 
-      // Continue to next batch
-      this.scheduleStepping(runId);
+      // Continue to next batch (after the pacing wait, if any)
+      // (capped so a pause, stop or cancel is never more than a moment from being noticed)
+      this.scheduleStepping(runId, Math.min(waitMs, 100));
     } catch {
       // Runtime exception -> terminal 'failed' with a sanitized reason (no stack/raw text)
       this.cleanupTerminal(

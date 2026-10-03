@@ -1236,7 +1236,7 @@ export type RefinementSelection = Selection;
 // Completion (§6)
 // ----------------------------------------------------------------------------
 
-export const COMPLETION_KINDS = ['quiescent', 'horizon', 'drain'] as const;
+export const COMPLETION_KINDS = ['quiescent', 'horizon', 'drain', 'count', 'open'] as const;
 export type CompletionKind = (typeof COMPLETION_KINDS)[number];
 
 export type QuiescentCompletionPolicy = {
@@ -1254,16 +1254,32 @@ export type DrainCompletionPolicy = {
   readonly deadlineMs: number;
 };
 
+/** D55: arrivals stop after `requests` root requests have arrived; the run drains until `deadlineMs`. */
+export type CountCompletionPolicy = {
+  readonly kind: 'count';
+  readonly requests: number;
+  readonly deadlineMs: number;
+};
+
+/** D55: no end: the run goes on until the user stops it, then stops arrivals and drains (60 s at most). */
+export type OpenCompletionPolicy = {
+  readonly kind: 'open';
+};
+
 /**
  * Contract §6: Completion
  * - {kind:'quiescent'}: logical only
  * - {kind:'horizon',horizonMs}: timed
  * - {kind:'drain',arrivalHorizonMs,deadlineMs}: timed
+ * - {kind:'count',requests,deadlineMs}: timed (D55)
+ * - {kind:'open'}: timed, until stopped (D55)
  */
 export type CompletionPolicy =
   | QuiescentCompletionPolicy
   | HorizonCompletionPolicy
-  | DrainCompletionPolicy;
+  | DrainCompletionPolicy
+  | CountCompletionPolicy
+  | OpenCompletionPolicy;
 
 // ----------------------------------------------------------------------------
 // Initial Contexts (§6)

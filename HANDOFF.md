@@ -34,6 +34,7 @@ Production e2e: `playwright.config.ts` reuses any server already on port 5174, w
 Tracked here until resolved; none blocks release.
 
 - (2026-10-03, D53/D54) No dedicated tests for saved parts (`domain/parts/capture.ts`, `remap.ts` beyond the request-class remap) or three-way merge (`merge-descriptor.ts`) with typed ports (`Port.protocol`, `Port.path`, `Port.settings`). The Workspace chunk is 496.5 kB of the 500 kB limit; split before adding to it (ideas: ResultsRegion, publishController, history controller).
+- (2026-10-04, D55) An open run has no event budget; very long open runs grow the trace until its cap. Stop shortens the drain only up to the next step boundary.
 - (2026-10-04, D54) `delivery` and `ordering` on message in-ports are declared only; batching saves hops, not broker work; `PORTABLE_VERSION` is still 9 although old v9 files no longer validate (no backward compatibility, decided with the user).
 
 (2026-09-30: the accessibility gaps moved to future scope, architecture.md §7.)

@@ -13,6 +13,8 @@ function makeProps(scenarios: readonly ScenarioSwitcherEntry[], selectedId: stri
     onSelect: noop,
     onRun: noop,
     onRunAll: noop,
+    runSpeed: 1,
+    onRunSpeedChange: noop,
     onNew: noop,
     onDuplicate: noop,
     onEdit: noop,
@@ -27,6 +29,7 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
       id: 'scn-1',
       label: 'Broken scenario',
       mode: 'logical',
+      completion: 'quiescent',
       status: {
         kind: 'not-ready',
         issues: [
@@ -48,12 +51,14 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
       id: 'scn-1',
       label: 'Good scenario',
       mode: 'logical',
+      completion: 'quiescent',
       status: { kind: 'not-run' },
     };
     const notReadyScenario: ScenarioSwitcherEntry = {
       id: 'scn-2',
       label: 'Broken scenario',
       mode: 'logical',
+      completion: 'quiescent',
       status: {
         kind: 'not-ready',
         issues: [
@@ -69,5 +74,26 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
     // The resting Run button (always server-rendered, unlike the popover's "Run all"
     // which only mounts client-side) must stay enabled for the ready selection.
     expect(html).not.toContain('disabled=""');
+  });
+});
+
+describe('ScenarioSwitcher: Stop and run speed (D55)', () => {
+  const timed = (completion: ScenarioSwitcherEntry['completion']): ScenarioSwitcherEntry => ({
+    id: 'scn-1', label: 'Timed', mode: 'timed', completion, status: { kind: 'not-run' },
+  });
+
+  it('shows Stop beside Pause and Reset while a timed run is active, and Stopping… once pressed', () => {
+    const active = { ...makeProps([timed('open')], 'scn-1'), runPhase: 'running' as const, onStop: () => undefined };
+    expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, active))).toContain('data-testid="scenario-stop-btn"');
+    const stopping = renderToStaticMarkup(React.createElement(ScenarioSwitcher, { ...active, isStopping: true }));
+    expect(stopping).toContain('Stopping…');
+    expect(stopping).toMatch(/data-testid="scenario-stop-btn"[^>]*disabled/);
+  });
+
+  it('has no Stop for a logical scenario or while idle', () => {
+    const logical: ScenarioSwitcherEntry = { id: 'scn-1', label: 'Logical', mode: 'logical', completion: 'quiescent', status: { kind: 'not-run' } };
+    const props = { ...makeProps([logical], 'scn-1'), runPhase: 'running' as const, onStop: () => undefined };
+    expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, props))).not.toContain('scenario-stop-btn');
+    expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, { ...makeProps([timed('horizon')], 'scn-1'), onStop: () => undefined }))).not.toContain('scenario-stop-btn');
   });
 });
