@@ -274,7 +274,7 @@ describe('Scenario Scope Closure (computeClosure)', () => {
             target: { elementId: elId, portId: inPortId },
             config: {
               latencyMs: 0,
-              linkClass: null,
+              linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null,
               weight: 1,
               condition: null,
               fallback: false,

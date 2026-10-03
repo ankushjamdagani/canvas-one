@@ -29,6 +29,7 @@ export interface ProjectMenuProps {
   onOpenSettings: () => void;
   onOpenExposedEndpoints: () => void;
   onAllProjects: () => void;
+  onDeleteProject: () => void;
   transferActions: TransferActions;
 }
 
@@ -40,7 +41,7 @@ export interface ProjectMenuProps {
  * - Standardized faded gray top header with uppercase mono category and metadata subtitle
  * - Pure white body section with standardized 14px icon sizing and consistent row spacing
  * - Rename project with shortcut hint (⌘R)
- * - Duplicate, Move to team, Settings, Export (submenu opening to the right), All projects, Archive
+ * - Duplicate, Move to team, Settings, Export (submenu opening to the right), All projects, Delete
  */
 export function ProjectMenu({
   projectTitle,
@@ -51,6 +52,7 @@ export function ProjectMenu({
   onOpenSettings,
   onOpenExposedEndpoints,
   onAllProjects,
+  onDeleteProject,
   transferActions,
 }: ProjectMenuProps) {
   const [open, setOpen] = React.useState(false);
@@ -158,14 +160,14 @@ export function ProjectMenu({
 
         <DropdownMenuSeparator />
 
-        {/* Archive project */}
+        {/* Delete project */}
         <DropdownMenuItem
-          data-testid="project-menu-archive"
+          data-testid="project-menu-delete"
           variant="destructive"
-          onSelect={() => {}}
+          onSelect={() => onDeleteProject()}
         >
           <Trash2 size={14} className="shrink-0 text-destructive" aria-hidden="true" />
-          <span>Archive project</span>
+          <span>Delete project…</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

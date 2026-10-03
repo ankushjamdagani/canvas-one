@@ -413,7 +413,7 @@ describe('Decision D36: broadcast message roots', () => {
           },
           config: {
             latencyMs: 10,
-            linkClass: null,
+            linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null,
             weight: 1,
             condition: null,
             fallback: false,
@@ -511,7 +511,7 @@ describe('Decision D36: broadcast message roots', () => {
           },
           config: {
             latencyMs: 10,
-            linkClass: null,
+            linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null,
             weight: 1,
             condition: null,
             fallback: false,

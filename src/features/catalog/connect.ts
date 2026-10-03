@@ -49,6 +49,9 @@ const DEFAULT_CALL_CONFIG: CallConnectionConfig = {
   latencyMs: LINK_CLASS_LATENCY_MS['same-az'],
   returnLatencyMs: LINK_CLASS_LATENCY_MS['same-az'],
   linkClass: 'same-az',
+  jitterMs: 0,
+  lossRate: 0,
+  bandwidthKbps: null,
   weight: 1, // assumption (catalog.md)
   condition: null,
   fallback: false,
@@ -56,6 +59,9 @@ const DEFAULT_CALL_CONFIG: CallConnectionConfig = {
 const DEFAULT_MESSAGE_CONFIG: MessageConnectionConfig = {
   latencyMs: LINK_CLASS_LATENCY_MS['same-az'],
   linkClass: 'same-az',
+  jitterMs: 0,
+  lossRate: 0,
+  bandwidthKbps: null,
   weight: 1, // assumption (catalog.md)
   condition: null,
   fallback: false,

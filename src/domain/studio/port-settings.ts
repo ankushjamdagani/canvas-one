@@ -67,6 +67,14 @@ export function describeCallerPolicy(port: Pick<Port, 'settings'>): string {
   if (num(s.deadlineDurationMs) !== undefined) parts.push(`deadline ${s.deadlineDurationMs} ms`);
   const request = s.request as RequestMeta | undefined;
   if (request) parts.push(`${request.operation} · ${request.requestClassLabel}`);
+  const breaker = s.circuitBreaker as { failureThreshold: number } | undefined;
+  if (breaker) parts.push(`breaker after ${breaker.failureThreshold} failures`);
+  if (num(s.maxInFlight) !== undefined) parts.push(`max ${s.maxInFlight} in flight`);
+  const hedge = s.hedge as { afterMs: number } | undefined;
+  if (hedge) parts.push(`hedge after ${hedge.afterMs} ms`);
+  if (s.confirm === false) parts.push('fire and forget');
+  const batch = s.batch as { size: number; windowMs: number } | undefined;
+  if (batch) parts.push(`batches of ${batch.size} / ${batch.windowMs} ms`);
   return parts.join(' · ');
 }
 
@@ -115,6 +123,9 @@ export function connectionAdvisories(document: Pick<Document, 'elements'>, conne
   }
   if (into.idempotent === false && retry && retry.maxAttempts > 1) {
     advisories.push('The caller retries an endpoint declared not idempotent.');
+  }
+  if (into.idempotent === false && out.hedge !== undefined) {
+    advisories.push('The caller hedges calls to an endpoint declared not idempotent, so a request can run twice.');
   }
   return advisories;
 }

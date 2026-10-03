@@ -418,6 +418,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -438,6 +441,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -458,6 +464,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -478,6 +487,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -497,6 +509,9 @@
       "config": {
         "latencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -517,6 +532,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -537,6 +555,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -556,6 +577,9 @@
       "config": {
         "latencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -576,6 +600,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -596,6 +623,9 @@
         "latencyMs": 2,
         "returnLatencyMs": 2,
         "linkClass": "same-az",
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false

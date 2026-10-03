@@ -1137,6 +1137,9 @@
       "config": {
         "latencyMs": 0,
         "linkClass": null,
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -1157,6 +1160,9 @@
         "latencyMs": 0,
         "returnLatencyMs": 0,
         "linkClass": null,
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -1177,6 +1183,9 @@
         "latencyMs": 0,
         "returnLatencyMs": 0,
         "linkClass": null,
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false
@@ -1197,6 +1206,9 @@
         "latencyMs": 0,
         "returnLatencyMs": 0,
         "linkClass": null,
+        "jitterMs": 0,
+        "lossRate": 0,
+        "bandwidthKbps": null,
         "weight": 1,
         "condition": null,
         "fallback": false

@@ -2625,24 +2625,34 @@ function validateConnectionConfig(
   if (kind === 'data') {
     checkRecord(rec, [], [], path, entityId, issues, 'DataConnectionConfig');
   } else if (kind === 'call') {
-    const keys = ['latencyMs', 'returnLatencyMs', 'linkClass', 'weight', 'condition', 'fallback'];
+    const keys = ['latencyMs', 'returnLatencyMs', 'linkClass', 'jitterMs', 'lossRate', 'bandwidthKbps', 'weight', 'condition', 'fallback'];
     if (checkRecord(rec, keys, keys, path, entityId, issues, 'CallConnectionConfig')) {
       validateNumber(rec.latencyMs, 0, 60000, [...path, 'latencyMs'], entityId, issues, 'latencyMs');
       validateNumber(rec.returnLatencyMs, 0, 60000, [...path, 'returnLatencyMs'], entityId, issues, 'returnLatencyMs');
       validateLinkClass(rec.linkClass, [...path, 'linkClass'], entityId, issues);
+      validateLinkImpairments(rec, path, entityId, issues);
       validateNumber(rec.weight, 0, 1e6, [...path, 'weight'], entityId, issues, 'weight', false, true);
       validateBoolean(rec.fallback, [...path, 'fallback'], entityId, issues, 'fallback');
       validateRouteCondition(rec.condition, [...path, 'condition'], entityId, issues);
     }
   } else if (kind === 'message') {
-    const keys = ['latencyMs', 'linkClass', 'weight', 'condition', 'fallback'];
+    const keys = ['latencyMs', 'linkClass', 'jitterMs', 'lossRate', 'bandwidthKbps', 'weight', 'condition', 'fallback'];
     if (checkRecord(rec, keys, keys, path, entityId, issues, 'MessageConnectionConfig')) {
       validateNumber(rec.latencyMs, 0, 60000, [...path, 'latencyMs'], entityId, issues, 'latencyMs');
       validateLinkClass(rec.linkClass, [...path, 'linkClass'], entityId, issues);
+      validateLinkImpairments(rec, path, entityId, issues);
       validateNumber(rec.weight, 0, 1e6, [...path, 'weight'], entityId, issues, 'weight', false, true);
       validateBoolean(rec.fallback, [...path, 'fallback'], entityId, issues, 'fallback');
       validateRouteCondition(rec.condition, [...path, 'condition'], entityId, issues);
     }
+  }
+}
+
+function validateLinkImpairments(rec: Record<string, unknown>, path: readonly (string | number)[], entityId: Id | null, issues: Issue[]): void {
+  validateNumber(rec.jitterMs, 0, 60000, [...path, 'jitterMs'], entityId, issues, 'jitterMs');
+  validateNumber(rec.lossRate, 0, 100, [...path, 'lossRate'], entityId, issues, 'lossRate');
+  if (rec.bandwidthKbps !== null) {
+    validateNumber(rec.bandwidthKbps, 0, 1e9, [...path, 'bandwidthKbps'], entityId, issues, 'bandwidthKbps', false, true);
   }
 }
 
@@ -2742,7 +2752,7 @@ function validateRequestMeta(
 }
 
 /** The simulated in-port settings only mean something on a node the runner simulates. */
-const SIMULATED_CALL_IN_KEYS = ['rateLimit', 'failureRate', 'serviceTimeMs'] as const;
+const SIMULATED_CALL_IN_KEYS = ['rateLimit', 'failureRate', 'serviceTimeMs', 'maxConcurrency', 'responseBytes'] as const;
 
 /**
  * D53: a port's settings, by direction and channel. Empty settings are not stored; the simulated
@@ -2758,11 +2768,11 @@ function validatePortSettings(
   issues: Issue[],
 ): void {
   let keys: readonly string[];
-  if (direction === 'in' && channel === 'call') keys = ['expectedP95Ms', 'availabilityPct', 'idempotent', 'maxConcurrency', ...SIMULATED_CALL_IN_KEYS];
+  if (direction === 'in' && channel === 'call') keys = ['expectedP95Ms', 'availabilityPct', 'idempotent', ...SIMULATED_CALL_IN_KEYS];
   else if (direction === 'in' && channel === 'message') keys = ['ackDelayMs', 'messageTtlMs', 'delivery', 'ordering'];
   else if (direction === 'in' && channel === 'data') keys = ['throughputPerSec', 'maxStalenessMs'];
-  else if (direction === 'out' && channel === 'call') keys = ['deadlineDurationMs', 'retry', 'request'];
-  else if (direction === 'out' && channel === 'message') keys = ['deadlineDurationMs', 'request'];
+  else if (direction === 'out' && channel === 'call') keys = ['deadlineDurationMs', 'retry', 'request', 'circuitBreaker', 'maxInFlight', 'hedge', 'requestBytes'];
+  else if (direction === 'out' && channel === 'message') keys = ['deadlineDurationMs', 'request', 'confirm', 'batch', 'requestBytes'];
   else {
     issues.push(errorIssue('structural-rule', path, entityId, `A ${String(direction)} ${String(channel)} port has no settings`));
     return;
@@ -2801,6 +2811,29 @@ function validatePortSettings(
   if (has('maxStalenessMs')) validateNumber(rec.maxStalenessMs, 0, 31_536_000_000, at('maxStalenessMs'), entityId, issues, 'maxStalenessMs', false, true);
   if (has('deadlineDurationMs')) validateNumber(rec.deadlineDurationMs, 0, 600000, at('deadlineDurationMs'), entityId, issues, 'deadlineDurationMs', false, true);
   if (has('retry')) validateCallRetryPolicy(rec.retry, at('retry'), entityId, issues);
+  if (has('responseBytes')) validateNumber(rec.responseBytes, 0, 1e12, at('responseBytes'), entityId, issues, 'responseBytes', true, true);
+  if (has('requestBytes')) validateNumber(rec.requestBytes, 0, 1e12, at('requestBytes'), entityId, issues, 'requestBytes', true, true);
+  if (has('maxInFlight')) validateNumber(rec.maxInFlight, 1, 1e6, at('maxInFlight'), entityId, issues, 'maxInFlight', true);
+  if (has('confirm')) validateBoolean(rec.confirm, at('confirm'), entityId, issues, 'confirm');
+  if (has('hedge') && checkRecord(rec.hedge, ['afterMs'], ['afterMs'], at('hedge'), entityId, issues, 'hedge')) {
+    validateNumber((rec.hedge as Record<string, unknown>).afterMs, 1, 600000, [...at('hedge'), 'afterMs'], entityId, issues, 'afterMs', false, true);
+  }
+  if (has('circuitBreaker')) {
+    const keysCb = ['failureThreshold', 'openMs', 'halfOpenProbes'];
+    if (checkRecord(rec.circuitBreaker, keysCb, keysCb, at('circuitBreaker'), entityId, issues, 'circuitBreaker')) {
+      const cb = rec.circuitBreaker as Record<string, unknown>;
+      validateNumber(cb.failureThreshold, 1, 1000, [...at('circuitBreaker'), 'failureThreshold'], entityId, issues, 'failureThreshold', true);
+      validateNumber(cb.openMs, 1, 600000, [...at('circuitBreaker'), 'openMs'], entityId, issues, 'openMs', false);
+      validateNumber(cb.halfOpenProbes, 1, 100, [...at('circuitBreaker'), 'halfOpenProbes'], entityId, issues, 'halfOpenProbes', true);
+    }
+  }
+  if (has('batch')) {
+    if (checkRecord(rec.batch, ['size', 'windowMs'], ['size', 'windowMs'], at('batch'), entityId, issues, 'batch')) {
+      const b = rec.batch as Record<string, unknown>;
+      validateNumber(b.size, 2, 1000, [...at('batch'), 'size'], entityId, issues, 'size', true);
+      validateNumber(b.windowMs, 1, 600000, [...at('batch'), 'windowMs'], entityId, issues, 'windowMs', false);
+    }
+  }
   if (has('request')) validateRequestMeta(rec.request, at('request'), entityId, issues);
 
   if (!isResourceNode) {

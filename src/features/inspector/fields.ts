@@ -29,7 +29,7 @@ import { connectionAdvisories, describeCalleeContract, describeCallerPolicy, fin
 import type { FieldOption, FieldSpec } from './types';
 import { portSettingsFields } from './portFields';
 import { RESOURCE_CONFIG_COPY } from '../catalog/resourceConfigCopy';
-import { numberField, readonlyField, selectField, textField } from './fieldBuilders';
+import { numberField, optionalNumberField, readonlyField, selectField, textField } from './fieldBuilders';
 
 // ============================================================================
 // Element fields
@@ -399,6 +399,37 @@ function linkFields(kind: 'call' | 'message'): FieldSpec<Connection>[] {
         })),
     }),
   ];
+  fields.push(
+    numberField<Connection>({
+      id: 'config.jitterMs',
+      label: 'Jitter (up to, per leg)',
+      unit: 'ms',
+      min: 0,
+      max: 60000,
+      get: (c) => cfg(c)?.jitterMs ?? 0,
+      set: (c, value) => withLinkConfig(c, (config) => ({ ...config, jitterMs: value })),
+    }),
+    numberField<Connection>({
+      id: 'config.lossRate',
+      label: 'Loss (per leg)',
+      unit: '%',
+      min: 0,
+      max: 100,
+      get: (c) => cfg(c)?.lossRate ?? 0,
+      set: (c, value) => withLinkConfig(c, (config) => ({ ...config, lossRate: value })),
+    }),
+    optionalNumberField<Connection>({
+      id: 'config.bandwidthKbps',
+      label: 'Bandwidth (blank = unlimited)',
+      unit: 'kbit/s',
+      note: 'Adds transfer time when the ports give request and response sizes',
+      min: 0,
+      max: 1e9,
+      minExclusive: true,
+      get: (c) => cfg(c)?.bandwidthKbps ?? undefined,
+      set: (c, value) => withLinkConfig(c, (config) => ({ ...config, bandwidthKbps: value })),
+    }),
+  );
   if (kind === 'call') {
     fields.push(
       numberField<Connection>({

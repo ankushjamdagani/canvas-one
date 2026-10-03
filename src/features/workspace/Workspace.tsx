@@ -59,7 +59,6 @@ import type { PartContent } from "../../domain/parts/types";
 import {
   loadScenarioStatuses,
   RunController,
-  ResultsRegion,
   WorkerTransport,
   type ScenariosStatusResult,
 } from "../runs";
@@ -277,7 +276,12 @@ export interface WorkspaceProps {
   runControl?: React.ReactNode;
 }
 
-// The Ours tab loads on demand, so the workspace chunk stays under the size limit.
+// The results region and the Ours tab load on demand, so the workspace chunk stays under the size limit.
+const ResultsRegion = lazyComponent(() => import("../runs/ResultsRegion").then((m) => m.ResultsRegion), null);
+const DeleteProjectDialog = lazyComponent(
+  () => import("./DeleteProjectDialog").then((m) => m.DeleteProjectDialog),
+  null,
+);
 const SavedParts = lazyComponent(() => import("../library/SavedParts").then((m) => m.SavedParts), null);
 
 export function Workspace({
@@ -1908,6 +1912,8 @@ export function Workspace({
     React.useState<DuplicateDialogState | null>(null);
   const [duplicateApplying, setDuplicateApplying] = React.useState(false);
 
+  const [deleteProjectOpen, setDeleteProjectOpen] = React.useState(false);
+
   const openHistoryPanel = React.useCallback(() => {
     panelDispatch({ type: "OPEN", panel: "history" });
     refreshBehindMainCheck();
@@ -3104,6 +3110,9 @@ export function Workspace({
           }
           createBranchDisabledReason={createBranchDisabledReason}
           onAllProjects={handleBackToProjects}
+          onDeleteProject={() => {
+            setDeleteProjectOpen(true);
+          }}
           onUpdateProjectDetails={handleUpdateProjectDetails}
           endpointCandidates={endpointCandidates}
           onToggleEndpointExposed={handleToggleEndpointExposed}
@@ -3404,6 +3413,17 @@ export function Workspace({
         initialCopySourceId={initialCopySourceId}
         onCreate={handleCreateScenario}
       />
+
+      {deleteProjectOpen && sessionState.projectId && mainBranchId && (
+        <DeleteProjectDialog
+          repository={repository}
+          projectId={sessionState.projectId}
+          mainBranchId={mainBranchId}
+          projectTitle={projectRecord?.title ?? ""}
+          onClose={() => setDeleteProjectOpen(false)}
+          onDeleted={onBackToProjects}
+        />
+      )}
 
       <DeleteScenarioDialog
         open={deleteScenarioTarget !== null}

@@ -39,6 +39,7 @@ export interface TopBarProps {
   onReopenBranch: (branchId: string) => Promise<BranchActionOutcome>;
   createBranchDisabledReason?: string | null;
   onAllProjects: () => void;
+  onDeleteProject: () => void;
   /** Saves the project's description and team; resolves to an error message, or null on success. */
   onUpdateProjectDetails: (details: ProjectDetails) => Promise<string | null>;
   /** D53: inbound ports of this project and whether each is exposed to projects that link it. */
@@ -102,6 +103,7 @@ export function TopBar({
   onReopenBranch,
   createBranchDisabledReason,
   onAllProjects,
+  onDeleteProject,
   onUpdateProjectDetails,
   endpointCandidates,
   onToggleEndpointExposed,
@@ -318,6 +320,7 @@ export function TopBar({
                 onOpenSettings={() => setSettingsOpen(true)}
                 onOpenExposedEndpoints={() => setExposedOpen(true)}
                 onAllProjects={onAllProjects}
+                onDeleteProject={onDeleteProject}
                 transferActions={transferActions}
               >
                 {(isOpen) => (

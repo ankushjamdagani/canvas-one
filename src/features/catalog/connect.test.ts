@@ -347,6 +347,9 @@ describe('connect.ts', () => {
       latencyMs: 2, // D49 default
       returnLatencyMs: 2,
       linkClass: 'same-az',
+      jitterMs: 0,
+      lossRate: 0,
+      bandwidthKbps: null,
       weight: 1,
       condition: null,
       fallback: false,

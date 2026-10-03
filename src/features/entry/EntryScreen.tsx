@@ -4,6 +4,7 @@ import {
   ArrowRight,
   FolderOpen,
   LayoutTemplate,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,8 @@ export type ProjectRowItem = {
   readonly project: ProjectRecord;
   readonly status: "loading" | "ready" | "error";
   readonly branches?: readonly OpenBranchChoice[];
+  /** Head commit of main, the compare-and-swap token for deleteProject. */
+  readonly mainHeadId?: Id | null;
   readonly errorMessage?: string;
 };
 
@@ -80,6 +83,8 @@ export function EntryScreen({
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isImporting, setIsImporting] = React.useState(false);
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = React.useState<Id | null>(null);
+  const [deletingId, setDeletingId] = React.useState<Id | null>(null);
 
   // Load existing projects on mount and fetch their open branches via loadHistory
   const refreshProjects = React.useCallback(async () => {
@@ -106,10 +111,14 @@ export function EntryScreen({
               return a.label.localeCompare(b.label);
             });
 
+            const main = history.branches.find(
+              (b) => b.id === project.mainBranchId,
+            );
             return {
               project,
               status: "ready",
               branches: openBranches,
+              mainHeadId: main?.headCommitId ?? null,
             };
           } catch (err) {
             console.error(
@@ -237,6 +246,35 @@ export function EntryScreen({
       setErrorMessage("An unexpected error occurred while opening project");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Delete a project and all its records. Two-step (inline confirm); uses the
+  // main head read at list time as the CAS token, so a stale row is refused
+  // and the list is refreshed instead of deleting newer work.
+  const handleDeleteProject = async (row: ProjectRowItem) => {
+    if (deletingId || isSubmitting) return;
+    setDeletingId(row.project.id);
+    setErrorMessage(null);
+    try {
+      const res = await repository.deleteProject(
+        row.project.id,
+        row.mainHeadId ?? null,
+      );
+      if (res.status === "stale") {
+        setErrorMessage(
+          `"${row.project.title}" changed since this list loaded. Review it, then delete again.`,
+        );
+      } else if (res.status !== "applied" && res.status !== "missing") {
+        setErrorMessage(formatStudioError(res, "Failed to delete project"));
+      }
+      setConfirmDeleteId(null);
+      await refreshProjects();
+    } catch (err) {
+      console.error("Unexpected error deleting project:", err);
+      setErrorMessage("An unexpected error occurred while deleting project");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -434,6 +472,52 @@ export function EntryScreen({
                               ))
                             )}
                           </div>
+                        )}
+
+                        {confirmDeleteId === row.project.id ? (
+                          <div
+                            role="group"
+                            aria-label={`Confirm delete ${row.project.title}`}
+                            className="flex items-center gap-1.5"
+                          >
+                            <Button
+                              data-testid={`confirm-delete-project-${row.project.id}`}
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="h-8 px-3 text-xs font-semibold"
+                              disabled={deletingId !== null}
+                              onClick={() => void handleDeleteProject(row)}
+                            >
+                              {deletingId === row.project.id
+                                ? "Deleting…"
+                                : "Delete"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-3 text-xs"
+                              disabled={deletingId !== null}
+                              onClick={() => setConfirmDeleteId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            data-testid={`delete-project-${row.project.id}`}
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-secondary-text hover:text-destructive"
+                            aria-label={`Delete ${row.project.title}`}
+                            title="Delete project"
+                            disabled={isSubmitting || deletingId !== null}
+                            onClick={() => setConfirmDeleteId(row.project.id)}
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </Button>
                         )}
                       </div>
                     </div>

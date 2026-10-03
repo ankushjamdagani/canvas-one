@@ -14,7 +14,6 @@ export type ExposedContract = {
   readonly expectedP95Ms?: number;
   readonly availabilityPct?: number;
   readonly idempotent?: boolean;
-  readonly maxConcurrency?: number;
   readonly delivery?: DeliveryGuarantee;
   readonly ordering?: MessageOrdering;
   readonly throughputPerSec?: number;
@@ -30,7 +29,7 @@ export type ProjectExposure = {
 };
 
 const CONTRACT_KEYS: Readonly<Record<ConnectableChannel, readonly string[]>> = {
-  call: ['expectedP95Ms', 'availabilityPct', 'idempotent', 'maxConcurrency'],
+  call: ['expectedP95Ms', 'availabilityPct', 'idempotent'],
   message: ['delivery', 'ordering'],
   data: ['throughputPerSec', 'maxStalenessMs'],
 };
@@ -58,7 +57,6 @@ function isContract(channel: ConnectableChannel, value: unknown): boolean {
       case 'expectedP95Ms': return finite(v, 0, 600000);
       case 'availabilityPct': return finite(v, 0, 100);
       case 'idempotent': return typeof v === 'boolean';
-      case 'maxConcurrency': return finite(v, 0, 100000, true);
       case 'delivery': return (DELIVERY_GUARANTEES as readonly unknown[]).includes(v);
       case 'ordering': return (MESSAGE_ORDERINGS as readonly unknown[]).includes(v);
       case 'throughputPerSec': return finite(v, 0, 1e9);

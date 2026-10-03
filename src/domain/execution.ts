@@ -73,6 +73,33 @@ export interface EndpointBehavior {
   failureRate?: number;
   /** Token bucket: calls beyond it are rejected at admission. */
   rateLimit?: { rps: number; burst: number };
+  /** Calls beyond this many in service or queued through the endpoint are rejected at admission. */
+  maxConcurrency?: number;
+  /** Size of the reply in bytes (transfer time on a link with a bandwidth). */
+  responseBytes?: number;
+}
+
+/** D54: the caller's out-port policies for one downstream endpoint; `key` identifies the out-port. */
+export interface CallerPolicy {
+  key: string;
+  /** Consecutive failures that open the breaker, how long it stays open, and the probes allowed when half-open. */
+  breaker?: { failureThreshold: number; openMs: number; halfOpenProbes: number };
+  /** Calls beyond this many outstanding fail fast. */
+  maxInFlight?: number;
+  /** An attempt unanswered after this many ms is sent again; the first success wins. */
+  hedgeAfterMs?: number;
+  requestBytes?: number;
+  /** Message edges: false = fire and forget (no wait for the acknowledgement). */
+  confirm?: boolean;
+  /** Message edges: publishes wait for `size` of them or `windowMs`, then travel together. */
+  batch?: { size: number; windowMs: number };
+}
+
+/** D54: what can go wrong on the wire of an edge. */
+export interface EdgeLink {
+  jitterMs: number;
+  lossRate: number;
+  bandwidthKbps: number | null;
 }
 
 export interface WorkloadDefinition {
@@ -108,6 +135,10 @@ export interface ExecutionEdge {
   retry?: CallRetryPolicy | null;
   /** D53: the target endpoint's overrides. */
   endpoint?: EndpointBehavior;
+  /** D54: the source out-port's policies. */
+  caller?: CallerPolicy;
+  /** D54: jitter, loss and bandwidth of the link. */
+  link?: EdgeLink;
 }
 
 export interface ExecutionNode {

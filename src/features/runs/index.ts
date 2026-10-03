@@ -7,4 +7,3 @@ export * from './transport';
 export * from './RunController';
 export * from './scenarioStatus';
 export * from './view-models';
-export * from './ResultsRegion';

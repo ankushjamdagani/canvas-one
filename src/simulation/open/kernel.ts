@@ -1,6 +1,7 @@
 import type {
   CallRetryPolicy,
   ExecutionGraph,
+  CallerPolicy,
   EndpointBehavior,
   ExecutionEdge,
   WorkloadDefinition,
@@ -319,6 +320,8 @@ export interface Op {
   deliveries?: number;
   /** D53: the endpoint this op entered through; its overrides apply at this node. */
   endpoint?: EndpointBehavior;
+  /** D54: the endpoint whose concurrency slot this op holds until it is released. */
+  slotKey?: string;
 }
 
 export interface NodeRuntime {
@@ -839,6 +842,10 @@ export class OpenSimulation {
   protected releaseOp(op: Op): void {
     if (op.released) return;
     op.released = true;
+    if (op.slotKey !== undefined) {
+      this.endpointSlots.set(op.slotKey, Math.max(0, (this.endpointSlots.get(op.slotKey) ?? 1) - 1));
+      op.slotKey = undefined;
+    }
     this.liveOpsCount--;
     op.unit.ops.delete(op);
   }
@@ -1029,6 +1036,83 @@ export class OpenSimulation {
   }
 
   private readonly endpointBuckets = new Map<string, { tokens: number; at: number }>();
+  /** D54: ops currently holding a slot of an endpoint with a concurrency cap. */
+  private readonly endpointSlots = new Map<string, number>();
+  /** D54: the caller side's breaker and in-flight state, keyed by out-port. */
+  private readonly callerStates = new Map<
+    string,
+    { failures: number; state: 'closed' | 'open' | 'half-open'; openUntil: number; probes: number; live: Set<Op> }
+  >();
+  /** D54: publishes waiting to travel together, keyed by out-port and edge. */
+  private readonly batchBuffers = new Map<string, { entries: Array<(departure: number, leg: number | null) => void>; bytes: number; epoch: number }>();
+  private batchSequence = 0;
+
+  /**
+   * D54: seconds one leg of `edge` takes (latency, jitter, transfer time at the link's bandwidth),
+   * or null when the leg is lost. Seeded per leg, so chunked and one-shot runs draw alike.
+   */
+  protected legSeconds(edge: ExecutionEdge, baseMs: number, bytes: number, id: string, lossy = true): number | null {
+    const link = edge.link;
+    let ms = baseMs;
+    if (link) {
+      const draw = makeRng((this.seed ^ hashString(`${id}:${edge.id}:leg`)) >>> 0);
+      if (lossy && link.lossRate > 0 && draw() * 100 < link.lossRate) return null;
+      if (link.jitterMs > 0) ms += draw() * link.jitterMs;
+      if (link.bandwidthKbps !== null && bytes > 0) ms += (bytes * 8) / link.bandwidthKbps;
+    }
+    return ms / 1000;
+  }
+
+  private callerState(key: string) {
+    let state = this.callerStates.get(key);
+    if (!state) {
+      state = { failures: 0, state: 'closed', openUntil: 0, probes: 0, live: new Set() };
+      this.callerStates.set(key, state);
+    }
+    return state;
+  }
+
+  /** D54: whether the caller may send now: its in-flight limit and circuit breaker (a half-open breaker lets probes through). */
+  protected callerGate(caller: CallerPolicy): 'ok' | 'probe' | 'reject' {
+    const st = this.callerState(caller.key);
+    if (caller.maxInFlight !== undefined) {
+      for (const live of st.live) if (live.done) st.live.delete(live);
+      if (st.live.size >= caller.maxInFlight) return 'reject';
+    }
+    const breaker = caller.breaker;
+    if (breaker) {
+      if (st.state === 'open') {
+        if (this.currentTime < st.openUntil) return 'reject';
+        st.state = 'half-open';
+        st.probes = 0;
+      }
+      if (st.state === 'half-open') {
+        if (st.probes >= breaker.halfOpenProbes) return 'reject';
+        st.probes++;
+        return 'probe';
+      }
+    }
+    return 'ok';
+  }
+
+  /** D54: what an answered attempt tells the breaker. Fast-failed attempts never reach it. */
+  protected callerOutcome(caller: CallerPolicy, outcome: Outcome, wasProbe: boolean): void {
+    const breaker = caller.breaker;
+    if (!breaker) return;
+    const st = this.callerState(caller.key);
+    if (wasProbe) st.probes = Math.max(0, st.probes - 1);
+    if (outcome === 'succeeded') {
+      st.failures = 0;
+      if (st.state === 'half-open') st.state = 'closed';
+      return;
+    }
+    st.failures++;
+    if (st.state === 'half-open' || st.failures >= breaker.failureThreshold) {
+      st.state = 'open';
+      st.openUntil = this.currentTime + breaker.openMs / 1000;
+      st.failures = 0;
+    }
+  }
 
   /** D53: one token per admitted call; refills at `rps` up to `burst`, full at the start. */
   private takeEndpointToken(endpoint: EndpointBehavior): boolean {
@@ -1050,7 +1134,11 @@ export class OpenSimulation {
     const hostDown = hostId !== undefined && this.hostState.get(hostId) === false;
     // D53: an endpoint's rate limit rejects calls beyond its token bucket; a retry already got in once.
     const overRateLimit = !hostDown && !isRetry && op.endpoint?.rateLimit !== undefined && !this.takeEndpointToken(op.endpoint);
-    if (hostDown || overRateLimit) {
+    // D54: an endpoint's concurrency cap rejects calls beyond the slots in use.
+    const overCapacity =
+      !hostDown && !overRateLimit && !isRetry && op.endpoint?.maxConcurrency !== undefined &&
+      (this.endpointSlots.get(op.endpoint.key) ?? 0) >= op.endpoint.maxConcurrency;
+    if (hostDown || overRateLimit || overCapacity) {
       // Admission to a host that is actually down is rejected immediately as unavailable,
       // whatever the router knows and regardless of whether this is a first attempt or a
       // retry landing during the outage (§6 Faults).
@@ -1071,6 +1159,11 @@ export class OpenSimulation {
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
       return false;
+    }
+
+    if (!isRetry && op.endpoint?.maxConcurrency !== undefined && op.slotKey === undefined) {
+      op.slotKey = op.endpoint.key;
+      this.endpointSlots.set(op.slotKey, (this.endpointSlots.get(op.slotKey) ?? 0) + 1);
     }
 
     if (!isRetry) {
@@ -1615,69 +1708,119 @@ export class OpenSimulation {
     // The first attempt's route sets the policy for the whole retry chain, even when a
     // router retries on another route.
     const retry = policy !== undefined ? policy : (edge.retry ?? null);
+    const caller = edge.caller;
 
     const childPath = attemptNo === 1 ? `${op.path}>${edge.id}` : `${op.path}>${edge.id}~${attemptNo}`;
+    // D54: the caller's in-flight limit and circuit breaker can turn the attempt away before it is sent.
+    const gate = caller ? this.callerGate(caller) : 'ok';
     // Resolved when the caller learns the attempt's outcome: its response arrives, or the
     // attempt timeout fires first (a response still on its way back is then ignored).
     let resolved = false;
+    const copies: Op[] = [];
+    let outstanding = 0;
+    let hedgePending = false;
     const resolveAttempt = (childOutcome: Outcome) => {
       if (resolved) return;
       resolved = true;
+      hedgePending = false;
       em.responses++;
+      if (caller && gate !== 'reject') this.callerOutcome(caller, childOutcome, gate === 'probe');
+      // D54: a hedged copy that lost the race is abandoned like a timed-out attempt.
+      const abandoned = new Set<string>();
+      for (const copy of copies) {
+        if (!copy.done) {
+          this.cancelOp(copy, abandoned);
+          op.children.delete(copy);
+        }
+      }
+      for (const nid of abandoned) this.pumpQueue(nid);
       if (childOutcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts && !op.done && !op.unit.done) {
         this.scheduleCallRetry(op, edge, attemptNo, retry);
         return;
       }
       this.handleChildResponse(op, childOutcome);
     };
-    const settleAttempt = (childOutcome: Outcome, atCaller: number) => {
-      this.scheduleEvent(atCaller, 1, () => resolveAttempt(childOutcome));
+    if (gate === 'reject') {
+      // Fails fast, as if the callee had turned the call away.
+      em.rejected++;
+      this.scheduleEvent(this.currentTime, 1, () => resolveAttempt('rejected'));
+      return;
+    }
+    // One copy of the call has an outcome; the attempt succeeds with the first success and fails when no copy is left.
+    const settleCopy = (copyOutcome: Outcome, atCaller: number) => {
+      this.scheduleEvent(atCaller, 1, () => {
+        if (resolved) return;
+        if (copyOutcome === 'succeeded') {
+          resolveAttempt('succeeded');
+          return;
+        }
+        outstanding--;
+        if (outstanding <= 0) resolveAttempt(copyOutcome);
+      });
     };
 
-    const childOp: Op = {
-      unit: op.unit,
-      nodeId: edge.target,
-      path: childPath,
-      phase: 'transit',
-      endpoint: edge.endpoint,
-      done: false,
-      attempt: 0,
-      children: new Set(),
-      arrived: this.currentTime + edge.latencyMs / 1000,
-      onDone: (childOutcome) => {
-        settleAttempt(childOutcome, this.currentTime + edge.returnLatencyMs / 1000);
-      },
+    const sendCopy = (copyNo: number) => {
+      const path = copyNo === 0 ? childPath : `${childPath}^h${copyNo}`;
+      const identity = `${op.unit.identity}:${path}`;
+      const requestLeg = this.legSeconds(edge, edge.latencyMs, caller?.requestBytes ?? 0, `${identity}:req`);
+      const childOp: Op = {
+        unit: op.unit,
+        nodeId: edge.target,
+        path,
+        phase: 'transit',
+        endpoint: edge.endpoint,
+        done: false,
+        attempt: 0,
+        children: new Set(),
+        arrived: this.currentTime + (requestLeg ?? edge.latencyMs / 1000),
+        onDone: (childOutcome) => {
+          const responseLeg = this.legSeconds(edge, edge.returnLatencyMs, edge.endpoint?.responseBytes ?? 0, `${identity}:res`);
+          // A lost response never reaches the caller: it waits for its timeout or deadline.
+          if (responseLeg !== null) settleCopy(childOutcome, this.currentTime + responseLeg);
+        },
+      };
+      copies.push(childOp);
+      outstanding++;
+      if (caller) this.callerState(caller.key).live.add(childOp);
+      if (copyNo > 0) em.sent++;
+
+      op.children.add(childOp);
+      op.unit.ops.add(childOp);
+      this.liveOpsCount++;
+
+      // A lost request never arrives: the copy stays in flight until it is given up on.
+      if (requestLeg === null) return;
+      this.scheduleEvent(this.currentTime + requestLeg, 2, () => {
+        if (childOp.done || childOp.unit.done) {
+          this.releaseOp(childOp);
+          return;
+        }
+        const admitted = this.admitOp(childOp, false);
+        if (admitted) {
+          em.admitted++;
+        } else {
+          em.rejected++;
+        }
+      });
     };
 
-    op.children.add(childOp);
-    op.unit.ops.add(childOp);
-    this.liveOpsCount++;
+    sendCopy(0);
 
-    this.scheduleEvent(this.currentTime + edge.latencyMs / 1000, 2, () => {
-      if (childOp.done || childOp.unit.done) {
-        this.releaseOp(childOp);
-        return;
-      }
-      const admitted = this.admitOp(childOp, false);
-      if (admitted) {
-        em.admitted++;
-      } else {
-        em.rejected++;
-      }
-    });
+    if (caller?.hedgeAfterMs !== undefined) {
+      hedgePending = true;
+      this.scheduleEvent(this.currentTime + caller.hedgeAfterMs / 1000, 1, () => {
+        if (!hedgePending || resolved || op.done || op.unit.done) return;
+        hedgePending = false;
+        sendCopy(1);
+      });
+    }
 
     if (retry && retry.attemptTimeoutMs !== null) {
       // The caller stops waiting for this attempt; the abandoned work is cancelled.
       this.scheduleEvent(this.currentTime + retry.attemptTimeoutMs / 1000, 1, () => {
         if (resolved || op.done || op.unit.done) return;
-        if (!childOp.done) {
-          // The callee isn't told the caller gave up: work already in service keeps its slot
-          // until it completes (wasted work), queued work is dropped.
-          const affectedNodes = new Set<string>();
-          this.cancelOp(childOp, affectedNodes);
-          for (const nid of affectedNodes) this.pumpQueue(nid);
-        }
-        op.children.delete(childOp);
+        // The callee isn't told the caller gave up: work already in service keeps its slot
+        // until it completes (wasted work), queued work is dropped. resolveAttempt cancels the copies.
         resolveAttempt('expired');
       });
     }
@@ -1806,6 +1949,15 @@ export class OpenSimulation {
     };
 
     let ackScheduled = false;
+    const caller = isSynthetic ? undefined : edge.caller;
+    // D54: fire and forget. The publisher moves on at once and never hears of the delivery's fate.
+    if (caller?.confirm === false) {
+      ackScheduled = true;
+      this.scheduleEvent(this.currentTime, 1, () => {
+        em.responses++;
+        this.handleChildResponse(parentOp, 'succeeded');
+      });
+    }
 
     this.scheduleEvent(deadline, 0, () => {
       if (!messageUnit.done) {
@@ -1842,41 +1994,85 @@ export class OpenSimulation {
     messageUnit.ops.add(msgRootOp);
     this.liveOpsCount++;
 
-    const arrivalTime = born + edge.latencyMs / 1000;
-    this.scheduleEvent(arrivalTime, 2, () => {
-      if (msgRootOp.done || messageUnit.done) {
-        this.releaseOp(msgRootOp);
-        return;
-      }
+    // The message travels once its leg is known: at once, or with the batch it was held for.
+    // A lost leg never arrives, so the message expires at its TTL.
+    const travel = (departure: number, requestLeg: number | null) => {
+      if (requestLeg === null) return;
+      const arrivalTime = departure + requestLeg;
+      msgRootOp.arrived = arrivalTime;
+      this.scheduleEvent(arrivalTime, 2, () => {
+        if (msgRootOp.done || messageUnit.done) {
+          this.releaseOp(msgRootOp);
+          return;
+        }
 
-      if (hops > 64) {
-        em.rejected++;
-        this.finishUnit(messageUnit, 'failed');
-        this.releaseOp(msgRootOp);
+        if (hops > 64) {
+          em.rejected++;
+          this.finishUnit(messageUnit, 'failed');
+          this.releaseOp(msgRootOp);
+          if (!ackScheduled) {
+            ackScheduled = true;
+            em.responses++;
+            this.handleChildResponse(parentOp, 'failed');
+          }
+          return;
+        }
+
+        const admitted = this.admitOp(msgRootOp, false);
+        if (admitted) {
+          em.admitted++;
+        } else {
+          em.rejected++;
+        }
+
         if (!ackScheduled) {
           ackScheduled = true;
-          em.responses++;
-          this.handleChildResponse(parentOp, 'failed');
+          const ackLeg = this.legSeconds(edge, edge.returnLatencyMs, 0, `${identity}:ack`);
+          // A lost acknowledgement never reaches the publisher.
+          if (ackLeg !== null) {
+            this.scheduleEvent(arrivalTime + edge.ackDelayMs / 1000 + ackLeg, 1, () => {
+              em.responses++;
+              this.handleChildResponse(parentOp, admitted ? 'succeeded' : 'failed');
+            });
+          }
         }
-        return;
-      }
+      });
+    };
 
-      const admitted = this.admitOp(msgRootOp, false);
-      if (admitted) {
-        em.admitted++;
-      } else {
-        em.rejected++;
-      }
+    const bytes = caller?.requestBytes ?? 0;
+    const batch = caller?.batch;
+    if (!batch) {
+      travel(born, this.legSeconds(edge, edge.latencyMs, bytes, `${identity}:req`));
+      return;
+    }
 
-      if (!ackScheduled) {
-        ackScheduled = true;
-        const ackDeliveryTime = arrivalTime + edge.ackDelayMs / 1000 + edge.returnLatencyMs / 1000;
-        this.scheduleEvent(ackDeliveryTime, 1, () => {
-          em.responses++;
-          this.handleChildResponse(parentOp, admitted ? 'succeeded' : 'failed');
-        });
-      }
-    });
+    // D54: hold the publish until `size` have gathered or `windowMs` has passed, then send them over one hop.
+    const bufferKey = `${caller!.key}>${edge.id}`;
+    let buffer = this.batchBuffers.get(bufferKey);
+    if (!buffer) {
+      buffer = { entries: [], bytes: 0, epoch: 0 };
+      this.batchBuffers.set(bufferKey, buffer);
+    }
+    const flush = () => {
+      const held = this.batchBuffers.get(bufferKey);
+      if (!held || held.entries.length === 0) return;
+      const entries = held.entries.splice(0);
+      const total = held.bytes;
+      held.bytes = 0;
+      held.epoch++;
+      const leg = this.legSeconds(edge, edge.latencyMs, total, `${bufferKey}:batch:${++this.batchSequence}`);
+      for (const send of entries) send(this.currentTime, leg);
+    };
+    buffer.entries.push(travel);
+    buffer.bytes += bytes;
+    if (buffer.entries.length >= batch.size) {
+      flush();
+    } else if (buffer.entries.length === 1) {
+      const epoch = buffer.epoch;
+      this.scheduleEvent(this.currentTime + batch.windowMs / 1000, 1, () => {
+        if (this.batchBuffers.get(bufferKey)?.epoch === epoch) flush();
+      });
+    }
   }
 
   protected handleChildResponse(parentOp: Op, outcome: Outcome): void {
@@ -2339,6 +2535,8 @@ export class OpenSimulation {
     // Each delivery (D50 redelivery) is its own path, so its seeded draws are independent.
     const delivery = brokerOp.deliveries ?? 1;
     const childPath = delivery === 1 ? `${brokerOp.path}>${edge.id}` : `${brokerOp.path}>${edge.id}#${delivery}`;
+    // D54: the hop to the consumer has jitter and transfer time like any link, but is never lost (the broker would wait forever).
+    const hopSeconds = this.legSeconds(edge, edge.latencyMs, 0, `${brokerOp.unit.identity}:${childPath}:hop`, false) ?? edge.latencyMs / 1000;
     const childOp: Op = {
       unit: brokerOp.unit,
       nodeId: edge.target,
@@ -2348,7 +2546,7 @@ export class OpenSimulation {
       done: false,
       attempt: 0,
       children: new Set(),
-      arrived: this.currentTime + edge.latencyMs / 1000,
+      arrived: this.currentTime + hopSeconds,
       onDone: (childOutcome) => {
         em.responses++;
         if (childOutcome === 'succeeded') {
@@ -2364,7 +2562,7 @@ export class OpenSimulation {
     brokerOp.unit.ops.add(childOp);
     this.liveOpsCount++;
 
-    const deliveryTime = this.currentTime + edge.latencyMs / 1000;
+    const deliveryTime = this.currentTime + hopSeconds;
     this.scheduleEvent(deliveryTime, 2, () => {
       if (childOp.done || childOp.unit.done || deliveryTime >= childOp.unit.deadline) {
         if (!childOp.done) {

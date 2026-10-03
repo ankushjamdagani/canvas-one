@@ -60,7 +60,7 @@ describe('Mermaid v1 Diagram Export (renderDiagramMermaid)', () => {
             weight: 1,
             condition: null,
             fallback: false,
-            linkClass: null,
+            linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null,
           },
           source: { elementId: 'el-alpha', portId: 'port-out' },
           target: { elementId: 'el-zebra', portId: 'port-in' },
@@ -169,7 +169,7 @@ describe('Mermaid v1 Diagram Export (renderDiagramMermaid)', () => {
           kind: 'message',
           config: {
             latencyMs: 10,
-            linkClass: null,
+            linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null,
             weight: 1,
             condition: null,
             fallback: false,

@@ -332,10 +332,12 @@ describe('fieldsForConnection', () => {
       kind: 'message',
       source: { elementId: 'a', portId: 'p-out' },
       target: { elementId: 'b', portId: 'p-in' },
-      config: { latencyMs: 0, linkClass: null, weight: 1, condition: null, fallback: false },
+      config: { latencyMs: 0, linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null, weight: 1, condition: null, fallback: false },
     };
     const fields = fieldsForConnection(conn);
-    expect(fields.map((f) => f.id)).toEqual(['config.linkClass', 'config.latencyMs', 'config.weight']);
+    expect(fields.map((f) => f.id)).toEqual([
+      'config.linkClass', 'config.latencyMs', 'config.jitterMs', 'config.lossRate', 'config.bandwidthKbps', 'config.weight',
+    ]);
     const preset = fields.find((f) => f.id === 'config.linkClass')!.apply(conn, 'cross-az');
     expect(preset.kind === 'message' && preset.config).toMatchObject({ linkClass: 'cross-az', latencyMs: 5 });
   });
@@ -405,6 +407,59 @@ describe('fieldsForElement: port settings (D53)', () => {
     const unmodeled = processorElement({ ports: [inPort], behavior: { kind: 'unmodeled', version: 1, reason: 'x' } });
     expect(fieldsForElement(unmodeled).some((f) => f.id === 'port.pi.rateLimit.rps')).toBe(false);
     expect(fieldsForElement(unmodeled).some((f) => f.id === 'port.pi.expectedP95Ms')).toBe(true);
+  });
+
+  it('a caller can open a circuit breaker, cap in-flight calls and hedge, and each is removed by blanking it (D54)', () => {
+    const el = processorElement({ ports: [outPort] });
+    const fields = fieldsForElement(el);
+    const threshold = fields.find((f) => f.id === 'port.po.circuitBreaker.failureThreshold')!;
+    expect(fieldsForElement(el).some((f) => f.id === 'port.po.circuitBreaker.openMs')).toBe(false);
+    const open = threshold.apply(el, 5) as Element;
+    expect(open.ports[0].settings).toEqual({ circuitBreaker: { failureThreshold: 5, openMs: 30000, halfOpenProbes: 1 } });
+    const detail = fieldsForElement(open).find((f) => f.id === 'port.po.circuitBreaker.halfOpenProbes')!;
+    expect((detail.apply(open, 3) as Element).ports[0].settings).toEqual({ circuitBreaker: { failureThreshold: 5, openMs: 30000, halfOpenProbes: 3 } });
+    expect((threshold.apply(open, null) as Element).ports[0].settings).toBeUndefined();
+
+    const inFlight = fields.find((f) => f.id === 'port.po.maxInFlight')!.apply(el, 20) as Element;
+    expect(inFlight.ports[0].settings).toEqual({ maxInFlight: 20 });
+    const hedge = fields.find((f) => f.id === 'port.po.hedge.afterMs')!.apply(inFlight, 80) as Element;
+    expect(hedge.ports[0].settings).toEqual({ maxInFlight: 20, hedge: { afterMs: 80 } });
+    const bytes = fields.find((f) => f.id === 'port.po.requestBytes')!.apply(el, 2048) as Element;
+    expect(bytes.ports[0].settings).toEqual({ requestBytes: 2048 });
+  });
+
+  it('a publisher chooses fire-and-forget and batching; a callee caps concurrency and sizes its reply (D54)', () => {
+    const msgOut = { id: 'pm', label: 'out', direction: 'out', channel: 'message', protocol: 'amqp', schemaId: 's', responseSchemaId: null } as Element['ports'][number];
+    const el = processorElement({ ports: [msgOut] });
+    const fields = fieldsForElement(el);
+    const confirm = fields.find((f) => f.id === 'port.pm.confirm')!;
+    expect(confirm.toRaw(el)).toBe('yes');
+    const forgotten = confirm.apply(el, 'no') as Element;
+    expect(forgotten.ports[0].settings).toEqual({ confirm: false });
+    expect(confirm.toRaw(forgotten)).toBe('no');
+    expect((confirm.apply(forgotten, 'yes') as Element).ports[0].settings).toBeUndefined();
+    const batched = fields.find((f) => f.id === 'port.pm.batch.size')!.apply(el, 10) as Element;
+    expect(batched.ports[0].settings).toEqual({ batch: { size: 10, windowMs: 100 } });
+    expect(fieldsForElement(batched).some((f) => f.id === 'port.pm.batch.windowMs')).toBe(true);
+
+    const callee = processorElement({ ports: [inPort] });
+    const cap = fieldsForElement(callee).find((f) => f.id === 'port.pi.maxConcurrency')!.apply(callee, 8) as Element;
+    expect(cap.ports[0].settings).toEqual({ maxConcurrency: 8 });
+    expect(fieldsForElement(callee).find((f) => f.id === 'port.pi.maxConcurrency')!.note).toMatch(/^Simulated/);
+    const sized = fieldsForElement(callee).find((f) => f.id === 'port.pi.responseBytes')!.apply(callee, 1000) as Element;
+    expect(sized.ports[0].settings).toEqual({ responseBytes: 1000 });
+  });
+
+  it('a link takes jitter, loss and a bandwidth that blank clears (D54)', () => {
+    const conn = callConnection();
+    const fields = fieldsForConnection(conn);
+    const bandwidth = fields.find((f) => f.id === 'config.bandwidthKbps')!;
+    expect(bandwidth.toRaw(conn)).toBe('');
+    const limited = bandwidth.apply(conn, 8000);
+    expect(limited.kind === 'call' && limited.config.bandwidthKbps).toBe(8000);
+    expect((bandwidth.apply(limited, null) as { config: { bandwidthKbps: unknown } }).config.bandwidthKbps).toBeNull();
+    expect(fields.find((f) => f.id === 'config.lossRate')!.parse('101').ok).toBe(false);
+    expect(fields.find((f) => f.id === 'config.jitterMs')!.parse('-1').ok).toBe(false);
   });
 
   it('an unsimulated caller also has a deadline and a request class; a simulated one inherits them', () => {

@@ -51,6 +51,8 @@ import type {
   ExecutionNode,
   ExecutionEdge,
   EndpointBehavior,
+  CallerPolicy,
+  EdgeLink,
   WorkloadDefinition,
   RequestClass as KernelRequestClass,
   BehaviorConfig,
@@ -225,12 +227,35 @@ function buildExecutionGraph(opts: {
   const allElementsById = new Map<Id, Element>();
   const portLookup = { elements: opts.elements };
   // D53: the simulated settings of the in-port a call enters through override the node's behavior for it.
+  // D54: the caller's circuit breaker, in-flight limit, hedging, payload size, confirm and batching.
+  const callerOf = (endpoint: Endpoint): CallerPolicy | undefined => {
+    const settings = findPort(portLookup, endpoint)?.port.settings as
+      | { circuitBreaker?: CallerPolicy['breaker']; maxInFlight?: number; hedge?: { afterMs: number }; requestBytes?: number; confirm?: boolean; batch?: CallerPolicy['batch'] }
+      | undefined;
+    if (!settings) return undefined;
+    const policy: CallerPolicy = {
+      key: `${endpoint.elementId}:${endpoint.portId}`,
+      ...(settings.circuitBreaker ? { breaker: { ...settings.circuitBreaker } } : {}),
+      ...(settings.maxInFlight !== undefined ? { maxInFlight: settings.maxInFlight } : {}),
+      ...(settings.hedge ? { hedgeAfterMs: settings.hedge.afterMs } : {}),
+      ...(settings.requestBytes !== undefined ? { requestBytes: settings.requestBytes } : {}),
+      ...(settings.confirm === false ? { confirm: false } : {}),
+      ...(settings.batch ? { batch: { ...settings.batch } } : {}),
+    };
+    return Object.keys(policy).length > 1 ? policy : undefined;
+  };
+  const linkOf = (c: { jitterMs: number; lossRate: number; bandwidthKbps: number | null }): EdgeLink | undefined =>
+    c.jitterMs > 0 || c.lossRate > 0 || c.bandwidthKbps !== null
+      ? { jitterMs: c.jitterMs, lossRate: c.lossRate, bandwidthKbps: c.bandwidthKbps }
+      : undefined;
   const endpointOf = (endpoint: Endpoint): EndpointBehavior | undefined => {
     const port = findPort(portLookup, endpoint)?.port;
-    const settings = port?.settings as { serviceTimeMs?: number; failureRate?: number; rateLimit?: { rps: number; burst: number } } | undefined;
+    const settings = port?.settings as { serviceTimeMs?: number; failureRate?: number; rateLimit?: { rps: number; burst: number }; maxConcurrency?: number; responseBytes?: number } | undefined;
     if (!port || !settings) return undefined;
     const behavior: EndpointBehavior = {
       key: `${endpoint.elementId}:${endpoint.portId}`,
+      ...(settings.maxConcurrency !== undefined ? { maxConcurrency: settings.maxConcurrency } : {}),
+      ...(settings.responseBytes !== undefined ? { responseBytes: settings.responseBytes } : {}),
       ...(settings.serviceTimeMs !== undefined ? { serviceTimeMs: settings.serviceTimeMs } : {}),
       ...(settings.failureRate !== undefined ? { failureRate: settings.failureRate } : {}),
       ...(settings.rateLimit ? { rateLimit: { ...settings.rateLimit } } : {}),
@@ -310,6 +335,8 @@ function buildExecutionGraph(opts: {
         // D49/D50: a caller's retries, or a broker route's redelivery policy.
         ...(callRetryOf(portLookup, conn) ? { retry: callRetryOf(portLookup, conn)! } : {}),
         ...(endpointOf(conn.target) ? { endpoint: endpointOf(conn.target)! } : {}),
+        ...(callerOf(conn.source) ? { caller: callerOf(conn.source)! } : {}),
+        ...(linkOf(callConn.config) ? { link: linkOf(callConn.config)! } : {}),
       });
     } else if (conn.kind === 'message') {
       const msgConn = conn as MessageConnection;
@@ -329,6 +356,8 @@ function buildExecutionGraph(opts: {
           : undefined,
         fallback: msgConn.config.fallback,
         ...(endpointOf(conn.target) ? { endpoint: endpointOf(conn.target)! } : {}),
+        ...(callerOf(conn.source) ? { caller: callerOf(conn.source)! } : {}),
+        ...(linkOf(msgConn.config) ? { link: linkOf(msgConn.config)! } : {}),
       });
     }
   }

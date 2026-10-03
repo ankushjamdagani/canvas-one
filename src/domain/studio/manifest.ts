@@ -252,14 +252,14 @@ const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseS
 // D53: port settings. E (kept in the manifest) changes what a run does; A (dropped) is a declared
 // expectation or presentation. Anything not listed here throws, like every other record.
 const SETTINGS_KEPT: Readonly<Record<string, readonly string[]>> = {
-  'in:call': ['rateLimit', 'failureRate', 'serviceTimeMs'],
+  'in:call': ['rateLimit', 'failureRate', 'serviceTimeMs', 'maxConcurrency', 'responseBytes'],
   'in:message': ['ackDelayMs', 'messageTtlMs'],
   'in:data': [],
-  'out:call': ['deadlineDurationMs', 'retry', 'request'],
-  'out:message': ['deadlineDurationMs', 'request'],
+  'out:call': ['deadlineDurationMs', 'retry', 'request', 'circuitBreaker', 'maxInFlight', 'hedge', 'requestBytes'],
+  'out:message': ['deadlineDurationMs', 'request', 'confirm', 'batch', 'requestBytes'],
 };
 const SETTINGS_DROPPED: Readonly<Record<string, readonly string[]>> = {
-  'in:call': ['expectedP95Ms', 'availabilityPct', 'idempotent', 'maxConcurrency'],
+  'in:call': ['expectedP95Ms', 'availabilityPct', 'idempotent'],
   'in:message': ['delivery', 'ordering'],
   'in:data': ['throughputPerSec', 'maxStalenessMs'],
   'out:call': [],

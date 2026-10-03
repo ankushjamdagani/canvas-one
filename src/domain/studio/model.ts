@@ -91,8 +91,9 @@ export type MessageOrdering = (typeof MESSAGE_ORDERINGS)[number];
 
 /**
  * An inbound call endpoint. Declared (shown to callers, checked by advisories, never simulated):
- * expectedP95Ms, availabilityPct, idempotent, maxConcurrency. Simulated (resource nodes only, they
- * override the node's own behavior for this endpoint): rateLimit, failureRate, serviceTimeMs.
+ * expectedP95Ms, availabilityPct, idempotent. Simulated (resource nodes only, they override the
+ * node's own behavior for this endpoint): rateLimit, failureRate, serviceTimeMs, maxConcurrency
+ * (calls beyond it are rejected) and responseBytes.
  */
 export type CallInSettings = {
   readonly expectedP95Ms?: number;
@@ -102,6 +103,8 @@ export type CallInSettings = {
   readonly rateLimit?: { readonly rps: number; readonly burst: number };
   readonly failureRate?: number;
   readonly serviceTimeMs?: number;
+  /** Size of the reply in bytes; with a link bandwidth it adds transfer time on the way back. */
+  readonly responseBytes?: number;
 };
 
 /**
@@ -130,12 +133,34 @@ export type CallOutSettings = {
   readonly deadlineDurationMs?: number;
   readonly retry?: CallRetryPolicy;
   readonly request?: RequestMeta;
+  /** After this many consecutive failures the caller stops calling for `openMs`, then probes. */
+  readonly circuitBreaker?: CircuitBreakerPolicy;
+  /** Calls beyond this many outstanding through this endpoint fail fast. */
+  readonly maxInFlight?: number;
+  /** An attempt unanswered after `afterMs` is sent again; the first success wins. */
+  readonly hedge?: { readonly afterMs: number };
+  /** Size of each request in bytes; with a link bandwidth it adds transfer time. */
+  readonly requestBytes?: number;
 };
 
-/** An outbound message endpoint. Simulated for traffic that originates here: request and deadlineDurationMs. */
+/** The caller's circuit breaker (D54). */
+export type CircuitBreakerPolicy = {
+  readonly failureThreshold: number;
+  readonly openMs: number;
+  readonly halfOpenProbes: number;
+};
+
+/**
+ * An outbound message endpoint. `confirm: false` makes the publisher fire and forget instead of
+ * waiting for the receiver's acknowledgement; `batch` holds publishes until `size` have gathered
+ * or `windowMs` has passed, then sends them over one hop.
+ */
 export type MessageOutSettings = {
   readonly deadlineDurationMs?: number;
   readonly request?: RequestMeta;
+  readonly confirm?: boolean;
+  readonly batch?: { readonly size: number; readonly windowMs: number };
+  readonly requestBytes?: number;
 };
 
 export type PortSettings =
@@ -267,6 +292,12 @@ export type CallConnectionConfig = {
   readonly latencyMs: number;
   readonly returnLatencyMs: number;
   readonly linkClass: LinkClass | null;
+  /** Each leg takes up to this much longer, uniformly at random (0 = steady). */
+  readonly jitterMs: number;
+  /** Percent of legs that never arrive (0 = reliable). */
+  readonly lossRate: number;
+  /** Link bandwidth in kilobits per second; null = unlimited. Transfer time needs payload sizes on the ports. */
+  readonly bandwidthKbps: number | null;
   readonly weight: number;
   readonly condition: RouteCondition | null;
   readonly fallback: boolean;
@@ -276,6 +307,9 @@ export type CallConnectionConfig = {
 export type MessageConnectionConfig = {
   readonly latencyMs: number;
   readonly linkClass: LinkClass | null;
+  readonly jitterMs: number;
+  readonly lossRate: number;
+  readonly bandwidthKbps: number | null;
   readonly weight: number;
   readonly condition: RouteCondition | null;
   readonly fallback: boolean;

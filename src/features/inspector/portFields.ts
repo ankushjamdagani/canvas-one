@@ -5,10 +5,10 @@
  * the connection inspector only summarizes them.
  */
 
-import type { CallRetryPolicy, Element, Port, RequestMeta } from '../../domain/studio/model';
+import type { CallRetryPolicy, CircuitBreakerPolicy, Element, Port, RequestMeta } from '../../domain/studio/model';
 import { DELIVERY_GUARANTEES, MESSAGE_ORDERINGS } from '../../domain/studio/model';
 import { describeEndpoint } from '../../domain/studio/protocols';
-import { numberField, optionalNumberField, optionalSelectField, readonlyField, textField } from './fieldBuilders';
+import { numberField, optionalNumberField, optionalSelectField, readonlyField, selectField, textField } from './fieldBuilders';
 import type { FieldSpec } from './types';
 
 type Settings = Record<string, unknown>;
@@ -76,10 +76,6 @@ function inCallFields(element: Element, port: Port): FieldSpec<Element>[] {
       get: (el) => { const v = settingsOf(el, port.id).idempotent; return v === true ? 'yes' : v === false ? 'no' : undefined; },
       set: (el, value) => withSetting(el, port.id, 'idempotent', value === null ? null : value === 'yes'),
     }),
-    optionalNumberField<Element>({
-      id: id('maxConcurrency'), label: 'Max concurrency', note: 'Declared: shown to callers, not simulated',
-      min: 1, max: 100000, integer: true, get: get('maxConcurrency'), set: set('maxConcurrency'),
-    }),
   ];
   if (element.behavior.kind !== 'resource') return fields;
 
@@ -116,6 +112,14 @@ function inCallFields(element: Element, port: Port): FieldSpec<Element>[] {
     optionalNumberField<Element>({
       id: id('serviceTimeMs'), label: 'Service time', unit: 'ms', note: 'Simulated: replaces 1 / capacity for this endpoint',
       min: 0, max: 600000, minExclusive: true, get: get('serviceTimeMs'), set: set('serviceTimeMs'),
+    }),
+    optionalNumberField<Element>({
+      id: id('maxConcurrency'), label: 'Max concurrency', note: 'Simulated: calls beyond this many in service or queued through this endpoint are rejected',
+      min: 1, max: 100000, integer: true, get: get('maxConcurrency'), set: set('maxConcurrency'),
+    }),
+    optionalNumberField<Element>({
+      id: id('responseBytes'), label: 'Response size', unit: 'bytes', note: 'Simulated: adds transfer time on the way back over a link with a bandwidth',
+      min: 0, max: 1e12, integer: true, minExclusive: true, get: get('responseBytes'), set: set('responseBytes'),
     }),
   );
   return fields;
@@ -252,8 +256,106 @@ function originatingFields(element: Element, port: Port): FieldSpec<Element>[] {
   ];
 }
 
+const BREAKER_WHEN_ENABLED = { openMs: 30000, halfOpenProbes: 1 } as const;
+/** A batch that is switched on waits this long for company (an assumption, shown in the inspector). */
+const BATCH_WINDOW_WHEN_ENABLED_MS = 100;
+
+function breakerFields(element: Element, port: Port): FieldSpec<Element>[] {
+  const id = (key: string) => `port.${port.id}.circuitBreaker.${key}`;
+  const breakerOf = (el: Element) => settingsOf(el, port.id).circuitBreaker as CircuitBreakerPolicy | undefined;
+  const withBreaker = (el: Element, patch: (b: CircuitBreakerPolicy) => CircuitBreakerPolicy): Element => {
+    const b = breakerOf(el);
+    return b ? withSetting(el, port.id, 'circuitBreaker', patch(b)) : el;
+  };
+  const fields: FieldSpec<Element>[] = [
+    optionalNumberField<Element>({
+      id: id('failureThreshold'), label: 'Circuit breaker: consecutive failures to open', note: 'Simulated: after this many failures in a row the caller stops calling, then probes',
+      min: 1, max: 1000, integer: true,
+      get: (el) => breakerOf(el)?.failureThreshold,
+      set: (el, value) => {
+        const b = breakerOf(el);
+        return withSetting(el, port.id, 'circuitBreaker', value === null ? null : b ? { ...b, failureThreshold: value } : { ...BREAKER_WHEN_ENABLED, failureThreshold: value });
+      },
+    }),
+  ];
+  if (!breakerOf(element)) return fields;
+  fields.push(
+    numberField<Element>({
+      id: id('openMs'), label: 'Breaker open time', unit: 'ms', min: 1, max: 600000,
+      get: (el) => breakerOf(el)?.openMs ?? BREAKER_WHEN_ENABLED.openMs, set: (el, value) => withBreaker(el, (b) => ({ ...b, openMs: value })),
+    }),
+    numberField<Element>({
+      id: id('halfOpenProbes'), label: 'Probe calls when half-open', min: 1, max: 100, integer: true,
+      get: (el) => breakerOf(el)?.halfOpenProbes ?? 1, set: (el, value) => withBreaker(el, (b) => ({ ...b, halfOpenProbes: value })),
+    }),
+  );
+  return fields;
+}
+
+function callerPolicyFields(element: Element, port: Port): FieldSpec<Element>[] {
+  const id = (key: string) => `port.${port.id}.${key}`;
+  return [
+    ...breakerFields(element, port),
+    optionalNumberField<Element>({
+      id: id('maxInFlight'), label: 'In-flight limit', note: 'Simulated: calls beyond this many outstanding through this endpoint fail fast',
+      min: 1, max: 1e6, integer: true, get: (el) => num(settingsOf(el, port.id), 'maxInFlight'), set: (el, value) => withSetting(el, port.id, 'maxInFlight', value),
+    }),
+    optionalNumberField<Element>({
+      id: id('hedge.afterMs'), label: 'Hedge after', unit: 'ms', note: 'Simulated: an attempt unanswered after this long is sent again; the first success wins',
+      min: 0, max: 600000, minExclusive: true,
+      get: (el) => (settingsOf(el, port.id).hedge as { afterMs: number } | undefined)?.afterMs,
+      set: (el, value) => withSetting(el, port.id, 'hedge', value === null ? null : { afterMs: value }),
+    }),
+    optionalNumberField<Element>({
+      id: id('requestBytes'), label: 'Request size', unit: 'bytes', note: 'Simulated: adds transfer time over a link with a bandwidth',
+      min: 0, max: 1e12, integer: true, minExclusive: true, get: (el) => num(settingsOf(el, port.id), 'requestBytes'), set: (el, value) => withSetting(el, port.id, 'requestBytes', value),
+    }),
+  ];
+}
+
+function outMessagePolicyFields(element: Element, port: Port): FieldSpec<Element>[] {
+  const id = (key: string) => `port.${port.id}.${key}`;
+  const batchOf = (el: Element) => settingsOf(el, port.id).batch as { size: number; windowMs: number } | undefined;
+  const fields: FieldSpec<Element>[] = [
+    selectField<Element>({
+      id: id('confirm'), label: 'Wait for acknowledgement',
+      options: [{ value: 'yes', label: 'Yes: the publisher waits for the receiver to confirm' }, { value: 'no', label: 'No: fire and forget' }],
+      get: (el) => (settingsOf(el, port.id).confirm === false ? 'no' : 'yes'),
+      set: (el, value) => withSetting(el, port.id, 'confirm', value === 'no' ? false : null),
+    }),
+    optionalNumberField<Element>({
+      id: id('batch.size'), label: 'Batch size', note: 'Simulated: publishes wait for this many (or the window), then travel together',
+      min: 2, max: 1000, integer: true,
+      get: (el) => batchOf(el)?.size,
+      set: (el, value) => {
+        const b = batchOf(el);
+        return withSetting(el, port.id, 'batch', value === null ? null : { windowMs: b?.windowMs ?? BATCH_WINDOW_WHEN_ENABLED_MS, size: value });
+      },
+    }),
+  ];
+  if (batchOf(element)) {
+    fields.push(
+      numberField<Element>({
+        id: id('batch.windowMs'), label: 'Batch window', unit: 'ms', min: 1, max: 600000,
+        get: (el) => batchOf(el)?.windowMs ?? BATCH_WINDOW_WHEN_ENABLED_MS,
+        set: (el, value) => {
+          const b = batchOf(el);
+          return b ? withSetting(el, port.id, 'batch', { ...b, windowMs: value }) : el;
+        },
+      }),
+    );
+  }
+  fields.push(
+    optionalNumberField<Element>({
+      id: id('requestBytes'), label: 'Message size', unit: 'bytes', note: 'Simulated: adds transfer time over a link with a bandwidth',
+      min: 0, max: 1e12, integer: true, minExclusive: true, get: (el) => num(settingsOf(el, port.id), 'requestBytes'), set: (el, value) => withSetting(el, port.id, 'requestBytes', value),
+    }),
+  );
+  return fields;
+}
+
 function outCallFields(element: Element, port: Port): FieldSpec<Element>[] {
-  const fields = retryFields(element, port);
+  const fields = [...retryFields(element, port), ...callerPolicyFields(element, port)];
   if (element.behavior.kind !== 'resource') fields.push(...originatingFields(element, port));
   return fields;
 }
@@ -268,7 +370,7 @@ export function portSettingsFields(element: Element): readonly FieldSpec<Element
     else if (port.direction === 'in' && port.channel === 'message') fields = inMessageFields(port);
     else if (port.direction === 'in' && port.channel === 'data') fields = inDataFields(port);
     else if (port.direction === 'out' && port.channel === 'call') fields = outCallFields(element, port);
-    else if (port.direction === 'out' && port.channel === 'message' && element.behavior.kind !== 'resource') fields = originatingFields(element, port);
+    else if (port.direction === 'out' && port.channel === 'message') fields = [...outMessagePolicyFields(element, port), ...(element.behavior.kind !== 'resource' ? originatingFields(element, port) : [])];
     result.push(...grouped(portGroup(element, port), fields));
   }
   return result;

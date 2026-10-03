@@ -2602,3 +2602,27 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: `tsc -b` clean, `npm test` 1,635 passed, `npm run build` ok (Workspace chunk 496.5 kB after lazy-loading the two dialogs and the Ours tab), production Playwright suite on an isolated port (2 workers, no retries): 108 passed, 4 skipped (dev-only specimen), 0 failed. The existing reference-architecture tests (retries, TTL, redelivery) pass unchanged after only moving where they set those values.
 - **Limitations**: See HANDOFF "Open debt". Old files no longer validate (decision: no backward compatibility); `PORTABLE_VERSION` was not bumped. The floating connection bar is deferred at the user's request.
 - **Lesson**: When a field moves between records, migrate the stored fixtures by script and split a port wherever its connections disagreed (none did here); then move the tests' setters, not their expectations. Editing a closed-record contract is cheap when every consumer reads through one helper (`port-settings.ts`).
+
+## 2026-10-04 — Delete project from entry screen; homepage import blocked
+
+- **Outcome**: Entry-screen project rows have a trash button with inline Delete/Cancel confirm, calling `repository.deleteProject` with the main head read at list time as the CAS token (stale → message + list refresh). Homepage redesign import from Claude Design not done: `claude_design` MCP failed to connect (HTTP 403, needs `/design-login`).
+- **Files**: `src/features/entry/EntryScreen.tsx`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean; entry unit tests 13 passed. No browser check of the delete flow, no new test.
+- **Limitations**: Homepage design not implemented; delete flow untested in the browser.
+
+## 2026-10-04 — Delete project from the project dropdown
+
+- **Outcome**: The project menu's no-op "Archive project" is now "Delete project…" (`project-menu-delete`): confirm dialog (lazy `DeleteProjectDialog`, CAS on main head), then back to the entry screen. Homepage import still blocked: `claude_design` MCP retried, still 403.
+- **Files**: `features/workspace/{DeleteProjectDialog,ProjectMenu,TopBar,Workspace}.tsx`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean; throwaway Playwright probe on a preview build passed (delete from menu, delete from entry list). Full suite not run.
+- **Limitations**: Workspace chunk is 500.67 kB; baseline without this change is already 500.04 kB from earlier uncommitted work, so the 500 kB warning is back (not caused here, +0.63 kB).
+
+## 2026-10-04 — Caller policies, link impairments, publish confirm and batching, concurrency cap (D54 follow-up)
+
+- **Outcome**: Everything D54 had listed as not built is now simulated. Call out-ports: `circuitBreaker` (consecutive failures open it, fast-fail while open, half-open probes), `maxInFlight` (fail fast beyond it), `hedge` (a second copy after `afterMs`, first success wins), `requestBytes`. Message out-ports: `confirm: false` (fire and forget), `batch {size, windowMs}` (publishes travel together over one hop), `requestBytes`. Call in-ports: `maxConcurrency` (now enforced, rejects beyond the slots) and `responseBytes`. Links: `jitterMs`, `lossRate`, `bandwidthKbps` (transfer time from the port sizes). The kernel got `CallerPolicy`/`EdgeLink` on edges, per-out-port breaker and in-flight state, per-endpoint concurrency slots and deterministic per-leg draws. Inspector: fields for all of them on the node (per port) and the link; advisory for hedging a not-idempotent endpoint; caller and callee summaries include them. `maxConcurrency` left the declared exposure contract. Fixtures migrated (three link keys).
+- **Files**: `domain/studio/{model,validate,manifest,port-settings,exposure}.ts`, `domain/execution.ts`, `simulation/open/kernel.ts`, `domain/studio/runner/resource-adapter.ts`, `domain/versioning/merge-descriptor.ts`, `features/catalog/connect.ts`, `features/inspector/{fields,portFields}`, `features/runs/index.ts` (no longer re-exports ResultsRegion), `features/workspace/Workspace.tsx` (ResultsRegion lazy), `specs/revamp/{port-settings,decisions}.md`, `contracts/model-and-runner.md`, fixtures, tests; new `runner/call-policies.test.ts`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean, `npm test` 1,656 passed (12 new runner tests cover each policy end to end), `npm run build` ok (Workspace chunk 487.3 kB after lazy-loading ResultsRegion), production Playwright suite on an isolated port: 108 passed, 4 skipped, 0 failed.
+- **Limitations**: `delivery` and `ordering` stay declared only. Batching saves hops, not broker work (broker cost is still per message). A broker-to-consumer hop gets jitter and transfer time but is never lost. Overrides and policies do not apply to calls that leave a state machine or enter from a scenario input.

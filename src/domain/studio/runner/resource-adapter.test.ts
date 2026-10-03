@@ -63,7 +63,7 @@ function makeCallConnection(
       weight: 1,
       condition: null,
       fallback: false,
-      linkClass: null,
+      linkClass: null, jitterMs: 0, lossRate: 0, bandwidthKbps: null,
     },
   };
 }
