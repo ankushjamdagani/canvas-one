@@ -463,17 +463,6 @@ export function kindTagForElement(element: Element): { readonly tag: string; rea
 // Connection fields
 // ============================================================================
 
-function connectionLabelField(): FieldSpec<Connection> {
-  return textField<Connection>({
-    id: LABEL_FIELD_ID,
-    label: 'Label',
-    min: 1,
-    max: 80,
-    get: (c) => c.label,
-    set: (c, value) => ({ ...c, label: value }),
-  });
-}
-
 /** D50: the variability a resource gets when its author chooses lognormal (an assumption, shown). */
 const LOGNORMAL_CV_WHEN_CHOSEN = 2;
 
@@ -692,14 +681,13 @@ function readOnlyRoutingFields(
 }
 
 export function fieldsForConnection(connection: Connection): readonly FieldSpec<Connection>[] {
-  const base = [connectionLabelField()];
   if (connection.kind === 'call') {
-    return [...base, ...callFields().filter((f) => shouldShowReadonly(connection, f)), ...retryFields(connection)];
+    return [...callFields().filter((f) => shouldShowReadonly(connection, f)), ...retryFields(connection)];
   }
   if (connection.kind === 'message') {
-    return [...base, ...messageFields().filter((f) => shouldShowReadonly(connection, f))];
+    return [...messageFields().filter((f) => shouldShowReadonly(connection, f))];
   }
-  return base;
+  return [];
 }
 
 function shouldShowReadonly(connection: Connection, field: FieldSpec<Connection>): boolean {

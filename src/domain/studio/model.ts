@@ -215,7 +215,6 @@ export type ConnectionKind = (typeof CONNECTION_KINDS)[number];
 
 export type CallConnection = {
   readonly id: Id;
-  readonly label: string;
   readonly kind: 'call';
   readonly source: Endpoint;
   readonly target: Endpoint;
@@ -224,7 +223,6 @@ export type CallConnection = {
 
 export type MessageConnection = {
   readonly id: Id;
-  readonly label: string;
   readonly kind: 'message';
   readonly source: Endpoint;
   readonly target: Endpoint;
@@ -233,7 +231,6 @@ export type MessageConnection = {
 
 export type DataConnection = {
   readonly id: Id;
-  readonly label: string;
   readonly kind: 'data';
   readonly source: Endpoint;
   readonly target: Endpoint;

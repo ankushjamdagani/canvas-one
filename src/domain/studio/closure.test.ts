@@ -269,7 +269,6 @@ describe('Scenario Scope Closure (computeClosure)', () => {
           const prevElId = makeId('aaaaaaaa', i - 1);
           connections.push({
             id: makeId('dddddddd', i),
-            label: `conn ${i}`,
             kind: 'message',
             source: { elementId: prevElId, portId: prevOutPortId },
             target: { elementId: elId, portId: inPortId },

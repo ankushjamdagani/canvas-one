@@ -19,6 +19,7 @@
  */
 
 import { markdownToPlainLines } from '../../lib/miniMarkdown';
+import { describeConnection } from '../../domain/studio/connection-label';
 import { NOTE_TONE_STYLES } from '../workspace/noteTones';
 import type { Connection, Document, Element, Id, Placement, View } from '../../domain/studio/model';
 import { getNodeCaption } from '../workspace/nodeVisuals';
@@ -293,9 +294,10 @@ export function renderDiagramSvg(document: Document, viewId?: string | null): st
         `marker-end="url(#diagram-arrow)"${dashAttr} data-connection-id="${xmlEscape(conn.id)}"/>`,
     );
 
-    if (conn.label) {
-      const escapedEdgeLabel = xmlEscape(conn.label);
-      const labelWidth = Math.max(36, Math.min(180, conn.label.length * 6.5 + 12));
+    const edgeLabel = describeConnection(document, conn);
+    {
+      const escapedEdgeLabel = xmlEscape(edgeLabel);
+      const labelWidth = Math.max(36, Math.min(180, edgeLabel.length * 6.5 + 12));
       const labelHeight = 18;
       const lx = labelX - labelWidth / 2;
       const ly = labelY - labelHeight / 2;

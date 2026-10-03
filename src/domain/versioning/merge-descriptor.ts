@@ -346,7 +346,6 @@ export const CONNECTION_DESCRIPTOR: UnionFieldDescriptor = {
       type: 'object',
       fields: {
         id: { type: 'scalar' },
-        label: { type: 'scalar' },
         kind: { type: 'scalar' },
         source: ENDPOINT_DESCRIPTOR,
         target: ENDPOINT_DESCRIPTOR,
@@ -368,7 +367,6 @@ export const CONNECTION_DESCRIPTOR: UnionFieldDescriptor = {
       type: 'object',
       fields: {
         id: { type: 'scalar' },
-        label: { type: 'scalar' },
         kind: { type: 'scalar' },
         source: ENDPOINT_DESCRIPTOR,
         target: ENDPOINT_DESCRIPTOR,
@@ -390,7 +388,6 @@ export const CONNECTION_DESCRIPTOR: UnionFieldDescriptor = {
       type: 'object',
       fields: {
         id: { type: 'scalar' },
-        label: { type: 'scalar' },
         kind: { type: 'scalar' },
         source: ENDPOINT_DESCRIPTOR,
         target: ENDPOINT_DESCRIPTOR,

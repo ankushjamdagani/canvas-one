@@ -2234,7 +2234,6 @@
   "connections": [
     {
       "id": "90c258a5-6003-5d54-8f25-d63df58bca7e",
-      "label": "mock request",
       "kind": "call",
       "source": {
         "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",
@@ -2255,7 +2254,6 @@
     },
     {
       "id": "cd1e0433-ba8e-5de6-89c2-408744b1bffc",
-      "label": "entry to validate",
       "kind": "data",
       "source": {
         "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
@@ -2269,7 +2267,6 @@
     },
     {
       "id": "d2930d72-096a-5ee5-8814-ab18b904be10",
-      "label": "valid to payment",
       "kind": "data",
       "source": {
         "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
@@ -2283,7 +2280,6 @@
     },
     {
       "id": "22cc9929-5655-58fa-a2ad-44ca80cb9172",
-      "label": "allow to reply",
       "kind": "data",
       "source": {
         "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
@@ -2297,7 +2293,6 @@
     },
     {
       "id": "5602258b-bb1f-55cb-8f0d-56eaea5cbbb5",
-      "label": "deny to reply",
       "kind": "data",
       "source": {
         "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
@@ -2311,7 +2306,6 @@
     },
     {
       "id": "69ad37df-b5ec-5301-8624-6063b4386686",
-      "label": "invalid to reply",
       "kind": "data",
       "source": {
         "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
@@ -2325,7 +2319,6 @@
     },
     {
       "id": "4682d3b1-50f5-5bd3-b36a-7ec0aac12a24",
-      "label": "publish fulfillment",
       "kind": "message",
       "source": {
         "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
@@ -2356,7 +2349,6 @@
     },
     {
       "id": "f32c3f55-a5d7-50d1-8e16-407f5defa777",
-      "label": "queue to worker",
       "kind": "call",
       "source": {
         "elementId": "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",
@@ -2377,7 +2369,6 @@
     },
     {
       "id": "10000000-0000-4000-8000-000000000001",
-      "label": "route A",
       "kind": "call",
       "source": {
         "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
@@ -2398,7 +2389,6 @@
     },
     {
       "id": "10000000-0000-4000-8000-000000000002",
-      "label": "route B",
       "kind": "call",
       "source": {
         "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
@@ -2419,7 +2409,6 @@
     },
     {
       "id": "475e7063-822b-51bc-a98b-e480798305c6",
-      "label": "entry to validate",
       "kind": "data",
       "source": {
         "elementId": "faefd261-257d-5a0f-ba6e-c04edba5f030",
@@ -2433,7 +2422,6 @@
     },
     {
       "id": "bb003547-3a1a-5356-9e43-3953f03cf08a",
-      "label": "valid to payment",
       "kind": "data",
       "source": {
         "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
@@ -2447,7 +2435,6 @@
     },
     {
       "id": "7348c420-3eea-533c-9a2e-4476b8170db5",
-      "label": "allow to reply",
       "kind": "data",
       "source": {
         "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
@@ -2461,7 +2448,6 @@
     },
     {
       "id": "9cb5e22f-6074-5035-a50e-916880ab938c",
-      "label": "deny to reply",
       "kind": "data",
       "source": {
         "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
@@ -2475,7 +2461,6 @@
     },
     {
       "id": "761d9f38-98c6-584d-83cf-1997494bf448",
-      "label": "invalid to reply",
       "kind": "data",
       "source": {
         "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
@@ -2489,7 +2474,6 @@
     },
     {
       "id": "8f9c1648-016b-5d53-8cbd-efb24f5f61a6",
-      "label": "publish fulfillment",
       "kind": "message",
       "source": {
         "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
@@ -2520,7 +2504,6 @@
     },
     {
       "id": "f900d9d9-5e68-5e80-a8f2-e4bad1927080",
-      "label": "queue to worker",
       "kind": "call",
       "source": {
         "elementId": "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
@@ -2541,7 +2524,6 @@
     },
     {
       "id": "30f21556-0ed3-50c0-9884-9ac427777ab0",
-      "label": "UI to API",
       "kind": "call",
       "source": {
         "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
@@ -2571,7 +2553,6 @@
     },
     {
       "id": "9e6e6628-d50f-5998-a5bf-315da2fc46e3",
-      "label": "API to business",
       "kind": "call",
       "source": {
         "elementId": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",

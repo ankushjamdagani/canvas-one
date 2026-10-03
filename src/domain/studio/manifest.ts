@@ -251,7 +251,7 @@ const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseS
 // §7: "PayloadSchema / fields | label | everything else, including IDs"
 const PAYLOAD_SCHEMA_KEYS = ['id', 'label', 'shape'] as const;
 // §7: "Connection / Relation | label; descriptive relations entirely | executable fields; ..."
-const CONNECTION_KEYS = ['id', 'label', 'kind', 'source', 'target', 'config'] as const;
+const CONNECTION_KEYS = ['id', 'kind', 'source', 'target', 'config'] as const;
 const CONTAINS_RELATION_KEYS = ['id', 'label', 'kind', 'parentId', 'childId'] as const;
 const DEPLOYED_ON_RELATION_KEYS = ['id', 'label', 'kind', 'elementId', 'hostId'] as const;
 // §7: "Assertion / Assumption | label / description | everything else"

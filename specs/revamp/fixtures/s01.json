@@ -590,7 +590,6 @@
   "connections": [
     {
       "id": "90c258a5-6003-5d54-8f25-d63df58bca7e",
-      "label": "mock request",
       "kind": "call",
       "source": {
         "elementId": "04f1d18c-7a82-5986-aae6-ca2fe393b135",

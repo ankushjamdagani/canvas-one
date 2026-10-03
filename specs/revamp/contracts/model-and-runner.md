@@ -20,7 +20,7 @@ The authored schema `studio-model/1`, its execution semantics, the runner interf
 | Element | `id, label, description, visualKind, ports:Port[], behavior:Behavior` |
 | Port | `id, label, direction:'in'\|'out', channel:'call'\|'message'\|'data'\|'event', schemaId, responseSchemaId:Id\|null` |
 | Endpoint | `elementId, portId` |
-| Connection | `id, label, kind:'call'\|'message'\|'data', source:Endpoint, target:Endpoint, config` (§4) |
+| Connection | `id, kind:'call'\|'message'\|'data', source:Endpoint, target:Endpoint, config` (§4). No label (D53): the canvas, exports and history derive `<kind> · <protocol> <path>` from the target port (`domain/studio/connection-label.ts`) |
 | Relation | `id, label` plus one of `{kind:'contains',parentId,childId}`, `{kind:'deployed-on',elementId,hostId}`, `{kind:'descriptive',sourceId,targetId}` |
 | Fixture | `id, schemaId, value:Json` |
 | View | `id, label, placements:Placement[], connectionIds:Id[], relationIds:Id[], groups:Group[], notes:Note[]` |
@@ -203,7 +203,7 @@ Normative for every nested field. Implementation uses closed schema descriptors,
 |---|---|---|
 | Document | title, views (all descendants) | schema, id; closure-filtered elements/connections/relations/schemas/fixtures/refinements; selected scenario |
 | Element / Port | label, description, visualKind, linkedProjectId (D52) / label | everything else |
-| Connection / Relation | label; descriptive relations entirely | executable fields; `contains` when used by refinement/fault resolution; `deployed-on` when resource/fault scope uses placement |
+| Relation | label; descriptive relations entirely | executable fields; `contains` when used by refinement/fault resolution; `deployed-on` when resource/fault scope uses placement |
 | PayloadSchema / fields | label | everything else, including IDs |
 | Scenario | label | everything else. Scope lists and `entryPorts` are sorted as sets (`entryPorts` by elementId, then portId); inputs, faults, operations and transitions stay ordered. |
 | Assertion / Assumption | label / description | everything else |

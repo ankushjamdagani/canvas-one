@@ -1419,15 +1419,13 @@ export function validateDocument(
     for (let cIdx = 0; cIdx < connections.length; cIdx++) {
       const c = connections[cIdx];
       const cPath = ['connections', cIdx];
-      if (checkRecord(c, ['id', 'label', 'kind', 'source', 'target', 'config'], ['id', 'label', 'kind', 'source', 'target', 'config'], cPath, docId, issues, 'Connection')) {
+      if (checkRecord(c, ['id', 'kind', 'source', 'target', 'config'], ['id', 'kind', 'source', 'target', 'config'], cPath, docId, issues, 'Connection')) {
         let cId: Id | null = null;
         if (validateId(c.id, [...cPath, 'id'], null, issues)) {
           cId = c.id;
           registerId(c.id, [...cPath, 'id'], allIds, issues);
           connectionsMap.set(c.id, { rec: c, index: cIdx });
         }
-
-        validateString(c.label, 1, 80, [...cPath, 'label'], cId, issues, 'Connection label');
 
         if (typeof c.kind !== 'string' || !CONNECTION_KINDS.includes(c.kind as (typeof CONNECTION_KINDS)[number])) {
           issues.push(

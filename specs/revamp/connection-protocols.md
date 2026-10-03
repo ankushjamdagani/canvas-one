@@ -59,8 +59,8 @@ the endpoints that nodes of that project accept (in-ports, plus any exposed endp
 
 ## Display
 
-- A new connection is labelled `<channel> · <protocol> <path>` (for example `call · HTTP / REST /orders`); an
-  author can rename it as before.
+- A connection has no label field. Its text is derived from the port it enters, `<channel> · <protocol> <path>`
+  (for example `call · HTTP / REST /orders`), on the canvas, in exports and in history, so it can never go stale.
 - A card expanded with the port toggle lists its ports as protocol and path (`in: HTTP / REST /orders, gRPC`),
   which for a linked node is the set of endpoints it can be connected with.
 

@@ -21,7 +21,6 @@ function element(id: string): Element {
 function connection(id: string, sourceId: string, targetId: string): Connection {
   return {
     id,
-    label: id,
     kind: 'data',
     source: { elementId: sourceId, portId: `${sourceId}-out` },
     target: { elementId: targetId, portId: `${targetId}-in` },

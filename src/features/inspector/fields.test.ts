@@ -35,7 +35,6 @@ function processorElement(overrides: Partial<Element> = {}): Element {
 function callConnection(overrides: Partial<Connection> = {}): Connection {
   return {
     id: 'c-1',
-    label: 'authorize',
     kind: 'call',
     source: { elementId: 'a', portId: 'p-out' },
     target: { elementId: 'b', portId: 'p-in' },
@@ -334,7 +333,6 @@ describe('fieldsForConnection', () => {
   it('message: latencyMs/ackDelayMs/messageTtlMs/weight with contract bounds', () => {
     const conn: Connection = {
       id: 'c-2',
-      label: 'enqueue',
       kind: 'message',
       source: { elementId: 'a', portId: 'p-out' },
       target: { elementId: 'b', portId: 'p-in' },
@@ -353,17 +351,16 @@ describe('fieldsForConnection', () => {
     expect(fields.find((f) => f.id === 'config.messageTtlMs')!.parse('3600000').ok).toBe(true);
   });
 
-  it('data connections: label only, no config fields', () => {
+  it('data connections: no fields at all', () => {
     const conn: Connection = {
       id: 'c-3',
-      label: 'copy',
       kind: 'data',
       source: { elementId: 'a', portId: 'p-out' },
       target: { elementId: 'b', portId: 'p-in' },
       config: {},
     };
     const fields = fieldsForConnection(conn);
-    expect(fields.map((f) => f.id)).toEqual(['label']);
+    expect(fields).toEqual([]);
   });
 });
 

@@ -21,6 +21,7 @@
  */
 
 import type { Document, Element, Group, Id, Relation, View } from '../../domain/studio/model';
+import { describeConnection } from '../../domain/studio/connection-label';
 import { mermaidFileName } from './filename';
 import { MERMAID_EXPORT_LIMITATIONS } from './limitations';
 import type { MermaidExportResult } from './types';
@@ -167,8 +168,7 @@ export function renderDiagramMermaid(document: Document, viewId?: string | null)
   for (const conn of relevantConnections) {
     const sourceNode = elementToNodeId.get(conn.source.elementId)!;
     const targetNode = elementToNodeId.get(conn.target.elementId)!;
-    const labelText = conn.label ? `${conn.kind}: ${conn.label}` : conn.kind;
-    const encodedEdgeLabel = encodeMermaidLabel(labelText);
+    const encodedEdgeLabel = encodeMermaidLabel(describeConnection(document, conn));
     lines.push(`  ${sourceNode} -->|"${encodedEdgeLabel}"| ${targetNode}`);
   }
 

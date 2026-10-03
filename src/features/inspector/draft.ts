@@ -19,6 +19,7 @@
  */
 
 import type { Connection, Document, Element, Id } from '../../domain/studio/model';
+import { describeConnection } from '../../domain/studio/connection-label';
 import type { RecordChange } from '../../persistence/studio/types';
 import { fieldsForConnection, fieldsForElement, kindTagForConnection, kindTagForElement } from './fields';
 import type {
@@ -65,7 +66,7 @@ function buildFieldsAndLabel(
   return {
     fields: fieldsForConnection(record),
     record,
-    label: record.label,
+    label: describeConnection(document, record),
     kindTag: kindTagForConnection(record),
     notSimulated: false,
     layer: null,

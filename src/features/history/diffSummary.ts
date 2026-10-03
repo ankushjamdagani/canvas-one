@@ -9,6 +9,7 @@
  */
 
 import type { Document, Element, Id } from '../../domain/studio/model';
+import { describeConnection } from '../../domain/studio/connection-label';
 import { diffDocuments, type RecordDiff } from '../../domain/versioning/diff';
 import type { CommitRecord, PublicationRecord } from '../../persistence/studio';
 import type { AheadOfVersionInfo, RecordChangeItem } from './types';
@@ -26,7 +27,10 @@ function findRecordLabel(doc: Document | null, recordKind: string, id: Id): stri
     case 'element':
       return doc.elements.find((e) => e.id === id)?.label ?? null;
     case 'connection':
-      return doc.connections.find((c) => c.id === id)?.label ?? null;
+      {
+        const connection = doc.connections.find((c) => c.id === id);
+        return connection ? describeConnection(doc, connection) : null;
+      }
     case 'relation':
       return doc.relations.find((r) => r.id === id)?.label ?? null;
     case 'schema':

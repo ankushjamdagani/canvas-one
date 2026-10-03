@@ -401,7 +401,6 @@
   "connections": [
     {
       "id": "cd1e0433-ba8e-5de6-89c2-408744b1bffc",
-      "label": "entry to validate",
       "kind": "data",
       "source": {
         "elementId": "d8cbd0df-0a36-5e75-8e9f-1b8768adcb5f",
@@ -415,7 +414,6 @@
     },
     {
       "id": "d2930d72-096a-5ee5-8814-ab18b904be10",
-      "label": "valid to payment",
       "kind": "data",
       "source": {
         "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
@@ -429,7 +427,6 @@
     },
     {
       "id": "22cc9929-5655-58fa-a2ad-44ca80cb9172",
-      "label": "allow to reply",
       "kind": "data",
       "source": {
         "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
@@ -443,7 +440,6 @@
     },
     {
       "id": "5602258b-bb1f-55cb-8f0d-56eaea5cbbb5",
-      "label": "deny to reply",
       "kind": "data",
       "source": {
         "elementId": "132f93c6-3d4f-5ab7-9505-bc877a33efaf",
@@ -457,7 +453,6 @@
     },
     {
       "id": "69ad37df-b5ec-5301-8624-6063b4386686",
-      "label": "invalid to reply",
       "kind": "data",
       "source": {
         "elementId": "50a4c8cf-c719-581f-81e1-d47dbedaf9bd",
@@ -471,7 +466,6 @@
     },
     {
       "id": "4682d3b1-50f5-5bd3-b36a-7ec0aac12a24",
-      "label": "publish fulfillment",
       "kind": "message",
       "source": {
         "elementId": "90ec764e-f2a1-5ae8-a015-707e69ff8148",
@@ -502,7 +496,6 @@
     },
     {
       "id": "f32c3f55-a5d7-50d1-8e16-407f5defa777",
-      "label": "queue to worker",
       "kind": "call",
       "source": {
         "elementId": "cbf95fcf-bc61-5c89-9c0c-d506c152f7f8",

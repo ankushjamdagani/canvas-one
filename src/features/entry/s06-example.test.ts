@@ -50,7 +50,7 @@ function buildS06(): Document {
     apply([{ kind: 'replace', value: { recordKind: 'element', record: { ...e, behavior: { ...e.behavior, config: { ...e.behavior.config, ...patch } } } as Element } } as never]);
   };
   const orderClass = mint();
-  const connect = (from: Id, to: Id, label: string, patch: Record<string, unknown> = {}): Id => {
+  const connect = (from: Id, to: Id, patch: Record<string, unknown> = {}): Id => {
     const out = el(from).ports.find((p) => p.direction === 'out' && p.channel !== 'event')!;
     const r = planConnection({ document: doc, viewId, source: { elementId: from, portId: out.id }, target: { elementId: to }, mintId: mint });
     if (r.kind === 'rejected') throw new Error(JSON.stringify(r.issues));
@@ -65,7 +65,7 @@ function buildS06(): Document {
       id = c.connectionId;
     }
     const conn = doc.connections.find((x) => x.id === id)!;
-    apply([{ kind: 'replace', value: { recordKind: 'connection', record: { ...conn, label, config: { ...conn.config, ...patch } } as Connection } } as never]);
+    apply([{ kind: 'replace', value: { recordKind: 'connection', record: { ...conn, config: { ...conn.config, ...patch } } as Connection } } as never]);
     return id;
   };
   const retry = (o: Partial<CallRetryPolicy>): CallRetryPolicy => ({
@@ -82,15 +82,15 @@ function buildS06(): Document {
   const worker = place('worker', 'Fulfilment worker', 900, 460, 'Packs and ships; 200 orders/s');
   configure(payments, { failureRate: 2 });
 
-  for (const api of [apiA, apiB]) connect(gateway, api, api === apiA ? 'route A' : 'route B', { retry: retry({ backoffMs: 0, jitter: false }) });
+  for (const api of [apiA, apiB]) connect(gateway, api, { retry: retry({ backoffMs: 0, jitter: false }) });
   for (const api of [apiA, apiB]) {
-    connect(api, db, 'write order');
-    connect(api, payments, 'charge', { retry: retry({ maxAttempts: 3 }) });
-    connect(api, queue, 'publish order');
+    connect(api, db);
+    connect(api, payments, { retry: retry({ maxAttempts: 3 }) });
+    connect(api, queue);
   }
-  const charge = connect(payments, processor, 'card API', { retry: retry({ attemptTimeoutMs: 1000 }) });
+  const charge = connect(payments, processor, { retry: retry({ attemptTimeoutMs: 1000 }) });
   void charge;
-  connect(queue, worker, 'deliver');
+  connect(queue, worker);
 
   // The card processor's scripted reply (a boundary), 150 ms, succeeding.
   const chargeOut = el(payments).ports.find((p) => p.direction === 'out' && p.channel === 'call')!;

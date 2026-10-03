@@ -139,7 +139,6 @@ describe('resolveConflict: resolving merge conflicts and re-validating', () => {
     const newConnId = '00000000-0000-5000-8000-000000000044';
     const newConn: Connection = {
       id: newConnId,
-      label: 'New Conn',
       kind: 'data',
       source: {
         elementId: base.elements[1].id,
@@ -350,7 +349,6 @@ describe('resolveConflict: resolving merge conflicts and re-validating', () => {
     const theirs = cloneDoc(base);
     const connC: Connection = {
       id: '00000000-0000-5000-8000-000000000099',
-      label: 'Connection C',
       kind: 'data',
       source: { elementId: elemA.id, portId: elemA.ports[0].id },
       target: { elementId: elemE.id, portId: elemE.ports[0].id },

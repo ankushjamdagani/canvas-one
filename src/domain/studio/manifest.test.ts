@@ -128,7 +128,6 @@ describe('buildManifest golden vectors: equal fingerprint (run-identity.md §2)'
       description: 'A different description entirely',
       visualKind: e.visualKind === 'custom' ? 'process' : 'custom',
     }));
-    presentational.connections = presentational.connections.map((c: any) => ({ ...c, label: `${c.label} (renamed)` }));
     presentational.schemas = presentational.schemas.map((s: any) => ({ ...s, label: `${s.label} (renamed)` }));
     presentational.views = presentational.views.map((v: any) => ({
       ...v,
@@ -400,7 +399,7 @@ describe('buildManifest: coverage test (model-and-runner.md §7 closed schema de
     // Demonstrates the flip side of the coverage test: a field this builder already
     // classifies as E (kept) — here Connection.config.latencyMs — changes the
     // fingerprint when it changes, and a field classified as A (dropped) — here
-    // Connection.label — does not. Both are exercised as dedicated golden vectors
+    // Element.label — does not. Both are exercised as dedicated golden vectors
     // above; this test names the pairing explicitly for the coverage requirement.
     const doc = loadFixture('s04.json');
     const scenario = doc.scenarios[0];
@@ -412,8 +411,7 @@ describe('buildManifest: coverage test (model-and-runner.md §7 closed schema de
     const bE = await buildManifest(eChanged, scenario.id, VERSIONS);
 
     const aChanged = structuredClone(doc);
-    const conn2 = aChanged.connections.find((c: any) => c.kind === 'call')!;
-    conn2.label = `${conn2.label} (renamed)`;
+    aChanged.elements[0].label = `${aChanged.elements[0].label} (renamed)`;
     const bA = await buildManifest(aChanged, scenario.id, VERSIONS);
 
     expect(a.status).toBe('ok');

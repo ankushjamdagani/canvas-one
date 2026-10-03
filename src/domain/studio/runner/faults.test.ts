@@ -402,7 +402,6 @@ describe('Decision D36: broadcast message roots', () => {
         ...s02Doc.connections,
         {
           id: 'queue-to-worker2',
-          label: 'Queue to Worker 2',
           kind: 'message' as const,
           source: {
             elementId: queueElementId,
@@ -503,7 +502,6 @@ describe('Decision D36: broadcast message roots', () => {
         ...s02Doc.connections,
         {
           id: 'queue-to-worker2-failing',
-          label: 'Queue to Worker 2 Failing',
           kind: 'message' as const,
           source: {
             elementId: queueElementId,

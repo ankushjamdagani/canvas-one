@@ -81,7 +81,6 @@ function decisionElement(id: string, inPort: string, outPort: string): Element {
 function dataConnection(id: string, sourceEl: string, sourcePort: string, targetEl: string, targetPort: string): Connection {
   return {
     id,
-    label: id,
     kind: 'data',
     source: { elementId: sourceEl, portId: sourcePort },
     target: { elementId: targetEl, portId: targetPort },

@@ -4,6 +4,7 @@ import { validateDocument } from '../../domain/studio/validate';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import type { RecordChange } from '../../persistence/studio/types';
 import { completeConnection, planConnection } from './connect';
+import { describeConnection } from '../../domain/studio/connection-label';
 import type { ProjectExposure } from '../../domain/studio/exposure';
 import { placeEntry } from './place';
 
@@ -183,7 +184,10 @@ describe('connect.ts', () => {
       const plan = t.connect(a, b, { path: '/orders' });
       if (plan.kind !== 'needs-resource-metadata') throw new Error(plan.kind);
       expect(plan.draft.path).toBe('/orders');
-      expect(plan.draft.connectionLabel).toBe('call · HTTP / REST /orders');
+      // The connection stores no label: it reads as its channel plus the protocol and path of the port it enters.
+      const connection = t.getDoc().connections[t.getDoc().connections.length - 1];
+      expect('label' in connection).toBe(false);
+      expect(describeConnection(t.getDoc(), connection)).toBe('call · HTTP / REST /orders');
       expect(t.ports(b, 'in').map((p) => p.path)).toEqual([undefined, '/orders']);
       expect(t.ports(a, 'out').map((p) => p.path)).toEqual([undefined, '/orders']);
       expect(t.ports(b, 'in')[1].label).toBe('HTTP / REST /orders');

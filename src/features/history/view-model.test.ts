@@ -74,7 +74,6 @@ describe('diffSummary view-model helpers', () => {
       connections: [
         {
           id: 'conn-1',
-          label: 'Queue → payment provider',
           kind: 'call',
           source: { elementId: 'elem-queue', portId: 'p1' },
           target: { elementId: 'elem-service', portId: 'p2' },
@@ -111,7 +110,7 @@ describe('diffSummary view-model helpers', () => {
     const connChange = changes.find((c) => c.id === 'conn-1');
     expect(connChange).toBeDefined();
     expect(connChange?.change).toBe('added');
-    expect(connChange?.label).toBe('Queue → payment provider');
+    expect(connChange?.label).toBe('call');
     expect(connChange?.detail).toBe('new connection');
   });
 

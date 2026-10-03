@@ -32,7 +32,6 @@ function processorElement(overrides: Partial<Element> = {}): Element {
 function callConnection(overrides: Partial<Connection> = {}): Connection {
   return {
     id: 'c-1',
-    label: 'authorize',
     kind: 'call',
     source: { elementId: 'el-1', portId: 'p-out' },
     target: { elementId: 'el-2', portId: 'p-in' },

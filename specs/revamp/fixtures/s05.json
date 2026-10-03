@@ -1012,7 +1012,6 @@
   "connections": [
     {
       "id": "475e7063-822b-51bc-a98b-e480798305c6",
-      "label": "entry to validate",
       "kind": "data",
       "source": {
         "elementId": "faefd261-257d-5a0f-ba6e-c04edba5f030",
@@ -1026,7 +1025,6 @@
     },
     {
       "id": "bb003547-3a1a-5356-9e43-3953f03cf08a",
-      "label": "valid to payment",
       "kind": "data",
       "source": {
         "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
@@ -1040,7 +1038,6 @@
     },
     {
       "id": "7348c420-3eea-533c-9a2e-4476b8170db5",
-      "label": "allow to reply",
       "kind": "data",
       "source": {
         "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
@@ -1054,7 +1051,6 @@
     },
     {
       "id": "9cb5e22f-6074-5035-a50e-916880ab938c",
-      "label": "deny to reply",
       "kind": "data",
       "source": {
         "elementId": "25cb80cb-3c3b-5adc-b9e8-d38b0e01094e",
@@ -1068,7 +1064,6 @@
     },
     {
       "id": "761d9f38-98c6-584d-83cf-1997494bf448",
-      "label": "invalid to reply",
       "kind": "data",
       "source": {
         "elementId": "3d59b8f9-b523-5601-90f7-059c9a3eb748",
@@ -1082,7 +1077,6 @@
     },
     {
       "id": "8f9c1648-016b-5d53-8cbd-efb24f5f61a6",
-      "label": "publish fulfillment",
       "kind": "message",
       "source": {
         "elementId": "39ac2685-b88e-539c-b7e2-511ca9a22990",
@@ -1113,7 +1107,6 @@
     },
     {
       "id": "f900d9d9-5e68-5e80-a8f2-e4bad1927080",
-      "label": "queue to worker",
       "kind": "call",
       "source": {
         "elementId": "3f495542-b8ea-5d92-90a0-3c8ec53b12d8",
@@ -1134,7 +1127,6 @@
     },
     {
       "id": "30f21556-0ed3-50c0-9884-9ac427777ab0",
-      "label": "UI to API",
       "kind": "call",
       "source": {
         "elementId": "b5582eea-b31f-5df1-b50c-bf73046f2726",
@@ -1164,7 +1156,6 @@
     },
     {
       "id": "9e6e6628-d50f-5998-a5bf-315da2fc46e3",
-      "label": "API to business",
       "kind": "call",
       "source": {
         "elementId": "2cc346b6-cb40-5685-8579-bd9e1c1ef3cc",

@@ -16,6 +16,7 @@ import type {
   Refinement,
   View,
 } from '../../domain/studio/model';
+import { describeConnection } from '../../domain/studio/connection-label';
 import type { RecordChange } from '../../persistence/studio/types';
 
 export type CatalogLayer =
@@ -565,7 +566,7 @@ export function projectDocumentToCanvas(
       // Custom edge (TrafficEdge): smoothstep routing + an HTML label chip
       // rendered above the node layer, instead of the default bezier/SVG label.
       type: 'traffic',
-      label: conn.label || undefined,
+      label: describeConnection(document, conn),
       labelShowBg: true,
       labelBgStyle: {
         fill: '#F7F5F1',

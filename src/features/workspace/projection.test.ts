@@ -53,7 +53,6 @@ function makeTestDocument(): Document {
   const connections: Connection[] = [
     {
       id: 'c1',
-      label: 'Submit order',
       kind: 'call',
       source: { elementId: 'e1', portId: 'p1_out' },
       target: { elementId: 'e2', portId: 'p2_in' },
@@ -61,7 +60,6 @@ function makeTestDocument(): Document {
     },
     {
       id: 'c2',
-      label: 'Enqueue order',
       kind: 'message',
       source: { elementId: 'e2', portId: 'p2_msg_out' },
       target: { elementId: 'e3', portId: 'p3_msg_in' },
@@ -69,7 +67,6 @@ function makeTestDocument(): Document {
     },
     {
       id: 'c3_to_unplaced',
-      label: 'Cache check',
       kind: 'call',
       source: { elementId: 'e2', portId: 'p2_in' },
       target: { elementId: 'e4_unplaced', portId: 'p4_in' },
@@ -77,7 +74,6 @@ function makeTestDocument(): Document {
     },
     {
       id: 'c4_not_in_view',
-      label: 'Other conn',
       kind: 'call',
       source: { elementId: 'e1', portId: 'p1_out' },
       target: { elementId: 'e2', portId: 'p2_in' },
@@ -194,13 +190,14 @@ describe('projectDocumentToCanvas', () => {
     // source and target point to placement IDs
     expect(c1Edge.source).toBe('pl1');
     expect(c1Edge.target).toBe('pl2');
-    expect(c1Edge.label).toBe('Submit order');
+    // Derived from the port the connection enters; the fixture's ports carry no protocol, so the node default shows.
+    expect(c1Edge.label).toBe('call · HTTP / REST');
     expect(c1Edge.style.strokeDasharray).toBeUndefined(); // solid
 
     const c2Edge = res.edges.find((e) => e.id === 'c2')!;
     expect(c2Edge.source).toBe('pl2');
     expect(c2Edge.target).toBe('pl3');
-    expect(c2Edge.label).toBe('Enqueue order');
+    expect(c2Edge.label).toBe('message · AMQP');
     expect(c2Edge.style.strokeDasharray).toBe('6,4'); // dashed
   });
 
@@ -449,7 +446,6 @@ describe('collapsed groups (RV-04g)', () => {
         ...doc.connections,
         {
           id: 'c5',
-          label: '',
           kind: 'call',
           source: { elementId: 'e1', portId: 'p1_out' },
           target: { elementId: 'e3', portId: 'p3_msg_in' },

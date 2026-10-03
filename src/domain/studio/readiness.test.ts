@@ -269,7 +269,7 @@ describe('checkReadiness mutation tests', () => {
     // scope regardless of dispatch semantics.
     const A = resourceElement('a1', 'a-in', [port('a-in', 'in', 'call', S_ID, S_ID), port('ap1', 'out', 'data', 'schema-a')]);
     const B = resourceElement('b1', 'bp1', [port('bp1', 'in', 'data', 'schema-b')]);
-    const conn: Connection = { id: 'c1', label: '', kind: 'data', source: { elementId: 'a1', portId: 'ap1' }, target: { elementId: 'b1', portId: 'bp1' }, config: {} };
+    const conn: Connection = { id: 'c1', kind: 'data', source: { elementId: 'a1', portId: 'ap1' }, target: { elementId: 'b1', portId: 'bp1' }, config: {} };
     const scenario: Scenario = {
       id: 'scn-shapes',
       label: 'shapes',
@@ -330,8 +330,8 @@ describe('checkReadiness mutation tests', () => {
   it('rejects a synchronous call cycle', () => {
     const R1 = resourceElement('r1', 'rp1', [port('rp1', 'in', 'call', S_ID, S_ID), port('rp1-out', 'out', 'call', S_ID, S_ID)]);
     const R2 = resourceElement('r2', 'rp2', [port('rp2', 'in', 'call', S_ID, S_ID), port('rp2-out', 'out', 'call', S_ID, S_ID)]);
-    const conn1: Connection = { id: 'c1', label: '', kind: 'call', source: { elementId: 'r1', portId: 'rp1-out' }, target: { elementId: 'r2', portId: 'rp2' }, config: callConfig };
-    const conn2: Connection = { id: 'c2', label: '', kind: 'call', source: { elementId: 'r2', portId: 'rp2-out' }, target: { elementId: 'r1', portId: 'rp1' }, config: callConfig };
+    const conn1: Connection = { id: 'c1', kind: 'call', source: { elementId: 'r1', portId: 'rp1-out' }, target: { elementId: 'r2', portId: 'rp2' }, config: callConfig };
+    const conn2: Connection = { id: 'c2', kind: 'call', source: { elementId: 'r2', portId: 'rp2-out' }, target: { elementId: 'r1', portId: 'rp1' }, config: callConfig };
     const scenario: Scenario = {
       id: 'scn-cycle',
       label: 'cycle',
@@ -535,7 +535,7 @@ describe('checkReadiness mutation tests', () => {
   it('propagates an unresolved crossing from computeClosure', () => {
     const R = resourceElement('r1', 'rp1', [port('rp1', 'in', 'call', S_ID, S_ID), port('rp2', 'out', 'call', S_ID, S_ID)]);
     const X = machineElement('x1', [port('xp1', 'in', 'call', S_ID, S_ID)]);
-    const conn: Connection = { id: 'c1', label: '', kind: 'call', source: { elementId: 'r1', portId: 'rp2' }, target: { elementId: 'x1', portId: 'xp1' }, config: callConfig };
+    const conn: Connection = { id: 'c1', kind: 'call', source: { elementId: 'r1', portId: 'rp2' }, target: { elementId: 'x1', portId: 'xp1' }, config: callConfig };
     const scenario: Scenario = {
       id: 'scn-crossing',
       label: 'crossing',
@@ -608,7 +608,6 @@ describe('checkReadiness mutation tests', () => {
       [
         {
           id: 'source-to-outer',
-          label: '',
           kind: 'data',
           source: { elementId: 'source', portId: 'source-out' },
           target: { elementId: 'outer', portId: 'outer-in' },

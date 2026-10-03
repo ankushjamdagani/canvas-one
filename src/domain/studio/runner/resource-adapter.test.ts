@@ -54,7 +54,6 @@ function makeCallConnection(
 ): CallConnection {
   return {
     id,
-    label: id,
     kind: 'call',
     source: { elementId: sourceEl, portId: `${sourceEl}-out` },
     target: { elementId: targetEl, portId: `${targetEl}-in` },

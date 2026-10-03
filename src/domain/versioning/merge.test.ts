@@ -378,7 +378,6 @@ describe('mergeDocuments: typed three-way merge', () => {
     const newConnId = '00000000-0000-5000-8000-000000000044';
     const newConn: Connection = {
       id: newConnId,
-      label: 'New Connection to Target',
       kind: 'data',
       source: {
         elementId: base.elements[1].id,
@@ -550,7 +549,6 @@ describe('mergeDocuments: typed three-way merge', () => {
     const theirs = cloneDoc(base);
     const connC: Connection = {
       id: '00000000-0000-5000-8000-000000000099',
-      label: 'Connection C',
       kind: 'data',
       source: {
         elementId: elemA.id,

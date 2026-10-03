@@ -177,7 +177,6 @@
   "connections": [
     {
       "id": "10000000-0000-4000-8000-000000000001",
-      "label": "route A",
       "kind": "call",
       "source": {
         "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",
@@ -198,7 +197,6 @@
     },
     {
       "id": "10000000-0000-4000-8000-000000000002",
-      "label": "route B",
       "kind": "call",
       "source": {
         "elementId": "816fe039-76dd-5b7b-a787-4d7666ff8d62",

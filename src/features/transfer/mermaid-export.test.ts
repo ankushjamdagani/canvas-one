@@ -53,7 +53,6 @@ describe('Mermaid v1 Diagram Export (renderDiagramMermaid)', () => {
       connections: [
         {
           id: 'c1',
-          label: 'fetch',
           kind: 'call',
           config: {
             latencyMs: 10,
@@ -96,7 +95,7 @@ describe('Mermaid v1 Diagram Export (renderDiagramMermaid)', () => {
     expect(mermaid).toContain('n1["Zebra Service"]');
 
     // Edge from n0 to n1 with kind and label
-    expect(mermaid).toContain('n0 -->|"call#58; fetch"| n1');
+    expect(mermaid).toContain('n0 -->|"call"| n1');
   });
 
   it('emits wholly represented groups as subgraphs and omits partially represented groups', () => {
@@ -167,7 +166,6 @@ describe('Mermaid v1 Diagram Export (renderDiagramMermaid)', () => {
       connections: [
         {
           id: 'c1',
-          label: '',
           kind: 'message',
           config: {
             latencyMs: 10,

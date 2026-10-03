@@ -77,8 +77,6 @@ export type ConnectionDraft = {
   /** D53: the endpoint path or name this draft was planned with, and the paths the target already has for the type. */
   readonly path: string;
   readonly pathOptions: readonly string[];
-  /** D53: how the connection reads on the canvas, e.g. `call · HTTP / REST /orders`. */
-  readonly connectionLabel: string;
   /** D53: schema inserts and element replacements for ports added by this connection. */
   readonly portChanges: readonly RecordChange[];
 };
@@ -356,7 +354,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   let pathOptions: readonly string[] = [];
   let chosenProtocol: Protocol | null = null;
   let chosenPath = '';
-  let connectionLabel: string | null = null;
   let targetElementReplacement: Element | undefined;
 
   if (sourceElementReplacement === undefined && effectiveSourcePort.channel === targetPort.channel) {
@@ -495,7 +492,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
       effectiveSourcePort = sourceOut;
       targetPort = targetIn;
-      connectionLabel = clip(`${channel} · ${describeEndpoint(protocol, path)}`);
     }
   }
 
@@ -644,7 +640,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       protocolOptions,
       path: chosenPath,
       pathOptions,
-      connectionLabel: connectionLabel ?? connectionKind,
       portChanges,
     };
     return {
@@ -658,7 +653,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   if (connectionKind === 'data') {
     const dataConnection: DataConnection = {
       id: connectionId,
-      label: connectionLabel ?? connectionKind,
       kind: 'data',
       source: sourceEndpoint,
       target: targetEndpoint,
@@ -668,7 +662,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   } else if (connectionKind === 'call') {
     const callConnection: CallConnection = {
       id: connectionId,
-      label: connectionLabel ?? connectionKind,
       kind: 'call',
       source: sourceEndpoint,
       target: targetEndpoint,
@@ -687,7 +680,6 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     // message
     const messageConnection: MessageConnection = {
       id: connectionId,
-      label: connectionLabel ?? connectionKind,
       kind: 'message',
       source: sourceEndpoint,
       target: targetEndpoint,
@@ -796,7 +788,6 @@ export function completeConnection(
   if (draft.kind === 'call') {
     const callConn: CallConnection = {
       id: draft.connectionId,
-      label: draft.connectionLabel,
       kind: 'call',
       source: draft.source,
       target: draft.target,
@@ -814,7 +805,6 @@ export function completeConnection(
   } else {
     const msgConn: MessageConnection = {
       id: draft.connectionId,
-      label: draft.connectionLabel,
       kind: 'message',
       source: draft.source,
       target: draft.target,

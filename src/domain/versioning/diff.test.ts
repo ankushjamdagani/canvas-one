@@ -155,10 +155,10 @@ describe('diffDocuments: deterministic per-record changes', () => {
 
     docB1.title = 'Changed Title';
     docB1.elements[0].label = 'Changed Label';
-    docB1.connections[0].label = 'Changed Conn';
+    (docB1.connections.find((c: { kind: string }) => c.kind === 'call')!.config as { latencyMs: number }).latencyMs += 5;
 
     // Same changes in different order
-    docB2.connections[0].label = 'Changed Conn';
+    (docB2.connections.find((c: { kind: string }) => c.kind === 'call')!.config as { latencyMs: number }).latencyMs += 5;
     docB2.title = 'Changed Title';
     docB2.elements[0].label = 'Changed Label';
 

@@ -49,7 +49,6 @@ function makeNonResourceElement(id: string): Element {
 function makeCallConnection(id: string, sourceEl: string, targetEl: string, latencyMs = 10, returnLatencyMs = 10): CallConnection {
   return {
     id,
-    label: id,
     kind: 'call',
     source: { elementId: sourceEl, portId: `${sourceEl}-out` },
     target: { elementId: targetEl, portId: `${targetEl}-in` },

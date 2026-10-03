@@ -2585,3 +2585,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Platform/subagents**: Claude, no subagents.
 - **Verification**: `tsc -b` clean, `npm test` 1,616 passed, `npm run build` ok, dev-server Playwright linked-projects (4), authoring, canvas-collapse, duplicate, saved-parts, shell (21) passed. Production full suite not rerun.
 - **Limitations**: The Workspace chunk is 499.78 kB, 0.2 kB under the 500 kB limit; the next addition to it needs a split. `Port.protocol` and `Port.path` are still optional and omitted at their defaults only to keep old documents valid, which the user says is unnecessary (asked, see the reply). A fresh catalog node still ships with a default out-port that stays unused once its downstream endpoints are connected.
+
+## 2026-10-03 — Connections lose their label; the text is derived from the ports
+
+- **Outcome**: `label` removed from Call/Message/Data connections (model, validator closed keys, run-manifest key list, merge descriptor, inspector field, connect planner, contract table in `model-and-runner.md`). `describeConnection(document, connection)` (`domain/studio/connection-label.ts`) derives `<kind> · <protocol> <path>` from the port the connection enters; the canvas edge chip, SVG and Mermaid export, history summaries and the inspector header use it. All six JSON fixtures had their connection labels stripped; S06's builder no longer names connections. The names the examples had ("route A", "charge", "UI to API") are gone; the edge chips now read as the endpoint.
+- **Files**: `domain/studio/{model,validate,manifest,connection-label}.ts`, `domain/versioning/merge-descriptor.ts`, `features/{catalog/connect,inspector/fields,inspector/draft,workspace/projection,transfer/svg-export,transfer/mermaid-export,history/diffSummary}`, `specs/revamp/{contracts/model-and-runner,connection-protocols}.md`, `specs/revamp/fixtures/*.json`, 16 test files.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean, `npm test` 1,616 passed, dev-server Playwright linked-projects, shell, authoring (19) passed. Production build and full suite not rerun.
+- **Limitations**: Two connections between the same pair of nodes at the same endpoint look identical on the canvas. The edge chip is longer than before.
