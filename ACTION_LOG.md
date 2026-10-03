@@ -2530,3 +2530,24 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: `tsc -b` clean, `npm test` 1,579 passed, dev-server Playwright full suite 107 passed; browser-checked deep link, back/forward, bad id, bad path.
 - **Limitations**: Not run against production build. Browser back from a project bypasses `runGuarded`, so an unsaved inspector draft is dropped. Quick options palette still lists zoom/fit commands (kept: it is a command palette, not the dock).
 - **Lesson**: With URL routing, `page.reload()` in a project keeps the project open; e2e that expects the entry screen must `page.goto('/')`.
+
+## 2026-10-02
+
+### Retro (Claude, scheduled)
+- **Range**: 2026-10-01 → 2026-10-01, 16 entries (git: 4 commits)
+- **Changed**: LESSONS.md +0 ~0 -0 (now 46 rules); all six 2026-10-01 `Lesson:` lines were already written into LESSONS.md in-task. Not promoted: the dock centre cluster flipped wrap → nowrap/clip → horizontal scroll in one day (one-off product churn); the Quick Options entry has an empty Verification section.
+
+## 2026-10-03
+
+### Retro (Claude, scheduled)
+- **Range**: 2026-10-02 → 2026-10-02, 11 entries (git: 2 commits)
+- **Changed**: LESSONS.md +2 ~0 -0 (now 48 rules); added e2e `page.goto('/')` vs reload rule and panel-id grep rule. Not promoted: cmdk filter, `tsc -b`, `--noEmit false` lessons (already in LESSONS.md); "read failing test name before attributing" (too generic).
+
+## 2026-10-03 — Header menus below the bar; comment bubbles, colours and Markdown
+
+- **Outcome**: Project menu, branch popover and scenario switcher now open 8 px below the header's bottom edge (`useHeaderSideOffset`, finds the open trigger by `aria-expanded`). Notes ("comments") rest as a 32 px bubble, open on hover (150 ms close delay), stay open after a click anywhere on the card or after editing, and close with a new Collapse button beside Delete. New Colour popover: Yellow/Gray (existing tones) plus Blue/Green/Pink/Purple (`NOTE_TONES` extended, tokens in `styles.css`). Editing has a Markdown toolbar (bold, italic, strike, code, link, bullets; ⌘/Ctrl+B/I/K) and the card renders a safe Markdown subset (`lib/miniMarkdown.ts`, no HTML injection, http(s)/mailto links only). SVG export uses the tone fill and plain text.
+- **Files**: `lib/{useHeaderSideOffset,miniMarkdown}.ts` (+ test), `features/workspace/{NoteNode,NoteMarkdown,noteTones,projection,CanvasView,ProjectMenu,BranchPopover}.ts(x)`, `features/scenarios/ScenarioSwitcher.tsx`, `features/transfer/svg-export.ts`, `domain/studio/model.ts`, `styles.css`; e2e `studio-notes` (new), `studio-selection-actions`, `studio-dock-customization`, `studio-project-rename` (header is 48 px, test said 56).
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: `tsc -b` clean, `npm test` 1,587 passed, dev-server Playwright 108 passed (studio-history conflict test timed out once under load 50, passed alone).
+- **Limitations**: Open/pinned state is per-session UI state, not saved. Note tones added to the v9 schema, so a bundle using a new tone won't import in an older build. Not run against production build.
+- **Lesson**: A swap of the pointer target on hover (button replaced by card) drops the click, because Chrome sends no click when the mousedown node left the DOM; keep the hit target a persistent element.

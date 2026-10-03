@@ -57,6 +57,14 @@
   --color-border-pressed: var(--border-pressed);
   --color-note: var(--note);
   --color-note-edge: var(--note-edge);
+  --color-note-sky: var(--note-sky);
+  --color-note-sky-edge: var(--note-sky-edge);
+  --color-note-mint: var(--note-mint);
+  --color-note-mint-edge: var(--note-mint-edge);
+  --color-note-rose: var(--note-rose);
+  --color-note-rose-edge: var(--note-rose-edge);
+  --color-note-lilac: var(--note-lilac);
+  --color-note-lilac-edge: var(--note-lilac-edge);
 
   /* Evergreen interaction-step roles (button/badge fidelity) */
   --color-desk: var(--desk);
@@ -273,6 +281,14 @@
   --border-pressed: #B8B1A3;
   --note: #FBF6E8;
   --note-edge: #E6DAB8;
+  --note-sky: #EAF2F8;
+  --note-sky-edge: #C3D7E8;
+  --note-mint: #E9F4EB;
+  --note-mint-edge: #BEDAC4;
+  --note-rose: #F9ECE9;
+  --note-rose-edge: #E8C6C0;
+  --note-lilac: #F1EBF8;
+  --note-lilac-edge: #D3C6E6;
 
   /* Evergreen interaction-step roles (button/badge fidelity) */
   --desk: #E9E7E2;

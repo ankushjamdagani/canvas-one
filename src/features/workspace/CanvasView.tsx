@@ -20,7 +20,7 @@ import {
   type EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import type { Document, Id } from '../../domain/studio/model';
+import type { Document, Id, NoteTone } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio/types';
 import { NodeCard } from './NodeCard';
 import { GroupNode } from './GroupNode';
@@ -339,6 +339,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               onUpdateText: (newText: string) => {
                 if (!document) return;
                 const plan = planUpdateNote(document, viewId, data.note.id, { text: newText });
+                if (plan.ok) {
+                  void onApplyChanges(plan.changes, plan.label);
+                }
+              },
+              onUpdateTone: (tone: NoteTone) => {
+                if (!document) return;
+                const plan = planUpdateNote(document, viewId, data.note.id, { tone });
                 if (plan.ok) {
                   void onApplyChanges(plan.changes, plan.label);
                 }

@@ -320,12 +320,13 @@ export type Group = {
   readonly collapsed: boolean;
 };
 
-export const NOTE_TONES = ['paper', 'neutral'] as const;
+/** `paper` is the yellow default; the rest are colours a user can pick for a comment. */
+export const NOTE_TONES = ['paper', 'neutral', 'sky', 'mint', 'rose', 'lilac'] as const;
 export type NoteTone = (typeof NOTE_TONES)[number];
 
 /**
  * Contract §2: Note
- * id, text, x, y, width, tone:'paper'|'neutral', attachedElementIds:Id[]
+ * id, text, x, y, width, tone:NoteTone, attachedElementIds:Id[]
  */
 export type Note = {
   readonly id: Id;

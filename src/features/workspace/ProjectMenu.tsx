@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useHeaderSideOffset } from '@/lib/useHeaderSideOffset';
 import {
   Pencil,
   Copy,
@@ -53,6 +54,8 @@ export function ProjectMenu({
     return () => window.removeEventListener('studio:dismiss-transients', handleDismiss);
   }, []);
 
+  const sideOffset = useHeaderSideOffset(open);
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>
@@ -61,7 +64,7 @@ export function ProjectMenu({
       <DropdownMenuContent
         data-testid="project-menu-popover"
         align="start"
-        sideOffset={6}
+        sideOffset={sideOffset}
         className="w-[268px]"
       >
         <DropdownMenuHeader className="flex-col items-start gap-0.5 px-3 py-2.5">

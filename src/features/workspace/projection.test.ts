@@ -253,7 +253,8 @@ describe('projectDocumentToCanvas', () => {
       expect(n1.data.text).toBe('Important architecture note');
       expect(n1.data.tone).toBe('paper');
       expect(n1.data.width).toBe(220);
-      expect(n1.style?.width).toBe(220);
+      // The node sizes to its content so a collapsed comment bubble doesn't keep a wide hit area.
+      expect(n1.style?.width).toBeUndefined();
     }
   });
 

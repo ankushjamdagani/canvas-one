@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useHeaderSideOffset } from '@/lib/useHeaderSideOffset';
 import { Search, Check, GitBranch, Plus, RotateCcw, Home } from 'lucide-react';
 import {
   Popover,
@@ -74,6 +75,7 @@ export function BranchPopover({
   const [actionPending, setActionPending] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
 
+  const sideOffset = useHeaderSideOffset(open);
   const current = branches.find((b) => b.id === currentBranchId) ?? null;
   const others = branches
     .filter((b) => b.id !== currentBranchId)
@@ -106,7 +108,7 @@ export function BranchPopover({
       <PopoverContent
         data-testid="branch-popover"
         align="start"
-        sideOffset={6}
+        sideOffset={sideOffset}
         className="w-[392px] max-w-[calc(100vw-24px)] p-0 rounded-popover border border-border bg-background shadow-popover overflow-hidden outline-none flex flex-col"
       >
         <div className="relative border-b border-hairline bg-panel select-none">

@@ -17,6 +17,7 @@
  * onReset are opaque callbacks; this component owns no run state.
  */
 
+import { useHeaderSideOffset } from '@/lib/useHeaderSideOffset';
 import * as React from 'react';
 import {
   Activity,
@@ -106,6 +107,7 @@ export function ScenarioSwitcher({
   onDelete,
 }: ScenarioSwitcherProps) {
   const [popoverOpen, setPopoverOpen] = React.useState(false);
+  const sideOffset = useHeaderSideOffset(popoverOpen);
 
   const selectedScenario =
     scenarios.find((s) => s.id === selectedId) ?? (scenarios.length > 0 ? scenarios[0] : null);
@@ -182,7 +184,7 @@ export function ScenarioSwitcher({
           data-testid="scenario-switcher-popover"
           className="w-80 md:w-96 p-0 bg-background border border-border rounded-popover shadow-popover overflow-hidden text-xs outline-none flex flex-col"
           align="end"
-          sideOffset={4}
+          sideOffset={sideOffset}
         >
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-hairline bg-panel select-none shrink-0">
             <span className="font-mono text-meta font-medium text-secondary-text uppercase">

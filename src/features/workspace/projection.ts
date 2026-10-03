@@ -149,11 +149,12 @@ export type ProjectedNodeData =
       readonly kind: 'note';
       readonly note: Note;
       readonly text: string;
-      readonly tone: 'paper' | 'neutral';
+      readonly tone: Note['tone'];
       readonly width: number;
       readonly attachedElementLabel?: string;
       readonly availableElements?: readonly { readonly id: Id; readonly label: string }[];
       readonly onUpdateText?: (newText: string) => void;
+      readonly onUpdateTone?: (tone: Note['tone']) => void;
       readonly onDelete?: () => void;
       readonly onAttach?: (elementId: string | null) => void;
     };
@@ -490,7 +491,6 @@ export function projectDocumentToCanvas(
       selectable: true,
       draggable: true,
       zIndex: 2,
-      style: { width: note.width },
     });
   }
 

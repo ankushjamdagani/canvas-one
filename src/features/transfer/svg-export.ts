@@ -18,6 +18,8 @@
  * - Bounding box = content + 32 px padding
  */
 
+import { markdownToPlainLines } from '../../lib/miniMarkdown';
+import { NOTE_TONE_STYLES } from '../workspace/noteTones';
 import type { Connection, Document, Element, Id, Placement, View } from '../../domain/studio/model';
 import { getNodeCaption } from '../workspace/nodeVisuals';
 import { CATALOG_LAYER_COLORS, getCatalogLayer } from '../workspace/projection';
@@ -206,13 +208,13 @@ export function renderDiagramSvg(document: Document, viewId?: string | null): st
     const noteX = note.x;
     const noteY = note.y;
     const noteWidth = note.width;
-    const lines = note.text.split('\n');
+    const lines = markdownToPlainLines(note.text);
     const noteHeight = Math.max(64, lines.length * 16 + 24);
 
     expandBounds(noteX, noteY, noteWidth, noteHeight);
 
-    const fill = note.tone === 'paper' ? '#F5F2EB' : '#FFFFFF';
-    const escapedText = xmlEscape(note.text);
+    const fill = NOTE_TONE_STYLES[note.tone].svgFill;
+    const escapedText = xmlEscape(lines.join('\n'));
 
     const textLinesSvg = lines
       .map((line, idx) => {

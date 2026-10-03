@@ -4,6 +4,14 @@ async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
 }
 
+// Notes rest as comment bubbles; a click keeps one open.
+async function openNotes(page: Page) {
+  const bubbles = page.locator('[data-open="false"]');
+  while ((await bubbles.count()) > 0) {
+    await bubbles.first().click();
+  }
+}
+
 test.describe('Studio selection actions and note dock (RV-04e)', () => {
   test('aligns, groups, undoes, and adds a note through registry commands', async ({ page }) => {
     await page.goto('/');
@@ -42,6 +50,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await noteInput.fill('Watch the payment retry budget');
     await noteInput.press('Enter');
     await waitForIdle(page);
+    await openNotes(page);
     await expect(page.locator('.note-card', { hasText: 'Watch the payment retry budget' })).toBeVisible();
   });
 
@@ -129,6 +138,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await noteInput.fill('Initial note text');
     await noteInput.press('Enter');
     await waitForIdle(page);
+    await openNotes(page);
 
     const noteCard = page.locator('.note-card').first();
     await expect(noteCard).toBeVisible();
@@ -363,6 +373,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await noteInput.fill('Note Alpha');
     await noteInput.press('Enter');
     await waitForIdle(page);
+    await openNotes(page);
 
     const note = page.locator('.note-card', { hasText: 'Note Alpha' });
     await expect(note).toBeVisible();
@@ -419,14 +430,16 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await waitForIdle(page);
     await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
 
-    const initialNoteCount = await page.locator('.note-card').count();
+    // A duplicate rests as a bubble (possibly under another note), so count both forms.
+    const noteCount = () => page.locator('.note-card, [data-testid^="note-bubble-"]');
+    const initialNoteCount = await noteCount().count();
     await page.getByTestId('selection-duplicate-btn').click();
     const confirmBtn = page.getByTestId('duplicate-confirm-btn');
     if (await confirmBtn.isVisible()) {
       await confirmBtn.click();
     }
     await waitForIdle(page);
-    await expect(page.locator('.note-card')).toHaveCount(initialNoteCount + 1);
+    await expect(noteCount()).toHaveCount(initialNoteCount + 1);
 
     // 8. Delete a note: click the duplicated note and press Delete
     const notes = page.locator('.note-card');
@@ -435,7 +448,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await expect(page.getByTestId('selection-count')).toHaveText('1 PART');
     await page.keyboard.press('Delete');
     await waitForIdle(page);
-    await expect(page.locator('.note-card')).toHaveCount(initialNoteCount);
+    await expect(noteCount()).toHaveCount(initialNoteCount);
   });
 
   test('selection box and grouping box have identical uniform spacing and matching position', async ({ page }) => {

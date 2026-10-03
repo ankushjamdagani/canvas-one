@@ -60,6 +60,8 @@ test('narrow dock keeps primary tools and puts the rest in touch sized overflow'
   await note.click();
   await page.getByTestId('dock-note-input').fill('Mobile note');
   await page.getByTestId('dock-note-input').press('Enter');
+  // The saved note rests as a comment bubble; a tap opens it.
+  await page.locator('[data-open="false"]').first().click();
   await expect(page.locator('.note-card', { hasText: 'Mobile note' })).toBeVisible();
 });
 
