@@ -2560,3 +2560,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: `tsc -b` clean, `npm test` 1,597 passed, dev-server Playwright 108/109 (studio-history "22E/22F" hit its 3 min timeout in the parallel run twice; passes alone in 3 s with and without these changes).
 - **Limitations**: Project description/team are not in the portable bundle (v9 unchanged), so an imported project starts empty. A linked node is not exercised by a full scenario run (connection and validation are tested; no run test). Dangling-link state has no e2e (no project delete in the UI). The manifest drop of `linkedProjectId` is covered by the closed-key list, not a dedicated test.
 - **Lesson**: Wrote the hover-hit-target rule into LESSONS (see 2026-10-03 comment bubbles).
+
+## 2026-10-03 — Linked-project fixes: drag, connect, logo
+
+- **Outcome**: Rows in the Library's Projects tab are draggable onto the canvas (`LINKED_PROJECT_MIME_TYPE`, drop places at the pointer). Connecting a node to a linked project no longer fails with "Incompatible payload shapes": a linked node is a black box, so `planConnection` rewrites its request/response schemas to the caller's shape (fresh field ids) and carries the rewrite through `ConnectionDraft.targetSchemaReplacements`. The top-bar logo is now a button that goes to All projects (same guarded handler as the project menu).
+- **Files**: `features/catalog/connect.ts` (+ test), `features/library/{LinkedProjects,types}`, `features/workspace/{CanvasView,TopBar}`, `tests/studio-linked-projects.spec.ts`.
+- **Platform/subagents**: Claude, no subagents.
+- **Verification**: reproduced the rejection in a browser probe first; `tsc -b` clean, `npm test` 1,598 passed, Playwright linked-projects, shell, entry, panels, project-rename 23 passed. Full e2e suite and production build not run.
+- **Limitations**: A second caller with a different shape re-rewrites the linked node's schema, which can leave the earlier connection's shape mismatched; readiness would flag it. Regular components were not checked for the same payload-shape rejection.
+- **Lesson**: Record field ids are document-unique, so copying a shape between schemas needs fresh ids.

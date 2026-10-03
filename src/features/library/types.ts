@@ -19,6 +19,9 @@ export type LibraryView = 'list' | 'grid';
 /** Drag-and-drop MIME type for studio catalog entries */
 export const CATALOG_ENTRY_MIME_TYPE = 'application/x-studio-catalog-entry';
 
+/** Drag-and-drop MIME type for a project dragged out of the Library's Projects tab (JSON `{projectId, title}`) */
+export const LINKED_PROJECT_MIME_TYPE = 'application/x-studio-linked-project';
+
 export type LibraryTab = 'standard' | 'ours' | 'projects';
 
 /** D52: what the Library shows about a project it can link to. */

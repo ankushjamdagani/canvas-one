@@ -16,7 +16,9 @@ import type {
   Endpoint,
   Id,
   MessageConnection,
+  PayloadSchema,
   Port,
+  Shape,
   ResourceCallMetadata,
   View,
 } from '../../domain/studio/model';
@@ -24,6 +26,18 @@ import { shapesCompatible } from '../../domain/studio/readiness';
 import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
 import { createIssue } from '../../domain/studio/issue';
+
+/** Record field ids are unique across the document, so a copied shape needs its own. */
+function cloneShapeWithFreshIds(shape: Shape, mintId: () => Id): Shape {
+  if (shape.type === 'record') {
+    return {
+      ...shape,
+      fields: shape.fields.map((field) => ({ ...field, id: mintId(), shape: cloneShapeWithFreshIds(field.shape, mintId) })),
+    };
+  }
+  if (shape.type === 'list') return { ...shape, items: cloneShapeWithFreshIds(shape.items, mintId) };
+  return shape;
+}
 
 export type PlanConnectionParams = {
   readonly document: Document;
@@ -41,6 +55,8 @@ export type ConnectionDraft = {
   readonly target: Endpoint;
   readonly kind: 'call' | 'message';
   readonly sourceElementReplacement?: Element;
+  /** D52: a linked-project target adopts the caller's payload shapes. */
+  readonly targetSchemaReplacements?: readonly PayloadSchema[];
 };
 
 export type ResourceMetadataInput = {
@@ -327,7 +343,15 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     };
   }
 
-  if (!shapesCompatible(sourceSchema.shape, targetSchema.shape)) {
+  // D52: a linked project is a black box that accepts whatever its caller sends, so its port
+  // schemas take the caller's shape instead of rejecting a mismatch.
+  const targetSchemaReplacements: PayloadSchema[] = [];
+  const adoptsCallerShapes = targetElement.linkedProjectId !== undefined;
+  if (adoptsCallerShapes && !shapesCompatible(sourceSchema.shape, targetSchema.shape)) {
+    targetSchemaReplacements.push({ ...targetSchema, shape: cloneShapeWithFreshIds(sourceSchema.shape, mintId) });
+  }
+
+  if (!adoptsCallerShapes && !shapesCompatible(sourceSchema.shape, targetSchema.shape)) {
     return {
       kind: 'rejected',
       issues: [
@@ -376,7 +400,11 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       };
     }
 
-    if (!shapesCompatible(sourceRespSchema.shape, targetRespSchema.shape)) {
+    if (adoptsCallerShapes && !shapesCompatible(sourceRespSchema.shape, targetRespSchema.shape)) {
+      targetSchemaReplacements.push({ ...targetRespSchema, shape: cloneShapeWithFreshIds(sourceRespSchema.shape, mintId) });
+    }
+
+    if (!adoptsCallerShapes && !shapesCompatible(sourceRespSchema.shape, targetRespSchema.shape)) {
       return {
         kind: 'rejected',
         issues: [
@@ -442,6 +470,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       target: targetEndpoint,
       kind: connectionKind as 'call' | 'message',
       sourceElementReplacement,
+      ...(targetSchemaReplacements.length > 0 ? { targetSchemaReplacements } : {}),
     };
     return {
       kind: 'needs-resource-metadata',
@@ -507,6 +536,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
   const changes: RecordChange[] = [
     ...newSourcePortChanges,
+    ...targetSchemaReplacements.map((record): RecordChange => ({ kind: 'replace', value: { recordKind: 'schema', record } })),
     { kind: 'insert', value: { recordKind: 'connection', record: connection } },
     { kind: 'replace', value: { recordKind: 'view', record: updatedView } },
   ];
@@ -640,7 +670,9 @@ export function completeConnection(
     connectionIds: [...(view?.connectionIds ?? []), draft.connectionId],
   };
 
-  const changes: RecordChange[] = [];
+  const changes: RecordChange[] = (draft.targetSchemaReplacements ?? []).map(
+    (record): RecordChange => ({ kind: 'replace', value: { recordKind: 'schema', record } }),
+  );
   if (draft.sourceElementReplacement) {
     changes.push({
       kind: 'replace',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Document, Id, PayloadSchema, Port } from '../../domain/studio/model';
+import { shapesCompatible } from '../../domain/studio/readiness';
 import { validateDocument } from '../../domain/studio/validate';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import type { RecordChange } from '../../persistence/studio/types';
@@ -140,6 +141,53 @@ describe('connect.ts', () => {
     expect(complete.ok).toBe(true);
     if (!complete.ok) return;
     expect(validateDocument(applyChanges(doc2, complete.changes)).ok).toBe(true);
+  });
+
+  it('a linked-project node adopts the caller payload shapes instead of rejecting them (D52)', () => {
+    const mintId = createMintId();
+    const { document: baseDoc, viewId } = makeBlankDocument(mintId);
+    const p1 = place(baseDoc, viewId, 'service', { x: 0, y: 0 }, mintId);
+    const doc1 = applyChanges(baseDoc, p1.changes);
+    const linkedPlaced = placeEntry({
+      document: doc1, viewId, entryId: 'linked-project', anchor: { x: 300, y: 0 }, mintId,
+      link: { projectId: '00000000-0000-4000-8000-0000000000aa', title: 'Orders system' },
+    });
+    if (!linkedPlaced.ok) throw new Error(JSON.stringify(linkedPlaced.issues));
+    let doc2 = applyChanges(doc1, linkedPlaced.changes);
+    const service = doc2.elements.find((e) => e.id === p1.elementId)!;
+    const outPort = service.ports.find((p) => p.direction === 'out' && p.channel === 'call')!;
+    const callerSchema = doc2.schemas.find((s) => s.id === outPort.schemaId)!;
+    doc2 = applyChanges(doc2, [
+      {
+        kind: 'replace',
+        value: {
+          recordKind: 'schema',
+          record: {
+            ...callerSchema,
+            shape: { type: 'record', nullable: false, fields: [{ id: mintId(), key: 'orderId', optional: false, shape: { type: 'string', nullable: false } }] },
+          },
+        },
+      },
+    ] as never);
+    const plan = planConnection({
+      document: doc2,
+      viewId,
+      source: { elementId: service.id, portId: outPort.id },
+      target: { elementId: linkedPlaced.elementId },
+      mintId,
+    });
+    expect(plan.kind).toBe('needs-resource-metadata');
+    if (plan.kind !== 'needs-resource-metadata') return;
+    const complete = completeConnection(plan.draft, {
+      requestClassId: mintId(), requestClassLabel: 'Order', operation: 'read', deadlineDurationMs: 500,
+    });
+    expect(complete.ok).toBe(true);
+    if (!complete.ok) return;
+    const doc3 = applyChanges(doc2, complete.changes);
+    expect(validateDocument(doc3).ok).toBe(true);
+    const linked = doc3.elements.find((e) => e.id === linkedPlaced.elementId)!;
+    const targetSchema = doc3.schemas.find((s) => s.id === linked.ports.find((p) => p.direction === 'in')!.schemaId)!;
+    expect(shapesCompatible(targetSchema.shape, doc3.schemas.find((s) => s.id === outPort.schemaId)!.shape)).toBe(true);
   });
 
   it('connects to a non-resource element with ready and resource: null', () => {

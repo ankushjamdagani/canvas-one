@@ -198,9 +198,13 @@ export function TopBar({
     >
       <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 max-sm:min-w-min shrink">
         {/* Brand mark */}
-        <div
+        <button
+          type="button"
           data-testid="brand"
-          className="flex items-center gap-2 font-semibold text-[14px] text-foreground shrink-0 select-none max-sm:pointer-coarse:hidden"
+          aria-label="All projects"
+          title="All projects"
+          onClick={onAllProjects}
+          className="flex cursor-pointer items-center gap-2 rounded-control font-semibold text-[14px] text-foreground shrink-0 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:pointer-coarse:hidden"
         >
           <svg
             className="size-5 shrink-0"
@@ -229,7 +233,7 @@ export function TopBar({
             />
           </svg>
           <span className="hidden sm:inline">System studio</span>
-        </div>
+        </button>
 
         {/* Vertical divider from brand mark */}
         <div

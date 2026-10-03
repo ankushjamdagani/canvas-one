@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { LinkedProjectSummary } from './types';
+import { LINKED_PROJECT_MIME_TYPE, type LinkedProjectSummary } from './types';
 
 /** D52: other projects the user can place as read-only linked nodes. Stays mounted while hidden. */
 export function LinkedProjects({
@@ -52,7 +52,12 @@ export function LinkedProjects({
             <li
               key={project.id}
               data-testid={`linked-project-row-${project.id}`}
-              className="flex items-start gap-2 rounded-card border border-control-border bg-background p-2.5"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(LINKED_PROJECT_MIME_TYPE, JSON.stringify({ projectId: project.id, title: project.title }));
+                e.dataTransfer.effectAllowed = 'copyMove';
+              }}
+              className="flex cursor-grab items-start gap-2 rounded-card border border-control-border bg-background p-2.5 active:cursor-grabbing"
             >
               <Link2 className="mt-0.5 size-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
               <div className="min-w-0 flex-1">

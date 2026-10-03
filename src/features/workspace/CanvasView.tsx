@@ -48,7 +48,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { InspectorTargetKind } from '../inspector';
-import { CATALOG_ENTRY_MIME_TYPE } from '../library/types';
+import { CATALOG_ENTRY_MIME_TYPE, LINKED_PROJECT_MIME_TYPE } from '../library/types';
 import { getEntry } from '../catalog/catalog';
 import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
@@ -843,7 +843,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   // Dragging a picker card or a note onto the canvas places it at the drop point.
   const handleCanvasDragOver = React.useCallback((e: React.DragEvent) => {
     const types = Array.from(e.dataTransfer.types);
-    if (types.includes(CATALOG_ENTRY_MIME_TYPE) || types.includes(NOTE_MIME_TYPE)) {
+    if (types.includes(CATALOG_ENTRY_MIME_TYPE) || types.includes(LINKED_PROJECT_MIME_TYPE) || types.includes(NOTE_MIME_TYPE)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     }
@@ -858,6 +858,23 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         e.preventDefault();
         const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
         await applyPlacement(entryId, flowPoint);
+        return;
+      }
+
+      if (types.includes(LINKED_PROJECT_MIME_TYPE)) {
+        e.preventDefault();
+        let link: { projectId: string; title: string } | null = null;
+        try {
+          const parsed = JSON.parse(e.dataTransfer.getData(LINKED_PROJECT_MIME_TYPE)) as { projectId?: unknown; title?: unknown };
+          if (typeof parsed.projectId === 'string' && typeof parsed.title === 'string') {
+            link = { projectId: parsed.projectId, title: parsed.title };
+          }
+        } catch {
+          link = null;
+        }
+        if (!link) return;
+        const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        await applyPlacement('linked-project', flowPoint, link);
         return;
       }
 
