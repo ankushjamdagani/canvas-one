@@ -123,6 +123,7 @@ export const PORT_DESCRIPTOR: ObjectFieldDescriptor = {
     schemaId: { type: 'scalar' },
     responseSchemaId: { type: 'scalar' },
     protocol: { type: 'scalar' },
+    path: { type: 'scalar' },
   },
 };
 

@@ -57,8 +57,8 @@ function makeBlankDocument(mintId: () => Id): { document: Document; viewId: Id }
 // D52: the linked-project entry can only be placed with the project it links to.
 const LINKED_PROJECT_ID = '00000000-0000-4000-8000-0000000000aa';
 const LINKED_EXPOSURES: readonly ProjectExposure[] = [
-  { channel: 'call', protocol: 'http' },
-  { channel: 'call', protocol: 'grpc' },
+  { channel: 'call', protocol: 'http', path: '' },
+  { channel: 'call', protocol: 'grpc', path: '/orders' },
 ];
 
 function linkFor(visualKind: string) {
@@ -136,6 +136,7 @@ describe('place.ts', () => {
       expect(element.ports.map((p) => p.direction)).toEqual(['in', 'in']);
       // http is the default call protocol, so only gRPC is written.
       expect(element.ports.map((p) => (p as { protocol?: string }).protocol)).toEqual([undefined, 'grpc']);
+      expect(element.ports.map((p) => (p as { path?: string }).path)).toEqual([undefined, '/orders']);
     });
 
     it('refuses to link a project that exposes no call connection type (D53)', () => {

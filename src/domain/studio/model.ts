@@ -92,6 +92,8 @@ export type Port = {
   readonly responseSchemaId: Id | null;
   /** D53: absent means the node's default protocol for the channel (see protocols.ts). */
   readonly protocol?: import('./protocols').Protocol;
+  /** D53: the endpoint path or name within the protocol (`/orders`, a topic, a procedure). Absent means none. */
+  readonly path?: string;
 };
 
 /**

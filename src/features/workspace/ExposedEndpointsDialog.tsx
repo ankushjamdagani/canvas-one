@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { PROTOCOL_LABELS, type Protocol } from '../../domain/studio/protocols';
+import { describeEndpoint, type Protocol } from '../../domain/studio/protocols';
 
 export type EndpointCandidate = {
   readonly key: string;
   readonly channel: 'call' | 'message' | 'data';
   readonly protocol: Protocol;
+  readonly path: string;
   readonly exposed: boolean;
   /** Nodes of this project that accept the type (empty when it is exposed but no node accepts it any more). */
   readonly nodeLabels: readonly string[];
@@ -34,8 +35,8 @@ export function ExposedEndpointsDialog({ open, projectTitle, candidates, onToggl
         <DialogHeader>
           <DialogTitle>Exposed endpoints</DialogTitle>
           <DialogDescription>
-            Projects that link {projectTitle} can connect only with the connection types you expose here. A type is
-            listed once a node of this project accepts it: connect to a node with that type first.
+            Projects that link {projectTitle} can connect only to the endpoints you expose here (type and path). An
+            endpoint is listed once a node of this project accepts it: connect to a node with that type and path first.
           </DialogDescription>
         </DialogHeader>
         {candidates.length === 0 ? (
@@ -48,14 +49,14 @@ export function ExposedEndpointsDialog({ open, projectTitle, candidates, onToggl
                 className="flex items-center gap-2 rounded-card border border-control-border bg-background px-2.5 py-1.5"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium text-ink">{PROTOCOL_LABELS[candidate.protocol]}</div>
+                  <div className="truncate text-[13px] font-medium text-ink">{describeEndpoint(candidate.protocol, candidate.path)}</div>
                   <div className="truncate font-mono text-[10px] text-secondary-text">
                     {candidate.channel} · {candidate.nodeLabels.length > 0 ? [...new Set(candidate.nodeLabels)].join(', ') : 'no node accepts it now'}
                   </div>
                 </div>
                 <Switch
                   data-testid={`expose-${candidate.key}`}
-                  aria-label={`Expose ${PROTOCOL_LABELS[candidate.protocol]}`}
+                  aria-label={`Expose ${describeEndpoint(candidate.protocol, candidate.path)}`}
                   checked={candidate.exposed}
                   onCheckedChange={(next) => {
                     void onToggle(candidate, next).then(setError);

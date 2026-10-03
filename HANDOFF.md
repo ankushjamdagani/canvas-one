@@ -31,7 +31,11 @@ Production e2e: `playwright.config.ts` reuses any server already on port 5174, w
 
 ## Open debt
 
-Tracked here until resolved; none blocks release. None open (2026-09-30: the accessibility gaps moved to future scope, architecture.md §7).
+Tracked here until resolved; none blocks release.
+
+- (2026-10-03, D53) No tests for saved parts (`domain/parts/capture.ts`, `remap.ts`) or three-way merge (`merge-descriptor.ts`) with typed ports (`Port.protocol`, `Port.path`).
+
+(2026-09-30: the accessibility gaps moved to future scope, architecture.md §7.)
 
 Resolved 2026-09-30: visual open items O1–O4 (D44; O1 kept icon-only). Resolved 2026-09-29 (see `ACTION_LOG.md`): the Button spinner test, the filled-field state (design package found), stale TODOs, the superseded RV-14b logical runner (its tests now run on `runScenario` and exposed the budget-status bug below), the replaced `ScenarioRunControl`, unused modules and dependencies, estimated group heights (now measured), bundle size (code-split), and an e2e spec writing screenshots into the repo.
 

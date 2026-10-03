@@ -11,7 +11,7 @@
  */
 
 import { canonicalJson } from './canonical';
-import { isProtocolOf } from './protocols';
+import { isProtocolOf, PORT_PATH_MAX_LENGTH } from './protocols';
 import type {
   Document,
   Id,
@@ -1303,7 +1303,7 @@ export function validateDocument(
           for (let pIdx = 0; pIdx < ports.length; pIdx++) {
             const p = ports[pIdx];
             const pPath = [...elPath, 'ports', pIdx];
-            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol'], ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
+            if (checkRecord(p, ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path'], ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId'], pPath, elId, issues, 'Port')) {
               let pId: Id | null = null;
               if (validateId(p.id, [...pPath, 'id'], elId, issues)) {
                 pId = p.id;
@@ -1345,6 +1345,10 @@ export function validateDocument(
                     `Invalid protocol '${String(p.protocol)}' for a '${String(p.channel)}' port`,
                   ),
                 );
+              }
+
+              if (p.path !== undefined) {
+                validateString(p.path, 1, PORT_PATH_MAX_LENGTH, [...pPath, 'path'], pId ?? elId, issues, 'Port path');
               }
 
               pendingSchemaRefs.push({ schemaId: p.schemaId, path: [...pPath, 'schemaId'], entityId: pId ?? elId });

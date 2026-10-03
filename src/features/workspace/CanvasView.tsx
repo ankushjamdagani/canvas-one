@@ -50,7 +50,7 @@ import {
 import type { InspectorTargetKind } from '../inspector';
 import { CATALOG_ENTRY_MIME_TYPE, LINKED_PROJECT_MIME_TYPE } from '../library/types';
 import type { ProjectExposure } from '../../domain/studio/exposure';
-import { PROTOCOL_LABELS, type Protocol } from '../../domain/studio/protocols';
+import { PORT_PATH_MAX_LENGTH, PROTOCOL_LABELS, type Protocol } from '../../domain/studio/protocols';
 import { getEntry } from '../catalog/catalog';
 import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
@@ -100,6 +100,8 @@ type ResourceFormState = {
   readonly operation: 'read' | 'write' | null;
   readonly deadlineMs: string;
   readonly error: string | null;
+  /** D53: the endpoint path or name being typed; the draft is re-planned with it on confirm. */
+  readonly path: string;
   /** D53: what the planner needs to re-plan when the connection type changes. */
   readonly plan: {
     readonly sourceElementId: Id;
@@ -1023,6 +1025,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           operation: null,
           deadlineMs: '',
           error: null,
+          path: result.draft.path,
           plan: { sourceElementId: sourceElement.id, sourcePortId: sourcePort.id, targetElementId: targetElement.id, linkedExposures },
         });
         return;
@@ -1047,7 +1050,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         linkedExposures: plan.linkedExposures,
       });
       if (result.kind === 'needs-resource-metadata') {
-        setResourceForm({ ...resourceForm, draft: result.draft, error: null });
+        setResourceForm({ ...resourceForm, draft: result.draft, path: result.draft.path, error: null });
       } else if (result.kind === 'rejected') {
         setResourceForm({ ...resourceForm, error: result.issues[0]?.message ?? 'That connection type is not available.' });
       }
@@ -1069,6 +1072,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     return [...classes.values()];
   }, [document]);
   const requestClassListId = React.useId();
+  const endpointPathListId = React.useId();
 
   // catalog.md resolution 8: request class (text), read/write and deadline
   // have no contracted default -- neither operation nor deadline is
@@ -1101,8 +1105,28 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       setResourceForm({ ...resourceForm, error: 'Deadline must be a positive number of ms.' });
       return;
     }
+    // D53: the path decides which ports the connection uses, so plan again with it before completing.
+    let draft = resourceForm.draft;
+    if (document && projection.activeView && draft.protocol) {
+      const { plan } = resourceForm;
+      const replanned = planConnection({
+        document,
+        viewId: projection.activeView.id,
+        source: { elementId: plan.sourceElementId, portId: plan.sourcePortId },
+        target: { elementId: plan.targetElementId },
+        mintId,
+        protocol: draft.protocol,
+        path: resourceForm.path,
+        linkedExposures: plan.linkedExposures,
+      });
+      if (replanned.kind === 'rejected') {
+        setResourceForm({ ...resourceForm, error: replanned.issues[0]?.message ?? 'That endpoint is not available.' });
+        return;
+      }
+      if (replanned.kind === 'needs-resource-metadata') draft = replanned.draft;
+    }
     const existingClass = requestClasses.find((entry) => entry.requestClassLabel === resourceForm.requestClass);
-    const result = completeConnection(resourceForm.draft, {
+    const result = completeConnection(draft, {
       requestClassId: existingClass ? existingClass.requestClassId : mintId(),
       requestClassLabel: resourceForm.requestClass,
       operation: resourceForm.operation,
@@ -1117,7 +1141,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     }
     setResourceForm(null);
     await onApplyChanges(result.changes, 'Connect');
-  }, [resourceForm, requestClasses, onApplyChanges, mintId]);
+  }, [resourceForm, requestClasses, onApplyChanges, mintId, document, projection.activeView]);
 
   // ==========================================================================
   // RV-12e: Delete -- Delete/Backspace on canvas focus, or the 16D toolbar
@@ -1415,6 +1439,27 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
                   </option>
                 ))}
               </NativeSelect>
+            </label>
+          ) : null}
+
+          {resourceForm.draft.protocol ? (
+            <label className="block mb-2">
+              <span className="block text-secondary-text mb-0.5">Path / name</span>
+              <Input
+                data-testid="connect-form-path"
+                list={endpointPathListId}
+                placeholder="/orders, a topic, a procedure"
+                type="text"
+                maxLength={PORT_PATH_MAX_LENGTH}
+                value={resourceForm.path}
+                onChange={(e) => setResourceForm({ ...resourceForm, path: e.target.value, error: null })}
+                className="h-8 text-xs"
+              />
+              <datalist id={endpointPathListId}>
+                {resourceForm.draft.pathOptions.filter((p) => p !== '').map((p) => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
             </label>
           ) : null}
 

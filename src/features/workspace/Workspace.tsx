@@ -38,8 +38,8 @@ import { whenIdle } from "@/lib/lazyComponent";
 import { LibraryPanel, type LibraryView } from "../library";
 import { downloadSavedPart, SavedParts } from "../library/SavedParts";
 import { LinkedProjects } from "../library/LinkedProjects";
-import type { ProjectExposure } from "../../domain/studio/exposure";
-import { portProtocol } from "../../domain/studio/protocols";
+import { sameExposure, type ProjectExposure } from "../../domain/studio/exposure";
+import { portPath, portProtocol } from "../../domain/studio/protocols";
 import type { EndpointCandidate } from "./ExposedEndpointsDialog";
 import { projectDetails, projectExposures } from "../../persistence/studio/types";
 import type {
@@ -1357,21 +1357,23 @@ export function Workspace({
         if (port.direction !== "in" || port.channel === "event") continue;
         const protocol = portProtocol(element, port);
         if (protocol === null) continue;
-        const key = `${port.channel}:${protocol}`;
+        const path = portPath(port);
+        const key = `${port.channel}:${protocol}:${path}`;
         const existing = byType.get(key);
         byType.set(key, {
           key,
           channel: port.channel,
           protocol,
-          exposed: exposedTypes.some((x) => x.channel === port.channel && x.protocol === protocol),
+          path,
+          exposed: exposedTypes.some((x) => x.channel === port.channel && x.protocol === protocol && x.path === path),
           nodeLabels: [...(existing?.nodeLabels ?? []), element.label],
         });
       }
     }
     // Types exposed earlier that no node accepts any more stay listed so they can be switched off.
     for (const x of exposedTypes) {
-      const key = `${x.channel}:${x.protocol}`;
-      if (!byType.has(key)) byType.set(key, { key, channel: x.channel, protocol: x.protocol, exposed: true, nodeLabels: [] });
+      const key = `${x.channel}:${x.protocol}:${x.path}`;
+      if (!byType.has(key)) byType.set(key, { key, channel: x.channel, protocol: x.protocol, path: x.path, exposed: true, nodeLabels: [] });
     }
     return [...byType.values()];
   }, [document, exposedTypes]);
@@ -1379,8 +1381,8 @@ export function Workspace({
   const handleToggleEndpointExposed = React.useCallback(
     async (candidate: EndpointCandidate, exposed: boolean): Promise<string | null> => {
       const current = projectRecord ? projectExposures(projectRecord) : [];
-      const others = current.filter((x) => !(x.channel === candidate.channel && x.protocol === candidate.protocol));
-      const next = exposed ? [...others, { channel: candidate.channel, protocol: candidate.protocol }] : others;
+      const others = current.filter((x) => !sameExposure(x, candidate));
+      const next = exposed ? [...others, { channel: candidate.channel, protocol: candidate.protocol, path: candidate.path }] : others;
       const result = await session.updateProjectDetails({
         ...(projectRecord ? projectDetails(projectRecord) : { description: "", team: "" }),
         exposures: next,

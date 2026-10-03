@@ -112,7 +112,7 @@ describe('connect.ts', () => {
   });
 
   describe('connection types (D53)', () => {
-    const exposure = (protocol: ProjectExposure['protocol']): ProjectExposure => ({ channel: 'call', protocol });
+    const exposure = (protocol: ProjectExposure['protocol'], path = ''): ProjectExposure => ({ channel: 'call', protocol, path });
 
     function setup() {
       const mintId = createMintId();
@@ -124,7 +124,7 @@ describe('connect.ts', () => {
         return placed.elementId;
       };
       const el = (id: Id) => doc.elements.find((e) => e.id === id)!;
-      const connect = (from: Id, to: Id, extra: { protocol?: ProjectExposure['protocol']; linkedExposures?: readonly ProjectExposure[] } = {}) => {
+      const connect = (from: Id, to: Id, extra: { protocol?: ProjectExposure['protocol']; path?: string; linkedExposures?: readonly ProjectExposure[] } = {}) => {
         const plan = planConnection({
           document: doc, viewId,
           source: { elementId: from, portId: el(from).ports.find((p) => p.direction === 'out' && p.channel !== 'event')!.id },
@@ -173,6 +173,49 @@ describe('connect.ts', () => {
       expect(t.ports(a, 'out')).toHaveLength(2);
       expect(t.ports(d, 'in')).toHaveLength(1);
       expect(validateDocument(t.getDoc()).ok).toBe(true);
+    });
+
+    it('a path or name is part of the endpoint: each distinct path gets its own port on both nodes, and a repeat reuses it', () => {
+      const t = setup();
+      const a = t.add('service', 0);
+      const b = t.add('service', 300);
+      const c = t.add('service', 600);
+      const plan = t.connect(a, b, { path: '/orders' });
+      if (plan.kind !== 'needs-resource-metadata') throw new Error(plan.kind);
+      expect(plan.draft.path).toBe('/orders');
+      expect(plan.draft.connectionLabel).toBe('call · HTTP / REST /orders');
+      expect(t.ports(b, 'in').map((p) => p.path)).toEqual([undefined, '/orders']);
+      expect(t.ports(a, 'out').map((p) => p.path)).toEqual([undefined, '/orders']);
+      expect(t.ports(b, 'in')[1].label).toBe('HTTP / REST /orders');
+
+      // The same path on another node adds that node's port; a second path adds a second port on the source.
+      t.connect(a, c, { path: '/orders' });
+      expect(t.ports(a, 'out')).toHaveLength(2);
+      t.connect(a, c, { path: '/invoices' });
+      expect(t.ports(a, 'out').map((p) => p.path)).toEqual([undefined, '/orders', '/invoices']);
+      expect(t.ports(c, 'in').map((p) => p.path)).toEqual([undefined, '/orders', '/invoices']);
+      expect(validateDocument(t.getDoc()).ok).toBe(true);
+    });
+
+    it('defaults the path to the target\'s own and offers the paths it has for the type', () => {
+      const t = setup();
+      const a = t.add('service', 0);
+      const b = t.add('service', 300);
+      t.connect(a, b, { path: '/orders' });
+      const d = t.add('service', 600);
+      // A fresh caller to b: the entry port has no path, so the default is none; /orders is offered.
+      const plan = t.connect(d, b);
+      if (plan.kind !== 'needs-resource-metadata') throw new Error(plan.kind);
+      expect(plan.draft.path).toBe('');
+      expect(plan.draft.pathOptions).toEqual(['', '/orders']);
+    });
+
+    it('rejects a path longer than the limit', () => {
+      const t = setup();
+      const a = t.add('service', 0);
+      const b = t.add('service', 300);
+      const res = t.connect(a, b, { path: 'x'.repeat(121) });
+      expect(res.kind).toBe('rejected');
     });
 
     it('rejects a type that is not valid for the channel, and shapes that conflict on an existing pair', () => {
@@ -232,6 +275,17 @@ describe('connect.ts', () => {
         expect(res.kind).toBe('rejected');
         if (res.kind === 'rejected') expect(res.issues[0].message).toMatch(/doesn't expose gRPC/);
         expect(t.ports(t.linked, 'in')).toHaveLength(1);
+      });
+
+      it('matches the exposed path too: an unexposed path is rejected, an exposed one connects', () => {
+        const live = [exposure('http', '/orders')];
+        const t = linkedSetup(live);
+        const wrong = t.connect(t.caller, t.linked, { path: '/refunds', linkedExposures: live });
+        expect(wrong.kind).toBe('rejected');
+        if (wrong.kind === 'rejected') expect(wrong.issues[0].message).toMatch(/doesn't expose HTTP \/ REST \/refunds/);
+        const right = t.connect(t.caller, t.linked, { path: '/orders', linkedExposures: live });
+        expect(right.kind).toBe('needs-resource-metadata');
+        expect(t.ports(t.linked, 'in').map((p) => p.path)).toEqual(['/orders']);
       });
 
       it('adds a type the project started exposing after the link', () => {

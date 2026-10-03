@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PROTOCOL_LABELS } from '../../domain/studio/protocols';
+import { describeEndpoint } from '../../domain/studio/protocols';
 import { LINKED_PROJECT_MIME_TYPE, type LinkedProjectSummary } from './types';
 
 /** D52: other projects the user can place as read-only linked nodes. Stays mounted while hidden. */
@@ -74,7 +74,7 @@ export function LinkedProjects({
                   ) : null}
                   <div data-testid={`linked-project-endpoints-${project.id}`} className="mt-1 text-[11px] text-secondary-text">
                     {linkable
-                      ? [...new Set(project.exposures.map((x) => PROTOCOL_LABELS[x.protocol]))].join(' · ')
+                      ? [...new Set(project.exposures.map((x) => describeEndpoint(x.protocol, x.path)))].join(' · ')
                       : 'Exposes no call connection type. Edit this project to expose one before linking it.'}
                   </div>
                 </div>

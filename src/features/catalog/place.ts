@@ -23,7 +23,7 @@ import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
 import { getEntry } from './catalog';
 import type { ProjectExposure } from '../../domain/studio/exposure';
-import { defaultProtocol, PROTOCOL_LABELS } from '../../domain/studio/protocols';
+import { defaultProtocol, describeEndpoint } from '../../domain/studio/protocols';
 import { createIssue } from '../../domain/studio/issue';
 
 export type PlaceEntryParams = {
@@ -178,12 +178,20 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
   for (const exposure of linkedExposures) {
     const requestId = mintId();
     const responseId = exposure.channel === 'call' ? mintId() : null;
-    const label = PROTOCOL_LABELS[exposure.protocol];
+    const label = Array.from(describeEndpoint(exposure.protocol, exposure.path)).slice(0, 60).join('');
     changes.push({ kind: 'insert', value: { recordKind: 'schema', record: { id: requestId, label: `${label} request`, shape: { type: 'record', nullable: false, fields: [] } } } });
     if (responseId) {
       changes.push({ kind: 'insert', value: { recordKind: 'schema', record: { id: responseId, label: `${label} response`, shape: { type: 'record', nullable: false, fields: [] } } } });
     }
-    const base: Port = { id: mintId(), label, direction: 'in', channel: exposure.channel, schemaId: requestId, responseSchemaId: responseId };
+    const base: Port = {
+      id: mintId(),
+      label,
+      direction: 'in',
+      channel: exposure.channel,
+      schemaId: requestId,
+      responseSchemaId: responseId,
+      ...(exposure.path ? { path: exposure.path } : {}),
+    };
     ports.push(exposure.protocol === defaultProtocol('linked-project', exposure.channel) ? base : { ...base, protocol: exposure.protocol });
   }
 

@@ -58,7 +58,7 @@ describe('project.update-details (D52)', () => {
 
   it('stores exposed connection types (D53) and rejects unknown, repeated or misplaced ones', async () => {
     const { db, repo, projectId, command } = await setup();
-    const exposures = [{ channel: 'call', protocol: 'grpc' }, { channel: 'message', protocol: 'kafka' }] as const;
+    const exposures = [{ channel: 'call', protocol: 'grpc', path: '/orders' }, { channel: 'message', protocol: 'kafka', path: 'orders.created' }] as const;
     expect(await repo.execute(command({ payload: { description: '', team: '', exposures } }))).toMatchObject({ status: 'applied' });
     expect(projectExposures((await repo.loadProject(projectId))!)).toEqual(exposures);
 
@@ -66,7 +66,7 @@ describe('project.update-details (D52)', () => {
     await repo.execute(command({ expectedProjectRevision: 1, payload: { description: 'x', team: '' } }));
     expect(projectExposures((await repo.loadProject(projectId))!)).toEqual(exposures);
 
-    for (const bad of [[{ channel: 'call', protocol: 'kafka' }], [exposures[0], exposures[0]], [{ channel: 'event', protocol: 'grpc' }]]) {
+    for (const bad of [[{ channel: 'call', protocol: 'kafka', path: '' }], [exposures[0], exposures[0]], [{ channel: 'event', protocol: 'grpc', path: '' }], [{ channel: 'call', protocol: 'grpc', path: ' padded ' }]]) {
       const result = await repo.execute(command({ expectedProjectRevision: 2, payload: { description: '', team: '', exposures: bad as never } }));
       expect(result.status).toBe('invalid');
     }

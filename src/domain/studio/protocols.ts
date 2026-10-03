@@ -76,3 +76,20 @@ export function defaultProtocol(visualKind: VisualKind, channel: PortChannel): P
 export function portProtocol(element: { readonly visualKind: VisualKind }, port: Port): Protocol | null {
   return port.protocol ?? defaultProtocol(element.visualKind, port.channel);
 }
+
+/** The longest endpoint path or name (`Port.path`, `ProjectExposure.path`). */
+export const PORT_PATH_MAX_LENGTH = 120;
+
+/** A path or name as stored: trimmed, and absent (empty) when blank. */
+export function normalizePath(value: string | undefined): string {
+  return (value ?? '').trim();
+}
+
+export function portPath(port: Pick<Port, 'path'>): string {
+  return port.path ?? '';
+}
+
+/** How a connectable port reads on a card or a connection: its protocol and path, e.g. `HTTP / REST /orders`. */
+export function describeEndpoint(protocol: Protocol, path: string): string {
+  return path ? `${PROTOCOL_LABELS[protocol]} ${path}` : PROTOCOL_LABELS[protocol];
+}

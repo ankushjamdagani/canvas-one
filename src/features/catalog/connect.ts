@@ -24,10 +24,23 @@ import type {
 } from '../../domain/studio/model';
 import { shapesCompatible } from '../../domain/studio/readiness';
 import type { ProjectExposure } from '../../domain/studio/exposure';
-import { defaultProtocol, PROTOCOL_LABELS, portProtocol, protocolsFor, type Protocol } from '../../domain/studio/protocols';
+import {
+  defaultProtocol,
+  describeEndpoint,
+  normalizePath,
+  PORT_PATH_MAX_LENGTH,
+  PROTOCOL_LABELS,
+  portPath,
+  portProtocol,
+  protocolsFor,
+  type Protocol,
+} from '../../domain/studio/protocols';
 import type { Issue } from '../../domain/studio/validate';
 import type { RecordChange } from '../../persistence/studio/types';
 import { createIssue } from '../../domain/studio/issue';
+
+/** Port, schema and connection labels are limited to 80 characters; a long path must not break validation. */
+const clip = (text: string): string => Array.from(text).slice(0, 80).join('');
 
 const linkedLabel = (element: Element): string => `'${element.label}'`;
 
@@ -44,6 +57,8 @@ export type PlanConnectionParams = {
   readonly mintId: () => Id;
   /** D53: the connection type chosen in the connect form; defaults to the target's entry protocol. */
   readonly protocol?: Protocol;
+  /** D53: the endpoint path or name; defaults to the target's own path for the chosen type. */
+  readonly path?: string;
   /** D53: the connection types the project a linked-project target points at exposes right now. */
   readonly linkedExposures?: readonly ProjectExposure[];
 };
@@ -59,6 +74,11 @@ export type ConnectionDraft = {
   /** D53: the connection type this draft was planned with, and the types the form may offer. */
   readonly protocol: Protocol | null;
   readonly protocolOptions: readonly Protocol[];
+  /** D53: the endpoint path or name this draft was planned with, and the paths the target already has for the type. */
+  readonly path: string;
+  readonly pathOptions: readonly string[];
+  /** D53: how the connection reads on the canvas, e.g. `call · HTTP / REST /orders`. */
+  readonly connectionLabel: string;
   /** D53: schema inserts and element replacements for ports added by this connection. */
   readonly portChanges: readonly RecordChange[];
 };
@@ -333,7 +353,10 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   const findSchema = (id: Id | null | undefined): PayloadSchema | undefined =>
     id ? (pendingSchemas.get(id) ?? document.schemas.find((x) => x.id === id)) : undefined;
   let protocolOptions: readonly Protocol[] = [];
+  let pathOptions: readonly string[] = [];
   let chosenProtocol: Protocol | null = null;
+  let chosenPath = '';
+  let connectionLabel: string | null = null;
   let targetElementReplacement: Element | undefined;
 
   if (sourceElementReplacement === undefined && effectiveSourcePort.channel === targetPort.channel) {
@@ -351,6 +374,29 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     const protocol: Protocol | null = 'portId' in target ? targetDefault : (params.protocol ?? targetDefault ?? portProtocol(sourceElement, effectiveSourcePort));
     chosenProtocol = protocol;
 
+    // The paths the target already has for this type (for a linked project, the ones it exposes).
+    const knownPaths = (protocolValue: Protocol | null): readonly string[] => [
+      ...new Set([
+        ...targetElement.ports
+          .filter((p) => p.direction === 'in' && p.channel === channel && portProtocol(targetElement, p) === protocolValue)
+          .map(portPath),
+        ...(isLinked ? exposures.filter((x) => x.protocol === protocolValue).map((x) => x.path) : []),
+      ]),
+    ];
+    pathOptions = knownPaths(protocol);
+    const path = normalizePath(
+      'portId' in target
+        ? portPath(targetPort)
+        : (params.path ?? (protocol === targetDefault ? portPath(targetPort) : (pathOptions[0] ?? ''))),
+    );
+    chosenPath = path;
+    if (Array.from(path).length > PORT_PATH_MAX_LENGTH) {
+      return {
+        kind: 'rejected',
+        issues: [createIssue('too-long', `A path or name can be at most ${PORT_PATH_MAX_LENGTH} characters`, ['path'])],
+      };
+    }
+
     if (protocol !== null && !protocolsFor(channel).includes(protocol)) {
       return {
         kind: 'rejected',
@@ -359,13 +405,14 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     }
 
     if (protocol !== null) {
-      const samePort = (el: Element, port: Port) => port.channel === channel && portProtocol(el, port) === protocol;
+      const samePort = (el: Element, port: Port) =>
+        port.channel === channel && portProtocol(el, port) === protocol && portPath(port) === path;
       let sourceOut: Port | undefined =
         samePort(sourceElement, effectiveSourcePort) ? effectiveSourcePort : sourceElement.ports.find((p) => p.direction === 'out' && samePort(sourceElement, p));
       let targetIn: Port | undefined =
         samePort(targetElement, targetPort) ? targetPort : targetElement.ports.find((p) => p.direction === 'in' && samePort(targetElement, p));
 
-      const exposure = exposures.find((x) => x.protocol === protocol);
+      const exposure = exposures.find((x) => x.protocol === protocol && x.path === path);
       if (!targetIn && isLinked && !exposure) {
         const name = linkedLabel(targetElement);
         return {
@@ -373,7 +420,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
           issues: [
             createIssue(
               'structural-rule',
-              `${name} doesn't expose ${PROTOCOL_LABELS[protocol]}. Edit that project to expose it, then connect.`,
+              `${name} doesn't expose ${describeEndpoint(protocol, path)}. Edit that project to expose it, then connect.`,
               ['protocol'],
             ),
           ],
@@ -402,7 +449,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
         return { schemaId: request.id, responseSchemaId: response?.id ?? null };
       };
 
-      const labelFor = (el: Element) => `${el.label} ${PROTOCOL_LABELS[protocol]}`;
+      const labelFor = (el: Element) => clip(`${el.label} ${describeEndpoint(protocol, path)}`.slice(0, 60));
       let shared: { schemaId: Id; responseSchemaId: Id | null } | null =
         targetIn ? { schemaId: targetIn.schemaId, responseSchemaId: targetIn.responseSchemaId }
         : sourceOut ? { schemaId: sourceOut.schemaId, responseSchemaId: sourceOut.responseSchemaId }
@@ -414,11 +461,12 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
         targetIn = withProtocol(
           {
             id: mintId(),
-            label: PROTOCOL_LABELS[protocol],
+            label: clip(describeEndpoint(protocol, path)),
             direction: 'in',
             channel,
             schemaId: ids.schemaId,
             responseSchemaId: ids.responseSchemaId,
+            ...(path ? { path } : {}),
           },
           targetElement,
           protocol,
@@ -431,11 +479,12 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
         sourceOut = withProtocol(
           {
             id: mintId(),
-            label: PROTOCOL_LABELS[protocol],
+            label: clip(describeEndpoint(protocol, path)),
             direction: 'out',
             channel,
             schemaId: targetIn.schemaId,
             responseSchemaId: targetIn.responseSchemaId,
+            ...(path ? { path } : {}),
           },
           sourceElement,
           protocol,
@@ -446,6 +495,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
       effectiveSourcePort = sourceOut;
       targetPort = targetIn;
+      connectionLabel = clip(`${channel} · ${describeEndpoint(protocol, path)}`);
     }
   }
 
@@ -592,6 +642,9 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
       sourceElementReplacement,
       protocol: chosenProtocol,
       protocolOptions,
+      path: chosenPath,
+      pathOptions,
+      connectionLabel: connectionLabel ?? connectionKind,
       portChanges,
     };
     return {
@@ -605,7 +658,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   if (connectionKind === 'data') {
     const dataConnection: DataConnection = {
       id: connectionId,
-      label: connectionKind,
+      label: connectionLabel ?? connectionKind,
       kind: 'data',
       source: sourceEndpoint,
       target: targetEndpoint,
@@ -615,7 +668,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   } else if (connectionKind === 'call') {
     const callConnection: CallConnection = {
       id: connectionId,
-      label: connectionKind,
+      label: connectionLabel ?? connectionKind,
       kind: 'call',
       source: sourceEndpoint,
       target: targetEndpoint,
@@ -634,7 +687,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     // message
     const messageConnection: MessageConnection = {
       id: connectionId,
-      label: connectionKind,
+      label: connectionLabel ?? connectionKind,
       kind: 'message',
       source: sourceEndpoint,
       target: targetEndpoint,
@@ -743,7 +796,7 @@ export function completeConnection(
   if (draft.kind === 'call') {
     const callConn: CallConnection = {
       id: draft.connectionId,
-      label: draft.kind,
+      label: draft.connectionLabel,
       kind: 'call',
       source: draft.source,
       target: draft.target,
@@ -761,7 +814,7 @@ export function completeConnection(
   } else {
     const msgConn: MessageConnection = {
       id: draft.connectionId,
-      label: draft.kind,
+      label: draft.connectionLabel,
       kind: 'message',
       source: draft.source,
       target: draft.target,

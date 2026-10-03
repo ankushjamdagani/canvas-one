@@ -66,6 +66,10 @@ test('a project can be linked into another as a read-only node that shows live d
   await expect(node.getByTestId(/node-linked-details-/)).toContainText('Orders team');
   await expect(node.getByTestId(/node-linked-details-/)).toContainText('Takes and fulfils customer orders');
 
+  // Expanded, the node lists the endpoints (type and path) it can be connected with.
+  await node.getByTestId(/node-expand-toggle-/).click();
+  await expect(node.getByTestId(/node-ports-/)).toContainText('in: HTTP / REST');
+
   // Inspector is read-only for the linked node.
   await node.click();
   await expect(page.getByTestId('inspector-kind-tag')).toHaveText('LINKED PROJECT');
@@ -166,6 +170,7 @@ test('the connect form offers a connection type and a service can be connected w
   await expect(select.locator('option[value="kafka"]')).toHaveCount(0);
   await select.selectOption('grpc');
   await expect(select).toHaveValue('grpc');
+  await page.getByTestId('connect-form-path').fill('/orders');
   await page.getByTestId('connect-form-request-class').fill('Order');
   await page.getByTestId('connect-form-op-read').check();
   await page.getByTestId('connect-form-deadline').fill('500');

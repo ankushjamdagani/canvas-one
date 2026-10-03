@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
+import { describeEndpoint, portPath, portProtocol } from '../../domain/studio/protocols';
 import { getNodeCaption, getNodeIcon } from './nodeVisuals';
 
 export function NodeCard({ data, selected }: NodeProps) {
@@ -15,7 +16,13 @@ export function NodeCard({ data, selected }: NodeProps) {
   const caption = getNodeCaption(element);
   const portSummary = ['in', 'out']
     .map((direction) => {
-      const labels = element.ports.filter((p) => p.direction === direction).map((p) => p.label);
+      // D53: connectable ports read as their protocol and path (HTTP / REST /orders); event ports keep their label.
+      const labels = element.ports
+        .filter((p) => p.direction === direction)
+        .map((p) => {
+          const protocol = portProtocol(element, p);
+          return protocol === null ? p.label : describeEndpoint(protocol, portPath(p));
+        });
       return `${direction}: ${labels.length > 0 ? labels.join(', ') : 'none'}`;
     })
     .join(' · ');

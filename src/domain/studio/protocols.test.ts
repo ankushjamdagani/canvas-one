@@ -35,7 +35,7 @@ describe('protocols (D53)', () => {
     expect(isProtocolOf('event', 'http')).toBe(false);
   });
 
-  it('validates the port protocol: it must fit the channel', () => {
+  it('validates the port protocol and path: the protocol must fit the channel, the path is bounded', () => {
     const withPort = (patch: Record<string, unknown>) => {
       const el = S01.elements.find((e) => e.ports.some((p) => p.direction === 'in' && p.channel === 'call'))!;
       const port = el.ports.find((p) => p.direction === 'in' && p.channel === 'call')!;
@@ -46,6 +46,9 @@ describe('protocols (D53)', () => {
     };
     expect(validateDocument(withPort({ protocol: 'grpc' })).ok).toBe(true);
     expect(validateDocument(withPort({ protocol: 'kafka' })).ok).toBe(false);
+    expect(validateDocument(withPort({ path: '/orders' })).ok).toBe(true);
+    expect(validateDocument(withPort({ path: '' })).ok).toBe(false);
+    expect(validateDocument(withPort({ path: 'x'.repeat(121) })).ok).toBe(false);
   });
 
   it('the run manifest ignores a port protocol', async () => {
@@ -62,11 +65,16 @@ describe('protocols (D53)', () => {
 
   it('accepts only well-formed exposure lists', () => {
     expect(isExposureList([])).toBe(true);
-    expect(isExposureList([{ channel: 'call', protocol: 'grpc' }, { channel: 'message', protocol: 'kafka' }])).toBe(true);
-    expect(isExposureList([{ channel: 'call', protocol: 'kafka' }])).toBe(false);
-    expect(isExposureList([{ channel: 'call', protocol: 'grpc' }, { channel: 'call', protocol: 'grpc' }])).toBe(false);
-    expect(isExposureList([{ channel: 'event', protocol: 'grpc' }])).toBe(false);
-    expect(isExposureList([{ channel: 'call', protocol: 'grpc', extra: 1 }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: '' }, { channel: 'message', protocol: 'kafka', path: 'orders' }])).toBe(true);
+    // The same type with two paths is two endpoints.
+    expect(isExposureList([{ channel: 'call', protocol: 'http', path: '/a' }, { channel: 'call', protocol: 'http', path: '/b' }])).toBe(true);
+    expect(isExposureList([{ channel: 'call', protocol: 'kafka', path: '' }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: '/a' }, { channel: 'call', protocol: 'grpc', path: '/a' }])).toBe(false);
+    expect(isExposureList([{ channel: 'event', protocol: 'grpc', path: '' }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: '', extra: 1 }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'grpc' }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: ' /a ' }])).toBe(false);
+    expect(isExposureList([{ channel: 'call', protocol: 'grpc', path: 'x'.repeat(121) }])).toBe(false);
     expect(isExposureList('call')).toBe(false);
   });
 });
