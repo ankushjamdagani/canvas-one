@@ -24,18 +24,6 @@ from the linked project, and it can be opened.
   node shows "Project unavailable" and Open is disabled. Self-links are rejected at placement.
 - Cycles (A links B, B links A) are allowed: a link is a reference, never traversed by the runner.
 
-## Ports and payload shapes
-
-A linked node is a black box and accepts whatever its caller sends, but a port still has exactly one schema
-(identical-shape rule, model-and-runner §3). Connecting a caller therefore picks the call-in port as follows:
-
-1. Reuse an in-port whose request and response shapes already match the caller.
-2. Otherwise, if nothing is connected to the entry port yet, copy the caller's shapes onto it (fresh field ids).
-3. Otherwise add a new call-in port (`call in N`) with the caller's shapes.
-
-A port that another connection uses is never rewritten. Callers that share a contract share a port.
-Implemented in `planConnection` (`targetChanges`).
-
 ## Fixed black-box behavior
 
 Same shape as the catalog `service` processor defaults (`BASE_RESOURCE_DEFAULTS`): pool-sized concurrency, 10 ms
