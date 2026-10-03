@@ -109,9 +109,23 @@ export type ProjectRecord = {
   readonly mainBranchId: Id;
   readonly initialSnapshotId: string; // Hash
   readonly importSourceId: Id | null;
+  /** Free-text details other projects show when they link here (D52). Absent on older rows. */
+  readonly description?: string;
+  readonly team?: string;
   readonly createdAt: number;
   readonly updatedAt: number;
 };
+
+export const PROJECT_DESCRIPTION_MAX_LENGTH = 500;
+export const PROJECT_TEAM_MAX_LENGTH = 60;
+
+/** Details with absent fields read as empty (rows written before D52 have none). */
+export function projectDetails(project: Pick<ProjectRecord, 'description' | 'team'>): {
+  readonly description: string;
+  readonly team: string;
+} {
+  return { description: project.description ?? '', team: project.team ?? '' };
+}
 
 /**
  * branches table: primary key [projectId+id]
@@ -476,6 +490,19 @@ export type ProjectRenameCommand = {
   };
 };
 
+/** D52: edits the project record's description and team only; no snapshot or branch changes. */
+export type ProjectUpdateDetailsCommand = {
+  readonly commandId: 'project.update-details';
+  readonly operationId: Id;
+  readonly projectId: Id;
+  readonly expectedProjectRevision: number;
+  readonly actor: Actor;
+  readonly payload: {
+    readonly description: string;
+    readonly team: string;
+  };
+};
+
 export type BranchCreateCommand = {
   readonly commandId: 'branch.create';
   readonly operationId: Id;
@@ -619,6 +646,7 @@ export type GenericCommand = {
 export type AuthoredCommand =
   | ProjectCreateCommand
   | ProjectRenameCommand
+  | ProjectUpdateDetailsCommand
   | BranchCreateCommand
   | ModelApplyRecordsCommand
   | HistoryCheckpointCommand

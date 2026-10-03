@@ -108,6 +108,11 @@ const PROCESSOR_CONFIG = {
   type: 'processor' as const,
 };
 
+/** D52: fixed black-box behavior for linked-project nodes; read-only in the inspector. */
+export const LINKED_PROJECT_CONFIG = {
+  ...PROCESSOR_CONFIG,
+} as const;
+
 const CACHE_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
   capacity: 5000, // assumption (catalog.md)
@@ -782,6 +787,21 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     doesNotModel: 'Everything, until the author adds ports/behavior via the inspector',
     tags: ['custom'],
     caption: { line1: 'Custom Node', line2template: 'Not simulated' },
+  },
+  // D52: instantiated from a project (see linked.ts), so the Library lists projects, not this entry.
+  {
+    entryId: 'linked-project',
+    label: 'Linked project',
+    group: 'Other',
+    category: 'Other',
+    visualKind: 'linked-project',
+    behaviorKind: 'resource',
+    ports: CALL_IN_PORT,
+    defaultConfig: LINKED_PROJECT_CONFIG,
+    models: 'Another project as a black box: a fixed service that answers calls',
+    doesNotModel: "The other project's real behavior, latency or failures; its configuration cannot be changed from here",
+    tags: ['linked', 'project', 'external'],
+    caption: { line1: 'Linked project', line2template: 'processor · fixed' },
   },
 ]);
 

@@ -19,7 +19,21 @@ export type LibraryView = 'list' | 'grid';
 /** Drag-and-drop MIME type for studio catalog entries */
 export const CATALOG_ENTRY_MIME_TYPE = 'application/x-studio-catalog-entry';
 
-export type LibraryTab = 'standard' | 'ours';
+export type LibraryTab = 'standard' | 'ours' | 'projects';
+
+/** D52: what the Library shows about a project it can link to. */
+export interface LinkedProjectSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly team: string;
+  readonly description: string;
+}
+
+export interface LinkedProjectsRenderContext {
+  readonly searchQuery: string;
+  readonly active: boolean;
+  readonly onCountChange: (count: number) => void;
+}
 
 export interface SavedPartsRenderContext {
   readonly searchQuery: string;
@@ -51,6 +65,8 @@ export interface LibraryPanelProps {
    * tab is showing (`active` false) so its count and a requested capture survive.
    */
   renderSavedParts?: (context: SavedPartsRenderContext) => import('react').ReactNode;
+  /** Renders the linked-projects ("Projects") content; the tab is absent without it. */
+  renderLinkedProjects?: (context: LinkedProjectsRenderContext) => import('react').ReactNode;
   /** Increments when a capture is requested from outside; switches to the Ours tab. */
   captureRequested?: number;
 }

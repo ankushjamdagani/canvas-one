@@ -107,6 +107,10 @@ export interface CanvasViewProps {
   isSaving: boolean;
   /** Elements a workload of the scenario being edited enters at (board scenario_traffic_editor). */
   trafficEntryElementIds?: ReadonlySet<Id>;
+  /** D52: details of the projects linked-project nodes point at (absent id = unavailable). */
+  linkedProjects?: ReadonlyMap<string, { readonly title: string; readonly team: string; readonly description: string }> | null;
+  /** D52: opens a linked project (guarded navigation owned by the workspace). */
+  onOpenLinkedProject?: (projectId: string) => void;
   /** A dirty scenario draft blocks Run; the canvas says so (board scenario_traffic_editor). */
   runWaitsForScenarioDraft?: boolean;
   onMoveNodes: (
@@ -150,7 +154,7 @@ export interface CanvasViewProps {
  * this ReactFlowProvider) can place a catalog entry through applyPlacement.
  */
 export interface CanvasViewHandle {
-  placeAtCentre: (entryId: string) => Promise<void>;
+  placeAtCentre: (entryId: string, link?: { projectId: string; title: string }) => Promise<void>;
   getVisibleCentre: () => { readonly x: number; readonly y: number };
   /** Measured card heights by placement id, for bounding-box planners (align/distribute). */
   getMeasuredHeights: () => MeasuredHeights;
@@ -196,6 +200,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onConfigureDock,
   onRestoreDockDefaults,
   trafficEntryElementIds,
+  linkedProjects,
+  onOpenLinkedProject,
   runWaitsForScenarioDraft,
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
@@ -375,6 +381,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         const trafficEntry = Boolean(trafficEntryElementIds?.has(data.element.id));
         const viewId = projection.activeView?.id;
         const togglePayload = viewId ? ({ viewId, target: { kind: 'placement', id: data.placement.id } } as const) : null;
+        const linkedId = data.element.linkedProjectId;
+        const linkedDetails = linkedId ? linkedProjects?.get(linkedId) : undefined;
         return {
           ...n,
           selected,
@@ -382,13 +390,23 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             ...data,
             connectable,
             trafficEntry,
+            ...(linkedId
+              ? {
+                  linked: linkedDetails
+                    ? { state: 'available' as const, ...linkedDetails }
+                    : linkedProjects
+                      ? { state: 'unavailable' as const }
+                      : { state: 'loading' as const },
+                  onOpenLinked: linkedDetails && onOpenLinkedProject ? () => onOpenLinkedProject(linkedId) : undefined,
+                }
+              : {}),
             onToggleExpanded: togglePayload
               ? () => void onExecuteCommand(data.placement.expanded ? 'canvas.collapse' : 'canvas.expand', togglePayload)
               : undefined,
           },
         };
       }),
-    [nodes, selectedElementIds, selectedNoteIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds, document, onApplyChanges, onRequestSelection],
+    [nodes, selectedElementIds, selectedNoteIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds, linkedProjects, onOpenLinkedProject, document, onApplyChanges, onRequestSelection],
   );
 
   const displayEdges = React.useMemo(
@@ -795,7 +813,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   }, [document?.id, projection, reactFlow]);
 
   const applyPlacement = React.useCallback(
-    async (entryId: string, anchor: { x: number; y: number }) => {
+    async (entryId: string, anchor: { x: number; y: number }, link?: { projectId: string; title: string }) => {
       if (!document || !projection.activeView || isSaving) return;
       const result = placeEntry({
         document,
@@ -803,9 +821,10 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         entryId,
         anchor,
         mintId,
+        link,
       });
       if (!result.ok) return;
-      const applied = await onApplyChanges(result.changes, 'Add component');
+      const applied = await onApplyChanges(result.changes, link ? 'Link project' : 'Add component');
       if (!applied) return;
       onRequestSelection?.({ kind: 'element', id: result.elementId, additive: false });
     },
@@ -1118,8 +1137,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   React.useImperativeHandle(
     ref,
     () => ({
-      placeAtCentre: async (entryId: string) => {
-        await applyPlacement(entryId, getVisibleCentre());
+      placeAtCentre: async (entryId: string, link?: { projectId: string; title: string }) => {
+        await applyPlacement(entryId, getVisibleCentre(), link);
       },
       getVisibleCentre,
       getMeasuredHeights: () => measuredHeights,

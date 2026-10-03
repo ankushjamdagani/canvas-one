@@ -98,6 +98,12 @@ export const CATALOG_LAYER_COLORS: Record<CatalogLayer, string> = {
   host: '#3A3F3C',
 };
 
+/** What a linked-project node shows about its target, read live from the project record. */
+export type LinkedProjectView =
+  | { readonly state: 'available'; readonly title: string; readonly team: string; readonly description: string }
+  | { readonly state: 'loading' }
+  | { readonly state: 'unavailable' };
+
 export type ProjectedNodeData =
   | {
       readonly kind: 'boundary';
@@ -127,6 +133,12 @@ export type ProjectedNodeData =
       readonly trafficEntry?: boolean;
       /** Directly toggles port summary expansion on the node card itself. */
       readonly onToggleExpanded?: () => void;
+      /**
+       * D52, set by CanvasView on linked-project elements: the linked project's live details, or
+       * `unavailable` when it no longer exists. Not part of the projection.
+       */
+      readonly linked?: LinkedProjectView;
+      readonly onOpenLinked?: () => void;
     }
   | {
       readonly kind: 'group';

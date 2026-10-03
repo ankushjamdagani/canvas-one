@@ -61,13 +61,14 @@ export const DOCUMENT_FIELDS = [
 /**
  * Contract §2: visualKind catalog.
  * Exactly the 29-kind catalog in src/domain/execution.ts:VALID_KINDS plus
- * 'state-machine', 'data-pipeline', and 'host'.
+ * 'state-machine', 'data-pipeline', 'host', and (D52) 'linked-project'.
  */
 export const VISUAL_KINDS = [
   ...VALID_KINDS,
   'state-machine',
   'data-pipeline',
   'host',
+  'linked-project',
 ] as const;
 
 export type VisualKind = (typeof VISUAL_KINDS)[number];
@@ -102,7 +103,7 @@ export type Endpoint = {
 
 /**
  * Contract §2: Element
- * id, label, description, visualKind, ports:Port[], behavior:Behavior
+ * id, label, description, visualKind, ports:Port[], behavior:Behavior, linkedProjectId? (D52)
  */
 export type Element = {
   readonly id: Id;
@@ -111,6 +112,12 @@ export type Element = {
   readonly visualKind: VisualKind;
   readonly ports: readonly Port[];
   readonly behavior: Behavior;
+  /**
+   * D52: the project this node stands for, on `linked-project` elements only. A reference by id
+   * (never a copy), omitted otherwise so older snapshot hashes are unchanged, and never part of
+   * the run manifest.
+   */
+  readonly linkedProjectId?: Id;
 };
 
 // ----------------------------------------------------------------------------

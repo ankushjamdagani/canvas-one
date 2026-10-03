@@ -322,6 +322,7 @@ export const ELEMENT_DESCRIPTOR: ObjectFieldDescriptor = {
     label: { type: 'scalar' },
     description: { type: 'scalar' },
     visualKind: { type: 'scalar' },
+    linkedProjectId: { type: 'scalar' },
     ports: { type: 'keyed', item: PORT_DESCRIPTOR },
     behavior: BEHAVIOR_DESCRIPTOR,
   },

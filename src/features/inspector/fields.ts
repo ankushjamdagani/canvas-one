@@ -423,13 +423,24 @@ function behaviorFields(element: Element): readonly FieldSpec<Element>[] {
   }
 }
 
+/** D52: a linked-project node is a fixed black box; nothing about it is editable here. */
+function linkedProjectFields(element: Element): readonly FieldSpec<Element>[] {
+  return [
+    readonlyField<Element>('linked.project', 'Linked project', element.label, 'Title, team and description are read from the linked project'),
+    readonlyField<Element>('linked.id', 'Project ID', element.linkedProjectId ?? ''),
+    readonlyField<Element>('behavior.summary', 'Behavior', 'Fixed black-box service', 'Its configuration cannot be changed from this project'),
+  ];
+}
+
 export function fieldsForElement(element: Element): readonly FieldSpec<Element>[] {
+  if (element.visualKind === 'linked-project') return linkedProjectFields(element);
   return [...elementLabelDescriptionFields(), ...behaviorFields(element)];
 }
 
 /** Uppercase kind tag(s) for the inspector header, per D42 caption words. */
 export function kindTagForElement(element: Element): { readonly tag: string; readonly notSimulated: boolean } {
   const behavior = element.behavior;
+  if (element.visualKind === 'linked-project') return { tag: 'LINKED PROJECT', notSimulated: false };
   switch (behavior.kind) {
     case 'unmodeled':
       return { tag: 'NOT SIMULATED', notSimulated: true };

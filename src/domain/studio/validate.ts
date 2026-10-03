@@ -1256,7 +1256,7 @@ export function validateDocument(
     for (let eIdx = 0; eIdx < elements.length; eIdx++) {
       const el = elements[eIdx];
       const elPath = ['elements', eIdx];
-      if (checkRecord(el, ['id', 'label', 'description', 'visualKind', 'ports', 'behavior'], ['id', 'label', 'description', 'visualKind', 'ports', 'behavior'], elPath, docId, issues, 'Element')) {
+      if (checkRecord(el, ['id', 'label', 'description', 'visualKind', 'ports', 'behavior', 'linkedProjectId'], ['id', 'label', 'description', 'visualKind', 'ports', 'behavior'], elPath, docId, issues, 'Element')) {
         let elId: Id | null = null;
         if (validateId(el.id, [...elPath, 'id'], null, issues)) {
           elId = el.id;
@@ -1275,6 +1275,19 @@ export function validateDocument(
               elId,
               `Invalid visualKind: '${String(el.visualKind)}'`,
             ),
+          );
+        }
+
+        // D52: a linked-project node names the project it stands for; no other element may.
+        const hasLink = el.linkedProjectId !== undefined;
+        if (hasLink) validateId(el.linkedProjectId, [...elPath, 'linkedProjectId'], elId, issues);
+        if (hasLink && el.visualKind !== 'linked-project') {
+          issues.push(
+            errorIssue('structural-rule', [...elPath, 'linkedProjectId'], elId, "Only a 'linked-project' element can set linkedProjectId"),
+          );
+        } else if (!hasLink && el.visualKind === 'linked-project') {
+          issues.push(
+            errorIssue('missing-property', [...elPath, 'linkedProjectId'], elId, "A 'linked-project' element must set linkedProjectId"),
           );
         }
 

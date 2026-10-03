@@ -10,6 +10,7 @@ import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
 import { validateDocument, type Issue } from '../../domain/studio/validate';
 import type { Document, Id, Scenario } from '../../domain/studio/model';
 import { TERMINAL_STATUSES, type TraceEvent } from '../../domain/studio/runner/types';
+import { codePointLength } from '../../domain/studio/text';
 import { createStudioDatabase, StudioDatabase } from './db';
 import { createIssue, mapErrorToFailedResult, RepositoryError } from './errors';
 import {
@@ -80,6 +81,9 @@ import {
   type ProjectImportCommand,
   type ProjectRecord,
   type ProjectRenameCommand,
+  type ProjectUpdateDetailsCommand,
+  PROJECT_DESCRIPTION_MAX_LENGTH,
+  PROJECT_TEAM_MAX_LENGTH,
   type PruneUnreferencedParams,
   type PruneUnreferencedResult,
   type PublicationRecord,
@@ -443,6 +447,8 @@ export class LocalRepository implements StudioRepository {
         return this.handleProjectCreate(command as ProjectCreateCommand);
       case 'project.rename':
         return this.handleProjectRename(command as ProjectRenameCommand);
+      case 'project.update-details':
+        return this.handleProjectUpdateDetails(command as ProjectUpdateDetailsCommand);
       case 'branch.create':
         return this.handleBranchCreate(command as BranchCreateCommand);
       case 'model.apply-records':
@@ -917,6 +923,91 @@ export class LocalRepository implements StudioRepository {
           return appliedResult;
         },
       );
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+  }
+
+  /**
+   * project.update-details (D52):
+   * Sets the project record's description and team. Advances the project revision only;
+   * snapshots, branches and undo history are untouched.
+   */
+  private async handleProjectUpdateDetails(
+    command: ProjectUpdateDetailsCommand,
+  ): Promise<AuthoredResult> {
+    const actorIssues = validateActor(command.actor);
+    if (actorIssues) return { status: 'invalid', issues: actorIssues };
+    const envelopeIssue =
+      validateUuid(command.operationId, ['operationId'], 'operationId') ??
+      validateUuid(command.projectId, ['projectId'], 'projectId') ??
+      validateRevision(command.expectedProjectRevision, ['expectedProjectRevision'], 'expectedProjectRevision');
+    if (envelopeIssue) return { status: 'invalid', issues: [envelopeIssue] };
+
+    const payload = command.payload;
+    const issues: Issue[] = [];
+    if (typeof payload?.description !== 'string') {
+      issues.push(createIssue('wrong-type', 'description must be a string', ['payload', 'description']));
+    } else if (codePointLength(payload.description) > PROJECT_DESCRIPTION_MAX_LENGTH) {
+      issues.push(createIssue('too-long', `Description must be ${PROJECT_DESCRIPTION_MAX_LENGTH} characters or fewer`, ['payload', 'description']));
+    }
+    if (typeof payload?.team !== 'string') {
+      issues.push(createIssue('wrong-type', 'team must be a string', ['payload', 'team']));
+    } else if (codePointLength(payload.team) > PROJECT_TEAM_MAX_LENGTH) {
+      issues.push(createIssue('too-long', `Team must be ${PROJECT_TEAM_MAX_LENGTH} characters or fewer`, ['payload', 'team']));
+    }
+    if (issues.length > 0) return { status: 'invalid', issues };
+    const description = payload.description.trim();
+    const team = payload.team.trim();
+
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+    } catch (err) {
+      return mapErrorToFailedResult(err);
+    }
+
+    try {
+      return await this.db.transaction('rw', getProjectTables(this.db), async () => {
+        const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+        if (replay) return replay;
+
+        const project = await this.db.projects.get(command.projectId);
+        if (!project) return { status: 'missing', ids: [command.projectId] };
+        if (project.revision !== command.expectedProjectRevision) {
+          return {
+            status: 'stale',
+            scope: 'project',
+            expected: command.expectedProjectRevision,
+            actual: project.revision,
+          };
+        }
+
+        const now = Date.now();
+        const nextProjectRev = project.revision + 1;
+        const updated: ProjectRecord = { ...project, description, team, revision: nextProjectRev, updatedAt: now };
+        const limit = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalReceipts: 1,
+          additionalLocalBytes: calculateRecordBytes(updated) - calculateRecordBytes(project),
+          additionalExportBytes: 0,
+        });
+        if (limit) return limit;
+
+        await this.db.projects.update(command.projectId, { description, team, revision: nextProjectRev, updatedAt: now });
+
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: null,
+          changedIds: [command.projectId],
+          undo: null,
+          value: { kind: 'none' },
+        };
+        await recordOperationReceipt(this.db, command.projectId, command.operationId, requestHash, appliedResult);
+        return appliedResult;
+      });
     } catch (err) {
       return mapErrorToFailedResult(err);
     }

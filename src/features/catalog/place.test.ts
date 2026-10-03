@@ -53,6 +53,12 @@ function makeBlankDocument(mintId: () => Id): { document: Document; viewId: Id }
   return { document, viewId };
 }
 
+// D52: the linked-project entry can only be placed with the project it links to.
+const LINKED_PROJECT_ID = '00000000-0000-4000-8000-0000000000aa';
+function linkFor(visualKind: string) {
+  return visualKind === 'linked-project' ? { projectId: LINKED_PROJECT_ID, title: 'Orders system' } : undefined;
+}
+
 describe('place.ts', () => {
   describe('validation and error handling', () => {
     it('rejects when mintId is missing or not a function', () => {
@@ -107,6 +113,62 @@ describe('place.ts', () => {
     });
   });
 
+  describe('linked-project placement (D52)', () => {
+    it('places a linked node with the link, the project title as label and a call-in port', () => {
+      const mintId = createMintId();
+      const { document, viewId } = makeBlankDocument(mintId);
+      const res = placeEntry({
+        document, viewId, entryId: 'linked-project', anchor: { x: 10, y: 20 }, mintId,
+        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system' },
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      const inserted = res.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'element');
+      const element = (inserted as unknown as { value: { record: { label: string; linkedProjectId?: string; ports: { direction: string }[] } } }).value.record;
+      expect(element.label).toBe('Orders system');
+      expect(element.linkedProjectId).toBe(LINKED_PROJECT_ID);
+      expect(element.ports.map((p) => p.direction)).toEqual(['in']);
+    });
+
+    it('validates: the link is required on linked-project elements and forbidden elsewhere', () => {
+      const mintId = createMintId();
+      const { document, viewId } = makeBlankDocument(mintId);
+      const placed = placeEntry({
+        document, viewId, entryId: 'linked-project', anchor: { x: 0, y: 0 }, mintId,
+        link: { projectId: LINKED_PROJECT_ID, title: 'Orders system' },
+      });
+      expect(placed.ok).toBe(true);
+      if (!placed.ok) return;
+      const applied = applyRecordChanges(document, placed.changes);
+      expect(applied.ok).toBe(true);
+      if (!applied.ok) return;
+      expect(validateDocument(applied.document).ok).toBe(true);
+
+      const element = applied.document.elements.find((e) => e.id === placed.elementId)!;
+      const { linkedProjectId: _link, ...unlinked } = element;
+      const withoutLink = { ...applied.document, elements: [unlinked] };
+      expect(validateDocument(withoutLink as unknown as Document).ok).toBe(false);
+
+      const misused = { ...applied.document, elements: [{ ...element, visualKind: 'service' }] };
+      expect(validateDocument(misused as unknown as Document).ok).toBe(false);
+
+      const badId = { ...applied.document, elements: [{ ...element, linkedProjectId: 'not-a-uuid' }] };
+      expect(validateDocument(badId as unknown as Document).ok).toBe(false);
+    });
+
+    it('rejects a linked node without a link and a link on any other entry', () => {
+      const mintId = createMintId();
+      const { document, viewId } = makeBlankDocument(mintId);
+      const missing = placeEntry({ document, viewId, entryId: 'linked-project', anchor: { x: 0, y: 0 }, mintId });
+      expect(missing.ok).toBe(false);
+      const extra = placeEntry({
+        document, viewId, entryId: 'service', anchor: { x: 0, y: 0 }, mintId,
+        link: { projectId: LINKED_PROJECT_ID, title: 'x' },
+      });
+      expect(extra.ok).toBe(false);
+    });
+  });
+
   describe('blank document placement for every catalog entry', () => {
     it('places every catalog entry on a blank document and passes applyRecordChanges + validateDocument', () => {
       for (const entry of CATALOG_ENTRIES) {
@@ -119,6 +181,7 @@ describe('place.ts', () => {
           entryId: entry.entryId,
           anchor: { x: 250, y: 350 },
           mintId,
+          link: linkFor(entry.visualKind),
         });
 
         expect(placeResult.ok).toBe(true);
@@ -169,6 +232,7 @@ describe('place.ts', () => {
           entryId: entry.entryId,
           anchor: { x: 500, y: 500 },
           mintId,
+          link: linkFor(entry.visualKind),
         });
 
         expect(placeResult.ok).toBe(true);

@@ -37,6 +37,8 @@ import {
 import { whenIdle } from "@/lib/lazyComponent";
 import { LibraryPanel, type LibraryView } from "../library";
 import { downloadSavedPart, SavedParts } from "../library/SavedParts";
+import { LinkedProjects } from "../library/LinkedProjects";
+import { projectDetails } from "../../persistence/studio/types";
 import type {
   BranchRecord,
   ProjectRecord,
@@ -1243,8 +1245,9 @@ export function Workspace({
   }, [isSaving, sessionState.lastError, sessionState.status]);
 
   // Other projects, so renaming can refuse a name another project already uses (13A "name taken").
+  const [projectsLoaded, setProjectsLoaded] = React.useState(false);
   const [otherProjects, setOtherProjects] = React.useState<
-    readonly { id: string; title: string }[]
+    readonly { id: string; title: string; team: string; description: string }[]
   >([]);
   const currentProjectId = sessionState.projectId;
   const currentProjectTitle = projectRecord?.title;
@@ -1252,10 +1255,11 @@ export function Workspace({
     let cancelled = false;
     void repository.listProjects().then((list) => {
       if (cancelled) return;
+      setProjectsLoaded(true);
       setOtherProjects(
         list
           .filter((p) => p.id !== currentProjectId)
-          .map((p) => ({ id: p.id, title: p.title })),
+          .map((p) => ({ id: p.id, title: p.title, ...projectDetails(p) })),
       );
     });
     return () => {
@@ -1283,6 +1287,23 @@ export function Workspace({
     },
     [session, otherProjects],
   );
+
+  const handleUpdateProjectDetails = React.useCallback(
+    async (details: { readonly description: string; readonly team: string }): Promise<string | null> => {
+      const result = await session.updateProjectDetails(details);
+      return result.status === "applied" ? null : formatStudioError(result, "Could not save project settings");
+    },
+    [session],
+  );
+
+  // D52: details for linked-project nodes, read live from the project records (this project included).
+  const linkedProjects = React.useMemo(() => {
+    if (!projectsLoaded) return null;
+    const map = new Map<string, { title: string; team: string; description: string }>();
+    for (const p of otherProjects) map.set(p.id, { title: p.title, team: p.team, description: p.description });
+    if (projectRecord) map.set(projectRecord.id, { title: projectRecord.title, ...projectDetails(projectRecord) });
+    return map;
+  }, [otherProjects, projectRecord, projectsLoaded]);
 
   const handleOpenProject = React.useCallback(
     (projectId: string) => {
@@ -2753,6 +2774,20 @@ export function Workspace({
               onCountChange={onCountChange}
             />
           )}
+          renderLinkedProjects={({ searchQuery, active, onCountChange }) => (
+            <LinkedProjects
+              projects={otherProjects}
+              searchQuery={searchQuery}
+              active={active}
+              onCountChange={onCountChange}
+              onPlace={(project) =>
+                void canvasViewRef.current?.placeAtCentre("linked-project", {
+                  projectId: project.id,
+                  title: project.title,
+                })
+              }
+            />
+          )}
           onPlace={(entryId) =>
             void canvasViewRef.current?.placeAtCentre(entryId)
           }
@@ -2787,6 +2822,7 @@ export function Workspace({
       captureBlockedReason,
       behindMainInfo,
       libraryView,
+      otherProjects,
       panelDispatch,
       runCommand,
       refreshBehindMainCheck,
@@ -3010,6 +3046,7 @@ export function Workspace({
           }
           createBranchDisabledReason={createBranchDisabledReason}
           onAllProjects={handleBackToProjects}
+          onUpdateProjectDetails={handleUpdateProjectDetails}
           saveStatusText={saveStatusText}
           isSaving={isSaving}
           hasError={hasError}
@@ -3097,6 +3134,8 @@ export function Workspace({
                       )
                     }
                     trafficEntryElementIds={trafficEntryElementIds}
+                    linkedProjects={linkedProjects}
+                    onOpenLinkedProject={handleOpenProject}
                     runWaitsForScenarioDraft={Boolean(
                       scenarioDraft &&
                       (scenarioDraft.dirty || scenarioDraft.isNew),

@@ -44,7 +44,7 @@ export function LibraryPicker({
   const gridContainerRef = React.useRef<HTMLDivElement>(null);
 
   const filteredEntries = React.useMemo(() => {
-    const result = filterEntries(CATALOG_ENTRIES, searchQuery);
+    const result = filterEntries(CATALOG_ENTRIES.filter((entry) => entry.visualKind !== 'linked-project'), searchQuery);
     return activeGroup === 'All' ? result : filterEntriesByGroup(result, activeGroup);
   }, [searchQuery, activeGroup]);
 

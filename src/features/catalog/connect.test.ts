@@ -110,6 +110,38 @@ describe('connect.ts', () => {
     expect(valRes.ok).toBe(true);
   });
 
+  it('connects a service to a linked-project node like any other call target (D52)', () => {
+    const mintId = createMintId();
+    const { document: baseDoc, viewId } = makeBlankDocument(mintId);
+    const p1 = place(baseDoc, viewId, 'service', { x: 0, y: 0 }, mintId);
+    const doc1 = applyChanges(baseDoc, p1.changes);
+    const linkedPlaced = placeEntry({
+      document: doc1, viewId, entryId: 'linked-project', anchor: { x: 300, y: 0 }, mintId,
+      link: { projectId: '00000000-0000-4000-8000-0000000000aa', title: 'Orders system' },
+    });
+    if (!linkedPlaced.ok) throw new Error(JSON.stringify(linkedPlaced.issues));
+    const doc2 = applyChanges(doc1, linkedPlaced.changes);
+
+    const service = doc2.elements.find((e) => e.id === p1.elementId)!;
+    const linked = doc2.elements.find((e) => e.id === linkedPlaced.elementId)!;
+    const plan = planConnection({
+      document: doc2,
+      viewId,
+      source: { elementId: service.id, portId: service.ports.find((p) => p.direction === 'out')!.id },
+      target: { elementId: linked.id },
+      mintId,
+    });
+    // A linked node is a resource, so the call needs request metadata like any other resource.
+    expect(plan.kind).toBe('needs-resource-metadata');
+    if (plan.kind !== 'needs-resource-metadata') return;
+    const complete = completeConnection(plan.draft, {
+      requestClassId: mintId(), requestClassLabel: 'Order', operation: 'read', deadlineDurationMs: 500,
+    });
+    expect(complete.ok).toBe(true);
+    if (!complete.ok) return;
+    expect(validateDocument(applyChanges(doc2, complete.changes)).ok).toBe(true);
+  });
+
   it('connects to a non-resource element with ready and resource: null', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);

@@ -14,7 +14,9 @@ import type {
   BranchRecord,
   ProjectRecord,
 } from "../../persistence/studio/types";
+import { projectDetails } from "../../persistence/studio/types";
 import { ProjectMenu } from "./ProjectMenu";
+import { ProjectDetailsDialog, type ProjectDetails } from "./ProjectDetailsDialog";
 import { RenameConflictPopover, RenamedNotice } from "./ProjectRenameFeedback";
 import { BranchPopover, type BranchActionOutcome } from "./BranchPopover";
 import type { TransferActions } from "../transfer";
@@ -35,6 +37,8 @@ export interface TopBarProps {
   onReopenBranch: (branchId: string) => Promise<BranchActionOutcome>;
   createBranchDisabledReason?: string | null;
   onAllProjects: () => void;
+  /** Saves the project's description and team; resolves to an error message, or null on success. */
+  onUpdateProjectDetails: (details: ProjectDetails) => Promise<string | null>;
   saveStatusText: string;
   isSaving: boolean;
   hasError: boolean;
@@ -83,6 +87,7 @@ export function TopBar({
   onReopenBranch,
   createBranchDisabledReason,
   onAllProjects,
+  onUpdateProjectDetails,
   saveStatusText,
   isSaving,
   hasError,
@@ -95,6 +100,7 @@ export function TopBar({
   transferActions,
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [titleDraft, setTitleDraft] = React.useState(project.title);
 
   React.useEffect(() => {
@@ -285,7 +291,9 @@ export function TopBar({
               <ProjectMenu
                 projectTitle={project.title}
                 branchCount={branches.length}
+                team={projectDetails(project).team}
                 onRenameProject={() => setIsRenaming(true)}
+                onOpenSettings={() => setSettingsOpen(true)}
                 onAllProjects={onAllProjects}
                 transferActions={transferActions}
               >
@@ -394,6 +402,14 @@ export function TopBar({
             )}
           </div>
         </RenamedNotice>
+
+        <ProjectDetailsDialog
+          open={settingsOpen}
+          projectTitle={project.title}
+          initial={projectDetails(project)}
+          onSave={onUpdateProjectDetails}
+          onClose={() => setSettingsOpen(false)}
+        />
 
         {/* Save Status */}
         <span

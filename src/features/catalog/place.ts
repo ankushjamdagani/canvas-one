@@ -30,6 +30,8 @@ export type PlaceEntryParams = {
   readonly entryId: string;
   readonly anchor: { readonly x: number; readonly y: number };
   readonly mintId: () => Id;
+  /** D52: required for (and only valid with) the `linked-project` entry; `title` is the label until it is read live. */
+  readonly link?: { readonly projectId: Id; readonly title: string };
 };
 
 export type PlaceEntryResult =
@@ -48,7 +50,7 @@ export type PlaceEntryResult =
  * Compiles placing a catalog entry into a single model.apply-records batch of RecordChanges.
  */
 export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
-  const { document, viewId, entryId, anchor, mintId } = params;
+  const { document, viewId, entryId, anchor, mintId, link } = params;
 
   if (!mintId || typeof mintId !== 'function') {
     return {
@@ -70,6 +72,21 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
     return {
       ok: false,
       issues: [createIssue('dangling-reference', `Catalog entry '${entryId}' does not exist`, ['entryId'])],
+    };
+  }
+
+  if ((entry.visualKind === 'linked-project') !== (link !== undefined)) {
+    return {
+      ok: false,
+      issues: [
+        createIssue(
+          'structural-rule',
+          entry.visualKind === 'linked-project'
+            ? 'A linked project needs the project to link to'
+            : 'Only the linked-project entry can carry a link',
+          ['link'],
+        ),
+      ],
     };
   }
 
@@ -231,11 +248,12 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
   // Element record
   const element: Element = {
     id: elementId,
-    label: entry.label,
+    label: link ? link.title.trim().slice(0, 80) || entry.label : entry.label,
     description: '',
     visualKind: entry.visualKind,
     ports,
     behavior,
+    ...(link ? { linkedProjectId: link.projectId } : {}),
   };
 
   changes.push({

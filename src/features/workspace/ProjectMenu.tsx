@@ -22,8 +22,10 @@ import { ExportMenu, type TransferActions } from '../transfer';
 export interface ProjectMenuProps {
   projectTitle: string;
   branchCount: number;
+  team: string;
   children: React.ReactNode | ((isOpen: boolean) => React.ReactNode);
   onRenameProject: () => void;
+  onOpenSettings: () => void;
   onAllProjects: () => void;
   transferActions: TransferActions;
 }
@@ -41,8 +43,10 @@ export interface ProjectMenuProps {
 export function ProjectMenu({
   projectTitle,
   branchCount,
+  team,
   children,
   onRenameProject,
+  onOpenSettings,
   onAllProjects,
   transferActions,
 }: ProjectMenuProps) {
@@ -75,7 +79,7 @@ export function ProjectMenu({
             {projectTitle}
           </div>
           <div className="font-mono text-[9.5px] text-secondary-text">
-            platform team · {branchCount} {branchCount === 1 ? 'branch' : 'branches'}
+            {team ? `${team} · ` : ''}{branchCount} {branchCount === 1 ? 'branch' : 'branches'}
           </div>
         </DropdownMenuHeader>
 
@@ -113,7 +117,9 @@ export function ProjectMenu({
         {/* Project settings */}
         <DropdownMenuItem
           data-testid="project-menu-settings"
-          onSelect={() => {}}
+          onSelect={() => {
+            onOpenSettings();
+          }}
         >
           <Settings size={14} className="shrink-0 text-secondary-text" aria-hidden="true" />
           <span>Project settings</span>

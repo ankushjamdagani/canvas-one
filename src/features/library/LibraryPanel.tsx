@@ -29,6 +29,9 @@ import { CatalogEntryCard } from './CatalogEntryCard';
 import { useCatalogSelection } from './useCatalogSelection';
 import { cn } from '../../lib/utils';
 
+// D52: the linked-project entry is instantiated from a project (Projects tab), not placed from the catalog.
+const STANDARD_ENTRIES = CATALOG_ENTRIES.filter((entry) => entry.visualKind !== 'linked-project');
+
 export function LibraryPanel({
   onPlace,
   onClose,
@@ -39,11 +42,13 @@ export function LibraryPanel({
   initialSearchQuery = '',
   className,
   renderSavedParts,
+  renderLinkedProjects,
   captureRequested,
 }: LibraryPanelProps) {
   const [searchQuery, setSearchQuery] = React.useState(initialSearchQuery);
   const [tab, setTab] = React.useState<LibraryTab>('standard');
   const [oursCount, setOursCount] = React.useState(0);
+  const [projectsCount, setProjectsCount] = React.useState(0);
   const lastCaptureRequest = React.useRef(captureRequested ?? 0);
   React.useEffect(() => {
     if (captureRequested && captureRequested !== lastCaptureRequest.current) setTab('ours');
@@ -62,7 +67,7 @@ export function LibraryPanel({
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const listContainerRef = React.useRef<HTMLDivElement>(null);
 
-  const filteredEntries = React.useMemo(() => filterEntries(CATALOG_ENTRIES, searchQuery), [searchQuery]);
+  const filteredEntries = React.useMemo(() => filterEntries(STANDARD_ENTRIES, searchQuery), [searchQuery]);
   const groupedSections = React.useMemo(() => groupCatalogEntries(filteredEntries), [filteredEntries]);
 
   const { selectedEntry, activate, onDragStart, onKeyDown } = useCatalogSelection({
@@ -151,7 +156,7 @@ export function LibraryPanel({
           {searchQuery.trim().length > 0 && (
             <div className="absolute right-2.5 flex items-center gap-1.5 text-[11px] font-mono text-secondary-text">
               <span>
-                {tab === 'ours' ? 'Search active' : `${filteredEntries.length} ${filteredEntries.length === 1 ? 'match' : 'matches'}`}
+                {tab !== 'standard' ? 'Search active' : `${filteredEntries.length} ${filteredEntries.length === 1 ? 'match' : 'matches'}`}
               </span>
               <button
                 type="button"
@@ -168,8 +173,8 @@ export function LibraryPanel({
 
       {/* 3. Filter Bar & List/Grid Toggle (12A/12B) */}
       <div className="flex items-end justify-between px-4 pb-0 text-xs">
-        <div role="tablist" aria-label="Library source" className="flex items-end gap-4 -mb-px">
-          {(['standard', ...(renderSavedParts ? ['ours'] : [])] as LibraryTab[]).map((id) => {
+        <div role="tablist" aria-label="Library source" className="flex min-w-0 items-end gap-3 -mb-px">
+          {(['standard', ...(renderSavedParts ? ['ours'] : []), ...(renderLinkedProjects ? ['projects'] : [])] as LibraryTab[]).map((id) => {
             const selectedTab = tab === id;
             return (
               <button
@@ -186,7 +191,7 @@ export function LibraryPanel({
                     : 'font-medium text-secondary-text border-transparent hover:text-foreground',
                 )}
               >
-                <span>{id === 'standard' ? 'Standard' : 'Ours'}</span>
+                <span>{id === 'standard' ? 'Standard' : id === 'ours' ? 'Ours' : 'Projects'}</span>
                 <span
                   className={cn(
                     'font-mono text-[10px] rounded-full px-1.5 leading-4',
@@ -195,15 +200,16 @@ export function LibraryPanel({
                       : 'bg-sunken text-secondary-text border border-border',
                   )}
                 >
-                  {id === 'standard' ? CATALOG_ENTRIES.length : oursCount}
+                  {id === 'standard' ? STANDARD_ENTRIES.length : id === 'ours' ? oursCount : projectsCount}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* List / Grid segmented toggle */}
+        {/* List / Grid segmented toggle (the Projects tab has a single list) */}
         <div
+          hidden={tab === 'projects'}
           role="group"
           aria-label="View mode toggle"
           className="flex items-center p-0.5 mb-1.5 rounded-md bg-sunken border border-control-border"
@@ -211,6 +217,7 @@ export function LibraryPanel({
           <button
             type="button"
             onClick={() => onViewChange('list')}
+            title="List view"
             aria-label="List view"
             aria-pressed={view === 'list'}
             className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
@@ -220,11 +227,12 @@ export function LibraryPanel({
             }`}
           >
             <ListIcon className="w-3.5 h-3.5" />
-            <span>List</span>
+            <span className="sr-only">List</span>
           </button>
           <button
             type="button"
             onClick={() => onViewChange('grid')}
+            title="Grid view"
             aria-label="Grid view"
             aria-pressed={view === 'grid'}
             className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
@@ -234,7 +242,7 @@ export function LibraryPanel({
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Grid</span>
+            <span className="sr-only">Grid</span>
           </button>
         </div>
       </div>
@@ -244,6 +252,7 @@ export function LibraryPanel({
       {/* 4. Entries Scroll Area */}
       <div className="flex-1 min-h-0 overflow-y-auto">
       {renderSavedParts?.({ searchQuery, view, active: tab === 'ours', onCountChange: setOursCount })}
+      {renderLinkedProjects?.({ searchQuery, active: tab === 'projects', onCountChange: setProjectsCount })}
       <div
         ref={listContainerRef}
         role="listbox"

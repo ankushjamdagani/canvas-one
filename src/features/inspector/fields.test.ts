@@ -372,3 +372,19 @@ describe('kindTagForConnection', () => {
     expect(kindTagForConnection(callConnection())).toBe('CALL');
   });
 });
+
+describe('linked-project elements (D52)', () => {
+  const linked = processorElement({ visualKind: 'linked-project', label: 'Orders system', linkedProjectId: '00000000-0000-4000-8000-0000000000aa' });
+
+  it('shows only read-only fields, so nothing can be edited or applied', () => {
+    const fields = fieldsForElement(linked);
+    expect(fields.map((f) => f.id)).toEqual(['linked.project', 'linked.id', 'behavior.summary']);
+    expect(fields.every((f) => f.kind === 'readonly')).toBe(true);
+    expect(fields[0].toRaw(linked)).toBe('Orders system');
+    expect(fields.every((f) => f.apply(linked, 'x') === linked)).toBe(true);
+  });
+
+  it('tags the header as a linked project, not as a processor', () => {
+    expect(kindTagForElement(linked)).toEqual({ tag: 'LINKED PROJECT', notSimulated: false });
+  });
+});

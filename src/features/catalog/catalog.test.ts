@@ -5,20 +5,21 @@ import { CATALOG_ENTRIES, GROUP_STRIPE_COLORS, STRIPE_COLORS, getEntry, groupOf 
 
 describe('catalog.ts', () => {
   describe('catalog completeness', () => {
-    it('contains every VALID_KINDS kind plus state-machine, data-pipeline, host exactly once (32 total)', () => {
-      expect(CATALOG_ENTRIES.length).toBe(32);
+    it('contains every VALID_KINDS kind plus state-machine, data-pipeline, host and linked-project exactly once (33 total)', () => {
+      expect(CATALOG_ENTRIES.length).toBe(33);
       expect(CATALOG_ENTRIES.length).toBe(VISUAL_KINDS.length);
 
       const entryKinds = CATALOG_ENTRIES.map((e) => e.visualKind);
       const uniqueKinds = new Set(entryKinds);
-      expect(uniqueKinds.size).toBe(32);
+      expect(uniqueKinds.size).toBe(33);
 
       // Check all 29 VALID_KINDS
       for (const kind of VALID_KINDS) {
         expect(uniqueKinds.has(kind as any)).toBe(true);
       }
 
-      // Check the 3 extra kinds
+      // Check the 4 extra kinds
+      expect(uniqueKinds.has('linked-project')).toBe(true);
       expect(uniqueKinds.has('state-machine')).toBe(true);
       expect(uniqueKinds.has('data-pipeline')).toBe(true);
       expect(uniqueKinds.has('host')).toBe(true);

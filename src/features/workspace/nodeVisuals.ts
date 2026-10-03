@@ -49,6 +49,7 @@ import {
   Workflow,
   Monitor,
   Component,
+  Link2,
   type LucideIcon,
 } from 'lucide-react';
 import type { Element, ResourceConfig } from '../../domain/studio/model';
@@ -59,6 +60,7 @@ import type { Element, ResourceConfig } from '../../domain/studio/model';
  * inventing a mapping.
  */
 const VISUAL_KIND_ICONS: Record<string, LucideIcon> = {
+  'linked-project': Link2,
   traffic: Radio,
   client: Smartphone,
   mobile: MonitorSmartphone,
@@ -110,6 +112,8 @@ export function getNodeIcon(visualKind: string): LucideIcon {
  */
 export function getNodeCaption(element: Element): string {
   const behavior = element.behavior;
+  // D52: a linked project is a fixed black box, so its caption doesn't quote editable-looking settings.
+  if (element.visualKind === 'linked-project') return 'black box · fixed';
   switch (behavior.kind) {
     case 'unmodeled':
       // D42 items 7 & 12: the whole label is exactly this — no kind word,

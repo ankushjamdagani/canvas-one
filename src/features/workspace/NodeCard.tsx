@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
 import { getNodeCaption, getNodeIcon } from './nodeVisuals';
@@ -19,6 +19,9 @@ export function NodeCard({ data, selected }: NodeProps) {
       return `${direction}: ${labels.length > 0 ? labels.join(', ') : 'none'}`;
     })
     .join(' · ');
+  const linked = nodeData.linked;
+  // The linked project's live title wins; the element label is the fallback until it loads.
+  const linkedTitle = linked?.state === 'available' ? linked.title : element.label;
   const hasOutPort = element.ports.some((p) => p.direction === 'out' && p.channel !== 'event');
   const hasInPort = element.ports.some((p) => p.direction === 'in' && p.channel !== 'event');
 
@@ -78,9 +81,9 @@ export function NodeCard({ data, selected }: NodeProps) {
           />
           <strong
             className="text-xs font-semibold text-ink truncate leading-tight flex-1 min-w-0"
-            title={element.label}
+            title={linkedTitle}
           >
-            {element.label}
+            {linkedTitle}
           </strong>
           {nodeData.onToggleExpanded && (
             <button
@@ -102,6 +105,46 @@ export function NodeCard({ data, selected }: NodeProps) {
             </button>
           )}
         </div>
+
+        {linked ? (
+          <div data-testid={`node-linked-details-${element.id}`} className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                data-testid={`node-linked-badge-${element.id}`}
+                className="shrink-0 rounded-tag border border-control-border bg-sunken px-1 font-mono text-[9px] uppercase tracking-wider text-secondary-text"
+              >
+                Linked
+              </span>
+              {linked.state === 'available' && linked.team ? (
+                <span className="truncate font-mono text-[10px] text-secondary-text leading-snug">{linked.team}</span>
+              ) : null}
+            </div>
+            {linked.state === 'available' ? (
+              <>
+                {linked.description ? (
+                  <span className="line-clamp-2 text-[11px] leading-snug text-secondary-text">{linked.description}</span>
+                ) : null}
+              </>
+            ) : (
+              <span className="font-mono text-[10px] text-risk-text leading-snug">
+                {linked.state === 'loading' ? 'Loading project…' : 'Project unavailable'}
+              </span>
+            )}
+            <button
+              type="button"
+              data-testid={`node-linked-open-${element.id}`}
+              disabled={!nodeData.onOpenLinked}
+              className="nodrag nopan pointer-events-auto mt-0.5 inline-flex w-fit items-center gap-1 rounded-control border border-control-border bg-background px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-sunken disabled:cursor-not-allowed disabled:text-secondary-text disabled:opacity-60 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                nodeData.onOpenLinked?.();
+              }}
+            >
+              <ExternalLink className="size-3" aria-hidden="true" />
+              Open project
+            </button>
+          </div>
+        ) : null}
 
         <div className="flex items-center gap-1.5">
           {/* No truncate: D42's caption values ("processor · 2 000 /s cap")

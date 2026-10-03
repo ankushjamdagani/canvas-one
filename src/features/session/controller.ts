@@ -23,6 +23,7 @@ import {
   type ModelApplyRecordsCommand,
   type ProjectCreateCommand,
   type ProjectRenameCommand,
+  type ProjectUpdateDetailsCommand,
   type RecordChange,
   type SnapshotRecord,
   type StudioRepository,
@@ -622,6 +623,34 @@ export class SessionController {
     };
 
     return this.runSaving(() => this.executeAndAdopt(command));
+  }
+
+  /** D52: description and team live on the project record, so no snapshot, undo entry or reload is involved. */
+  async updateProjectDetails(details: { readonly description: string; readonly team: string }): Promise<SessionRenameResult> {
+    const open = this.openBranchOrReject(
+      'Session requires reload before editing project details',
+      'No project is open to edit',
+    );
+    if ('status' in open) return open;
+
+    const command: ProjectUpdateDetailsCommand = {
+      commandId: 'project.update-details',
+      operationId: this.mintId(),
+      projectId: open.projectId,
+      expectedProjectRevision: open.projectRevision,
+      actor: this.actor,
+      payload: { description: details.description, team: details.team },
+    };
+
+    return this.runSaving(async () => {
+      const result = await this.repository.execute(command);
+      this.updateState(
+        result.status === 'applied'
+          ? { status: 'ready', projectRevision: result.projectRevision, lastError: null }
+          : { status: 'ready', lastError: result },
+      );
+      return result;
+    });
   }
 
   /** Part artifacts advance project revision without changing content or undo history. */
