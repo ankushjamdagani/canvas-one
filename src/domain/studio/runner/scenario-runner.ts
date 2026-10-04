@@ -1492,7 +1492,7 @@ export class ScenarioRunner {
 
   /** Start, response and completion revisions since the last call. */
   drainCycles(): Cycle[] {
-    return this.adapter?.cycleTracker.drainRevisions() ?? [];
+    return this.adapter?.cycleTracker.drainRevisions(this.isFinished) ?? [];
   }
 
   private lastResultSnapshot: RunCheckpoint | null = null;

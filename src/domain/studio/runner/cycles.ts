@@ -110,7 +110,7 @@ export class CycleTracker {
   }
 
   /** Start, response and completion snapshots since the last call. */
-  drainRevisions(): Cycle[] {
+  drainRevisions(ended = false): Cycle[] {
     const out = this.revisions;
     this.revisions = [];
     this.finished = [];
@@ -119,7 +119,7 @@ export class CycleTracker {
       // settlement can be separate same-time steps; a later instant confirms the lineage is closed.
       for (const id of this.pendingDiscard) {
         const cycle = this.byId.get(id);
-        if (cycle?.completedAtMs == null || cycle.completedAtMs >= this.observedAtMs) continue;
+        if (cycle?.completedAtMs == null || (!ended && cycle.completedAtMs >= this.observedAtMs)) continue;
         if (this.byId.delete(id)) this.discarded++;
         this.pendingDiscard.delete(id);
       }

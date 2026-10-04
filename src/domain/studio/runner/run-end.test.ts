@@ -236,15 +236,19 @@ describe('checkpoints and cycle draining (D57)', () => {
     expect(end.elementMetrics.length).toBeGreaterThan(0);
   });
 
-  it('drainCycles() hands out finished cycles once; with streamOutCycles they leave memory', async () => {
+  it('drainCycles() hands out start/response/completion revisions; terminal streams release completed bookkeeping', async () => {
     const doc = build(bulk(20, { spreadMs: 1000 }));
     ready(doc);
     const runner = new ScenarioRunner(doc, doc.scenarios[0].id, 'drain', { streamOutCycles: true });
-    const seen: string[] = [];
-    while (await runner.step()) seen.push(...runner.drainCycles().map((c) => c.id));
-    seen.push(...runner.drainCycles().map((c) => c.id));
-    expect(new Set(seen).size).toBe(20);
-    expect(seen).toHaveLength(20);
+    const seen: ReturnType<ScenarioRunner['drainCycles']> = [];
+    while (await runner.step()) seen.push(...runner.drainCycles());
+    seen.push(...runner.drainCycles());
+    expect(new Set(seen.map(c => c.id)).size).toBe(20);
+    expect(seen.filter(c => c.responseAtMs === null)).toHaveLength(20);
+    expect(seen.filter(c => c.responseAtMs !== null && c.completedAtMs === null)).toHaveLength(20);
+    expect(seen.filter(c => c.completedAtMs !== null)).toHaveLength(20);
+    expect(seen).toHaveLength(60);
+    expect(runner.drainCycles()).toEqual([]);
     expect(runner.getResult().cycles).toEqual([]);
     expect(runner.getResult().summary.cycles).toMatchObject({ total: 20, open: 0 });
   });
