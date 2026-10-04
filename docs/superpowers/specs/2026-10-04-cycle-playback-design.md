@@ -169,6 +169,10 @@ Packet position is derived from `stateAt(playhead)`: for a unit leg `[sentAt, ar
 
 The existing `livePackets.tsx` stage queue is removed. `TrafficEdge` keeps its path and heading logic and consumes `stateAt`.
 
+Lifecycle cues use a 240 ms simulated-time window returned by `stateAt`: pause freezes them and seeking reconstructs them. Identical cues aggregate with exact counts, using the newest constituent's age. Normal motion expands/fades the send pulse; reduced motion keeps static symbols with the same counts. Decorations do not change node dimensions or port hit areas.
+
+Outbound arrivals require a recorded admission or local queue/processing/settlement fact at the recorded arrival time; a planned leg endpoint alone is insufficient. Return arrivals and call outcomes use the recorded response leg's projected endpoint. Messages show recorded settlement at their source. Completed cycles show their recorded outcome above the captured workload entry node, including timeout/stuck. Known outbound loss appears mid-line without an arrival. A lost return with no recorded response leg cannot produce a return cue; no arrival or outcome is invented.
+
 ## 6. Timeline and playback UI
 
 ### 6.1 Track

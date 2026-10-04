@@ -218,3 +218,53 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     expect(after.width).toBeGreaterThanOrEqual(15);
   });
 });
+for (const reduced of [false, true]) test(`recorded flashes survive pause and seeking (${reduced ? 'reduced' : 'normal'} motion)`, async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+  await openS06(page);
+  await setTraffic(page, { mode: 'bulk', requests: 1 }, 'Checkout API A');
+  const edgeId = await configurePlaybackLink(page);
+  await setSpeed(page, '16');
+  await page.getByTestId('scenario-run-btn').click();
+  await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+  const nodeOutcome = page.locator('.component-node [data-testid="traffic-flash"][data-kind="outcome"]');
+  await expect(nodeOutcome.first()).toBeVisible();
+  await expect(nodeOutcome.first()).toHaveAttribute('data-outcome', 'ok');
+  await page.screenshot({ path: test.info().outputPath(`outcomes-${reduced ? 'reduced' : 'normal'}.png`) });
+  const seeker = page.getByRole('slider', { name: 'Playback position' });
+  const root = page.locator('[data-slot="slider"]').filter({ has: seeker });
+  const edge = page.getByTestId(`edge-${edgeId}`);
+  // Pixel seek to a little after the recorded send/arrival: allow rounding while staying within 240 ms.
+  const seek = async (ms: number) => {
+    const end = Number((await seeker.getAttribute('aria-valuemax')));
+    const box = (await root.boundingBox())!;
+    await root.click({ position: { x: box.width * ms / end, y: box.height / 2 } });
+  };
+  await seeker.focus();
+  await seeker.press('Home');
+  await seek(100);
+  const send = edge.locator('[data-testid="traffic-flash"][data-kind="sent"]').first();
+  await expect(send).toBeVisible();
+  await expect(send).toHaveAttribute('data-reduced', String(reduced));
+  await expect.poll(async () => Number(await send.getAttribute('data-age'))).toBeGreaterThan(0);
+  const age = await send.getAttribute('data-age');
+  await page.waitForTimeout(200);
+  await expect(send).toHaveAttribute('data-age', age!);
+  if (reduced) await expect(send).toHaveAttribute('opacity', '1');
+  await seek(5100);
+  await expect(edge.locator('[data-testid="traffic-flash"][data-kind="arrived"]')).toBeVisible();
+  await expect(edge.locator('[data-testid="traffic-flash"][data-kind="outcome"]')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath(`arrival-${reduced ? 'reduced' : 'normal'}.png`) });
+  // The response may depart as the request arrives; both truthful endpoint cues coexist.
+  await seek(5500);
+  await expect(edge.getByTestId('traffic-flash')).toHaveCount(0);
+  await seeker.focus();
+  await seeker.press('Home');
+  await seek(100);
+  await expect(send).toBeVisible();
+  await expect.poll(async () => Number(await send.getAttribute('data-age'))).toBeGreaterThan(0);
+  await page.screenshot({ path: test.info().outputPath(`flashes-${reduced ? 'reduced' : 'normal'}.png`) });
+  await page.keyboard.press('F2');
+  await page.getByTestId('quick-options-input').fill('Reset run');
+  await page.getByTestId('quick-option-run.reset').click();
+  await expect(page.getByTestId('traffic-flash')).toHaveCount(0);
+});

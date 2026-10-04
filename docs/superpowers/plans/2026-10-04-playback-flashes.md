@@ -7,3 +7,5 @@ Add the deferred send, arrival and outcome cues from design section 5. Flashes a
 3. Add deterministic production browser checks by pausing/seeking to recorded times; verify normal/reduced cues, replay and no-run cleanup. Run TypeScript, full units, build (chunks below500kB), Storybook and isolated full production Playwright. Profile the frame path at flash-sale load. Update ACTION_LOG/HANDOFF and the traffic decision/spec; commit with own trailer.
 
 No worker/kernel accounting changes, persistence, floating connection bar, bookkeeping audit or eviction optimization.
+
+Completed: indexed facts and unit regressions, shared canvas symbols and independent source review, normal/reduced production browser checks and screenshot inspection. TypeScript, 1,783 unit tests (10 skipped), production build (Workspace 473.88 kB), Storybook and final isolated production Playwright (121 passed, 4 dev-only skipped) passed. Flash ingestion/read p95 is 0.482 ms; inherited overlapping-flow sorting remains separately documented. See ACTION_LOG and D60.

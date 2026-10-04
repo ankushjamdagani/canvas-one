@@ -1,15 +1,19 @@
 import * as React from "react";
-import type { LegAt, NodeAt, PlaybackStore } from "../runs/playback";
+import type { FlashAt, LegAt, NodeAt, PlaybackStore } from "../runs/playback";
 
 type Traffic = {
   legs: ReadonlyMap<string, readonly LegAt[]>;
   nodes: ReadonlyMap<string, NodeAt>;
+  connectionFlashes: ReadonlyMap<string, readonly FlashAt[]>;
+  nodeFlashes: ReadonlyMap<string, readonly FlashAt[]>;
   reduced: boolean;
   hasRun: boolean;
 };
 const EMPTY: Traffic = {
   legs: new Map(),
   nodes: new Map(),
+  connectionFlashes: new Map(),
+  nodeFlashes: new Map(),
   reduced: false,
   hasRun: false,
 };
@@ -36,9 +40,22 @@ export function usePlaybackTraffic(
           if (list) list.push(leg);
           else legs.set(leg.connectionId, [leg]);
         }
+        const connectionFlashes = new Map<string, FlashAt[]>();
+        const nodeFlashes = new Map<string, FlashAt[]>();
+        for (const flash of state.flashes) {
+          const map =
+            flash.connectionId === null ? nodeFlashes : connectionFlashes;
+          const id = flash.connectionId ?? flash.elementId;
+          if (id === null) continue;
+          const list = map.get(id);
+          if (list) list.push(flash);
+          else map.set(id, [flash]);
+        }
         setTraffic({
           legs,
           nodes: state.nodes,
+          connectionFlashes,
+          nodeFlashes,
           reduced: media.matches,
           hasRun: true,
         });

@@ -10,6 +10,7 @@ import {
 import { PlaybackTrafficContext } from "./usePlaybackTraffic";
 import { placeLeg, trafficDensity } from "./playbackTraffic";
 import type { LegAt } from "../runs/playback";
+import { TrafficFlash } from "../../components/ui/traffic-flash";
 import {
   chipOverlapsAnyNode,
   estimateLabelChipRect,
@@ -65,6 +66,7 @@ export function TrafficEdge({
   const traffic = React.useContext(PlaybackTrafficContext);
   const packets = traffic.legs.get(connectionId ?? "") ?? [];
   const density = trafficDensity(packets);
+  const flashes = traffic.connectionFlashes.get(connectionId ?? "") ?? [];
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -115,6 +117,41 @@ export function TrafficEdge({
       data-testid={`edge-${id}`}
     >
       <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {flashes.map((flash, index) => {
+        const side = flash.progress === 0 ? sourcePosition : targetPosition;
+        const countWidth =
+          flash.count > 1 ? 13 + String(flash.count).length * 7 : 0;
+        const gutterX =
+          side === "left" ? -14 - countWidth : side === "right" ? 14 : 0;
+        const gutterY = side === "top" ? -14 : side === "bottom" ? 14 : 0;
+        const x =
+          flash.progress === 0
+            ? sourceX + gutterX
+            : flash.progress === 1
+              ? targetX + gutterX
+              : labelX;
+        const y =
+          flash.progress === 0
+            ? sourceY + gutterY
+            : flash.progress === 1
+              ? targetY + gutterY
+              : labelY;
+        const stack = flashes
+          .slice(0, index)
+          .filter((other) => other.progress === flash.progress).length;
+        const lift =
+          flash.progress !== 0.5 && side === "bottom"
+            ? 12 + stack * 18
+            : -12 - stack * 18;
+        return (
+          <g
+            key={`${flash.kind}:${flash.outcome}:${flash.progress}`}
+            transform={`translate(${x} ${y + lift})`}
+          >
+            <TrafficFlash {...flash} reduced={traffic.reduced} />
+          </g>
+        );
+      })}
       {density.aggregate ? (
         <>
           {(["out", "back"] as const).map((direction) =>

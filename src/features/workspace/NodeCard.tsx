@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useContext } from 'react';
 import { PlaybackTrafficContext } from './usePlaybackTraffic';
 import { NodeOccupancy } from '@/components/ui/node-occupancy';
+import { TrafficFlash } from '@/components/ui/traffic-flash';
 import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
@@ -188,6 +189,14 @@ export function NodeCard({ data, selected }: NodeProps) {
 
       <div className="pointer-events-none absolute inset-x-0 top-full mt-1">
         <NodeOccupancy {...(traffic.nodes.get(element.id) ?? { queued: 0, active: 0 })} />
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 -top-7 flex gap-1">
+        {(traffic.nodeFlashes.get(element.id) ?? []).map((flash) => (
+          <svg key={`${flash.kind}:${flash.outcome}`} width={flash.count > 1 ? 38 + String(flash.count).length * 7 : 24} height={24}
+            className="shrink-0 overflow-visible" viewBox={`-12 -12 ${flash.count > 1 ? 38 + String(flash.count).length * 7 : 24} 24`}>
+            <TrafficFlash {...flash} reduced={traffic.reduced} />
+          </svg>
+        ))}
       </div>
       <Handle
         type="source"
