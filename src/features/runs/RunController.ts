@@ -19,7 +19,7 @@
  * RunController itself does not inspect or validate editor draft state.
  */
 
-import type { Document, Fault, Id } from '../../domain/studio/model';
+import type { Document, Fault, Id, Scenario } from '../../domain/studio/model';
 import type { StudioRepository } from '../../persistence/studio/types';
 import { mapErrorToFailedResult } from '../../persistence/studio/errors';
 import {
@@ -564,7 +564,7 @@ export class RunController {
 
     const scenario = document.scenarios.find((s) => s.id === scenarioId);
     if (scenario?.mode === 'timed' && this.runAllContext === null) {
-      this.beginPlayback(document, scenario.workloads.some((w) => w.enabled && w.emission.mode === 'stream'));
+      this.beginPlayback(document, scenario.workloads);
       this.playbackFaults = structuredClone(scenario.faults);
     }
 
@@ -697,11 +697,16 @@ export class RunController {
   // Playback (D57)
   // ==========================================================================
 
-  private beginPlayback(document: Document, hasStream: boolean): void {
+  private beginPlayback(document: Document, workloads: Scenario['workloads']): void {
     this.endPlayback(true);
     const store = new PlaybackStore({
       connectionTargets: new Map(document.connections.map((c) => [c.id, c.target.elementId])),
-      historyMs: hasStream ? HISTORY_MS : null,
+      connectionChannels: new Map(document.connections.flatMap(c => {
+        const port = document.elements.find(e => e.id === c.source.elementId)?.ports.find(p => p.id === c.source.portId);
+        return port ? [[c.id, port.channel] as const] : [];
+      })),
+      workloadEntries: new Map(workloads.map(w => [w.id, w.entry.elementId])),
+      historyMs: workloads.some(w => w.enabled && w.emission.mode === 'stream') ? HISTORY_MS : null,
     });
     store.speed = this.speed;
     store.playing = true;

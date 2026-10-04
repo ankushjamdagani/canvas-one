@@ -9,6 +9,8 @@
 
 import type { Cycle, CycleOutcome, ElementMetric, FlowRecord, ResultDelta, RunCheckpoint } from '../../domain/studio/runner/types';
 import { CycleIndex } from './playback-history';
+import { FlashIndex, type FlashAt } from './playback-flashes';
+export type { FlashAt } from './playback-flashes';
 
 /** How much history behind the playhead a stream keeps, in simulated ms. */
 export const HISTORY_MS = 120_000;
@@ -21,6 +23,8 @@ export type PlaybackOptions = {
   readonly connectionTargets: ReadonlyMap<string, string>;
   /** Raw records older than `playhead - historyMs` are dropped; null keeps everything (a bulk). */
   readonly historyMs: number | null;
+  readonly connectionChannels?: ReadonlyMap<string, string>;
+  readonly workloadEntries?: ReadonlyMap<string, string>;
 };
 
 export type LegAt = {
@@ -36,6 +40,7 @@ export type NodeAt = { readonly queued: number; readonly active: number };
 export type StateAt = {
   readonly atMs: number;
   readonly legs: readonly LegAt[];
+  readonly flashes: readonly FlashAt[];
   readonly nodes: ReadonlyMap<string, NodeAt>;
   /** Cycles started by `atMs`, and how many of those had finished by then. */
   readonly cycles: { readonly started: number; readonly finished: number };
@@ -45,6 +50,8 @@ export type StateAt = {
 
 export class PlaybackStore {
   private readonly options: PlaybackOptions;
+  private readonly flashes = new FlashIndex();
+  private readonly pendingArrivals = new Map<string, number>();
   private flow: FlowRecord[] = [];
   private flowSorted = true;
   private readonly cyclesById = new Map<string, Cycle>();
@@ -89,6 +96,41 @@ export class PlaybackStore {
 
   ingestFlow(records: readonly FlowRecord[]): void {
     for (const r of records) {
+      const base = { connectionId: r.connectionId, elementId: null, outcome: null };
+      if (r.connectionId !== null) {
+        const arrivalKey = `${r.connectionId}\u0000${r.key}`;
+        const arrival = this.pendingArrivals.get(arrivalKey);
+        if (r.phase === 'received' || (arrival === r.atMs &&
+          (r.phase === 'queued' || r.phase === 'processing' || r.phase === 'settled'))) {
+          this.flashes.add({ ...base, kind: 'arrived', progress: 1, atMs: r.atMs });
+          this.pendingArrivals.delete(arrivalKey);
+        } else if (r.phase === 'settled' || r.phase === 'released') this.pendingArrivals.delete(arrivalKey);
+        if (r.phase === 'sent' || r.phase === 'response') {
+          const back = r.phase === 'response';
+          if (!back && r.arriveAtMs !== null) {
+            // Normally the worker reports departure first. A late departure can
+            // find already-ingested admission facts; this scan is ingestion-only.
+            const last = this.flow[this.flow.length - 1];
+            const confirmed = last && last.atMs >= r.arriveAtMs ? this.flow.find(f =>
+              f.key === r.key && f.connectionId === r.connectionId && f.atMs === r.arriveAtMs &&
+              (f.phase === 'received' || f.phase === 'queued' || f.phase === 'processing' || f.phase === 'settled')) : undefined;
+            if (confirmed) {
+              if (confirmed.phase !== 'received') this.flashes.add({ ...base, kind: 'arrived', progress: 1, atMs: confirmed.atMs });
+            } else this.pendingArrivals.set(arrivalKey, r.arriveAtMs);
+          }
+          this.flashes.add({ ...base, kind: 'sent', progress: back ? 1 : 0, atMs: r.atMs });
+          if (back && r.arriveAtMs !== null) {
+            this.flashes.add({ ...base, kind: 'arrived', progress: 0, atMs: r.arriveAtMs });
+            if (r.outcome !== null) this.flashes.add({ ...base, kind: 'outcome', progress: 0,
+              outcome: r.outcome === 'succeeded' ? 'ok' : r.outcome, atMs: r.arriveAtMs });
+          } else if (!back && r.arriveAtMs === null) {
+            this.flashes.add({ ...base, kind: 'outcome', progress: 0.5, outcome: 'lost', atMs: r.atMs });
+          }
+        } else if (r.phase === 'settled' && r.outcome !== null && this.options.connectionChannels?.get(r.connectionId) === 'message') {
+          this.flashes.add({ ...base, kind: 'outcome', progress: 0,
+            outcome: r.outcome === 'succeeded' ? 'ok' : r.outcome, atMs: r.atMs });
+        }
+      }
       if (r.atMs <= this.indexedAt) this.resetIndex();
       const last = this.flow[this.flow.length - 1];
       if (last && r.atMs < last.atMs) this.flowSorted = false;
@@ -100,6 +142,12 @@ export class PlaybackStore {
     if (cycles.length) this.version++;
     for (const cycle of cycles) {
       const previous = this.cyclesById.get(cycle.id);
+      const elementId = this.options.workloadEntries?.get(cycle.workloadId);
+      if (elementId !== undefined && cycle.completedAtMs !== null && cycle.outcome !== null &&
+        (previous?.completedAtMs !== cycle.completedAtMs || previous?.outcome !== cycle.outcome)) {
+        this.flashes.add({ connectionId: null, elementId, kind: 'outcome', progress: 0,
+          outcome: cycle.outcome, atMs: cycle.observedAtMs ?? cycle.completedAtMs });
+      }
       this.cyclesById.set(cycle.id, cycle);
       if (!previous) this.addRevision(cycle.startedAtMs, { ...cycle, responseAtMs: null, completedAtMs: null, outcome: null, counts: emptyCycleCounts() });
       if (cycle.responseAtMs !== null && previous?.responseAtMs == null) {
@@ -257,7 +305,7 @@ export class PlaybackStore {
       else break;
     }
 
-    return { atMs, legs, nodes, cycles: { started, finished }, checkpoint };
+    return { atMs, legs, flashes: this.flashes.read(atMs), nodes, cycles: { started, finished }, checkpoint };
   }
 
   /** Visible cycle state at t; no response, completion or outcome from the future leaks backward. */
@@ -402,6 +450,8 @@ export class PlaybackStore {
     const start = this.playhead - history;
     if (start < this.windowStart + EVICT_STEP_MS) return;
     this.windowStart = start;
+    this.flashes.evict(start);
+    for (const [key, arrival] of this.pendingArrivals) if (arrival < start) this.pendingArrivals.delete(key);
     this.sortFlow();
     const cut = this.firstAfter(start - 1); // first record with atMs >= start
     if (cut > 0) {

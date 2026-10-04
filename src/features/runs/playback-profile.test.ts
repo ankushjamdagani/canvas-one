@@ -59,6 +59,11 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       sample.push(...runner.drainFlow());
       cycles.push(...runner.drainCycles());
       const store = new PlaybackStore({
+        workloadEntries: new Map(document.scenarios[0].workloads.map(w => [w.id, w.entry.elementId])),
+        connectionChannels: new Map(document.connections.flatMap(c => {
+          const port = document.elements.find(e => e.id === c.source.elementId)?.ports.find(p => p.id === c.source.portId);
+          return port ? [[c.id, port.channel] as const] : [];
+        })),
         connectionTargets: new Map(
           document.connections.map((c) => [c.id, c.target.elementId]),
         ),
