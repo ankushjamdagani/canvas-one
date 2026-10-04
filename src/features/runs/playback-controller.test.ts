@@ -1,0 +1,165 @@
+/**
+ * D57: RunController plays the worker's recording: a playhead clock, with flow, trace events and the final
+ * result released as the playhead passes them.
+ */
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Document, Emission } from '../../domain/studio/model';
+import type { StudioRepository } from '../../persistence/studio/types';
+import { InProcessTransport } from './inProcessTransport';
+import { RunController, type PlaybackClock } from './RunController';
+import { WorkerProtocolHandler, type HostMessage } from './protocol';
+
+const s06 = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+
+function docWith(emission: Emission): Document {
+  return {
+    ...s06,
+    scenarios: s06.scenarios.map((s, i) => (i === 0 ? { ...s, workloads: s.workloads.map((w) => ({ ...w, emission })) } : s)),
+  };
+}
+
+/** A clock the test moves by hand. */
+function manualClock() {
+  let now = 0;
+  let seq = 0;
+  const tasks: { at: number; run: () => void; id: number }[] = [];
+  const clock: PlaybackClock = {
+    now: () => now,
+    schedule: (run, ms) => {
+      const id = ++seq;
+      tasks.push({ at: now + ms, run, id });
+      return id;
+    },
+    cancel: (handle) => {
+      const i = tasks.findIndex((t) => t.id === handle);
+      if (i >= 0) tasks.splice(i, 1);
+    },
+  };
+  /** Moves real time forward in 16 ms steps, running what is due and letting the worker compute in between. */
+  const advance = async (ms: number) => {
+    for (let t = 0; t < ms; t += 16) {
+      now += 16;
+      for (const task of tasks.filter((x) => x.at <= now)) {
+        tasks.splice(tasks.indexOf(task), 1);
+        task.run();
+      }
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  };
+  return { clock, advance };
+}
+
+function setup(emission: Emission, speed: number) {
+  const { clock, advance } = manualClock();
+  const saved: unknown[] = [];
+  const repository = {
+    saveRun: async (...args: unknown[]) => {
+      saved.push(args);
+      return { status: 'applied' };
+    },
+  } as unknown as StudioRepository;
+  const handler = new WorkerProtocolHandler((m: HostMessage) => queueMicrotask(() => transportListeners.forEach((l) => l(m))), { stepBatchSize: 500 });
+  const transportListeners = new Set<(m: HostMessage) => void>();
+  const transport = new InProcessTransport(handler);
+  // The transport above delivers to its own listeners only when built without a handler; wire ours.
+  const originalOn = transport.onMessage.bind(transport);
+  transport.onMessage = (listener) => {
+    transportListeners.add(listener);
+    const off = originalOn(listener);
+    return () => {
+      transportListeners.delete(listener);
+      off();
+    };
+  };
+  const controller = new RunController({ repository, transport, mintId: () => crypto.randomUUID(), clock });
+  controller.setSpeed(speed);
+  const doc = docWith(emission);
+  const params = { projectId: 'p', branchId: 'b', snapshotId: 'snap', document: doc, scenarioId: doc.scenarios[0].id };
+  /** Moves the manual clock on until `what` holds, giving up after `maxMs` of real time. */
+  const until = async (what: () => boolean, maxMs = 20000) => {
+    const deadline = Date.now() + maxMs;
+    while (!what() && Date.now() < deadline) await advance(16);
+  };
+  return { controller, params, advance, until, saved };
+}
+
+describe('playback pacing (D57)', () => {
+  it('holds the result until the playhead reaches the end of the run', async () => {
+    const { controller, params, until, advance } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 2000 } }, 50);
+    void controller.run(params);
+    await until(() => controller.getPlayback()?.ended === true, 5000);
+    const store = controller.getPlayback()!;
+    expect(store.ended).toBe(true);
+    // The worker has finished, but the playhead has not got there yet.
+    if (!store.atEnd()) {
+      expect(controller.getState().phase).toBe('running');
+      expect(controller.getState().current?.terminal).toBeNull();
+    }
+    await until(() => controller.getState().phase === 'done', 10000);
+    expect(controller.getState().current?.terminal?.status).toBe('completed');
+    expect(store.atEnd()).toBe(true);
+    await advance(32);
+  }, 30000);
+
+  it('speed Infinity jumps to the live edge and finishes without waiting', async () => {
+    const { controller, params, until } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 2000 } }, Infinity);
+    const finished = controller.run(params);
+    await until(() => controller.getState().phase === 'done', 10000);
+    expect((await finished)?.status).toBe('completed');
+  }, 30000);
+
+  it('pause freezes the playhead; resume continues it', async () => {
+    const { controller, params, until, advance } = setup({ mode: 'bulk', requests: 200, arrival: { spreadMs: 8000 } }, 20);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.playheadMs ?? 0) > 500, 5000);
+    controller.pause();
+    const frozen = controller.getPlayback()!.playheadMs;
+    await advance(320);
+    expect(controller.getPlayback()!.playheadMs).toBe(frozen);
+    controller.resume();
+    await advance(320);
+    expect(controller.getPlayback()!.playheadMs).toBeGreaterThan(frozen);
+    controller.reset();
+  }, 30000);
+
+  it('releases flow records and trace events only as the playhead passes them', async () => {
+    const { controller, params, until } = setup({ mode: 'bulk', requests: 50, arrival: { spreadMs: 4000 } }, 10);
+    const seen: number[] = [];
+    controller.subscribeFlow((_run, records) => {
+      for (const r of records) seen.push(r.atMs);
+    });
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.playheadMs ?? 0) > 800, 5000);
+    const playhead = controller.getPlayback()!.playheadMs;
+    expect(seen.length).toBeGreaterThan(0);
+    expect(Math.max(...seen)).toBeLessThanOrEqual(playhead);
+    const events = controller.getState().events;
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((e) => e.atMs === null || e.atMs <= playhead)).toBe(true);
+    // The worker already knows more than it has shown.
+    expect(controller.getPlayback()!.computedMs).toBeGreaterThan(playhead);
+    controller.reset();
+  }, 30000);
+
+  it('a stream computes only about a lookahead ahead of a playhead that has not moved', async () => {
+    const { controller, params, until } = setup({ mode: 'stream', ratePerSecond: 100, profile: { kind: 'steady' } }, 1);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) >= 28_000, 20000);
+    const computed = controller.getPlayback()!.computedMs;
+    expect(computed).toBeGreaterThanOrEqual(28_000);
+    expect(computed).toBeLessThan(36_000);
+    expect(controller.getState().phase).toBe('running');
+    controller.reset();
+  }, 30000);
+
+  it('reset drops the recording', async () => {
+    const { controller, params, until } = setup({ mode: 'bulk', requests: 20, arrival: { spreadMs: 8000 } }, 1);
+    void controller.run(params);
+    await until(() => controller.getPlayback() !== null, 2000);
+    controller.reset();
+    expect(controller.getPlayback()).toBeNull();
+    expect(controller.getState().phase).toBe('idle');
+  });
+});

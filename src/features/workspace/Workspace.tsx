@@ -286,7 +286,7 @@ const SavedParts = lazyComponent(() => import("../library/SavedParts").then((m) 
 
 const RUN_SPEED_STORAGE_KEY = "studio.runSpeed";
 
-/** The hidden run-speed override: simulated seconds per real second, 0 for as fast as possible; real time when unset. */
+/** The hidden playback-speed override: simulated seconds per real second, 0 to jump to the live edge; real time when unset. */
 function readStoredRunSpeed(): number {
   try {
     const raw = window.localStorage.getItem(RUN_SPEED_STORAGE_KEY);
@@ -949,7 +949,7 @@ export function Workspace({
     sessionState.workingSnapshotId,
   ]);
 
-  // D55: runs go in real time. `studio.runSpeed` in localStorage is a hidden override (0 = as fast as possible) the
+  // D55/D57: the playhead moves in real time. `studio.runSpeed` in localStorage is a hidden override (0 = jump to the live edge, or a playback multiplier) the
   // browser suite uses; there is no control for it.
   React.useEffect(() => {
     runController?.setSpeed(readStoredRunSpeed());

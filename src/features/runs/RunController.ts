@@ -40,6 +40,7 @@ import {
 } from '../../domain/studio/runner/types';
 import type { PrepareIssue } from '../../domain/studio/runner/compile';
 import type { RunTransport } from './transport';
+import { HISTORY_MS, PlaybackStore } from './playback';
 import { createEmptySummary } from './summary';
 import type {
   CompileResultMessage,
@@ -108,10 +109,29 @@ export type RunAllParams = {
   readonly scenarioIds: readonly Id[];
 };
 
+/** D57: the timer the playhead runs on; tests inject a manual one. */
+export type PlaybackClock = {
+  readonly now: () => number;
+  readonly schedule: (run: () => void, ms: number) => unknown;
+  readonly cancel: (handle: unknown) => void;
+};
+
+const REAL_CLOCK: PlaybackClock = {
+  now: () => performance.now(),
+  schedule: (run, ms) => setTimeout(run, ms),
+  cancel: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+};
+
+/** D57: the worker is told where the playhead is when it has moved this far (simulated ms). */
+const PLAYHEAD_REPORT_MS = 250;
+/** D57: how often the playhead moves (real ms). */
+const TICK_MS = 16;
+
 export interface RunControllerOptions {
   readonly repository: StudioRepository;
   readonly transport: RunTransport;
   readonly mintId: () => string;
+  readonly clock?: PlaybackClock;
 }
 
 // ============================================================================
@@ -132,7 +152,19 @@ export class RunController {
     stopping: false,
   };
 
-  private speed = 0;
+  /** D57: playback speed, simulated seconds per real second; Infinity jumps to the live edge. */
+  private speed = 1;
+  private readonly clock: PlaybackClock;
+  private playback: PlaybackStore | null = null;
+  private clockHandle: unknown = null;
+  private lastTickAt = 0;
+  private lastPlayheadPostMs = -Infinity;
+  private releasedFlowMs = -1;
+  /** Trace events the worker has reported that the playhead has not reached yet. */
+  private heldEvents: TraceEvent[] = [];
+  private heldEventIndex = 0;
+  /** The worker's final result, applied once the playhead reaches the end of the run. */
+  private pendingTerminal: Parameters<RunController['handleTerminal']>[0] | null = null;
   private readonly listeners = new Set<(state: RunControllerState) => void>();
   private readonly flowListeners = new Set<(runId: string, records: readonly FlowRecord[], ended: boolean) => void>();
   private unsubscribeTransport: (() => void) | null = null;
@@ -167,6 +199,7 @@ export class RunController {
     this.repository = options.repository;
     this.transport = options.transport;
     this.mintId = options.mintId;
+    this.clock = options.clock ?? REAL_CLOCK;
 
     this.unsubscribeTransport = this.transport.onMessage((msg: HostMessage) => {
       this.handleHostMessage(msg);
@@ -264,15 +297,25 @@ export class RunController {
   }
 
   /**
-   * D55: how fast simulated time passes against the wall clock for the runs this controller starts, in
-   * simulated seconds per real second (1 = real time). 0 = as fast as the machine can.
+   * D57: how fast the playhead moves for the runs this controller starts, in simulated seconds per real second
+   * (1 = real time). Anything that is not a positive finite number, including 0 and Infinity, jumps to the
+   * live edge as fast as the worker computes.
    */
   setSpeed(speed: number): void {
-    this.speed = Number.isFinite(speed) && speed > 0 ? speed : 0;
+    this.speed = Number.isFinite(speed) && speed > 0 ? speed : Infinity;
+    if (this.playback) {
+      this.playback.speed = this.speed;
+      if (this.speed === Infinity) this.postPlayhead(Infinity);
+    }
   }
 
   getSpeed(): number {
     return this.speed;
+  }
+
+  /** D57: the current run's recording and playhead (timed runs), or null. */
+  getPlayback(): PlaybackStore | null {
+    return this.playback;
   }
 
   /**
@@ -293,6 +336,7 @@ export class RunController {
         runId: this.activeRunId,
         kind: 'pause',
       });
+      if (this.playback) this.playback.playing = false;
       this.setState({ phase: 'paused' });
     }
   }
@@ -304,6 +348,10 @@ export class RunController {
         runId: this.activeRunId,
         kind: 'resume',
       });
+      if (this.playback) {
+        this.playback.playing = true;
+        this.lastTickAt = this.clock.now();
+      }
       this.setState({ phase: 'running' });
     }
   }
@@ -338,6 +386,7 @@ export class RunController {
     this.activeDocument = null;
     this.activeTerminal = null;
     this.bufferedEvents = [];
+    this.endPlayback(true);
     this.runAllQueue = [];
     this.runAllContext = null;
 
@@ -394,6 +443,7 @@ export class RunController {
     this.activeDocument = document;
     this.activeTerminal = null;
     this.bufferedEvents = [];
+    this.endPlayback(true);
     this.activeStartToken = null;
 
     this.setState({
@@ -470,14 +520,17 @@ export class RunController {
     // 3. Start scenario in worker
     this.setState({ phase: 'running' });
 
+    const scenario = document.scenarios.find((s) => s.id === scenarioId);
+    if (scenario?.mode === 'timed') this.beginPlayback(document, scenario.workloads.some((w) => w.enabled && w.emission.mode === 'stream'));
+
     this.transport.postMessage({
       type: 'start',
       runId,
       snapshotId,
       planId: compileResult.plan.planId,
       workerSessionId: compileResult.plan.workerSessionId,
-      ...(this.speed > 0 ? { speed: this.speed } : {}),
     });
+    if (this.speed === Infinity) this.postPlayhead(Infinity);
 
     // Wait until terminal completes
     return await new Promise<TerminalResult | null>((resolve) => {
@@ -532,6 +585,13 @@ export class RunController {
       case 'batch': {
         // Buffer batches within trace caps (storage.md §6)
         const cap = RUN_BUDGET_LIMITS.maxTraceRows.max;
+        if (this.playback) {
+          // D57: the worker is ahead of the playhead, so events wait until the playhead reaches them.
+          const room = Math.max(0, cap - this.bufferedEvents.length - (this.heldEvents.length - this.heldEventIndex));
+          this.heldEvents.push(...update.events.slice(0, room));
+          for (const e of update.events) if (e.atMs !== null) this.playback.setComputedEdge(e.atMs);
+          break;
+        }
         const availableSpace = Math.max(0, cap - this.bufferedEvents.length);
         if (availableSpace > 0) {
           const eventsToAdd = update.events.slice(0, availableSpace);
@@ -544,16 +604,127 @@ export class RunController {
       }
 
       case 'flow': {
-        for (const listener of this.flowListeners) listener(update.runId, update.records, false);
+        if (this.playback) {
+          this.playback.ingestFlow(update.records);
+          for (const r of update.records) this.playback.setComputedEdge(r.atMs);
+        } else {
+          for (const listener of this.flowListeners) listener(update.runId, update.records, false);
+        }
+        break;
+      }
+
+      case 'cycles': {
+        this.playback?.ingestCycles(update.cycles);
+        break;
+      }
+
+      case 'checkpoint': {
+        this.playback?.ingestCheckpoint(update.checkpoint);
+        this.playback?.setComputedEdge(update.checkpoint.atMs);
+        break;
+      }
+
+      case 'buffer': {
+        this.playback?.setComputedEdge(update.computedMs);
         break;
       }
 
       case 'terminal': {
+        if (this.playback && update.measured) {
+          // D57: the run has finished computing, but the playhead may be far behind. Keep the result until it arrives.
+          this.playback.setEnded(Math.max(this.playback.computedMs, update.summary.elapsedMs ?? 0));
+          this.pendingTerminal = update;
+          if (this.playback.speed === Infinity) this.tick();
+          break;
+        }
         for (const listener of this.flowListeners) listener(update.runId, [], true);
+        this.endPlayback(false);
         void this.handleTerminal(update);
         break;
       }
     }
+  }
+
+  // ==========================================================================
+  // Playback (D57)
+  // ==========================================================================
+
+  private beginPlayback(document: Document, hasStream: boolean): void {
+    this.endPlayback(true);
+    const store = new PlaybackStore({
+      connectionTargets: new Map(document.connections.map((c) => [c.id, c.target.elementId])),
+      historyMs: hasStream ? HISTORY_MS : null,
+    });
+    store.speed = this.speed;
+    store.playing = true;
+    this.playback = store;
+    this.lastTickAt = this.clock.now();
+    this.lastPlayheadPostMs = -Infinity;
+    this.releasedFlowMs = -1;
+    this.heldEvents = [];
+    this.heldEventIndex = 0;
+    this.pendingTerminal = null;
+    this.clockHandle = this.clock.schedule(() => this.tick(), TICK_MS);
+  }
+
+  /** Stops the clock; `discard` also drops the recording (a reset or a new run). */
+  private endPlayback(discard: boolean): void {
+    if (this.clockHandle !== null) this.clock.cancel(this.clockHandle);
+    this.clockHandle = null;
+    this.pendingTerminal = null;
+    if (discard) {
+      this.playback = null;
+      this.heldEvents = [];
+      this.heldEventIndex = 0;
+    }
+  }
+
+  private postPlayhead(simulatedMs: number): void {
+    if (!this.activeRunId) return;
+    this.transport.postMessage({ type: 'playhead', runId: this.activeRunId, simulatedMs });
+  }
+
+  /** One step of the playhead: move it, hand out what it passed, tell the worker, and finish the run if it is over. */
+  private tick(): void {
+    const store = this.playback;
+    if (!store || !this.activeRunId) return;
+    if (this.clockHandle !== null) this.clock.cancel(this.clockHandle);
+    this.clockHandle = null;
+    const now = this.clock.now();
+    store.advance(now - this.lastTickAt);
+    this.lastTickAt = now;
+
+    const runId = this.activeRunId;
+    const records = store.flowBetween(this.releasedFlowMs, store.playheadMs);
+    this.releasedFlowMs = store.playheadMs;
+    if (records.length > 0) for (const listener of this.flowListeners) listener(runId, records, false);
+
+    let released = false;
+    while (this.heldEventIndex < this.heldEvents.length) {
+      const e = this.heldEvents[this.heldEventIndex];
+      if (e.atMs !== null && e.atMs > store.playheadMs) break;
+      this.bufferedEvents.push(e);
+      this.heldEventIndex++;
+      released = true;
+    }
+    if (released) this.setState({ events: [...this.bufferedEvents] });
+
+    if (this.speed !== Infinity && store.playheadMs - this.lastPlayheadPostMs >= PLAYHEAD_REPORT_MS) {
+      this.lastPlayheadPostMs = store.playheadMs;
+      this.postPlayhead(store.playheadMs);
+    }
+
+    if (store.atEnd() && this.pendingTerminal) {
+      const terminal = this.pendingTerminal;
+      this.pendingTerminal = null;
+      // The playhead is at the end: whatever trace the worker reported is now visible, and the result applies.
+      while (this.heldEventIndex < this.heldEvents.length) this.bufferedEvents.push(this.heldEvents[this.heldEventIndex++]);
+      this.setState({ events: [...this.bufferedEvents] });
+      for (const listener of this.flowListeners) listener(runId, [], true);
+      void this.handleTerminal(terminal);
+      return;
+    }
+    this.clockHandle = this.clock.schedule(() => this.tick(), TICK_MS);
   }
 
   private async handleTerminal(terminalMsg: {
