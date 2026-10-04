@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Document } from "../../domain/studio/model";
 import { checkReadiness } from "../../domain/studio/readiness";
 import { ScenarioRunner } from "../../domain/studio/runner/scenario-runner";
 import type { Cycle, FlowRecord, ResultDelta } from "../../domain/studio/runner/types";
 import { PlaybackStore } from "./playback";
+import { FlashIndex } from './playback-flashes';
 import { cycleDensity, stuckMarkers } from './timeline-layout';
 
 // Opt-in measurement: real S06 flow at flash-sale load, repeated to fill a 120 s
@@ -150,6 +151,62 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       const timelineBatchStart = performance.now();
       store.cyclesAt(end + 1000);
       const timelineBatchReadMs = performance.now() - timelineBatchStart;
+      // Return endpoints are projected into the future; interleave new live
+      // batches with reads after 120 s to catch repeated full-history sorting.
+      const liveSample = sample.filter(r => r.atMs < 100);
+      const liveReadTimings: number[] = [];
+      const liveIngestTimings: number[] = [];
+      // Interactive worker computation stays ahead of the playhead. Reading
+      // exactly at batch start instead exercises late same-instant flow reset.
+      store.stateAt(end - 2000);
+      for (let batch = 0; batch < 60; batch++) {
+        const offset = end + batch * 100;
+        const records = liveSample.map(r => ({ ...r, key: `live/${batch}/${r.key}`,
+          atMs: r.atMs + offset, arriveAtMs: r.arriveAtMs === null ? null : r.arriveAtMs + offset }));
+        const ingestStart = performance.now(); store.ingestFlow(records);
+        liveIngestTimings.push(performance.now() - ingestStart);
+        const readStart = performance.now(); store.stateAt(offset - 2000 + 100);
+        liveReadTimings.push(performance.now() - readStart);
+      }
+      liveReadTimings.sort((a,b) => a-b); liveIngestTimings.sort((a,b) => a-b);
+      // Isolate flash cost from the inherited flow index, which re-sorts a
+      // nonmonotone live batch together with all retained flow records.
+      type FlashFact = Parameters<FlashIndex['add']>[0];
+      const captureFlashes = (records: readonly FlowRecord[], revisions: readonly Cycle[]): FlashFact[] => {
+        const facts: FlashFact[] = [];
+        const add = FlashIndex.prototype.add;
+        const spy = vi.spyOn(FlashIndex.prototype, 'add').mockImplementation(function(this: FlashIndex, fact) {
+          facts.push(fact); add.call(this, fact);
+        });
+        try {
+          const probe = new PlaybackStore({ historyMs: null,
+            connectionTargets: new Map(document.connections.map(c => [c.id, c.target.elementId])),
+            connectionChannels: new Map(document.connections.flatMap(c => {
+              const port = document.elements.find(e => e.id === c.source.elementId)?.ports.find(p => p.id === c.source.portId);
+              return port ? [[c.id, port.channel] as const] : [];
+            })),
+            workloadEntries: new Map(document.scenarios[0].workloads.map(w => [w.id, w.entry.elementId])),
+          });
+          probe.ingestFlow(records); probe.ingestCycles(revisions);
+        } finally { spy.mockRestore(); }
+        return facts;
+      };
+      const recordedFlashes = captureFlashes(sample, cycles);
+      const liveFlashes = captureFlashes(liveSample, []);
+      const flashIndex = new FlashIndex();
+      for (let repeat = 0; repeat < 12; repeat++) for (const fact of recordedFlashes) {
+        flashIndex.add({ ...fact, atMs: fact.atMs + repeat * 10_000 });
+      }
+      flashIndex.read(end - 2000);
+      const flashLiveTimings: number[] = [];
+      for (let batch = 0; batch < 60; batch++) {
+        const offset = end + batch * 100;
+        const started = performance.now();
+        for (const fact of liveFlashes) flashIndex.add({ ...fact, atMs: fact.atMs + offset });
+        flashIndex.read(offset - 2000 + 100);
+        flashLiveTimings.push(performance.now() - started);
+      }
+      flashLiveTimings.sort((a,b) => a-b);
       store.seek(end); store.setComputedEdge(end + 1000); store.playing = true;
       const evictionStart = performance.now(); store.advance(1000);
       const rollingEvictionMs = performance.now() - evictionStart;
@@ -166,6 +223,11 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           medianMs: timings[30],
           p95Ms: timings[57],
           maxMs: timings[59],
+          liveBatchRecords: liveSample.length,
+          liveReadMedianMs: liveReadTimings[30], liveReadP95Ms: liveReadTimings[57], liveReadMaxMs: liveReadTimings[59],
+          liveIngestMedianMs: liveIngestTimings[30], liveIngestP95Ms: liveIngestTimings[57],
+          flashLiveCombinedMedianMs: flashLiveTimings[30], flashLiveCombinedP95Ms: flashLiveTimings[57],
+          flashLiveCombinedMaxMs: flashLiveTimings[59],
           resultMedianMs: resultTimings[30], resultP95Ms: resultTimings[57],
           timelineReadMs, timelineLayoutMs, timelineCycles: timelineCycles.length,
           timelineBatchReadMs,

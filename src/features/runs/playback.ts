@@ -111,7 +111,7 @@ export class PlaybackStore {
             // Normally the worker reports departure first. A late departure can
             // find already-ingested admission facts; this scan is ingestion-only.
             const last = this.flow[this.flow.length - 1];
-            const confirmed = last && last.atMs >= r.arriveAtMs ? this.flow.find(f =>
+            const confirmed = last && last.atMs > r.atMs && last.atMs >= r.arriveAtMs ? this.flow.find(f =>
               f.key === r.key && f.connectionId === r.connectionId && f.atMs === r.arriveAtMs &&
               (f.phase === 'received' || f.phase === 'queued' || f.phase === 'processing' || f.phase === 'settled')) : undefined;
             if (confirmed) {

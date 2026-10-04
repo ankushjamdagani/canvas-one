@@ -128,4 +128,18 @@ describe('recorded lifecycle flashes', () => {
       expect.objectContaining({ progress: 1, count: 1 }),
     ]);
   });
+
+  it('preserves the consumed prefix when live batches insert before a projected return arrival', () => {
+    const s = make();
+    s.ingestFlow([record('response', 100, { arriveAtMs: 500, outcome: 'failed' })]);
+    s.stateAt(150);
+    s.ingestFlow([record('received', 200), record('received', 300, { key: 'next' })]);
+    expect(s.stateAt(300).flashes.filter(f => f.kind === 'arrived')).toEqual([
+      expect.objectContaining({ progress: 1, count: 2 }),
+    ]);
+    expect(s.stateAt(500).flashes.filter(f => f.kind === 'arrived')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ progress: 0, count: 1 }),
+      expect.objectContaining({ progress: 1, count: 1 }),
+    ]));
+  });
 });
