@@ -178,6 +178,101 @@ describe('PlaybackStore.stateAt', () => {
     expect(s.stateAt(450).nodes.get('svc') ?? { queued: 0, active: 0 }).toEqual({ queued: 0, active: 0 });
   });
 
+  it('reconstructs occupancy and transit after a backward seek and late ingestion', () => {
+    const s = store();
+    s.ingestFlow(trip);
+    expect(s.stateAt(450).legs[0].direction).toBe('back');
+    expect(s.stateAt(250).nodes.get('svc')).toEqual({ queued: 1, active: 0 });
+    s.ingestFlow([rec({ key: 'late', phase: 'processing', atMs: 210 })]);
+    expect(s.stateAt(250).nodes.get('svc')).toEqual({ queued: 1, active: 1 });
+    expect(s.stateAt(350).nodes.get('svc')).toEqual({ queued: 0, active: 2 });
+    expect(s.stateAt(500).legs).toEqual([]);
+    s.ingestFlow([rec({ key: 'late', phase: 'settled', atMs: 500 })]);
+    expect(s.stateAt(500).nodes.size).toBe(0);
+  });
+
+  it('retains cached occupancy when new future records need sorting', () => {
+    const s = store();
+    s.ingestFlow([
+      rec({ key: 'active', phase: 'processing', atMs: 10 }),
+      rec({ key: 'active', phase: 'settled', atMs: 100 }),
+    ]);
+    expect(s.stateAt(20).nodes.get('svc')?.active).toBe(1);
+    s.ingestFlow([rec({ key: 'queued', phase: 'queued', atMs: 50 })]);
+    expect(s.stateAt(60).nodes.get('svc')).toEqual({ queued: 1, active: 1 });
+    expect(s.stateAt(100).nodes.get('svc')).toEqual({ queued: 1, active: 0 });
+  });
+
+  it('preserves unfinished work across eviction, forward frames and a seek to the boundary', () => {
+    const s = store(10_000);
+    s.ingestFlow([
+      rec({ key: 'done', phase: 'processing', atMs: 0 }),
+      rec({ key: 'done', phase: 'settled', atMs: 100 }),
+      rec({ key: 'queue', phase: 'queued', atMs: 1000 }),
+      rec({ key: 'active', phase: 'processing', atMs: 1000 }),
+      rec({ key: 'transit', phase: 'sent', atMs: 1000, arriveAtMs: 70_000 }),
+    ]);
+    s.stateAt(59_000);
+    s.setComputedEdge(60_000);
+    s.playing = true;
+    s.speed = Infinity;
+    s.advance(1);
+    expect(s.flowBetween(-1, 60_000).some((r) => r.key === 'done')).toBe(false);
+    expect(s.stateAt(60_000).nodes.get('svc')).toEqual({ queued: 1, active: 1 });
+    expect(s.stateAt(50_000).legs[0].progress).toBeCloseTo(49_000 / 69_000);
+    s.ingestFlow([rec({ key: 'queue', phase: 'processing', atMs: 61_000 })]);
+    expect(s.stateAt(61_000).nodes.get('svc')).toEqual({ queued: 0, active: 2 });
+  });
+
+  it('counts newly ingested cycles after cached reads and backward seeks', () => {
+    const s = store();
+    s.ingestCycles([cycle('a', 100, 300)]);
+    expect(s.stateAt(500).cycles).toEqual({ started: 1, finished: 1 });
+    s.ingestCycles([cycle('b', 50, 600)]);
+    expect(s.stateAt(200).cycles).toEqual({ started: 2, finished: 0 });
+    expect(s.stateAt(600).cycles).toEqual({ started: 2, finished: 2 });
+  });
+
+  it('clears dequeued occupancy without inventing processing or an outcome', () => {
+    const s = store();
+    s.ingestFlow([
+      rec({ key: 'message', phase: 'queued', atMs: 0 }),
+      rec({ key: 'message', phase: 'released', atMs: 100 }),
+      rec({ key: 'message/child', connectionId: 'c2', phase: 'sent', atMs: 100, arriveAtMs: 200 }),
+    ]);
+    expect(s.stateAt(50).nodes.get('svc')).toEqual({ queued: 1, active: 0 });
+    expect(s.stateAt(150).nodes.size).toBe(0);
+    expect(s.stateAt(150).legs).toEqual([{ key: 'message/child', connectionId: 'c2', direction: 'out', progress: 0.5 }]);
+    expect(s.stateAt(50).nodes.get('svc')?.queued).toBe(1);
+  });
+
+  it('counts direct workload entry occupancy without inventing a connection', () => {
+    const s = store();
+    s.ingestFlow([
+      rec({ key: 'root', connectionId: null, elementId: 'svc', phase: 'queued', atMs: 0 }),
+      rec({ key: 'root', connectionId: null, elementId: 'svc', phase: 'processing', atMs: 10 }),
+      rec({ key: 'root', connectionId: null, elementId: 'svc', phase: 'released', atMs: 20 }),
+    ]);
+    expect(s.stateAt(5).nodes.get('svc')).toEqual({ queued: 1, active: 0 });
+    expect(s.stateAt(15).nodes.get('svc')).toEqual({ queued: 0, active: 1 });
+    expect(s.stateAt(15).legs).toEqual([]);
+    expect(s.stateAt(20).nodes.size).toBe(0);
+  });
+
+  it('does not retain cached occupancy when a jump evicts its unseen settlement', () => {
+    const s = store(10_000);
+    s.ingestFlow([
+      rec({ key: 'done', phase: 'processing', atMs: 0 }),
+      rec({ key: 'done', phase: 'settled', atMs: 100 }),
+    ]);
+    expect(s.stateAt(0).nodes.get('svc')?.active).toBe(1);
+    s.setComputedEdge(60_000);
+    s.playing = true;
+    s.speed = Infinity;
+    s.advance(1);
+    expect(s.stateAt(60_000).nodes.size).toBe(0);
+  });
+
   it('counts each element separately', () => {
     const s = store();
     s.ingestFlow([

@@ -1,4 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useContext } from 'react';
+import { PlaybackTrafficContext } from './usePlaybackTraffic';
+import { NodeOccupancy } from '@/components/ui/node-occupancy';
 import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
@@ -7,6 +10,7 @@ import { describeEndpoint, portPath } from '../../domain/studio/protocols';
 import { getNodeCaption, getNodeIcon } from './nodeVisuals';
 
 export function NodeCard({ data, selected }: NodeProps) {
+  const traffic = useContext(PlaybackTrafficContext);
   const nodeData = data as ProjectedNodeData;
   if (nodeData.kind !== 'element') return null;
 
@@ -182,6 +186,9 @@ export function NodeCard({ data, selected }: NodeProps) {
         ) : null}
       </div>
 
+      <div className="pointer-events-none absolute inset-x-0 top-full mt-1">
+        <NodeOccupancy {...(traffic.nodes.get(element.id) ?? { queued: 0, active: 0 })} />
+      </div>
       <Handle
         type="source"
         position={Position.Right}

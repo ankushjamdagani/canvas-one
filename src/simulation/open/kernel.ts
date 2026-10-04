@@ -35,7 +35,9 @@ export type SimLifecycleFactKind =
   /** A request or message leaves its sender along `edgeId`; `arriveAt` (seconds) is when it reaches the target, absent when the leg is lost. */
   | 'sent'
   /** A response leaves the target back along `edgeId`; `arriveAt` is when the caller receives it. */
-  | 'response_sent';
+  | 'response_sent'
+  /** A queued/active operation no longer occupies its node; this does not settle its unit. */
+  | 'occupancy_released';
 
 export interface SimLifecycleFact {
   kind: SimLifecycleFactKind;
@@ -49,6 +51,8 @@ export interface SimLifecycleFact {
   edgeId?: string;
   /** `sent` and `response_sent` only: simulated time the leg ends. */
   arriveAt?: number;
+  /** `occupancy_released`: false for broker dequeue, true for final operation cleanup. */
+  operationReleased?: boolean;
   /** Bridge call frames (RV-14f, model-and-runner.md §8): the system frame ID a
    * 'bridge_dispatch' fact carries, correlating it to the eventual settleCall(). */
   frameId?: string;
@@ -924,6 +928,10 @@ export class OpenSimulation {
   protected releaseOp(op: Op): void {
     if (op.released) return;
     op.released = true;
+    this.emitFact({
+      kind: 'occupancy_released', time: this.currentTime, nodeId: op.nodeId,
+      unitIdentity: op.unit.identity, attempt: op.attempt, path: op.path, operationReleased: true,
+    });
     if (op.slotKey !== undefined) {
       this.endpointSlots.set(op.slotKey, Math.max(0, (this.endpointSlots.get(op.slotKey) ?? 1) - 1));
       op.slotKey = undefined;
@@ -2649,6 +2657,10 @@ export class OpenSimulation {
     const routes = this.plan.outgoing.get(brokerOp.nodeId)!;
     brokerNr.competingCursor = (routes.indexOf(edge) + 1) % routes.length;
     brokerOp.phase = 'waiting';
+    this.emitFact({
+      kind: 'occupancy_released', time: this.currentTime, nodeId: brokerOp.nodeId,
+      unitIdentity: brokerOp.unit.identity, attempt: brokerOp.attempt, path: brokerOp.path, operationReleased: false,
+    });
     brokerNr.waitingSources.add(brokerOp);
     brokerNr.counters.delivered = (brokerNr.counters.delivered || 0) + 1;
 
@@ -2688,6 +2700,11 @@ export class OpenSimulation {
     this.liveOpsCount++;
 
     const deliveryTime = this.currentTime + hopSeconds;
+    this.emitFact({
+      kind: 'sent', time: this.currentTime, nodeId: edge.target,
+      unitIdentity: brokerOp.unit.identity, attempt: childOp.attempt, path: childPath,
+      edgeId: edge.id, arriveAt: deliveryTime,
+    });
     this.scheduleEvent(deliveryTime, 2, () => {
       if (childOp.done || childOp.unit.done || deliveryTime >= childOp.unit.deadline) {
         if (!childOp.done) {
@@ -2735,6 +2752,10 @@ export class OpenSimulation {
       if (brokerOp.done || brokerOp.unit.done) return;
       brokerOp.phase = 'queued';
       brokerNr.queue.push(brokerOp);
+      this.emitFact({
+        kind: 'queued', time: this.currentTime, nodeId: brokerOp.nodeId,
+        unitIdentity: brokerOp.unit.identity, attempt: brokerOp.attempt, path: brokerOp.path,
+      });
       this.pumpBrokers();
     });
     return true;

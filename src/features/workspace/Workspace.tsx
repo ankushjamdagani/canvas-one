@@ -3210,7 +3210,7 @@ export function Workspace({
                       )
                     }
                     trafficEntryElementIds={trafficEntryElementIds}
-                    flowSource={runController}
+                    playbackSource={runController}
                     linkedProjects={linkedProjects}
                     loadLinkedExposures={async (projectId) => {
                       const record = await repository.loadProject(projectId);

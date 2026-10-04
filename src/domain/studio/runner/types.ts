@@ -221,8 +221,11 @@ export type RunSummary = {
  */
 export type FlowRecord = {
   readonly key: string;
-  readonly connectionId: Id;
-  readonly phase: 'sent' | 'received' | 'queued' | 'processing' | 'settled' | 'response';
+  /** Null for a workload admitted directly at a node, without an incoming connection. */
+  readonly connectionId: Id | null;
+  /** The occupied node, supplied for local phase facts without an incoming connection. */
+  readonly elementId?: Id;
+  readonly phase: 'sent' | 'received' | 'queued' | 'processing' | 'settled' | 'response' | 'released';
   readonly atMs: number;
   /** `sent` and `response`: when the leg ends; absent when the leg was lost. */
   readonly arriveAtMs: number | null;

@@ -28,8 +28,7 @@ import { GroupNode } from './GroupNode';
 import { NoteNode } from './NoteNode';
 import { BoundaryFrameNode } from './BoundaryFrameNode';
 import { TrafficEdge } from './TrafficEdge';
-import { PacketContext, useLivePackets } from './livePackets';
-import type { FlowRecord } from '../../domain/studio/runner/types';
+import { PlaybackTrafficContext, usePlaybackTraffic, type PlaybackSource } from './usePlaybackTraffic';
 import { FloatingDock } from './FloatingDock';
 import { SelectionBox } from './SelectionBox';
 import {
@@ -130,8 +129,8 @@ export interface CanvasViewProps {
   isSaving: boolean;
   /** Elements a workload of the scenario being edited enters at (board scenario_traffic_editor). */
   trafficEntryElementIds?: ReadonlySet<Id>;
-  /** Live packet steps of the run in progress; each request or message shows as a packet beside its connection. */
-  flowSource?: { subscribeFlow(listener: (runId: string, records: readonly FlowRecord[], ended: boolean) => void): () => void } | null;
+  /** Recording read at the controller's playhead for transit and node occupancy. */
+  playbackSource?: PlaybackSource | null;
   /** D52: details of the projects linked-project nodes point at (absent id = unavailable). */
   /** D53: reads what a project exposes right now (for linking and for connecting to a linked node). */
   loadLinkedExposures?: (projectId: string) => Promise<readonly ProjectExposure[]>;
@@ -227,7 +226,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onConfigureDock,
   onRestoreDockDefaults,
   trafficEntryElementIds,
-  flowSource,
+  playbackSource,
   linkedProjects,
   loadLinkedExposures,
   onOpenLinkedProject,
@@ -237,7 +236,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const reactFlow = useReactFlow();
   const { zoom } = useViewport();
   const gridGap = gridGapFor(zoom);
-  const trafficPulses = useLivePackets(flowSource);
+  const playbackTraffic = usePlaybackTraffic(playbackSource);
   const nodesInitialized = useNodesInitialized();
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -1306,7 +1305,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       {/* Selected node IDs for the unified selection box */}
       {(() => null)()}
 
-      <PacketContext.Provider value={trafficPulses}>
+      <PlaybackTrafficContext.Provider value={playbackTraffic}>
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -1361,7 +1360,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         )}
       </ReactFlow>
-      </PacketContext.Provider>
+      </PlaybackTrafficContext.Provider>
 
       {/* Connect: rejected -- small inline message near the pointer/edge */}
       {rejectMessage && (

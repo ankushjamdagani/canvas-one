@@ -581,7 +581,7 @@ export class ResourceAdapter {
       traceHook: (fact) => {
         this.recordFlow(fact);
         this.cycleTracker.record(fact);
-        if (fact.kind !== 'sent' && fact.kind !== 'response_sent') this.stepFacts.push(fact);
+        if (fact.kind !== 'sent' && fact.kind !== 'response_sent' && fact.kind !== 'occupancy_released') this.stepFacts.push(fact);
       },
       disabledWorkloadIds,
       requireRunnable: hasActiveWorkloads,
@@ -602,30 +602,31 @@ export class ResourceAdapter {
     const key = `${fact.unitIdentity}|${fact.path}`;
     const ms = (seconds: number) => Math.round(seconds * 1000);
     if (fact.kind === 'sent' && fact.edgeId) {
-      if (this.flowConnections.size > 5000) this.flowConnections.clear();
       this.flowConnections.set(key, fact.edgeId);
       this.flowRecords.push({ key, connectionId: fact.edgeId, phase: 'sent', atMs: ms(fact.time), arriveAtMs: fact.arriveAt === undefined ? null : ms(fact.arriveAt), outcome: null });
       return;
     }
-    const connectionId = this.flowConnections.get(key);
-    if (!connectionId) return;
+    const connectionId = this.flowConnections.get(key) ?? null;
     const phase: FlowRecord['phase'] | null =
       fact.kind === 'admitted' ? 'received'
       : fact.kind === 'queued' ? 'queued'
       : fact.kind === 'started' ? 'processing'
       : fact.kind === 'attempt_settled' || fact.kind === 'rejected' ? 'settled'
       : fact.kind === 'response_sent' ? 'response'
+      : fact.kind === 'occupancy_released' ? 'released'
       : null;
     if (!phase) return;
+    if (phase === 'response' && connectionId === null) return;
     this.flowRecords.push({
       key,
       connectionId,
+      ...(connectionId === null ? { elementId: fact.nodeId } : {}),
       phase,
       atMs: ms(fact.time),
       arriveAtMs: phase === 'response' && fact.arriveAt !== undefined ? ms(fact.arriveAt) : null,
       outcome: phase === 'settled' ? (fact.kind === 'rejected' ? 'rejected' : (fact.outcome ?? null)) : phase === 'response' ? (fact.outcome ?? null) : null,
     });
-    if (phase === 'response') this.flowConnections.delete(key);
+    if (phase === 'released' && fact.operationReleased) this.flowConnections.delete(key);
   }
 
   /** D55: nothing is live in the kernel and no arrival is pending. */

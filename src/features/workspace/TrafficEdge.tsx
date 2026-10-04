@@ -7,13 +7,9 @@ import {
   useViewport,
   type EdgeProps,
 } from "@xyflow/react";
-import {
-  PacketContext,
-  STAGE_LABEL,
-  STAGE_MIN_MS,
-  type Packet,
-  type PacketStage,
-} from "./livePackets";
+import { PlaybackTrafficContext } from "./usePlaybackTraffic";
+import { placeLeg, trafficDensity } from "./playbackTraffic";
+import type { LegAt } from "../runs/playback";
 import {
   chipOverlapsAnyNode,
   estimateLabelChipRect,
@@ -66,8 +62,9 @@ export function TrafficEdge({
   const { zoom } = useViewport();
   const connectionId = (data as { connection?: { id?: string } } | undefined)
     ?.connection?.id;
-  const packets = React.useContext(PacketContext).get(connectionId ?? "") ?? [];
-  const returning = packets.some((p) => p.stage === "returning");
+  const traffic = React.useContext(PlaybackTrafficContext);
+  const packets = traffic.legs.get(connectionId ?? "") ?? [];
+  const density = trafficDensity(packets);
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -117,30 +114,85 @@ export function TrafficEdge({
       onMouseLeave={() => setHovered(false)}
       data-testid={`edge-${id}`}
     >
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        style={
-          packets.length > 0
-            ? {
-                ...style,
-                stroke: "var(--color-primary, #0B5C54)",
-                strokeDasharray: "6 5",
-                animation: "traffic-flow 0.5s linear infinite",
-                animationDirection: returning ? "reverse" : "normal",
-              }
-            : style
-        }
-        markerEnd={markerEnd}
-      />
-      {packets.map((packet, index) => (
-        <PacketMarker
-          key={packet.key}
-          packet={packet}
-          path={edgePath}
-          lane={index}
-        />
-      ))}
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {density.aggregate ? (
+        <>
+          {(["out", "back"] as const).map((direction) =>
+            density[direction] > 0 ? (
+              <path
+                key={direction}
+                d={edgePath}
+                fill="none"
+                stroke="var(--color-primary)"
+                strokeWidth={3}
+                strokeDasharray={density.dash}
+                opacity={0.6}
+                transform={`translate(0 ${direction === "out" ? -3 : 3})`}
+                style={{
+                  animation: traffic.reduced
+                    ? "none"
+                    : `traffic-flow ${density.durationSeconds}s linear infinite`,
+                  animationDirection:
+                    direction === "back" ? "reverse" : "normal",
+                }}
+                data-direction={direction}
+                pointerEvents="none"
+              />
+            ) : null,
+          )}
+          <EdgeLabelRenderer>
+            <div
+              data-testid="traffic-aggregate"
+              data-count={density.count}
+              className="nodrag nopan absolute whitespace-nowrap rounded-tag border border-control-border bg-panel px-1.5 py-0.5 font-mono text-[10px] text-body shadow-xs"
+              style={{
+                transform: `translate(${labelX}px, ${labelY}px) translate(-50%, 8px)`,
+                pointerEvents: "none",
+              }}
+            >
+              {density.count} in flight · {density.out} out / {density.back}{" "}
+              back
+            </div>
+          </EdgeLabelRenderer>
+        </>
+      ) : (
+        packets.map((packet, index) => (
+          <PacketMarker
+            key={`${packet.key}:${packet.direction}`}
+            packet={packet}
+            path={edgePath}
+            reduced={traffic.reduced}
+            staticProgress={(index + 1) / (packets.length + 1)}
+          />
+        ))
+      )}
+      {selected && traffic.hasRun ? (
+        <EdgeLabelRenderer>
+          <div
+            role="region"
+            aria-label="Units in transit"
+            data-testid="traffic-units"
+            className="nodrag nopan absolute max-h-40 w-64 overflow-auto rounded-panel border border-control-border bg-panel px-2 py-1 font-mono text-[10px] text-body shadow-xs"
+            style={{
+              transform: `translate(${labelX}px, ${labelY}px) translate(-50%, 32px)`,
+              pointerEvents: "auto",
+            }}
+          >
+            <div className="border-b border-control-border py-1 font-semibold">
+              {packets.length} units in transit
+            </div>
+            {packets.map((packet) => (
+              <div
+                key={`${packet.key}:${packet.direction}`}
+                className="flex gap-2 py-0.5"
+              >
+                <span className="min-w-0 flex-1 break-all">{packet.key}</span>
+                <span>{packet.direction}</span>
+              </div>
+            ))}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
       {showChip && labelText ? (
         <EdgeLabelRenderer>
           <div
@@ -167,94 +219,27 @@ export function TrafficEdge({
   );
 }
 
-const STAGE_COLOR: Record<PacketStage, string> = {
-  sent: "#0B5C54",
-  transit: "#0B5C54",
-  received: "#0B5C54",
-  queued: "#B7791F",
-  processing: "#2B6CB0",
-  done: "#2F855A",
-  rejected: "#B3261E",
-  failed: "#B3261E",
-  lost: "#B3261E",
-  returning: "#2F855A",
-  delivered: "#2F855A",
-};
-
-/** How far along the connection (0 = sender, 1 = receiver) a packet is, given its stage and how long it has been in it. */
-function progressOf(stage: PacketStage, elapsedMs: number): number {
-  const through = Math.min(1, elapsedMs / STAGE_MIN_MS[stage]);
-  switch (stage) {
-    case "sent":
-      return 0.05;
-    case "transit":
-      return 0.05 + 0.9 * through;
-    case "lost":
-      return 0.5;
-    case "returning":
-      return 0.95 - 0.9 * through;
-    case "delivered":
-      return 0.05;
-    default:
-      return 0.95;
-  }
-}
-
-/**
- * One packet beside its connection: a small chip that sits on the line, moves with the stage and points the way it
- * travels, with the stage written next to it. Position is set from an animation frame, not React state.
- */
 function PacketMarker({
   packet,
   path,
-  lane,
+  reduced,
+  staticProgress,
 }: {
-  packet: Packet;
+  packet: LegAt;
   path: string;
-  lane: number;
+  reduced: boolean;
+  staticProgress: number;
 }) {
   const pathRef = React.useRef<SVGPathElement>(null);
   const markRef = React.useRef<SVGGElement>(null);
-  const labelRef = React.useRef<HTMLDivElement>(null);
-  const reduced = React.useMemo(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-    [],
-  );
-
-  React.useEffect(() => {
-    let frame = 0;
-    const place = () => {
-      const line = pathRef.current;
-      if (line) {
-        const length = line.getTotalLength();
-        const elapsed = performance.now() - packet.stageStartedAt;
-        const t = progressOf(
-          packet.stage,
-          reduced ? STAGE_MIN_MS[packet.stage] : elapsed,
-        );
-        const at = line.getPointAtLength(length * t);
-        const ahead = line.getPointAtLength(Math.min(length, length * t + 1));
-        const back = line.getPointAtLength(Math.max(0, length * t - 1));
-        const heading =
-          (Math.atan2(ahead.y - back.y, ahead.x - back.x) * 180) / Math.PI +
-          (packet.stage === "returning" ? 180 : 0);
-        markRef.current?.setAttribute(
-          "transform",
-          `translate(${at.x} ${at.y}) rotate(${heading})`,
-        );
-        if (labelRef.current) {
-          labelRef.current.style.transform = `translate(${at.x}px, ${at.y}px) translate(-50%, calc(-100% - 10px - ${lane * 18}px))`;
-        }
-      }
-      frame = requestAnimationFrame(place);
-    };
-    place();
-    return () => cancelAnimationFrame(frame);
-  }, [packet.stage, packet.stageStartedAt, lane, reduced, path]);
-
-  const color = STAGE_COLOR[packet.stage];
+  React.useLayoutEffect(() => {
+    if (!pathRef.current) return;
+    const at = placeLeg(pathRef.current, packet, reduced, staticProgress);
+    markRef.current?.setAttribute(
+      "transform",
+      `translate(${at.x} ${at.y}) rotate(${at.heading})`,
+    );
+  }, [packet, path, reduced, staticProgress]);
   return (
     <>
       <path
@@ -267,7 +252,9 @@ function PacketMarker({
       <g
         ref={markRef}
         data-testid="traffic-packet"
-        data-stage={packet.stage}
+        data-unit={packet.key}
+        data-direction={packet.direction}
+        data-progress={packet.progress}
         pointerEvents="none"
       >
         <rect
@@ -276,31 +263,19 @@ function PacketMarker({
           width={14}
           height={10}
           rx={2.5}
-          fill={color}
-          stroke="#fff"
+          fill="var(--color-primary)"
+          stroke="var(--color-background)"
           strokeWidth={1.2}
         />
         <path
           d="M-2.5 -2.5 L2.5 0 L-2.5 2.5"
           fill="none"
-          stroke="#fff"
+          stroke="var(--color-background)"
           strokeWidth={1.4}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       </g>
-      {lane === 0 ? (
-        <EdgeLabelRenderer>
-          <div
-            ref={labelRef}
-            className="nodrag nopan absolute whitespace-nowrap rounded-tag border border-control-border bg-panel px-1.5 py-0.5 text-[10px] font-medium text-body shadow-xs"
-            style={{ pointerEvents: "none", borderColor: color, color }}
-            data-testid="traffic-packet-label"
-          >
-            {STAGE_LABEL[packet.stage]}
-          </div>
-        </EdgeLabelRenderer>
-      ) : null}
     </>
   );
 }

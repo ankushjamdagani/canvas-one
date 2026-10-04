@@ -124,17 +124,15 @@ describe('playback pacing (D57)', () => {
     controller.reset();
   }, 30000);
 
-  it('releases flow records and trace events only as the playhead passes them', async () => {
+  it('reads canvas state at the playhead and releases trace events only as it passes them', async () => {
     const { controller, params, until } = setup({ mode: 'bulk', requests: 50, arrival: { spreadMs: 4000 } }, 10);
-    const seen: number[] = [];
-    controller.subscribeFlow((_run, records) => {
-      for (const r of records) seen.push(r.atMs);
-    });
     void controller.run(params);
     await until(() => (controller.getPlayback()?.playheadMs ?? 0) > 800, 5000);
     const playhead = controller.getPlayback()!.playheadMs;
-    expect(seen.length).toBeGreaterThan(0);
-    expect(Math.max(...seen)).toBeLessThanOrEqual(playhead);
+    const state = controller.getPlayback()!.stateAt(playhead);
+    expect(state.atMs).toBe(playhead);
+    expect(controller.getPlayback()!.flowBetween(-1, playhead).length).toBeGreaterThan(0);
+    expect(state.legs.every((leg) => leg.progress >= 0 && leg.progress <= 1)).toBe(true);
     const events = controller.getState().events;
     expect(events.length).toBeGreaterThan(0);
     expect(events.every((e) => e.atMs === null || e.atMs <= playhead)).toBe(true);

@@ -10,7 +10,7 @@ async function openS06(page: Page) {
 type Traffic = { mode: 'bulk'; requests: number; overMs?: number } | { mode: 'stream'; rate: number };
 
 /** Sets the selected scenario's first traffic source in the editor and applies it. */
-async function setTraffic(page: Page, traffic: Traffic) {
+async function setTraffic(page: Page, traffic: Traffic, entryLabel?: string) {
   await page.getByTestId('scenario-switcher-trigger').click();
   await page
     .getByTestId('scenario-switcher-popover')
@@ -20,6 +20,12 @@ async function setTraffic(page: Page, traffic: Traffic) {
   const editor = page.getByTestId('scenario-editor');
   await expect(editor).toBeVisible();
   const row = editor.locator('[data-testid^="workload-row-"]').first();
+  if (entryLabel) {
+    const entry = row.getByLabel('Entry point');
+    const value = await entry.locator('option').filter({ hasText: entryLabel }).first().getAttribute('value');
+    expect(value).not.toBeNull();
+    await entry.selectOption(value!);
+  }
   await row.getByLabel('Sends').selectOption(traffic.mode);
   if (traffic.mode === 'stream') {
     await row.getByTestId('stream-rate').fill(String(traffic.rate));
@@ -40,6 +46,22 @@ async function setSpeed(page: Page, value: string) {
   await page.evaluate((v) => window.localStorage.setItem('studio.runSpeed', v), value);
   await page.reload();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
+}
+
+/** Give the existing SQL call enough real transit time to inspect its exact concurrent units. */
+async function configurePlaybackLink(page: Page) {
+  const source = await page.locator('.component-node').filter({ has: page.getByText('Checkout API A', { exact: true }) }).getAttribute('data-placement-id');
+  const target = await page.locator('.component-node').filter({ has: page.getByText('Orders DB', { exact: true }) }).getAttribute('data-placement-id');
+  const edge = page.locator(`.react-flow__edge[aria-label="Edge from ${source} to ${target}"]`);
+  await edge.locator('.react-flow__edge-interaction').dispatchEvent('click');
+  await page.getByTestId('inspector-field-config.latencyMs').fill('5000');
+  await page.getByTestId('inspector-field-config.returnLatencyMs').fill('5000');
+  await page.getByTestId('inspector-apply').click();
+  await expect(page.getByTestId('inspector-apply')).toBeDisabled();
+  await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+  await expect(page.getByTestId('inspector-field-config.latencyMs')).toHaveValue('5000');
+  await expect(page.getByTestId('inspector-field-config.returnLatencyMs')).toHaveValue('5000');
+  return edge.getAttribute('data-id');
 }
 
 test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
@@ -101,24 +123,61 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     expect(Date.now() - instantStart).toBeLessThan(2500);
   });
 
-  test('each request shows as a packet that moves through its stages on the connection', async ({ page }) => {
+  test('canvas shows exact transit packets, then node occupancy, and clears on completion', async ({ page }) => {
     await openS06(page);
-    await setTraffic(page, { mode: 'stream', rate: 100 });
+    await setTraffic(page, { mode: 'bulk', requests: 6 }, 'Checkout API A');
+    // Real processing lasts longer than a frame; avoid polling for a millisecond-wide occupancy interval.
+    await page.locator('.component-node').filter({ has: page.getByText('Orders DB', { exact: true }) }).click();
+    await page.getByTestId('inspector-field-config.capacity').fill('1');
+    await page.getByTestId('inspector-field-config.writeCapacity').fill('1');
+    await page.getByTestId('inspector-field-config.serviceTime').selectOption('fixed');
+    await page.getByTestId('inspector-field-config.concurrency').fill('1');
+    await page.getByTestId('inspector-apply').click();
+    await expect(page.getByTestId('inspector-apply')).toBeDisabled();
+    await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+    const linkId = await configurePlaybackLink(page);
     await setSpeed(page, '1');
+    await page.locator(`.react-flow__edge[data-id="${linkId}"]`).locator('.react-flow__edge-interaction').dispatchEvent('click');
+    await expect(page.getByTestId('inspector-field-config.latencyMs')).toHaveValue('5000');
     await page.getByTestId('scenario-run-btn').click();
-    const stages = new Set<string>();
-    const deadline = Date.now() + 15000;
-    while (Date.now() < deadline && !['sent', 'transit', 'received', 'returning', 'delivered'].every((s) => stages.has(s))) {
-      for (const stage of await page.locator('[data-testid="traffic-packet"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-stage') ?? ''))) {
-        stages.add(stage);
-      }
-      await page.waitForTimeout(50);
-    }
-    expect([...stages]).toEqual(expect.arrayContaining(['sent', 'transit', 'received', 'returning', 'delivered']));
-    await expect(page.getByTestId('traffic-packet-label').first()).toBeVisible();
-    await page.getByTestId('scenario-stop-btn').click();
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 30000 });
-    await expect(page.locator('[data-testid="traffic-packet"]')).toHaveCount(0, { timeout: 8000 });
+    const edge = page.getByTestId(`edge-${linkId}`);
+    await expect(edge.getByTestId('traffic-packet')).toHaveCount(6);
+    await expect(page.getByTestId('traffic-aggregate')).toHaveCount(0);
+    const packets = edge.getByTestId('traffic-packet');
+    const first = await packets.first().getAttribute('transform');
+    await expect.poll(() => packets.first().getAttribute('transform')).not.toBe(first);
+    expect(await packets.evaluateAll((els) => els.every((e) => e.getAttribute('data-direction') === 'out' && !e.hasAttribute('data-stage')))).toBe(true);
+    await expect(page.getByTestId('traffic-packet-label')).toHaveCount(0);
+    await expect(page.getByTestId('node-occupancy').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('node-occupancy').filter({ hasText: '5 queued' })).toHaveAttribute('data-active', '1');
+    await page.screenshot({ path: test.info().outputPath('canvas-playback-occupancy.png') });
+    await setSpeed(page, '0');
+    await page.getByTestId('scenario-run-btn').click();
+    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+    await expect(page.getByTestId('traffic-packet')).toHaveCount(0);
+    await expect(page.getByTestId('node-occupancy')).toHaveCount(0);
+  });
+
+  test('seven units aggregate and a selected connection lists every unit with reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openS06(page);
+    await setTraffic(page, { mode: 'bulk', requests: 7 }, 'Checkout API A');
+    const linkId = await configurePlaybackLink(page);
+    await setSpeed(page, '1');
+    await page.locator(`.react-flow__edge[data-id="${linkId}"]`).locator('.react-flow__edge-interaction').dispatchEvent('click');
+    await expect(page.getByTestId('inspector-field-config.latencyMs')).toHaveValue('5000');
+    await page.getByTestId('scenario-run-btn').click();
+    const aggregate = page.getByTestId('traffic-aggregate').filter({ hasText: '7 in flight' });
+    await expect(aggregate).toContainText('7 in flight · 7 out / 0 back');
+    const flow = page.getByTestId(`edge-${linkId}`);
+    await expect(flow.getByTestId('traffic-packet')).toHaveCount(0);
+    await expect(flow.locator('path[data-direction="out"]')).toHaveCSS('animation-name', 'none');
+    // Select the connection through the canvas click path used by the inspector.
+    const wrapper = page.locator('.react-flow__edge').filter({ has: flow });
+    await wrapper.locator('.react-flow__edge-interaction').dispatchEvent('click');
+    await expect(page.getByTestId('traffic-units')).toContainText('7 units in transit');
+    await expect(page.getByTestId('traffic-units').locator('div.flex')).toHaveCount(7);
+    await page.screenshot({ path: test.info().outputPath('canvas-playback-aggregate.png') });
   });
 
   test('scenario rows carry rename, edit and delete; no menu, tick, footer actions or run speed', async ({ page }) => {

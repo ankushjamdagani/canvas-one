@@ -33,7 +33,6 @@ import {
 import {
   RUN_BUDGET_LIMITS,
   type CheckResult,
-  type FlowRecord,
   type RunSummary,
   type TerminalStatus,
   type TraceEvent,
@@ -159,14 +158,12 @@ export class RunController {
   private clockHandle: unknown = null;
   private lastTickAt = 0;
   private lastPlayheadPostMs = -Infinity;
-  private releasedFlowMs = -1;
   /** Trace events the worker has reported that the playhead has not reached yet. */
   private heldEvents: TraceEvent[] = [];
   private heldEventIndex = 0;
   /** The worker's final result, applied once the playhead reaches the end of the run. */
   private pendingTerminal: Parameters<RunController['handleTerminal']>[0] | null = null;
   private readonly listeners = new Set<(state: RunControllerState) => void>();
-  private readonly flowListeners = new Set<(runId: string, records: readonly FlowRecord[], ended: boolean) => void>();
   private unsubscribeTransport: (() => void) | null = null;
 
   // Active execution context
@@ -210,14 +207,7 @@ export class RunController {
     return this.state;
   }
 
-  /** Live canvas view: every packet step of the run in progress, as the worker reports it. */
-  subscribeFlow(listener: (runId: string, records: readonly FlowRecord[], ended: boolean) => void): () => void {
-    this.flowListeners.add(listener);
-    return () => {
-      this.flowListeners.delete(listener);
-    };
-  }
-
+  /** Subscribe to run lifecycle and playhead-released trace events. */
   subscribe(listener: (state: RunControllerState) => void): () => void {
     this.listeners.add(listener);
     return () => {
@@ -607,8 +597,6 @@ export class RunController {
         if (this.playback) {
           this.playback.ingestFlow(update.records);
           for (const r of update.records) this.playback.setComputedEdge(r.atMs);
-        } else {
-          for (const listener of this.flowListeners) listener(update.runId, update.records, false);
         }
         break;
       }
@@ -637,7 +625,6 @@ export class RunController {
           if (this.playback.speed === Infinity) this.tick();
           break;
         }
-        for (const listener of this.flowListeners) listener(update.runId, [], true);
         this.endPlayback(false);
         void this.handleTerminal(update);
         break;
@@ -660,7 +647,6 @@ export class RunController {
     this.playback = store;
     this.lastTickAt = this.clock.now();
     this.lastPlayheadPostMs = -Infinity;
-    this.releasedFlowMs = -1;
     this.heldEvents = [];
     this.heldEventIndex = 0;
     this.pendingTerminal = null;
@@ -694,11 +680,6 @@ export class RunController {
     store.advance(now - this.lastTickAt);
     this.lastTickAt = now;
 
-    const runId = this.activeRunId;
-    const records = store.flowBetween(this.releasedFlowMs, store.playheadMs);
-    this.releasedFlowMs = store.playheadMs;
-    if (records.length > 0) for (const listener of this.flowListeners) listener(runId, records, false);
-
     let released = false;
     while (this.heldEventIndex < this.heldEvents.length) {
       const e = this.heldEvents[this.heldEventIndex];
@@ -720,7 +701,6 @@ export class RunController {
       // The playhead is at the end: whatever trace the worker reported is now visible, and the result applies.
       while (this.heldEventIndex < this.heldEvents.length) this.bufferedEvents.push(this.heldEvents[this.heldEventIndex++]);
       this.setState({ events: [...this.bufferedEvents] });
-      for (const listener of this.flowListeners) listener(runId, [], true);
       void this.handleTerminal(terminal);
       return;
     }
