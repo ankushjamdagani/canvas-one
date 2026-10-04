@@ -8,6 +8,8 @@ export interface ArrivalSettings {
   traffic: number;
   duration: number;
   profile?: TrafficProfile;
+  /** D56: a ramp keeps its end rate after `duration` instead of ending the arrivals (an endless stream). */
+  holdFinalRate?: boolean;
 }
 
 function rateAt(settings: ArrivalSettings, time: number): number {
@@ -34,11 +36,15 @@ export function nextArrivalTime(
   const p = settings.profile;
   if (!p || p.kind === "steady") return after + hazard / settings.traffic;
   if (p.kind === "ramp") {
+    if (settings.holdFinalRate && after >= settings.duration) return after + hazard / p.endRate;
     const rate = rateAt(settings, after),
       slope = (p.endRate - settings.traffic) / settings.duration;
     const remaining = settings.duration - after;
-    if (hazard > rate * remaining + 0.5 * slope * remaining * remaining)
-      return Infinity;
+    const mass = rate * remaining + 0.5 * slope * remaining * remaining;
+    if (hazard > mass) {
+      if (!settings.holdFinalRate) return Infinity;
+      return settings.duration + (hazard - mass) / p.endRate;
+    }
     if (slope === 0) return after + hazard / rate;
     return (
       after +
