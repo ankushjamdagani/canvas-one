@@ -12,7 +12,7 @@ import {
   deleteScenario,
   openScenarioDraft,
 } from './draft';
-import { toStorableScenario, type DraftScenario } from './draftScenario';
+import { toStorableScenario, UNSET_EMISSION, type DraftEmission, type DraftScenario, type DraftWorkload } from './draftScenario';
 import type { ScenarioDraftHandle, ScenarioDraftSession, ScenarioDraftTarget } from './types';
 
 const fixedRandom = () => 0.25; // deterministic: seed = floor(0.25 * (2^32-1) + ...)
@@ -26,7 +26,7 @@ function inboundPort(document: Document): { elementId: Id; portId: Id } {
 
 /**
  * Turns an empty timed draft into a minimally runnable one: one workload (with a fully
- * filled-in request class), one assertion, and a chosen completion. Test-only
+ * filled-in request class), one assertion, and a stream. Test-only
  * convenience for the "Apply succeeds" tests -- NOT how a real user session works
  * (that's exactly what the "blocks Apply" tests below exercise field by field).
  */
@@ -34,16 +34,14 @@ function makeReady(handle: ScenarioDraftHandle, document: Document, mintId: () =
   const entry = inboundPort(document);
   return changeScenarioDraft(handle, document, (s) => ({
     ...s,
-    completion: { kind: 'horizon', horizonMs: 30000 },
     workloads: [
       {
         id: mintId(),
         entry,
         enabled: true,
-        rate: 10,
-        profile: { kind: 'steady' },
+        startDelayMs: 0,
+        emission: { mode: 'stream', ratePerSecond: 10, profile: { kind: 'steady' } },
         timeoutMs: 30000,
-        intervalMs: null,
         classes: [],
       },
     ],
@@ -128,12 +126,10 @@ describe('buildEmptyScenario', () => {
     expect(scenario.initialContexts).toEqual([]);
     expect(scenario.scopeElementIds).toEqual(document.elements.map((e) => e.id));
     expect(scenario.budgets).toEqual(DEFAULT_SCENARIO_BUDGETS);
-    // The one item explicitly NOT prefilled for timed: completion.
-    expect(scenario.completion).toEqual({ kind: null });
     // Exhaustive: nothing beyond the contract's three allowed prefills (budgets, seed,
     // scope) plus the caller-supplied id/label/mode/revision is present with a
     // non-empty/non-default value.
-    const allowedNonEmptyKeys = new Set(['id', 'label', 'mode', 'revision', 'scopeElementIds', 'budgets', 'seed', 'completion']);
+    const allowedNonEmptyKeys = new Set(['id', 'label', 'mode', 'revision', 'scopeElementIds', 'budgets', 'seed']);
     for (const [key, value] of Object.entries(scenario)) {
       if (allowedNonEmptyKeys.has(key)) continue;
       expect(Array.isArray(value) ? value.length : value, `unexpected prefilled field '${key}'`).toBe(
@@ -143,7 +139,7 @@ describe('buildEmptyScenario', () => {
     }
   });
 
-  it('invents nothing for a fresh logical draft: the only prefill beyond timed is completion:quiescent (the one legal value)', () => {
+  it('invents nothing for a fresh logical draft', () => {
     const document = buildMockDocument();
     const mintId = makeCounterMintId(2);
     const scenario = buildEmptyScenario({
@@ -153,7 +149,6 @@ describe('buildEmptyScenario', () => {
       label: 'Logical one',
       document,
     });
-    expect(scenario.completion).toEqual({ kind: 'quiescent' });
     expect(scenario.workloads).toEqual([]);
     expect(scenario.inputs).toEqual([]);
     expect(scenario.boundaries).toEqual([]);
@@ -185,23 +180,42 @@ describe('buildEmptyScenario', () => {
 });
 
 describe('toStorableScenario', () => {
-  it('returns null while completion is unset (timed)', () => {
+  const unsetWorkload = (mintId: () => Id, document: Document): DraftWorkload => ({
+    id: mintId(), entry: inboundPort(document), enabled: true, startDelayMs: 0, emission: UNSET_EMISSION, timeoutMs: 30000, classes: [],
+  });
+
+  it('returns null while a workload has no emission chosen', () => {
     const document = buildMockDocument();
     const mintId = makeCounterMintId(4);
-    const draft = buildEmptyScenario({ mintId, randomSource: fixedRandom, mode: 'timed', label: 'X', document });
+    const draft: DraftScenario = {
+      ...buildEmptyScenario({ mintId, randomSource: fixedRandom, mode: 'timed', label: 'X', document }),
+      workloads: [unsetWorkload(mintId, document)],
+    };
     expect(toStorableScenario(draft)).toBeNull();
   });
 
-  it('returns a real Scenario once completion is chosen and filled', () => {
+  it('returns null while a chosen emission still misses a value', () => {
+    const document = buildMockDocument();
+    const mintId = makeCounterMintId(6);
+    const base = buildEmptyScenario({ mintId, randomSource: fixedRandom, mode: 'timed', label: 'X', document });
+    const withEmission = (emission: DraftEmission): DraftScenario => ({ ...base, workloads: [{ ...unsetWorkload(mintId, document), emission }] });
+    expect(toStorableScenario(withEmission({ mode: 'bulk', requests: null, arrival: 'instant' }))).toBeNull();
+    expect(toStorableScenario(withEmission({ mode: 'bulk', requests: 10, arrival: null }))).toBeNull();
+    expect(toStorableScenario(withEmission({ mode: 'bulk', requests: 10, arrival: { spreadMs: null } }))).toBeNull();
+    expect(toStorableScenario(withEmission({ mode: 'stream', ratePerSecond: null, profile: { kind: 'steady' } }))).toBeNull();
+    expect(toStorableScenario(withEmission({ mode: 'stream', ratePerSecond: 5, profile: { kind: 'ramp', endRate: 9, rampMs: null } }))).toBeNull();
+  });
+
+  it('returns a real Scenario once every emission is filled', () => {
     const document = buildMockDocument();
     const mintId = makeCounterMintId(5);
+    const base = buildEmptyScenario({ mintId, randomSource: fixedRandom, mode: 'timed', label: 'X', document });
     const draft: DraftScenario = {
-      ...buildEmptyScenario({ mintId, randomSource: fixedRandom, mode: 'timed', label: 'X', document }),
-      completion: { kind: 'horizon', horizonMs: 5000 },
+      ...base,
+      workloads: [{ ...unsetWorkload(mintId, document), emission: { mode: 'bulk', requests: 100, arrival: { ramp: { spreadMs: 2000 } } } }],
     };
     const stored = toStorableScenario(draft);
-    expect(stored).not.toBeNull();
-    expect(stored?.completion).toEqual({ kind: 'horizon', horizonMs: 5000 });
+    expect(stored?.workloads[0].emission).toEqual({ mode: 'bulk', requests: 100, arrival: { ramp: { spreadMs: 2000 } } });
   });
 });
 
@@ -329,8 +343,8 @@ describe('openScenarioDraft', () => {
     // not a storable ("invalid") problem.
     expect(handle.allIssues.length).toBeGreaterThan(0);
     expect(handle.issuesBySection.assertions.length).toBeGreaterThan(0);
-    // The draft-only "choose when the run ends" completeness issue is present too.
-    expect(handle.issuesBySection.runSettings.some((i) => i.message === 'Choose when the run ends')).toBe(true);
+    // Nothing to send yet: readiness says so.
+    expect(handle.allIssues.some((i) => i.message.includes('finite input or enabled workload'))).toBe(true);
   });
 
   it('kind:"new"/"copy" throws if the mode does not match the copy source (contract violation)', () => {
@@ -358,16 +372,14 @@ describe('openScenarioDraft', () => {
     const source: Scenario = {
       ...logicalSourceScenario(document, mintId, 'Original'),
       mode: 'timed',
-      completion: { kind: 'horizon', horizonMs: 9000 },
       workloads: [
         {
           id: mintId(),
           entry,
           enabled: true,
-          rate: 5,
-          profile: { kind: 'steady' },
+          startDelayMs: 0,
+          emission: { mode: 'stream', ratePerSecond: 5, profile: { kind: 'steady' } },
           timeoutMs: 30000,
-          intervalMs: null,
           classes: [
             {
               id: mintId(),
@@ -392,7 +404,7 @@ describe('openScenarioDraft', () => {
       randomSource: fixedRandom,
     });
 
-    expect(handle.scenario?.completion).toEqual({ kind: 'horizon', horizonMs: 9000 });
+    expect(handle.scenario?.workloads[0].emission).toEqual({ mode: 'stream', ratePerSecond: 5, profile: { kind: 'steady' } });
     expect(handle.scenario?.workloads[0].classes[0].keyDistribution).toEqual({
       kind: 'uniform',
       catalogSize: 10,
@@ -459,16 +471,14 @@ describe('changeScenarioDraft / computeScenarioIssues', () => {
 
     handle = changeScenarioDraft(handle, document, (s) => ({
       ...s,
-      completion: { kind: 'horizon', horizonMs: 30000 },
       workloads: [
         {
           id: mintId(),
           entry,
           enabled: true,
-          rate: 10,
-          profile: { kind: 'steady' },
+          startDelayMs: 0,
+          emission: { mode: 'stream', ratePerSecond: 10, profile: { kind: 'steady' } },
           timeoutMs: 30000,
-          intervalMs: null,
           classes: [],
         },
       ],
@@ -487,63 +497,57 @@ describe('changeScenarioDraft / computeScenarioIssues', () => {
 // ============================================================================
 
 describe('Apply is blocked until the user supplies each draft-only field (no invented defaults)', () => {
-  it('timed completion: blocked while unset, then unblocked once horizon + its ms value are both chosen', async () => {
+  it('workload emission: blocked while unset, then unblocked once bulk and its values are chosen', async () => {
     const document = buildMockDocument();
     const mintId = makeCounterMintId(500);
     let handle = openScenarioDraft({
       draftId: mintId(),
-      target: { kind: 'new', mode: 'timed', from: { kind: 'empty' }, label: 'Completion test' },
+      target: { kind: 'new', mode: 'timed', from: { kind: 'empty' }, label: 'Emission test' },
       document,
       baseWorkingRevision: 0,
       mintId,
       randomSource: fixedRandom,
     });
-    // Fill everything else readiness needs, but leave completion unset.
-    handle = changeScenarioDraft(handle, document, (s) => ({
-      ...s,
-      workloads: [
-        {
-          id: mintId(),
-          entry: inboundPort(document),
-          enabled: true,
-          rate: 10,
-          profile: { kind: 'steady' },
-          timeoutMs: 30000,
-          intervalMs: null,
-          classes: [],
-        },
-      ],
-      assertions: [
-        {
-          id: mintId(),
-          label: 'ok',
-          subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' },
-          operator: 'at-least',
-          expected: 0,
-        },
-      ],
-    }));
-    expect(handle.scenario?.completion).toEqual({ kind: null });
+    const workload = (emission: DraftEmission): DraftWorkload => ({
+      id: mintId(), entry: inboundPort(document), enabled: true, startDelayMs: 0, emission, timeoutMs: 30000, classes: [],
+    });
+    const assertion = {
+      id: mintId(),
+      label: 'ok',
+      subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' } as const,
+      operator: 'at-least' as const,
+      expected: 0,
+    };
+    // Everything readiness needs, but the workload's emission is unset.
+    handle = changeScenarioDraft(handle, document, (s) => ({ ...s, workloads: [workload(UNSET_EMISSION)], assertions: [assertion] }));
+    expect(handle.scenario?.workloads[0].emission).toEqual({ mode: null });
 
     const session1 = fakeSession(document, 0);
     const blocked = await applyScenarioDraft(handle, session1);
     expect(blocked.status).toBe('invalid');
-    expect(blocked.issuesBySection.runSettings.some((i) => i.message === 'Choose when the run ends')).toBe(true);
+    expect(blocked.issuesBySection.traffic.some((i) => i.message === 'Choose whether this traffic is a bulk of requests or a stream')).toBe(true);
     expect(session1.getState().document?.scenarios).toHaveLength(0);
 
-    // Choosing "horizon" but not yet typing its ms value still blocks.
-    const halfChosen = changeScenarioDraft(handle, document, (s) => ({ ...s, completion: { kind: 'horizon', horizonMs: null } }));
+    // Choosing "bulk" but not yet typing its requests still blocks.
+    const halfChosen = changeScenarioDraft(handle, document, (s) => ({
+      ...s,
+      workloads: [workload({ mode: 'bulk', requests: null, arrival: null })],
+    }));
     const session2 = fakeSession(document, 0);
     const stillBlocked = await applyScenarioDraft(halfChosen, session2);
     expect(stillBlocked.status).toBe('invalid');
-    expect(stillBlocked.issuesBySection.runSettings.some((i) => i.message === 'Enter a horizon')).toBe(true);
+    expect(stillBlocked.issuesBySection.traffic.some((i) => i.message === 'Enter how many requests the bulk sends')).toBe(true);
+    expect(stillBlocked.issuesBySection.traffic.some((i) => i.message === 'Choose how the bulk is spread')).toBe(true);
 
-    // Filling the ms value unblocks Apply.
-    const filled = changeScenarioDraft(halfChosen, document, (s) => ({ ...s, completion: { kind: 'horizon', horizonMs: 10000 } }));
+    // Filling the values unblocks Apply.
+    const filled = changeScenarioDraft(halfChosen, document, (s) => ({
+      ...s,
+      workloads: [workload({ mode: 'bulk', requests: 100, arrival: { spreadMs: 10000 } })],
+    }));
     const session3 = fakeSession(document, 0);
     const applied = await applyScenarioDraft(filled, session3);
     expect(applied.status).toBe('clean');
-    expect(session3.getState().document?.scenarios[0]?.completion).toEqual({ kind: 'horizon', horizonMs: 10000 });
+    expect(session3.getState().document?.scenarios[0]?.workloads[0].emission).toEqual({ mode: 'bulk', requests: 100, arrival: { spreadMs: 10000 } });
   });
 
   it('workload request-class keyDistribution: blocked while any of kind/catalogSize/hotSubset/hotShare is unset', async () => {
@@ -559,16 +563,14 @@ describe('Apply is blocked until the user supplies each draft-only field (no inv
     });
     handle = changeScenarioDraft(handle, document, (s) => ({
       ...s,
-      completion: { kind: 'horizon', horizonMs: 10000 },
       workloads: [
         {
           id: mintId(),
           entry: inboundPort(document),
           enabled: true,
-          rate: 10,
-          profile: { kind: 'steady' },
+          startDelayMs: 0,
+          emission: { mode: 'stream', ratePerSecond: 10, profile: { kind: 'steady' } },
           timeoutMs: 30000,
-          intervalMs: null,
           classes: [
             {
               id: mintId(),

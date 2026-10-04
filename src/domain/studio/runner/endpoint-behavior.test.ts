@@ -41,7 +41,7 @@ function build(settings: Record<string, unknown> | null): { doc: Document; servi
     entryPorts: [entry], inputs: [],
     workloads: [{
       id: mint(), entry, enabled: true, startDelayMs: 0, timeoutMs: 30000,
-      emission: { mode: 'bulk', requests: 500, arrival: { spreadMs: 5000 } },
+      emission: { mode: 'stream', ratePerSecond: 100, profile: { kind: 'steady' } },
       classes: [{ id: mint(), name: 'Req', weight: 1, operation: 'read', tags: [], keyDistribution: { kind: 'uniform', catalogSize: 100, hotSubset: 1, hotShare: 100 } }],
     }],
     faults: [], boundaries: [], refinementSelections: [], initialContexts: [],
@@ -56,9 +56,11 @@ async function roots(settings: Record<string, unknown> | null) {
   const valid = validateDocument(doc);
   expect(valid.ok ? [] : valid.issues).toEqual([]);
   expect(checkReadiness(doc, doc.scenarios[0].id).ready).toBe(true);
-  const r = await runScenario(doc, doc.scenarios[0].id, 'endpoint');
+  // 100/s offered for 5 s, then Stop.
+  const r = await runScenario(doc, doc.scenarios[0].id, 'endpoint', { stopAtMs: 5000 });
   expect(r.status).toBe('completed');
-  return r.summary.rootCounts as { generated: number; succeeded: number; failed: number; rejected: number };
+  const meanMs = r.summary.elementMetrics.find((m) => m.scope === 'root' && m.key === 'meanLatencyMs')?.value ?? NaN;
+  return { ...(r.summary.rootCounts as { generated: number; succeeded: number; failed: number; rejected: number }), meanMs };
 }
 
 describe('endpoint behavior overrides (D53)', () => {
@@ -81,10 +83,11 @@ describe('endpoint behavior overrides (D53)', () => {
     expect(c.failed).toBe(c.generated);
   });
 
-  it('a service time slower than the node can serve makes calls queue up and be turned away', async () => {
+  it('a service time slower than the node can serve makes calls wait in the queue', async () => {
     const fast = await roots({ serviceTimeMs: 1 });
     const slow = await roots({ serviceTimeMs: 500 });
     expect(fast.succeeded).toBe(fast.generated);
-    expect(slow.succeeded).toBeLessThan(slow.generated);
+    // Stop lets the queue drain, so nothing is lost, but every call waited behind the others.
+    expect(slow.meanMs).toBeGreaterThan(fast.meanMs * 50);
   });
 });
