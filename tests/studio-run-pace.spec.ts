@@ -80,4 +80,51 @@ test.describe('Run duration and pace (D55)', () => {
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 15000 });
     expect(Date.now() - instantStart).toBeLessThan(2500);
   });
+
+  test('traffic shows as dots on connections while a paced run goes', async ({ page }) => {
+    await openS06(page);
+    await setCompletion(page, 'open');
+    await setSpeed(page, '10');
+    await page.getByTestId('scenario-run-btn').click();
+    await expect(page.locator('[data-testid^="traffic-pulse-"]').first()).toBeAttached({ timeout: 10000 });
+    await page.getByTestId('scenario-stop-btn').click();
+    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+    // The dots go away once nothing more arrives.
+    await expect(page.locator('[data-testid^="traffic-pulse-"]')).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('the scenario list keeps its edit actions on the active row, icon only, and New alone in the footer', async ({ page }) => {
+    await openS06(page);
+    await page.getByTestId('scenario-switcher-trigger').click();
+    const popover = page.getByTestId('scenario-switcher-popover');
+    for (const name of ['edit', 'duplicate', 'delete']) await expect(popover.getByTestId(`scenario-${name}-btn`)).toHaveCount(1);
+    await expect(popover.getByRole('button', { name: /^Edit / })).toHaveText('');
+    await expect(popover.getByRole('button', { name: 'New scenario' })).toBeVisible();
+    await expect(popover.getByText(/^Duplicate$/)).toHaveCount(0);
+  });
+
+  test('canvas grid dots keep their on-screen size when zooming out and the pitch resets', async ({ page }) => {
+    await openS06(page);
+    const dot = () =>
+      page.evaluate(() => {
+        const circle = document.querySelector('.react-flow__background pattern circle');
+        const pattern = document.querySelector('.react-flow__background pattern');
+        const zoom = Number(/scale\(([\d.]+)/.exec(document.querySelector('.react-flow__viewport')?.getAttribute('style') ?? '')?.[1] ?? 1);
+        const r = Number(circle?.getAttribute('r') ?? 0);
+        const width = Number(pattern?.getAttribute('width') ?? 0);
+        return { r, width, zoom };
+      });
+    const canvas = page.locator('.react-flow__pane');
+    const box = (await canvas.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const before = await dot();
+    await page.keyboard.down('Control');
+    for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 300);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(400);
+    const after = await dot();
+    expect(after.zoom).toBeLessThan(before.zoom);
+    expect(after.r).toBeCloseTo(before.r, 1);
+    expect(after.width).toBeGreaterThanOrEqual(15);
+  });
 });

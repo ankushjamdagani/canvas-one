@@ -274,33 +274,59 @@ export function ScenarioSwitcher({
                   </button>
 
                   <div className="flex items-center gap-1 shrink-0 p-2 pl-0">
-                    {isSelected && <Check className="size-4 text-primary shrink-0 mr-1" aria-hidden="true" />}
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors"
-                          aria-label={`Actions for scenario ${s.label}`}
-                        >
-                          <MoreHorizontal className="size-3.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40 p-1.5 bg-background border-border shadow-popover rounded-popover">
-                        <DropdownMenuItem onClick={() => onRename(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
-                          <Pencil className="size-3.5 text-secondary-text shrink-0" />
-                          <span>Rename</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDuplicate(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
-                          <Copy className="size-3.5 text-secondary-text shrink-0" />
-                          <span>Duplicate</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] text-destructive hover:text-destructive">
-                          <Trash2 className="size-3.5 text-destructive shrink-0" />
-                          <span>Delete…</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {isSelected ? (
+                      <>
+                        <Check className="size-4 text-primary shrink-0 mr-1" aria-hidden="true" />
+                        {(
+                          [
+                            { label: 'Edit', icon: Pencil, run: () => { setPopoverOpen(false); onEdit(s.id); }, tone: '' },
+                            { label: 'Duplicate', icon: Copy, run: () => { setPopoverOpen(false); onDuplicate(s.id); }, tone: '' },
+                            { label: 'Delete', icon: Trash2, run: () => { setPopoverOpen(false); onDelete(s.id); }, tone: 'text-destructive hover:text-destructive' },
+                          ] as const
+                        ).map(({ label, icon: Icon, run, tone }) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={run}
+                            title={`${label} scenario`}
+                            aria-label={`${label} scenario ${s.label}`}
+                            data-testid={`scenario-${label.toLowerCase()}-btn`}
+                            className={cn(
+                              'size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors',
+                              tone,
+                            )}
+                          >
+                            <Icon className="size-3.5" aria-hidden="true" />
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors"
+                            aria-label={`Actions for scenario ${s.label}`}
+                          >
+                            <MoreHorizontal className="size-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40 p-1.5 bg-background border-border shadow-popover rounded-popover">
+                          <DropdownMenuItem onClick={() => onRename(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
+                            <Pencil className="size-3.5 text-secondary-text shrink-0" />
+                            <span>Rename</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onDuplicate(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
+                            <Copy className="size-3.5 text-secondary-text shrink-0" />
+                            <span>Duplicate</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onDelete(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] text-destructive hover:text-destructive">
+                            <Trash2 className="size-3.5 text-destructive shrink-0" />
+                            <span>Delete…</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
               );
@@ -347,7 +373,7 @@ export function ScenarioSwitcher({
             </div>
           )}
 
-          <div className="flex items-center justify-between px-3 py-2.5 border-t border-hairline bg-panel text-[11px] font-medium text-body select-none shrink-0 mt-auto">
+          <div className="flex items-center px-3 py-2.5 border-t border-hairline bg-panel text-[11px] font-medium text-body select-none shrink-0 mt-auto">
             <button
               type="button"
               onClick={() => {
@@ -360,33 +386,6 @@ export function ScenarioSwitcher({
               New scenario
             </button>
 
-            {selectedScenario && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPopoverOpen(false);
-                  onDuplicate(selectedScenario.id);
-                }}
-                className="inline-flex items-center gap-1 text-body hover:text-foreground transition-colors cursor-pointer"
-              >
-                <Copy className="size-3.5" aria-hidden="true" />
-                Duplicate
-              </button>
-            )}
-
-            {selectedScenario && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPopoverOpen(false);
-                  onEdit(selectedScenario.id);
-                }}
-                className="inline-flex items-center gap-1 text-body hover:text-foreground transition-colors cursor-pointer"
-              >
-                <Pencil className="size-3.5" aria-hidden="true" />
-                Edit {selectedScenario.label}
-              </button>
-            )}
           </div>
         </PopoverContent>
       </Popover>

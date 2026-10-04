@@ -28,6 +28,8 @@ import { GroupNode } from './GroupNode';
 import { NoteNode } from './NoteNode';
 import { BoundaryFrameNode } from './BoundaryFrameNode';
 import { TrafficEdge } from './TrafficEdge';
+import { TrafficPulseContext, useTrafficPulses } from './trafficPulses';
+import type { TraceEvent } from '../../domain/studio/runner/types';
 import { FloatingDock } from './FloatingDock';
 import { SelectionBox } from './SelectionBox';
 import {
@@ -107,6 +109,20 @@ type ResourceFormState = {
   };
 };
 
+/** On-screen dot diameter of the canvas grid, held constant at every zoom. */
+const GRID_DOT_PX = 2.4;
+const GRID_PITCH = 26;
+
+/**
+ * Grid pitch in flow units. Zoomed in, the pitch is the 26px snap grid; zoomed out it doubles each time the
+ * on-screen spacing would fall under ~16px, so the dots never crowd into a haze (the spacing resets to 26-52px
+ * on screen at each step).
+ */
+function gridGapFor(zoom: number): number {
+  const steps = Math.max(0, Math.ceil(Math.log2(16 / (GRID_PITCH * Math.max(zoom, 0.01)))));
+  return GRID_PITCH * 2 ** steps;
+}
+
 export interface CanvasViewProps {
   document: Document | null;
   activeViewId: Id | null;
@@ -114,6 +130,8 @@ export interface CanvasViewProps {
   isSaving: boolean;
   /** Elements a workload of the scenario being edited enters at (board scenario_traffic_editor). */
   trafficEntryElementIds?: ReadonlySet<Id>;
+  /** Trace events of the run in progress; each admitted request draws a dot along its connection. */
+  runEvents?: readonly TraceEvent[];
   /** D52: details of the projects linked-project nodes point at (absent id = unavailable). */
   /** D53: reads what a project exposes right now (for linking and for connecting to a linked node). */
   loadLinkedExposures?: (projectId: string) => Promise<readonly ProjectExposure[]>;
@@ -209,6 +227,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onConfigureDock,
   onRestoreDockDefaults,
   trafficEntryElementIds,
+  runEvents,
   linkedProjects,
   loadLinkedExposures,
   onOpenLinkedProject,
@@ -217,6 +236,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
   const { zoom } = useViewport();
+  const gridGap = gridGapFor(zoom);
+  const trafficPulses = useTrafficPulses(runEvents, document?.connections);
   const nodesInitialized = useNodesInitialized();
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -1285,6 +1306,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       {/* Selected node IDs for the unified selection box */}
       {(() => null)()}
 
+      <TrafficPulseContext.Provider value={trafficPulses}>
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -1330,7 +1352,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         </ViewportPortal>
         {/* Dotted grid on the same 26px pitch as snap-to-grid; dots use the control border tone so they read on the white canvas. */}
-        <Background variant={BackgroundVariant.Dots} color="var(--control-border)" gap={26} size={1.6} />
+        <Background variant={BackgroundVariant.Dots} color="var(--control-border)" gap={gridGap} size={GRID_DOT_PX / zoom} />
         {showMinimap && (
           <MiniMap
             nodeColor="#0B5C54"
@@ -1339,6 +1361,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         )}
       </ReactFlow>
+      </TrafficPulseContext.Provider>
 
       {/* Connect: rejected -- small inline message near the pointer/edge */}
       {rejectMessage && (

@@ -2652,3 +2652,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - **Verification**: `tsc -b` clean, `npm test` 1,664 passed (a few kernel tests timed out once at load average 44 and passed alone), `npm run build` ok (Workspace chunk 485 kB), production Playwright suite on an isolated port: 112 passed, 4 skipped, 0 failed (the config sets run speed to Instant via storage state).
 - **Limitations**: Pacing waits for the next event, so a run with sparse events steps in jumps; Stop takes effect at the next step boundary (at most the gap to the next event). An open run is bounded only by the 24 simulated-hour ceiling and the event budget is not applied to it; trace recording stops at its cap but the run continues. A stopped run that still has work in flight after 60 s ends `incomplete`. The old `horizon` cap (300 s) and drain cap (600 s) are unchanged.
 - **Lesson**: A run that "ends in an instant" needs pacing in the worker loop, not in the UI; measure it against the wall clock per event, cap the wait so Stop and Pause stay responsive, and give the e2e suite an Instant default through storage state rather than editing every spec.
+
+## 2026-10-04
+
+### Scenario list actions, canvas grid zoom behaviour, live traffic on connections
+- Outcome: scenario popover keeps only "New scenario" in the footer; the active row has icon-only Edit/Duplicate/Delete (other rows keep the `...` menu). Canvas grid dots keep a constant on-screen size (2.4 px) and the pitch doubles as you zoom out so on-screen spacing stays 16-52 px. While a paced run goes, each admitted (green) or refused (red) request draws a dot along its connection (`trafficPulses.tsx`, SMIL `animateMotion` in `TrafficEdge`), taken from trace events, the caller picked via `parentId` when several connections enter one port.
+- Files: `ScenarioSwitcher.tsx`, `CanvasView.tsx`, `TrafficEdge.tsx`, `trafficPulses.tsx`, `Workspace.tsx`, `tests/studio-run-pace.spec.ts`.
+- Verification: `tsc -b` clean; `npm test` green; build ok (Workspace chunk 487 kB); production Playwright isolated port 115 passed, 4 skipped; 3 new specs.
+- Limitations: a run at Instant speed finishes before any dot is drawn; dots mark admission at the target, not the exact send time; at most 4 dots per connection and 24 new dots per update; not visually inspected beyond the specs.

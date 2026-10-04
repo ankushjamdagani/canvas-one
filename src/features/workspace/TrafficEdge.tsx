@@ -7,6 +7,7 @@ import {
   useViewport,
   type EdgeProps,
 } from '@xyflow/react';
+import { PULSE_TRAVEL_MS, TrafficPulseContext } from './trafficPulses';
 import { chipOverlapsAnyNode, estimateLabelChipRect, type Rect } from './edgeLabelPlacement';
 
 /**
@@ -49,9 +50,12 @@ export function TrafficEdge({
   label,
   markerEnd,
   selected,
+  data,
 }: EdgeProps) {
   const [hovered, setHovered] = React.useState(false);
   const { zoom } = useViewport();
+  const connectionId = (data as { connection?: { id?: string } } | undefined)?.connection?.id;
+  const pulses = React.useContext(TrafficPulseContext).get(connectionId ?? '') ?? [];
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -102,6 +106,19 @@ export function TrafficEdge({
       data-testid={`edge-${id}`}
     >
       <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {pulses.map((pulse) => (
+        <circle
+          key={pulse.key}
+          r={4}
+          fill={pulse.tone === 'ok' ? 'var(--color-primary, #0B5C54)' : '#B3261E'}
+          stroke="#fff"
+          strokeWidth={1}
+          data-testid={`traffic-pulse-${id}`}
+          pointerEvents="none"
+        >
+          <animateMotion dur={`${PULSE_TRAVEL_MS}ms`} path={edgePath} fill="freeze" calcMode="linear" />
+        </circle>
+      ))}
       {showChip && labelText ? (
         <EdgeLabelRenderer>
           <div

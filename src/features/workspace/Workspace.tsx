@@ -3235,6 +3235,7 @@ export function Workspace({
                       )
                     }
                     trafficEntryElementIds={trafficEntryElementIds}
+                    runEvents={runControllerState?.events}
                     linkedProjects={linkedProjects}
                     loadLinkedExposures={async (projectId) => {
                       const record = await repository.loadProject(projectId);
