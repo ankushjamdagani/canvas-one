@@ -1,3 +1,4 @@
+import type { BulkArrival } from './bulk-arrivals';
 import type { TrafficProfile } from './workload';
 
 export type ComponentKind =
@@ -102,6 +103,15 @@ export interface EdgeLink {
   bandwidthKbps: number | null;
 }
 
+/**
+ * D56: how a studio source emits. A bulk sends `requests` arrivals at deterministic times; a stream
+ * keeps arriving (Poisson, shaped by `profile`) until arrivals are stopped. Absent = the engine-level
+ * `rate`/`intervalMs` behaviour the kernel tests drive directly.
+ */
+export type WorkloadSchedule =
+  | { kind: 'bulk'; requests: number; arrival: BulkArrival; startDelayMs: number }
+  | { kind: 'stream'; startDelayMs: number; /** a ramp reaches its end rate after this long, then holds it */ rampSeconds?: number };
+
 export interface WorkloadDefinition {
   id: string;
   entryNodeId: string;
@@ -110,6 +120,7 @@ export interface WorkloadDefinition {
   profile?: TrafficProfile;
   timeoutMs: number;
   intervalMs?: number;
+  schedule?: WorkloadSchedule;
   classes: RequestClass[];
   /** D53: the entry endpoint's overrides. */
   endpoint?: EndpointBehavior;
@@ -123,7 +134,8 @@ export interface ExecutionEdge {
   latencyMs: number;
   returnLatencyMs: number;
   ackDelayMs: number;
-  messageTtlMs: number;
+  /** D56: null = the message never expires. */
+  messageTtlMs: number | null;
   weight: number;
   condition?: {
     field: 'class' | 'operation' | 'tag';
@@ -352,7 +364,7 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
     if (!isNum(e.latencyMs, 0, 60000)) err(issues, 'INVALID_LATENCY', 'latencyMs must be 0..60000', undefined, isStr(e.id) ? e.id : undefined);
     if (!isNum(e.returnLatencyMs, 0, 60000)) err(issues, 'INVALID_RETURN_LATENCY', 'returnLatencyMs must be 0..60000', undefined, isStr(e.id) ? e.id : undefined);
     if (!isNum(e.ackDelayMs, 0, 60000)) err(issues, 'INVALID_ACK_DELAY', 'ackDelayMs must be 0..60000', undefined, isStr(e.id) ? e.id : undefined);
-    if (!isNum(e.messageTtlMs, 1, 3600000)) err(issues, 'INVALID_MESSAGE_TTL', 'messageTtlMs must be 1..3600000', undefined, isStr(e.id) ? e.id : undefined);
+    if (e.messageTtlMs !== null && !isNum(e.messageTtlMs, 1, 3600000)) err(issues, 'INVALID_MESSAGE_TTL', 'messageTtlMs must be 1..3600000', undefined, isStr(e.id) ? e.id : undefined);
     if (!isNum(e.weight, Number.MIN_VALUE, Infinity)) err(issues, 'INVALID_EDGE_WEIGHT', 'weight must be > 0 and finite', undefined, isStr(e.id) ? e.id : undefined);
     if (e.condition !== undefined) {
       if (!isObj(e.condition) || (e.condition.field !== 'class' && e.condition.field !== 'operation' && e.condition.field !== 'tag') || !isStr(e.condition.value, 80)) {
@@ -390,7 +402,8 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
 
     if (!isStr(w.entryNodeId) || !nodeIds.has(w.entryNodeId)) err(issues, 'INVALID_ENTRY_NODE', `entryNodeId does not exist: ${String(w.entryNodeId)}`);
     if (typeof w.enabled !== 'boolean') err(issues, 'INVALID_WORKLOAD_ENABLED', 'enabled must be boolean');
-    if (!isNum(w.rate, 1, 10000)) err(issues, 'INVALID_WORKLOAD_RATE', 'rate must be 1..10000');
+    // D56: a bulk's arrivals come from its schedule, so its rate is unused.
+    if (w.schedule?.kind !== 'bulk' && !isNum(w.rate, 1, 10000)) err(issues, 'INVALID_WORKLOAD_RATE', 'rate must be 1..10000');
     if (!isNum(w.timeoutMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_TIMEOUT', 'timeoutMs must be 1..3600000');
     if (w.intervalMs !== undefined && !isNum(w.intervalMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_INTERVAL', 'intervalMs must be 1..3600000');
     if (w.profile !== undefined) validateProfile(w.profile, dur, issues);

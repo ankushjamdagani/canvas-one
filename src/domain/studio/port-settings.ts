@@ -8,8 +8,6 @@ import type { CallRetryPolicy, Connection, Document, Element, Endpoint, Port } f
 
 /** A message acknowledges at once unless its receiving port says otherwise. */
 export const DEFAULT_ACK_DELAY_MS = 0;
-/** A message lives five minutes unless its receiving port says otherwise. */
-export const DEFAULT_MESSAGE_TTL_MS = 300_000;
 
 export function findPort(document: Pick<Document, 'elements'>, endpoint: Endpoint): { element: Element; port: Port } | null {
   const element = document.elements.find((e) => e.id === endpoint.elementId);
@@ -43,8 +41,9 @@ export function ackDelayOf(document: Pick<Document, 'elements'>, connection: Con
   return targetSettings(document, connection).ackDelayMs ?? DEFAULT_ACK_DELAY_MS;
 }
 
-export function messageTtlOf(document: Pick<Document, 'elements'>, connection: Connection): number {
-  return targetSettings(document, connection).messageTtlMs ?? DEFAULT_MESSAGE_TTL_MS;
+/** D56: null when the port sets no TTL, so a message never expires (unconsumed, it is reported stuck). */
+export function messageTtlOf(document: Pick<Document, 'elements'>, connection: Connection): number | null {
+  return targetSettings(document, connection).messageTtlMs ?? null;
 }
 
 // ----------------------------------------------------------------------------

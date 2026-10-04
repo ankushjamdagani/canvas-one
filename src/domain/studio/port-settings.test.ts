@@ -5,7 +5,7 @@ import type { Document, Element, Port } from './model';
 import { validateDocument } from './validate';
 import { buildManifest } from './manifest';
 import { DEFAULT_BUILD_VERSIONS } from '../../persistence/studio/types';
-import { connectionAdvisories, describeCalleeContract, describeCallerPolicy, callRetryOf, ackDelayOf, messageTtlOf, DEFAULT_ACK_DELAY_MS, DEFAULT_MESSAGE_TTL_MS } from './port-settings';
+import { connectionAdvisories, describeCalleeContract, describeCallerPolicy, callRetryOf, ackDelayOf, messageTtlOf, DEFAULT_ACK_DELAY_MS } from './port-settings';
 
 const S05 = JSON.parse(readFileSync(resolve(__dirname, '../../../specs/revamp/fixtures/s06.json'), 'utf8')) as Document; // S06: workloads, an unmodeled call target and default-TTL messages
 
@@ -82,7 +82,7 @@ describe('reading and describing port settings', () => {
 
   it('defaults when the receiving port sets none', () => {
     expect(ackDelayOf(S05, connection)).toBe(DEFAULT_ACK_DELAY_MS);
-    expect(messageTtlOf(S05, connection)).toBe(DEFAULT_MESSAGE_TTL_MS);
+    expect(messageTtlOf(S05, connection)).toBeNull();
   });
 
   it('reads a receiver\'s ack and TTL and a caller\'s retry from the right ports', () => {

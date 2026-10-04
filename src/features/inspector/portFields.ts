@@ -133,7 +133,7 @@ function inMessageFields(port: Port): FieldSpec<Element>[] {
       min: 0, max: 60000, get: (el) => num(settingsOf(el, port.id), 'ackDelayMs'), set: (el, value) => withSetting(el, port.id, 'ackDelayMs', value),
     }),
     optionalNumberField<Element>({
-      id: id('messageTtlMs'), label: 'Message TTL', unit: 'ms', note: 'Simulated: a message expires this long after it was published (default 5 minutes)',
+      id: id('messageTtlMs'), label: 'Message TTL', unit: 'ms', note: 'Simulated: a message expires this long after it was published; leave empty for no expiry (an unconsumed message is then reported stuck)',
       min: 1, max: 3600000, get: (el) => num(settingsOf(el, port.id), 'messageTtlMs'), set: (el, value) => withSetting(el, port.id, 'messageTtlMs', value),
     }),
     optionalSelectField<Element>({

@@ -9,6 +9,7 @@ import type {
   CompiledPlan,
 } from '../../domain/execution';
 import { compileExecution } from '../../domain/execution';
+import { bulkArrivalMs } from '../../domain/bulk-arrivals';
 import { nextArrivalTime } from '../../domain/workload';
 import { RouteSelector, RuntimeCache } from './behaviors';
 import type { CacheSnapshot } from './behaviors';
@@ -197,6 +198,8 @@ export interface SimEvent {
   priority: number;
   seq: number;
   run: () => void;
+  /** Periodic bookkeeping that cannot change an outcome (D56). */
+  housekeeping?: boolean;
 }
 
 class SimpleEventHeap {
@@ -386,6 +389,10 @@ export class OpenSimulation {
   protected plan: CompiledPlan;
   protected routeSelector = new RouteSelector();
   protected events = new SimpleEventHeap();
+  /** Units created and not yet settled (D56: reported as stuck when nothing more can happen). */
+  protected liveUnits = new Set<Unit>();
+  /** Scheduled events other than housekeeping (samples); see hasPendingWork(). */
+  protected workEvents = 0;
   protected seq = 0;
   protected currentTime = 0;
   protected duration: number;
@@ -738,8 +745,14 @@ export class OpenSimulation {
     });
   }
 
-  protected scheduleEvent(time: number, priority: number, run: () => void): void {
-    this.events.push({ time, priority, seq: this.seq++, run });
+  protected scheduleEvent(time: number, priority: number, run: () => void, housekeeping = false): void {
+    this.events.push({ time, priority, seq: this.seq++, run, ...(housekeeping ? { housekeeping } : {}) });
+    if (!housekeeping) this.workEvents++;
+  }
+
+  /** D56: true while an event that could still change an outcome is scheduled (periodic samples do not count). */
+  hasPendingWork(): boolean {
+    return this.workEvents > 0;
   }
 
   protected scheduleSample(t: number): void {
@@ -758,7 +771,7 @@ export class OpenSimulation {
         latency: latSnap.mean,
       });
       this.scheduleSample(t + 1);
-    });
+    }, true);
   }
 
   protected updateIntegrals(newTime: number): void {
@@ -830,6 +843,21 @@ export class OpenSimulation {
     return this.liveOpsCount === 0 && this.pendingArrivals === 0;
   }
 
+  /** D56: units that have not settled, with where each one is held. */
+  unsettled(): readonly { identity: string; category: 'root' | 'message'; holderNodeId: string; phase: OpPhase }[] {
+    return [...this.liveUnits].map((u) => ({
+      identity: u.identity,
+      category: u.category,
+      holderNodeId: u.rootOp?.nodeId ?? '',
+      phase: u.rootOp?.phase ?? 'transit',
+    }));
+  }
+
+  /** D56: arrivals still to come: a bulk's remaining requests, or one for each live stream. */
+  pendingArrivalCount(): number {
+    return this.pendingArrivals;
+  }
+
   /** D55: stop every workload from arriving again; what is in flight carries on. */
   stopArrivals(): void {
     this.arrivalsStopped = true;
@@ -839,12 +867,16 @@ export class OpenSimulation {
     if (this.disabledWorkloads.has(wl.id) || this.arrivalsStopped) return;
     if (this.maxRootArrivals !== undefined && this.scheduledArrivals >= this.maxRootArrivals) return;
     const ordinal = this.workloadNextOrdinal.get(wl.id)!;
+    const schedule = wl.schedule;
+    if (schedule?.kind === 'bulk' && ordinal >= schedule.requests) return;
     this.workloadNextOrdinal.set(wl.id, ordinal + 1);
 
     const intervalMs = wl.intervalMs;
     let arrTime: number;
 
-    if (intervalMs !== undefined && intervalMs > 0) {
+    if (schedule?.kind === 'bulk') {
+      arrTime = bulkArrivalMs(ordinal, schedule.requests, schedule.arrival, schedule.startDelayMs) / 1000;
+    } else if (intervalMs !== undefined && intervalMs > 0) {
       arrTime = (ordinal + 1) * (intervalMs / 1000);
     } else {
       const rng = this.workloadRngs.get(wl.id)!;
@@ -853,12 +885,13 @@ export class OpenSimulation {
       const adapter = {
         traffic: wl.rate,
         seed: this.seed,
-        // Profiles (ramp, burst) are shaped over the arrival window.
-        duration: this.arrivalHorizon,
+        // Profiles (ramp, burst) are shaped over the arrival window; a stream's ramp has its own length.
+        duration: schedule?.kind === 'stream' && schedule.rampSeconds !== undefined ? schedule.rampSeconds : this.arrivalHorizon,
         timeoutMs: wl.timeoutMs,
         profile: wl.profile,
+        holdFinalRate: schedule?.kind === 'stream',
       };
-      arrTime = nextArrivalTime(adapter, afterTime, hazard);
+      arrTime = nextArrivalTime(adapter, Math.max(afterTime, (schedule?.startDelayMs ?? 0) / 1000), hazard);
     }
 
     if (!Number.isFinite(arrTime) || arrTime > this.arrivalHorizon) return;
@@ -907,6 +940,7 @@ export class OpenSimulation {
         done: false,
         ops: new Set(),
       };
+      this.liveUnits.add(unit);
 
       this.scheduleEvent(deadline, 0, () => {
         if (!unit.done) {
@@ -932,6 +966,7 @@ export class OpenSimulation {
       done: false,
       ops: new Set(),
     };
+    this.liveUnits.add(unit);
 
     this.scheduleEvent(deadline, 0, () => {
       if (!unit.done) {
@@ -1030,6 +1065,7 @@ export class OpenSimulation {
   protected finishUnit(unit: Unit, outcome: Outcome, payloadRef?: string): void {
     if (unit.done) return;
     unit.done = true;
+    this.liveUnits.delete(unit);
     this.emitFact({
       kind: 'unit_settled',
       time: this.currentTime,
@@ -1974,7 +2010,8 @@ export class OpenSimulation {
     const parentUnit = parentOp.unit;
     const hops = parentUnit.hops + 1;
     const born = this.currentTime;
-    const edgeDeadline = born + edge.messageTtlMs / 1000;
+    // D56: no TTL means the message never expires; unconsumed, it is reported stuck at quiescence.
+    const edgeDeadline = edge.messageTtlMs === null ? Infinity : born + edge.messageTtlMs / 1000;
     const deadline = Math.min(edgeDeadline, parentUnit.lineageDeadline);
     const lineageDeadline = deadline;
     const identity = `${parentUnit.identity}:${parentOp.path}:${edge.id}:${subscription ?? ''}`;
@@ -2004,6 +2041,7 @@ export class OpenSimulation {
       done: false,
       ops: new Set(),
     };
+    this.liveUnits.add(messageUnit);
 
     let ackScheduled = false;
     const caller = isSynthetic ? undefined : edge.caller;
@@ -2016,7 +2054,7 @@ export class OpenSimulation {
       });
     }
 
-    this.scheduleEvent(deadline, 0, () => {
+    if (Number.isFinite(deadline)) this.scheduleEvent(deadline, 0, () => {
       if (!messageUnit.done) {
         this.expireUnit(messageUnit);
         if (!ackScheduled) {
@@ -2724,6 +2762,7 @@ export class OpenSimulation {
       if (nextEvt.time > targetTime) break;
 
       this.events.pop();
+      if (!nextEvt.housekeeping) this.workEvents--;
       this.updateIntegrals(nextEvt.time);
       this.currentTime = nextEvt.time;
       this.totalEventsProcessed++;
@@ -2870,6 +2909,7 @@ export class OpenSimulation {
       return false;
     }
     const nextEvt = this.events.pop()!;
+    if (!nextEvt.housekeeping) this.workEvents--;
     this.updateIntegrals(nextEvt.time);
     this.currentTime = nextEvt.time;
     this.totalEventsProcessed++;
@@ -2950,6 +2990,7 @@ export class OpenSimulation {
       done: false,
       ops: new Set(),
     };
+    this.liveUnits.add(unit);
 
     this.scheduleEvent(input.deadline, 0, () => {
       if (!unit.done) {

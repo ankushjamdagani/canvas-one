@@ -190,15 +190,11 @@ export interface ResourceAdapterOptions {
   workloads?: readonly Workload[];
   seed?: number;
   durationMs?: number;
-  /** Drain completion: workloads stop arriving here; the run continues to `durationMs`. */
-  arrivalHorizonMs?: number;
-  /** D55: count completion: at most this many root requests arrive in total. */
-  maxRootArrivals?: number;
   disabledWorkloadIds?: Iterable<string>;
 }
 
-/** D55: how far an open-ended run's clock may go (24 simulated hours), far past any practical session. */
-export const OPEN_RUN_CEILING_MS = 86_400_000;
+/** D56: how far a run's clock may go (24 simulated hours), far past any practical session. */
+export const RUN_CEILING_MS = 86_400_000;
 
 export type ResourceAdapterInit =
   | ResourceAdapterOptions
@@ -331,7 +327,7 @@ function buildExecutionGraph(opts: {
         latencyMs: callConn.config.latencyMs,
         returnLatencyMs: callConn.config.returnLatencyMs,
         ackDelayMs: 0,
-        messageTtlMs: 3600000,
+        messageTtlMs: null,
         weight: callConn.config.weight,
         condition: callConn.config.condition
           ? { field: callConn.config.condition.field, value: String(callConn.config.condition.value) }
@@ -374,16 +370,24 @@ function buildExecutionGraph(opts: {
     id: w.id,
     entryNodeId: w.entry.elementId,
     enabled: w.enabled,
-    rate: w.rate,
+    // D56: a stream's base rate and profile; a bulk's arrivals come from its schedule.
+    rate: w.emission.mode === 'stream' ? w.emission.ratePerSecond : 0,
     timeoutMs: w.timeoutMs,
-    intervalMs: w.intervalMs ?? undefined,
     ...(endpointOf(w.entry) ? { endpoint: endpointOf(w.entry)! } : {}),
+    schedule:
+      w.emission.mode === 'bulk'
+        ? { kind: 'bulk', requests: w.emission.requests, arrival: w.emission.arrival, startDelayMs: w.startDelayMs }
+        : {
+            kind: 'stream',
+            startDelayMs: w.startDelayMs,
+            ...(w.emission.profile.kind === 'ramp' ? { rampSeconds: w.emission.profile.rampMs / 1000 } : {}),
+          },
     // D50: the ms<->s conversion lives only at this boundary.
     profile:
-      w.profile.kind === 'burst'
-        ? { kind: 'burst', peakRate: w.profile.peakRate, start: w.profile.startMs / 1000, end: w.profile.endMs / 1000 }
-        : w.profile.kind === 'ramp'
-          ? { kind: 'ramp', endRate: w.profile.endRate }
+      w.emission.mode === 'stream' && w.emission.profile.kind === 'burst'
+        ? { kind: 'burst', peakRate: w.emission.profile.peakRate, start: w.emission.profile.startMs / 1000, end: w.emission.profile.endMs / 1000 }
+        : w.emission.mode === 'stream' && w.emission.profile.kind === 'ramp'
+          ? { kind: 'ramp', endRate: w.emission.profile.endRate }
           : { kind: 'steady' },
     classes: w.classes.map((c: StudioRequestClass): KernelRequestClass => ({
       id: c.id,
@@ -485,8 +489,6 @@ export class ResourceAdapter {
     let workloads: readonly Workload[] | undefined;
     let seed: number | undefined;
     let durationMs: number | undefined;
-    let arrivalHorizonMs: number | undefined;
-    let maxRootArrivals: number | undefined;
     let faults: readonly Fault[] | undefined;
     let relations: readonly Relation[] | undefined;
     const disabledWorkloadIds = new Set<string>(init.disabledWorkloadIds ?? []);
@@ -499,18 +501,6 @@ export class ResourceAdapter {
       seed = scenario?.seed;
       faults = scenario?.faults;
       relations = init.document.relations;
-      if (scenario?.completion.kind === 'horizon') {
-        durationMs = scenario.completion.horizonMs;
-      } else if (scenario?.completion.kind === 'drain') {
-        durationMs = scenario.completion.deadlineMs;
-        arrivalHorizonMs = scenario.completion.arrivalHorizonMs;
-      } else if (scenario?.completion.kind === 'count') {
-        durationMs = scenario.completion.deadlineMs;
-        maxRootArrivals = scenario.completion.requests;
-      } else if (scenario?.completion.kind === 'open') {
-        durationMs = OPEN_RUN_CEILING_MS;
-      }
-
       if (scenario) {
         // Disabling is decided once, at adapter construction, from the scenario
         // (the workloads whose entry receives finite inputs, per "A finite bridge input disables internal generation for that workload")
@@ -529,8 +519,6 @@ export class ResourceAdapter {
       workloads = init.workloads;
       seed = init.seed;
       durationMs = init.durationMs;
-      arrivalHorizonMs = init.arrivalHorizonMs;
-      maxRootArrivals = init.maxRootArrivals;
       faults = init.faults;
       relations = init.relations;
     }
@@ -566,7 +554,7 @@ export class ResourceAdapter {
       connections,
       workloads,
       seed,
-      durationMs,
+      durationMs: durationMs ?? RUN_CEILING_MS,
     });
 
     this.edgeMap = edgeMap;
@@ -592,8 +580,6 @@ export class ResourceAdapter {
       hostPlacement,
       faults: kernelFaults,
       bridges: kernelBridges,
-      ...(arrivalHorizonMs !== undefined ? { arrivalHorizonSeconds: arrivalHorizonMs / 1000 } : {}),
-      ...(maxRootArrivals !== undefined ? { maxRootArrivals } : {}),
     });
   }
 
