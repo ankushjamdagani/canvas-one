@@ -30,7 +30,11 @@ export type SimLifecycleFactKind =
   | 'failure_detected'
   | 'recovery_detected'
   | 'bridge_dispatch'
-  | 'call_retry';
+  | 'call_retry'
+  /** A request or message leaves its sender along `edgeId`; `arriveAt` (seconds) is when it reaches the target, absent when the leg is lost. */
+  | 'sent'
+  /** A response leaves the target back along `edgeId`; `arriveAt` is when the caller receives it. */
+  | 'response_sent';
 
 export interface SimLifecycleFact {
   kind: SimLifecycleFactKind;
@@ -42,6 +46,8 @@ export interface SimLifecycleFact {
   outcome?: Outcome;
   parentIdentity?: string;
   edgeId?: string;
+  /** `sent` and `response_sent` only: simulated time the leg ends. */
+  arriveAt?: number;
   /** Bridge call frames (RV-14f, model-and-runner.md §8): the system frame ID a
    * 'bridge_dispatch' fact carries, correlating it to the eventual settleCall(). */
   frameId?: string;
@@ -1804,7 +1810,20 @@ export class OpenSimulation {
         onDone: (childOutcome) => {
           const responseLeg = this.legSeconds(edge, edge.returnLatencyMs, edge.endpoint?.responseBytes ?? 0, `${identity}:res`);
           // A lost response never reaches the caller: it waits for its timeout or deadline.
-          if (responseLeg !== null) settleCopy(childOutcome, this.currentTime + responseLeg);
+          if (responseLeg !== null) {
+            this.emitFact({
+              kind: 'response_sent',
+              time: this.currentTime,
+              nodeId: edge.target,
+              unitIdentity: op.unit.identity,
+              attempt: attemptNo,
+              path,
+              edgeId: edge.id,
+              outcome: childOutcome,
+              arriveAt: this.currentTime + responseLeg,
+            });
+            settleCopy(childOutcome, this.currentTime + responseLeg);
+          }
         },
       };
       copies.push(childOp);
@@ -1816,6 +1835,16 @@ export class OpenSimulation {
       op.unit.ops.add(childOp);
       this.liveOpsCount++;
 
+      this.emitFact({
+        kind: 'sent',
+        time: this.currentTime,
+        nodeId: edge.target,
+        unitIdentity: op.unit.identity,
+        attempt: attemptNo,
+        path,
+        edgeId: edge.id,
+        ...(requestLeg === null ? {} : { arriveAt: this.currentTime + requestLeg }),
+      });
       // A lost request never arrives: the copy stays in flight until it is given up on.
       if (requestLeg === null) return;
       this.scheduleEvent(this.currentTime + requestLeg, 2, () => {
@@ -2025,6 +2054,16 @@ export class OpenSimulation {
     // The message travels once its leg is known: at once, or with the batch it was held for.
     // A lost leg never arrives, so the message expires at its TTL.
     const travel = (departure: number, requestLeg: number | null) => {
+      this.emitFact({
+        kind: 'sent',
+        time: departure,
+        nodeId: edge.target,
+        unitIdentity: identity,
+        attempt: 0,
+        path: msgOpPath,
+        edgeId: edge.id,
+        ...(requestLeg === null ? {} : { arriveAt: departure + requestLeg }),
+      });
       if (requestLeg === null) return;
       const arrivalTime = departure + requestLeg;
       msgRootOp.arrived = arrivalTime;

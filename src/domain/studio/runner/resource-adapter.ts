@@ -37,7 +37,7 @@ import type {
   ElementMetric,
   TraceEvent,
 } from './types';
-import { WORKLOAD_PAYLOAD_REF } from './types';
+import { WORKLOAD_PAYLOAD_REF, type FlowRecord } from './types';
 import {
   OpenSimulation,
   type SimLifecycleFact,
@@ -429,6 +429,9 @@ export class ResourceAdapter {
   private readonly unitContexts = new Map<string, UnitContext>();
   private traceSequence = 0;
   private stepFacts: SimLifecycleFact[] = [];
+  /** Live canvas view: connection of each packet announced by a `sent` fact, and the steps not yet drained. */
+  private readonly flowConnections = new Map<string, string>();
+  private flowRecords: FlowRecord[] = [];
 
   // Delivered-copy ordinal, keyed by the delivering (kernel) parent unit identity, so
   // every message delivery (single or D36 broadcast fan-out) gets a stable, deterministic
@@ -581,7 +584,8 @@ export class ResourceAdapter {
     const hasActiveWorkloads = graph.workloads.some((w) => w.enabled && !disabledWorkloadIds.has(w.id));
     this.sim = new OpenSimulation(graph, {
       traceHook: (fact) => {
-        this.stepFacts.push(fact);
+        this.recordFlow(fact);
+        if (fact.kind !== 'sent' && fact.kind !== 'response_sent') this.stepFacts.push(fact);
       },
       disabledWorkloadIds,
       requireRunnable: hasActiveWorkloads,
@@ -591,6 +595,43 @@ export class ResourceAdapter {
       ...(arrivalHorizonMs !== undefined ? { arrivalHorizonSeconds: arrivalHorizonMs / 1000 } : {}),
       ...(maxRootArrivals !== undefined ? { maxRootArrivals } : {}),
     });
+  }
+
+  /** Takes the packet steps recorded since the last call (live canvas view). */
+  drainFlow(): FlowRecord[] {
+    const records = this.flowRecords;
+    this.flowRecords = [];
+    return records;
+  }
+
+  private recordFlow(fact: SimLifecycleFact): void {
+    const key = `${fact.unitIdentity}|${fact.path}`;
+    const ms = (seconds: number) => Math.round(seconds * 1000);
+    if (fact.kind === 'sent' && fact.edgeId) {
+      if (this.flowConnections.size > 5000) this.flowConnections.clear();
+      this.flowConnections.set(key, fact.edgeId);
+      this.flowRecords.push({ key, connectionId: fact.edgeId, phase: 'sent', atMs: ms(fact.time), arriveAtMs: fact.arriveAt === undefined ? null : ms(fact.arriveAt), outcome: null });
+      return;
+    }
+    const connectionId = this.flowConnections.get(key);
+    if (!connectionId) return;
+    const phase: FlowRecord['phase'] | null =
+      fact.kind === 'admitted' ? 'received'
+      : fact.kind === 'queued' ? 'queued'
+      : fact.kind === 'started' ? 'processing'
+      : fact.kind === 'attempt_settled' || fact.kind === 'rejected' ? 'settled'
+      : fact.kind === 'response_sent' ? 'response'
+      : null;
+    if (!phase) return;
+    this.flowRecords.push({
+      key,
+      connectionId,
+      phase,
+      atMs: ms(fact.time),
+      arriveAtMs: phase === 'response' && fact.arriveAt !== undefined ? ms(fact.arriveAt) : null,
+      outcome: phase === 'settled' ? (fact.kind === 'rejected' ? 'rejected' : (fact.outcome ?? null)) : phase === 'response' ? (fact.outcome ?? null) : null,
+    });
+    if (phase === 'response') this.flowConnections.delete(key);
   }
 
   /** D55: nothing is live in the kernel and no arrival is pending. */

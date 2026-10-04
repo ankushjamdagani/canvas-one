@@ -33,6 +33,7 @@ import {
 import {
   RUN_BUDGET_LIMITS,
   type CheckResult,
+  type FlowRecord,
   type RunSummary,
   type TerminalStatus,
   type TraceEvent,
@@ -133,6 +134,7 @@ export class RunController {
 
   private speed = 0;
   private readonly listeners = new Set<(state: RunControllerState) => void>();
+  private readonly flowListeners = new Set<(runId: string, records: readonly FlowRecord[], ended: boolean) => void>();
   private unsubscribeTransport: (() => void) | null = null;
 
   // Active execution context
@@ -173,6 +175,14 @@ export class RunController {
 
   getState(): RunControllerState {
     return this.state;
+  }
+
+  /** Live canvas view: every packet step of the run in progress, as the worker reports it. */
+  subscribeFlow(listener: (runId: string, records: readonly FlowRecord[], ended: boolean) => void): () => void {
+    this.flowListeners.add(listener);
+    return () => {
+      this.flowListeners.delete(listener);
+    };
   }
 
   subscribe(listener: (state: RunControllerState) => void): () => void {
@@ -533,7 +543,13 @@ export class RunController {
         break;
       }
 
+      case 'flow': {
+        for (const listener of this.flowListeners) listener(update.runId, update.records, false);
+        break;
+      }
+
       case 'terminal': {
+        for (const listener of this.flowListeners) listener(update.runId, [], true);
         void this.handleTerminal(update);
         break;
       }

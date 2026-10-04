@@ -20,6 +20,7 @@ import { ScenarioRunner } from '../../domain/studio/runner/scenario-runner';
 import type {
   AuthoredSnapshot,
   CheckResult,
+  FlowRecord,
   RunControl,
   RunSummary,
   RunUpdate,
@@ -91,9 +92,13 @@ export type ProtocolTerminalUpdate = {
   readonly measured: boolean;
 };
 
+/** Live canvas view: the packet steps since the last report; not part of the run's trace. */
+export type ProtocolFlowUpdate = { readonly kind: 'flow'; readonly runId: string; readonly records: readonly FlowRecord[] };
+
 export type ProtocolRunUpdate =
   | Exclude<RunUpdate, { kind: 'terminal' }>
-  | ProtocolTerminalUpdate;
+  | ProtocolTerminalUpdate
+  | ProtocolFlowUpdate;
 
 export type RunUpdateMessage = {
   readonly type: 'update';
@@ -548,6 +553,11 @@ export class WorkerProtocolHandler {
       if (statusAfterBatch === 'cancelled') {
         this.cleanupTerminal(runId, active, { status: 'cancelled', reason: null });
         return;
+      }
+
+      const flow = active.runner.drainFlow();
+      if (flow.length > 0) {
+        this.postMessageCallback({ type: 'update', message: { kind: 'flow', runId, records: flow } });
       }
 
       // Check for newly recorded events

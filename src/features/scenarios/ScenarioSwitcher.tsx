@@ -21,16 +21,14 @@ import { useHeaderSideOffset } from '@/lib/useHeaderSideOffset';
 import * as React from 'react';
 import {
   Activity,
-  Check,
   ChevronDown,
-  Copy,
   GitCommitHorizontal,
   Info,
-  MoreHorizontal,
   Pause,
   Pencil,
   Play,
   Plus,
+  SlidersHorizontal,
   RotateCcw,
   Square,
   Trash2,
@@ -42,13 +40,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../../components/ui/popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
-import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import {
   Tooltip,
   TooltipContent,
@@ -72,16 +63,6 @@ export interface ScenarioSwitcherEntry {
   readonly status: ScenarioStatus;
 }
 
-/** D55: how fast simulated time passes against the wall clock, in simulated seconds per real second (0 = as fast as possible). */
-export const RUN_SPEED_OPTIONS = [
-  { value: 1, label: 'Real time (1×)' },
-  { value: 2, label: '2×' },
-  { value: 5, label: '5×' },
-  { value: 10, label: '10×' },
-  { value: 50, label: '50×' },
-  { value: 0, label: 'Instant' },
-] as const;
-
 /** The run phases the switcher renders; a subset of RunController's RunPhase (no 'done'). */
 export type ScenarioSwitcherRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving';
 
@@ -99,10 +80,7 @@ export interface ScenarioSwitcherProps {
   /** D55: stop a timed run gracefully, keeping its results; `isStopping` while it drains. */
   readonly onStop?: () => void;
   readonly isStopping?: boolean;
-  readonly runSpeed: number;
-  readonly onRunSpeedChange: (speed: number) => void;
   readonly onNew: () => void;
-  readonly onDuplicate: (scenarioId: Id) => void;
   readonly onEdit: (scenarioId: Id) => void;
   readonly onRename: (scenarioId: Id) => void;
   readonly onDelete: (scenarioId: Id) => void;
@@ -121,10 +99,7 @@ export function ScenarioSwitcher({
   onReset,
   onStop,
   isStopping,
-  runSpeed,
-  onRunSpeedChange,
   onNew,
-  onDuplicate,
   onEdit,
   onRename,
   onDelete,
@@ -273,60 +248,37 @@ export function ScenarioSwitcher({
                     </div>
                   </button>
 
-                  <div className="flex items-center gap-1 shrink-0 p-2 pl-0">
-                    {isSelected ? (
-                      <>
-                        <Check className="size-4 text-primary shrink-0 mr-1" aria-hidden="true" />
-                        {(
-                          [
-                            { label: 'Edit', icon: Pencil, run: () => { setPopoverOpen(false); onEdit(s.id); }, tone: '' },
-                            { label: 'Duplicate', icon: Copy, run: () => { setPopoverOpen(false); onDuplicate(s.id); }, tone: '' },
-                            { label: 'Delete', icon: Trash2, run: () => { setPopoverOpen(false); onDelete(s.id); }, tone: 'text-destructive hover:text-destructive' },
-                          ] as const
-                        ).map(({ label, icon: Icon, run, tone }) => (
-                          <button
-                            key={label}
-                            type="button"
-                            onClick={run}
-                            title={`${label} scenario`}
-                            aria-label={`${label} scenario ${s.label}`}
-                            data-testid={`scenario-${label.toLowerCase()}-btn`}
-                            className={cn(
-                              'size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors',
-                              tone,
-                            )}
-                          >
-                            <Icon className="size-3.5" aria-hidden="true" />
-                          </button>
-                        ))}
-                      </>
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            className="size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors"
-                            aria-label={`Actions for scenario ${s.label}`}
-                          >
-                            <MoreHorizontal className="size-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40 p-1.5 bg-background border-border shadow-popover rounded-popover">
-                          <DropdownMenuItem onClick={() => onRename(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
-                            <Pencil className="size-3.5 text-secondary-text shrink-0" />
-                            <span>Rename</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onDuplicate(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px]">
-                            <Copy className="size-3.5 text-secondary-text shrink-0" />
-                            <span>Duplicate</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onDelete(s.id)} className="gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] text-destructive hover:text-destructive">
-                            <Trash2 className="size-3.5 text-destructive shrink-0" />
-                            <span>Delete…</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  <div
+                    className={cn(
+                      'flex items-center gap-0.5 shrink-0 p-2 pl-0 transition-opacity',
+                      isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100',
                     )}
+                  >
+                    {(
+                      [
+                        { label: 'Rename', icon: Pencil, run: () => onRename(s.id), tone: '' },
+                        { label: 'Edit', icon: SlidersHorizontal, run: () => onEdit(s.id), tone: '' },
+                        { label: 'Delete', icon: Trash2, run: () => onDelete(s.id), tone: 'text-destructive hover:text-destructive' },
+                      ] as const
+                    ).map(({ label, icon: Icon, run, tone }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          setPopoverOpen(false);
+                          run();
+                        }}
+                        title={`${label} scenario`}
+                        aria-label={`${label} scenario ${s.label}`}
+                        data-testid={`scenario-${label.toLowerCase()}-btn-${s.id}`}
+                        className={cn(
+                          'size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors',
+                          tone,
+                        )}
+                      >
+                        <Icon className="size-3.5" aria-hidden="true" />
+                      </button>
+                    ))}
                   </div>
                 </div>
               );
@@ -336,26 +288,6 @@ export function ScenarioSwitcher({
               <div className="p-4 text-center text-secondary-text">No scenarios yet. Add a scenario to begin testing.</div>
             )}
           </div>
-
-          <label
-            data-testid="run-speed-row"
-            className="mx-2.5 mt-1.5 flex items-center justify-between gap-3 text-[11px] text-secondary-text"
-          >
-            <span>Run speed</span>
-            <NativeSelect
-              data-testid="run-speed-select"
-              aria-label="Run speed"
-              value={selectedScenario?.completion === 'open' && runSpeed === 0 ? 1 : runSpeed}
-              onChange={(e) => onRunSpeedChange(Number(e.target.value))}
-              className="h-7 w-auto min-w-[8.5rem] text-xs"
-            >
-              {RUN_SPEED_OPTIONS.map((option) => (
-                <NativeSelectOption key={option.value} value={option.value} disabled={option.value === 0 && selectedScenario?.completion === 'open'}>
-                  {option.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </label>
 
           {totalScenarios > 0 && (
             <div

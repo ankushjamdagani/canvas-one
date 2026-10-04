@@ -1,4 +1,4 @@
-import * as React from 'react';
+import * as React from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -6,9 +6,19 @@ import {
   useStore,
   useViewport,
   type EdgeProps,
-} from '@xyflow/react';
-import { PULSE_TRAVEL_MS, TrafficPulseContext } from './trafficPulses';
-import { chipOverlapsAnyNode, estimateLabelChipRect, type Rect } from './edgeLabelPlacement';
+} from "@xyflow/react";
+import {
+  PacketContext,
+  STAGE_LABEL,
+  STAGE_MIN_MS,
+  type Packet,
+  type PacketStage,
+} from "./livePackets";
+import {
+  chipOverlapsAnyNode,
+  estimateLabelChipRect,
+  type Rect,
+} from "./edgeLabelPlacement";
 
 /**
  * Custom edge for the 2A workspace canvas (review round 1 fix).
@@ -54,8 +64,10 @@ export function TrafficEdge({
 }: EdgeProps) {
   const [hovered, setHovered] = React.useState(false);
   const { zoom } = useViewport();
-  const connectionId = (data as { connection?: { id?: string } } | undefined)?.connection?.id;
-  const pulses = React.useContext(TrafficPulseContext).get(connectionId ?? '') ?? [];
+  const connectionId = (data as { connection?: { id?: string } } | undefined)
+    ?.connection?.id;
+  const packets = React.useContext(PacketContext).get(connectionId ?? "") ?? [];
+  const returning = packets.some((p) => p.stage === "returning");
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -81,7 +93,7 @@ export function TrafficEdge({
     return rects;
   });
 
-  const labelText = typeof label === 'string' ? label : null;
+  const labelText = typeof label === "string" ? label : null;
 
   const overlapsNode = React.useMemo(() => {
     if (!labelText) return false;
@@ -105,27 +117,37 @@ export function TrafficEdge({
       onMouseLeave={() => setHovered(false)}
       data-testid={`edge-${id}`}
     >
-      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
-      {pulses.map((pulse) => (
-        <circle
-          key={pulse.key}
-          r={4}
-          fill={pulse.tone === 'ok' ? 'var(--color-primary, #0B5C54)' : '#B3261E'}
-          stroke="#fff"
-          strokeWidth={1}
-          data-testid={`traffic-pulse-${id}`}
-          pointerEvents="none"
-        >
-          <animateMotion dur={`${PULSE_TRAVEL_MS}ms`} path={edgePath} fill="freeze" calcMode="linear" />
-        </circle>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={
+          packets.length > 0
+            ? {
+                ...style,
+                stroke: "var(--color-primary, #0B5C54)",
+                strokeDasharray: "6 5",
+                animation: "traffic-flow 0.5s linear infinite",
+                animationDirection: returning ? "reverse" : "normal",
+              }
+            : style
+        }
+        markerEnd={markerEnd}
+      />
+      {packets.map((packet, index) => (
+        <PacketMarker
+          key={packet.key}
+          packet={packet}
+          path={edgePath}
+          lane={index}
+        />
       ))}
       {showChip && labelText ? (
         <EdgeLabelRenderer>
           <div
             className={
-              'nodrag nopan absolute whitespace-nowrap rounded-tag border ' +
-              'border-control-border bg-panel px-1.5 py-0.5 text-[10px] ' +
-              'font-medium text-body shadow-xs'
+              "nodrag nopan absolute whitespace-nowrap rounded-tag border " +
+              "border-control-border bg-panel px-1.5 py-0.5 text-[10px] " +
+              "font-medium text-body shadow-xs"
             }
             style={{
               // Position at the path midpoint, then lift the chip fully above
@@ -133,7 +155,7 @@ export function TrafficEdge({
               // centering on the line -- keeps it off node rectangles that sit
               // close to the edge on tightly spaced layouts.
               transform: `translate(${labelX}px, ${labelY}px) translate(-50%, calc(-100% - 6px))`,
-              pointerEvents: 'none',
+              pointerEvents: "none",
             }}
             data-testid={`edge-label-${id}`}
           >
@@ -142,5 +164,143 @@ export function TrafficEdge({
         </EdgeLabelRenderer>
       ) : null}
     </g>
+  );
+}
+
+const STAGE_COLOR: Record<PacketStage, string> = {
+  sent: "#0B5C54",
+  transit: "#0B5C54",
+  received: "#0B5C54",
+  queued: "#B7791F",
+  processing: "#2B6CB0",
+  done: "#2F855A",
+  rejected: "#B3261E",
+  failed: "#B3261E",
+  lost: "#B3261E",
+  returning: "#2F855A",
+  delivered: "#2F855A",
+};
+
+/** How far along the connection (0 = sender, 1 = receiver) a packet is, given its stage and how long it has been in it. */
+function progressOf(stage: PacketStage, elapsedMs: number): number {
+  const through = Math.min(1, elapsedMs / STAGE_MIN_MS[stage]);
+  switch (stage) {
+    case "sent":
+      return 0.05;
+    case "transit":
+      return 0.05 + 0.9 * through;
+    case "lost":
+      return 0.5;
+    case "returning":
+      return 0.95 - 0.9 * through;
+    case "delivered":
+      return 0.05;
+    default:
+      return 0.95;
+  }
+}
+
+/**
+ * One packet beside its connection: a small chip that sits on the line, moves with the stage and points the way it
+ * travels, with the stage written next to it. Position is set from an animation frame, not React state.
+ */
+function PacketMarker({
+  packet,
+  path,
+  lane,
+}: {
+  packet: Packet;
+  path: string;
+  lane: number;
+}) {
+  const pathRef = React.useRef<SVGPathElement>(null);
+  const markRef = React.useRef<SVGGElement>(null);
+  const labelRef = React.useRef<HTMLDivElement>(null);
+  const reduced = React.useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
+
+  React.useEffect(() => {
+    let frame = 0;
+    const place = () => {
+      const line = pathRef.current;
+      if (line) {
+        const length = line.getTotalLength();
+        const elapsed = performance.now() - packet.stageStartedAt;
+        const t = progressOf(
+          packet.stage,
+          reduced ? STAGE_MIN_MS[packet.stage] : elapsed,
+        );
+        const at = line.getPointAtLength(length * t);
+        const ahead = line.getPointAtLength(Math.min(length, length * t + 1));
+        const back = line.getPointAtLength(Math.max(0, length * t - 1));
+        const heading =
+          (Math.atan2(ahead.y - back.y, ahead.x - back.x) * 180) / Math.PI +
+          (packet.stage === "returning" ? 180 : 0);
+        markRef.current?.setAttribute(
+          "transform",
+          `translate(${at.x} ${at.y}) rotate(${heading})`,
+        );
+        if (labelRef.current) {
+          labelRef.current.style.transform = `translate(${at.x}px, ${at.y}px) translate(-50%, calc(-100% - 10px - ${lane * 18}px))`;
+        }
+      }
+      frame = requestAnimationFrame(place);
+    };
+    place();
+    return () => cancelAnimationFrame(frame);
+  }, [packet.stage, packet.stageStartedAt, lane, reduced, path]);
+
+  const color = STAGE_COLOR[packet.stage];
+  return (
+    <>
+      <path
+        ref={pathRef}
+        d={path}
+        fill="none"
+        stroke="none"
+        pointerEvents="none"
+      />
+      <g
+        ref={markRef}
+        data-testid="traffic-packet"
+        data-stage={packet.stage}
+        pointerEvents="none"
+      >
+        <rect
+          x={-7}
+          y={-5}
+          width={14}
+          height={10}
+          rx={2.5}
+          fill={color}
+          stroke="#fff"
+          strokeWidth={1.2}
+        />
+        <path
+          d="M-2.5 -2.5 L2.5 0 L-2.5 2.5"
+          fill="none"
+          stroke="#fff"
+          strokeWidth={1.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+      {lane === 0 ? (
+        <EdgeLabelRenderer>
+          <div
+            ref={labelRef}
+            className="nodrag nopan absolute whitespace-nowrap rounded-tag border border-control-border bg-panel px-1.5 py-0.5 text-[10px] font-medium text-body shadow-xs"
+            style={{ pointerEvents: "none", borderColor: color, color }}
+            data-testid="traffic-packet-label"
+          >
+            {STAGE_LABEL[packet.stage]}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
+    </>
   );
 }

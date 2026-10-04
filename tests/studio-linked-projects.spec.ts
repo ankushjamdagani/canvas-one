@@ -89,7 +89,7 @@ test('a project can be dragged from the Library onto the canvas, and the logo re
   await openLibrary(page);
   await page.getByTestId('library-tab-projects').click();
   const row = page.getByTestId('library-linked-projects').locator('li', { hasText: 'Billing system' });
-  await row.dragTo(page.locator('.react-flow__pane').first(), { targetPosition: { x: 760, y: 420 } });
+  await row.dragTo(page.locator('.react-flow__pane').first(), { targetPosition: { x: 1000, y: 640 } });
   await waitForIdle(page);
   const node = page.locator('.component-node', { hasText: 'Billing system' });
   await expect(node).toBeVisible();

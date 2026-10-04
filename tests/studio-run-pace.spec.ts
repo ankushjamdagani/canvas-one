@@ -10,7 +10,11 @@ async function openS06(page: Page) {
 /** Sets the selected scenario's completion in the editor and applies it. */
 async function setCompletion(page: Page, kind: 'horizon' | 'count' | 'open', fill: Record<string, string> = {}) {
   await page.getByTestId('scenario-switcher-trigger').click();
-  await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+  await page
+    .getByTestId('scenario-switcher-popover')
+    .locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') })
+    .getByRole('button', { name: /^Edit scenario/ })
+    .click();
   const editor = page.getByTestId('scenario-editor');
   await expect(editor).toBeVisible();
   await editor.getByLabel('Completion kind').selectOption(kind);
@@ -22,10 +26,11 @@ async function setCompletion(page: Page, kind: 'horizon' | 'count' | 'open', fil
   await editor.getByRole('button', { name: /Cancel|Close/ }).first().click().catch(() => undefined);
 }
 
+/** The browser suite runs as fast as it can; a hidden localStorage override (no UI) puts a test on a paced clock. */
 async function setSpeed(page: Page, value: string) {
-  await page.getByTestId('scenario-switcher-trigger').click();
-  await page.getByTestId('run-speed-select').selectOption(value);
-  await page.keyboard.press('Escape');
+  await page.evaluate((v) => window.localStorage.setItem('studio.runSpeed', v), value);
+  await page.reload();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
 }
 
 test.describe('Run duration and pace (D55)', () => {
@@ -45,13 +50,6 @@ test.describe('Run duration and pace (D55)', () => {
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
     await expect(page.getByTestId('scenario-stop-btn')).toHaveCount(0);
     await expect(page.getByTestId('results-region')).toContainText('Saved');
-  });
-
-  test('an open run cannot be Instant: that option is not offered for it', async ({ page }) => {
-    await openS06(page);
-    await setCompletion(page, 'open');
-    await page.getByTestId('scenario-switcher-trigger').click();
-    await expect(page.getByTestId('run-speed-select').locator('option[value="0"]')).toHaveAttribute('disabled', '');
   });
 
   test('a run for a number of requests sends that many and ends when they have settled', async ({ page }) => {
@@ -81,24 +79,37 @@ test.describe('Run duration and pace (D55)', () => {
     expect(Date.now() - instantStart).toBeLessThan(2500);
   });
 
-  test('traffic shows as dots on connections while a paced run goes', async ({ page }) => {
+  test('each request shows as a packet that moves through its stages on the connection', async ({ page }) => {
     await openS06(page);
     await setCompletion(page, 'open');
-    await setSpeed(page, '10');
+    await setSpeed(page, '1');
     await page.getByTestId('scenario-run-btn').click();
-    await expect(page.locator('[data-testid^="traffic-pulse-"]').first()).toBeAttached({ timeout: 10000 });
+    const stages = new Set<string>();
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline && !['sent', 'transit', 'received', 'returning', 'delivered'].every((s) => stages.has(s))) {
+      for (const stage of await page.locator('[data-testid="traffic-packet"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-stage') ?? ''))) {
+        stages.add(stage);
+      }
+      await page.waitForTimeout(50);
+    }
+    expect([...stages]).toEqual(expect.arrayContaining(['sent', 'transit', 'received', 'returning', 'delivered']));
+    await expect(page.getByTestId('traffic-packet-label').first()).toBeVisible();
     await page.getByTestId('scenario-stop-btn').click();
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
-    // The dots go away once nothing more arrives.
-    await expect(page.locator('[data-testid^="traffic-pulse-"]')).toHaveCount(0, { timeout: 5000 });
+    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 30000 });
+    await expect(page.locator('[data-testid="traffic-packet"]')).toHaveCount(0, { timeout: 8000 });
   });
 
-  test('the scenario list keeps its edit actions on the active row, icon only, and New alone in the footer', async ({ page }) => {
+  test('scenario rows carry rename, edit and delete; no menu, tick, footer actions or run speed', async ({ page }) => {
     await openS06(page);
     await page.getByTestId('scenario-switcher-trigger').click();
     const popover = page.getByTestId('scenario-switcher-popover');
-    for (const name of ['edit', 'duplicate', 'delete']) await expect(popover.getByTestId(`scenario-${name}-btn`)).toHaveCount(1);
-    await expect(popover.getByRole('button', { name: /^Edit / })).toHaveText('');
+    const row = popover.locator('[data-testid^="scenario-row-"]').first();
+    const actions = row.getByRole('button', { name: /scenario/i });
+    await expect(actions).toHaveCount(3);
+    for (const name of ['Rename', 'Edit', 'Delete']) await expect(row.getByRole('button', { name: new RegExp(`^${name} scenario`) })).toBeVisible();
+    await expect(row.getByRole('button', { name: new RegExp('^Edit scenario') })).toHaveText('');
+    await expect(popover.getByRole('button', { name: /Actions for scenario/ })).toHaveCount(0);
+    await expect(popover.getByTestId('run-speed-select')).toHaveCount(0);
     await expect(popover.getByRole('button', { name: 'New scenario' })).toBeVisible();
     await expect(popover.getByText(/^Duplicate$/)).toHaveCount(0);
   });
@@ -125,6 +136,7 @@ test.describe('Run duration and pace (D55)', () => {
     const after = await dot();
     expect(after.zoom).toBeLessThan(before.zoom);
     expect(after.r).toBeCloseTo(before.r, 1);
+    expect(before.width / before.zoom).toBeCloseTo(24, 0);
     expect(after.width).toBeGreaterThanOrEqual(15);
   });
 });

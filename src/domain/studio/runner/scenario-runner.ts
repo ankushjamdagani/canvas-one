@@ -45,7 +45,7 @@ import type {
   TraceEvent,
   TraceEventKind,
 } from './types';
-import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD } from './types';
+import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type FlowRecord } from './types';
 import { rootId, traceEventId, PayloadTable } from './trace';
 import { defaultEvaluator, readPath } from './expr';
 import { isMissing } from './expr-api';
@@ -1473,6 +1473,11 @@ export class ScenarioRunner {
   /** D55: ask a timed run to stop arrivals and drain; it takes effect at the next step boundary. */
   requestStop(): void {
     if (this.scenario.mode === 'timed' && !this.isFinished) this.stopRequested = true;
+  }
+
+  /** Packet steps recorded since the last call, for the live canvas view. */
+  drainFlow(): FlowRecord[] {
+    return this.adapter?.drainFlow() ?? [];
   }
 
   /** D55: the run's simulated clock, in ms. */

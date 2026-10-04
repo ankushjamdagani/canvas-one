@@ -218,8 +218,8 @@ A project with no exposed call endpoint cannot be linked. Protocols are a closed
 
 ## 8. Scenario completion and run controls
 
-How a timed run ends is part of the scenario (Scenario editor → Run settings → Completion); how fast it plays is a
-per-browser preference (scenario switcher → Run speed).
+How a timed run ends is part of the scenario (Scenario editor → Run settings → Completion); a timed run plays in real time (there is no
+speed control; a hidden `studio.runSpeed` localStorage override, 0 = as fast as possible, exists for the browser suite).
 
 | Completion | Ends | Range |
 | :--- | :--- | :--- |
@@ -231,7 +231,6 @@ per-browser preference (scenario switcher → Run speed).
 
 | Run control | Effect |
 | :--- | :--- |
-| Run speed | 1× (real time, the default), 2×, 5×, 10×, 50× or Instant, in simulated seconds per real second. An open run is never Instant (at least 10×) |
 | Pause / Resume | hold and continue the clock |
 | Stop | stop new requests, let work in flight finish, complete with the results kept |
 | Reset | cancel and discard the run |

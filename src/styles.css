@@ -561,3 +561,15 @@ body {
     cursor: not-allowed;
   }
 }
+
+/* Live traffic: dashes run along a connection in the direction requests travel. */
+@keyframes traffic-flow {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge path {
+    animation: none !important;
+  }
+}

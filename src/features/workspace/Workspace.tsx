@@ -286,7 +286,7 @@ const SavedParts = lazyComponent(() => import("../library/SavedParts").then((m) 
 
 const RUN_SPEED_STORAGE_KEY = "studio.runSpeed";
 
-/** The stored run speed: a number of simulated seconds per real second, 0 for as fast as possible; real time when unset. */
+/** The hidden run-speed override: simulated seconds per real second, 0 for as fast as possible; real time when unset. */
 function readStoredRunSpeed(): number {
   try {
     const raw = window.localStorage.getItem(RUN_SPEED_STORAGE_KEY);
@@ -949,19 +949,11 @@ export function Workspace({
     sessionState.workingSnapshotId,
   ]);
 
-  // D55: how fast simulated time passes against the wall clock; a per-browser preference, not part of the project.
-  const [runSpeed, setRunSpeed] = React.useState<number>(() => readStoredRunSpeed());
+  // D55: runs go in real time. `studio.runSpeed` in localStorage is a hidden override (0 = as fast as possible) the
+  // browser suite uses; there is no control for it.
   React.useEffect(() => {
-    runController?.setSpeed(runSpeed);
-  }, [runController, runSpeed]);
-  const handleRunSpeedChange = React.useCallback((speed: number) => {
-    setRunSpeed(speed);
-    try {
-      window.localStorage.setItem(RUN_SPEED_STORAGE_KEY, String(speed));
-    } catch {
-      // Storage can be unavailable (private windows); the choice still applies for this session.
-    }
-  }, []);
+    runController?.setSpeed(readStoredRunSpeed());
+  }, [runController]);
 
   const handleResetRun = React.useCallback(() => {
     runController?.reset();
@@ -1017,19 +1009,6 @@ export function Workspace({
       setNewScenarioDialogOpen(true);
     });
   }, [closeInspector, runGuarded]);
-
-  const handleDuplicateScenario = React.useCallback(
-    (scenarioId: Id) => {
-      if (!document?.scenarios.some((scenario) => scenario.id === scenarioId))
-        return;
-      runGuarded(() => {
-        closeInspector();
-        setInitialCopySourceId(scenarioId);
-        setNewScenarioDialogOpen(true);
-      });
-    },
-    [closeInspector, document, runGuarded],
-  );
 
   const handleCreateScenario = React.useCallback(
     (params: Parameters<NewScenarioDialogProps["onCreate"]>[0]) => {
@@ -1163,10 +1142,7 @@ export function Workspace({
       onReset={handleResetRun}
       onStop={() => runController?.stop()}
       isStopping={runControllerState?.stopping ?? false}
-      runSpeed={runSpeed}
-      onRunSpeedChange={handleRunSpeedChange}
       onNew={handleNewScenario}
-      onDuplicate={handleDuplicateScenario}
       onEdit={handleEditScenario}
       onRename={handleRenameScenario}
       onDelete={handleRequestDeleteScenario}
@@ -3235,7 +3211,7 @@ export function Workspace({
                       )
                     }
                     trafficEntryElementIds={trafficEntryElementIds}
-                    runEvents={runControllerState?.events}
+                    flowSource={runController}
                     linkedProjects={linkedProjects}
                     loadLinkedExposures={async (projectId) => {
                       const record = await repository.loadProject(projectId);

@@ -10,7 +10,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await page.getByTestId('scenario-switcher-trigger').click();
     const popover = page.getByTestId('scenario-switcher-popover');
     await expect(popover).toBeVisible();
-    await popover.getByRole('button', { name: /^Edit / }).click();
+    await popover.locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
 
     const editor = page.getByTestId('scenario-editor');
     await expect(editor).toBeVisible();
@@ -47,7 +47,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
     await page.getByTestId('scenario-switcher-trigger').click();
-    await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+    await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
     const editor = page.getByTestId('scenario-editor');
     await expect(editor).toBeVisible();
     await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(0);
@@ -68,7 +68,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
     await page.getByTestId('scenario-switcher-trigger').click();
-    await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+    await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
     const editor = page.getByTestId('scenario-editor');
     await editor.getByRole('button', { name: /Add traffic/ }).click();
 
@@ -97,7 +97,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await expect(page.getByTestId('save-status')).toContainText('Saved');
     const openEditor = async () => {
       await page.getByTestId('scenario-switcher-trigger').click();
-      await page.getByTestId('scenario-switcher-popover').getByRole('button', { name: /^Edit / }).click();
+      await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
       const editor = page.getByTestId('scenario-editor');
       await expect(editor).toBeVisible();
       const boundaries = editor.getByTestId('scenario-section-boundaries');

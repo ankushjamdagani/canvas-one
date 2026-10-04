@@ -175,6 +175,21 @@ export type RunSummary = {
   readonly trace?: { readonly recordedRows: number; readonly truncatedBy: 'trace-rows' | 'trace-bytes' | null };
 };
 
+/**
+ * One step in the life of a request or message on a connection, for the live canvas view only (never
+ * stored in a run's trace). `key` identifies the packet; times are simulated ms.
+ */
+export type FlowRecord = {
+  readonly key: string;
+  readonly connectionId: Id;
+  readonly phase: 'sent' | 'received' | 'queued' | 'processing' | 'settled' | 'response';
+  readonly atMs: number;
+  /** `sent` and `response`: when the leg ends; absent when the leg was lost. */
+  readonly arriveAtMs: number | null;
+  /** `settled` and `response`: how the work ended. */
+  readonly outcome: TransportOutcome | null;
+};
+
 export type RunUpdate =
   | { readonly kind: 'state'; readonly runId: string; readonly state: RunState }
   | {
