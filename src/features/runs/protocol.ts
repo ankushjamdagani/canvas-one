@@ -20,7 +20,9 @@ import { ScenarioRunner } from '../../domain/studio/runner/scenario-runner';
 import type {
   AuthoredSnapshot,
   CheckResult,
+  Cycle,
   FlowRecord,
+  RunCheckpoint,
   RunControl,
   RunSummary,
   RunUpdate,
@@ -68,12 +70,6 @@ export type StartRequestMessage = {
   readonly snapshotId: string;
   readonly planId: string;
   readonly workerSessionId: string;
-  /**
-   * D55: how fast simulated time passes against the wall clock, in simulated seconds per real
-   * second (1 = real time, 10 = ten times faster). Absent or 0 runs as fast as the machine can,
-   * except that an open-ended run (which never ends by itself) is paced at least `OPEN_RUN_MIN_SPEED`.
-   */
-  readonly speed?: number;
 };
 
 export type ControlRequestMessage = {
@@ -95,17 +91,47 @@ export type ProtocolTerminalUpdate = {
 /** Live canvas view: the packet steps since the last report; not part of the run's trace. */
 export type ProtocolFlowUpdate = { readonly kind: 'flow'; readonly runId: string; readonly records: readonly FlowRecord[] };
 
+/** D57: cycles that completed since the last report (a stream's cycles leave the worker once sent). */
+export type ProtocolCyclesUpdate = { readonly kind: 'cycles'; readonly runId: string; readonly cycles: readonly Cycle[] };
+
+/** D57: the run's cumulative summary at one simulated time, about every `CHECKPOINT_MS`. */
+export type ProtocolCheckpointUpdate = { readonly kind: 'checkpoint'; readonly runId: string; readonly checkpoint: RunCheckpoint };
+
+/**
+ * D57: what the worker is doing. `computing`: stepping; `idle`: waiting for the playhead because it is
+ * `LOOKAHEAD_MS` ahead; `draining`: Stop was pressed and the limit is lifted.
+ */
+export type ProtocolBufferUpdate = {
+  readonly kind: 'buffer';
+  readonly runId: string;
+  readonly state: 'computing' | 'idle' | 'draining';
+  readonly computedMs: number;
+};
+
 export type ProtocolRunUpdate =
   | Exclude<RunUpdate, { kind: 'terminal' }>
   | ProtocolTerminalUpdate
-  | ProtocolFlowUpdate;
+  | ProtocolFlowUpdate
+  | ProtocolCyclesUpdate
+  | ProtocolCheckpointUpdate
+  | ProtocolBufferUpdate;
 
 export type RunUpdateMessage = {
   readonly type: 'update';
   readonly message: ProtocolRunUpdate;
 };
 
-export type WorkerMessage = CompileRequestMessage | StartRequestMessage | ControlRequestMessage;
+/**
+ * D57: where the main thread's playhead is, in simulated ms (Infinity = no limit). The worker computes up to
+ * `LOOKAHEAD_MS` beyond it and then waits; a larger value wakes it.
+ */
+export type PlayheadMessage = {
+  readonly type: 'playhead';
+  readonly runId: string;
+  readonly simulatedMs: number;
+};
+
+export type WorkerMessage = CompileRequestMessage | StartRequestMessage | ControlRequestMessage | PlayheadMessage;
 export type HostMessage = CompileResultMessage | RunUpdateMessage;
 
 // ============================================================================
@@ -129,6 +155,11 @@ type StoredPlan = {
   used: boolean;
 };
 
+/** D57: how far ahead of the playhead the worker computes, in simulated ms. */
+export const LOOKAHEAD_MS = 30_000;
+/** D57: how often (simulated ms) the worker posts a cumulative summary. */
+export const CHECKPOINT_MS = 5_000;
+
 type ActiveRun = {
   readonly runId: string;
   readonly planId: string;
@@ -138,15 +169,14 @@ type ActiveRun = {
   status: 'running' | 'paused' | 'cancelled';
   lastReportedEventCount: number;
   steppingPromise: Promise<void> | null;
-  /** D55: simulated seconds per real second; 0 = unpaced. */
-  readonly speed: number;
-  /** D55: the wall clock and the simulated clock at the moment pacing was last anchored. */
-  paceWallMs: number;
-  paceSimMs: number;
+  /** D57: the main thread's playhead (simulated ms); the worker computes up to `LOOKAHEAD_MS` beyond it. */
+  playheadMs: number;
+  /** D55: Stop was pressed; the lookahead limit is lifted so the run can drain. */
+  stopping: boolean;
+  /** D57: stepping has paused at the lookahead limit and waits for the playhead (or Stop). */
+  idle: boolean;
+  lastCheckpointMs: number;
 };
-
-/** D55/D56: a run with a stream never ends by itself, so it is never unpaced (until stage 2 replaces the pacing). */
-export const OPEN_RUN_MIN_SPEED = 10;
 
 // ============================================================================
 // Pure In-Process Worker Protocol Handler
@@ -207,6 +237,9 @@ export class WorkerProtocolHandler {
         break;
       case 'control':
         this.handleControl(msg);
+        break;
+      case 'playhead':
+        this.handlePlayhead(msg);
         break;
     }
   }
@@ -399,6 +432,7 @@ export class WorkerProtocolHandler {
     try {
       runner = new ScenarioRunner(plan.snapshot.document, plan.scenarioId, runId, {
         signal: abortController.signal,
+        streamOutCycles: true,
       });
     } catch {
       this.plans.delete(planId);
@@ -417,13 +451,6 @@ export class WorkerProtocolHandler {
       return;
     }
 
-    const requestedSpeed = typeof msg.speed === 'number' && msg.speed > 0 ? msg.speed : 0;
-    const speed =
-      scenarioMode !== 'timed'
-        ? 0
-        : scenario.workloads.some((w) => w.enabled && w.emission.mode === 'stream')
-          ? Math.max(requestedSpeed, OPEN_RUN_MIN_SPEED)
-          : requestedSpeed;
     const activeRun: ActiveRun = {
       runId,
       planId,
@@ -433,9 +460,10 @@ export class WorkerProtocolHandler {
       status: 'running',
       lastReportedEventCount: 0,
       steppingPromise: null,
-      speed,
-      paceWallMs: Date.now(),
-      paceSimMs: 0,
+      playheadMs: 0,
+      stopping: false,
+      idle: false,
+      lastCheckpointMs: 0,
     };
     this.activeRuns.set(runId, activeRun);
 
@@ -449,8 +477,35 @@ export class WorkerProtocolHandler {
       },
     });
 
+    this.postMessageCallback({ type: 'update', message: { kind: 'buffer', runId, state: 'computing', computedMs: 0 } });
+
     // Start stepping loop
     this.scheduleStepping(runId);
+  }
+
+  /** D57: the playhead moved; a worker waiting at the lookahead limit may have room to compute again. */
+  private handlePlayhead(msg: PlayheadMessage): void {
+    const active = this.activeRuns.get(msg.runId);
+    if (!active || !(msg.simulatedMs > active.playheadMs)) return;
+    active.playheadMs = msg.simulatedMs;
+    this.wakeIfRoom(active);
+  }
+
+  /** D57: the furthest simulated ms the worker may compute to right now. */
+  private computeLimitMs(active: ActiveRun): number {
+    return active.stopping || active.scenarioMode !== 'timed' ? Infinity : active.playheadMs + LOOKAHEAD_MS;
+  }
+
+  private wakeIfRoom(active: ActiveRun): void {
+    if (!active.idle || active.status !== 'running') return;
+    const next = active.runner.nextEventAtMs();
+    if (next !== null && next > this.computeLimitMs(active)) return;
+    active.idle = false;
+    this.postMessageCallback({
+      type: 'update',
+      message: { kind: 'buffer', runId: active.runId, state: active.stopping ? 'draining' : 'computing', computedMs: active.runner.simulatedMs },
+    });
+    this.scheduleStepping(active.runId);
   }
 
   private handleControl(msg: ControlRequestMessage): void {
@@ -475,7 +530,6 @@ export class WorkerProtocolHandler {
     } else if (kind === 'resume') {
       if (active.status === 'paused') {
         active.status = 'running';
-        this.anchorPacing(active);
         this.postMessageCallback({
           type: 'update',
           message: {
@@ -487,13 +541,16 @@ export class WorkerProtocolHandler {
         this.scheduleStepping(runId);
       }
     } else if (kind === 'stop') {
-      // D55: stop arrivals and drain; a paused run resumes to do so.
+      // D55: stop arrivals and drain; a paused run resumes to do so. D57: Stop lifts the lookahead limit.
       active.runner.requestStop();
+      active.stopping = true;
+      this.postMessageCallback({ type: 'update', message: { kind: 'buffer', runId, state: 'draining', computedMs: active.runner.simulatedMs } });
       if (active.status === 'paused') {
         active.status = 'running';
-        this.anchorPacing(active);
         this.postMessageCallback({ type: 'update', message: { kind: 'state', runId, state: 'running' } });
         this.scheduleStepping(runId);
+      } else {
+        this.wakeIfRoom(active);
       }
     } else if (kind === 'cancel') {
       active.status = 'cancelled';
@@ -514,21 +571,6 @@ export class WorkerProtocolHandler {
     }, delayMs);
   }
 
-  /** D55: measure paced simulated time from now (after a pause, or at the start). */
-  private anchorPacing(active: ActiveRun): void {
-    active.paceWallMs = Date.now();
-    active.paceSimMs = active.runner.simulatedMs;
-  }
-
-  /** D55: how long to wait before the next event is due on the paced clock; 0 when unpaced or already due. */
-  private paceDelayMs(active: ActiveRun): number {
-    if (active.speed <= 0) return 0;
-    const next = active.runner.nextEventAtMs();
-    if (next === null) return 0;
-    const dueWallMs = active.paceWallMs + (next - active.paceSimMs) / active.speed;
-    return Math.max(0, dueWallMs - Date.now());
-  }
-
   private async stepRun(runId: string): Promise<void> {
     const active = this.activeRuns.get(runId);
     if (!active || active.status !== 'running') {
@@ -538,13 +580,15 @@ export class WorkerProtocolHandler {
     try {
       let stepsInBatch = 0;
       let hasMore = true;
-      let waitMs = 0;
+      let reachedLimit = false;
 
       while (stepsInBatch < this.stepBatchSize && active.status === 'running') {
-        // D55: a paced run waits until the next event is due on the wall clock, after reporting what it has done.
-        waitMs = this.paceDelayMs(active);
-        if (waitMs >= 1) break;
-        waitMs = 0;
+        // D57: the worker computes only up to LOOKAHEAD_MS ahead of the playhead; Stop lifts the limit.
+        const next = active.runner.nextEventAtMs();
+        if (next !== null && next > this.computeLimitMs(active)) {
+          reachedLimit = true;
+          break;
+        }
         hasMore = await active.runner.step();
         stepsInBatch++;
         if (!hasMore) {
@@ -562,6 +606,15 @@ export class WorkerProtocolHandler {
       const flow = active.runner.drainFlow();
       if (flow.length > 0) {
         this.postMessageCallback({ type: 'update', message: { kind: 'flow', runId, records: flow } });
+      }
+
+      const finishedCycles = active.runner.drainCycles();
+      if (finishedCycles.length > 0) {
+        this.postMessageCallback({ type: 'update', message: { kind: 'cycles', runId, cycles: finishedCycles } });
+      }
+      if (hasMore && active.runner.simulatedMs >= active.lastCheckpointMs + CHECKPOINT_MS) {
+        active.lastCheckpointMs = active.runner.simulatedMs;
+        this.postMessageCallback({ type: 'update', message: { kind: 'checkpoint', runId, checkpoint: active.runner.checkpoint() } });
       }
 
       // Check for newly recorded events
@@ -602,9 +655,18 @@ export class WorkerProtocolHandler {
         return;
       }
 
-      // Continue to next batch (after the pacing wait, if any)
-      // (capped so a pause, stop or cancel is never more than a moment from being noticed)
-      this.scheduleStepping(runId, Math.min(waitMs, 100));
+      // D57: at the lookahead limit, report it once and wait for the playhead (or Stop) to wake the loop.
+      if (reachedLimit) {
+        active.idle = true;
+        this.postMessageCallback({
+          type: 'update',
+          message: { kind: 'buffer', runId, state: 'idle', computedMs: active.runner.simulatedMs },
+        });
+        return;
+      }
+
+      // Continue to next batch
+      this.scheduleStepping(runId);
     } catch {
       // Runtime exception -> terminal 'failed' with a sanitized reason (no stack/raw text)
       this.cleanupTerminal(
