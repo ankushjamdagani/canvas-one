@@ -181,6 +181,18 @@ export type CycleSummary = {
   readonly completionLatencyMs: { readonly mean: number; readonly max: number } | null;
 };
 
+/**
+ * D57: the run's cumulative summary at one simulated time, posted about every 5 s of simulated time so a
+ * playhead can show "results as of now" without replaying the whole run.
+ */
+export type RunCheckpoint = {
+  readonly atMs: number;
+  readonly rootCounts: Counts;
+  readonly messageCounts: Counts;
+  readonly cycles: CycleSummary;
+  readonly elementMetrics: readonly ElementMetric[];
+};
+
 export type RunSummary = {
   readonly cycles: CycleSummary;
   readonly mode: 'logical' | 'timed';

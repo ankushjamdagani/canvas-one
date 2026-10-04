@@ -216,3 +216,36 @@ describe('stream traces truncate instead of ending the run (D57)', () => {
     expect(result.reason).toMatch(/Budget exhausted/);
   });
 });
+
+describe('checkpoints and cycle draining (D57)', () => {
+  it('checkpoint() reports cumulative counts and cycle summary at the current clock', async () => {
+    const doc = build(bulk(40, { spreadMs: 2000 }));
+    ready(doc);
+    const runner = new ScenarioRunner(doc, doc.scenarios[0].id, 'cp');
+    while (runner.simulatedMs < 1000) await runner.step();
+    const early = runner.checkpoint();
+    while (await runner.step()) {
+      // run to the end
+    }
+    const end = runner.checkpoint();
+    expect(early.atMs).toBeGreaterThanOrEqual(1000);
+    expect(early.rootCounts.generated).toBeGreaterThan(5);
+    expect(end.rootCounts.generated).toBe(40);
+    expect(end.cycles.total).toBe(40);
+    expect(end.atMs).toBeGreaterThanOrEqual(early.atMs);
+    expect(end.elementMetrics.length).toBeGreaterThan(0);
+  });
+
+  it('drainCycles() hands out finished cycles once; with streamOutCycles they leave memory', async () => {
+    const doc = build(bulk(20, { spreadMs: 1000 }));
+    ready(doc);
+    const runner = new ScenarioRunner(doc, doc.scenarios[0].id, 'drain', { streamOutCycles: true });
+    const seen: string[] = [];
+    while (await runner.step()) seen.push(...runner.drainCycles().map((c) => c.id));
+    seen.push(...runner.drainCycles().map((c) => c.id));
+    expect(new Set(seen).size).toBe(20);
+    expect(seen).toHaveLength(20);
+    expect(runner.getResult().cycles).toEqual([]);
+    expect(runner.getResult().summary.cycles).toMatchObject({ total: 20, open: 0 });
+  });
+});

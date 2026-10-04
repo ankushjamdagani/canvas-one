@@ -184,6 +184,8 @@ export function validateFaultsAndPlacements(
 
 export interface ResourceAdapterOptions {
   runId?: string;
+  /** D57: cycles leave the tracker once handed out (a streamed recording); the summary still counts them. */
+  streamOutCycles?: boolean;
   elements: readonly Element[];
   connections: readonly Connection[];
   relations?: readonly Relation[];
@@ -203,6 +205,7 @@ export type ResourceAdapterInit =
       document: Document;
       scenarioId: Id;
       runId?: string;
+      streamOutCycles?: boolean;
       disabledWorkloadIds?: Iterable<string>;
     };
 
@@ -436,7 +439,7 @@ export class ResourceAdapter {
   private stepFacts: SimLifecycleFact[] = [];
   /** Live canvas view: connection of each packet announced by a `sent` fact, and the steps not yet drained. */
   /** D56: cycles assembled from the kernel's lifecycle facts. */
-  readonly cycleTracker = new CycleTracker();
+  readonly cycleTracker: CycleTracker;
   private readonly flowConnections = new Map<string, string>();
   private flowRecords: FlowRecord[] = [];
 
@@ -486,6 +489,7 @@ export class ResourceAdapter {
 
   constructor(init: ResourceAdapterInit) {
     this.runId = init.runId ?? 'run-local';
+    this.cycleTracker = new CycleTracker({ discardFinished: init.streamOutCycles === true });
 
     let elements: readonly Element[];
     let connections: readonly Connection[];

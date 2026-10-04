@@ -46,7 +46,7 @@ import type {
   TraceEventKind,
 } from './types';
 import { emptyCycleSummary } from './cycles';
-import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type Cycle, type FlowRecord } from './types';
+import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type Cycle, type FlowRecord, type RunCheckpoint } from './types';
 import { rootId, traceEventId, PayloadTable } from './trace';
 import { defaultEvaluator, readPath } from './expr';
 import { isMissing } from './expr-api';
@@ -89,6 +89,8 @@ export type ScenarioRunnerOptions = {
   readonly signal?: AbortSignal;
   /** D56: request Stop when the simulated clock reaches this time (the headless Stop button). */
   readonly stopAtMs?: number;
+  /** D57: finished cycles leave memory once `drainCycles()` hands them out (a streamed recording). */
+  readonly streamOutCycles?: boolean;
 };
 
 type InvocationContext = {
@@ -481,6 +483,7 @@ export class ScenarioRunner {
   private stopRequested = false;
   /** D56: simulated ms at which a headless run requests Stop. */
   private readonly stopAtMs: number | undefined;
+  private readonly streamOutCycles: boolean;
   /** D56: an enabled stream (one no finite input replaces) keeps the run going until Stop. */
   private hasStream = false;
   /** D56: requests the enabled bulk sources send in all, for the "sent M of N" report on Stop. */
@@ -500,6 +503,7 @@ export class ScenarioRunner {
     this.runId = runId;
     this.signal = options.signal;
     this.stopAtMs = options.stopAtMs;
+    this.streamOutCycles = options.streamOutCycles === true;
 
     const foundScenario = document.scenarios.find((s) => s.id === scenarioId);
     if (!foundScenario) {
@@ -649,6 +653,7 @@ export class ScenarioRunner {
           durationMs: RUN_CEILING_MS,
           runId: this.runId,
           disabledWorkloadIds,
+          streamOutCycles: this.streamOutCycles,
         });
       }
 
@@ -1472,6 +1477,22 @@ export class ScenarioRunner {
   /** D55: ask a timed run to stop arrivals and drain; it takes effect at the next step boundary. */
   requestStop(): void {
     if (this.scenario.mode === 'timed' && !this.isFinished) this.stopRequested = true;
+  }
+
+  /** D57: the run's cumulative summary at the current simulated time. */
+  checkpoint(): RunCheckpoint {
+    return {
+      atMs: this.currentTimeMs,
+      rootCounts: this.totalRootCounts(),
+      messageCounts: { ...this.messageCounts },
+      cycles: this.adapter?.cycleTracker.summary() ?? emptyCycleSummary(),
+      elementMetrics: this.adapter ? this.adapter.snapshot().metrics : [],
+    };
+  }
+
+  /** D57: cycles that completed since the last call, once each. */
+  drainCycles(): Cycle[] {
+    return this.adapter?.cycleTracker.drainFinished() ?? [];
   }
 
   /** Packet steps recorded since the last call, for the live canvas view. */
