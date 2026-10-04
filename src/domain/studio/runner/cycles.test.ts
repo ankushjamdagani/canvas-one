@@ -149,3 +149,44 @@ describe('CycleTracker with the kernel', () => {
     expect(tracker.summary().completionLatencyMs!.mean).toBeGreaterThan(tracker.summary().responseLatencyMs!.mean * 5);
   });
 });
+
+describe('CycleTracker streaming out', () => {
+  const run = (t: CycleTracker, id: string, start: number, end: number) => {
+    t.record(fact({ kind: 'admitted', time: start, unitIdentity: id }));
+    t.record(settled(end, id, 'succeeded'));
+  };
+
+  it('drainFinished hands out each completed cycle once, in completion order', () => {
+    const t = new CycleTracker();
+    run(t, 'w-0', 0, 2);
+    run(t, 'w-1', 0, 1);
+    t.record(fact({ kind: 'admitted', time: 0, unitIdentity: 'w-2' }));
+    expect(t.drainFinished().map((c) => c.id)).toEqual(['w-0', 'w-1']);
+    expect(t.drainFinished()).toEqual([]);
+    t.record(settled(3, 'w-2', 'succeeded'));
+    expect(t.drainFinished().map((c) => c.id)).toEqual(['w-2']);
+  });
+
+  it('discardFinished frees drained cycles but the summary still counts them', () => {
+    const t = new CycleTracker({ discardFinished: true });
+    run(t, 'w-0', 0, 1);
+    run(t, 'w-1', 0, 3);
+    t.record(fact({ kind: 'admitted', time: 0, unitIdentity: 'w-2' }));
+    t.drainFinished();
+    expect(t.cycles().map((c) => c.id)).toEqual(['w-2']);
+    const s = t.summary();
+    expect(s).toMatchObject({ total: 3, open: 1, byOutcome: expect.objectContaining({ ok: 2 }) });
+    expect(s.completionLatencyMs).toEqual({ mean: 2000, max: 3000 });
+  });
+
+  it('a cycle that reopens after it was drained is handed out again when it completes', () => {
+    const t = new CycleTracker();
+    run(t, 'w-0', 0, 1);
+    expect(t.drainFinished()).toHaveLength(1);
+    t.record(msg(2, 'w-0:p:e:', 'w-0'));
+    t.record(settled(4, 'w-0:p:e:', 'succeeded', 'message'));
+    expect(t.drainFinished().map((c) => [c.id, c.completedAtMs])).toEqual([['w-0', 4000]]);
+    expect(t.summary().byOutcome.ok).toBe(1);
+    expect(t.summary().completionLatencyMs).toEqual({ mean: 4000, max: 4000 });
+  });
+});

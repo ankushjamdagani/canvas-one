@@ -55,6 +55,17 @@ function mapOutcome(category: 'root' | 'message', outcome: string): CycleOutcome
  */
 export class CycleTracker {
   private readonly byId = new Map<string, Open>();
+  /** Cycles dropped from `byId` after being handed out (see `drainFinished`). */
+  private discarded = 0;
+  /** Ids that completed since the last `drainFinished`, in completion order. */
+  private finished: string[] = [];
+  /** Running totals over completed cycles, so the summary survives discarding. */
+  private readonly byOutcome = emptyOutcomeCounts();
+  private readonly response = { n: 0, sum: 0, max: 0 };
+  private readonly completion = { n: 0, sum: 0, max: 0 };
+
+  /** `discardFinished`: a stream's cycles leave memory once handed out; the summary still counts them. */
+  constructor(private readonly options: { readonly discardFinished?: boolean } = {}) {}
 
   record(fact: SimLifecycleFact): void {
     if ((fact.kind === 'admitted' || fact.kind === 'rejected') && fact.category === 'root') {
@@ -64,6 +75,7 @@ export class CycleTracker {
       if (!c) return;
       c.open.add(fact.unitIdentity);
       // Work born after the cycle looked complete (a consumer publishing on) reopens it.
+      if (c.outcome !== null) this.uncount(c);
       c.completedAtMs = null;
       c.outcome = null;
     } else if (fact.kind === 'unit_settled' && fact.outcome !== undefined) {
@@ -83,7 +95,70 @@ export class CycleTracker {
   }
 
   cycles(): readonly Cycle[] {
-    return [...this.byId.values()].map((c) => ({
+    return [...this.byId.values()].map((c) => this.snapshot(c));
+  }
+
+  openCycleIds(): readonly string[] {
+    return [...this.byId.values()].filter((c) => c.outcome === null).map((c) => c.id);
+  }
+
+  /** Cycles that completed since the last call, once each, in completion order. */
+  drainFinished(): Cycle[] {
+    const out: Cycle[] = [];
+    for (const id of new Set(this.finished)) {
+      const c = this.byId.get(id);
+      if (!c || c.outcome === null) continue;
+      out.push(this.snapshot(c));
+      if (this.options.discardFinished) {
+        this.byId.delete(id);
+        this.discarded++;
+      }
+    }
+    this.finished = [];
+    return out;
+  }
+
+  summary(): CycleSummary {
+    let open = 0;
+    for (const c of this.byId.values()) if (c.outcome === null) open++;
+    const stat = (a: { n: number; sum: number; max: number }) => (a.n === 0 ? null : { mean: a.sum / a.n, max: a.max });
+    return {
+      total: this.byId.size + this.discarded,
+      open,
+      byOutcome: { ...this.byOutcome },
+      responseLatencyMs: stat(this.response),
+      completionLatencyMs: stat(this.completion),
+    };
+  }
+
+  private count(c: Open): void {
+    this.byOutcome[c.outcome!]++;
+    const done = c.completedAtMs! - c.startedAtMs;
+    this.completion.n++;
+    this.completion.sum += done;
+    this.completion.max = Math.max(this.completion.max, done);
+    if (c.responseAtMs !== null) {
+      const resp = c.responseAtMs - c.startedAtMs;
+      this.response.n++;
+      this.response.sum += resp;
+      this.response.max = Math.max(this.response.max, resp);
+    }
+  }
+
+  /** A completed cycle reopened: take back what `count` added (max is not reversible, so it keeps the larger value). */
+  private uncount(c: Open): void {
+    this.byOutcome[c.outcome!]--;
+    const done = c.completedAtMs! - c.startedAtMs;
+    this.completion.n--;
+    this.completion.sum -= done;
+    if (c.responseAtMs !== null) {
+      this.response.n--;
+      this.response.sum -= c.responseAtMs - c.startedAtMs;
+    }
+  }
+
+  private snapshot(c: Open): Cycle {
+    return {
       id: c.id,
       workloadId: c.workloadId,
       startedAtMs: c.startedAtMs,
@@ -91,30 +166,7 @@ export class CycleTracker {
       completedAtMs: c.completedAtMs,
       outcome: c.outcome,
       counts: { ...c.counts },
-    }));
-  }
-
-  openCycleIds(): readonly string[] {
-    return [...this.byId.values()].filter((c) => c.outcome === null).map((c) => c.id);
-  }
-
-  summary(): CycleSummary {
-    const byOutcome = emptyOutcomeCounts();
-    const responses: number[] = [];
-    const completions: number[] = [];
-    let open = 0;
-    for (const c of this.byId.values()) {
-      if (c.outcome === null) {
-        open++;
-        continue;
-      }
-      byOutcome[c.outcome]++;
-      completions.push(c.completedAtMs! - c.startedAtMs);
-      if (c.responseAtMs !== null) responses.push(c.responseAtMs - c.startedAtMs);
-    }
-    const stat = (xs: number[]) =>
-      xs.length === 0 ? null : { mean: xs.reduce((a, b) => a + b, 0) / xs.length, max: Math.max(...xs) };
-    return { total: this.byId.size, open, byOutcome, responseLatencyMs: stat(responses), completionLatencyMs: stat(completions) };
+    };
   }
 
   private open(id: string, time: number): void {
@@ -144,6 +196,8 @@ export class CycleTracker {
     if (c.open.size === 0 && c.rootSettled) {
       c.completedAtMs = atMs;
       c.outcome = c.worst;
+      this.count(c);
+      this.finished.push(c.id);
     }
   }
 }
