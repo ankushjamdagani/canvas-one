@@ -102,8 +102,8 @@ function buildS06(): Document {
   doc = { ...doc, fixtures: [...doc.fixtures, approval] };
 
   const gatewayEntry = { elementId: gateway, portId: (el(gateway).behavior as { entryPortId: Id }).entryPortId };
-  const workload = (profile: Workload['profile']): Workload => ({
-    id: mint(), entry: gatewayEntry, enabled: true, rate: 100, profile, timeoutMs: 30000, intervalMs: null,
+  const workload = (emission: Workload['emission'], startDelayMs = 0): Workload => ({
+    id: mint(), entry: gatewayEntry, enabled: true, startDelayMs, emission, timeoutMs: 30000,
     // Class IDs are unique per document; the name 'Order' matches the connections' class label.
     classes: [{ id: mint(), name: 'Order', weight: 1, operation: 'write', tags: [], keyDistribution: { kind: 'uniform', catalogSize: 10000, hotSubset: 1, hotShare: 100 } }],
   });
@@ -113,24 +113,29 @@ function buildS06(): Document {
   const metricCheck = (elementId: Id, key: 'p95LatencyMs' | 'throughput', operator: Assertion['operator'], expected: number, label: string): Assertion => ({
     id: mint(), label, subject: { kind: 'metric', elementId, key }, operator, expected,
   });
-  const scenario = (label: string, profile: Workload['profile'], completion: Scenario['completion'], assertions: Assertion[], maxEvents: number): Scenario => {
-    const wl = workload(profile);
+  const scenario = (label: string, workloads: Workload[], assertions: Assertion[], maxEvents: number): Scenario => {
+    const wl = workloads[0];
     return {
       // The card processor is outside the scope: the boundary on the payment call stands in for it.
       id: mint(), label, revision: 0, mode: 'timed', scopeElementIds: doc.elements.filter((e) => e.id !== processor).map((e) => e.id),
-      entryPorts: [wl.entry], inputs: [], workloads: [wl], faults: [],
+      entryPorts: [wl.entry], inputs: [], workloads, faults: [],
       boundaries: [{
         id: mint(), source: { elementId: payments, portId: chargeOut.id }, schemaId: chargeOut.responseSchemaId!,
         responses: [{ id: mint(), match: { op: 'exists', value: { kind: 'literal', value: true } }, responseFixtureId: approval.id, payloadBindings: [], delayMs: 150, afterInputId: null, outcome: 'succeeded', repeat: true }],
       }],
-      refinementSelections: [], initialContexts: [], assertions, seed: 6, budgets: { ...DEFAULT_SCENARIO_BUDGETS, maxEvents }, completion, assumptions: [],
+      refinementSelections: [], initialContexts: [], assertions, seed: 6, budgets: { ...DEFAULT_SCENARIO_BUDGETS, maxEvents }, assumptions: [],
     };
   };
   doc = {
     ...doc,
     scenarios: [
-      scenario('Steady traffic', { kind: 'steady' }, { kind: 'horizon', horizonMs: 30000 }, CHECKS.steady(count, metricCheck, { gateway, worker }), DEFAULT_SCENARIO_BUDGETS.maxEvents),
-      scenario('Flash sale', { kind: 'burst', peakRate: 600, startMs: 10000, endMs: 20000 }, { kind: 'drain', arrivalHorizonMs: 30000, deadlineMs: 120000 }, CHECKS.flash(count, metricCheck, { gateway, worker }), 1_000_000),
+      // 100 orders/s for 30 s.
+      scenario('Steady traffic', [workload({ mode: 'bulk', requests: 3000, arrival: { spreadMs: 30000 } })], CHECKS.steady(count, metricCheck, { gateway, worker }), DEFAULT_SCENARIO_BUDGETS.maxEvents),
+      // The same 100 orders/s, plus a 500 orders/s spike (600/s in all) from 10 s to 20 s.
+      scenario('Flash sale', [
+        workload({ mode: 'bulk', requests: 3000, arrival: { spreadMs: 30000 } }),
+        workload({ mode: 'bulk', requests: 5000, arrival: { spreadMs: 10000 } }, 10000),
+      ], CHECKS.flash(count, metricCheck, { gateway, worker }), 1_000_000),
     ],
   };
   return doc;

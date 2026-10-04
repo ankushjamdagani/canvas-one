@@ -65,9 +65,8 @@ import type {
   InitialContext,
   Input,
   ScenarioMode,
-  CompletionPolicy,
   ScenarioBudgets,
-  WorkloadProfile,
+  Emission,
 } from './model';
 import { checkReadiness, type ReadinessIssue } from './readiness';
 import { canonicalJson, sha256Hex } from './canonical';
@@ -154,10 +153,9 @@ export type ManifestWorkload = {
   readonly id: Id;
   readonly entry: Endpoint;
   readonly enabled: boolean;
-  readonly rate: number;
-  readonly profile: WorkloadProfile;
+  readonly startDelayMs: number;
+  readonly emission: Emission;
   readonly timeoutMs: number;
-  readonly intervalMs: null;
   readonly classes: readonly ManifestRequestClass[];
 };
 
@@ -176,7 +174,6 @@ export type ManifestScenario = {
   readonly assertions: readonly ManifestAssertion[];
   readonly seed: number;
   readonly budgets: ScenarioBudgets;
-  readonly completion: CompletionPolicy;
   readonly assumptions: readonly ManifestAssumption[];
 };
 
@@ -288,14 +285,14 @@ const DEPLOYED_ON_RELATION_KEYS = ['id', 'label', 'kind', 'elementId', 'hostId']
 const ASSERTION_KEYS = ['id', 'label', 'subject', 'operator', 'expected'] as const;
 const ASSUMPTION_KEYS = ['id', 'key', 'value', 'source', 'description'] as const;
 // §7: "Workload / RequestClass | class name | everything else, including enablement, tags and class order"
-const WORKLOAD_KEYS = ['id', 'entry', 'enabled', 'rate', 'profile', 'timeoutMs', 'intervalMs', 'classes'] as const;
+const WORKLOAD_KEYS = ['id', 'entry', 'enabled', 'startDelayMs', 'emission', 'timeoutMs', 'classes'] as const;
 const REQUEST_CLASS_KEYS = ['id', 'name', 'weight', 'operation', 'tags', 'keyDistribution'] as const;
 // §7: "Scenario | label | everything else. Scope lists are sorted as sets; inputs, faults,
 // operations and transitions stay ordered."
 const SCENARIO_KEYS = [
   'id', 'label', 'revision', 'mode', 'scopeElementIds', 'entryPorts', 'inputs', 'workloads',
   'faults', 'boundaries', 'refinementSelections', 'initialContexts', 'assertions', 'seed',
-  'budgets', 'completion', 'assumptions',
+  'budgets', 'assumptions',
 ] as const;
 
 function byId(a: { readonly id: Id }, b: { readonly id: Id }): number {
@@ -503,10 +500,9 @@ export async function buildManifest(
       id: w.id,
       entry: w.entry,
       enabled: w.enabled,
-      rate: w.rate,
-      profile: w.profile,
+      startDelayMs: w.startDelayMs,
+      emission: w.emission,
       timeoutMs: w.timeoutMs,
-      intervalMs: w.intervalMs,
       classes,
     };
   });
@@ -533,7 +529,6 @@ export async function buildManifest(
     // authored type (no omission path exists), so it is copied through as-is rather than
     // defaulted.
     budgets: scenario.budgets,
-    completion: scenario.completion,
     assumptions,
   };
 

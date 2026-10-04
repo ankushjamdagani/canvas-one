@@ -327,9 +327,6 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "quiescent"
-      },
       "assumptions": []
     }
   ],

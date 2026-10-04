@@ -33,7 +33,6 @@ import {
   VALUE_KINDS,
   TRANSPORT_OUTCOMES,
   OPERATION_KINDS,
-  COMPLETION_KINDS,
   ASSERTION_SUBJECT_KINDS,
   ASSERTION_OPERATORS,
   COUNT_SUBJECT_SCOPES,
@@ -2662,10 +2661,10 @@ function validateRouteCondition(
 
 
 
-/** D50: steady, burst ({peakRate, startMs < endMs}) or ramp ({endRate}). */
+/** D50/D56: steady, burst ({peakRate, startMs < endMs}) or ramp ({endRate, rampMs}). */
 function validateWorkloadProfile(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
   const kind = (value as { kind?: unknown } | null)?.kind;
-  const keys = kind === 'burst' ? ['kind', 'peakRate', 'startMs', 'endMs'] : kind === 'ramp' ? ['kind', 'endRate'] : ['kind'];
+  const keys = kind === 'burst' ? ['kind', 'peakRate', 'startMs', 'endMs'] : kind === 'ramp' ? ['kind', 'endRate', 'rampMs'] : ['kind'];
   if (!checkRecord(value, keys, keys, path, entityId, issues, 'Workload profile')) return;
   const p = value as Record<string, unknown>;
   if (kind === 'burst') {
@@ -2677,6 +2676,7 @@ function validateWorkloadProfile(value: unknown, path: (string | number)[], enti
     }
   } else if (kind === 'ramp') {
     validateNumber(p.endRate, 0, 10000, [...path, 'endRate'], entityId, issues, 'endRate', false, true);
+    validateNumber(p.rampMs, 1, 3600000, [...path, 'rampMs'], entityId, issues, 'rampMs');
   } else if (kind !== 'steady') {
     issues.push({ code: 'invalid-literal', path: [...path, 'kind'], entityId, severity: 'error', message: `Workload profile kind must be 'steady', 'burst' or 'ramp'` });
   }
@@ -3317,7 +3317,7 @@ function validateScenario(
   const allowed = [
     'id', 'label', 'revision', 'mode', 'scopeElementIds', 'entryPorts',
     'inputs', 'workloads', 'faults', 'boundaries', 'refinementSelections',
-    'initialContexts', 'assertions', 'seed', 'budgets', 'completion', 'assumptions',
+    'initialContexts', 'assertions', 'seed', 'budgets', 'assumptions',
   ];
 
   if (!checkRecord(s, allowed, allowed, sPath, null, issues, 'Scenario')) return;
@@ -3671,9 +3671,6 @@ function validateScenario(
   // Budgets (storage.md §6: events 1M, trace rows 100k, trace bytes 16 MiB, scheduled events 100k, live roots 10k)
   validateScenarioBudgets(rec.budgets, [...sPath, 'budgets'], sId, issues);
 
-  // Completion
-  validateCompletionPolicy(rec.completion, [...sPath, 'completion'], sId, issues);
-
   // Assumptions
   if (validateArray(rec.assumptions, Number.MAX_SAFE_INTEGER, [...sPath, 'assumptions'], sId, issues, 'Scenario assumptions')) {
     const assumptions = rec.assumptions as unknown[];
@@ -3773,6 +3770,42 @@ function validateResourceMetadata(
   }
 }
 
+/** D56: a workload emits a bulk of N requests or an endless stream. */
+function validateEmission(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
+  const mode = (value as { mode?: unknown } | null)?.mode;
+  if (mode === 'bulk') {
+    if (!checkRecord(value, ['mode', 'requests', 'arrival'], ['mode', 'requests', 'arrival'], path, entityId, issues, 'Bulk emission')) return;
+    const e = value as Record<string, unknown>;
+    validateNumber(e.requests, 1, 100000, [...path, 'requests'], entityId, issues, 'Bulk requests', true);
+    validateBulkArrival(e.arrival, [...path, 'arrival'], entityId, issues);
+  } else if (mode === 'stream') {
+    if (!checkRecord(value, ['mode', 'ratePerSecond', 'profile'], ['mode', 'ratePerSecond', 'profile'], path, entityId, issues, 'Stream emission')) return;
+    const e = value as Record<string, unknown>;
+    validateNumber(e.ratePerSecond, 0, 10000, [...path, 'ratePerSecond'], entityId, issues, 'Stream ratePerSecond', false, true);
+    validateWorkloadProfile(e.profile, [...path, 'profile'], entityId, issues);
+  } else {
+    issues.push(errorIssue('invalid-literal', [...path, 'mode'], entityId, `Workload emission mode must be 'bulk' or 'stream'`));
+  }
+}
+
+function validateBulkArrival(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
+  if (value === 'instant') return;
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const rec = value as Record<string, unknown>;
+    if ('ramp' in rec) {
+      if (!checkRecord(rec, ['ramp'], ['ramp'], path, entityId, issues, 'Bulk arrival')) return;
+      if (!checkRecord(rec.ramp, ['spreadMs'], ['spreadMs'], [...path, 'ramp'], entityId, issues, 'Bulk ramp arrival')) return;
+      validateNumber((rec.ramp as Record<string, unknown>).spreadMs, 1, 3600000, [...path, 'ramp', 'spreadMs'], entityId, issues, 'spreadMs');
+      return;
+    }
+    if (checkRecord(rec, ['spreadMs'], ['spreadMs'], path, entityId, issues, 'Bulk arrival')) {
+      validateNumber(rec.spreadMs, 1, 3600000, [...path, 'spreadMs'], entityId, issues, 'spreadMs');
+    }
+    return;
+  }
+  issues.push(errorIssue('wrong-type', path, entityId, `Bulk arrival must be 'instant', { spreadMs } or { ramp: { spreadMs } }`));
+}
+
 function validateWorkload(
   w: unknown,
   path: readonly (string | number)[],
@@ -3781,7 +3814,7 @@ function validateWorkload(
   pendingEndpoints: { endpoint: Record<string, unknown>; path: readonly (string | number)[]; entityId: Id | null }[],
   issues: Issue[],
 ): void {
-  const allowed = ['id', 'entry', 'enabled', 'rate', 'profile', 'timeoutMs', 'intervalMs', 'classes'];
+  const allowed = ['id', 'entry', 'enabled', 'startDelayMs', 'emission', 'timeoutMs', 'classes'];
   if (!checkRecord(w, allowed, allowed, path, scenarioId, issues, 'Workload')) return;
 
   const rec = w as Record<string, unknown>;
@@ -3796,22 +3829,10 @@ function validateWorkload(
   }
 
   validateBoolean(rec.enabled, [...path, 'enabled'], wId ?? scenarioId, issues, 'Workload enabled');
-  validateNumber(rec.rate, 0, 10000, [...path, 'rate'], wId ?? scenarioId, issues, 'Workload rate', false, true);
-
-  validateWorkloadProfile(rec.profile, [...path, 'profile'], wId ?? scenarioId, issues);
+  validateNumber(rec.startDelayMs, 0, 3600000, [...path, 'startDelayMs'], wId ?? scenarioId, issues, 'Workload startDelayMs');
+  validateEmission(rec.emission, [...path, 'emission'], wId ?? scenarioId, issues);
 
   validateNumber(rec.timeoutMs, 1, 3600000, [...path, 'timeoutMs'], wId ?? scenarioId, issues, 'Workload timeoutMs');
-
-  if (rec.intervalMs !== null) {
-    issues.push(
-      errorIssue(
-        'structural-rule',
-        [...path, 'intervalMs'],
-        wId ?? scenarioId,
-        `Workload intervalMs must be null`,
-      ),
-    );
-  }
 
   // Classes (storage.md §6: 20 classes per workload)
   if (validateArray(rec.classes, 20, [...path, 'classes'], wId ?? scenarioId, issues, 'Workload classes')) {
@@ -3986,70 +4007,4 @@ function validateScenarioBudgets(
   validateNumber(rec.maxTraceBytes, 1, 16777216, [...path, 'maxTraceBytes'], scenarioId, issues, 'maxTraceBytes', true);
   validateNumber(rec.maxScheduledEvents, 1, 100000, [...path, 'maxScheduledEvents'], scenarioId, issues, 'maxScheduledEvents', true);
   validateNumber(rec.maxLiveRoots, 1, 10000, [...path, 'maxLiveRoots'], scenarioId, issues, 'maxLiveRoots', true);
-}
-
-function validateCompletionPolicy(
-  completion: unknown,
-  path: readonly (string | number)[],
-  scenarioId: Id | null,
-  issues: Issue[],
-): void {
-  if (completion === null || typeof completion !== 'object' || Array.isArray(completion)) {
-    issues.push(errorIssue('wrong-type', path, scenarioId, 'Completion policy must be an object'));
-    return;
-  }
-
-  const rec = completion as Record<string, unknown>;
-  const kind = rec.kind;
-
-  if (typeof kind !== 'string' || !COMPLETION_KINDS.includes(kind as (typeof COMPLETION_KINDS)[number])) {
-    issues.push(
-      errorIssue(
-        'invalid-literal',
-        [...path, 'kind'],
-        scenarioId,
-        `Invalid completion policy kind: '${String(kind)}'`,
-      ),
-    );
-    return;
-  }
-
-  // D32: completion kind vs scenario mode is a readiness rule (readiness.ts), not
-  // storable. The storable check only confirms `kind` is a valid literal (above) and
-  // validates each kind's own per-field bounds (below).
-
-  if (kind === 'quiescent') {
-    checkRecord(rec, ['kind'], ['kind'], path, scenarioId, issues, 'quiescent completion policy');
-  } else if (kind === 'horizon') {
-    if (checkRecord(rec, ['kind', 'horizonMs'], ['kind', 'horizonMs'], path, scenarioId, issues, 'horizon completion policy')) {
-      // storage.md §6: timed horizon 1–300 s (1,000..300,000 ms)
-      validateNumber(rec.horizonMs, 1000, 300000, [...path, 'horizonMs'], scenarioId, issues, 'horizonMs');
-    }
-  } else if (kind === 'drain') {
-    if (checkRecord(rec, ['kind', 'arrivalHorizonMs', 'deadlineMs'], ['kind', 'arrivalHorizonMs', 'deadlineMs'], path, scenarioId, issues, 'drain completion policy')) {
-      // storage.md §6: arrival horizon 1–300 s (1,000..300,000 ms), drain deadline > arrival horizon and <= 600 s (600,000 ms)
-      validateNumber(rec.arrivalHorizonMs, 1000, 300000, [...path, 'arrivalHorizonMs'], scenarioId, issues, 'arrivalHorizonMs');
-      validateNumber(rec.deadlineMs, 1000, 600000, [...path, 'deadlineMs'], scenarioId, issues, 'deadlineMs');
-      if (typeof rec.arrivalHorizonMs === 'number' && typeof rec.deadlineMs === 'number') {
-        if (rec.deadlineMs <= rec.arrivalHorizonMs) {
-          issues.push(
-            errorIssue(
-              'structural-rule',
-              [...path, 'deadlineMs'],
-              scenarioId,
-              `Drain deadlineMs (${rec.deadlineMs}) must be strictly greater than arrivalHorizonMs (${rec.arrivalHorizonMs})`,
-            ),
-          );
-        }
-      }
-    }
-  } else if (kind === 'count') {
-    if (checkRecord(rec, ['kind', 'requests', 'deadlineMs'], ['kind', 'requests', 'deadlineMs'], path, scenarioId, issues, 'count completion policy')) {
-      // D55: N root requests (whole number), then a drain deadline of 1–600 s of simulated time.
-      validateNumber(rec.requests, 1, 100000, [...path, 'requests'], scenarioId, issues, 'requests', true);
-      validateNumber(rec.deadlineMs, 1000, 600000, [...path, 'deadlineMs'], scenarioId, issues, 'deadlineMs');
-    }
-  } else if (kind === 'open') {
-    checkRecord(rec, ['kind'], ['kind'], path, scenarioId, issues, 'open completion policy');
-  }
 }

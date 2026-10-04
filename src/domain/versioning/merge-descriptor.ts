@@ -536,10 +536,9 @@ export const WORKLOAD_DESCRIPTOR: ObjectFieldDescriptor = {
     id: { type: 'scalar' },
     entry: ENDPOINT_DESCRIPTOR,
     enabled: { type: 'scalar' },
-    rate: { type: 'scalar' },
-    profile: { type: 'atomic' },
+    startDelayMs: { type: 'scalar' },
+    emission: { type: 'atomic' },
     timeoutMs: { type: 'scalar' },
-    intervalMs: { type: 'scalar' },
     classes: { type: 'atomic' }, // §7: workload classes are atomic
   },
 };
@@ -552,48 +551,6 @@ export const ASSERTION_DESCRIPTOR: ObjectFieldDescriptor = {
     subject: { type: 'atomic' },
     operator: { type: 'scalar' },
     expected: { type: 'scalar' }, // Json value
-  },
-};
-
-export const COMPLETION_POLICY_DESCRIPTOR: UnionFieldDescriptor = {
-  type: 'union',
-  discriminant: 'kind',
-  variants: {
-    quiescent: {
-      type: 'object',
-      fields: {
-        kind: { type: 'scalar' },
-      },
-    },
-    horizon: {
-      type: 'object',
-      fields: {
-        kind: { type: 'scalar' },
-        horizonMs: { type: 'scalar' },
-      },
-    },
-    drain: {
-      type: 'object',
-      fields: {
-        kind: { type: 'scalar' },
-        arrivalHorizonMs: { type: 'scalar' },
-        deadlineMs: { type: 'scalar' },
-      },
-    },
-    count: {
-      type: 'object',
-      fields: {
-        kind: { type: 'scalar' },
-        requests: { type: 'scalar' },
-        deadlineMs: { type: 'scalar' },
-      },
-    },
-    open: {
-      type: 'object',
-      fields: {
-        kind: { type: 'scalar' },
-      },
-    },
   },
 };
 
@@ -635,7 +592,6 @@ export const SCENARIO_DESCRIPTOR: ObjectFieldDescriptor = {
         maxLiveRoots: { type: 'scalar' },
       },
     },
-    completion: COMPLETION_POLICY_DESCRIPTOR,
     assumptions: { type: 'keyed', item: ASSUMPTION_DESCRIPTOR },
   },
 };

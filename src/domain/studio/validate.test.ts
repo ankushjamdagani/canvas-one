@@ -568,3 +568,48 @@ describe('validateDocument mutation tests', () => {
     }
   });
 });
+
+describe('workload emission (D56)', () => {
+  const withWorkload = (patch: Record<string, unknown>) => {
+    const doc = loadFixture('s06.json') as any;
+    Object.assign(doc.scenarios[0].workloads[0], patch);
+    return doc;
+  };
+
+  it('accepts a bulk and a stream emission', () => {
+    expect(validateDocument(loadFixture('s06.json')).ok).toBe(true);
+    expect(validateDocument(withWorkload({ emission: { mode: 'stream', ratePerSecond: 50, profile: { kind: 'steady' } } })).ok).toBe(true);
+    expect(validateDocument(withWorkload({ emission: { mode: 'stream', ratePerSecond: 50, profile: { kind: 'ramp', endRate: 90, rampMs: 5000 } } })).ok).toBe(true);
+    expect(validateDocument(withWorkload({ emission: { mode: 'bulk', requests: 10, arrival: { ramp: { spreadMs: 1000 } } } })).ok).toBe(true);
+    expect(validateDocument(withWorkload({ emission: { mode: 'bulk', requests: 10, arrival: 'instant' } })).ok).toBe(true);
+  });
+
+  it('rejects a scenario that still carries completion', () => {
+    const doc = loadFixture('s06.json') as any;
+    doc.scenarios[0].completion = { kind: 'horizon', horizonMs: 5000 };
+    const result = validateDocument(doc);
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(result)).toContain('completion');
+  });
+
+  it('rejects the old rate and profile workload fields', () => {
+    expect(validateDocument(withWorkload({ rate: 100, profile: { kind: 'steady' }, intervalMs: null })).ok).toBe(false);
+  });
+
+  it.each([
+    [{ mode: 'bulk', requests: 0, arrival: 'instant' }],
+    [{ mode: 'bulk', requests: 1.5, arrival: 'instant' }],
+    [{ mode: 'bulk', requests: 100001, arrival: 'instant' }],
+    [{ mode: 'bulk', requests: 10, arrival: { spreadMs: 0 } }],
+    [{ mode: 'bulk', requests: 10, arrival: 'later' }],
+    [{ mode: 'stream', ratePerSecond: -1, profile: { kind: 'steady' } }],
+    [{ mode: 'stream', ratePerSecond: 5, profile: { kind: 'ramp', endRate: 10 } }],
+    [{ mode: 'forever' }],
+  ])('rejects bad emission %j', (emission) => {
+    expect(validateDocument(withWorkload({ emission })).ok).toBe(false);
+  });
+
+  it('rejects a negative start delay', () => {
+    expect(validateDocument(withWorkload({ startDelayMs: -1 })).ok).toBe(false);
+  });
+});

@@ -4,7 +4,7 @@
  * Implements the "Runnable" validation level described in:
  * - specs/revamp/contracts/model-and-runner.md §1 ("Two validation levels, one schema.
  *   Runnable: also requires complete scope, supported behavior, compatible ports,
- *   nonempty inputs and an explicit completion policy. Readiness errors never block
+ *   nonempty inputs. Readiness errors never block
  *   saving a structurally valid design.")
  * - specs/revamp/contracts/model-and-runner.md §2 (Synchronous call cycles are rejected)
  * - specs/revamp/contracts/model-and-runner.md §3 (Port compatibility)
@@ -92,10 +92,10 @@ const READINESS_ISSUE_CODES = [
    * one finite input or enabled workload."
    */
   'no-arrivals',
-  /** §6 Completion: quiescent is logical-only; horizon/drain are timed-only. */
-  'completion-mode-mismatch',
-  /** storage.md §6: timed horizon 1-300s; drain deadline > arrival horizon and <=600s. */
-  'time-limit-out-of-range',
+  /** D56: only timed scenarios have workloads; a logical scenario is driven by its inputs. */
+  'workload-in-logical',
+  /** D56: a bulk needs a whole number of requests and a positive spread; an enabled stream needs a rate above zero. */
+  'workload-emission-range',
   /** §6 Boundaries: logical delayMs null; timed delayMs required, afterInputId null. */
   'boundary-timing-mode-mismatch',
   /** §6 Assertions: "A qualifying scenario needs >=1 assertion". */
@@ -104,8 +104,6 @@ const READINESS_ISSUE_CODES = [
   'assertion-subject-out-of-scope',
   /** §6 Workloads: "They can target only resource entry ports." */
   'workload-target-not-resource-entry',
-  /** D50: a burst must end within the scenario's arrival window (horizon, or drain's arrival horizon). */
-  'workload-profile-outside-window',
   /** D50: a broker's delivery route redelivers after a backoff; it has no attempt timeout. */
   'broker-route-attempt-timeout',
   /** run-identity.md §3: compiler returned 'analysis-limit' instead of a closure. */
@@ -772,22 +770,23 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   // --------------------------------------------------------------------------
   // §6: workloads can target only resource entry ports.
   // --------------------------------------------------------------------------
-  const arrivalWindowMs =
-    scenario.completion.kind === 'horizon'
-      ? scenario.completion.horizonMs
-      : scenario.completion.kind === 'drain'
-        ? scenario.completion.arrivalHorizonMs
-        : null;
   scenario.workloads.forEach((w, i) => {
-    if (w.profile.kind === 'burst' && arrivalWindowMs !== null && w.profile.endMs > arrivalWindowMs) {
-      issues.push(
-        issue(
-          'workload-profile-outside-window',
-          [...scenarioPath, 'workloads', i, 'profile', 'endMs'],
-          w.id,
-          `The burst ends at ${w.profile.endMs} ms, after arrivals stop at ${arrivalWindowMs} ms`,
-        ),
-      );
+    const at = [...scenarioPath, 'workloads', i];
+    if (scenario.mode === 'logical') {
+      issues.push(issue('workload-in-logical', at, w.id, 'Logical scenarios are driven by inputs; workloads belong to timed scenarios'));
+      return;
+    }
+    const e = w.emission;
+    if (e.mode === 'bulk') {
+      if (!Number.isInteger(e.requests) || e.requests < 1) {
+        issues.push(issue('workload-emission-range', [...at, 'emission', 'requests'], w.id, 'A bulk needs a whole number of requests, at least 1'));
+      }
+      const spread = e.arrival === 'instant' ? null : 'spreadMs' in e.arrival ? e.arrival.spreadMs : e.arrival.ramp.spreadMs;
+      if (spread !== null && !(spread >= 1)) {
+        issues.push(issue('workload-emission-range', [...at, 'emission', 'arrival'], w.id, 'A bulk spread needs at least 1 ms'));
+      }
+    } else if (w.enabled && !(e.ratePerSecond > 0)) {
+      issues.push(issue('workload-emission-range', [...at, 'emission', 'ratePerSecond'], w.id, 'A stream needs a rate above 0 per second'));
     }
   });
   doc.connections.forEach((conn, ci) => {
@@ -824,57 +823,6 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
       );
     }
   });
-
-  // --------------------------------------------------------------------------
-  // §6: completion policy kind must match scenario mode.
-  // --------------------------------------------------------------------------
-  const completion = scenario.completion;
-  if (scenario.mode === 'logical' && completion.kind !== 'quiescent') {
-    issues.push(
-      issue('completion-mode-mismatch', [...scenarioPath, 'completion', 'kind'], scenario.id, "Logical scenarios must use 'quiescent' completion"),
-    );
-  } else if (scenario.mode === 'timed' && completion.kind === 'quiescent') {
-    issues.push(
-      issue('completion-mode-mismatch', [...scenarioPath, 'completion', 'kind'], scenario.id, "Timed scenarios must use 'horizon', 'drain', 'count' or 'open' completion"),
-    );
-  }
-
-  // --------------------------------------------------------------------------
-  // storage.md §6: timed horizon 1-300s; drain deadline > arrival horizon and <=600s.
-  // --------------------------------------------------------------------------
-  if (completion.kind === 'horizon') {
-    if (completion.horizonMs < 1000 || completion.horizonMs > 300000) {
-      issues.push(
-        issue(
-          'time-limit-out-of-range',
-          [...scenarioPath, 'completion', 'horizonMs'],
-          scenario.id,
-          'Timed horizon must be within 1-300 seconds (storage.md §6)',
-        ),
-      );
-    }
-  } else if (completion.kind === 'drain') {
-    if (completion.arrivalHorizonMs < 1000 || completion.arrivalHorizonMs > 300000) {
-      issues.push(
-        issue(
-          'time-limit-out-of-range',
-          [...scenarioPath, 'completion', 'arrivalHorizonMs'],
-          scenario.id,
-          'Drain arrival horizon must be within 1-300 seconds (storage.md §6)',
-        ),
-      );
-    }
-    if (completion.deadlineMs <= completion.arrivalHorizonMs || completion.deadlineMs > 600000) {
-      issues.push(
-        issue(
-          'time-limit-out-of-range',
-          [...scenarioPath, 'completion', 'deadlineMs'],
-          scenario.id,
-          'Drain deadline must be greater than the arrival horizon and at most 600 seconds (storage.md §6)',
-        ),
-      );
-    }
-  }
 
   // --------------------------------------------------------------------------
   // §6 Boundaries: logical delayMs null; timed delayMs required, afterInputId null.

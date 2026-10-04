@@ -9,6 +9,7 @@
  * - §6 Scenarios
  */
 
+import type { BulkArrival } from '../bulk-arrivals';
 import { VALID_KINDS } from '../execution';
 
 // ============================================================================
@@ -1119,29 +1120,44 @@ export type RequestClass = {
 };
 
 /**
- * D50: a workload's arrival rate over its arrival window. `burst` runs at `peakRate`
- * between `startMs` and `endMs` (from the run start) and at `rate` otherwise; `ramp` moves
- * linearly from `rate` to `endRate` over the arrival window.
+ * D50/D56: the arrival rate of a stream over time. `burst` runs at `peakRate` between `startMs`
+ * and `endMs` (from the run start) and at the base rate otherwise; `ramp` moves linearly from the
+ * base rate to `endRate` over `rampMs` and then holds `endRate`.
  */
 export type WorkloadProfile =
   | { readonly kind: 'steady' }
   | { readonly kind: 'burst'; readonly peakRate: number; readonly startMs: number; readonly endMs: number }
-  | { readonly kind: 'ramp'; readonly endRate: number };
+  | { readonly kind: 'ramp'; readonly endRate: number; readonly rampMs: number };
+
+/** D56: a bulk of N requests; the run's cycle for this source completes when all N have settled. */
+export type BulkEmission = {
+  readonly mode: 'bulk';
+  readonly requests: number;
+  readonly arrival: BulkArrival;
+};
+
+/** D56: requests at a rate with no end; the run goes on until the user presses Stop. */
+export type StreamEmission = {
+  readonly mode: 'stream';
+  readonly ratePerSecond: number;
+  readonly profile: WorkloadProfile;
+};
+
+export type Emission = BulkEmission | StreamEmission;
 
 /**
- * Contract §6: Workload
- * Workloads keep the current WorkloadDefinition/RequestClass fields, with interval null,
- * entryNodeId replaced by entry:Endpoint, UUID workload/class IDs, and a steady, burst or
- * ramp profile (D50).
+ * Contract §6: Workload (D56)
+ * A source: where requests enter, when it starts (`startDelayMs` from the run start), and what it
+ * emits (a bulk of N or an endless stream). Keeps the RequestClass fields; entry is an Endpoint,
+ * IDs are UUIDs.
  */
 export type Workload = {
   readonly id: Id;
   readonly entry: Endpoint;
   readonly enabled: boolean;
-  readonly rate: number;
-  readonly profile: WorkloadProfile;
+  readonly startDelayMs: number;
+  readonly emission: Emission;
   readonly timeoutMs: number;
-  readonly intervalMs: null;
   readonly classes: readonly RequestClass[];
 };
 
@@ -1231,55 +1247,6 @@ export type Selection = {
   readonly mode: 'aggregate' | 'refined';
 };
 export type RefinementSelection = Selection;
-
-// ----------------------------------------------------------------------------
-// Completion (§6)
-// ----------------------------------------------------------------------------
-
-export const COMPLETION_KINDS = ['quiescent', 'horizon', 'drain', 'count', 'open'] as const;
-export type CompletionKind = (typeof COMPLETION_KINDS)[number];
-
-export type QuiescentCompletionPolicy = {
-  readonly kind: 'quiescent';
-};
-
-export type HorizonCompletionPolicy = {
-  readonly kind: 'horizon';
-  readonly horizonMs: number;
-};
-
-export type DrainCompletionPolicy = {
-  readonly kind: 'drain';
-  readonly arrivalHorizonMs: number;
-  readonly deadlineMs: number;
-};
-
-/** D55: arrivals stop after `requests` root requests have arrived; the run drains until `deadlineMs`. */
-export type CountCompletionPolicy = {
-  readonly kind: 'count';
-  readonly requests: number;
-  readonly deadlineMs: number;
-};
-
-/** D55: no end: the run goes on until the user stops it, then stops arrivals and drains (60 s at most). */
-export type OpenCompletionPolicy = {
-  readonly kind: 'open';
-};
-
-/**
- * Contract §6: Completion
- * - {kind:'quiescent'}: logical only
- * - {kind:'horizon',horizonMs}: timed
- * - {kind:'drain',arrivalHorizonMs,deadlineMs}: timed
- * - {kind:'count',requests,deadlineMs}: timed (D55)
- * - {kind:'open'}: timed, until stopped (D55)
- */
-export type CompletionPolicy =
-  | QuiescentCompletionPolicy
-  | HorizonCompletionPolicy
-  | DrainCompletionPolicy
-  | CountCompletionPolicy
-  | OpenCompletionPolicy;
 
 // ----------------------------------------------------------------------------
 // Initial Contexts (§6)
@@ -1423,7 +1390,7 @@ export type Assumption = {
  * entryPorts:Endpoint[],inputs:Input[],workloads:Workload[],faults:Fault[],
  * boundaries:Boundary[],refinementSelections:Selection[],
  * initialContexts:[{elementId,fixtureId}],assertions:Assertion[],seed,
- * budgets,completion,assumptions:Assumption[]}
+ * budgets,assumptions:Assumption[]}
  */
 export type Scenario = {
   readonly id: Id;
@@ -1441,6 +1408,5 @@ export type Scenario = {
   readonly assertions: readonly Assertion[];
   readonly seed: number;
   readonly budgets: ScenarioBudgets;
-  readonly completion: CompletionPolicy;
   readonly assumptions: readonly Assumption[];
 };

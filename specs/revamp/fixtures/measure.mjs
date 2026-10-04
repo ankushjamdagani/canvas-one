@@ -77,7 +77,7 @@ function inventory(document) {
     if(c.kind === 'call') assert(compatible(a.responseSchemaId,b.responseSchemaId), 'Call response mismatch');
   }
   for (const s of document.scenarios) {
-    keys(s,'id,label,revision,mode,scopeElementIds,entryPorts,inputs,workloads,faults,boundaries,refinementSelections,initialContexts,assertions,seed,budgets,completion,assumptions',s.label);
+    keys(s,'id,label,revision,mode,scopeElementIds,entryPorts,inputs,workloads,faults,boundaries,refinementSelections,initialContexts,assertions,seed,budgets,assumptions',s.label);
     assert(s.assertions.length > 0 && s.inputs.length > 0, 'Vacuous fixture');
     for (const id of s.scopeElementIds) assert(elements.has(id), 'Missing scope');
     for (const i of s.inputs) { const p=endpoint(i.entry); const f=fixtures.get(i.fixtureId); assert(p.direction === 'in' && f && compatible(p.schemaId,f.schemaId),'Input shape'); }

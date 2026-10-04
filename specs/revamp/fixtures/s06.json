@@ -802,21 +802,24 @@
       "inputs": [],
       "workloads": [
         {
-          "id": "00000000-0006-4000-8000-000000000044",
+          "id": "00000000-0006-4000-8000-000000000041",
           "entry": {
             "elementId": "00000000-0006-4000-8000-000000000004",
             "portId": "00000000-0006-4000-8000-000000000008"
           },
           "enabled": true,
-          "rate": 100,
-          "profile": {
-            "kind": "steady"
+          "startDelayMs": 0,
+          "emission": {
+            "mode": "bulk",
+            "requests": 3000,
+            "arrival": {
+              "spreadMs": 30000
+            }
           },
           "timeoutMs": 30000,
-          "intervalMs": null,
           "classes": [
             {
-              "id": "00000000-0006-4000-8000-000000000045",
+              "id": "00000000-0006-4000-8000-000000000042",
               "name": "Order",
               "weight": 1,
               "operation": "write",
@@ -864,7 +867,7 @@
       "initialContexts": [],
       "assertions": [
         {
-          "id": "00000000-0006-4000-8000-000000000041",
+          "id": "00000000-0006-4000-8000-000000000043",
           "label": "no failed orders",
           "subject": {
             "kind": "count",
@@ -876,7 +879,7 @@
           "expected": 0
         },
         {
-          "id": "00000000-0006-4000-8000-000000000042",
+          "id": "00000000-0006-4000-8000-000000000044",
           "label": "p95 checkout under 400 ms",
           "subject": {
             "kind": "metric",
@@ -887,7 +890,7 @@
           "expected": 400
         },
         {
-          "id": "00000000-0006-4000-8000-000000000043",
+          "id": "00000000-0006-4000-8000-000000000045",
           "label": "about 100 orders/s get through",
           "subject": {
             "kind": "metric",
@@ -906,14 +909,10 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "horizon",
-        "horizonMs": 30000
-      },
       "assumptions": []
     },
     {
-      "id": "00000000-0006-4000-8000-000000000050",
+      "id": "00000000-0006-4000-8000-000000000052",
       "label": "Flash sale",
       "revision": 0,
       "mode": "timed",
@@ -935,24 +934,56 @@
       "inputs": [],
       "workloads": [
         {
-          "id": "00000000-0006-4000-8000-00000000004e",
+          "id": "00000000-0006-4000-8000-000000000049",
           "entry": {
             "elementId": "00000000-0006-4000-8000-000000000004",
             "portId": "00000000-0006-4000-8000-000000000008"
           },
           "enabled": true,
-          "rate": 100,
-          "profile": {
-            "kind": "burst",
-            "peakRate": 600,
-            "startMs": 10000,
-            "endMs": 20000
+          "startDelayMs": 0,
+          "emission": {
+            "mode": "bulk",
+            "requests": 3000,
+            "arrival": {
+              "spreadMs": 30000
+            }
           },
           "timeoutMs": 30000,
-          "intervalMs": null,
           "classes": [
             {
-              "id": "00000000-0006-4000-8000-00000000004f",
+              "id": "00000000-0006-4000-8000-00000000004a",
+              "name": "Order",
+              "weight": 1,
+              "operation": "write",
+              "tags": [],
+              "keyDistribution": {
+                "kind": "uniform",
+                "catalogSize": 10000,
+                "hotSubset": 1,
+                "hotShare": 100
+              }
+            }
+          ]
+        },
+        {
+          "id": "00000000-0006-4000-8000-00000000004b",
+          "entry": {
+            "elementId": "00000000-0006-4000-8000-000000000004",
+            "portId": "00000000-0006-4000-8000-000000000008"
+          },
+          "enabled": true,
+          "startDelayMs": 10000,
+          "emission": {
+            "mode": "bulk",
+            "requests": 5000,
+            "arrival": {
+              "spreadMs": 10000
+            }
+          },
+          "timeoutMs": 30000,
+          "classes": [
+            {
+              "id": "00000000-0006-4000-8000-00000000004c",
               "name": "Order",
               "weight": 1,
               "operation": "write",
@@ -970,7 +1001,7 @@
       "faults": [],
       "boundaries": [
         {
-          "id": "00000000-0006-4000-8000-000000000051",
+          "id": "00000000-0006-4000-8000-000000000053",
           "source": {
             "elementId": "00000000-0006-4000-8000-00000000001b",
             "portId": "00000000-0006-4000-8000-000000000020"
@@ -978,7 +1009,7 @@
           "schemaId": "00000000-0006-4000-8000-00000000001e",
           "responses": [
             {
-              "id": "00000000-0006-4000-8000-000000000052",
+              "id": "00000000-0006-4000-8000-000000000054",
               "match": {
                 "op": "exists",
                 "value": {
@@ -1000,7 +1031,7 @@
       "initialContexts": [],
       "assertions": [
         {
-          "id": "00000000-0006-4000-8000-000000000049",
+          "id": "00000000-0006-4000-8000-00000000004d",
           "label": "at most 1,000 orders turned away at the peak",
           "subject": {
             "kind": "count",
@@ -1012,7 +1043,7 @@
           "expected": 1000
         },
         {
-          "id": "00000000-0006-4000-8000-00000000004a",
+          "id": "00000000-0006-4000-8000-00000000004e",
           "label": "no fulfilment message expires",
           "subject": {
             "kind": "count",
@@ -1024,7 +1055,7 @@
           "expected": 0
         },
         {
-          "id": "00000000-0006-4000-8000-00000000004b",
+          "id": "00000000-0006-4000-8000-00000000004f",
           "label": "the fulfilment backlog drains",
           "subject": {
             "kind": "count",
@@ -1036,7 +1067,7 @@
           "expected": 0
         },
         {
-          "id": "00000000-0006-4000-8000-00000000004c",
+          "id": "00000000-0006-4000-8000-000000000050",
           "label": "no failed orders",
           "subject": {
             "kind": "count",
@@ -1048,7 +1079,7 @@
           "expected": 0
         },
         {
-          "id": "00000000-0006-4000-8000-00000000004d",
+          "id": "00000000-0006-4000-8000-000000000051",
           "label": "fulfilment keeps working through the spike",
           "subject": {
             "kind": "metric",
@@ -1066,11 +1097,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 30000,
-        "deadlineMs": 120000
       },
       "assumptions": []
     }

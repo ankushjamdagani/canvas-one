@@ -3586,9 +3586,6 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "quiescent"
-      },
       "assumptions": []
     },
     {
@@ -3726,9 +3723,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "quiescent"
       },
       "assumptions": []
     },
@@ -3928,9 +3922,6 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "quiescent"
-      },
       "assumptions": []
     },
     {
@@ -4040,11 +4031,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
       },
       "assumptions": []
     },
@@ -4156,11 +4142,6 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
-      },
       "assumptions": []
     },
     {
@@ -4252,9 +4233,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "quiescent"
       },
       "assumptions": []
     },
@@ -4473,11 +4451,6 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
-      },
       "assumptions": []
     },
     {
@@ -4643,11 +4616,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
       },
       "assumptions": []
     },
@@ -4815,11 +4783,6 @@
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
       },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
-      },
       "assumptions": []
     },
     {
@@ -4931,11 +4894,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
       },
       "assumptions": []
     },
@@ -5095,11 +5053,6 @@
         "maxTraceBytes": 4194304,
         "maxScheduledEvents": 100000,
         "maxLiveRoots": 10000
-      },
-      "completion": {
-        "kind": "drain",
-        "arrivalHorizonMs": 6000,
-        "deadlineMs": 10000
       },
       "assumptions": []
     }
