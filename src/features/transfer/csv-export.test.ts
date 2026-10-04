@@ -20,6 +20,7 @@ import type { Document, Id } from '../../domain/studio/model';
 import type { ElementMetric, RunSummary } from '../../domain/studio/runner/types';
 import type { RunRecord } from '../../persistence/studio/types';
 import { exportRunCsv, formatCsvTextCell, MalformedRunError } from './csv-export';
+import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 
 function makeSnapshotDocument(elements: readonly { id: Id; label: string }[] = []): Document {
   return {
@@ -47,6 +48,7 @@ function makeSnapshotDocument(elements: readonly { id: Id; label: string }[] = [
 function makeRunRecord(overrides: Partial<RunRecord> = {}): RunRecord {
   const defaultSummary: RunSummary = {
     mode: 'timed',
+    cycles: emptyCycleSummary(),
     consumedInputs: 10,
     rootCounts: { generated: 10, succeeded: 8, rejected: 1, failed: 1, expired: 0, inFlight: 0 },
     messageCounts: { generated: 20, succeeded: 18, rejected: 0, failed: 2, expired: 0, inFlight: 0 },
@@ -261,6 +263,7 @@ describe('CSV v1 Export (exportRunCsv)', () => {
     it('exports measured counts for logical runs with empty sample times', () => {
       const logicalSummary: RunSummary = {
         mode: 'logical',
+        cycles: emptyCycleSummary(),
         consumedInputs: 5,
         rootCounts: { generated: 5, succeeded: 5, rejected: 0, failed: 0, expired: 0, inFlight: 0 },
         messageCounts: { generated: 10, succeeded: 10, rejected: 0, failed: 0, expired: 0, inFlight: 0 },

@@ -532,10 +532,9 @@ describe('Retained Resource Adapter (RV-14d-2)', () => {
       id: 'wl-stream',
       entry: { elementId: 'p1', portId: 'p1-in' },
       enabled: true,
-      rate: 20, // arrives every 50ms
-      profile: { kind: 'steady' },
+      startDelayMs: 0,
+      emission: { mode: 'stream', ratePerSecond: 20, profile: { kind: 'steady' } },
       timeoutMs: 1000,
-      intervalMs: null,
       classes: [
         {
           id: 'rc-wl',
@@ -626,10 +625,9 @@ describe('Retained Resource Adapter (RV-14d-2)', () => {
       id: 'wl-prime',
       entry: { elementId: 'cache', portId: 'cache-in' },
       enabled: true,
-      rate: 10,
-      profile: { kind: 'steady' },
+      startDelayMs: 0,
+      emission: { mode: 'stream', ratePerSecond: 10, profile: { kind: 'steady' } },
       timeoutMs: 1000,
-      intervalMs: null,
       classes: [
         {
           id: 'rc-prime',

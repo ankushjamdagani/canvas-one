@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { evidenceEntryFromTerminal } from './evidence';
 import type { RunUpdate } from './types';
+import { emptyCycleSummary } from './cycles';
 
 function terminalUpdate(): Extract<RunUpdate, { kind: 'terminal' }> {
   return {
@@ -13,6 +14,7 @@ function terminalUpdate(): Extract<RunUpdate, { kind: 'terminal' }> {
     ],
     summary: {
       mode: 'logical',
+      cycles: emptyCycleSummary(),
       consumedInputs: 2,
       rootCounts: { generated: 2, succeeded: 2, rejected: 0, failed: 0, expired: 0, inFlight: 0 },
       messageCounts: { generated: 0, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 0 },

@@ -97,12 +97,13 @@ function build(opts: {
     id: mint(), label: 'Steady', revision: 0, mode: 'timed', scopeElementIds: doc.elements.map((e) => e.id),
     entryPorts: [entry], inputs: [],
     workloads: [{
-      id: mint(), entry, enabled: true, rate: opts.rate ?? 50, profile: { kind: 'steady' }, timeoutMs: 30000, intervalMs: null,
+      id: mint(), entry, enabled: true, startDelayMs: 0, timeoutMs: 30000,
+      emission: { mode: 'bulk', requests: Math.round((opts.rate ?? 50) * (opts.seconds ?? 5)), arrival: { spreadMs: (opts.seconds ?? 5) * 1000 } },
       classes: [{ id: mint(), name: 'Req', weight: 1, operation: 'read', tags: [], keyDistribution: { kind: 'uniform', catalogSize: 100, hotSubset: 1, hotShare: 100 } }],
     }],
     faults: [], boundaries: [], refinementSelections: [], initialContexts: [],
     assertions: [count('succeeded'), count('failed'), count('rejected'), count('expired')],
-    seed: 9, budgets: DEFAULT_SCENARIO_BUDGETS, completion: { kind: 'drain', arrivalHorizonMs: (opts.seconds ?? 5) * 1000, deadlineMs: 60000 }, assumptions: [],
+    seed: 9, budgets: DEFAULT_SCENARIO_BUDGETS, assumptions: [],
   };
   return { doc: { ...doc, scenarios: [scenario] }, caller, callee, worker };
 }

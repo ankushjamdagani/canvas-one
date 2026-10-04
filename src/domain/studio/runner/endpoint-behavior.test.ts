@@ -40,12 +40,13 @@ function build(settings: Record<string, unknown> | null): { doc: Document; servi
     id: mint(), label: 'Steady', revision: 0, mode: 'timed', scopeElementIds: [service.id],
     entryPorts: [entry], inputs: [],
     workloads: [{
-      id: mint(), entry, enabled: true, rate: 100, profile: { kind: 'steady' }, timeoutMs: 30000, intervalMs: null,
+      id: mint(), entry, enabled: true, startDelayMs: 0, timeoutMs: 30000,
+      emission: { mode: 'bulk', requests: 500, arrival: { spreadMs: 5000 } },
       classes: [{ id: mint(), name: 'Req', weight: 1, operation: 'read', tags: [], keyDistribution: { kind: 'uniform', catalogSize: 100, hotSubset: 1, hotShare: 100 } }],
     }],
     faults: [], boundaries: [], refinementSelections: [], initialContexts: [],
     assertions: [count('failed', 'at-least', 0), count('rejected', 'at-least', 0), count('succeeded', 'at-least', 0)],
-    seed: 8, budgets: DEFAULT_SCENARIO_BUDGETS, completion: { kind: 'horizon', horizonMs: 5000 }, assumptions: [],
+    seed: 8, budgets: DEFAULT_SCENARIO_BUDGETS, assumptions: [],
   };
   return { doc: { ...doc, scenarios: [scenario] }, service: service.id };
 }

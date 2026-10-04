@@ -190,7 +190,6 @@ function logicalHappyDoc(): Document {
     ],
     seed: 1,
     budgets: defaultBudgets,
-    completion: { kind: 'quiescent' },
     assumptions: [],
   };
   return baseDoc([M], [], scenario);
@@ -228,7 +227,6 @@ function timedHappyDoc(): Document {
     ],
     seed: 1,
     budgets: defaultBudgets,
-    completion: { kind: 'horizon', horizonMs: 5000 },
     assumptions: [],
   };
   return baseDoc([R], [], scenario);
@@ -286,7 +284,6 @@ describe('checkReadiness mutation tests', () => {
       assertions: [{ id: 'a1', label: 'final', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 0 }],
       seed: 1,
       budgets: defaultBudgets,
-      completion: { kind: 'quiescent' },
       assumptions: [],
     };
     const doc = baseDoc([A, B], [conn], scenario, [
@@ -358,7 +355,6 @@ describe('checkReadiness mutation tests', () => {
       assertions: [{ id: 'a1', label: 's', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 1 }],
       seed: 1,
       budgets: defaultBudgets,
-      completion: { kind: 'horizon', horizonMs: 5000 },
       assumptions: [],
     };
     const doc = baseDoc([R1, R2], [conn1, conn2], scenario);
@@ -409,7 +405,6 @@ describe('checkReadiness mutation tests', () => {
       assertions: [{ id: 'a1', label: 's', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 1 }],
       seed: 1,
       budgets: defaultBudgets,
-      completion: { kind: 'quiescent' },
       assumptions: [],
     };
     const doc = baseDoc([R], [], scenario);
@@ -430,34 +425,49 @@ describe('checkReadiness mutation tests', () => {
     }
   });
 
-  it('rejects completion kind quiescent in timed mode', () => {
+  const bulkWorkload = (emission: unknown, enabled = true) => ({
+    id: 'w1',
+    entry: { elementId: 'r1', portId: 'rp1' },
+    enabled,
+    startDelayMs: 0,
+    emission,
+    timeoutMs: 1000,
+    classes: [{ id: 'c1', name: 'c', weight: 1, operation: 'read', tags: [], keyDistribution: { kind: 'uniform', catalogSize: 10, hotSubset: 1, hotShare: 1 } }],
+  });
+  const withWorkload = (workload: unknown) => {
     const doc = clone(timedHappyDoc());
-    (doc.scenarios[0] as { completion: { kind: string } }).completion = { kind: 'quiescent' };
+    (doc.scenarios[0] as any).inputs = [];
+    (doc.scenarios[0] as any).workloads = [workload];
+    return doc;
+  };
+  const codes = (doc: ReturnType<typeof timedHappyDoc>) => {
     const result = checkReadiness(doc, 'scn-timed');
-    expect(result.ready).toBe(false);
-    if (!result.ready) {
-      expect(result.issues.some((i) => i.code === 'completion-mode-mismatch')).toBe(true);
-    }
+    return result.ready ? [] : result.issues.map((i) => i.code);
+  };
+
+  it('accepts a bulk and a stream as the only traffic', () => {
+    expect(checkReadiness(withWorkload(bulkWorkload({ mode: 'bulk', requests: 10, arrival: { spreadMs: 1000 } })), 'scn-timed').ready).toBe(true);
+    expect(checkReadiness(withWorkload(bulkWorkload({ mode: 'stream', ratePerSecond: 5, profile: { kind: 'steady' } })), 'scn-timed').ready).toBe(true);
   });
 
-  it('rejects a horizon of 301 seconds', () => {
-    const doc = clone(timedHappyDoc());
-    (doc.scenarios[0].completion as { horizonMs: number }).horizonMs = 301000;
-    const result = checkReadiness(doc, 'scn-timed');
-    expect(result.ready).toBe(false);
-    if (!result.ready) {
-      expect(result.issues.some((i) => i.code === 'time-limit-out-of-range')).toBe(true);
-    }
+  it('rejects a bulk with no requests or a spread under a millisecond', () => {
+    expect(codes(withWorkload(bulkWorkload({ mode: 'bulk', requests: 0, arrival: 'instant' })))).toContain('workload-emission-range');
+    expect(codes(withWorkload(bulkWorkload({ mode: 'bulk', requests: 5, arrival: { spreadMs: 0 } })))).toContain('workload-emission-range');
+    expect(codes(withWorkload(bulkWorkload({ mode: 'bulk', requests: 2.5, arrival: 'instant' })))).toContain('workload-emission-range');
   });
 
-  it('rejects a drain deadline <= arrival horizon', () => {
-    const doc = clone(timedHappyDoc());
-    (doc.scenarios[0] as any).completion = { kind: 'drain', arrivalHorizonMs: 6000, deadlineMs: 5000 };
-    const result = checkReadiness(doc, 'scn-timed');
+  it('rejects an enabled stream with no rate, but not a disabled one', () => {
+    const stream = { mode: 'stream', ratePerSecond: 0, profile: { kind: 'steady' } };
+    expect(codes(withWorkload(bulkWorkload(stream)))).toContain('workload-emission-range');
+    expect(codes(withWorkload(bulkWorkload(stream, false)))).not.toContain('workload-emission-range');
+  });
+
+  it('rejects a workload in a logical scenario', () => {
+    const doc = clone(logicalHappyDoc());
+    (doc.scenarios[0] as any).workloads = [bulkWorkload({ mode: 'bulk', requests: 1, arrival: 'instant' })];
+    const result = checkReadiness(doc, 'scn-logical');
     expect(result.ready).toBe(false);
-    if (!result.ready) {
-      expect(result.issues.some((i) => i.code === 'time-limit-out-of-range')).toBe(true);
-    }
+    if (!result.ready) expect(result.issues.map((i) => i.code)).toContain('workload-in-logical');
   });
 
   it('rejects a boundary delayMs set in logical mode', () => {
@@ -518,10 +528,9 @@ describe('checkReadiness mutation tests', () => {
         id: 'w1',
         entry: { elementId: 'd1', portId: 'dp1' },
         enabled: true,
-        rate: 1,
-        profile: { kind: 'steady' },
+        startDelayMs: 0,
+        emission: { mode: 'bulk', requests: 1, arrival: 'instant' },
         timeoutMs: 1000,
-        intervalMs: null,
         classes: [{ id: 'c1', name: 'c', weight: 1, operation: 'read', tags: [], keyDistribution: { kind: 'uniform', catalogSize: 10, hotSubset: 1, hotShare: 1 } }],
       },
     ];
@@ -562,7 +571,6 @@ describe('checkReadiness mutation tests', () => {
       assertions: [{ id: 'a1', label: 's', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'succeeded' }, operator: 'equals', expected: 1 }],
       seed: 1,
       budgets: defaultBudgets,
-      completion: { kind: 'horizon', horizonMs: 5000 },
       assumptions: [],
     };
     const doc = baseDoc([R, X], [conn], scenario);
@@ -988,7 +996,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1052,7 +1059,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1105,7 +1111,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1158,7 +1163,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1198,7 +1202,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1243,7 +1246,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'horizon', horizonMs: 5000 },
         assumptions: [],
       };
 
@@ -1285,7 +1287,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1327,7 +1328,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1361,7 +1361,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1401,7 +1400,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 
@@ -1443,7 +1441,6 @@ describe('RV-02f runnable-readiness rejects', () => {
         ],
         seed: 1,
         budgets: defaultBudgets,
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
 

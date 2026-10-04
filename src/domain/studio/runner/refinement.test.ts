@@ -135,7 +135,6 @@ function scenarioFor(refinementSelections: Selection[]): Scenario {
     assertions: [],
     seed: 1,
     budgets: { maxEvents: 1000, maxTraceRows: 1000, maxTraceBytes: 1_000_000, maxScheduledEvents: 1000, maxLiveRoots: 1000 },
-    completion: { kind: 'quiescent' },
     assumptions: [],
   };
 }

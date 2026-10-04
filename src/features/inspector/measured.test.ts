@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { RunSummary } from '../../domain/studio/runner/types';
 import { selectMeasuredSection } from './measured';
+import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 
 function summary(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     mode: 'timed',
+    cycles: emptyCycleSummary(),
     consumedInputs: 10,
     rootCounts: { generated: 10, succeeded: 10, rejected: 0, failed: 0, expired: 0, inFlight: 0 },
     messageCounts: { generated: 0, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 0 },

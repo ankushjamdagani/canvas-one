@@ -22,6 +22,7 @@ import { computeSnapshotId } from './primitives';
 import { LocalRepository } from './repository';
 import { mintRunStartToken } from './token';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type ProjectCreateCommand } from './types';
+import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 
 const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
@@ -35,6 +36,7 @@ const testActor: Actor = {
 function createMockSummary(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     mode: 'logical',
+    cycles: emptyCycleSummary(),
     consumedInputs: 1,
     rootCounts: { generated: 1, succeeded: 1, rejected: 0, failed: 0, expired: 0, inFlight: 0 },
     messageCounts: { generated: 0, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 0 },

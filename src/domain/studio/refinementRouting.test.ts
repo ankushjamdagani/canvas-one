@@ -71,7 +71,6 @@ function scenario(selections: readonly Selection[]): Scenario {
       maxScheduledEvents: 100,
       maxLiveRoots: 100,
     },
-    completion: { kind: 'quiescent' },
     assumptions: [],
   };
 }

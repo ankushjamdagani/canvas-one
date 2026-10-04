@@ -1,19 +1,27 @@
 /**
- * D55: a run can be paced against the wall clock and stopped; an open-ended run is never unpaced.
+ * D55: a run can be paced against the wall clock and stopped; a run with a stream is never unpaced.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Document } from '../../domain/studio/model';
+import type { Document, Emission } from '../../domain/studio/model';
 import { DEFAULT_BUILD_VERSIONS } from '../../persistence/studio/types';
 import { WorkerProtocolHandler, type HostMessage } from './protocol';
 
 const s06 = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
 
-/** S06's first scenario with a different completion, so the test needs no network or storage. */
-function withCompletion(completion: Document['scenarios'][number]['completion']): Document {
-  return { ...s06, scenarios: s06.scenarios.map((s, i) => (i === 0 ? { ...s, completion } : s)) };
+/** S06's first scenario with a different emission, so the test needs no network or storage. */
+function withEmission(emission: Emission): Document {
+  return {
+    ...s06,
+    scenarios: s06.scenarios.map((s, i) => (i === 0 ? { ...s, workloads: s.workloads.map((w) => ({ ...w, emission })) } : s)),
+  };
 }
+
+/** 100 requests/s for 2 simulated seconds. */
+const TWO_SECONDS: Emission = { mode: 'bulk', requests: 200, arrival: { spreadMs: 2000 } };
+/** 100 requests/s with no end. */
+const STREAM: Emission = { mode: 'stream', ratePerSecond: 100, profile: { kind: 'steady' } };
 
 async function start(doc: Document, speed?: number) {
   const messages: HostMessage[] = [];
@@ -42,7 +50,7 @@ const terminalOf = (run: Awaited<ReturnType<typeof start>>) => {
 
 describe('paced runs (D55)', () => {
   it('an unpaced run finishes at once; a paced one takes simulated time divided by speed', async () => {
-    const doc = withCompletion({ kind: 'horizon', horizonMs: 2000 });
+    const doc = withEmission(TWO_SECONDS);
     const fast = await start(doc);
     await fast.waitFor(fast.terminal, 20000);
     expect(terminalOf(fast)?.status).toBe('completed');
@@ -58,7 +66,7 @@ describe('paced runs (D55)', () => {
   }, 60000);
 
   it('reports progress while it runs, not only at the end', async () => {
-    const run = await start(withCompletion({ kind: 'horizon', horizonMs: 2000 }), 4);
+    const run = await start(withEmission(TWO_SECONDS), 4);
     await run.waitFor(() => run.messages.some((m) => m.type === 'update' && m.message.kind === 'batch'), 5000);
     expect(run.terminal()).toBeUndefined();
     await run.waitFor(run.terminal, 20000);
@@ -67,8 +75,8 @@ describe('paced runs (D55)', () => {
 });
 
 describe('stopping a run (D55)', () => {
-  it('an open run goes on until stopped, then drains and completes with its results', async () => {
-    const run = await start(withCompletion({ kind: 'open' }), 50);
+  it('a stream goes on until stopped, then drains and completes with its results', async () => {
+    const run = await start(withEmission(STREAM), 50);
     await new Promise((r) => setTimeout(r, 300));
     expect(run.terminal()).toBeUndefined();
     await run.handler.handleMessage({ type: 'control', runId: 'run', kind: 'stop' });
@@ -80,8 +88,8 @@ describe('stopping a run (D55)', () => {
     expect(terminal?.summary.rootCounts.inFlight).toBe(0);
   }, 60000);
 
-  it('an open run is never unpaced, even when Instant was chosen', async () => {
-    const run = await start(withCompletion({ kind: 'open' }));
+  it('a stream is never unpaced, even when Instant was chosen', async () => {
+    const run = await start(withEmission(STREAM));
     await new Promise((r) => setTimeout(r, 300));
     // Unpaced it would have run to the 24-hour ceiling or a budget by now; paced it is still going.
     expect(run.terminal()).toBeUndefined();
@@ -91,7 +99,7 @@ describe('stopping a run (D55)', () => {
   }, 60000);
 
   it('stop on a paused run resumes it to drain', async () => {
-    const run = await start(withCompletion({ kind: 'open' }), 50);
+    const run = await start(withEmission(STREAM), 50);
     await new Promise((r) => setTimeout(r, 150));
     await run.handler.handleMessage({ type: 'control', runId: 'run', kind: 'pause' });
     await run.handler.handleMessage({ type: 'control', runId: 'run', kind: 'stop' });
@@ -100,7 +108,7 @@ describe('stopping a run (D55)', () => {
   }, 60000);
 
   it('cancel still discards: no results are kept', async () => {
-    const run = await start(withCompletion({ kind: 'open' }), 50);
+    const run = await start(withEmission(STREAM), 50);
     await new Promise((r) => setTimeout(r, 100));
     await run.handler.handleMessage({ type: 'control', runId: 'run', kind: 'cancel' });
     await run.waitFor(run.terminal, 5000);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { traceEventId, rootId, PayloadTable, TraceRecorder, RunUpdateGuard, type TraceAppendInput } from './trace';
 import type { RunUpdate, TraceEvent } from './types';
+import { emptyCycleSummary } from './cycles';
 
 function input(overrides: Partial<TraceAppendInput> = {}): TraceAppendInput {
   return {
@@ -205,6 +206,7 @@ describe('RunUpdateGuard', () => {
       checks: [],
       summary: {
         mode: 'logical',
+        cycles: emptyCycleSummary(),
         consumedInputs: 0,
         rootCounts: { generated: 0, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 0 },
         messageCounts: { generated: 0, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 0 },

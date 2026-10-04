@@ -335,7 +335,6 @@ describe('Scenario Scope Closure (computeClosure)', () => {
               maxScheduledEvents: 100,
               maxLiveRoots: 100,
             },
-            completion: { kind: 'quiescent' },
             assumptions: [],
           },
         ],

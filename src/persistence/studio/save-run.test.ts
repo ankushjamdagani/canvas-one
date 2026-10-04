@@ -9,6 +9,7 @@ import { computeSnapshotId } from './primitives';
 import type { Actor, ProjectCreateCommand } from './types';
 import type { Document } from '../../domain/studio/model';
 import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../domain/studio/runner/types';
+import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 
 const s01Doc = JSON.parse(
   readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
@@ -23,6 +24,7 @@ const testActor: Actor = {
 function createMockSummary(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     mode: 'logical',
+    cycles: emptyCycleSummary(),
     consumedInputs: 1,
     rootCounts: {
       generated: 1,

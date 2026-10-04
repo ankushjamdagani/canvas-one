@@ -22,6 +22,7 @@ import {
   NO_PROJECT_REASON,
   NO_SAVED_RUN_REASON,
 } from './preconditions';
+import { emptyCycleSummary } from '../../../domain/studio/runner/cycles';
 
 const s05 = REFERENCE_EXAMPLES.find((e) => e.id === 's05')!.fixture;
 
@@ -230,6 +231,7 @@ describe('createTransferActions: exportCsv', () => {
   function makeRunRecord(): RunRecord {
     const summary: RunSummary = {
       mode: 'timed',
+      cycles: emptyCycleSummary(),
       consumedInputs: 10,
       rootCounts: { generated: 10, succeeded: 8, rejected: 1, failed: 1, expired: 0, inFlight: 0 },
       messageCounts: { generated: 20, succeeded: 18, rejected: 0, failed: 2, expired: 0, inFlight: 0 },

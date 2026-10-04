@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { evaluateAssertion, evaluateAssertions } from './assertions';
 import type { Assertion } from '../model';
 import type { RunSummary, TraceEvent } from './types';
+import { emptyCycleSummary } from './cycles';
 
 describe('assertions: evaluateAssertion', () => {
   const dummySummary: RunSummary = {
     mode: 'logical',
+    cycles: emptyCycleSummary(),
     consumedInputs: 2,
     rootCounts: {
       generated: 2,

@@ -34,7 +34,6 @@ function scenario(mode: Scenario['mode'], scopeElementIds: readonly Id[] = [ids.
     entryPorts: [], inputs: [], workloads: [], faults: [], boundaries: [], refinementSelections: [],
     initialContexts: [], assertions: [], seed: 1,
     budgets: { maxEvents: 100, maxTraceRows: 100, maxTraceBytes: 1000, maxScheduledEvents: 100, maxLiveRoots: 10 },
-    completion: mode === 'logical' ? { kind: 'quiescent' } : { kind: 'horizon', horizonMs: 1000 },
     assumptions: [],
   };
 }

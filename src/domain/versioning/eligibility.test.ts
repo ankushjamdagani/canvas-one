@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { CheckResult, RunSummary, TerminalStatus } from '../studio/runner/types';
 import { buildEvidenceManifest, evaluateCandidate, runQualifies } from './eligibility';
 import type { CandidateScenario, RunCandidate, RunQualifiesExpected } from './types';
+import { emptyCycleSummary } from '../studio/runner/cycles';
 
 function createMockSummary(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     mode: 'logical',
+    cycles: emptyCycleSummary(),
     consumedInputs: 1,
     rootCounts: {
       generated: 1,
