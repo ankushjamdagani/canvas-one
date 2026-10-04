@@ -154,7 +154,35 @@ export type RowOutcome = {
   readonly errorCode: 'schema-mismatch' | 'wrong-type' | 'missing-path' | 'integer-overflow' | null;
 };
 
+/** D56: how one cycle ended, worst first when its units differ. `lost` is reserved for a lost leg. */
+export type CycleOutcome = 'ok' | 'expired' | 'rejected' | 'timed-out' | 'failed' | 'lost' | 'stuck';
+
+/**
+ * D56: one request from a source and everything it caused. The response reaches the source at
+ * `responseAtMs`; the cycle is complete at `completedAtMs`, when its last descendant has settled.
+ */
+export type Cycle = {
+  /** The root unit's identity: `${workloadId}-${ordinal}`. */
+  readonly id: string;
+  readonly workloadId: Id;
+  readonly startedAtMs: number;
+  readonly responseAtMs: number | null;
+  readonly completedAtMs: number | null;
+  readonly outcome: CycleOutcome | null;
+  /** Over the root and its descendant messages. */
+  readonly counts: Readonly<Record<CycleOutcome, number>>;
+};
+
+export type CycleSummary = {
+  readonly total: number;
+  readonly open: number;
+  readonly byOutcome: Readonly<Record<CycleOutcome, number>>;
+  readonly responseLatencyMs: { readonly mean: number; readonly max: number } | null;
+  readonly completionLatencyMs: { readonly mean: number; readonly max: number } | null;
+};
+
 export type RunSummary = {
+  readonly cycles: CycleSummary;
   readonly mode: 'logical' | 'timed';
   readonly consumedInputs: number;
   readonly rootCounts: Counts;
