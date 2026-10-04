@@ -327,7 +327,7 @@ export class RunController {
   goLive(): void {
     if (!this.playback?.isStream) return;
     this.seek(this.playback.computedMs);
-    this.resume();
+    if (!this.playback.ended) this.resume();
   }
 
   /** D57: the current run's recording and playhead (timed runs), or null. */

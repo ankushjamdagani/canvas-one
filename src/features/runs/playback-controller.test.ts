@@ -163,6 +163,10 @@ describe('playback pacing (D57)', () => {
     await until(() => controller.getState().phase === 'done');
     expect(controller.getState().current?.terminal?.status).toBe('completed');
     expect(saved).toHaveLength(1);
+    controller.seek(store.windowStartMs);
+    controller.goLive();
+    expect(store.playheadMs).toBe(store.computedMs);
+    expect(store.playing).toBe(false);
     controller.reset();
   }, 30000);
 
