@@ -162,6 +162,8 @@ export type CycleOutcome = 'ok' | 'expired' | 'rejected' | 'timed-out' | 'failed
  * `responseAtMs`; the cycle is complete at `completedAtMs`, when its last descendant has settled.
  */
 export type Cycle = {
+  /** Observation time for streamed revisions, including a late descendant reopening a cycle. */
+  readonly observedAtMs?: number;
   /** The root unit's identity: `${workloadId}-${ordinal}`. */
   readonly id: string;
   readonly workloadId: Id;
@@ -191,6 +193,17 @@ export type RunCheckpoint = {
   readonly messageCounts: Counts;
   readonly cycles: CycleSummary;
   readonly elementMetrics: readonly ElementMetric[];
+};
+
+/** Exact measured changes observed after one discrete timed scheduler step. */
+export type ResultDelta = {
+  readonly atMs: number;
+  readonly rootCounts?: Counts;
+  readonly messageCounts?: Counts;
+  /** Replacement rows keyed by elementId/scope/key. */
+  readonly elementMetrics?: readonly ElementMetric[];
+  /** Occupied slot fractions immediately after the measurement; integrate until the next event. */
+  readonly occupancyRates?: Readonly<Record<string, number>>;
 };
 
 export type RunSummary = {

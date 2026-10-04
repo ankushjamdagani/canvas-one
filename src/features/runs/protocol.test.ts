@@ -17,6 +17,35 @@ const loadS01 = (): Document =>
 const s01Doc = loadS01();
 
 describe('Worker Protocol and Handler (protocol.ts)', () => {
+  it('records exact timed measurements and checkpoints the measured final summary', async () => {
+    const document = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+    const source = document.scenarios[0];
+    const snapshot = { id: 'measured', document: { ...document, scenarios: [{ ...source,
+      workloads: source.workloads.map(w => ({ ...w, startDelayMs: 0, emission: { mode: 'bulk' as const, requests: 2, arrival: 'instant' as const } })),
+    }] } };
+    const messages: HostMessage[] = [];
+    let finished!: () => void;
+    const terminalReady = new Promise<void>(resolve => { finished = resolve; });
+    const handler = new WorkerProtocolHandler(message => {
+      messages.push(message);
+      if (message.type === 'update' && message.message.kind === 'terminal') finished();
+    });
+    await handler.handleMessage({ type: 'compile', requestId: 'metrics', snapshot, scenarioId: source.id, versions: DEFAULT_BUILD_VERSIONS });
+    const compile = messages[0];
+    if (compile.type !== 'compile-result' || compile.result.status !== 'ready') throw new Error('Compile failed');
+    await handler.handleMessage({ type: 'start', runId: 'metrics', snapshotId: snapshot.id, ...compile.result.plan, interactive: true });
+    await terminalReady;
+    const updates = messages.flatMap(message => message.type === 'update' ? [message.message] : []);
+    const checkpoints = updates.filter(message => message.kind === 'checkpoint');
+    expect(checkpoints[0].checkpoint.rootCounts.generated).toBe(0);
+    const terminal = updates.find(message => message.kind === 'terminal');
+    if (!terminal || terminal.kind !== 'terminal') throw new Error('No terminal');
+    expect(checkpoints.at(-1)?.checkpoint).toEqual({ atMs: terminal.summary.elapsedMs,
+      rootCounts: terminal.summary.rootCounts, messageCounts: terminal.summary.messageCounts,
+      cycles: terminal.summary.cycles, elementMetrics: terminal.summary.elementMetrics });
+    const deltas = updates.flatMap(message => message.kind === 'results' ? message.records : []);
+    expect(deltas.some(delta => !delta.rootCounts && !delta.messageCounts && delta.elementMetrics?.some(metric => metric.key === 'active' || metric.key === 'queued'))).toBe(true);
+  });
   it('compile -> start -> batches -> one terminal for S01', async () => {
     const messages: HostMessage[] = [];
     const handler = new WorkerProtocolHandler((msg) => {
@@ -54,6 +83,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: planHandle.planId,
       workerSessionId: planHandle.workerSessionId,
+      interactive: true,
     });
 
     // Wait for stepping batches and terminal to complete
@@ -124,6 +154,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan.planId,
       workerSessionId: plan.workerSessionId,
+      interactive: true,
     });
 
     // Second start with same handle is rejected
@@ -134,6 +165,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan.planId,
       workerSessionId: plan.workerSessionId,
+      interactive: true,
     });
 
     expect(messages).toHaveLength(1);
@@ -158,6 +190,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId: 'snap-1',
       planId: 'forged-plan-id',
       workerSessionId: handler.sessionId,
+      interactive: true,
     });
 
     let update = messages[0] as RunUpdateMessage;
@@ -175,6 +208,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId: 'snap-1',
       planId: 'any-plan-id',
       workerSessionId: 'different-session-id',
+      interactive: true,
     });
 
     update = messages[0] as RunUpdateMessage;
@@ -218,6 +252,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan.planId,
       workerSessionId: plan.workerSessionId,
+      interactive: true,
     });
 
     // Pause immediately
@@ -294,6 +329,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan.planId,
       workerSessionId: plan.workerSessionId,
+      interactive: true,
     });
 
     await new Promise((r) => setTimeout(r, 40));
@@ -378,6 +414,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan.planId,
       workerSessionId: plan.workerSessionId,
+      interactive: true,
     });
 
     expect(messages).toHaveLength(1);
@@ -415,6 +452,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan1.planId,
       workerSessionId: plan1.workerSessionId,
+      interactive: true,
     });
 
     await new Promise<void>((resolve) => {
@@ -451,6 +489,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
       snapshotId,
       planId: plan2.planId,
       workerSessionId: plan2.workerSessionId,
+      interactive: true,
     });
 
     await handler.handleMessage({

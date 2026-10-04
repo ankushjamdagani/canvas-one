@@ -7,7 +7,8 @@
  * `advance(realDtMs)`.
  */
 
-import type { Cycle, FlowRecord, RunCheckpoint } from '../../domain/studio/runner/types';
+import type { Cycle, CycleOutcome, ElementMetric, FlowRecord, ResultDelta, RunCheckpoint } from '../../domain/studio/runner/types';
+import { CycleIndex } from './playback-history';
 
 /** How much history behind the playhead a stream keeps, in simulated ms. */
 export const HISTORY_MS = 120_000;
@@ -46,8 +47,19 @@ export class PlaybackStore {
   private readonly options: PlaybackOptions;
   private flow: FlowRecord[] = [];
   private flowSorted = true;
-  private cycles: Cycle[] = [];
+  private readonly cyclesById = new Map<string, Cycle>();
+  private cycleRevisions: { atMs: number; cycle: Cycle }[] = [];
+  private readonly evictedCycles = {
+    total: 0,
+    byOutcome: emptyCycleCounts(),
+    response: { n: 0, sum: 0, max: 0 },
+    completion: { n: 0, sum: 0, max: 0 },
+  };
   private readonly checkpoints: RunCheckpoint[] = [];
+  private resultDeltas: ResultDelta[] = [];
+  private readonly timelineIndex = new CycleIndex();
+  private readonly resultsIndex = new CycleIndex();
+  private resultsCache: { atMs: number; baseline: RunCheckpoint; cursor: number; rootCounts: RunCheckpoint['rootCounts']; messageCounts: RunCheckpoint['messageCounts']; metrics: Map<string, ElementMetric>; occupancyRates: Readonly<Record<string, number>> } | null = null;
   private indexedAt = -Infinity;
   private cursor = 0;
   private readonly transit = new Map<number, FlowRecord>();
@@ -60,8 +72,10 @@ export class PlaybackStore {
   private computed = 0;
   private windowStart = 0;
   private endAt: number | null = null;
+  /** Changes when new cycle revisions arrive, including updates at the same computed instant. */
+  version = 0;
 
-  /** Simulated seconds per real second; Infinity jumps to the live edge. */
+  /** Simulated seconds per real second. */
   speed = 1;
   playing = false;
 
@@ -83,11 +97,41 @@ export class PlaybackStore {
   }
 
   ingestCycles(cycles: readonly Cycle[]): void {
-    this.cycles.push(...cycles);
+    if (cycles.length) this.version++;
     for (const cycle of cycles) {
-      this.insertTime(this.cycleStarts, cycle.startedAtMs);
-      if (cycle.completedAtMs !== null) this.insertTime(this.cycleEnds, cycle.completedAtMs);
+      const previous = this.cyclesById.get(cycle.id);
+      this.cyclesById.set(cycle.id, cycle);
+      if (!previous) this.addRevision(cycle.startedAtMs, { ...cycle, responseAtMs: null, completedAtMs: null, outcome: null, counts: emptyCycleCounts() });
+      if (cycle.responseAtMs !== null && previous?.responseAtMs == null) {
+        this.addRevision(cycle.responseAtMs, { ...cycle, completedAtMs: null, outcome: null, counts: emptyCycleCounts() });
+      }
+      if (cycle.completedAtMs !== null) this.addRevision(cycle.observedAtMs ?? cycle.completedAtMs, cycle);
+      else if (previous?.completedAtMs != null && cycle.observedAtMs !== undefined) this.addRevision(cycle.observedAtMs, cycle);
+      if (!previous) this.insertTime(this.cycleStarts, cycle.startedAtMs);
+      if (previous?.completedAtMs != null && previous.completedAtMs !== cycle.completedAtMs) {
+        const old = this.lowerBound(this.cycleEnds, previous.completedAtMs); this.cycleEnds.splice(old, 1);
+      }
+      if (cycle.completedAtMs !== null && previous?.completedAtMs !== cycle.completedAtMs) this.insertTime(this.cycleEnds, cycle.completedAtMs);
     }
+  }
+
+  private addRevision(atMs: number, cycle: Cycle): void {
+    const last = this.cycleRevisions[this.cycleRevisions.length - 1];
+    if (atMs <= this.timelineIndex.at) this.timelineIndex.reset();
+    if (atMs <= this.resultsIndex.at) this.resultsIndex.reset();
+    if (!last || last.atMs <= atMs) this.cycleRevisions.push({ atMs, cycle });
+    else {
+      let lo = 0; let hi = this.cycleRevisions.length;
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (this.cycleRevisions[mid].atMs <= atMs) lo = mid + 1; else hi = mid; }
+      this.cycleRevisions.splice(lo, 0, { atMs, cycle });
+    }
+  }
+
+  ingestResults(records: readonly ResultDelta[]): void {
+    if (records.some(r => r.atMs <= (this.resultsCache?.atMs ?? -Infinity))) this.resultsCache = null;
+    const last = this.resultDeltas[this.resultDeltas.length - 1];
+    this.resultDeltas.push(...records);
+    if (last && records.some(r => r.atMs < last.atMs)) this.resultDeltas.sort((a, b) => a.atMs - b.atMs);
   }
 
   ingestCheckpoint(checkpoint: RunCheckpoint): void {
@@ -130,17 +174,22 @@ export class PlaybackStore {
     return this.endAt;
   }
 
+  get isStream(): boolean {
+    return this.options.historyMs !== null;
+  }
+
   /** Moves the playhead by `realDtMs` of real time at `speed`, never past what is computed or the end of the run. */
   advance(realDtMs: number): void {
     if (!this.playing) return;
     const limit = Math.min(this.computed, this.endAt ?? Infinity);
-    const target = this.speed === Infinity ? limit : this.playhead + (realDtMs / 1000) * this.speed * 1000;
+    const target = this.playhead + realDtMs * this.speed;
     this.playhead = Math.max(this.playhead, Math.min(target, limit));
     this.evict();
   }
 
   /** Jumps the playhead within the retained window and what is computed. */
   seek(ms: number): void {
+    if (Number.isNaN(ms)) return;
     const limit = Math.min(this.computed, this.endAt ?? Infinity);
     this.playhead = Math.max(this.windowStart, Math.min(ms, limit));
   }
@@ -198,7 +247,9 @@ export class PlaybackStore {
     const nodes = new Map(this.nodeCounts);
 
     const started = this.countThrough(this.cycleStarts, atMs);
-    const finished = this.countThrough(this.cycleEnds, atMs);
+    this.resultsIndex.read(this.cycleRevisions, atMs);
+    const cycleSummary = this.resultsIndex.summary(this.evictedCycles);
+    const finished = cycleSummary.total - cycleSummary.open - this.evictedCycles.total;
 
     let checkpoint: RunCheckpoint | null = null;
     for (const cp of this.checkpoints) {
@@ -207,6 +258,68 @@ export class PlaybackStore {
     }
 
     return { atMs, legs, nodes, cycles: { started, finished }, checkpoint };
+  }
+
+  /** Visible cycle state at t; no response, completion or outcome from the future leaks backward. */
+  cyclesAt(atMs: number): readonly Cycle[] {
+    this.timelineIndex.read(this.cycleRevisions, atMs);
+    return [...this.timelineIndex.cycles.values()];
+  }
+
+  /** Nearest distinct cycle start strictly before/after t. */
+  cycleStep(atMs: number, direction: -1 | 1): number | null {
+    if (direction === -1) {
+      const index = this.lowerBound(this.cycleStarts, atMs) - 1;
+      return index >= 0 ? this.cycleStarts[index] : null;
+    }
+    const index = this.countThrough(this.cycleStarts, atMs);
+    return index < this.cycleStarts.length ? this.cycleStarts[index] : null;
+  }
+
+  /** Reconstruct measured replacements with a forward cursor; backward seeks rebuild from a checkpoint. */
+  resultsAt(atMs: number): RunCheckpoint | null {
+    let baseline: RunCheckpoint | null = null;
+    for (const cp of this.checkpoints) { if (cp.atMs <= atMs) baseline = cp; else break; }
+    if (!baseline) return null;
+    let cache = this.resultsCache;
+    if (!cache || cache.baseline !== baseline || atMs < cache.atMs) {
+      let lo = 0; let hi = this.resultDeltas.length;
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (this.resultDeltas[mid].atMs <= baseline.atMs) lo = mid + 1; else hi = mid; }
+      cache = { atMs: baseline.atMs, baseline, cursor: lo, rootCounts: baseline.rootCounts,
+        messageCounts: baseline.messageCounts, metrics: new Map(baseline.elementMetrics.map(m => [metricKey(m), m])),
+        occupancyRates: {} };
+      // Rates are state at each measurement, and may precede this checkpoint.
+      for (let i = lo - 1; i >= 0; i--) if (this.resultDeltas[i].occupancyRates) {
+        cache.occupancyRates = this.resultDeltas[i].occupancyRates!; break;
+      }
+      this.resultsCache = cache;
+    }
+    while (cache.cursor < this.resultDeltas.length && this.resultDeltas[cache.cursor].atMs <= atMs) {
+      const delta = this.resultDeltas[cache.cursor++];
+      if (delta.rootCounts) cache.rootCounts = delta.rootCounts;
+      if (delta.messageCounts) cache.messageCounts = delta.messageCounts;
+      if (delta.occupancyRates) cache.occupancyRates = delta.occupancyRates;
+      for (const metric of delta.elementMetrics ?? []) cache.metrics.set(metricKey(metric), metric);
+    }
+    cache.atMs = atMs;
+    this.resultsIndex.read(this.cycleRevisions, atMs);
+    const metricRows = [...cache.metrics.values()].map((metric): ElementMetric => {
+      if (metric.windowEndMs === atMs) return metric;
+      if (metric.key === 'throughput' && atMs > 0) {
+        const count = metric.scope === 'root' ? cache.rootCounts.succeeded
+          : typeof metric.value === 'number' && metric.windowEndMs !== null ? metric.value * metric.windowEndMs / 1000 : 0;
+        return { ...metric, value: count * 1000 / atMs, available: true, reason: null, windowEndMs: atMs };
+      }
+      if (metric.key === 'utilization' && typeof metric.value === 'number' && atMs > 0 && metric.windowEndMs !== null) {
+        const measuredAt = metric.windowEndMs;
+        const occupied = metric.value * measuredAt;
+        const rate = cache.occupancyRates[metric.elementId ?? ''] ?? 0;
+        return { ...metric, value: (occupied + rate * (atMs - measuredAt)) / atMs, windowEndMs: atMs };
+      }
+      return { ...metric, windowEndMs: atMs };
+    });
+    return { atMs, rootCounts: cache.rootCounts, messageCounts: cache.messageCounts,
+      cycles: this.resultsIndex.summary(this.evictedCycles), elementMetrics: metricRows };
   }
 
   // --------------------------------------------------------------------------
@@ -255,6 +368,12 @@ export class PlaybackStore {
       if (times[mid] <= ms) lo = mid + 1;
       else hi = mid;
     }
+    return lo;
+  }
+
+  private lowerBound(times: readonly number[], ms: number): number {
+    let lo = 0; let hi = times.length;
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (times[mid] < ms) lo = mid + 1; else hi = mid; }
     return lo;
   }
 
@@ -316,8 +435,47 @@ export class PlaybackStore {
       // settlement it has not consumed. Rebuild from the retained boundary.
       if (this.indexedAt < start) this.resetIndex();
     }
-    this.cycles = this.cycles.filter((c) => c.completedAtMs === null || c.completedAtMs >= start);
-    this.cycleStarts = this.cycles.map((c) => c.startedAtMs).sort((a, b) => a - b);
-    this.cycleEnds = this.cycles.flatMap((c) => c.completedAtMs === null ? [] : [c.completedAtMs]).sort((a, b) => a - b);
+    const removedCycles = new Set<string>();
+    for (const [id, cycle] of this.cyclesById) {
+      if (cycle.completedAtMs === null || cycle.completedAtMs >= start) continue;
+      this.cyclesById.delete(id);
+      removedCycles.add(id);
+      this.evictedCycles.total++;
+      if (cycle.outcome !== null) this.evictedCycles.byOutcome[cycle.outcome]++;
+      const completion = cycle.completedAtMs - cycle.startedAtMs;
+      this.evictedCycles.completion.n++; this.evictedCycles.completion.sum += completion;
+      this.evictedCycles.completion.max = Math.max(this.evictedCycles.completion.max, completion);
+      if (cycle.responseAtMs !== null) {
+        const response = cycle.responseAtMs - cycle.startedAtMs;
+        this.evictedCycles.response.n++; this.evictedCycles.response.sum += response;
+        this.evictedCycles.response.max = Math.max(this.evictedCycles.response.max, response);
+      }
+    }
+    let timelineConsumedRemoved = 0; let resultsConsumedRemoved = 0;
+    this.cycleRevisions = this.cycleRevisions.filter((r, i) => {
+      if (!removedCycles.has(r.cycle.id)) return true;
+      if (i < this.timelineIndex.cursor) timelineConsumedRemoved++;
+      if (i < this.resultsIndex.cursor) resultsConsumedRemoved++;
+      return false;
+    });
+    this.timelineIndex.compact(removedCycles, timelineConsumedRemoved, start);
+    this.resultsIndex.compact(removedCycles, resultsConsumedRemoved, start);
+    this.resultsCache = null;
+    this.cycleStarts = [...this.cyclesById.values()].map((c) => c.startedAtMs).sort((a, b) => a - b);
+    this.cycleEnds = [...this.cyclesById.values()].flatMap((c) => c.completedAtMs === null ? [] : [c.completedAtMs]).sort((a, b) => a - b);
+    let baselineIndex = -1;
+    for (let i = 0; i < this.checkpoints.length && this.checkpoints[i].atMs <= start; i++) baselineIndex = i;
+    if (baselineIndex > 0) this.checkpoints.splice(0, baselineIndex);
+    const baselineAt = this.checkpoints[0]?.atMs ?? 0;
+    let occupancyRates: ResultDelta['occupancyRates'];
+    for (const delta of this.resultDeltas) {
+      if (delta.atMs > baselineAt) break;
+      if (delta.occupancyRates) occupancyRates = delta.occupancyRates;
+    }
+    this.resultDeltas = this.resultDeltas.filter((delta) => delta.atMs > baselineAt);
+    if (occupancyRates) this.resultDeltas.unshift({ atMs: baselineAt, occupancyRates });
   }
 }
+
+const metricKey = (metric: ElementMetric): string => `${metric.elementId ?? ''}\u0000${metric.scope}\u0000${metric.key}`;
+const emptyCycleCounts = (): Record<CycleOutcome, number> => ({ ok: 0, expired: 0, rejected: 0, 'timed-out': 0, failed: 0, lost: 0, stuck: 0 });

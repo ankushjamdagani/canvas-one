@@ -431,6 +431,10 @@ function buildExecutionGraph(opts: {
 export class ResourceAdapter {
   readonly runId: string;
   private readonly sim: OpenSimulation;
+  private lastOccupancyRates: Readonly<Record<string, number>> = {};
+
+  /** Paired with the latest metrics-only snapshot; includes downstream-held slots. */
+  occupancyRates(): Readonly<Record<string, number>> { return this.lastOccupancyRates; }
   private readonly edgeMap: Map<string, Connection>;
   private readonly resourceElements: Map<Id, Element>;
   private readonly bridgeConnByNode: Map<Id, Connection>;
@@ -1315,8 +1319,10 @@ export class ResourceAdapter {
    */
   snapshot(): ResourceSummary {
     const atMs = Math.round(this.sim.currentTimeSeconds * 1000);
-    const kernelSnap = this.sim.snapshot();
+    const kernelSnap = this.sim.metricsSnapshot();
 
+    this.lastOccupancyRates = Object.fromEntries(Object.entries(kernelSnap.nodes).map(([id, node]) =>
+      [id, node.activeWorkers / Math.max(1, this.sim.planRef.nodes.get(id)!.behavior.concurrency)]));
     const metrics: ElementMetric[] = [];
 
     const countKeys: (keyof Counts)[] = ['generated', 'succeeded', 'rejected', 'failed', 'expired', 'inFlight'];

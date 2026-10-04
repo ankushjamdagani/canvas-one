@@ -59,6 +59,9 @@ export class CycleTracker {
   private discarded = 0;
   /** Ids that completed since the last `drainFinished`, in completion order. */
   private finished: string[] = [];
+  private revisions: Cycle[] = [];
+  private readonly pendingDiscard = new Set<string>();
+  private observedAtMs = -Infinity;
   /** Running totals over completed cycles, so the summary survives discarding. */
   private readonly byOutcome = emptyOutcomeCounts();
   private readonly response = { n: 0, sum: 0, max: 0 };
@@ -68,16 +71,20 @@ export class CycleTracker {
   constructor(private readonly options: { readonly discardFinished?: boolean } = {}) {}
 
   record(fact: SimLifecycleFact): void {
+    this.observedAtMs = Math.max(this.observedAtMs, ms(fact.time));
     if ((fact.kind === 'admitted' || fact.kind === 'rejected') && fact.category === 'root') {
       this.open(fact.unitIdentity, fact.time);
     } else if (fact.kind === 'message_created') {
       const c = this.byId.get(rootOf(fact.unitIdentity));
       if (!c) return;
       c.open.add(fact.unitIdentity);
+      const reopened = c.outcome !== null;
+      if (reopened) this.pendingDiscard.delete(c.id);
       // Work born after the cycle looked complete (a consumer publishing on) reopens it.
       if (c.outcome !== null) this.uncount(c);
       c.completedAtMs = null;
       c.outcome = null;
+      if (reopened) this.revisions.push(this.snapshot(c, ms(fact.time)));
     } else if (fact.kind === 'unit_settled' && fact.outcome !== undefined) {
       const c = this.byId.get(rootOf(fact.unitIdentity));
       if (!c) return;
@@ -100,6 +107,24 @@ export class CycleTracker {
 
   openCycleIds(): readonly string[] {
     return [...this.byId.values()].filter((c) => c.outcome === null).map((c) => c.id);
+  }
+
+  /** Start, response and completion snapshots since the last call. */
+  drainRevisions(): Cycle[] {
+    const out = this.revisions;
+    this.revisions = [];
+    this.finished = [];
+    if (this.options.discardFinished) {
+      // Keep the latest scheduler instant across batch boundaries. Publications and parent
+      // settlement can be separate same-time steps; a later instant confirms the lineage is closed.
+      for (const id of this.pendingDiscard) {
+        const cycle = this.byId.get(id);
+        if (cycle?.completedAtMs == null || cycle.completedAtMs >= this.observedAtMs) continue;
+        if (this.byId.delete(id)) this.discarded++;
+        this.pendingDiscard.delete(id);
+      }
+    }
+    return out;
   }
 
   /** Cycles that completed since the last call, once each, in completion order. */
@@ -137,12 +162,6 @@ export class CycleTracker {
     this.completion.n++;
     this.completion.sum += done;
     this.completion.max = Math.max(this.completion.max, done);
-    if (c.responseAtMs !== null) {
-      const resp = c.responseAtMs - c.startedAtMs;
-      this.response.n++;
-      this.response.sum += resp;
-      this.response.max = Math.max(this.response.max, resp);
-    }
   }
 
   /** A completed cycle reopened: take back what `count` added (max is not reversible, so it keeps the larger value). */
@@ -151,13 +170,9 @@ export class CycleTracker {
     const done = c.completedAtMs! - c.startedAtMs;
     this.completion.n--;
     this.completion.sum -= done;
-    if (c.responseAtMs !== null) {
-      this.response.n--;
-      this.response.sum -= c.responseAtMs - c.startedAtMs;
-    }
   }
 
-  private snapshot(c: Open): Cycle {
+  private snapshot(c: Open, observedAtMs?: number): Cycle {
     return {
       id: c.id,
       workloadId: c.workloadId,
@@ -166,12 +181,13 @@ export class CycleTracker {
       completedAtMs: c.completedAtMs,
       outcome: c.outcome,
       counts: { ...c.counts },
+      ...(observedAtMs === undefined ? {} : { observedAtMs }),
     };
   }
 
   private open(id: string, time: number): void {
     if (this.byId.has(id)) return;
-    this.byId.set(id, {
+    const opened: Open = {
       id,
       workloadId: id.slice(0, id.lastIndexOf('-')),
       startedAtMs: ms(time),
@@ -182,7 +198,9 @@ export class CycleTracker {
       open: new Set([id]),
       worst: null,
       rootSettled: false,
-    });
+    };
+    this.byId.set(id, opened);
+    this.revisions.push(this.snapshot(opened, ms(time)));
   }
 
   private settle(c: Open, identity: string, outcome: CycleOutcome, atMs: number, isMessage: boolean): void {
@@ -192,12 +210,17 @@ export class CycleTracker {
     if (!isMessage) {
       c.rootSettled = true;
       c.responseAtMs = atMs;
+      const response = atMs - c.startedAtMs;
+      this.response.n++; this.response.sum += response; this.response.max = Math.max(this.response.max, response);
+      this.revisions.push(this.snapshot(c, atMs));
     }
     if (c.open.size === 0 && c.rootSettled) {
       c.completedAtMs = atMs;
       c.outcome = c.worst;
       this.count(c);
       this.finished.push(c.id);
+      if (this.options.discardFinished) this.pendingDiscard.add(c.id);
+      this.revisions.push(this.snapshot(c, atMs));
     }
   }
 }

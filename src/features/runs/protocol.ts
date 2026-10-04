@@ -22,6 +22,7 @@ import type {
   CheckResult,
   Cycle,
   FlowRecord,
+  ResultDelta,
   RunCheckpoint,
   RunControl,
   RunSummary,
@@ -70,6 +71,8 @@ export type StartRequestMessage = {
   readonly snapshotId: string;
   readonly planId: string;
   readonly workerSessionId: string;
+  /** Individual timed runs record interactively; batch/logical runs compute without a playhead allowance. */
+  readonly interactive: boolean;
 };
 
 export type ControlRequestMessage = {
@@ -96,6 +99,7 @@ export type ProtocolCyclesUpdate = { readonly kind: 'cycles'; readonly runId: st
 
 /** D57: the run's cumulative summary at one simulated time, about every `CHECKPOINT_MS`. */
 export type ProtocolCheckpointUpdate = { readonly kind: 'checkpoint'; readonly runId: string; readonly checkpoint: RunCheckpoint };
+export type ProtocolResultsUpdate = { readonly kind: 'results'; readonly runId: string; readonly records: readonly ResultDelta[] };
 
 /**
  * D57: what the worker is doing. `computing`: stepping; `idle`: waiting for the playhead because it is
@@ -114,6 +118,7 @@ export type ProtocolRunUpdate =
   | ProtocolFlowUpdate
   | ProtocolCyclesUpdate
   | ProtocolCheckpointUpdate
+  | ProtocolResultsUpdate
   | ProtocolBufferUpdate;
 
 export type RunUpdateMessage = {
@@ -176,6 +181,7 @@ type ActiveRun = {
   /** D57: stepping has paused at the lookahead limit and waits for the playhead (or Stop). */
   idle: boolean;
   lastCheckpointMs: number;
+  readonly interactive: boolean;
 };
 
 // ============================================================================
@@ -464,6 +470,7 @@ export class WorkerProtocolHandler {
       stopping: false,
       idle: false,
       lastCheckpointMs: 0,
+      interactive: msg.interactive && scenarioMode === 'timed',
     };
     this.activeRuns.set(runId, activeRun);
 
@@ -478,6 +485,9 @@ export class WorkerProtocolHandler {
     });
 
     this.postMessageCallback({ type: 'update', message: { kind: 'buffer', runId, state: 'computing', computedMs: 0 } });
+    if (scenarioMode === 'timed') {
+      this.postMessageCallback({ type: 'update', message: { kind: 'checkpoint', runId, checkpoint: runner.checkpoint() } });
+    }
 
     // Start stepping loop
     this.scheduleStepping(runId);
@@ -486,14 +496,14 @@ export class WorkerProtocolHandler {
   /** D57: the playhead moved; a worker waiting at the lookahead limit may have room to compute again. */
   private handlePlayhead(msg: PlayheadMessage): void {
     const active = this.activeRuns.get(msg.runId);
-    if (!active || !(msg.simulatedMs > active.playheadMs)) return;
+    if (!active || !Number.isFinite(msg.simulatedMs) || msg.simulatedMs < 0 || msg.simulatedMs === active.playheadMs) return;
     active.playheadMs = msg.simulatedMs;
     this.wakeIfRoom(active);
   }
 
   /** D57: the furthest simulated ms the worker may compute to right now. */
   private computeLimitMs(active: ActiveRun): number {
-    return active.stopping || active.scenarioMode !== 'timed' ? Infinity : active.playheadMs + LOOKAHEAD_MS;
+    return active.stopping || !active.interactive ? Infinity : active.playheadMs + LOOKAHEAD_MS;
   }
 
   private wakeIfRoom(active: ActiveRun): void {
@@ -581,6 +591,7 @@ export class WorkerProtocolHandler {
       let stepsInBatch = 0;
       let hasMore = true;
       let reachedLimit = false;
+      const resultDeltas: ResultDelta[] = [];
 
       while (stepsInBatch < this.stepBatchSize && active.status === 'running') {
         // D57: the worker computes only up to LOOKAHEAD_MS ahead of the playhead; Stop lifts the limit.
@@ -590,6 +601,26 @@ export class WorkerProtocolHandler {
           break;
         }
         hasMore = await active.runner.step();
+        // All scheduler work at one rounded millisecond is one observable instant. Capture after its
+        // final discrete step so same-ms changes are coalesced without repeatedly snapshotting the adapter.
+        const nextAfterStep = active.runner.nextEventAtMs();
+        const resultDelta = active.interactive && (!hasMore || nextAfterStep === null || nextAfterStep !== active.runner.simulatedMs)
+          ? active.runner.captureResultDelta()
+          : null;
+        if (resultDelta) {
+          const prior = resultDeltas[resultDeltas.length - 1];
+          if (prior?.atMs === resultDelta.atMs) {
+            const metrics = new Map((prior.elementMetrics ?? []).map((m) => [`${m.elementId ?? ''}\u0000${m.scope}\u0000${m.key}`, m]));
+            for (const metric of resultDelta.elementMetrics ?? []) metrics.set(`${metric.elementId ?? ''}\u0000${metric.scope}\u0000${metric.key}`, metric);
+            resultDeltas[resultDeltas.length - 1] = {
+              atMs: resultDelta.atMs,
+              rootCounts: resultDelta.rootCounts ?? prior.rootCounts,
+              messageCounts: resultDelta.messageCounts ?? prior.messageCounts,
+              occupancyRates: resultDelta.occupancyRates ?? prior.occupancyRates,
+              ...((metrics.size > 0) ? { elementMetrics: [...metrics.values()] } : {}),
+            };
+          } else resultDeltas.push(resultDelta);
+        }
         stepsInBatch++;
         if (!hasMore) {
           break;
@@ -606,6 +637,9 @@ export class WorkerProtocolHandler {
       const flow = active.runner.drainFlow();
       if (flow.length > 0) {
         this.postMessageCallback({ type: 'update', message: { kind: 'flow', runId, records: flow } });
+      }
+      if (resultDeltas.length > 0) {
+        this.postMessageCallback({ type: 'update', message: { kind: 'results', runId, records: resultDeltas } });
       }
 
       const finishedCycles = active.runner.drainCycles();
@@ -692,6 +726,14 @@ export class WorkerProtocolHandler {
     this.plans.delete(active.planId);
 
     if (runnerResult) {
+      if (active.interactive) {
+        const summary = runnerResult.summary;
+        this.postMessageCallback({ type: 'update', message: { kind: 'checkpoint', runId, checkpoint: {
+          atMs: summary.elapsedMs ?? active.runner.simulatedMs,
+          rootCounts: summary.rootCounts, messageCounts: summary.messageCounts,
+          cycles: summary.cycles, elementMetrics: summary.elementMetrics,
+        } } });
+      }
       this.postMessageCallback({
         type: 'update',
         message: {

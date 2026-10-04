@@ -49,14 +49,14 @@ describe('PlaybackStore clock', () => {
     expect(s.playheadMs).toBe(2000);
   });
 
-  it('does not move while paused, and Infinity jumps to the edge', () => {
+  it('does not move while paused, and finite speed advances to the edge', () => {
     const s = store();
     s.setComputedEdge(3000);
     s.advance(500);
     expect(s.playheadMs).toBe(0);
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(1000);
     expect(s.playheadMs).toBe(3000);
   });
 
@@ -65,8 +65,8 @@ describe('PlaybackStore clock', () => {
     s.setComputedEdge(2000);
     s.setEnded(1500);
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(1000);
     expect(s.playheadMs).toBe(1500);
     expect(s.atEnd()).toBe(true);
   });
@@ -118,8 +118,8 @@ describe('PlaybackStore recording', () => {
     s.ingestCycles([cycle('c-old', 1000, 1100), cycle('c-new', 55_000, 55_100)]);
     s.ingestCheckpoint(checkpoint(5000, 10));
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(4000);
     expect(s.windowStartMs).toBe(50_000);
     expect(s.flowBetween(-1, 60_000).map((r) => r.key)).toEqual(['new']);
     expect(s.stateAt(60_000).cycles.started).toBe(1);
@@ -134,8 +134,8 @@ describe('PlaybackStore recording', () => {
       rec({ key: 'long', phase: 'settled', atMs: 58_000, outcome: 'succeeded' }),
     ]);
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(4000);
     expect(s.flowBetween(-1, 60_000)).toHaveLength(2);
   });
 
@@ -144,8 +144,8 @@ describe('PlaybackStore recording', () => {
     s.setComputedEdge(500_000);
     s.ingestFlow([rec({ key: 'old', phase: 'sent', atMs: 1, arriveAtMs: 2 })]);
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(40000);
     expect(s.windowStartMs).toBe(0);
     expect(s.flowBetween(-1, 10)).toHaveLength(1);
   });
@@ -215,8 +215,8 @@ describe('PlaybackStore.stateAt', () => {
     s.stateAt(59_000);
     s.setComputedEdge(60_000);
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(4000);
     expect(s.flowBetween(-1, 60_000).some((r) => r.key === 'done')).toBe(false);
     expect(s.stateAt(60_000).nodes.get('svc')).toEqual({ queued: 1, active: 1 });
     expect(s.stateAt(50_000).legs[0].progress).toBeCloseTo(49_000 / 69_000);
@@ -268,8 +268,8 @@ describe('PlaybackStore.stateAt', () => {
     expect(s.stateAt(0).nodes.get('svc')?.active).toBe(1);
     s.setComputedEdge(60_000);
     s.playing = true;
-    s.speed = Infinity;
-    s.advance(1);
+    s.speed = 16;
+    s.advance(4000);
     expect(s.stateAt(60_000).nodes.size).toBe(0);
   });
 
@@ -301,5 +301,98 @@ describe('PlaybackStore.stateAt', () => {
     expect(s.stateAt(250).checkpoint).toBeNull();
     expect(s.stateAt(1500).checkpoint?.atMs).toBe(1000);
     expect(s.stateAt(5000).checkpoint?.atMs).toBe(2000);
+  });
+});
+
+describe('PlaybackStore cycle revisions and historical results', () => {
+  it('integrates occupied slots and normalizes cumulative throughput between events', () => {
+    const s = store();
+    s.ingestCheckpoint(checkpoint(0, 0));
+    const metric = { elementId: 'svc', scope: 'element' as const, key: 'utilization' as const, value: 0.25, unit: 'ratio' as const, available: true, reason: null, windowStartMs: 0, windowEndMs: 1000 };
+    s.ingestResults([{ atMs: 1000, occupancyRates: { svc: 1 }, elementMetrics: [metric,
+      { ...metric, key: 'throughput', value: 2, unit: 'requests/s' }] }]);
+    expect(s.resultsAt(2000)?.elementMetrics.find(m => m.key === 'utilization')?.value).toBe(0.625);
+    expect(s.resultsAt(2000)?.elementMetrics.find(m => m.key === 'throughput')?.value).toBe(1);
+    expect(s.resultsAt(1500)?.elementMetrics.find(m => m.key === 'utilization')?.value).toBe(0.5);
+    // A checkpoint carries accumulated occupancy, while the last rate remains in earlier telemetry.
+    s.ingestCheckpoint({ ...checkpoint(1500, 0), elementMetrics: [{ ...metric, value: 0.5, windowEndMs: 1500 }] });
+    expect(s.resultsAt(2000)?.elementMetrics[0].value).toBe(0.625);
+  });
+
+  it('invalidates forward caches for late changes and independent timeline reads', () => {
+    const s = store(); s.ingestCheckpoint(checkpoint(0, 0));
+    s.ingestCycles([cycle('a', 100, 1000), cycle('b', 500, 1500)]);
+    expect(s.cyclesAt(2000)).toHaveLength(2);
+    expect(s.resultsAt(200)?.cycles.open).toBe(1);
+    expect(s.resultsAt(600)?.cycles.open).toBe(2);
+    s.ingestResults([{ atMs: 550, rootCounts: checkpoint(0, 5).rootCounts }]);
+    expect(s.resultsAt(600)?.rootCounts.generated).toBe(5);
+    expect(s.resultsAt(200)?.rootCounts.generated).toBe(0);
+  });
+  it('upserts revisions, masks future fields and counts a cycle once', () => {
+    const s = store();
+    const started = { ...cycle('one', 100, 400), responseAtMs: null, completedAtMs: null, outcome: null };
+    const responded = { ...started, responseAtMs: 250 };
+    const completed = cycle('one', 100, 400);
+    s.ingestCycles([started, responded, completed]);
+    expect(s.cyclesAt(150)).toEqual([{ ...started, counts: { ok: 0, expired: 0, rejected: 0, 'timed-out': 0, failed: 0, lost: 0, stuck: 0 } }]);
+    expect(s.cyclesAt(300)[0].responseAtMs).toBe(250);
+    expect(s.cyclesAt(300)[0].completedAtMs).toBeNull();
+    s.ingestCheckpoint(checkpoint(0, 0));
+    expect(s.resultsAt(300)?.cycles.responseLatencyMs).toEqual({ mean: 150, max: 150 });
+    expect(s.resultsAt(300)?.cycles.completionLatencyMs).toBeNull();
+    expect(s.cyclesAt(500)).toHaveLength(1);
+    expect(s.stateAt(500).cycles).toEqual({ started: 1, finished: 1 });
+  });
+
+  it('steps to strictly earlier and later distinct cycle starts', () => {
+    const s = store();
+    s.ingestCycles([cycle('a', 100, 200), cycle('b', 100, 300), cycle('c', 500, 600)]);
+    expect(s.cycleStep(100, -1)).toBeNull();
+    expect(s.cycleStep(100, 1)).toBe(500);
+    expect(s.cycleStep(500, -1)).toBe(100);
+    expect(s.cycleStep(500, 1)).toBeNull();
+  });
+
+  it('reopens a cycle at the late descendant observation without double-counting completion', () => {
+    const s = store(); s.ingestCheckpoint(checkpoint(0, 0));
+    const done = cycle('late', 0, 100);
+    s.ingestCycles([done]);
+    s.ingestCycles([{ ...done, observedAtMs: 200, completedAtMs: null, outcome: null }]);
+    expect(s.resultsAt(150)?.cycles.open).toBe(0);
+    expect(s.stateAt(150).cycles.finished).toBe(1);
+    expect(s.resultsAt(250)?.cycles.open).toBe(1);
+    expect(s.stateAt(250).cycles.finished).toBe(0);
+    expect(s.resultsAt(250)?.cycles.byOutcome.ok).toBe(0);
+    s.ingestCycles([{ ...done, observedAtMs: 400, completedAtMs: 400 }]);
+    expect(s.resultsAt(500)?.cycles.byOutcome.ok).toBe(1);
+    expect(s.resultsAt(250)?.cycles.open).toBe(1);
+    expect(s.stateAt(500).cycles.finished).toBe(1);
+  });
+
+  it('reconstructs exact counts and changed metrics between checkpoints and on backward reads', () => {
+    const s = store();
+    s.ingestCheckpoint(checkpoint(0, 0));
+    s.ingestResults([
+      { atMs: 100, rootCounts: { generated: 1, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 1 } },
+      { atMs: 200, rootCounts: { generated: 1, succeeded: 1, rejected: 0, failed: 0, expired: 0, inFlight: 0 } },
+    ]);
+    expect(s.resultsAt(150)?.rootCounts).toEqual({ generated: 1, succeeded: 0, rejected: 0, failed: 0, expired: 0, inFlight: 1 });
+    expect(s.resultsAt(50)?.rootCounts.generated).toBe(0);
+    expect(s.resultsAt(250)?.rootCounts.succeeded).toBe(1);
+    expect(s.resultsAt(150)?.rootCounts.succeeded).toBe(0);
+  });
+
+  it('retains cumulative completed-cycle results after stream eviction', () => {
+    const s = store(1000);
+    s.ingestCheckpoint(checkpoint(0, 0));
+    s.ingestCycles([cycle('old', 100, 200), cycle('new', 1900, 2000)]);
+    s.setComputedEdge(2500);
+    s.playing = true;
+    s.speed = 16;
+    s.advance(1000);
+    expect(s.cyclesAt(2500).map((c) => c.id)).toEqual(['new']);
+    expect(s.resultsAt(2500)?.cycles.total).toBe(2);
+    expect(s.resultsAt(2500)?.cycles.byOutcome.ok).toBe(2);
   });
 });

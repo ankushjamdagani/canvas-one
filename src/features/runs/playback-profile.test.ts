@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Document } from "../../domain/studio/model";
 import { checkReadiness } from "../../domain/studio/readiness";
 import { ScenarioRunner } from "../../domain/studio/runner/scenario-runner";
-import type { Cycle, FlowRecord } from "../../domain/studio/runner/types";
+import type { Cycle, FlowRecord, ResultDelta } from "../../domain/studio/runner/types";
 import { PlaybackStore } from "./playback";
 
 // Opt-in measurement: real S06 flow at flash-sale load, repeated to fill a 120 s
@@ -39,9 +39,21 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       });
       const sample: FlowRecord[] = [];
       const cycles: Cycle[] = [];
-      while (await runner.step()) {
+      const initial = runner.checkpoint();
+      const deltas: ResultDelta[] = [];
+      let telemetryMs = 0;
+      let observations = 0;
+      let more = true;
+      while (more) {
+        more = await runner.step();
         sample.push(...runner.drainFlow());
         cycles.push(...runner.drainCycles());
+        if (!more || runner.nextEventAtMs() !== runner.simulatedMs) {
+          const start = performance.now();
+          const delta = runner.captureResultDelta();
+          telemetryMs += performance.now() - start; observations++;
+          if (delta) deltas.push(delta);
+        }
       }
       sample.push(...runner.drainFlow());
       cycles.push(...runner.drainCycles());
@@ -51,6 +63,7 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
         ),
         historyMs: 120_000,
       });
+      store.ingestCheckpoint(initial);
       for (let repeat = 0; repeat < 12; repeat++) {
         store.ingestFlow(
           sample.map((r) => ({
@@ -65,6 +78,7 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           cycles.map((c) => ({
             ...c,
             id: `${repeat}/${c.id}`,
+            observedAtMs: c.observedAtMs === undefined ? undefined : c.observedAtMs + repeat * 10_000,
             startedAtMs: c.startedAtMs + repeat * 10_000,
             responseAtMs:
               c.responseAtMs === null ? null : c.responseAtMs + repeat * 10_000,
@@ -74,6 +88,11 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
                 : c.completedAtMs + repeat * 10_000,
           })),
         );
+        store.ingestResults(deltas.map(delta => ({ ...delta,
+          atMs: delta.atMs + repeat * 10_000,
+          elementMetrics: delta.elementMetrics?.map(metric => ({ ...metric,
+            windowEndMs: (metric.windowEndMs ?? 0) + repeat * 10_000 })),
+        })));
       }
       const end = 120_000;
       store.setComputedEdge(end);
@@ -88,6 +107,17 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
         timings.push(performance.now() - start);
       }
       timings.sort((a, b) => a - b);
+      store.resultsAt(end - 1100);
+      const resultTimings: number[] = [];
+      for (let i = 0; i < 60; i++) {
+        const start = performance.now();
+        store.resultsAt(end - 1000 + i * 16);
+        resultTimings.push(performance.now() - start);
+      }
+      resultTimings.sort((a,b) => a-b);
+      const timelineStart = performance.now();
+      const timelineCycles = store.cyclesAt(end);
+      const timelineReadMs = performance.now() - timelineStart;
       // Include a live-style cycle batch and report its ingestion separately.
       const cycleIngestStart = performance.now();
       store.ingestCycles(
@@ -96,6 +126,7 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           .map((c) => ({
             ...c,
             id: `new/${c.id}`,
+            observedAtMs: c.observedAtMs === undefined ? undefined : c.observedAtMs + end,
             startedAtMs: c.startedAtMs + end,
             responseAtMs: null,
             completedAtMs:
@@ -106,7 +137,10 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       const batchStart = performance.now();
       store.stateAt(end);
       const cycleBatchReadMs = performance.now() - batchStart;
-      console.log(
+      const timelineBatchStart = performance.now();
+      store.cyclesAt(end + 1000);
+      const timelineBatchReadMs = performance.now() - timelineBatchStart;
+      process.stdout.write(
         JSON.stringify({
           records: sample.length * 12,
           cycles: cycles.length * 12,
@@ -116,7 +150,12 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           medianMs: timings[30],
           p95Ms: timings[57],
           maxMs: timings[59],
-        }),
+          resultMedianMs: resultTimings[30], resultP95Ms: resultTimings[57],
+          timelineReadMs, timelineCycles: timelineCycles.length,
+          timelineBatchReadMs,
+          telemetryMs, observations, telemetryMeanMs: telemetryMs / observations,
+          resultDeltas: deltas.length * 12,
+        }) + '\n',
       );
       expect(sample.length).toBeGreaterThan(6000);
     }, 120_000);

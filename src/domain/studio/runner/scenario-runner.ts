@@ -46,7 +46,7 @@ import type {
   TraceEventKind,
 } from './types';
 import { emptyCycleSummary } from './cycles';
-import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type Cycle, type FlowRecord, type RunCheckpoint } from './types';
+import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type Cycle, type FlowRecord, type ResultDelta, type RunCheckpoint } from './types';
 import { rootId, traceEventId, PayloadTable } from './trace';
 import { defaultEvaluator, readPath } from './expr';
 import { isMissing } from './expr-api';
@@ -1490,9 +1490,42 @@ export class ScenarioRunner {
     };
   }
 
-  /** D57: cycles that completed since the last call, once each. */
+  /** Start, response and completion revisions since the last call. */
   drainCycles(): Cycle[] {
-    return this.adapter?.cycleTracker.drainFinished() ?? [];
+    return this.adapter?.cycleTracker.drainRevisions() ?? [];
+  }
+
+  private lastResultSnapshot: RunCheckpoint | null = null;
+  private lastOccupancyRates: Readonly<Record<string, number>> = {};
+
+  /** Exact changed measurements after a discrete timed scheduler step. */
+  captureResultDelta(): ResultDelta | null {
+    if (this.scenario.mode !== 'timed') return null;
+    const sameCounts = (a: Counts | undefined, b: Counts) => a !== undefined &&
+      a.generated === b.generated && a.succeeded === b.succeeded && a.rejected === b.rejected &&
+      a.failed === b.failed && a.expired === b.expired && a.inFlight === b.inFlight;
+    const next = this.checkpoint();
+    const previous = this.lastResultSnapshot;
+    this.lastResultSnapshot = next;
+    const occupancyRates = this.adapter?.occupancyRates() ?? {};
+    const ratesChanged = JSON.stringify(occupancyRates) !== JSON.stringify(this.lastOccupancyRates);
+    this.lastOccupancyRates = occupancyRates;
+    const key = (m: ElementMetric) => `${m.elementId ?? ''}\u0000${m.scope}\u0000${m.key}`;
+    const oldMetrics = new Map((previous?.elementMetrics ?? []).map((m) => [key(m), m]));
+    const changed = next.elementMetrics.filter((m) => {
+      const old = oldMetrics.get(key(m));
+      const throughputCountChanged = m.key === 'throughput' && typeof m.value === 'number' && typeof old?.value === 'number' &&
+        m.value * (m.windowEndMs ?? 0) !== old.value * (old.windowEndMs ?? 0);
+      return !old || old.value !== m.value || old.available !== m.available || old.reason !== m.reason || throughputCountChanged || (m.key === 'utilization' && ratesChanged);
+    }).map((m) => ({ ...m, windowEndMs: next.atMs }));
+    const delta: ResultDelta = {
+      atMs: next.atMs,
+      ...(!sameCounts(previous?.rootCounts, next.rootCounts) ? { rootCounts: next.rootCounts } : {}),
+      ...(!sameCounts(previous?.messageCounts, next.messageCounts) ? { messageCounts: next.messageCounts } : {}),
+      ...(changed.length > 0 ? { elementMetrics: changed } : {}),
+      ...(ratesChanged ? { occupancyRates } : {}),
+    };
+    return delta.rootCounts || delta.messageCounts || delta.elementMetrics || delta.occupancyRates ? delta : null;
   }
 
   /** Packet steps recorded since the last call, for the live canvas view. */

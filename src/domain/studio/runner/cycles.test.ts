@@ -18,6 +18,16 @@ const settled = (time: number, id: string, outcome: SimLifecycleFact['outcome'],
   fact({ kind: 'unit_settled', time, unitIdentity: id, outcome, category });
 
 describe('CycleTracker', () => {
+  it('streams start, response and completion revisions in order', () => {
+    const tracker = new CycleTracker();
+    tracker.record(fact({ kind: 'admitted', category: 'root', unitIdentity: 'work-1', time: 0 }));
+    expect(tracker.drainRevisions().map((c) => [c.responseAtMs, c.completedAtMs])).toEqual([[null, null]]);
+    tracker.record(fact({ kind: 'message_created', category: 'message', unitIdentity: 'work-1:m', time: 0.01 }));
+    tracker.record(fact({ kind: 'unit_settled', category: 'root', unitIdentity: 'work-1', time: 0.02, outcome: 'succeeded' }));
+    expect(tracker.drainRevisions().map((c) => [c.responseAtMs, c.completedAtMs])).toEqual([[20, null]]);
+    tracker.record(fact({ kind: 'unit_settled', category: 'message', unitIdentity: 'work-1:m', time: 0.03, outcome: 'succeeded' }));
+    expect(tracker.drainRevisions().map((c) => [c.responseAtMs, c.completedAtMs, c.outcome])).toEqual([[20, 30, 'ok']]);
+  });
   it('a plain request is complete when its response arrives', () => {
     const t = new CycleTracker();
     t.record(fact({ kind: 'admitted', time: 1, unitIdentity: 'w-0' }));
@@ -40,6 +50,8 @@ describe('CycleTracker', () => {
     t.record(settled(0.2, 'w-0', 'succeeded'));
     expect(t.cycles()[0]).toMatchObject({ responseAtMs: 200, completedAtMs: null, outcome: null });
     expect(t.openCycleIds()).toEqual(['w-0']);
+    expect(t.summary().responseLatencyMs).toEqual({ mean: 200, max: 200 });
+    expect(t.summary().completionLatencyMs).toBeNull();
     t.record(settled(3, 'w-0:p:e1:', 'succeeded', 'message'));
     expect(t.cycles()[0]).toMatchObject({ responseAtMs: 200, completedAtMs: 3000, outcome: 'ok' });
   });
@@ -151,6 +163,18 @@ describe('CycleTracker with the kernel', () => {
 });
 
 describe('CycleTracker streaming out', () => {
+  it('retains a same-instant completed parent across drains until publications are known', () => {
+    const t = new CycleTracker({ discardFinished: true });
+    t.record(fact({ kind: 'admitted', time: 0, unitIdentity: 'w-0' }));
+    t.record(settled(1, 'w-0', 'succeeded')); t.drainRevisions();
+    t.record(msg(1, 'w-0:p:e:', 'w-0'));
+    expect(t.drainRevisions()[0]).toMatchObject({ observedAtMs: 1000, completedAtMs: null });
+    expect(t.summary().open).toBe(1);
+    t.record(settled(2, 'w-0:p:e:', 'succeeded', 'message')); t.drainRevisions();
+    t.record(fact({ kind: 'admitted', time: 3, unitIdentity: 'w-1' })); t.drainRevisions();
+    expect(t.cycles().map(c => c.id)).toEqual(['w-1']);
+    expect(t.summary()).toMatchObject({ total: 2, open: 1, byOutcome: { ok: 1 } });
+  });
   const run = (t: CycleTracker, id: string, start: number, end: number) => {
     t.record(fact({ kind: 'admitted', time: start, unitIdentity: id }));
     t.record(settled(end, id, 'succeeded'));
