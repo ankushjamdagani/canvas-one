@@ -19,7 +19,7 @@
  * RunController itself does not inspect or validate editor draft state.
  */
 
-import type { Document, Id } from '../../domain/studio/model';
+import type { Document, Fault, Id } from '../../domain/studio/model';
 import type { StudioRepository } from '../../persistence/studio/types';
 import { mapErrorToFailedResult } from '../../persistence/studio/errors';
 import {
@@ -151,10 +151,12 @@ export class RunController {
     stopping: false,
   };
 
-  /** D57: playback speed, simulated seconds per real second; Infinity jumps to the live edge. */
+  /** Playback speed, simulated seconds per real second. */
   private speed = 1;
+  private loop = false;
   private readonly clock: PlaybackClock;
   private playback: PlaybackStore | null = null;
+  private playbackFaults: readonly Fault[] = [];
   private clockHandle: unknown = null;
   private lastTickAt = 0;
   private lastPlayheadPostMs = -Infinity;
@@ -288,24 +290,53 @@ export class RunController {
 
   /**
    * D57: how fast the playhead moves for the runs this controller starts, in simulated seconds per real second
-   * (1 = real time). Anything that is not a positive finite number, including 0 and Infinity, jumps to the
-   * live edge as fast as the worker computes.
+   * (1 = real time). Only the seven supported finite speeds are accepted.
    */
-  setSpeed(speed: number): void {
-    this.speed = Number.isFinite(speed) && speed > 0 ? speed : Infinity;
-    if (this.playback) {
-      this.playback.speed = this.speed;
-      if (this.speed === Infinity) this.postPlayhead(Infinity);
-    }
+  setPlaybackSpeed(speed: number): void {
+    if (![0.25, 0.5, 1, 2, 4, 8, 16].includes(speed)) throw new RangeError('Unsupported playback speed');
+    this.speed = speed;
+    if (this.playback) this.playback.speed = speed;
   }
 
-  getSpeed(): number {
+  getPlaybackSpeed(): number {
     return this.speed;
+  }
+
+  setLoop(loop: boolean): void { this.loop = loop; }
+  getLoop(): boolean { return this.loop; }
+
+  seek(ms: number): void {
+    const store = this.playback;
+    if (!store) return;
+    store.playing = false;
+    if (this.activeRunId && !store.ended) this.transport.postMessage({ type: 'control', runId: this.activeRunId, kind: 'pause' });
+    store.seek(ms);
+    this.rebuildVisibleEvents();
+    this.postPlayhead(store.playheadMs);
+    if (this.state.phase === 'running') this.setState({ phase: 'paused' });
+    else this.setState({});
+  }
+
+  stepCycle(direction: -1 | 1): void {
+    const store = this.playback;
+    if (!store) return;
+    const target = store.cycleStep(store.playheadMs, direction);
+    if (target !== null) this.seek(target);
+  }
+
+  goLive(): void {
+    if (!this.playback?.isStream) return;
+    this.seek(this.playback.computedMs);
+    this.resume();
   }
 
   /** D57: the current run's recording and playhead (timed runs), or null. */
   getPlayback(): PlaybackStore | null {
     return this.playback;
+  }
+
+  getPlaybackFaults(): readonly Fault[] {
+    return this.playbackFaults;
   }
 
   /**
@@ -315,11 +346,21 @@ export class RunController {
   stop(): void {
     if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'paused') && !this.state.stopping) {
       this.transport.postMessage({ type: 'control', runId: this.activeRunId, kind: 'stop' });
+      if (this.playback) {
+        this.playback.playing = true;
+        this.lastTickAt = this.clock.now();
+        this.ensureClock();
+      }
       this.setState({ stopping: true, ...(this.state.phase === 'paused' ? { phase: 'running' as const } : {}) });
     }
   }
 
   pause(): void {
+    if (this.playback?.ended && (this.state.phase === 'done' || this.state.phase === 'saving')) {
+      this.playback.playing = false;
+      this.setState({});
+      return;
+    }
     if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'compiling')) {
       this.transport.postMessage({
         type: 'control',
@@ -332,6 +373,17 @@ export class RunController {
   }
 
   resume(): void {
+    if (this.playback?.ended && this.state.phase === 'done') {
+      if (this.playback.atEnd()) {
+        this.playback.seek(this.playback.windowStartMs);
+        this.rebuildVisibleEvents();
+      }
+      this.playback.playing = true;
+      this.lastTickAt = this.clock.now();
+      this.ensureClock();
+      this.setState({});
+      return;
+    }
     if (this.activeRunId && this.state.phase === 'paused') {
       this.transport.postMessage({
         type: 'control',
@@ -341,6 +393,7 @@ export class RunController {
       if (this.playback) {
         this.playback.playing = true;
         this.lastTickAt = this.clock.now();
+        this.ensureClock();
       }
       this.setState({ phase: 'running' });
     }
@@ -511,7 +564,10 @@ export class RunController {
     this.setState({ phase: 'running' });
 
     const scenario = document.scenarios.find((s) => s.id === scenarioId);
-    if (scenario?.mode === 'timed') this.beginPlayback(document, scenario.workloads.some((w) => w.enabled && w.emission.mode === 'stream'));
+    if (scenario?.mode === 'timed' && this.runAllContext === null) {
+      this.beginPlayback(document, scenario.workloads.some((w) => w.enabled && w.emission.mode === 'stream'));
+      this.playbackFaults = structuredClone(scenario.faults);
+    }
 
     this.transport.postMessage({
       type: 'start',
@@ -519,8 +575,8 @@ export class RunController {
       snapshotId,
       planId: compileResult.plan.planId,
       workerSessionId: compileResult.plan.workerSessionId,
+      interactive: scenario?.mode === 'timed' && this.runAllContext === null,
     });
-    if (this.speed === Infinity) this.postPlayhead(Infinity);
 
     // Wait until terminal completes
     return await new Promise<TerminalResult | null>((resolve) => {
@@ -606,6 +662,11 @@ export class RunController {
         break;
       }
 
+      case 'results': {
+        this.playback?.ingestResults(update.records);
+        break;
+      }
+
       case 'checkpoint': {
         this.playback?.ingestCheckpoint(update.checkpoint);
         this.playback?.setComputedEdge(update.checkpoint.atMs);
@@ -618,11 +679,12 @@ export class RunController {
       }
 
       case 'terminal': {
+        if (this.state.current?.terminal || this.pendingTerminal) break;
         if (this.playback && update.measured) {
           // D57: the run has finished computing, but the playhead may be far behind. Keep the result until it arrives.
           this.playback.setEnded(Math.max(this.playback.computedMs, update.summary.elapsedMs ?? 0));
           this.pendingTerminal = update;
-          if (this.playback.speed === Infinity) this.tick();
+          if (this.playback.atEnd()) this.tick();
           break;
         }
         this.endPlayback(false);
@@ -660,6 +722,7 @@ export class RunController {
     this.pendingTerminal = null;
     if (discard) {
       this.playback = null;
+      this.playbackFaults = [];
       this.heldEvents = [];
       this.heldEventIndex = 0;
     }
@@ -673,7 +736,7 @@ export class RunController {
   /** One step of the playhead: move it, hand out what it passed, tell the worker, and finish the run if it is over. */
   private tick(): void {
     const store = this.playback;
-    if (!store || !this.activeRunId) return;
+    if (!store) return;
     if (this.clockHandle !== null) this.clock.cancel(this.clockHandle);
     this.clockHandle = null;
     const now = this.clock.now();
@@ -690,7 +753,7 @@ export class RunController {
     }
     if (released) this.setState({ events: [...this.bufferedEvents] });
 
-    if (this.speed !== Infinity && store.playheadMs - this.lastPlayheadPostMs >= PLAYHEAD_REPORT_MS) {
+    if (store.playheadMs - this.lastPlayheadPostMs >= PLAYHEAD_REPORT_MS) {
       this.lastPlayheadPostMs = store.playheadMs;
       this.postPlayhead(store.playheadMs);
     }
@@ -701,10 +764,40 @@ export class RunController {
       // The playhead is at the end: whatever trace the worker reported is now visible, and the result applies.
       while (this.heldEventIndex < this.heldEvents.length) this.bufferedEvents.push(this.heldEvents[this.heldEventIndex++]);
       this.setState({ events: [...this.bufferedEvents] });
-      void this.handleTerminal(terminal);
+      void this.handleTerminal(terminal).then(() => {
+        if (this.playback !== store) return;
+        if (store.playing && this.loop && !store.isStream) {
+          store.seek(store.windowStartMs);
+          this.rebuildVisibleEvents();
+          this.lastTickAt = this.clock.now();
+          this.ensureClock();
+        } else {
+          store.playing = false;
+          this.setState({});
+        }
+      });
       return;
     }
-    this.clockHandle = this.clock.schedule(() => this.tick(), TICK_MS);
+    if (store.playing && store.atEnd() && store.ended && this.loop && !store.isStream && this.state.phase === 'done') {
+      store.seek(store.windowStartMs);
+      this.rebuildVisibleEvents();
+    } else if (store.atEnd() && store.ended && this.state.phase === 'done') {
+      store.playing = false;
+    }
+    this.setState({});
+    if (!store.ended || store.playing) this.ensureClock();
+  }
+
+  private ensureClock(): void {
+    if (this.clockHandle === null) this.clockHandle = this.clock.schedule(() => this.tick(), TICK_MS);
+  }
+
+  private rebuildVisibleEvents(): void {
+    const playhead = this.playback?.playheadMs ?? 0;
+    this.bufferedEvents = this.heldEvents.filter((event) => event.atMs === null || event.atMs <= playhead);
+    this.heldEventIndex = this.heldEvents.findIndex((event) => event.atMs !== null && event.atMs > playhead);
+    if (this.heldEventIndex < 0) this.heldEventIndex = this.heldEvents.length;
+    this.setState({ events: [...this.bufferedEvents] });
   }
 
   private async handleTerminal(terminalMsg: {

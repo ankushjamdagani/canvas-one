@@ -24,7 +24,7 @@ async function start(doc: Document) {
   const compiled = messages[0];
   if (compiled.type !== 'compile-result' || compiled.result.status !== 'ready') throw new Error('compile failed');
   await handler.handleMessage({
-    type: 'start', runId: 'run', snapshotId: 'snap', planId: compiled.result.plan.planId, workerSessionId: compiled.result.plan.workerSessionId,
+    type: 'start', runId: 'run', snapshotId: 'snap', planId: compiled.result.plan.planId, workerSessionId: compiled.result.plan.workerSessionId, interactive: true,
   });
   const updates = () => messages.flatMap((m) => (m.type === 'update' ? [m.message] : []));
   const waitFor = async (what: () => unknown, timeoutMs = 20000) => {
@@ -62,9 +62,9 @@ describe('lookahead (D57)', () => {
     expect(t && t.kind === 'terminal' ? t.status : null).toBe('completed');
   }, 30000);
 
-  it('an Infinity playhead means no limit: a bulk runs to its end by itself', async () => {
+  it('a far finite playhead lets a bulk run to its end by itself', async () => {
     const run = await start(withEmission(BULK));
-    await run.handler.handleMessage({ type: 'playhead', runId: 'run', simulatedMs: Infinity });
+    await run.handler.handleMessage({ type: 'playhead', runId: 'run', simulatedMs: 1_000_000_000 });
     await run.waitFor(run.terminal, 20000);
     const t = run.terminal();
     expect(t && t.kind === 'terminal' ? t.status : null).toBe('completed');
@@ -73,10 +73,10 @@ describe('lookahead (D57)', () => {
   it('posts every finished cycle once and a checkpoint about every CHECKPOINT_MS of simulated time', async () => {
     const doc = withEmission({ mode: 'bulk', requests: 300, arrival: { spreadMs: 12_000 } });
     const run = await start(doc);
-    await run.handler.handleMessage({ type: 'playhead', runId: 'run', simulatedMs: Infinity });
+    await run.handler.handleMessage({ type: 'playhead', runId: 'run', simulatedMs: 1_000_000_000 });
     await run.waitFor(run.terminal, 20000);
     const cycles = run.updates().flatMap((u) => (u.kind === 'cycles' ? u.cycles : []));
-    expect(cycles).toHaveLength(300);
+    expect(cycles.filter((c) => c.completedAtMs !== null)).toHaveLength(300);
     expect(new Set(cycles.map((c) => c.id)).size).toBe(300);
     const checkpoints = run.updates().flatMap((u) => (u.kind === 'checkpoint' ? [u.checkpoint] : []));
     expect(checkpoints.length).toBeGreaterThanOrEqual(2);
@@ -96,7 +96,7 @@ describe('lookahead (D57)', () => {
   it('pause holds the worker; resume lets it go on', async () => {
     const run = await start(withEmission(BULK));
     await run.handler.handleMessage({ type: 'control', runId: 'run', kind: 'pause' });
-    await run.handler.handleMessage({ type: 'playhead', runId: 'run', simulatedMs: Infinity });
+    await run.handler.handleMessage({ type: 'playhead', runId: 'run', simulatedMs: 1_000_000_000 });
     await new Promise((r) => setTimeout(r, 100));
     const stalled = run.updates().length;
     await new Promise((r) => setTimeout(r, 100));

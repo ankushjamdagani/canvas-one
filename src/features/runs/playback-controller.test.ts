@@ -74,7 +74,7 @@ function setup(emission: Emission, speed: number) {
     };
   };
   const controller = new RunController({ repository, transport, mintId: () => crypto.randomUUID(), clock });
-  controller.setSpeed(speed);
+  controller.setPlaybackSpeed(speed);
   const doc = docWith(emission);
   const params = { projectId: 'p', branchId: 'b', snapshotId: 'snap', document: doc, scenarioId: doc.scenarios[0].id };
   /** Moves the manual clock on until `what` holds, giving up after `maxMs` of real time. */
@@ -86,8 +86,88 @@ function setup(emission: Emission, speed: number) {
 }
 
 describe('playback pacing (D57)', () => {
+  it('rejects unsupported speeds without changing the current speed', () => {
+    const { controller } = setup({ mode: 'bulk', requests: 1, arrival: { spreadMs: 0 } }, 1);
+    for (const speed of [0, Infinity, NaN, 3, -1]) expect(() => controller.setPlaybackSpeed(speed)).toThrow(RangeError);
+    expect(controller.getPlaybackSpeed()).toBe(1);
+    controller.reset();
+  });
+
+  it('Run all completes timed scenarios with a frozen clock and no interactive recording', async () => {
+    const { controller, params, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 2000 } }, 0.25);
+    const first = params.document.scenarios[0];
+    let encoded = JSON.stringify(first);
+    const ids = [...encoded.matchAll(/"id":"([^"]+)"/g)].map((match) => match[1]);
+    for (const id of ids) encoded = encoded.replaceAll(id, crypto.randomUUID());
+    const second = JSON.parse(encoded) as typeof first;
+    const document = { ...params.document, scenarios: [first, second] };
+    await controller.runAll({ ...params, document, scenarioIds: [first.id, second.id] });
+    const deadline = Date.now() + 5000;
+    while (saved.length < 2 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(saved).toHaveLength(2);
+    expect(controller.getPlayback()).toBeNull();
+    expect(controller.getState().phase).toBe('done');
+    controller.reset();
+  }, 10000);
+
+  it('seeks, steps, replays and loops a finished recording without saving twice', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 2000 } }, 16);
+    void controller.run(params);
+    await until(() => controller.getState().phase === 'done');
+    const store = controller.getPlayback()!;
+    expect(saved).toHaveLength(1);
+    controller.seek(-100);
+    expect(store.playheadMs).toBe(store.windowStartMs);
+    expect(store.playing).toBe(false);
+    controller.stepCycle(1);
+    expect(store.playheadMs).toBeGreaterThan(0);
+    controller.stepCycle(-1);
+    expect(store.playheadMs).toBe(0);
+    controller.seek(Infinity);
+    expect(store.playheadMs).toBe(store.computedMs);
+    controller.resume();
+    expect(store.playheadMs).toBe(0);
+    await advance(32);
+    controller.pause();
+    const frozen = store.playheadMs;
+    await advance(64);
+    expect(store.playheadMs).toBe(frozen);
+    controller.setLoop(true);
+    controller.seek(store.computedMs - 1);
+    controller.resume();
+    await advance(32);
+    expect(store.playheadMs).toBeLessThan(store.computedMs);
+    expect(store.playing).toBe(true);
+    expect(saved).toHaveLength(1);
+    controller.setLoop(false);
+    await until(() => !store.playing);
+    expect(saved).toHaveLength(1);
+    controller.reset();
+  }, 30000);
+
+  it('Stop resumes a paused stream and drains it; Go Live resumes at the edge', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'stream', ratePerSecond: 2, profile: { kind: 'steady' } }, 16);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
+    controller.seek(0);
+    const store = controller.getPlayback()!;
+    expect(store.playing).toBe(false);
+    controller.goLive();
+    expect(store.playheadMs).toBe(store.computedMs);
+    expect(store.playing).toBe(true);
+    await advance(32);
+    controller.pause();
+    controller.stop();
+    expect(store.playing).toBe(true);
+    expect(controller.getState().stopping).toBe(true);
+    await until(() => controller.getState().phase === 'done');
+    expect(controller.getState().current?.terminal?.status).toBe('completed');
+    expect(saved).toHaveLength(1);
+    controller.reset();
+  }, 30000);
+
   it('holds the result until the playhead reaches the end of the run', async () => {
-    const { controller, params, until, advance } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 2000 } }, 50);
+    const { controller, params, until, advance } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 2000 } }, 16);
     void controller.run(params);
     await until(() => controller.getPlayback()?.ended === true, 5000);
     const store = controller.getPlayback()!;
@@ -103,15 +183,15 @@ describe('playback pacing (D57)', () => {
     await advance(32);
   }, 30000);
 
-  it('speed Infinity jumps to the live edge and finishes without waiting', async () => {
-    const { controller, params, until } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 2000 } }, Infinity);
+  it('speed 16 finishes without an instant-playback mode', async () => {
+    const { controller, params, until } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 2000 } }, 16);
     const finished = controller.run(params);
     await until(() => controller.getState().phase === 'done', 10000);
     expect((await finished)?.status).toBe('completed');
   }, 30000);
 
   it('pause freezes the playhead; resume continues it', async () => {
-    const { controller, params, until, advance } = setup({ mode: 'bulk', requests: 200, arrival: { spreadMs: 8000 } }, 20);
+    const { controller, params, until, advance } = setup({ mode: 'bulk', requests: 200, arrival: { spreadMs: 8000 } }, 16);
     void controller.run(params);
     await until(() => (controller.getPlayback()?.playheadMs ?? 0) > 500, 5000);
     controller.pause();
@@ -125,7 +205,7 @@ describe('playback pacing (D57)', () => {
   }, 30000);
 
   it('reads canvas state at the playhead and releases trace events only as it passes them', async () => {
-    const { controller, params, until } = setup({ mode: 'bulk', requests: 50, arrival: { spreadMs: 4000 } }, 10);
+    const { controller, params, until } = setup({ mode: 'bulk', requests: 50, arrival: { spreadMs: 4000 } }, 8);
     void controller.run(params);
     await until(() => (controller.getPlayback()?.playheadMs ?? 0) > 800, 5000);
     const playhead = controller.getPlayback()!.playheadMs;
