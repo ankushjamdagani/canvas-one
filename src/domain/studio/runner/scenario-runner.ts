@@ -1513,7 +1513,9 @@ export class ScenarioRunner {
       return false;
     }
 
-    if (this.processedEvents >= this.scenario.budgets.maxEvents) {
+    // D57: a stream has no event budget (the worker's lookahead bounds how far it computes, and its trace
+    // truncates at the trace cap); the kernel's own hard limits still end a run that gets that far.
+    if (!this.hasStream && this.processedEvents >= this.scenario.budgets.maxEvents) {
       this.terminalStatus = 'incomplete';
       this.failureReason = this.budgetStop ??= 'Budget exhausted: maxEvents limit reached';
       this.isFinished = true;

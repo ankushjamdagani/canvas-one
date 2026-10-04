@@ -192,3 +192,27 @@ describe('work that can never settle (D56)', () => {
     }
   });
 });
+
+describe('stream traces truncate instead of ending the run (D57)', () => {
+  const tinyBudgets = { ...DEFAULT_SCENARIO_BUDGETS, maxEvents: 200, maxTraceRows: 50 };
+  const withBudgets = (doc: Document): Document => ({ ...doc, scenarios: [{ ...doc.scenarios[0], budgets: tinyBudgets }] });
+
+  it('a stream keeps running past the trace and event budgets, with the trace marked truncated', async () => {
+    const doc = withBudgets(build(stream(100)));
+    ready(doc);
+    const result = await runScenario(doc, doc.scenarios[0].id, 'stream-budget', { stopAtMs: 3000 });
+    expect(result.status).toBe('completed');
+    expect(result.summary.rootCounts.generated).toBeGreaterThan(200);
+    expect(result.summary.trace?.truncatedBy).toBe('trace-rows');
+    expect(result.events.length).toBeLessThanOrEqual(50);
+    expect(result.summary.cycles.total).toBe(result.summary.rootCounts.generated);
+  });
+
+  it('a bulk still ends incomplete at its budgets', async () => {
+    const doc = withBudgets(build(bulk(500, { spreadMs: 1000 })));
+    ready(doc);
+    const result = await runScenario(doc, doc.scenarios[0].id, 'bulk-budget');
+    expect(result.status).toBe('incomplete');
+    expect(result.reason).toMatch(/Budget exhausted/);
+  });
+});
