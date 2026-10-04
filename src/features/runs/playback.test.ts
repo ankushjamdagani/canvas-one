@@ -305,6 +305,14 @@ describe('PlaybackStore.stateAt', () => {
 });
 
 describe('PlaybackStore cycle revisions and historical results', () => {
+  it('applies measurements at the checkpoint instant, including work emitted at zero', () => {
+    const s = store(); s.ingestCheckpoint(checkpoint(0, 0));
+    s.ingestResults([{ atMs: 0, rootCounts: checkpoint(0, 1).rootCounts }]);
+    expect(s.resultsAt(0)?.rootCounts.generated).toBe(1);
+    s.ingestCheckpoint(checkpoint(5000, 1));
+    s.ingestResults([{ atMs: 5000, rootCounts: checkpoint(5000, 2).rootCounts }]);
+    expect(s.resultsAt(5000)?.rootCounts.generated).toBe(2);
+  });
   it('integrates occupied slots and normalizes cumulative throughput between events', () => {
     const s = store();
     s.ingestCheckpoint(checkpoint(0, 0));

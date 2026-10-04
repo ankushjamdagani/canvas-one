@@ -284,7 +284,7 @@ export class PlaybackStore {
     let cache = this.resultsCache;
     if (!cache || cache.baseline !== baseline || atMs < cache.atMs) {
       let lo = 0; let hi = this.resultDeltas.length;
-      while (lo < hi) { const mid = (lo + hi) >>> 1; if (this.resultDeltas[mid].atMs <= baseline.atMs) lo = mid + 1; else hi = mid; }
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (this.resultDeltas[mid].atMs < baseline.atMs) lo = mid + 1; else hi = mid; }
       cache = { atMs: baseline.atMs, baseline, cursor: lo, rootCounts: baseline.rootCounts,
         messageCounts: baseline.messageCounts, metrics: new Map(baseline.elementMetrics.map(m => [metricKey(m), m])),
         occupancyRates: {} };
@@ -460,7 +460,7 @@ export class PlaybackStore {
     });
     this.timelineIndex.compact(removedCycles, timelineConsumedRemoved, start);
     this.resultsIndex.compact(removedCycles, resultsConsumedRemoved, start);
-    this.resultsCache = null;
+    if (this.resultsCache && this.resultsCache.atMs < start) this.resultsCache = null;
     this.cycleStarts = [...this.cyclesById.values()].map((c) => c.startedAtMs).sort((a, b) => a - b);
     this.cycleEnds = [...this.cyclesById.values()].flatMap((c) => c.completedAtMs === null ? [] : [c.completedAtMs]).sort((a, b) => a - b);
     let baselineIndex = -1;
@@ -472,8 +472,13 @@ export class PlaybackStore {
       if (delta.atMs > baselineAt) break;
       if (delta.occupancyRates) occupancyRates = delta.occupancyRates;
     }
-    this.resultDeltas = this.resultDeltas.filter((delta) => delta.atMs > baselineAt);
+    this.resultDeltas = this.resultDeltas.filter((delta) => delta.atMs >= baselineAt);
     if (occupancyRates) this.resultDeltas.unshift({ atMs: baselineAt, occupancyRates });
+    if (this.resultsCache) {
+      let lo = 0; let hi = this.resultDeltas.length;
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (this.resultDeltas[mid].atMs <= this.resultsCache.atMs) lo = mid + 1; else hi = mid; }
+      this.resultsCache.cursor = lo;
+    }
   }
 }
 

@@ -140,6 +140,12 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       const timelineBatchStart = performance.now();
       store.cyclesAt(end + 1000);
       const timelineBatchReadMs = performance.now() - timelineBatchStart;
+      store.seek(end); store.setComputedEdge(end + 1000); store.playing = true;
+      const evictionStart = performance.now(); store.advance(1000);
+      const rollingEvictionMs = performance.now() - evictionStart;
+      const afterEvictionStart = performance.now();
+      store.stateAt(end + 1000); store.resultsAt(end + 1000); store.cyclesAt(end + 1000);
+      const postEvictionReadMs = performance.now() - afterEvictionStart;
       process.stdout.write(
         JSON.stringify({
           records: sample.length * 12,
@@ -153,6 +159,7 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           resultMedianMs: resultTimings[30], resultP95Ms: resultTimings[57],
           timelineReadMs, timelineCycles: timelineCycles.length,
           timelineBatchReadMs,
+          rollingEvictionMs, postEvictionReadMs,
           telemetryMs, observations, telemetryMeanMs: telemetryMs / observations,
           resultDeltas: deltas.length * 12,
         }) + '\n',

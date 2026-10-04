@@ -21,7 +21,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
     const document = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
     const source = document.scenarios[0];
     const snapshot = { id: 'measured', document: { ...document, scenarios: [{ ...source,
-      workloads: source.workloads.map(w => ({ ...w, startDelayMs: 0, emission: { mode: 'bulk' as const, requests: 2, arrival: 'instant' as const } })),
+      workloads: source.workloads.map(w => ({ ...w, startDelayMs: 5000, emission: { mode: 'bulk' as const, requests: 2, arrival: 'instant' as const } })),
     }] } };
     const messages: HostMessage[] = [];
     let finished!: () => void;
@@ -29,7 +29,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
     const handler = new WorkerProtocolHandler(message => {
       messages.push(message);
       if (message.type === 'update' && message.message.kind === 'terminal') finished();
-    });
+    }, { stepBatchSize: 1 });
     await handler.handleMessage({ type: 'compile', requestId: 'metrics', snapshot, scenarioId: source.id, versions: DEFAULT_BUILD_VERSIONS });
     const compile = messages[0];
     if (compile.type !== 'compile-result' || compile.result.status !== 'ready') throw new Error('Compile failed');
@@ -38,6 +38,7 @@ describe('Worker Protocol and Handler (protocol.ts)', () => {
     const updates = messages.flatMap(message => message.type === 'update' ? [message.message] : []);
     const checkpoints = updates.filter(message => message.kind === 'checkpoint');
     expect(checkpoints[0].checkpoint.rootCounts.generated).toBe(0);
+    expect(checkpoints.find(message => message.checkpoint.atMs === 5000)?.checkpoint.rootCounts.generated).toBe(2);
     const terminal = updates.find(message => message.kind === 'terminal');
     if (!terminal || terminal.kind !== 'terminal') throw new Error('No terminal');
     expect(checkpoints.at(-1)?.checkpoint).toEqual({ atMs: terminal.summary.elapsedMs,

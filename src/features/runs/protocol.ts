@@ -646,7 +646,7 @@ export class WorkerProtocolHandler {
       if (finishedCycles.length > 0) {
         this.postMessageCallback({ type: 'update', message: { kind: 'cycles', runId, cycles: finishedCycles } });
       }
-      if (hasMore && active.runner.simulatedMs >= active.lastCheckpointMs + CHECKPOINT_MS) {
+      if (hasMore && active.runner.nextEventAtMs() !== active.runner.simulatedMs && active.runner.simulatedMs >= active.lastCheckpointMs + CHECKPOINT_MS) {
         active.lastCheckpointMs = active.runner.simulatedMs;
         this.postMessageCallback({ type: 'update', message: { kind: 'checkpoint', runId, checkpoint: active.runner.checkpoint() } });
       }
