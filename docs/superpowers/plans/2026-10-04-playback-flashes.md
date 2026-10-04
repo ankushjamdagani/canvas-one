@@ -1,0 +1,9 @@
+# Playback lifecycle flashes
+
+Add the deferred send, arrival and outcome cues from design section 5. Flashes are decorative snapshots of recorded facts, never a new packet stage or a change to accounting. Their 240 ms lifetime uses simulated time; pause, seeking, replay and reduced motion must remain truthful.
+
+1. Extend PlaybackStore.stateAt with grouped flashes: connectionId or elementId, kind (sent/arrived/outcome), endpoint progress, outcome, exact count and age/progress within the flash window. Record sends and confirmed arrivals; return arrival/outcome comes from the recorded response leg. Lost outbound legs have no arrival and use a fading loss marker mid-line. Message settlement appears at its source; call outcomes wait for the return. Completed-cycle outcomes mark the source node using captured workload entry metadata, including timeout/stuck outcomes. Unknown outcomes remain absent. Index forward reads, reset on backward/late reads and retain boundary flashes through eviction. Unit-test timing, direction, counts, no future outcomes, loss, pause/seek and eviction.
+2. Add a shared SVG cue primitive in components/ui. Keep pulses/ticks/outcome symbols outside measured node layout and pointer hit areas, use existing colors, aggregate counts without sampling, and make reduced-motion cues static. Wire the traffic hook, edge and node overlays. Independent source review before acceptance.
+3. Add deterministic production browser checks by pausing/seeking to recorded times; verify normal/reduced cues, replay and no-run cleanup. Run TypeScript, full units, build (chunks below500kB), Storybook and isolated full production Playwright. Profile the frame path at flash-sale load. Update ACTION_LOG/HANDOFF and the traffic decision/spec; commit with own trailer.
+
+No worker/kernel accounting changes, persistence, floating connection bar, bookkeeping audit or eviction optimization.
