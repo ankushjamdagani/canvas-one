@@ -26,7 +26,6 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
       id: 'scn-1',
       label: 'Broken scenario',
       mode: 'logical',
-      completion: 'quiescent',
       status: {
         kind: 'not-ready',
         issues: [
@@ -48,14 +47,12 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
       id: 'scn-1',
       label: 'Good scenario',
       mode: 'logical',
-      completion: 'quiescent',
       status: { kind: 'not-run' },
     };
     const notReadyScenario: ScenarioSwitcherEntry = {
       id: 'scn-2',
       label: 'Broken scenario',
       mode: 'logical',
-      completion: 'quiescent',
       status: {
         kind: 'not-ready',
         issues: [
@@ -74,13 +71,13 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
   });
 });
 
-describe('ScenarioSwitcher: Stop and run speed (D55)', () => {
-  const timed = (completion: ScenarioSwitcherEntry['completion']): ScenarioSwitcherEntry => ({
-    id: 'scn-1', label: 'Timed', mode: 'timed', completion, status: { kind: 'not-run' },
+describe('ScenarioSwitcher: Stop (D55)', () => {
+  const timed = (): ScenarioSwitcherEntry => ({
+    id: 'scn-1', label: 'Timed', mode: 'timed', status: { kind: 'not-run' },
   });
 
   it('shows Stop beside Pause and Reset while a timed run is active, and Stopping… once pressed', () => {
-    const active = { ...makeProps([timed('open')], 'scn-1'), runPhase: 'running' as const, onStop: () => undefined };
+    const active = { ...makeProps([timed()], 'scn-1'), runPhase: 'running' as const, onStop: () => undefined };
     expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, active))).toContain('data-testid="scenario-stop-btn"');
     const stopping = renderToStaticMarkup(React.createElement(ScenarioSwitcher, { ...active, isStopping: true }));
     expect(stopping).toContain('Stopping…');
@@ -88,9 +85,9 @@ describe('ScenarioSwitcher: Stop and run speed (D55)', () => {
   });
 
   it('has no Stop for a logical scenario or while idle', () => {
-    const logical: ScenarioSwitcherEntry = { id: 'scn-1', label: 'Logical', mode: 'logical', completion: 'quiescent', status: { kind: 'not-run' } };
+    const logical: ScenarioSwitcherEntry = { id: 'scn-1', label: 'Logical', mode: 'logical', status: { kind: 'not-run' } };
     const props = { ...makeProps([logical], 'scn-1'), runPhase: 'running' as const, onStop: () => undefined };
     expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, props))).not.toContain('scenario-stop-btn');
-    expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, { ...makeProps([timed('horizon')], 'scn-1'), onStop: () => undefined }))).not.toContain('scenario-stop-btn');
+    expect(renderToStaticMarkup(React.createElement(ScenarioSwitcher, { ...makeProps([timed()], 'scn-1'), onStop: () => undefined }))).not.toContain('scenario-stop-btn');
   });
 });

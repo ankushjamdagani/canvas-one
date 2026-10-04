@@ -16,7 +16,6 @@ import type { Document } from '../../domain/studio/model';
 import type { CheckResult } from '../../domain/studio/runner/types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { cn } from '../../lib/utils';
 import { TrafficSection } from './TrafficSection';
 import { StepsSection } from './StepsSection';
@@ -132,176 +131,11 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
         <section data-testid="scenario-section-run-settings" className="space-y-2">
           <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Run settings</div>
 
-          {scenario.mode === 'timed' ? (
-            <div className="space-y-2">
-              <label className="space-y-1 text-[11px] text-secondary-text">
-                Completion
-                <NativeSelect
-                  value={scenario.completion.kind ?? ''}
-                  aria-invalid={scenario.completion.kind === null}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    onChange((s) => ({
-                      ...s,
-                      completion:
-                        value === 'horizon'
-                          ? { kind: 'horizon', horizonMs: null }
-                          : value === 'drain'
-                            ? {
-                                kind: 'drain',
-                                arrivalHorizonMs: null,
-                                deadlineMs: null,
-                              }
-                            : value === 'count'
-                              ? { kind: 'count', requests: null, deadlineMs: null }
-                              : value === 'open'
-                                ? { kind: 'open' }
-                                : { kind: null },
-                    }));
-                  }}
-                  aria-label="Completion kind"
-                >
-                  <NativeSelectOption value="" disabled>
-                    Choose…
-                  </NativeSelectOption>
-                  <NativeSelectOption value="horizon">For a number of seconds</NativeSelectOption>
-                  <NativeSelectOption value="count">For a number of requests</NativeSelectOption>
-                  <NativeSelectOption value="open">Until I stop it</NativeSelectOption>
-                  <NativeSelectOption value="drain">Arrivals for a while, then drain</NativeSelectOption>
-                </NativeSelect>
-              </label>
-
-              {scenario.completion.kind === 'horizon' && (
-                <label className="space-y-1 text-[11px] text-secondary-text">
-                  Run for (ms)
-                  <Input
-                    type="number"
-                    min={1000}
-                    max={300000}
-                    placeholder="—"
-                    value={scenario.completion.horizonMs ?? ''}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const v = raw === '' ? null : Number(raw);
-                      onChange((s) =>
-                        s.completion.kind === 'horizon' && (v === null || Number.isFinite(v))
-                          ? {
-                              ...s,
-                              completion: { kind: 'horizon', horizonMs: v },
-                            }
-                          : s,
-                      );
-                    }}
-                  />
-                </label>
-              )}
-
-              {scenario.completion.kind === 'count' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="space-y-1 text-[11px] text-secondary-text">
-                    Requests
-                    <Input
-                      type="number"
-                      min={1}
-                      max={100000}
-                      placeholder="—"
-                      aria-label="Requests"
-                      value={scenario.completion.requests ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = raw === '' ? null : Number(raw);
-                        onChange((s) =>
-                          s.completion.kind === 'count' && (v === null || Number.isFinite(v))
-                            ? { ...s, completion: { ...s.completion, requests: v } }
-                            : s,
-                        );
-                      }}
-                    />
-                  </label>
-                  <label className="space-y-1 text-[11px] text-secondary-text">
-                    Give up at (ms)
-                    <Input
-                      type="number"
-                      min={1000}
-                      max={600000}
-                      placeholder="—"
-                      aria-label="Count deadline"
-                      value={scenario.completion.deadlineMs ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = raw === '' ? null : Number(raw);
-                        onChange((s) =>
-                          s.completion.kind === 'count' && (v === null || Number.isFinite(v))
-                            ? { ...s, completion: { ...s.completion, deadlineMs: v } }
-                            : s,
-                        );
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
-
-              {scenario.completion.kind === 'open' && (
-                <p data-testid="scenario-open-note" className="text-[11px] text-secondary-text">
-                  Runs until you press Stop, then stops new requests and lets work in flight finish (up to 60 s of
-                  simulated time). It is always paced: Instant is not available for it.
-                </p>
-              )}
-
-              {scenario.completion.kind === 'drain' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="space-y-1 text-[11px] text-secondary-text">
-                    Arrivals stop after (ms)
-                    <Input
-                      type="number"
-                      min={0}
-                      placeholder="—"
-                      value={scenario.completion.arrivalHorizonMs ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = raw === '' ? null : Number(raw);
-                        onChange((s) =>
-                          s.completion.kind === 'drain' && (v === null || Number.isFinite(v))
-                            ? {
-                                ...s,
-                                completion: {
-                                  ...s.completion,
-                                  arrivalHorizonMs: v,
-                                },
-                              }
-                            : s,
-                        );
-                      }}
-                    />
-                  </label>
-                  <label className="space-y-1 text-[11px] text-secondary-text">
-                    Deadline (ms)
-                    <Input
-                      type="number"
-                      min={0}
-                      max={600000}
-                      placeholder="—"
-                      value={scenario.completion.deadlineMs ?? ''}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = raw === '' ? null : Number(raw);
-                        onChange((s) =>
-                          s.completion.kind === 'drain' && (v === null || Number.isFinite(v))
-                            ? {
-                                ...s,
-                                completion: { ...s.completion, deadlineMs: v },
-                              }
-                            : s,
-                        );
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-[11px] text-secondary-text">Runs step by step. No timing or throughput.</p>
-          )}
+          <p className="text-[11px] text-secondary-text">
+            {scenario.mode === 'timed'
+              ? 'Each traffic source says how much it sends. The run ends when a bulk has finished and everything has settled; a stream runs until you press Stop.'
+              : 'Runs step by step. No timing or throughput.'}
+          </p>
 
           <label className="space-y-1 text-[11px] text-secondary-text">
             Seed

@@ -58,8 +58,6 @@ export interface ScenarioSwitcherEntry {
   readonly id: Id;
   readonly label: string;
   readonly mode: 'logical' | 'timed';
-  /** D55: how the run ends; an open-ended run needs a paced speed. */
-  readonly completion: 'quiescent' | 'horizon' | 'drain' | 'count' | 'open';
   readonly status: ScenarioStatus;
 }
 

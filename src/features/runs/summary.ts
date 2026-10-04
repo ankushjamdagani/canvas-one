@@ -1,9 +1,11 @@
+import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 import type { RunSummary } from '../../domain/studio/runner/types';
 
 /** A zeroed RunSummary for a run that has produced no results yet. */
 export function createEmptySummary(mode: 'logical' | 'timed' = 'logical'): RunSummary {
   return {
     mode,
+    cycles: emptyCycleSummary(),
     consumedInputs: 0,
     rootCounts: {
       generated: 0,

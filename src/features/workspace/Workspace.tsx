@@ -1107,7 +1107,6 @@ export function Workspace({
         id: s.scenario.id,
         label: s.scenario.label,
         mode: s.scenario.mode,
-        completion: s.scenario.completion.kind,
         status: s.status,
       })),
     [scenariosWithStatus],

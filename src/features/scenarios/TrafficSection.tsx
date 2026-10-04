@@ -22,7 +22,16 @@ import { Input } from '../../components/ui/input';
 import { NativeSelect, NativeSelectOption } from '../../components/ui/native-select';
 import { Switch } from '../../components/ui/switch';
 import { inboundEndpointOptions, endpointLabel } from './pickers';
-import { UNSET_KEY_DISTRIBUTION, type DraftRequestClass, type DraftScenario, type DraftWorkload, type DraftWorkloadProfile } from './draftScenario';
+import {
+  UNSET_EMISSION,
+  UNSET_KEY_DISTRIBUTION,
+  type DraftBulkArrival,
+  type DraftEmission,
+  type DraftRequestClass,
+  type DraftScenario,
+  type DraftWorkload,
+  type DraftWorkloadProfile,
+} from './draftScenario';
 import type { ScenarioIssue } from './types';
 import { summarizeWorkloadMix } from './summaries';
 import { CompactRow } from './CompactRow';
@@ -58,10 +67,9 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
       id: mintId(),
       entry: { elementId: first.elementId, portId: first.portId },
       enabled: true,
-      rate: 1,
-      profile: { kind: 'steady' },
+      startDelayMs: 0,
+      emission: UNSET_EMISSION,
       timeoutMs: 30000,
-      intervalMs: null,
       classes: [],
     };
     onChange((s) => ({ ...s, workloads: [...s.workloads, workload] }));
@@ -143,20 +151,25 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
               </label>
 
               <label className="space-y-1 text-[11px] text-secondary-text">
-                Rate (req/s)
+                Starts after (ms)
                 <Input
                   type="number"
                   min={0}
                   step="any"
-                  value={workload.rate}
+                  value={workload.startDelayMs}
                   onChange={(e) => {
                     const value = Number(e.target.value);
-                    updateWorkload(workload.id, (w) => ({ ...w, rate: Number.isFinite(value) ? value : w.rate }));
+                    updateWorkload(workload.id, (w) => ({ ...w, startDelayMs: Number.isFinite(value) && value >= 0 ? value : w.startDelayMs }));
                   }}
-                  aria-label="Rate"
+                  aria-label="Starts after"
                 />
               </label>
             </div>
+
+            <EmissionFields
+              emission={workload.emission}
+              onChange={(emission) => updateWorkload(workload.id, (w) => ({ ...w, emission }))}
+            />
 
             <CompactRow
               isExpanded={expandedId === workload.id}
@@ -170,10 +183,6 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
               }
             >
               <div className="space-y-3">
-                <ProfileFields
-                  profile={workload.profile}
-                  onChange={(profile) => updateWorkload(workload.id, (w) => ({ ...w, profile }))}
-                />
                 <div className="grid grid-cols-2 gap-2">
                   <label className="space-y-1 text-[11px] text-secondary-text col-span-2">
                     Timeout (ms)
@@ -238,7 +247,149 @@ const numberOrNull = (raw: string): number | null => {
   return Number.isFinite(v) ? v : null;
 };
 
-/** D50: steady, burst (peak rate between two times) or ramp (to an end rate over the arrival window). */
+/** D56: a source sends a bulk of N requests, or an endless stream at a rate. */
+function EmissionFields({
+  emission,
+  onChange,
+}: {
+  readonly emission: DraftEmission;
+  readonly onChange: (emission: DraftEmission) => void;
+}) {
+  return (
+    <div className="space-y-2" data-testid="traffic-emission">
+      <label className="block space-y-1 text-[11px] text-secondary-text">
+        Sends
+        <NativeSelect
+          data-testid="workload-mode"
+          aria-label="Sends"
+          aria-invalid={emission.mode === null}
+          value={emission.mode ?? ''}
+          onChange={(e) => {
+            const mode = e.target.value;
+            onChange(
+              mode === 'bulk'
+                ? { mode: 'bulk', requests: null, arrival: null }
+                : mode === 'stream'
+                  ? { mode: 'stream', ratePerSecond: null, profile: { kind: 'steady' } }
+                  : UNSET_EMISSION,
+            );
+          }}
+        >
+          <NativeSelectOption value="" disabled>
+            Choose…
+          </NativeSelectOption>
+          <NativeSelectOption value="bulk">A bulk of requests</NativeSelectOption>
+          <NativeSelectOption value="stream">A stream until I stop it</NativeSelectOption>
+        </NativeSelect>
+      </label>
+      {emission.mode === 'bulk' && <BulkFields emission={emission} onChange={onChange} />}
+      {emission.mode === 'stream' && <StreamFields emission={emission} onChange={onChange} />}
+    </div>
+  );
+}
+
+const arrivalKind = (arrival: DraftBulkArrival | null): 'instant' | 'spread' | 'ramp' | '' =>
+  arrival === null ? '' : arrival === 'instant' ? 'instant' : 'spreadMs' in arrival ? 'spread' : 'ramp';
+
+const arrivalSpread = (arrival: DraftBulkArrival | null): number | null =>
+  arrival === null || arrival === 'instant' ? null : 'spreadMs' in arrival ? arrival.spreadMs : arrival.ramp.spreadMs;
+
+function BulkFields({
+  emission,
+  onChange,
+}: {
+  readonly emission: Extract<DraftEmission, { mode: 'bulk' }>;
+  readonly onChange: (emission: DraftEmission) => void;
+}) {
+  const kind = arrivalKind(emission.arrival);
+  const spread = arrivalSpread(emission.arrival);
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <label className="space-y-1 text-[11px] text-secondary-text">
+        Requests
+        <Input
+          type="number"
+          min={1}
+          max={100000}
+          placeholder="—"
+          data-testid="bulk-requests"
+          aria-label="Requests"
+          value={emission.requests ?? ''}
+          onChange={(e) => onChange({ ...emission, requests: numberOrNull(e.target.value) })}
+        />
+      </label>
+      <label className="space-y-1 text-[11px] text-secondary-text">
+        Arrive
+        <NativeSelect
+          data-testid="bulk-arrival"
+          aria-label="Arrive"
+          value={kind}
+          onChange={(e) => {
+            const next = e.target.value;
+            onChange({
+              ...emission,
+              arrival:
+                next === 'instant' ? 'instant' : next === 'spread' ? { spreadMs: spread } : next === 'ramp' ? { ramp: { spreadMs: spread } } : null,
+            });
+          }}
+        >
+          <NativeSelectOption value="" disabled>
+            Choose…
+          </NativeSelectOption>
+          <NativeSelectOption value="instant">All at once</NativeSelectOption>
+          <NativeSelectOption value="spread">Evenly over</NativeSelectOption>
+          <NativeSelectOption value="ramp">Ramping up over</NativeSelectOption>
+        </NativeSelect>
+      </label>
+      {(kind === 'spread' || kind === 'ramp') && (
+        <label className="space-y-1 text-[11px] text-secondary-text">
+          Over (ms)
+          <Input
+            type="number"
+            min={1}
+            placeholder="—"
+            data-testid="bulk-spread"
+            aria-label="Over"
+            value={spread ?? ''}
+            onChange={(e) => {
+              const v = numberOrNull(e.target.value);
+              onChange({ ...emission, arrival: kind === 'spread' ? { spreadMs: v } : { ramp: { spreadMs: v } } });
+            }}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function StreamFields({
+  emission,
+  onChange,
+}: {
+  readonly emission: Extract<DraftEmission, { mode: 'stream' }>;
+  readonly onChange: (emission: DraftEmission) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="block space-y-1 text-[11px] text-secondary-text">
+        Rate (req/s)
+        <Input
+          type="number"
+          min={0}
+          step="any"
+          placeholder="—"
+          data-testid="stream-rate"
+          aria-label="Rate"
+          value={emission.ratePerSecond ?? ''}
+          onChange={(e) => onChange({ ...emission, ratePerSecond: numberOrNull(e.target.value) })}
+        />
+      </label>
+      <ProfileFields profile={emission.profile} onChange={(profile) => onChange({ ...emission, profile })} />
+    </div>
+  );
+}
+
+/** D50/D56: steady, burst (peak rate between two times) or ramp (to an end rate over a time, then held). */
 function ProfileFields({
   profile,
   onChange,
@@ -265,14 +416,14 @@ function ProfileFields({
               kind === 'burst'
                 ? { kind: 'burst', peakRate: null, startMs: null, endMs: null }
                 : kind === 'ramp'
-                  ? { kind: 'ramp', endRate: null }
+                  ? { kind: 'ramp', endRate: null, rampMs: null }
                   : { kind: 'steady' },
             );
           }}
         >
           <NativeSelectOption value="steady">Steady</NativeSelectOption>
           <NativeSelectOption value="burst">Burst (a higher rate for a while)</NativeSelectOption>
-          <NativeSelectOption value="ramp">Ramp (rate changes steadily)</NativeSelectOption>
+          <NativeSelectOption value="ramp">Ramp (rate changes steadily, then holds)</NativeSelectOption>
         </NativeSelect>
       </label>
       {profile.kind === 'burst' && (
@@ -285,6 +436,7 @@ function ProfileFields({
       {profile.kind === 'ramp' && (
         <div className="grid grid-cols-2 gap-2">
           {field('Rate at the end (/s)', 'traffic-ramp-end', profile.endRate, (v) => onChange({ ...profile, endRate: v }))}
+          {field('Reaches it after (ms)', 'traffic-ramp-time', profile.rampMs, (v) => onChange({ ...profile, rampMs: v }))}
         </div>
       )}
     </div>

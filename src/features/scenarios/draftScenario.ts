@@ -3,8 +3,7 @@
  * RV-05c).
  *
  * commands.md §4 "Empty drafts invent nothing": "the only prefilled values are the
- * contracted budget defaults (storage.md §6), completion:{kind:'quiescent'} for
- * step-by-step (the only legal value), and a seed drawn at random when the draft
+ * contracted budget defaults (storage.md §6) and a seed drawn at random when the draft
  * opens." Every other value the stored `Scenario` record requires must be entered by
  * the user before Apply.
  *
@@ -13,8 +12,7 @@
  * state -- never the stored `Scenario` type (draft.ts converts back with
  * `toStorableScenario`, which returns null while anything is unset, and Apply is
  * blocked whenever it does):
- * - `completion` (timed only; logical's `quiescent` is the one allowed prefill and is
- *   never unset).
+ * - each workload's `emission` (D56: bulk or stream, with the values that mode needs).
  * - each workload request class's `keyDistribution` (model-and-runner.md §6 Workloads:
  *   `RequestClass.keyDistribution` is a required, always-present object regardless of
  *   `kind`, per `src/domain/studio/validate.ts`'s `validateRequestClass`).
@@ -34,7 +32,7 @@
 import type {
   Assertion,
   AssertionSubject,
-  CompletionPolicy,
+  Emission,
   Json,
   KeyDistribution,
   Path,
@@ -43,48 +41,6 @@ import type {
   Workload,
   WorkloadProfile,
 } from '../../domain/studio/model';
-
-// ============================================================================
-// DraftCompletion
-// ============================================================================
-
-/**
- * `{kind:null}` = nothing chosen yet (timed only -- logical is always the fixed
- * `{kind:'quiescent'}`, never this type's `null` state). Once `horizon`/`drain` is
- * picked, its own numeric fields stay individually nullable so partial entry (kind
- * chosen, value not yet typed) isn't lost on every keystroke elsewhere in the form.
- */
-export type DraftCompletion =
-  | { readonly kind: null }
-  | { readonly kind: 'quiescent' }
-  | { readonly kind: 'horizon'; readonly horizonMs: number | null }
-  | { readonly kind: 'drain'; readonly arrivalHorizonMs: number | null; readonly deadlineMs: number | null }
-  | { readonly kind: 'count'; readonly requests: number | null; readonly deadlineMs: number | null }
-  | { readonly kind: 'open' };
-
-export const UNSET_COMPLETION: DraftCompletion = { kind: null };
-
-function completionToDraft(completion: CompletionPolicy): DraftCompletion {
-  return completion;
-}
-
-/** Returns the stored CompletionPolicy once every required field is filled, else null. */
-function draftCompletionToStorable(completion: DraftCompletion): CompletionPolicy | null {
-  if (completion.kind === null) return null;
-  if (completion.kind === 'quiescent') return { kind: 'quiescent' };
-  if (completion.kind === 'horizon') {
-    return completion.horizonMs === null ? null : { kind: 'horizon', horizonMs: completion.horizonMs };
-  }
-  if (completion.kind === 'open') return { kind: 'open' };
-  if (completion.kind === 'count') {
-    return completion.requests === null || completion.deadlineMs === null
-      ? null
-      : { kind: 'count', requests: completion.requests, deadlineMs: completion.deadlineMs };
-  }
-  return completion.arrivalHorizonMs === null || completion.deadlineMs === null
-    ? null
-    : { kind: 'drain', arrivalHorizonMs: completion.arrivalHorizonMs, deadlineMs: completion.deadlineMs };
-}
 
 // ============================================================================
 // DraftKeyDistribution
@@ -124,19 +80,52 @@ export type DraftRequestClass = Omit<RequestClass, 'keyDistribution'> & {
 export type DraftWorkloadProfile =
   | { readonly kind: 'steady' }
   | { readonly kind: 'burst'; readonly peakRate: number | null; readonly startMs: number | null; readonly endMs: number | null }
-  | { readonly kind: 'ramp'; readonly endRate: number | null };
+  | { readonly kind: 'ramp'; readonly endRate: number | null; readonly rampMs: number | null };
 
 function draftProfileToStorable(p: DraftWorkloadProfile): WorkloadProfile | null {
   if (p.kind === 'burst') {
     if (p.peakRate === null || p.startMs === null || p.endMs === null) return null;
     return { kind: 'burst', peakRate: p.peakRate, startMs: p.startMs, endMs: p.endMs };
   }
-  if (p.kind === 'ramp') return p.endRate === null ? null : { kind: 'ramp', endRate: p.endRate };
+  if (p.kind === 'ramp') return p.endRate === null || p.rampMs === null ? null : { kind: 'ramp', endRate: p.endRate, rampMs: p.rampMs };
   return { kind: 'steady' };
 }
 
-export type DraftWorkload = Omit<Workload, 'classes' | 'profile'> & {
-  readonly profile: DraftWorkloadProfile;
+/** D56: how a bulk's requests spread; each value stays individually nullable until typed. */
+export type DraftBulkArrival =
+  | 'instant'
+  | { readonly spreadMs: number | null }
+  | { readonly ramp: { readonly spreadMs: number | null } };
+
+/**
+ * D56: `mode: null` = nothing chosen yet. Once bulk or stream is picked, its own values stay
+ * individually nullable so partial entry isn't lost on every keystroke elsewhere in the form.
+ */
+export type DraftEmission =
+  | { readonly mode: null }
+  | { readonly mode: 'bulk'; readonly requests: number | null; readonly arrival: DraftBulkArrival | null }
+  | { readonly mode: 'stream'; readonly ratePerSecond: number | null; readonly profile: DraftWorkloadProfile };
+
+export const UNSET_EMISSION: DraftEmission = { mode: null };
+
+function draftEmissionToStorable(e: DraftEmission): Emission | null {
+  if (e.mode === null) return null;
+  if (e.mode === 'stream') {
+    const profile = draftProfileToStorable(e.profile);
+    return e.ratePerSecond === null || profile === null ? null : { mode: 'stream', ratePerSecond: e.ratePerSecond, profile };
+  }
+  if (e.requests === null || e.arrival === null) return null;
+  if (e.arrival === 'instant') return { mode: 'bulk', requests: e.requests, arrival: 'instant' };
+  if ('spreadMs' in e.arrival) {
+    return e.arrival.spreadMs === null ? null : { mode: 'bulk', requests: e.requests, arrival: { spreadMs: e.arrival.spreadMs } };
+  }
+  return e.arrival.ramp.spreadMs === null
+    ? null
+    : { mode: 'bulk', requests: e.requests, arrival: { ramp: { spreadMs: e.arrival.ramp.spreadMs } } };
+}
+
+export type DraftWorkload = Omit<Workload, 'classes' | 'emission'> & {
+  readonly emission: DraftEmission;
   readonly classes: readonly DraftRequestClass[];
 };
 
@@ -155,15 +144,15 @@ function workloadToDraft(w: Workload): DraftWorkload {
 }
 
 function draftWorkloadToStorable(w: DraftWorkload): Workload | null {
-  const profile = draftProfileToStorable(w.profile);
-  if (profile === null) return null;
+  const emission = draftEmissionToStorable(w.emission);
+  if (emission === null) return null;
   const classes: RequestClass[] = [];
   for (const c of w.classes) {
     const stored = draftRequestClassToStorable(c);
     if (stored === null) return null;
     classes.push(stored);
   }
-  return { ...w, profile, classes };
+  return { ...w, emission, classes };
 }
 
 // ============================================================================
@@ -206,8 +195,7 @@ function draftAssertionToStorable(a: DraftAssertion): Assertion | null {
 // DraftScenario
 // ============================================================================
 
-export type DraftScenario = Omit<Scenario, 'completion' | 'workloads' | 'assertions'> & {
-  readonly completion: DraftCompletion;
+export type DraftScenario = Omit<Scenario, 'workloads' | 'assertions'> & {
   readonly workloads: readonly DraftWorkload[];
   readonly assertions: readonly DraftAssertion[];
 };
@@ -216,22 +204,18 @@ export type DraftScenario = Omit<Scenario, 'completion' | 'workloads' | 'asserti
 export function scenarioToDraft(scenario: Scenario): DraftScenario {
   return {
     ...scenario,
-    completion: completionToDraft(scenario.completion),
     workloads: scenario.workloads.map(workloadToDraft),
     assertions: scenario.assertions.map(assertionToDraft),
   };
 }
 
 /**
- * Returns the stored Scenario once completion, every workload class's key
+ * Returns the stored Scenario once every workload's emission, every workload class's key
  * distribution, and every output/context assertion path are chosen; otherwise null.
  * Callers must not Apply while this is null (draft.ts's completeness-issue check
  * always agrees with this function about what's missing).
  */
 export function toStorableScenario(draft: DraftScenario): Scenario | null {
-  const completion = draftCompletionToStorable(draft.completion);
-  if (completion === null) return null;
-
   const workloads: Workload[] = [];
   for (const w of draft.workloads) {
     const stored = draftWorkloadToStorable(w);
@@ -246,33 +230,25 @@ export function toStorableScenario(draft: DraftScenario): Scenario | null {
     assertions.push(stored);
   }
 
-  return { ...draft, completion, workloads, assertions };
+  return { ...draft, workloads, assertions };
 }
 
 /**
  * A best-effort stored Scenario used only to run the storable/readiness validators so
- * *other* field errors (e.g. an empty label) still surface while completion/
+ * *other* field errors (e.g. an empty label) still surface while emission/
  * keyDistribution/path remain unset. The substituted values here are never persisted:
  * `toStorableScenario` (used by Apply) returns null whenever any of them was actually
  * substituted, and draft.ts's `draftCompletenessIssues` independently blocks Apply in
  * that case regardless of what this validation-only candidate reports.
  */
 export function toValidationScenario(draft: DraftScenario): Scenario {
-  const completion: CompletionPolicy =
-    draftCompletionToStorable(draft.completion) ??
-    // storage.md §6: timed horizon is 1-300s (1000-300000ms); 1000 is the storable
-    // minimum, picked here only so *other* field issues (e.g. an empty label) still
-    // surface via validateDocument while completion itself remains unset -- never
-    // persisted (see this function's doc comment).
-    (draft.mode === 'logical' ? { kind: 'quiescent' } : { kind: 'horizon', horizonMs: 1000 });
-
   const workloads: Workload[] = draft.workloads.map((w) => {
     const stored = draftWorkloadToStorable(w);
     if (stored) return stored;
     return {
       ...w,
-      // Validation-only stand-in for unset burst/ramp fields (never persisted).
-      profile: draftProfileToStorable(w.profile) ?? { kind: 'steady' },
+      // Validation-only stand-in for an unset emission (never persisted).
+      emission: draftEmissionToStorable(w.emission) ?? { mode: 'bulk', requests: 1, arrival: 'instant' },
       classes: w.classes.map((c) => ({
         ...c,
         keyDistribution: draftKeyDistributionToStorable(c.keyDistribution) ?? {
@@ -301,7 +277,7 @@ export function toValidationScenario(draft: DraftScenario): Scenario {
     throw new Error('toValidationScenario: unexpected unset assertion subject');
   });
 
-  return { ...draft, completion, workloads, assertions };
+  return { ...draft, workloads, assertions };
 }
 
 export type { Json };

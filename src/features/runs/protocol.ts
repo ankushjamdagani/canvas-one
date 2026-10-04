@@ -145,7 +145,7 @@ type ActiveRun = {
   paceSimMs: number;
 };
 
-/** D55: an open-ended run never ends by itself, so it is never unpaced. */
+/** D55/D56: a run with a stream never ends by itself, so it is never unpaced (until stage 2 replaces the pacing). */
 export const OPEN_RUN_MIN_SPEED = 10;
 
 // ============================================================================
@@ -419,7 +419,11 @@ export class WorkerProtocolHandler {
 
     const requestedSpeed = typeof msg.speed === 'number' && msg.speed > 0 ? msg.speed : 0;
     const speed =
-      scenarioMode !== 'timed' ? 0 : scenario.completion.kind === 'open' ? Math.max(requestedSpeed, OPEN_RUN_MIN_SPEED) : requestedSpeed;
+      scenarioMode !== 'timed'
+        ? 0
+        : scenario.workloads.some((w) => w.enabled && w.emission.mode === 'stream')
+          ? Math.max(requestedSpeed, OPEN_RUN_MIN_SPEED)
+          : requestedSpeed;
     const activeRun: ActiveRun = {
       runId,
       planId,

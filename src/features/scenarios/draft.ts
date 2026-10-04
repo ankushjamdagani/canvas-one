@@ -7,8 +7,8 @@
  *   command and one undo. Cancel stores nothing."
  * - "Empty drafts invent nothing": no workloads/inputs/faults/boundaries/assertions;
  *   scope = every element in the document at draft time; the only prefilled values are
- *   the contracted budget defaults, completion:{kind:'quiescent'} for step-by-step, and
- *   a seed drawn at random when the draft opens (shown and editable).
+ *   the contracted budget defaults and a seed drawn at random when the draft opens
+ *   (shown and editable).
  * - scenario.delete: "One model.apply-records remove; one undo."
  * - §6 Draft lifecycle: open/change/validate/apply/cancel; "Apply parses, validates the
  *   candidate and revision, persists one compound command, clears dirty state and adds
@@ -36,7 +36,6 @@ import {
   type ScenarioSection,
 } from './types';
 import {
-  UNSET_COMPLETION,
   scenarioToDraft,
   toStorableScenario,
   toValidationScenario,
@@ -55,10 +54,8 @@ function scopeElementIdsAtDraftOpen(document: Document): readonly Id[] {
  * commands.md §4/"Empty drafts invent nothing": builds a brand-new, unsaved
  * DraftScenario with no workloads/inputs/faults/boundaries/assertions, scope = every
  * element in the document right now, contracted budget defaults, a freshly drawn
- * seed, and completion:{kind:'quiescent'} for logical (the one allowed prefill,
- * "the only legal value"). Timed scenarios get NO completion prefill --
- * `completion.kind === null` until the user picks horizon/drain and fills its
- * value(s); see draftScenario.ts's DraftCompletion and draftCompletenessIssues below.
+ * seed. A workload added later has no emission until the user picks bulk or stream and
+ * fills its values; see draftScenario.ts's DraftEmission and draftCompletenessIssues below.
  * `revision: 0` -- a never-yet-persisted record; see idRemap.ts's
  * remapScenarioForCopy for the same choice on a copy.
  *
@@ -93,7 +90,6 @@ export function buildEmptyScenario(params: {
     assertions: [],
     seed: drawSeed(randomSource),
     budgets: DEFAULT_SCENARIO_BUDGETS,
-    completion: mode === 'logical' ? { kind: 'quiescent' } : UNSET_COMPLETION,
     assumptions: [],
   };
 }
@@ -118,7 +114,6 @@ function sectionForField(field: string | number | undefined): ScenarioSection {
       return 'assertions';
     case 'seed':
     case 'budgets':
-    case 'completion':
       return 'runSettings';
     default:
       return 'general';
@@ -150,29 +145,27 @@ function draftIssue(entityId: Id, field: string, message: string): ScenarioIssue
 /**
  * commands.md §4 "Empty drafts invent nothing": everything the record requires but the
  * user hasn't chosen yet blocks Apply. Reports exactly the three draft-only "unset"
- * states (see draftScenario.ts): timed completion, each workload class's key
+ * states (see draftScenario.ts): each workload's emission, each workload class's key
  * distribution, each output/context assertion's path.
  */
 function draftCompletenessIssues(draft: DraftScenario): ScenarioIssue[] {
   const issues: ScenarioIssue[] = [];
 
-  if (draft.mode === 'timed' && draft.completion.kind === null) {
-    issues.push(draftIssue(draft.id, 'completion', 'Choose when the run ends'));
-  } else if (draft.completion.kind === 'horizon' && draft.completion.horizonMs === null) {
-    issues.push(draftIssue(draft.id, 'completion', 'Enter a horizon'));
-  } else if (
-    draft.completion.kind === 'drain' &&
-    (draft.completion.arrivalHorizonMs === null || draft.completion.deadlineMs === null)
-  ) {
-    issues.push(draftIssue(draft.id, 'completion', 'Enter both drain fields'));
-  } else if (draft.completion.kind === 'count' && (draft.completion.requests === null || draft.completion.deadlineMs === null)) {
-    issues.push(draftIssue(draft.id, 'completion', 'Enter the number of requests and the deadline'));
-  }
-
   for (const workload of draft.workloads) {
-    const p = workload.profile;
-    if ((p.kind === 'burst' && (p.peakRate === null || p.startMs === null || p.endMs === null)) || (p.kind === 'ramp' && p.endRate === null)) {
-      issues.push(draftIssue(draft.id, 'workloads', p.kind === 'burst' ? 'Enter the burst rate, start and end' : 'Enter the ramp end rate'));
+    const e = workload.emission;
+    if (e.mode === null) {
+      issues.push(draftIssue(draft.id, 'workloads', 'Choose whether this traffic is a bulk of requests or a stream'));
+    } else if (e.mode === 'bulk') {
+      const spread = e.arrival === null || e.arrival === 'instant' ? undefined : 'spreadMs' in e.arrival ? e.arrival.spreadMs : e.arrival.ramp.spreadMs;
+      if (e.requests === null) issues.push(draftIssue(draft.id, 'workloads', 'Enter how many requests the bulk sends'));
+      if (e.arrival === null) issues.push(draftIssue(draft.id, 'workloads', 'Choose how the bulk is spread'));
+      else if (spread === null) issues.push(draftIssue(draft.id, 'workloads', 'Enter the time the bulk is spread over'));
+    } else {
+      const p = e.profile;
+      if (e.ratePerSecond === null) issues.push(draftIssue(draft.id, 'workloads', 'Enter the stream rate'));
+      if ((p.kind === 'burst' && (p.peakRate === null || p.startMs === null || p.endMs === null)) || (p.kind === 'ramp' && (p.endRate === null || p.rampMs === null))) {
+        issues.push(draftIssue(draft.id, 'workloads', p.kind === 'burst' ? 'Enter the burst rate, start and end' : 'Enter the ramp end rate and how long it takes'));
+      }
     }
     for (const cls of workload.classes) {
       const kd = cls.keyDistribution;
