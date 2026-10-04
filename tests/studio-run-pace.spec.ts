@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 async function openS06(page: Page) {
   await page.goto('/');
@@ -41,11 +41,9 @@ async function setTraffic(page: Page, traffic: Traffic, entryLabel?: string) {
   await editor.getByRole('button', { name: /Cancel|Close/ }).first().click().catch(() => undefined);
 }
 
-/** The browser suite runs as fast as it can; a hidden localStorage override (no UI) puts a test on a paced clock. */
+/** Use the same speed control available to the user; the current recording stays in memory. */
 async function setSpeed(page: Page, value: string) {
-  await page.evaluate((v) => window.localStorage.setItem('studio.runSpeed', v), value);
-  await page.reload();
-  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await page.getByTestId('playback-speed').selectOption(value);
 }
 
 /** Give the existing SQL call enough real transit time to inspect its exact concurrent units. */
@@ -68,7 +66,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
   test('a stream goes on until Stop, then drains and keeps its results', async ({ page }) => {
     await openS06(page);
     await setTraffic(page, { mode: 'stream', rate: 100 });
-    await setSpeed(page, '10');
+    await setSpeed(page, '16');
 
     await page.getByTestId('scenario-run-btn').click();
     await expect(page.getByTestId('scenario-stop-btn')).toBeVisible();
@@ -87,7 +85,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await openS06(page);
     await setTraffic(page, { mode: 'stream', rate: 100 });
     // 20x: after 8 real seconds the playhead is far past where the default 100k-event budget would have ended it.
-    await setSpeed(page, '20');
+    await setSpeed(page, '16');
     await page.getByTestId('scenario-run-btn').click();
     await page.waitForTimeout(8000);
     await expect(page.getByTestId('scenario-stop-btn')).toBeVisible();
@@ -99,12 +97,12 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
   test('a bulk sends that many requests and ends by itself when they have settled', async ({ page }) => {
     await openS06(page);
     await setTraffic(page, { mode: 'bulk', requests: 120 });
-    await setSpeed(page, '0');
+    await setSpeed(page, '16');
     await page.getByTestId('scenario-run-btn').click();
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
   });
 
-  test('real time takes real time; Instant does not', async ({ page }) => {
+  test('real time takes real time; faster playback advances the recording', async ({ page }) => {
     await openS06(page);
     await setTraffic(page, { mode: 'bulk', requests: 300, overMs: 3000 });
 
@@ -116,7 +114,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 15000 });
     expect(Date.now() - start).toBeGreaterThan(2500);
 
-    await setSpeed(page, '0');
+    await setSpeed(page, '16');
     const instantStart = Date.now();
     await page.getByTestId('scenario-run-btn').click();
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 15000 });
@@ -151,8 +149,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await expect(page.getByTestId('node-occupancy').first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('node-occupancy').filter({ hasText: '5 queued' })).toHaveAttribute('data-active', '1');
     await page.screenshot({ path: test.info().outputPath('canvas-playback-occupancy.png') });
-    await setSpeed(page, '0');
-    await page.getByTestId('scenario-run-btn').click();
+    await setSpeed(page, '16');
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
     await expect(page.getByTestId('traffic-packet')).toHaveCount(0);
     await expect(page.getByTestId('node-occupancy')).toHaveCount(0);

@@ -1,0 +1,179 @@
+import { test, expect, type Page } from "./fixtures";
+
+async function traffic(page: Page, mode: "bulk" | "stream", amount: number) {
+  await page.goto("/");
+  await page.getByTestId("create-example-s06").click();
+  await expect(page.getByTestId("playback-speed")).toBeVisible();
+  await page.getByTestId("scenario-switcher-trigger").click();
+  await page
+    .getByTestId("scenario-switcher-popover")
+    .locator('[data-testid^="scenario-row-"]', {
+      has: page.locator('button[aria-pressed="true"]'),
+    })
+    .getByRole("button", { name: /^Edit scenario/ })
+    .click();
+  const editor = page.getByTestId("scenario-editor");
+  const row = editor.locator('[data-testid^="workload-row-"]').first();
+  await row.getByLabel("Sends").selectOption(mode);
+  if (mode === "bulk") {
+    await row.getByTestId("bulk-requests").fill(String(amount));
+    await row.getByTestId("bulk-arrival").selectOption("spread");
+    await row.getByTestId("bulk-spread").fill("3000");
+  } else {
+    await row.getByTestId("stream-rate").fill(String(amount));
+  }
+  await editor.getByTestId("scenario-editor-apply").click();
+  await expect(page.getByTestId("save-status")).toHaveAttribute(
+    "data-state",
+    "idle",
+  );
+  await editor
+    .getByRole("button", { name: /Cancel|Close/ })
+    .first()
+    .click();
+}
+
+test("pause, seek, speed and completed replay keep results at the playhead", async ({
+  page,
+}) => {
+  await traffic(page, "bulk", 6);
+  await page.getByTestId("playback-speed").selectOption("1");
+  await page.getByTestId("scenario-run-btn").click();
+  await expect(page.getByTestId("timeline-cycle").first()).toBeVisible();
+  await expect
+    .poll(async () =>
+      Number(
+        (await page.getByTestId("playback-time").textContent())?.replace(
+          " s",
+          "",
+        ),
+      ),
+    )
+    .toBeGreaterThan(0.6);
+  await page
+    .getByRole("button", { name: "Pause playback", exact: true })
+    .click();
+  const time = await page.getByTestId("playback-time").textContent();
+  await page.waitForTimeout(200);
+  await expect(page.getByTestId("playback-time")).toHaveText(time!);
+  const seeker = page.getByRole("slider", { name: "Playback position" });
+  await seeker.focus();
+  await seeker.press("Home");
+  await expect(page.getByTestId("playback-time")).toHaveText("0.00 s");
+  await expect(page.getByTestId("results-cycles")).toContainText("1 cycles");
+  await page.getByRole("button", { name: "Next cycle", exact: true }).click();
+  await expect(page.getByTestId("playback-time")).not.toHaveText("0.00 s");
+  await page.getByTestId("playback-speed").selectOption("16");
+  await page
+    .getByRole("button", { name: "Play recording", exact: true })
+    .click();
+  await expect(page.getByTestId("results-status-badge")).toContainText(
+    "completed",
+    { timeout: 20000 },
+  );
+  await expect(page.getByTestId("results-cycles")).toContainText("6 cycles");
+  const finalTime = await page.getByTestId("playback-time").textContent();
+  await seeker.focus();
+  await seeker.press("Home");
+  await expect(page.getByTestId("results-cycles")).toContainText("1 cycles");
+  await expect(page.getByTestId("results-status-badge")).toContainText(
+    "paused",
+  );
+  await page
+    .getByRole("button", { name: "Play recording", exact: true })
+    .focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByTestId("results-status-badge")).toContainText(
+    "completed",
+    { timeout: 10000 },
+  );
+  await expect(page.getByTestId("playback-time")).toHaveText(finalTime!);
+  await expect(page.getByTestId("results-region")).toContainText("Saved");
+  await page.screenshot({
+    path: test.info().outputPath("timeline-desktop.png"),
+  });
+});
+
+test.describe("touch phone playback", () => {
+  test.use({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 },
+  });
+  test("a dense bulk uses a density strip and playback controls fit a phone", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await traffic(page, "bulk", 250);
+    await page.getByTestId("playback-speed").selectOption("16");
+    await page.getByTestId("scenario-run-btn").click();
+    await expect(page.getByTestId("results-status-badge")).toContainText(
+      "completed",
+      { timeout: 20000 },
+    );
+    await expect(page.getByTestId("timeline-density")).toBeVisible();
+    await expect(page.getByTestId("timeline-cycle")).toHaveCount(0);
+    await expect(page.getByTestId("timeline-density")).toHaveAttribute(
+      "aria-label",
+      /250 cycles/,
+    );
+    await page.getByRole("checkbox", { name: "Loop recording" }).check();
+    await expect(
+      page.getByRole("checkbox", { name: "Loop recording" }),
+    ).toBeChecked();
+    const width = await page
+      .getByTestId("playback-panel")
+      .evaluate((element) => ({
+        scroll: element.scrollWidth,
+        client: element.clientWidth,
+      }));
+    expect(width.scroll).toBeLessThanOrEqual(width.client + 1);
+    for (const button of await page
+      .getByTestId("playback-panel")
+      .getByRole("button")
+      .all()) {
+      const box = await button.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+    }
+    await page.getByRole("slider", { name: "Playback position" }).focus();
+    await page.keyboard.press("Home");
+    await expect(page.getByTestId("playback-time")).toHaveText("0.00 s");
+    await page.screenshot({
+      path: test.info().outputPath("timeline-phone.png"),
+    });
+  });
+});
+
+test("Go live resumes a paused stream and Stop drains it", async ({ page }) => {
+  await traffic(page, "stream", 6);
+  await page.getByTestId("playback-speed").selectOption("16");
+  await page.getByTestId("scenario-run-btn").click();
+  await expect(
+    page.getByRole("button", { name: "Go live", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId("timeline-cycle").first()).toBeVisible();
+  await page
+    .getByRole("button", { name: "Pause playback", exact: true })
+    .click();
+  const seeker = page.getByRole("slider", { name: "Playback position" });
+  await seeker.focus();
+  await seeker.press("Home");
+  await expect(page.getByTestId("playback-time")).toHaveText("0.00 s");
+  await page.getByRole("button", { name: "Go live", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Pause playback", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId("playback-time")).not.toHaveText("0.00 s");
+  await page
+    .getByRole("button", { name: "Pause playback", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Stop emission and drain", exact: true })
+    .click();
+  await expect(page.getByTestId("results-status-badge")).toContainText(
+    "completed",
+    { timeout: 20000 },
+  );
+  await expect(page.getByTestId("results-region")).toContainText("Saved");
+});

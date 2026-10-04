@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('Studio Runs E2E (RV-12d)', () => {
   test('S01: switcher lists Not run yet, Run passes, Run all passes, drag keeps Passed with a stale notice', async ({

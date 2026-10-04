@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe("Specimen review page", () => {
   test.skip(process.env.TEST_PRODUCTION === "1", "Specimen is dev-only");

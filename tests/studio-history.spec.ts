@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 /**
  * RV-13b: History panel journeys (screens 22A-F; contracts/commands.md section 3,

@@ -1,4 +1,4 @@
-import { test, expect, devices } from '@playwright/test';
+import { test, expect, devices } from './fixtures';
 
 /**
  * RV-13 phone acceptance (D14 full phone editing; design.md "Touch targets";

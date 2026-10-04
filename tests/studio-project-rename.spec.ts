@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test('13A rename: blank projects default to Untitled, taken names are flagged, success offers Undo', async ({ page }) => {
   const suffix = Date.now();

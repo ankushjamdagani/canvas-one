@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test('create a branch from saved work and reopen a closed draft', async ({ page }) => {
   await page.goto('/');

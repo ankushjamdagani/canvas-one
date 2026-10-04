@@ -36,7 +36,7 @@ npm run build                    # Workspace chunk must stay under 500 kB
 # browser suite: copy a throwaway config INTO the repo, isolated port, then delete it
 TEST_PRODUCTION=1 npx playwright test -c pw-iso.tmp.config.ts
 ```
-The throwaway config: `testDir ./tests`, `workers: 2`, `retries: 0`, a free port, `webServer: npx vite preview --host 127.0.0.1 --port <port>` with `reuseExistingServer: false`, and `storageState` setting localStorage `studio.runSpeed` = `0` for the base URL. Run `npm run build` first so the preview serves fresh code. `tests/studio-authoring.spec.ts` connect-gesture tests flake about 1 run in 2 on the previous commits too; rerun them alone before blaming your change.
+The throwaway config: `testDir ./tests`, `workers: 2`, `retries: 0`, a free port, `webServer: npx vite preview --host 127.0.0.1 --port <port>` with `reuseExistingServer: false`. Browser tests choose ×16 through the visible playback control using `tests/fixtures.ts`; there is no hidden speed override. Run `npm run build` first so the preview serves fresh code. `tests/studio-authoring.spec.ts` connect-gesture tests flake about 1 run in 2 on the previous commits too; rerun them alone before blaming your change.
 
 ## When you finish a step
 Append a short entry to `ACTION_LOG.md` (outcome, files, verification numbers, limitations, a `Lesson:` line if something surprised you), commit, and tell the user in a few plain sentences what changed and what is next.

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ElementMetric } from '../../domain/studio/runner/types';
 import {
-  calculateProgressPercent,
   findRunAllDisabledReason,
   formatChecksSummary,
   formatCommitLineText,
@@ -120,17 +119,8 @@ describe('View-Model Formatters and Helpers', () => {
   it('formats elapsed time for logical and timed modes without fabricated 0', () => {
     expect(formatElapsed('logical', 1234)).toBe('logical');
     expect(formatElapsed('timed', 30000)).toBe('30.0 s');
-    expect(formatElapsed('timed', null, 18600, 30000)).toBe('18.6 s / 30 s');
-    expect(formatElapsed('timed', null, null, 30000)).toBe('—');
-    expect(formatElapsed('timed', null, null, null)).toBe('—');
-  });
-
-  it('computes progress percentage accurately', () => {
-    expect(calculateProgressPercent(15000, 30000)).toBe(50);
-    expect(calculateProgressPercent(30000, 30000)).toBe(100);
-    expect(calculateProgressPercent(45000, 30000)).toBe(100);
-    expect(calculateProgressPercent(null, 30000)).toBe(0);
-    expect(calculateProgressPercent(10000, 0)).toBe(0);
+    expect(formatElapsed('timed', null, 18600)).toBe('18.6 s');
+    expect(formatElapsed('timed', null, null)).toBe('—');
   });
 
   it('formats root counts and failures correctly without fabricated 0', () => {

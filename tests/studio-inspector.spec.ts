@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 // specs/revamp/fixtures/s04.json element ids (stable UUIDs in the fixture).
 const ROUTER_ELEMENT_ID = '816fe039-76dd-5b7b-a787-4d7666ff8d62';

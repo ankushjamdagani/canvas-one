@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ className, defaultValue, value, min = 0, max = 100, ...props }, ref) => {
+>(({ className, defaultValue, value, min = 0, max = 100, 'aria-label': label, 'aria-valuetext': valueText, ...props }, ref) => {
   const values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -24,6 +24,7 @@ const Slider = React.forwardRef<
       value={value}
       min={min}
       max={max}
+      aria-label={label}
       className={cn(
         "relative flex w-full touch-none select-none items-center data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col data-[disabled]:cursor-not-allowed",
         className
@@ -33,7 +34,7 @@ const Slider = React.forwardRef<
       <SliderPrimitive.Track
         data-slot="slider-track"
         className={cn(
-          "relative h-1 w-full grow overflow-hidden rounded-full bg-[#E2DED6] data-[orientation=vertical]:w-1 data-[orientation=vertical]:h-full"
+          "relative h-1 w-full grow overflow-hidden rounded-full bg-sunken data-[orientation=vertical]:w-1 data-[orientation=vertical]:h-full"
         )}
       >
         <SliderPrimitive.Range
@@ -47,6 +48,8 @@ const Slider = React.forwardRef<
         <SliderPrimitive.Thumb
           key={index}
           data-slot="slider-thumb"
+          aria-label={label}
+          aria-valuetext={valueText}
           className="block size-3.5 pointer-coarse:size-5 shrink-0 rounded-full border border-primary bg-background shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:border-hairline disabled:bg-panel cursor-pointer"
         />
       ))}

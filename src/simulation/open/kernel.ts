@@ -373,9 +373,18 @@ export interface NodeRuntime {
 
 export class LatencyCollector {
   private values: number[] = [];
+  private total = 0;
 
   push(ms: number): void {
-    this.values.push(ms);
+    this.total += ms;
+    let left = 0;
+    let right = this.values.length;
+    while (left < right) {
+      const middle = (left + right) >>> 1;
+      if (this.values[middle] <= ms) left = middle + 1;
+      else right = middle;
+    }
+    this.values.splice(left, 0, ms);
   }
 
   get count(): number {
@@ -384,12 +393,8 @@ export class LatencyCollector {
 
   snapshot(): { mean: number; p95: number } {
     if (this.values.length === 0) return { mean: 0, p95: 0 };
-    let sum = 0;
-    for (const v of this.values) sum += v;
-    const mean = sum / this.values.length;
-    const sorted = [...this.values].sort((a, b) => a - b);
-    const idx = Math.ceil(sorted.length * 0.95) - 1;
-    return { mean, p95: sorted[idx] };
+    const idx = Math.ceil(this.values.length * 0.95) - 1;
+    return { mean: this.total / this.values.length, p95: this.values[idx] };
   }
 }
 
@@ -2821,6 +2826,11 @@ export class OpenSimulation {
   }
 
   snapshot(): OpenMetrics {
+    return { ...this.metricsSnapshot(), history: structuredClone(this.history) };
+  }
+
+  /** Current measured values without cloning the presentation history. */
+  metricsSnapshot(): Omit<OpenMetrics, 'history'> {
     const nodeMetrics: Record<string, ResourceMetrics> = Object.create(null);
     for (const [id, nr] of this.nodesRuntime.entries()) {
       let liveQueued = 0;
@@ -2932,7 +2942,6 @@ export class OpenSimulation {
       messages,
       nodes: nodeMetrics,
       edges: edgeMetricsCopy,
-      history: structuredClone(this.history),
     };
   }
 

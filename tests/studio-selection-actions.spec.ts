@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
@@ -496,5 +496,4 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     expect(Math.abs(grpBox!.height - selBox!.height)).toBeLessThanOrEqual(2);
   });
 });
-
 

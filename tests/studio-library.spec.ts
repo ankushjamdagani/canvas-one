@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 /**
  * RV-13b: Library panel journeys (screens 12A list, 12B grid, 12C hover/focus

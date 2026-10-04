@@ -11,7 +11,6 @@
  * - Excludes Stop run, p99, bottleneck/pressure/headroom labels, "vs run" deltas,
  *   predictions, Save result button.
  * - Shows measured values only; unavailable telemetry displays "Unavailable" + reason.
- * - Progress rule for timed runs from modeled time vs horizon.
  * - Accessible: aria-live region on status badge, labels, responsive 1512x982 and 390x844.
  */
 
@@ -26,11 +25,10 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Id } from '../../domain/studio/model';
-import type { TraceEvent } from '../../domain/studio/runner/types';
+import type { RunCheckpoint, TraceEvent } from '../../domain/studio/runner/types';
 import { Separator } from '../../components/ui/separator';
 import type { RunPhase, SaveStatus, TerminalResult } from './RunController';
 import {
-  calculateProgressPercent,
   formatChecksSummary,
   formatElapsed,
   formatMetricDisplay,
@@ -49,10 +47,12 @@ export interface ResultsRegionProps {
   readonly runId?: string | null;
   readonly runPhase: RunPhase;
   readonly terminal: TerminalResult | null;
+  /** Actual measured summary reconstructed at the current recording playhead. */
+  readonly playbackSummary?: RunCheckpoint | null;
+  readonly playbackAtEnd?: boolean;
   readonly events?: readonly TraceEvent[];
   readonly saveStatus?: SaveStatus;
   readonly onRetrySave?: () => void;
-  readonly timedHorizonMs?: number | null;
   readonly currentTimeMs?: number | null;
   readonly isExpanded?: boolean;
   readonly onToggleExpanded?: () => void;
@@ -87,10 +87,11 @@ export function ResultsRegion({
   runId,
   runPhase,
   terminal,
+  playbackSummary = null,
+  playbackAtEnd = true,
   events = [],
   saveStatus = 'unsaved',
   onRetrySave,
-  timedHorizonMs,
   currentTimeMs,
   isExpanded: controlledExpanded,
   onToggleExpanded,
@@ -111,38 +112,32 @@ export function ResultsRegion({
     }
   };
 
-  const isMeasured =
+  const isMeasured = playbackSummary !== null || (
     controlledMeasured !== undefined
       ? controlledMeasured
-      : (terminal?.measured ?? false);
+      : (terminal?.measured ?? false));
+  const summary = playbackSummary ?? terminal?.summary;
+  const finalMeasured = isMeasured && playbackAtEnd;
 
   const mode = scenarioMode;
-  const statusBadge = formatStatusBadge(runPhase, terminal?.status, scenarioName, runId);
-  const checksSummary = isMeasured ? formatChecksSummary(terminal?.checks) : '—';
+  const statusBadge = formatStatusBadge(runPhase, playbackAtEnd ? terminal?.status : undefined, scenarioName, runId);
+  const checksSummary = finalMeasured ? formatChecksSummary(terminal?.checks) : '—';
   const elapsedText =
-    terminal
+    playbackSummary && currentTimeMs != null ? formatElapsed(mode, null, currentTimeMs) : terminal
       ? isMeasured
-        ? formatElapsed(mode, terminal.summary?.elapsedMs ?? null, currentTimeMs, timedHorizonMs)
+        ? formatElapsed(mode, terminal.summary?.elapsedMs ?? null, currentTimeMs)
         : '—'
       : mode === 'logical'
         ? 'logical'
         : currentTimeMs != null
-          ? formatElapsed(mode, null, currentTimeMs, timedHorizonMs)
+          ? formatElapsed(mode, null, currentTimeMs)
           : '—';
 
-  const progressPercent =
-    mode === 'timed'
-      ? calculateProgressPercent(
-          currentTimeMs ?? (isMeasured ? terminal?.summary?.elapsedMs : null),
-          timedHorizonMs,
-        )
-      : 0;
-
   const rootCountsInfo = isMeasured
-    ? formatRootCountsSummary(terminal?.summary?.rootCounts)
+    ? formatRootCountsSummary(summary?.rootCounts)
     : { rootsLabel: '—', failuresCount: '—' };
-  const messageCounts = isMeasured ? terminal?.summary?.messageCounts : null;
-  const elementMetrics = isMeasured ? (terminal?.summary?.elementMetrics ?? []) : [];
+  const messageCounts = isMeasured ? summary?.messageCounts : null;
+  const elementMetrics = isMeasured ? (summary?.elementMetrics ?? []) : [];
   const generalMetrics = elementMetrics.filter((m) => m.elementId === null);
   const componentMetrics = elementMetrics.filter((m) => m.elementId !== null);
 
@@ -153,21 +148,6 @@ export function ResultsRegion({
       role="region"
       aria-label="Simulation results and telemetry"
     >
-      {/* ================================================================== */}
-      {/* Timed Simulation Top Progress Rule                                 */}
-      {/* ================================================================== */}
-      {mode === 'timed' && progressPercent > 0 && (
-        <div
-          className="absolute top-0 left-0 h-[2px] bg-primary transition-all duration-200 z-10"
-          style={{ width: `${progressPercent}%` }}
-          role="progressbar"
-          aria-valuenow={Math.round(progressPercent)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Simulation progress"
-        />
-      )}
-
       {/* ================================================================== */}
       {/* Compact Resting Footer Strip (7A screen look)                      */}
       {/* ================================================================== */}
@@ -302,6 +282,15 @@ export function ResultsRegion({
         </div>
       </div>
 
+      {isMeasured && summary?.cycles && (
+        <div data-testid="results-cycles" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-divider px-4 py-1.5 font-mono text-[11px] tabular-nums">
+          <span>{summary.cycles.total} cycles · {summary.cycles.open} open</span>
+          {Object.entries(summary.cycles.byOutcome).filter(([, count]) => count > 0).map(([outcome, count]) => <span key={outcome}>{count} {outcome}</span>)}
+          <span>Response mean {summary.cycles.responseLatencyMs === null ? '—' : `${summary.cycles.responseLatencyMs.mean.toFixed(2)} ms`}</span>
+          <span>Completion mean {summary.cycles.completionLatencyMs === null ? '—' : `${summary.cycles.completionLatencyMs.mean.toFixed(2)} ms`}</span>
+        </div>
+      )}
+
       {/* ================================================================== */}
       {/* Expanded Details Section (21B & 21D screens)                       */}
       {/* ================================================================== */}
@@ -358,7 +347,7 @@ export function ResultsRegion({
                 </div>
                 <span className="text-[11px] font-mono text-secondary-text">
                   {events.length} events recorded
-                  {isMeasured && terminal?.summary?.trace?.truncatedBy && (
+                  {finalMeasured && terminal?.summary?.trace?.truncatedBy && (
                     <span data-testid="results-trace-truncated" className="block sm:inline sm:ml-1">
                       · trace stopped at its {terminal.summary.trace.truncatedBy === 'trace-rows' ? 'row' : 'byte'} budget; counts, metrics
                       and checks cover the whole run
@@ -382,7 +371,7 @@ export function ResultsRegion({
                           <div>
                             <span className="text-secondary-text">Consumed inputs: </span>
                             <span className="font-mono font-medium">
-                              {isMeasured && terminal?.summary?.consumedInputs != null
+                              {finalMeasured && terminal?.summary?.consumedInputs != null
                                 ? terminal.summary.consumedInputs
                                 : '—'}
                             </span>
@@ -390,7 +379,7 @@ export function ResultsRegion({
                           <div>
                             <span className="text-secondary-text">Processed events: </span>
                             <span className="font-mono font-medium">
-                              {isMeasured && terminal?.summary?.processedEvents != null
+                              {finalMeasured && terminal?.summary?.processedEvents != null
                                 ? terminal.summary.processedEvents
                                 : '—'}
                             </span>
@@ -398,16 +387,16 @@ export function ResultsRegion({
                           <div>
                             <span className="text-secondary-text">Roots succeeded: </span>
                             <span className="font-mono font-medium text-primary">
-                              {isMeasured && terminal?.summary?.rootCounts.succeeded != null
-                                ? terminal.summary.rootCounts.succeeded
+                              {isMeasured && summary?.rootCounts.succeeded != null
+                                ? summary.rootCounts.succeeded
                                 : '—'}
                             </span>
                           </div>
                           <div>
                             <span className="text-secondary-text">Roots failed: </span>
                             <span className="font-mono font-medium text-risk-text">
-                              {isMeasured && terminal?.summary?.rootCounts.failed != null
-                                ? terminal.summary.rootCounts.failed
+                              {isMeasured && summary?.rootCounts.failed != null
+                                ? summary.rootCounts.failed
                                 : '—'}
                             </span>
                           </div>
@@ -455,11 +444,11 @@ export function ResultsRegion({
                       {/* Assertion Checks List */}
                       <div className="p-3 rounded-control border border-control-border bg-background space-y-2">
                         <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                          CHECKS {isMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
+                          CHECKS {finalMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
                         </span>
                         <div className="space-y-1.5 max-h-44 overflow-y-auto" tabIndex={0} role="region" aria-label="Checks">
                           {isMeasured &&
-                            terminal?.checks.map((check) => (
+                            (playbackAtEnd ? terminal?.checks : undefined)?.map((check) => (
                               <div
                                 key={check.assertionId}
                                 className="flex items-start gap-2 p-1.5 rounded-sm bg-sunken/40 text-xs"
@@ -490,9 +479,9 @@ export function ResultsRegion({
                                 </div>
                               </div>
                             ))}
-                          {(!isMeasured || !terminal?.checks || terminal.checks.length === 0) && (
+                          {(!finalMeasured || !terminal?.checks || terminal.checks.length === 0) && (
                             <div className="text-xs text-secondary-text">
-                              {!isMeasured ? 'Checks not evaluated.' : 'No checks configured for this scenario.'}
+                              {!finalMeasured ? 'Checks not evaluated.' : 'No checks configured for this scenario.'}
                             </div>
                           )}
                         </div>

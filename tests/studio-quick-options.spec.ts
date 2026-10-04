@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 // RV-03q: 14A Quick options over the command registry (commands.md §1).
 test.describe('Studio Quick options (RV-03q)', () => {

@@ -192,16 +192,9 @@ export function formatElapsed(
   mode: 'logical' | 'timed',
   elapsedMs: number | null,
   currentTimeMs?: number | null,
-  horizonMs?: number | null,
 ): string {
   if (mode === 'logical') {
     return 'logical';
-  }
-
-  if (currentTimeMs != null && horizonMs != null && horizonMs > 0) {
-    const curSec = (currentTimeMs / 1000).toFixed(1);
-    const horSec = (horizonMs / 1000).toFixed(0);
-    return `${curSec} s / ${horSec} s`;
   }
 
   if (currentTimeMs != null) {
@@ -213,19 +206,6 @@ export function formatElapsed(
   }
 
   return '—';
-}
-
-/**
- * Computes progress percentage (0-100) for timed simulation bar.
- */
-export function calculateProgressPercent(
-  currentTimeMs?: number | null,
-  horizonMs?: number | null,
-): number {
-  if (!horizonMs || horizonMs <= 0 || currentTimeMs == null) {
-    return 0;
-  }
-  return Math.min(100, Math.max(0, (currentTimeMs / horizonMs) * 100));
 }
 
 /**

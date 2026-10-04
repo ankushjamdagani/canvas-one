@@ -220,8 +220,9 @@ A project with no exposed call endpoint cannot be linked. Protocols are a closed
 
 A scenario has no completion setting (D56). Each traffic source in the scenario editor says how much it sends. A timed run is computed ahead of a
 playhead that moves in real time: the worker stays about 30 s of simulated time ahead of it and waits for it (D57), so a stream can play on
-without growing. There is no speed control yet (stage 4); a hidden `studio.runSpeed` localStorage override (0 = jump to the live edge, or a
-playback multiplier) exists for the browser suite.
+within a retained history window. Timeline controls (D59) provide play/pause, seek, previous/next cycle, speeds ×0.25–×16 (default ×1),
+finished-bulk loop, stream Go live, Stop/drain and Restart. Results follow the playhead. Completed recordings can replay in memory until
+reset/restart; reload does not restore them. Browser tests use the visible speed control, with no hidden storage override.
 
 | Source | Sends | Ends | Range |
 | :--- | :--- | :--- | :--- |

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 
 /**
  * Board 16D overflow menu (commands.md "Selection-scoped actions", D46): Save as

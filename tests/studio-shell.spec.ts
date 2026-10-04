@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('Studio Shell E2E (RV-03s)', () => {
   test('entry two columns, create S05, breadcrumb, project menu rename persists, branch popover switches, drag on main auto-drafts, dock zoom, no rail, mobile no scroll', async ({

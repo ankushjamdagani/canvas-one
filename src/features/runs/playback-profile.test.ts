@@ -5,6 +5,7 @@ import { checkReadiness } from "../../domain/studio/readiness";
 import { ScenarioRunner } from "../../domain/studio/runner/scenario-runner";
 import type { Cycle, FlowRecord, ResultDelta } from "../../domain/studio/runner/types";
 import { PlaybackStore } from "./playback";
+import { cycleDensity, stuckMarkers } from './timeline-layout';
 
 // Opt-in measurement: real S06 flow at flash-sale load, repeated to fill a 120 s
 // recording without conflating the kernel's event ceiling with playback cost.
@@ -118,6 +119,10 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       const timelineStart = performance.now();
       const timelineCycles = store.cyclesAt(end);
       const timelineReadMs = performance.now() - timelineStart;
+      const densityStart = performance.now();
+      cycleDensity(timelineCycles, 0, end);
+      stuckMarkers(timelineCycles, 0, end);
+      const timelineLayoutMs = performance.now() - densityStart;
       // Include a live-style cycle batch and report its ingestion separately.
       const cycleIngestStart = performance.now();
       store.ingestCycles(
@@ -157,7 +162,7 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           p95Ms: timings[57],
           maxMs: timings[59],
           resultMedianMs: resultTimings[30], resultP95Ms: resultTimings[57],
-          timelineReadMs, timelineCycles: timelineCycles.length,
+          timelineReadMs, timelineLayoutMs, timelineCycles: timelineCycles.length,
           timelineBatchReadMs,
           rollingEvictionMs, postEvictionReadMs,
           telemetryMs, observations, telemetryMeanMs: telemetryMs / observations,

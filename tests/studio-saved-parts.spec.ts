@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 async function openLibrary(page: Page) {
   if (await page.getByTestId("library-panel").isVisible()) return;

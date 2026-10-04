@@ -80,8 +80,10 @@ describe('lookahead (D57)', () => {
     expect(new Set(cycles.map((c) => c.id)).size).toBe(300);
     const checkpoints = run.updates().flatMap((u) => (u.kind === 'checkpoint' ? [u.checkpoint] : []));
     expect(checkpoints.length).toBeGreaterThanOrEqual(2);
-    for (let i = 1; i < checkpoints.length; i++) expect(checkpoints[i].atMs - checkpoints[i - 1].atMs).toBeGreaterThanOrEqual(CHECKPOINT_MS - 1);
+    // The terminal checkpoint is an exact end snapshot, not another periodic interval.
+    for (let i = 1; i < checkpoints.length - 1; i++) expect(checkpoints[i].atMs - checkpoints[i - 1].atMs).toBeGreaterThanOrEqual(CHECKPOINT_MS - 1);
     const t = run.terminal();
+    expect(checkpoints.at(-1)?.atMs).toBe(t && t.kind === 'terminal' ? t.summary.elapsedMs : null);
     expect(t && t.kind === 'terminal' ? t.summary.cycles.total : 0).toBe(300);
   }, 30000);
 

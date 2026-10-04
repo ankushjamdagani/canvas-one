@@ -38,10 +38,17 @@ import { whenIdle } from "@/lib/lazyComponent";
 import { LibraryPanel, type LibraryView } from "../library";
 import { lazyComponent } from "@/lib/lazyComponent";
 import { LinkedProjects } from "../library/LinkedProjects";
-import { declaredContractOf, sameExposure, type ProjectExposure } from "../../domain/studio/exposure";
+import {
+  declaredContractOf,
+  sameExposure,
+  type ProjectExposure,
+} from "../../domain/studio/exposure";
 import { portPath } from "../../domain/studio/protocols";
 import type { EndpointCandidate } from "./ExposedEndpointsDialog";
-import { projectDetails, projectExposures } from "../../persistence/studio/types";
+import {
+  projectDetails,
+  projectExposures,
+} from "../../persistence/studio/types";
 import type {
   BranchRecord,
   ProjectRecord,
@@ -58,10 +65,10 @@ import { planPlacement } from "../../domain/parts/place";
 import type { PartContent } from "../../domain/parts/types";
 import {
   loadScenarioStatuses,
-  RunController,
-  WorkerTransport,
   type ScenariosStatusResult,
-} from "../runs";
+} from "../runs/scenarioStatus";
+import type { RunController } from "../runs/RunController";
+import { WorkerTransport } from "../runs/transport";
 import {
   applyScenarioDraft,
   changeScenarioDraft,
@@ -133,7 +140,7 @@ import {
   routePublishController,
 } from "./historyRouting";
 import { DEFAULT_DOCK_CONFIG, type DockConfig } from "./dockConfig";
-import { findRunAllDisabledReason } from "../runs";
+import { findRunAllDisabledReason } from "../runs/view-models";
 import type { SessionRenameResult } from "../session/types";
 import {
   planAddNote,
@@ -277,25 +284,18 @@ export interface WorkspaceProps {
 }
 
 // The results region and the Ours tab load on demand, so the workspace chunk stays under the size limit.
-const ResultsRegion = lazyComponent(() => import("../runs/ResultsRegion").then((m) => m.ResultsRegion), null);
+const PlaybackPanel = lazyComponent(
+  () => import("../runs/PlaybackPanel").then((m) => m.PlaybackPanel),
+  null,
+);
 const DeleteProjectDialog = lazyComponent(
   () => import("./DeleteProjectDialog").then((m) => m.DeleteProjectDialog),
   null,
 );
-const SavedParts = lazyComponent(() => import("../library/SavedParts").then((m) => m.SavedParts), null);
-
-const RUN_SPEED_STORAGE_KEY = "studio.runSpeed";
-
-/** The hidden playback-speed override: simulated seconds per real second, 0 to jump to the live edge; real time when unset. */
-function readStoredRunSpeed(): number {
-  try {
-    const raw = window.localStorage.getItem(RUN_SPEED_STORAGE_KEY);
-    const value = raw === null ? Number.NaN : Number(raw);
-    return Number.isFinite(value) && value >= 0 ? value : 1;
-  } catch {
-    return 1;
-  }
-}
+const SavedParts = lazyComponent(
+  () => import("../library/SavedParts").then((m) => m.SavedParts),
+  null,
+);
 
 export function Workspace({
   session,
@@ -736,22 +736,31 @@ export function Workspace({
     React.useState<RunController | null>(null);
 
   React.useEffect(() => {
-    const worker = new Worker(
-      new URL("../runs/runner.worker.ts", import.meta.url),
-      {
-        type: "module",
-      },
-    );
-    const transport = new WorkerTransport(worker);
-    const controller = new RunController({
-      repository,
-      transport,
-      mintId,
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    void import("../runs/RunController").then(({ RunController }) => {
+      if (disposed) return;
+      const worker = new Worker(
+        new URL("../runs/runner.worker.ts", import.meta.url),
+        {
+          type: "module",
+        },
+      );
+      const transport = new WorkerTransport(worker);
+      const controller = new RunController({
+        repository,
+        transport,
+        mintId,
+      });
+      setRunController(controller);
+      cleanup = () => {
+        controller.destroy();
+        transport.terminate?.();
+      };
     });
-    setRunController(controller);
     return () => {
-      controller.destroy();
-      transport.terminate?.();
+      disposed = true;
+      cleanup?.();
     };
   }, [repository, mintId]);
 
@@ -948,12 +957,6 @@ export function Workspace({
     sessionState.branchId,
     sessionState.workingSnapshotId,
   ]);
-
-  // D55/D57: the playhead moves in real time. `studio.runSpeed` in localStorage is a hidden override (0 = jump to the live edge, or a playback multiplier) the
-  // browser suite uses; there is no control for it.
-  React.useEffect(() => {
-    runController?.setSpeed(readStoredRunSpeed());
-  }, [runController]);
 
   const handleResetRun = React.useCallback(() => {
     runController?.reset();
@@ -1264,7 +1267,13 @@ export function Workspace({
   // Other projects, so renaming can refuse a name another project already uses (13A "name taken").
   const [projectsLoaded, setProjectsLoaded] = React.useState(false);
   const [otherProjects, setOtherProjects] = React.useState<
-    readonly { id: string; title: string; team: string; description: string; exposures: readonly ProjectExposure[] }[]
+    readonly {
+      id: string;
+      title: string;
+      team: string;
+      description: string;
+      exposures: readonly ProjectExposure[];
+    }[]
   >([]);
   const currentProjectId = sessionState.projectId;
   const currentProjectTitle = projectRecord?.title;
@@ -1276,7 +1285,12 @@ export function Workspace({
       setOtherProjects(
         list
           .filter((p) => p.id !== currentProjectId)
-          .map((p) => ({ id: p.id, title: p.title, ...projectDetails(p), exposures: projectExposures(p) })),
+          .map((p) => ({
+            id: p.id,
+            title: p.title,
+            ...projectDetails(p),
+            exposures: projectExposures(p),
+          })),
       );
     });
     return () => {
@@ -1306,9 +1320,14 @@ export function Workspace({
   );
 
   const handleUpdateProjectDetails = React.useCallback(
-    async (details: { readonly description: string; readonly team: string }): Promise<string | null> => {
+    async (details: {
+      readonly description: string;
+      readonly team: string;
+    }): Promise<string | null> => {
       const result = await session.updateProjectDetails(details);
-      return result.status === "applied" ? null : formatStudioError(result, "Could not save project settings");
+      return result.status === "applied"
+        ? null
+        : formatStudioError(result, "Could not save project settings");
     },
     [session],
   );
@@ -1316,9 +1335,21 @@ export function Workspace({
   // D52: details for linked-project nodes, read live from the project records (this project included).
   const linkedProjects = React.useMemo(() => {
     if (!projectsLoaded) return null;
-    const map = new Map<string, { title: string; team: string; description: string }>();
-    for (const p of otherProjects) map.set(p.id, { title: p.title, team: p.team, description: p.description });
-    if (projectRecord) map.set(projectRecord.id, { title: projectRecord.title, ...projectDetails(projectRecord) });
+    const map = new Map<
+      string,
+      { title: string; team: string; description: string }
+    >();
+    for (const p of otherProjects)
+      map.set(p.id, {
+        title: p.title,
+        team: p.team,
+        description: p.description,
+      });
+    if (projectRecord)
+      map.set(projectRecord.id, {
+        title: projectRecord.title,
+        ...projectDetails(projectRecord),
+      });
     return map;
   }, [otherProjects, projectRecord, projectsLoaded]);
 
@@ -1361,7 +1392,10 @@ export function Workspace({
   );
 
   // D53: the connection types this project accepts (from its nodes' in-ports) and which are exposed.
-  const exposedTypes = React.useMemo(() => (projectRecord ? projectExposures(projectRecord) : []), [projectRecord]);
+  const exposedTypes = React.useMemo(
+    () => (projectRecord ? projectExposures(projectRecord) : []),
+    [projectRecord],
+  );
   const endpointCandidates = React.useMemo<readonly EndpointCandidate[]>(() => {
     if (!document) return [];
     const byType = new Map<string, EndpointCandidate>();
@@ -1379,33 +1413,64 @@ export function Workspace({
           channel: port.channel,
           protocol,
           path,
-          exposed: exposedTypes.some((x) => x.channel === port.channel && x.protocol === protocol && x.path === path),
+          exposed: exposedTypes.some(
+            (x) =>
+              x.channel === port.channel &&
+              x.protocol === protocol &&
+              x.path === path,
+          ),
           nodeLabels: [...(existing?.nodeLabels ?? []), element.label],
           // The first node that declares a contract for this endpoint speaks for it.
-          contract: existing?.contract ?? declaredContractOf(port.channel, port.settings),
+          contract:
+            existing?.contract ??
+            declaredContractOf(port.channel, port.settings),
         });
       }
     }
     // Types exposed earlier that no node accepts any more stay listed so they can be switched off.
     for (const x of exposedTypes) {
       const key = `${x.channel}:${x.protocol}:${x.path}`;
-      if (!byType.has(key)) byType.set(key, { key, channel: x.channel, protocol: x.protocol, path: x.path, exposed: true, nodeLabels: [], contract: x.contract });
+      if (!byType.has(key))
+        byType.set(key, {
+          key,
+          channel: x.channel,
+          protocol: x.protocol,
+          path: x.path,
+          exposed: true,
+          nodeLabels: [],
+          contract: x.contract,
+        });
     }
     return [...byType.values()];
   }, [document, exposedTypes]);
 
   const handleToggleEndpointExposed = React.useCallback(
-    async (candidate: EndpointCandidate, exposed: boolean): Promise<string | null> => {
+    async (
+      candidate: EndpointCandidate,
+      exposed: boolean,
+    ): Promise<string | null> => {
       const current = projectRecord ? projectExposures(projectRecord) : [];
       const others = current.filter((x) => !sameExposure(x, candidate));
       const next = exposed
-        ? [...others, { channel: candidate.channel, protocol: candidate.protocol, path: candidate.path, ...(candidate.contract ? { contract: candidate.contract } : {}) }]
+        ? [
+            ...others,
+            {
+              channel: candidate.channel,
+              protocol: candidate.protocol,
+              path: candidate.path,
+              ...(candidate.contract ? { contract: candidate.contract } : {}),
+            },
+          ]
         : others;
       const result = await session.updateProjectDetails({
-        ...(projectRecord ? projectDetails(projectRecord) : { description: "", team: "" }),
+        ...(projectRecord
+          ? projectDetails(projectRecord)
+          : { description: "", team: "" }),
         exposures: next,
       });
-      return result.status === "applied" ? null : formatStudioError(result, "Could not save exposed endpoints");
+      return result.status === "applied"
+        ? null
+        : formatStudioError(result, "Could not save exposed endpoints");
     },
     [projectRecord, session],
   );
@@ -2579,7 +2644,11 @@ export function Workspace({
       "part.place": ({ content, label }) => placeSavedPart(content, label),
       "part.export": (part) =>
         import("../library/SavedParts").then((m) =>
-          m.downloadSavedPart(repository, session.getState().projectId as Id, part),
+          m.downloadSavedPart(
+            repository,
+            session.getState().projectId as Id,
+            part,
+          ),
         ),
       "part.import": ({ command }) => session.savePart(command),
     }),
@@ -3290,10 +3359,14 @@ export function Workspace({
               ref={resultsRegionRef}
               tabIndex={-1}
               aria-label="Results"
-              className="outline-none"
+              className="outline-none shrink-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
             >
               {runningOrSelectedScenario ? (
-                <ResultsRegion
+                <PlaybackPanel
+                  controller={runController}
+                  onRestart={() =>
+                    void handleRunScenario(runningOrSelectedScenario.id)
+                  }
                   scenarioName={runningOrSelectedScenario.label}
                   scenarioMode={runningOrSelectedScenario.mode}
                   runId={runControllerState?.current?.runId ?? null}

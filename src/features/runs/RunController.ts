@@ -340,8 +340,7 @@ export class RunController {
   }
 
   /**
-   * D55: Stop ends a timed run gracefully: no new requests arrive, work in flight finishes (up to 60 s of
-   * simulated time), and the run completes with its results. Unlike Reset it keeps what was measured.
+   * Stop ends emission and drains in-flight work before finalizing measured results.
    */
   stop(): void {
     if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'paused') && !this.state.stopping) {

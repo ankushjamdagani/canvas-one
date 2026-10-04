@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 
 /**
  * RV-13 storage cutover (D19, verification.md "Storage cutover: old DB untouched").

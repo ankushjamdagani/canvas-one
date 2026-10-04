@@ -6,6 +6,26 @@ import type { TerminalResult } from './RunController';
 import { createEmptySummary } from './protocol';
 
 describe('ResultsRegion (Items 3, 4, 5)', () => {
+  it('shows historical measurements and hides final checks and whole-run counters before the end', () => {
+    const summary = createEmptySummary('timed');
+    const terminal: TerminalResult = {
+      status: 'completed', measured: true, reason: null,
+      checks: [{ assertionId: 'final', status: 'passed', actual: true, reason: null }],
+      summary: { ...summary, rootCounts: { ...summary.rootCounts, generated: 99, succeeded: 99 }, consumedInputs: 987, processedEvents: 654 },
+    };
+    const html = renderToStaticMarkup(React.createElement(ResultsRegion, {
+      scenarioMode: 'timed', runPhase: 'paused', terminal, playbackAtEnd: false,
+      playbackSummary: { atMs: 1000, rootCounts: { ...summary.rootCounts, generated: 3, inFlight: 2, succeeded: 1 }, messageCounts: summary.messageCounts, cycles: { ...summary.cycles, total: 3, open: 2 }, elementMetrics: [] },
+      currentTimeMs: 1000, isExpanded: true, elementLabels: {}, assertionLabels: {},
+    }));
+    expect(html).toContain('font-medium text-foreground">3</span>');
+    expect(html).toMatch(/3(?:<!-- -->)? cycles/);
+    expect(html).toContain('Checks not evaluated.');
+    expect(html).not.toContain('font-medium text-foreground">99</span>');
+    expect(html).not.toContain('987');
+    expect(html).not.toContain('654');
+    expect(html).not.toContain('1 of 1 passed');
+  });
   it('Item 3: unmeasured terminal (measured: false) shows NO counts, elapsed, checks totals or metrics — only status and reason', () => {
     const unmeasuredTerminal: TerminalResult = {
       status: 'invalid',
