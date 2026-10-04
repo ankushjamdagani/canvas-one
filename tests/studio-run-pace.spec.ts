@@ -7,8 +7,10 @@ async function openS06(page: Page) {
   await expect(page.getByTestId('save-status')).toContainText('Saved');
 }
 
-/** Sets the selected scenario's completion in the editor and applies it. */
-async function setCompletion(page: Page, kind: 'horizon' | 'count' | 'open', fill: Record<string, string> = {}) {
+type Traffic = { mode: 'bulk'; requests: number; overMs?: number } | { mode: 'stream'; rate: number };
+
+/** Sets the selected scenario's first traffic source in the editor and applies it. */
+async function setTraffic(page: Page, traffic: Traffic) {
   await page.getByTestId('scenario-switcher-trigger').click();
   await page
     .getByTestId('scenario-switcher-popover')
@@ -17,8 +19,15 @@ async function setCompletion(page: Page, kind: 'horizon' | 'count' | 'open', fil
     .click();
   const editor = page.getByTestId('scenario-editor');
   await expect(editor).toBeVisible();
-  await editor.getByLabel('Completion kind').selectOption(kind);
-  for (const [label, value] of Object.entries(fill)) await editor.getByLabel(label).fill(value);
+  const row = editor.locator('[data-testid^="workload-row-"]').first();
+  await row.getByLabel('Sends').selectOption(traffic.mode);
+  if (traffic.mode === 'stream') {
+    await row.getByTestId('stream-rate').fill(String(traffic.rate));
+  } else {
+    await row.getByTestId('bulk-requests').fill(String(traffic.requests));
+    await row.getByTestId('bulk-arrival').selectOption(traffic.overMs === undefined ? 'instant' : 'spread');
+    if (traffic.overMs !== undefined) await row.getByTestId('bulk-spread').fill(String(traffic.overMs));
+  }
   const apply = editor.getByTestId('scenario-editor-apply');
   await expect(apply).toBeEnabled();
   await apply.click();
@@ -33,10 +42,10 @@ async function setSpeed(page: Page, value: string) {
   await expect(page.getByTestId('workspace-root')).toBeVisible();
 }
 
-test.describe('Run duration and pace (D55)', () => {
-  test('an open run goes on until Stop, then drains and keeps its results', async ({ page }) => {
+test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
+  test('a stream goes on until Stop, then drains and keeps its results', async ({ page }) => {
     await openS06(page);
-    await setCompletion(page, 'open');
+    await setTraffic(page, { mode: 'stream', rate: 100 });
     await setSpeed(page, '10');
 
     await page.getByTestId('scenario-run-btn').click();
@@ -52,9 +61,9 @@ test.describe('Run duration and pace (D55)', () => {
     await expect(page.getByTestId('results-region')).toContainText('Saved');
   });
 
-  test('a run for a number of requests sends that many and ends when they have settled', async ({ page }) => {
+  test('a bulk sends that many requests and ends by itself when they have settled', async ({ page }) => {
     await openS06(page);
-    await setCompletion(page, 'count', { Requests: '120', 'Count deadline': '60000' });
+    await setTraffic(page, { mode: 'bulk', requests: 120 });
     await setSpeed(page, '0');
     await page.getByTestId('scenario-run-btn').click();
     await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
@@ -62,7 +71,7 @@ test.describe('Run duration and pace (D55)', () => {
 
   test('real time takes real time; Instant does not', async ({ page }) => {
     await openS06(page);
-    await setCompletion(page, 'horizon', { 'Run for (ms)': '3000' });
+    await setTraffic(page, { mode: 'bulk', requests: 300, overMs: 3000 });
 
     await setSpeed(page, '1');
     const start = Date.now();
@@ -81,7 +90,7 @@ test.describe('Run duration and pace (D55)', () => {
 
   test('each request shows as a packet that moves through its stages on the connection', async ({ page }) => {
     await openS06(page);
-    await setCompletion(page, 'open');
+    await setTraffic(page, { mode: 'stream', rate: 100 });
     await setSpeed(page, '1');
     await page.getByTestId('scenario-run-btn').click();
     const stages = new Set<string>();

@@ -71,6 +71,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
     const editor = page.getByTestId('scenario-editor');
     await editor.getByRole('button', { name: /Add traffic/ }).click();
+    await editor.getByLabel('Sends').selectOption('stream');
 
     const shape = editor.getByTestId('traffic-profile-kind');
     await expect(shape).toHaveValue('steady');

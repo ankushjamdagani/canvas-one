@@ -216,21 +216,24 @@ A project with no exposed call endpoint cannot be linked. Protocols are a closed
 - message: amqp, kafka, mqtt, nats, stomp, sqs, sns, google-pubsub, azure-service-bus
 - data: jdbc, s3, sftp, cdc, http-bulk
 
-## 8. Scenario completion and run controls
+## 8. Traffic sources, cycles and run controls
 
-How a timed run ends is part of the scenario (Scenario editor → Run settings → Completion); a timed run plays in real time (there is no
-speed control; a hidden `studio.runSpeed` localStorage override, 0 = as fast as possible, exists for the browser suite).
+A scenario has no completion setting (D56). Each traffic source in the scenario editor says how much it sends; a timed run plays in real time
+(there is no speed control; a hidden `studio.runSpeed` localStorage override, 0 = as fast as possible, exists for the browser suite).
 
-| Completion | Ends | Range |
-| :--- | :--- | :--- |
-| `horizon` ("For a number of seconds") | after that much simulated time | 1–300 s |
-| `count` ("For a number of requests") | once workloads have sent that many requests and the work has settled; incomplete if the deadline comes first | requests 1–100000; deadline 1–600 s |
-| `open` ("Until I stop it") | when the user presses Stop; arrivals stop and work in flight gets up to 60 s to finish | none |
-| `drain` ("Arrivals for a while, then drain") | when arrivals have stopped at the horizon and the work has settled, or at the deadline | arrivals 1–300 s; deadline up to 600 s |
-| `quiescent` | logical scenarios only: when all inputs are consumed and all work settled | |
+| Source | Sends | Ends | Range |
+| :--- | :--- | :--- | :--- |
+| Bulk, "All at once" | N requests at the start delay | by itself, when all N cycles have settled | N 1–100000 |
+| Bulk, "Evenly over" | N requests evenly over D ms | same | D 1 ms–1 h |
+| Bulk, "Ramping up over" | N requests, the rate rising linearly from zero over D ms | same | D 1 ms–1 h |
+| Stream | requests at a rate (Poisson), steady, burst or ramp (ramp holds its end rate) | never by itself; the user presses Stop | rate above 0, up to 10000/s |
+
+Every source also has a start delay (0–1 h). A run ends when every bulk has sent its requests and everything has settled; with a stream it runs until Stop.
+
+A **cycle** is one request and everything it causes, including side effects after the response. Results report response latency (the response reached the source) and completion latency (the last descendant settled). Work that can never settle is reported `stuck`, by where it is held; a message port's optional TTL makes a waiting message `expired` instead.
 
 | Run control | Effect |
 | :--- | :--- |
 | Pause / Resume | hold and continue the clock |
-| Stop | stop new requests, let work in flight finish, complete with the results kept |
+| Stop | stop new requests, let work in flight finish (up to 60 s of simulated time), complete with the results kept |
 | Reset | cancel and discard the run |
