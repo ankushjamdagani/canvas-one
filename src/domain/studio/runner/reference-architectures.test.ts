@@ -15,7 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { CompletionPolicy, Connection, Document, Element, Id, Scenario, Workload } from '../model';
+import type { Connection, Document, Element, Id, Scenario, Workload, WorkloadProfile } from '../model';
 import { applyRecordChanges } from '../../../persistence/studio/apply-records';
 import { getEntry } from '../../../features/catalog/catalog';
 import { placeEntry } from '../../../features/catalog/place';
@@ -139,19 +139,24 @@ const uniformKeys = { kind: 'uniform' as const, catalogSize: 1000, hotSubset: 1,
 
 /**
  * Timed scenario with one workload, workload timeout 30 s (TrafficSection's default).
- * Completion defaults to a horizon at `seconds`. Budgets are the contracted maxima
+ * The workload is a stream, stopped after `seconds` of simulated time; arrivals end there and
+ * what is in flight drains. Budgets are the contracted maxima
  * (storage.md §6) so the traces the tests read stay complete.
  */
+/** Simulated ms at which `run` presses Stop for a scenario built by `scenario` (D56: a stream never ends by itself). */
+const stopAfterMs = new Map<Id, number>();
+
 function scenario(
   a: Arch,
   entry: Id,
-  opts: { rate: number; seconds: number; timeoutMs?: number; classes?: Workload['classes']; seed?: number; completion?: CompletionPolicy },
+  opts: { rate: number; seconds: number; timeoutMs?: number; classes?: Workload['classes']; seed?: number },
 ): Id {
   const e = a.el(entry);
   const entryPortId = e.behavior.kind === 'resource' ? e.behavior.entryPortId : e.ports.find((p) => p.direction === 'in')!.id;
   const workload: Workload = {
-    id: a.mint(), entry: { elementId: entry, portId: entryPortId }, enabled: true, rate: opts.rate, profile: { kind: 'steady' },
-    timeoutMs: opts.timeoutMs ?? 30000, intervalMs: null,
+    id: a.mint(), entry: { elementId: entry, portId: entryPortId }, enabled: true, startDelayMs: 0,
+    emission: { mode: 'stream', ratePerSecond: opts.rate, profile: { kind: 'steady' } },
+    timeoutMs: opts.timeoutMs ?? 30000,
     classes: opts.classes ?? [{ id: a.readClass, name: 'read', weight: 1, operation: 'read', tags: [], keyDistribution: uniformKeys }],
   };
   const scn: Scenario = {
@@ -161,17 +166,17 @@ function scenario(
     assertions: [{ id: a.mint(), label: 'nothing failed', subject: { kind: 'count', scope: 'root', elementId: null, outcome: 'failed' }, operator: 'equals', expected: 0 }],
     seed: opts.seed ?? 7,
     budgets: { ...DEFAULT_SCENARIO_BUDGETS, maxEvents: 1_000_000, maxTraceRows: 100_000, maxTraceBytes: 16 * 1048576 },
-    completion: opts.completion ?? { kind: 'horizon', horizonMs: opts.seconds * 1000 },
     assumptions: [],
   };
   a.doc = { ...a.doc, scenarios: [...a.doc.scenarios, scn] };
+  stopAfterMs.set(scn.id, opts.seconds * 1000);
   return scn.id;
 }
 
 async function run(a: Arch, scenarioId: Id): Promise<Run> {
   const ready = checkReadiness(a.doc, scenarioId);
   if (!ready.ready) throw new Error(`not ready: ${JSON.stringify(ready.issues)}`);
-  const r = await runScenario(a.doc, scenarioId, `run-${scenarioId}`);
+  const r = await runScenario(a.doc, scenarioId, `run-${scenarioId}`, { stopAtMs: stopAfterMs.get(scenarioId) });
   report(a, r);
   return r;
 }
@@ -293,7 +298,7 @@ describe('A2 queue absorbs a burst', () => {
 
   it('defaults: a burst at 2x the worker rate queues up and drains afterwards; nothing is lost', async () => {
     const { a, api } = build('A2 defaults burst and drain');
-    const r = await run(a, scenario(a, api, { rate: 400, seconds: 8, completion: { kind: 'drain', arrivalHorizonMs: 8000, deadlineMs: 30000 } }));
+    const r = await run(a, scenario(a, api, { rate: 400, seconds: 8 }));
     expect(r.status).toBe('completed');
     const m = outcomes(r, 'message');
     expect(m.rejected + m.failed + m.expired + m.inFlight).toBe(0);
@@ -357,16 +362,16 @@ describe('A4 balancer failover', () => {
       const base = d.scenarios[0]; // H1 (route A) down 2-4 s, detection and recovery detection 1 s
       const workload: Workload = {
         id: '00000000-0000-4000-8000-0000000000aa', entry: { elementId: router.id, portId: (router.behavior as { entryPortId: Id }).entryPortId },
-        enabled: true, rate: 100, profile: { kind: 'steady' }, timeoutMs: 30000, intervalMs: null,
+        enabled: true, startDelayMs: 0, emission: { mode: 'stream', ratePerSecond: 100, profile: { kind: 'steady' } }, timeoutMs: 30000,
         classes: [{ id: '00000000-0000-4000-8000-0000000000ab', name: 'read', weight: 1, operation: 'read', tags: [], keyDistribution: uniformKeys }],
       };
       const scn: Scenario = {
-        ...base, inputs: [], workloads: [workload], seed, entryPorts: [workload.entry], completion: { kind: 'horizon', horizonMs: 6000 },
+        ...base, inputs: [], workloads: [workload], seed, entryPorts: [workload.entry],
         assertions: base.assertions.filter((x) => x.subject.kind === 'count').slice(0, 1),
       };
       const doc = { ...d, title: `A4 seed ${seed}`, elements, scenarios: [scn] } as Document;
       expect(checkReadiness(doc, scn.id).ready).toBe(true);
-      const r = await runScenario(doc, scn.id, `a4-${seed}`);
+      const r = await runScenario(doc, scn.id, `a4-${seed}`, { stopAtMs: 6000 });
       expect(r.status).toBe('completed');
       const bad = r.events.filter((e) => e.kind === 'settled' && e.elementId === router.id && !e.code.startsWith('attempt') && e.outcome !== 'succeeded');
       for (const e of bad) {
@@ -582,8 +587,8 @@ describe('A12 service calling a third party', () => {
 
 describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   const retryPolicy = (o: Record<string, unknown> = {}) => ({ maxAttempts: 3, backoffMs: 0, backoffMultiplier: 2, maxBackoffMs: 1000, jitter: false, attemptTimeoutMs: null, ...o });
-  const withProfile = (a: Arch, id: Id, profile: Workload['profile']) => {
-    a.doc = { ...a.doc, scenarios: a.doc.scenarios.map((x) => (x.id === id ? { ...x, workloads: x.workloads.map((w) => ({ ...w, profile })) } : x)) };
+  const withProfile = (a: Arch, id: Id, profile: WorkloadProfile) => {
+    a.doc = { ...a.doc, scenarios: a.doc.scenarios.map((x) => (x.id === id ? { ...x, workloads: x.workloads.map((w) => ({ ...w, emission: w.emission.mode === 'stream' ? { ...w.emission, profile } : w.emission })) } : x)) };
   };
 
   it('A2 with a real burst: 5x traffic for 5 s is absorbed by the queue and drained; nothing is lost', async () => {
@@ -593,7 +598,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
     const q = a.place('queue', 'Queue');
     a.connect(api, q);
     a.connect(q, a.place('worker', 'Worker')); // 2 x 100/s
-    const id = scenario(a, api, { rate: 100, seconds: 20, completion: { kind: 'drain', arrivalHorizonMs: 20000, deadlineMs: 60000 } });
+    const id = scenario(a, api, { rate: 100, seconds: 20 });
     withProfile(a, id, { kind: 'burst', peakRate: 500, startMs: 5000, endMs: 10000 });
     const r = await run(a, id);
     expect(r.status).toBe('completed');
@@ -607,18 +612,9 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   it('a ramp from 10/s to 100/s over 10 s sends the average of the two rates', async () => {
     const { a, ids } = chain('D50 ramp', ['service']);
     const id = scenario(a, ids[0], { rate: 10, seconds: 10 });
-    withProfile(a, id, { kind: 'ramp', endRate: 100 });
+    withProfile(a, id, { kind: 'ramp', endRate: 100, rampMs: 10000 });
     const r = await run(a, id);
     expect(Math.abs(outcomes(r).generated - 550)).toBeLessThan(80);
-  });
-
-  it('readiness rejects a burst that ends after arrivals stop', () => {
-    const { a, ids } = chain('D50 burst window', ['service']);
-    const id = scenario(a, ids[0], { rate: 10, seconds: 10 });
-    withProfile(a, id, { kind: 'burst', peakRate: 50, startMs: 5000, endMs: 15000 });
-    const ready = checkReadiness(a.doc, id);
-    expect(ready.ready).toBe(false);
-    if (!ready.ready) expect(ready.issues.map((i) => i.code)).toContain('workload-profile-outside-window');
   });
 
   async function thirdParty(title: string, delayMs: number, outcome: 'succeeded' | 'failed', retry: ReturnType<typeof retryPolicy>) {
@@ -767,10 +763,10 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(messages.succeeded).toBeGreaterThanOrEqual(roots.succeeded - 1);
   });
 
-  it('drain completion stops arrivals at arrivalHorizonMs and runs on to drain [fixed B2]', async () => {
+  it('Stop ends arrivals at the stop time and the run drains what is in flight [fixed B2]', async () => {
     const a = new Arch();
     const svc = a.place('service');
-    const r = await run(a, scenario(a, svc, { rate: 50, seconds: 10, completion: { kind: 'drain', arrivalHorizonMs: 10000, deadlineMs: 20000 } }));
+    const r = await run(a, scenario(a, svc, { rate: 50, seconds: 10 }));
     expect(r.status).toBe('completed');
     const admissions = r.events.filter((e) => e.kind === 'dispatch' && e.code === 'admitted');
     expect(admissions.every((e) => e.atMs! <= 10000)).toBe(true);
