@@ -218,8 +218,10 @@ A project with no exposed call endpoint cannot be linked. Protocols are a closed
 
 ## 8. Traffic sources, cycles and run controls
 
-A scenario has no completion setting (D56). Each traffic source in the scenario editor says how much it sends; a timed run plays in real time
-(there is no speed control; a hidden `studio.runSpeed` localStorage override, 0 = as fast as possible, exists for the browser suite).
+A scenario has no completion setting (D56). Each traffic source in the scenario editor says how much it sends. A timed run is computed ahead of a
+playhead that moves in real time: the worker stays about 30 s of simulated time ahead of it and waits for it (D57), so a stream can play on
+without growing. There is no speed control yet (stage 4); a hidden `studio.runSpeed` localStorage override (0 = jump to the live edge, or a
+playback multiplier) exists for the browser suite.
 
 | Source | Sends | Ends | Range |
 | :--- | :--- | :--- | :--- |

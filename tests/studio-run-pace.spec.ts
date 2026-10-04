@@ -61,6 +61,19 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await expect(page.getByTestId('results-region')).toContainText('Saved');
   });
 
+  test('a stream is not cut off by the event budget, and Stop still completes it', async ({ page }) => {
+    await openS06(page);
+    await setTraffic(page, { mode: 'stream', rate: 100 });
+    // 20x: after 8 real seconds the playhead is far past where the default 100k-event budget would have ended it.
+    await setSpeed(page, '20');
+    await page.getByTestId('scenario-run-btn').click();
+    await page.waitForTimeout(8000);
+    await expect(page.getByTestId('scenario-stop-btn')).toBeVisible();
+    await expect(page.getByTestId('results-status-badge')).not.toContainText('completed');
+    await page.getByTestId('scenario-stop-btn').click();
+    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 40000 });
+  });
+
   test('a bulk sends that many requests and ends by itself when they have settled', async ({ page }) => {
     await openS06(page);
     await setTraffic(page, { mode: 'bulk', requests: 120 });
