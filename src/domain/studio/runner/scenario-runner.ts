@@ -45,7 +45,8 @@ import type {
   TraceEvent,
   TraceEventKind,
 } from './types';
-import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type FlowRecord } from './types';
+import { emptyCycleSummary } from './cycles';
+import { WORKLOAD_PAYLOAD_REF, WORKLOAD_REQUEST_PAYLOAD, type Cycle, type FlowRecord } from './types';
 import { rootId, traceEventId, PayloadTable } from './trace';
 import { defaultEvaluator, readPath } from './expr';
 import { isMissing } from './expr-api';
@@ -53,7 +54,7 @@ import { deepCloneJson, setPathInContext, stepMachine } from './machine';
 import { runPipeline } from './pipeline';
 import { runDecision } from './decision';
 import { evaluateAssertions } from './assertions';
-import { OPEN_RUN_CEILING_MS, ResourceAdapter, validateFaultsAndPlacements } from './resource-adapter';
+import { RUN_CEILING_MS, ResourceAdapter, validateFaultsAndPlacements } from './resource-adapter';
 import { validateSchemaValue } from './schema-value';
 import { resolveRefinementRouting, type RefinementRouting } from '../refinementRouting';
 
@@ -73,6 +74,8 @@ export type ScenarioRunResult = {
   readonly status: TerminalStatus;
   readonly events: readonly TraceEvent[];
   readonly summary: RunSummary;
+  /** D56: every cycle of the run, in the order its request arrived. */
+  readonly cycles: readonly Cycle[];
   readonly checks: readonly CheckResult[];
   readonly reason: string | null;
   readonly issues?: readonly (Issue | ScenarioIssue)[];
@@ -84,6 +87,8 @@ export type ScenarioRunnerOptions = {
    * compiler and runner batch boundaries"). An aborted signal ends the run 'cancelled'
    * with no terminal success, mirroring `prepareScenario`'s compile-time cancellation. */
   readonly signal?: AbortSignal;
+  /** D56: request Stop when the simulated clock reaches this time (the headless Stop button). */
+  readonly stopAtMs?: number;
 };
 
 type InvocationContext = {
@@ -474,6 +479,12 @@ export class ScenarioRunner {
   private isFinished = false;
   /** D55: set by requestStop(); applied at the next step boundary. */
   private stopRequested = false;
+  /** D56: simulated ms at which a headless run requests Stop. */
+  private readonly stopAtMs: number | undefined;
+  /** D56: an enabled stream (one no finite input replaces) keeps the run going until Stop. */
+  private hasStream = false;
+  /** D56: requests the enabled bulk sources send in all, for the "sent M of N" report on Stop. */
+  private bulkRequests = 0;
   /** D55: when a stop took effect (simulated ms), and the latest the stopped run may keep draining. */
   private stoppedAtMs: number | null = null;
   private stopDrainDeadlineMs: number | null = null;
@@ -488,6 +499,7 @@ export class ScenarioRunner {
     this.document = document;
     this.runId = runId;
     this.signal = options.signal;
+    this.stopAtMs = options.stopAtMs;
 
     const foundScenario = document.scenarios.find((s) => s.id === scenarioId);
     if (!foundScenario) {
@@ -513,7 +525,6 @@ export class ScenarioRunner {
           maxScheduledEvents: 100000,
           maxLiveRoots: 10000,
         },
-        completion: { kind: 'quiescent' },
         assumptions: [],
       };
       this.terminalStatus = 'invalid';
@@ -624,22 +635,9 @@ export class ScenarioRunner {
             .map((wl) => wl.id),
         );
 
-        let durationMs: number | undefined;
-        let arrivalHorizonMs: number | undefined;
-        let maxRootArrivals: number | undefined;
-        if (this.scenario.completion.kind === 'horizon') durationMs = this.scenario.completion.horizonMs;
-        else if (this.scenario.completion.kind === 'drain') {
-          // §6: no arrivals after arrivalHorizonMs; the run continues to deadlineMs to drain.
-          durationMs = this.scenario.completion.deadlineMs;
-          arrivalHorizonMs = this.scenario.completion.arrivalHorizonMs;
-        } else if (this.scenario.completion.kind === 'count') {
-          // D55: arrivals stop after `requests` roots; the run continues to deadlineMs to drain.
-          durationMs = this.scenario.completion.deadlineMs;
-          maxRootArrivals = this.scenario.completion.requests;
-        } else if (this.scenario.completion.kind === 'open') {
-          // D55: no end until the user stops it.
-          durationMs = OPEN_RUN_CEILING_MS;
-        }
+        const activeWorkloads = this.scenario.workloads.filter((wl) => wl.enabled && !disabledWorkloadIds.has(wl.id));
+        this.hasStream = activeWorkloads.some((wl) => wl.emission.mode === 'stream');
+        this.bulkRequests = activeWorkloads.reduce((n, wl) => n + (wl.emission.mode === 'bulk' ? wl.emission.requests : 0), 0);
 
         this.adapter = new ResourceAdapter({
           elements: effectiveElements,
@@ -648,9 +646,7 @@ export class ScenarioRunner {
           faults: this.scenario.faults,
           workloads: this.scenario.workloads,
           seed: this.scenario.seed,
-          durationMs,
-          arrivalHorizonMs,
-          maxRootArrivals,
+          durationMs: RUN_CEILING_MS,
           runId: this.runId,
           disabledWorkloadIds,
         });
@@ -1458,16 +1454,19 @@ export class ScenarioRunner {
    * Steps the runner by one discrete scheduler event.
    * Returns true if more steps remain, false if execution has completed or terminated.
    */
-  /**
-   * D55: the latest simulated ms at which a draining run must be settled, or null while the run
-   * is not draining (a horizon run, or an open run that has not been stopped). A stop shortens the
-   * deadline of a drain or count run and starts the drain of a horizon or open run.
-   */
-  private drainDeadlineMs(): number | null {
-    const completion = this.scenario.completion;
-    const own = completion.kind === 'drain' || completion.kind === 'count' ? completion.deadlineMs : null;
-    if (this.stopDrainDeadlineMs === null) return own;
-    return own === null ? this.stopDrainDeadlineMs : Math.min(own, this.stopDrainDeadlineMs);
+  private finishTimed(status: TerminalStatus, reason: string | null): false {
+    this.isFinished = true;
+    this.terminalStatus = status;
+    this.failureReason = reason;
+    return false;
+  }
+
+  /** D56: "3 units never settled: 2 in Queue, 1 in Worker", by where each is held. */
+  private describeStuck(stuck: readonly { holderNodeId: string }[]): string {
+    const byHolder = new Map<string, number>();
+    for (const u of stuck) byHolder.set(u.holderNodeId, (byHolder.get(u.holderNodeId) ?? 0) + 1);
+    const where = [...byHolder].map(([id, n]) => `${n} in ${this.elementsMap.get(id)?.label ?? id}`).join(', ');
+    return `${stuck.length} ${stuck.length === 1 ? 'unit' : 'units'} never settled: ${where}`;
   }
 
   /** D55: ask a timed run to stop arrivals and drain; it takes effect at the next step boundary. */
@@ -1697,86 +1696,50 @@ export class ScenarioRunner {
       this.timedQueue.splice(0, this.timedQueue.length, ...kept);
     }
 
-    // Check completion condition
-    const completion = this.scenario.completion;
-    // Horizon runs end at their horizon whether or not work is in flight.
-    if (completion.kind === 'horizon' && this.currentTimeMs >= completion.horizonMs) {
-      this.isFinished = true;
-      this.terminalStatus = 'completed';
-      this.failureReason = null;
-      return false;
+    // D56: a headless run stops itself at `stopAtMs`.
+    if (this.stopAtMs !== undefined && !this.stopRequested && this.currentTimeMs >= this.stopAtMs) this.stopRequested = true;
+    if (this.stopRequested && this.stoppedAtMs === null) {
+      this.stoppedAtMs = this.currentTimeMs;
+      this.stopDrainDeadlineMs = this.currentTimeMs + STOP_DRAIN_MS;
+      this.adapter?.stopArrivals();
+      const kept = this.timedQueue.filter((evt) => evt.kind !== 'external-input');
+      this.timedQueue.splice(0, this.timedQueue.length, ...kept);
     }
-    const drainDeadlineMs = this.drainDeadlineMs();
-    if (drainDeadlineMs !== null) {
-      // A pending kernel event at or before the scenario's own drain deadline might still
-      // be, or lead to, real causal work (a queued/retrying attempt, a periodic sample
-      // that happens to coincide with the deadline as its very last tick — the existing,
-      // exact mechanism S02/S04 rely on for their own drain completion). A pending event
-      // strictly AFTER the deadline can't matter to this run's outcome either way (the
-      // scenario itself never observes past its own deadline), so it never blocks
-      // detecting drainage from the studio-level counts alone. This is what keeps an
-      // already-settled unit's own deadline-expiry timer (scheduled unconditionally,
-      // becoming a harmless no-op once its unit is done) from blocking completion when it
-      // merely happens to fall a little past the deadline — narrower than requiring the
-      // raw kernel event heap to be empty (peekNext() === null) outright.
-      // D55: a count or stopped run is drained as soon as nothing is live and nothing will arrive; a plain
-      // drain run keeps the event-based rule above, which its recorded behavior depends on.
-      const kernelPeek = this.adapter?.peekNext() ?? null;
-      const legacyDrain = completion.kind === 'drain' && this.stoppedAtMs === null;
-      const kernelMayStillMatter = legacyDrain
-        ? !!kernelPeek && kernelPeek.atMs <= drainDeadlineMs
-        : !(this.adapter?.isIdle() ?? true);
-      const isDrained =
-        this.timedQueue.length === 0 &&
-        !kernelMayStillMatter &&
-        this.totalRootCounts().inFlight === 0 &&
-        this.messageCounts.inFlight === 0 &&
-        this.openFrames.size === 0;
 
-      if (isDrained) {
-        this.isFinished = true;
-        // A count run that ran out of time before sending every request did not do what it was asked.
+    // D56: a run ends when every bulk has sent its requests, nothing is in flight and nothing can
+    // still happen. A stream never ends by itself; Stop ends its emission and the rest drains.
+    const arrivalsDone =
+      this.stoppedAtMs !== null ||
+      (!this.hasStream &&
+        (this.adapter?.pendingArrivalCount() ?? 0) === 0 &&
+        !this.timedQueue.some((evt) => evt.kind === 'external-input'));
+    const inFlight =
+      this.totalRootCounts().inFlight > 0 || this.messageCounts.inFlight > 0 || this.openFrames.size > 0;
+    const adapterBusy = this.adapter?.hasPendingWork() ?? false;
+    if (arrivalsDone && this.timedQueue.length === 0 && !adapterBusy) {
+      if (!inFlight && (this.adapter?.unsettled().length ?? 0) === 0) {
         const sent = this.totalRootCounts().generated;
-        if (completion.kind === 'count' && this.stoppedAtMs === null && sent < completion.requests) {
-          this.terminalStatus = 'incomplete';
-          this.failureReason = `Only ${sent} of ${completion.requests} requests arrived before the deadline`;
-        } else {
-          this.terminalStatus = 'completed';
-          this.failureReason = null;
-        }
-        return false;
+        const cut = this.stoppedAtMs !== null && this.bulkRequests > 0 && sent < this.bulkRequests;
+        return this.finishTimed('completed', cut ? `Stopped after sending ${sent} of ${this.bulkRequests} requests` : null);
       }
-
-      if (this.currentTimeMs >= drainDeadlineMs) {
-        this.isFinished = true;
-        this.terminalStatus = 'incomplete';
-        this.failureReason =
-          this.stoppedAtMs !== null && completion.kind !== 'drain' && completion.kind !== 'count'
-            ? 'Stopped, but work was still in flight after the drain time'
-            : 'Drain deadline reached before all causal work settled';
-        return false;
+      // Nothing is left that could settle the remaining work: report it as stuck, by where it is held.
+      const stuck = this.adapter?.unsettled() ?? [];
+      if (stuck.length > 0) {
+        this.adapter?.cycleTracker.markStuck(stuck.map((u) => u.identity), this.currentTimeMs);
+        return this.finishTimed('incomplete', this.describeStuck(stuck));
       }
+      return this.finishTimed('incomplete', 'Unsettled work remaining at end of events');
+    }
+    if (this.stopDrainDeadlineMs !== null && this.currentTimeMs >= this.stopDrainDeadlineMs) {
+      return this.finishTimed('incomplete', 'Stopped, but work was still in flight after the drain time');
+    }
+    if (this.currentTimeMs >= RUN_CEILING_MS) {
+      return this.finishTimed('incomplete', 'The run reached its 24 simulated hour limit');
     }
 
     const kernelNext = this.adapter?.peekNext();
     const globalNext = this.timedQueue[0];
-
-    if (!kernelNext && !globalNext) {
-      // Nothing more to run
-      this.isFinished = true;
-      if (this.drainDeadlineMs() !== null) {
-        const isDrained =
-          this.totalRootCounts().inFlight === 0 &&
-          this.messageCounts.inFlight === 0 &&
-          this.openFrames.size === 0;
-        this.terminalStatus = isDrained ? 'completed' : 'incomplete';
-        this.failureReason = isDrained ? null : 'Unsettled work remaining at end of events';
-      } else {
-        this.terminalStatus = 'completed';
-        this.failureReason = null;
-      }
-      return false;
-    }
+    if (!kernelNext && !globalNext) return this.finishTimed('completed', null);
 
     // Compare priorities: (atMs, phase, sequence)
     let stepKernel = false;
@@ -1942,11 +1905,8 @@ export class ScenarioRunner {
 
     switch (evt.kind) {
       case 'external-input': {
-        if (
-          (this.scenario.completion.kind === 'drain' && evt.atMs > this.scenario.completion.arrivalHorizonMs) ||
-          (this.stoppedAtMs !== null && evt.atMs > this.stoppedAtMs)
-        ) {
-          // No arrivals after arrivalHorizonMs (§6), or after a stop (D55)
+        if (this.stoppedAtMs !== null && evt.atMs > this.stoppedAtMs) {
+          // No arrivals after a stop (D55)
           return true;
         }
 
@@ -2311,18 +2271,7 @@ export class ScenarioRunner {
     let metrics: readonly ElementMetric[] = [];
 
     if (this.scenario.mode === 'timed') {
-      const drainDeadline = this.drainDeadlineMs();
-      if (drainDeadline !== null) {
-        const isDrained =
-          this.totalRootCounts().inFlight === 0 &&
-          this.messageCounts.inFlight === 0 &&
-          this.openFrames.size === 0;
-        elapsedMs = isDrained ? this.currentTimeMs : Math.max(this.currentTimeMs, drainDeadline);
-      } else if (this.scenario.completion.kind === 'horizon') {
-        elapsedMs = this.scenario.completion.horizonMs;
-      } else {
-        elapsedMs = this.currentTimeMs;
-      }
+      elapsedMs = this.currentTimeMs;
 
       if (this.adapter) {
         // Collect metrics from adapter snapshot
@@ -2358,6 +2307,7 @@ export class ScenarioRunner {
       processedEvents: this.processedEvents,
       elapsedMs,
       rowOutcomes: this.collectedRowOutcomes,
+      cycles: this.adapter?.cycleTracker.summary() ?? emptyCycleSummary(),
       trace: { recordedRows: this.recorder.events.length, truncatedBy: this.recorder.truncatedBy },
     };
 
@@ -2367,6 +2317,7 @@ export class ScenarioRunner {
       status: this.budgetStop !== null && this.terminalStatus === 'failed' ? 'incomplete' : this.terminalStatus,
       events: this.recorder.events,
       summary,
+      cycles: this.adapter?.cycleTracker.cycles() ?? [],
       checks,
       reason: this.budgetStop !== null && this.terminalStatus === 'failed' ? this.budgetStop : this.failureReason,
       issues: this.issues,

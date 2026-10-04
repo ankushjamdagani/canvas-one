@@ -200,6 +200,8 @@ export interface SimEvent {
   run: () => void;
   /** Periodic bookkeeping that cannot change an outcome (D56). */
   housekeeping?: boolean;
+  /** This is the expiry timer of `unit`: once the unit has settled it is a no-op (D56). */
+  unit?: Unit;
 }
 
 class SimpleEventHeap {
@@ -303,6 +305,8 @@ export interface Unit {
   done: boolean;
   rootOp?: Op;
   ops: Set<Op>;
+  /** Its expiry timer is scheduled and has not run (D56: it stops counting as pending work once the unit settles). */
+  expiryPending?: boolean;
 }
 
 export type OpPhase = 'transit' | 'queued' | 'reserved' | 'processing' | 'waiting' | 'retrying' | 'settled';
@@ -745,9 +749,20 @@ export class OpenSimulation {
     });
   }
 
-  protected scheduleEvent(time: number, priority: number, run: () => void, housekeeping = false): void {
-    this.events.push({ time, priority, seq: this.seq++, run, ...(housekeeping ? { housekeeping } : {}) });
-    if (!housekeeping) this.workEvents++;
+  protected scheduleEvent(time: number, priority: number, run: () => void, tag: { housekeeping?: true; unit?: Unit } = {}): void {
+    this.events.push({ time, priority, seq: this.seq++, run, ...tag });
+    if (tag.unit) tag.unit.expiryPending = true;
+    if (!tag.housekeeping) this.workEvents++;
+  }
+
+  /** An event leaves the queue: it stops counting as pending work unless the unit it belonged to already settled. */
+  protected eventPopped(evt: SimEvent): void {
+    if (evt.housekeeping) return;
+    if (evt.unit) {
+      if (!evt.unit.expiryPending) return; // already discounted when the unit settled
+      evt.unit.expiryPending = false;
+    }
+    this.workEvents--;
   }
 
   /** D56: true while an event that could still change an outcome is scheduled (periodic samples do not count). */
@@ -771,7 +786,7 @@ export class OpenSimulation {
         latency: latSnap.mean,
       });
       this.scheduleSample(t + 1);
-    }, true);
+    }, { housekeeping: true });
   }
 
   protected updateIntegrals(newTime: number): void {
@@ -946,7 +961,7 @@ export class OpenSimulation {
         if (!unit.done) {
           this.expireUnit(unit);
         }
-      });
+      }, { unit });
 
       this.handleBrokerWorkloadEntry(unit, wl, arrTime);
       return;
@@ -972,7 +987,7 @@ export class OpenSimulation {
       if (!unit.done) {
         this.expireUnit(unit);
       }
-    });
+    }, { unit });
 
     const rootOp: Op = {
       unit,
@@ -1066,6 +1081,11 @@ export class OpenSimulation {
     if (unit.done) return;
     unit.done = true;
     this.liveUnits.delete(unit);
+    if (unit.expiryPending) {
+      // Its expiry timer is now a no-op, so it no longer counts as work that could still happen.
+      unit.expiryPending = false;
+      this.workEvents--;
+    }
     this.emitFact({
       kind: 'unit_settled',
       time: this.currentTime,
@@ -2066,7 +2086,7 @@ export class OpenSimulation {
           });
         }
       }
-    });
+    }, { unit: messageUnit });
 
     const msgOpPath = `${parentOp.path}>${edge.id}`;
     const msgRootOp: Op = {
@@ -2762,7 +2782,7 @@ export class OpenSimulation {
       if (nextEvt.time > targetTime) break;
 
       this.events.pop();
-      if (!nextEvt.housekeeping) this.workEvents--;
+      this.eventPopped(nextEvt);
       this.updateIntegrals(nextEvt.time);
       this.currentTime = nextEvt.time;
       this.totalEventsProcessed++;
@@ -2909,7 +2929,7 @@ export class OpenSimulation {
       return false;
     }
     const nextEvt = this.events.pop()!;
-    if (!nextEvt.housekeeping) this.workEvents--;
+    this.eventPopped(nextEvt);
     this.updateIntegrals(nextEvt.time);
     this.currentTime = nextEvt.time;
     this.totalEventsProcessed++;
@@ -2996,7 +3016,7 @@ export class OpenSimulation {
       if (!unit.done) {
         this.expireUnit(unit);
       }
-    });
+    }, { unit });
 
     if (entryNode.behavior.type === 'broker') {
       const rootOp: Op = {

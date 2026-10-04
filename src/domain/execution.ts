@@ -403,7 +403,7 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
     if (!isStr(w.entryNodeId) || !nodeIds.has(w.entryNodeId)) err(issues, 'INVALID_ENTRY_NODE', `entryNodeId does not exist: ${String(w.entryNodeId)}`);
     if (typeof w.enabled !== 'boolean') err(issues, 'INVALID_WORKLOAD_ENABLED', 'enabled must be boolean');
     // D56: a bulk's arrivals come from its schedule, so its rate is unused.
-    if (w.schedule?.kind !== 'bulk' && !isNum(w.rate, 1, 10000)) err(issues, 'INVALID_WORKLOAD_RATE', 'rate must be 1..10000');
+    if ((w.schedule as { kind?: unknown } | undefined)?.kind !== 'bulk' && !isNum(w.rate, 1, 10000)) err(issues, 'INVALID_WORKLOAD_RATE', 'rate must be 1..10000');
     if (!isNum(w.timeoutMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_TIMEOUT', 'timeoutMs must be 1..3600000');
     if (w.intervalMs !== undefined && !isNum(w.intervalMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_INTERVAL', 'intervalMs must be 1..3600000');
     if (w.profile !== undefined) validateProfile(w.profile, dur, issues);

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { SimLifecycleFact } from '../../../simulation/open/kernel';
+import type { ExecutionGraph, ExecutionNode } from '../../../domain/execution';
+import { defaultBehavior, defaultExecutionEdge, defaultWorkload } from '../../../domain/behaviorDefaults';
+import { OpenSimulation } from '../../../simulation/open/kernel';
 import { CycleTracker } from './cycles';
 
 const fact = (p: Partial<SimLifecycleFact> & Pick<SimLifecycleFact, 'kind' | 'time' | 'unitIdentity'>): SimLifecycleFact => ({
@@ -96,5 +99,53 @@ describe('CycleTracker', () => {
     expect(s).toMatchObject({ total: 3, open: 1, byOutcome: expect.objectContaining({ ok: 2 }) });
     expect(s.completionLatencyMs).toEqual({ mean: 2000, max: 3000 });
     expect(s.responseLatencyMs).toEqual({ mean: 2000, max: 3000 });
+  });
+});
+
+describe('CycleTracker with the kernel', () => {
+  /** entry -> svc (call) -> queue (message) -> one worker that takes 1 s per message. */
+  function slowConsumerGraph(): ExecutionGraph {
+    const nodes: ExecutionNode[] = [
+      { id: 'src', kind: 'traffic', name: 'src', position: { x: 0, y: 0 }, behavior: defaultBehavior('traffic') },
+      { id: 'svc', kind: 'service', name: 'svc', position: { x: 0, y: 0 }, behavior: defaultBehavior('service') },
+      {
+        id: 'q', kind: 'queue', name: 'q', position: { x: 0, y: 0 },
+        behavior: { type: 'broker', delivery: 'competing', capacity: 2000, concurrency: 1, queueLimit: 100, failureRate: 0, maxRetries: 0, retryDelayMs: 100 },
+      },
+      {
+        id: 'w', kind: 'worker', name: 'w', position: { x: 0, y: 0 },
+        behavior: { type: 'processor', capacity: 1, concurrency: 1, queueLimit: 100, failureRate: 0, maxRetries: 0, retryDelayMs: 100 },
+      },
+    ];
+    const call = defaultExecutionEdge('src', 'svc');
+    call.id = 'e1';
+    const publish = defaultExecutionEdge('svc', 'q', nodes[2].behavior);
+    publish.id = 'e2';
+    publish.messageTtlMs = null;
+    const deliver = defaultExecutionEdge('q', 'w', nodes[3].behavior);
+    deliver.id = 'e3';
+    deliver.transport = 'message';
+    deliver.messageTtlMs = null;
+    const wl = defaultWorkload('src');
+    wl.id = 'w';
+    wl.schedule = { kind: 'bulk', requests: 3, arrival: 'instant', startDelayMs: 0 };
+    return { executionVersion: 'open-system/1', nodes, edges: [call, publish, deliver], workloads: [wl], settings: { seed: 3, duration: 3600 } };
+  }
+
+  it('the response comes back at once; the cycle completes when the slow consumer is done', () => {
+    const tracker = new CycleTracker();
+    const sim = new OpenSimulation(slowConsumerGraph(), { requireRunnable: false, traceHook: (f) => tracker.record(f) });
+    while (sim.hasPendingWork()) sim.stepEvent();
+    const cycles = tracker.cycles();
+    expect(cycles).toHaveLength(3);
+    for (const c of cycles) {
+      expect(c.outcome).toBe('ok');
+      expect(c.responseAtMs!).toBeLessThan(200);
+      expect(c.completedAtMs!).toBeGreaterThan(c.responseAtMs! + 500);
+    }
+    // One worker at 1 message per second: the cycles finish about a second apart.
+    const done = cycles.map((c) => c.completedAtMs!).sort((a, b) => a - b);
+    expect(done[2] - done[0]).toBeGreaterThan(1500);
+    expect(tracker.summary().completionLatencyMs!.mean).toBeGreaterThan(tracker.summary().responseLatencyMs!.mean * 5);
   });
 });

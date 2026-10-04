@@ -65,6 +65,7 @@ import { traceEventId } from './trace';
 const SYSTEM_FAULT_ROOT_ID = 'fault';
 const SYSTEM_FAULT_JOURNEY_ID = 'system';
 import type { ResourceMetrics } from '../../../simulation/open/kernel';
+import { CycleTracker } from './cycles';
 
 type MutableCounts = {
   generated: number;
@@ -434,6 +435,8 @@ export class ResourceAdapter {
   private traceSequence = 0;
   private stepFacts: SimLifecycleFact[] = [];
   /** Live canvas view: connection of each packet announced by a `sent` fact, and the steps not yet drained. */
+  /** D56: cycles assembled from the kernel's lifecycle facts. */
+  readonly cycleTracker = new CycleTracker();
   private readonly flowConnections = new Map<string, string>();
   private flowRecords: FlowRecord[] = [];
 
@@ -573,6 +576,7 @@ export class ResourceAdapter {
     this.sim = new OpenSimulation(graph, {
       traceHook: (fact) => {
         this.recordFlow(fact);
+        this.cycleTracker.record(fact);
         if (fact.kind !== 'sent' && fact.kind !== 'response_sent') this.stepFacts.push(fact);
       },
       disabledWorkloadIds,
@@ -623,6 +627,21 @@ export class ResourceAdapter {
   /** D55: nothing is live in the kernel and no arrival is pending. */
   isIdle(): boolean {
     return this.sim.isIdle();
+  }
+
+  /** D56: an event that could still change an outcome is scheduled (periodic samples do not count). */
+  hasPendingWork(): boolean {
+    return this.sim.hasPendingWork();
+  }
+
+  /** D56: arrivals still to come (a live stream always has one). */
+  pendingArrivalCount(): number {
+    return this.sim.pendingArrivalCount();
+  }
+
+  /** D56: units that have not settled, with where each is held. */
+  unsettled(): ReturnType<OpenSimulation['unsettled']> {
+    return this.sim.unsettled();
   }
 
   /** D55: no workload arrives again; work in flight carries on. */
