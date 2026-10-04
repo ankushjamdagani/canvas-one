@@ -2666,3 +2666,10 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Files: `ScenarioSwitcher.tsx`, `Workspace.tsx`, `CanvasView.tsx`, `TrafficEdge.tsx`, `livePackets.tsx` (replaces `trafficPulses.tsx`), `RunController.ts`, `protocol.ts`, runner `types.ts`, `resource-adapter.ts`, `scenario-runner.ts`, `kernel.ts`, `styles.css`, specs, tests.
 - Verification: `tsc -b` clean; `npm test` 1,664 passed; build ok (Workspace 488 kB); production Playwright isolated port.
 - Limitations: packets are a sample (at most 2 per connection, 80 overall) and each stage shows at least 0.3-1.2 s, so a fast run is slowed in the picture only, not in the results; a packet that falls behind skips to its latest stages; `sent` for a message is the publish or batch departure; no unit test of `FlowRecord` mapping beyond the browser spec; runs at 1x can be long (a 1000-request run takes as long as its workload spans).
+
+### Design spec: cycles, live recording, timeline playback
+- Outcome: wrote `docs/superpowers/specs/2026-10-04-cycle-playback-design.md` after a Q&A with the user. Replaces the completion kinds, run pace and sampled packets with bulk/stream sources, cycles (complete when all side effects settle), a worker-produced live recording with lookahead and a sliding history window, results as of the playhead, and a timeline with video-style controls. No code changed.
+- Files: the spec, `ACTION_LOG.md`.
+- Verification: none (docs only). Defaults for lookahead, history, checkpoint interval, packet threshold and speed range are assumptions awaiting user review.
+- Limitations: four implementation stages still to plan; open items listed in spec section 8.
+- Lesson: the earlier packet animation was built before agreeing on states; agree the state model and what it means for each element first.
