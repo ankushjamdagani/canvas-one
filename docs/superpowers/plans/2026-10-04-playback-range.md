@@ -7,3 +7,5 @@ Select a start/end interval within the retained recording. Play stops at its end
 3. Verify keyboard selection, range playback/loop/clear and narrow viewports in production browsers. Run TypeScript, units, production build (<500 kB), Storybook and the isolated full production suite. Independently review source, update log/HANDOFF/spec/decision and commit. Preserve unrelated design-proposal docs.
 
 No simulation, persisted recording, per-range results or cycle/request filtering.
+
+Completed 2026-10-05. Store/controller range boundaries, eviction, unfinished-run pause, live/finished loops and save-once terminal behavior are covered by unit tests. Distinct foundation slider handles and the timeline interval passed keyboard and 320 px touch browser checks. TypeScript, 1,789 unit tests (10 skipped), production build (Workspace 473.88 kB), Storybook and isolated production browser suite (122 passed, 4 dev-only skipped) passed. Independent source review passed; see D61 and ACTION_LOG.

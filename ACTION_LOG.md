@@ -2717,3 +2717,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Profile: repeated real S06 600 req/s to 120 s, 1,992,156 flow records/72,732 cycles. Warm stateAt median 0.183 ms/p95 0.259 ms; isolated captured-flash ingestion plus reading median 0.387 ms/p95 0.482 ms. Synthetic overlapping live batches still cost ~30.2 ms p95 in inherited retained-flow sorting; repeated sample drain tails overlap, so this is not continuous live execution. Cold read ~1 s, eviction ~717 ms; React excluded.
 - Limitations: lost returns without response facts cannot show return arrival/outcome; no facts are invented. Floating connection bar, long-stream bookkeeping audit and accepted large-history eviction optimization remain outside scope.
 - Lesson: test real adapter descendant phases, since arrival often appears as queued/processing rather than received. Profile alternating ingestion/reads, not only pre-ingested replay. Browser seeks must wait for the sought frame, and request arrival can coincide with return departure. Screenshot inspection caught node-layer occlusion; move endpoint decorations into the port gutter. Updated LESSONS.
+
+## 2026-10-05
+
+### Recorded playback time-range selection (D61)
+
+- Outcome: the scissors tool enables start/end handles and a highlighted interval. Editing pauses/seeks to its start; Play stops exactly at its end and Loop repeats it, including stream history. Clear restores full playback, while Go live/Stop clear the range. Eviction clamps/clears it. Whole-run persistence and Results at the playhead stay intact; selection is in memory only.
+- Files: PlaybackStore, RunController/controller and range unit tests; PlaybackPanel/Timeline; foundation Slider and range story; production playback spec; plan, spec section 6.2, D61 and HANDOFF. Plan committed first (`d428d6e`).
+- Platform: Codex lead with independent native critic/reviewer; no executor or nested agents. Source review passed.
+- Verification: `npx tsc -b` passed; `npm test` 1,789 passed/10 skipped; build passed (Workspace 473.88 kB); Storybook passed. Updated controller suite 13 passed, including live-range looping. Targeted production playback 4 passed; isolated full production browser 122 passed/4 dev-only skipped, two workers/no retries. Authoring connect tests passed, no rerun required. Keyboard range edits, stop/loop/clear, Go live and 320 px touch/canvas space covered; desktop/phone screenshots inspected.
+- Limitations: selection is restricted to retained/computed history, not persisted, and does not filter cycles or compute range totals. No simulation or accounting changes.

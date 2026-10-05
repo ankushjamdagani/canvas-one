@@ -7,6 +7,7 @@ import {
   SkipBack,
   SkipForward,
   Square,
+  Scissors,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
@@ -27,11 +28,13 @@ function Tool({
   disabled,
   onClick,
   children,
+  pressed,
 }: {
   label: string;
   disabled?: boolean;
   onClick(): void;
   children: React.ReactNode;
+  pressed?: boolean;
 }) {
   return (
     <Tooltip>
@@ -41,6 +44,7 @@ function Tool({
           size="icon"
           className="size-8 pointer-coarse:size-11 shrink-0"
           aria-label={label}
+          aria-pressed={pressed}
           disabled={disabled}
           onClick={onClick}
         >
@@ -67,7 +71,7 @@ export function PlaybackPanel({
     const read = () => {
       const store = controller?.getPlayback();
       const value = store
-        ? `${store.version}/${store.playheadMs}/${store.computedMs}/${store.windowStartMs}/${store.playing}/${store.ended}`
+        ? `${store.version}/${store.playheadMs}/${store.computedMs}/${store.windowStartMs}/${store.playing}/${store.ended}/${store.selection?.startMs}/${store.selection?.endMs}`
         : "";
       if (value !== last) {
         last = value;
@@ -113,11 +117,13 @@ export function PlaybackPanel({
                 ? results.terminal && results.terminal.status !== "completed"
                   ? results.terminal.status
                   : "Finished"
-                : !store.playing
-                  ? "Paused"
-                  : store.atEdge()
-                    ? "Computing"
-                    : "Playing"
+                : store.atSelectionEnd() && !store.playing
+                  ? "Range ended"
+                  : !store.playing
+                    ? "Paused"
+                    : store.atEdge()
+                      ? "Computing"
+                      : "Playing"
             : "Ready";
   return (
     <>
@@ -134,7 +140,13 @@ export function PlaybackPanel({
               aria-label="Playback controls"
             >
               <Tool
-                label={store?.playing ? "Pause playback" : "Play recording"}
+                label={
+                  store?.playing
+                    ? "Pause playback"
+                    : store?.selection
+                      ? "Play selected range"
+                      : "Play recording"
+                }
                 disabled={!store}
                 onClick={() =>
                   change(() =>
@@ -180,7 +192,30 @@ export function PlaybackPanel({
                   </option>
                 ))}
               </NativeSelect>
-              {store?.isStream ? (
+              <Tool
+                label={
+                  store?.selection
+                    ? "Clear playback range"
+                    : "Select playback range"
+                }
+                pressed={Boolean(store?.selection)}
+                disabled={
+                  !store ||
+                  end - bounds < 1 ||
+                  results.runPhase === "saving" ||
+                  controller.getState().stopping
+                }
+                onClick={() =>
+                  change(() =>
+                    controller.setPlaybackRange(
+                      store?.selection ? null : { startMs: bounds, endMs: end },
+                    ),
+                  )
+                }
+              >
+                <Scissors className="size-4" />
+              </Tool>
+              {store?.isStream && (
                 <Tool
                   label="Go live"
                   disabled={store.ended}
@@ -188,12 +223,17 @@ export function PlaybackPanel({
                 >
                   <Radio className="size-4" />
                 </Tool>
-              ) : (
+              )}
+              {(!store?.isStream || store.selection) && (
                 <label className="inline-flex h-8 pointer-coarse:h-11 items-center gap-1.5 px-1 text-xs">
                   <Checkbox
-                    aria-label="Loop recording"
+                    aria-label={
+                      store?.selection
+                        ? "Loop selected range"
+                        : "Loop recording"
+                    }
                     checked={controller.getLoop()}
-                    disabled={!store?.ended}
+                    disabled={!store?.ended && !store?.selection}
                     onCheckedChange={(checked) =>
                       change(() => controller.setLoop(checked === true))
                     }
@@ -237,6 +277,10 @@ export function PlaybackPanel({
               end={end}
               playhead={at}
               onSeek={(time) => change(() => controller.seek(time))}
+              selection={store.selection}
+              onSelectRange={(range) =>
+                change(() => controller.setPlaybackRange(range))
+              }
             />
           )}
         </section>

@@ -139,6 +139,12 @@ test.describe("touch phone playback", () => {
     await page.getByRole("slider", { name: "Playback position" }).focus();
     await page.keyboard.press("Home");
     await expect(page.getByTestId("playback-time")).toHaveText("0.00 s");
+    await page.getByRole('button', { name: 'Select playback range', exact: true }).click();
+    await expect(page.getByRole('slider', { name: 'Playback range start' })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Playback range end' })).toBeVisible();
+    await page.setViewportSize({ width: 320, height: 640 });
+    expect(await page.getByTestId('playback-panel').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    expect((await page.locator('.react-flow__pane').boundingBox())!.height).toBeGreaterThan(80);
     await page.screenshot({
       path: test.info().outputPath("timeline-phone.png"),
     });
@@ -160,7 +166,13 @@ test("Go live resumes a paused stream and Stop drains it", async ({ page }) => {
   await seeker.focus();
   await seeker.press("Home");
   await expect(page.getByTestId("playback-time")).toHaveText("0.00 s");
+  await page.getByRole('button', { name: 'Select playback range', exact: true }).click();
+  await page.getByRole('slider', { name: 'Playback range end' }).press('Home');
+  await page.getByRole('button', { name: 'Play selected range', exact: true }).click();
+  await expect(page.getByTestId('playback-status')).toHaveText('Range ended');
+  await expect(page.getByTestId('results-status-badge')).toContainText('paused');
   await page.getByRole("button", { name: "Go live", exact: true }).click();
+  await expect(page.getByTestId('playback-range')).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Pause playback", exact: true }),
   ).toBeVisible();
@@ -176,4 +188,45 @@ test("Go live resumes a paused stream and Stop drains it", async ({ page }) => {
     { timeout: 20000 },
   );
   await expect(page.getByTestId("results-region")).toContainText("Saved");
+});
+
+test('selects, plays, loops and clears a recorded time range', async ({ page }) => {
+  await traffic(page, 'bulk', 6);
+  await page.getByTestId('playback-speed').selectOption('16');
+  await page.getByTestId('scenario-run-btn').click();
+  await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+  await page.getByRole('button', { name: 'Select playback range', exact: true }).click();
+  const start = page.getByRole('slider', { name: 'Playback range start' });
+  const end = page.getByRole('slider', { name: 'Playback range end' });
+  const range = page.getByTestId('playback-range').locator('[data-slot="slider"]');
+  const box = (await range.boundingBox())!;
+  await range.click({ position: { x: box.width * .75, y: box.height / 2 } });
+  await range.click({ position: { x: box.width * .25, y: box.height / 2 } });
+  const before = Number(await start.getAttribute('aria-valuenow'));
+  await start.press('ArrowRight');
+  await expect(start).toHaveAttribute('aria-valuenow', String(before + 1));
+  const startMs = Number(await start.getAttribute('aria-valuenow'));
+  const endMs = Number(await end.getAttribute('aria-valuenow'));
+  expect(startMs).toBeGreaterThan(0);
+  expect(endMs).toBeGreaterThan(startMs);
+  expect(endMs).toBeLessThan(Number(await end.getAttribute('aria-valuemax')));
+  await expect(page.getByTestId('playback-range-highlight')).toBeVisible();
+  await page.getByRole('button', { name: 'Play selected range', exact: true }).click();
+  await expect(page.getByTestId('playback-status')).toHaveText('Range ended');
+  await expect(page.getByRole('slider', { name: 'Playback position' })).toHaveAttribute('aria-valuenow', String(endMs));
+  await expect(page.getByTestId('results-status-badge')).toContainText('paused');
+  await page.getByRole('checkbox', { name: 'Loop selected range' }).check();
+  await page.getByRole('button', { name: 'Play selected range', exact: true }).click();
+  await page.waitForTimeout(300);
+  await expect(page.getByRole('button', { name: 'Pause playback', exact: true })).toBeVisible();
+  const at = Number(await page.getByRole('slider', { name: 'Playback position' }).getAttribute('aria-valuenow'));
+  expect(at).toBeGreaterThanOrEqual(startMs); expect(at).toBeLessThanOrEqual(endMs);
+  await page.getByRole('button', { name: 'Pause playback', exact: true }).click();
+  await page.screenshot({ path: test.info().outputPath('playback-range.png') });
+  await page.getByRole('button', { name: 'Clear playback range', exact: true }).click();
+  await expect(page.getByTestId('playback-range-highlight')).toHaveCount(0);
+  await expect(start).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Loop recording' }).uncheck();
+  await page.getByRole('button', { name: 'Play recording', exact: true }).click();
+  await expect(page.getByTestId('results-status-badge')).toContainText('completed');
 });

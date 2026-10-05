@@ -190,14 +190,16 @@ Outbound arrivals require a recorded admission or local queue/processing/settlem
 | Seeker | scrub within the retained window |
 | Speed | x0.25, x0.5, x1, x2, x4, x8, x16 of real time (assumed range) |
 | Step | previous / next cycle |
-| Loop | replays a finished bulk run from the start |
-| Go live | jumps the playhead to the computed edge (streams) |
-| Stop | ends emission, drains, finalizes the recording |
+| Select range | start/end handles select an interval within retained, computed history; editing pauses and seeks to its start |
+| Loop | repeats the selected interval, including a stream recording; without a selection, replays a finished bulk |
+| Go live | clears selection and jumps the playhead to the computed edge (streams) |
+| Stop | clears selection, ends emission, drains, finalizes the recording |
 | Restart | begins a fresh run of the same scenario |
 
 - Pressing Run starts playback automatically at x1.
 - If the playhead catches the computed edge (computation slower than playback), playback waits and shows a "computing" state; it does not skip.
 - After Stop, the recording stays scrubbable. Streams keep only the retained window.
+- With a selection, Play resumes inside it or starts at its beginning when the playhead is outside/at its end. Playback stops exactly at the selected end unless Loop is checked. The full recording remains available for inspection; the next Play returns to the selected interval. Clear range pauses at the current playhead and restores full-recording playback. A selection is in memory only, resets with the recording, and is clamped/cleared when history is evicted. It has at least a 1 ms span. Range-end pause never completes or saves a whole run early; Results continue to describe the actual playhead, not range-specific totals.
 
 ### 6.3 Scenario editor
 

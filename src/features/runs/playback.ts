@@ -11,6 +11,7 @@ import type { Cycle, CycleOutcome, ElementMetric, FlowRecord, ResultDelta, RunCh
 import { CycleIndex } from './playback-history';
 import { FlashIndex, type FlashAt } from './playback-flashes';
 export type { FlashAt } from './playback-flashes';
+export type PlaybackRange = { readonly startMs: number; readonly endMs: number };
 
 /** How much history behind the playhead a stream keeps, in simulated ms. */
 export const HISTORY_MS = 120_000;
@@ -85,6 +86,20 @@ export class PlaybackStore {
   /** Simulated seconds per real second. */
   speed = 1;
   playing = false;
+  private range: PlaybackRange | null = null;
+
+  get selection(): PlaybackRange | null { return this.range; }
+
+  setSelection(range: PlaybackRange | null): void {
+    if (range === null) { this.range = null; return; }
+    if (!Number.isFinite(range.startMs) || !Number.isFinite(range.endMs)) return;
+    const limit = Math.min(this.computed, this.endAt ?? Infinity);
+    const startMs = Math.max(this.windowStart, Math.min(range.startMs, limit));
+    const endMs = Math.max(this.windowStart, Math.min(range.endMs, limit));
+    this.range = endMs - startMs >= 1 ? { startMs, endMs } : null;
+  }
+
+  atSelectionEnd(): boolean { return this.range !== null && this.playhead >= this.range.endMs; }
 
   constructor(options: PlaybackOptions) {
     this.options = options;
@@ -196,6 +211,7 @@ export class PlaybackStore {
   setEnded(endMs: number): void {
     this.endAt = endMs;
     this.setComputedEdge(endMs);
+    this.setSelection(this.range);
   }
 
   // --------------------------------------------------------------------------
@@ -229,7 +245,7 @@ export class PlaybackStore {
   /** Moves the playhead by `realDtMs` of real time at `speed`, never past what is computed or the end of the run. */
   advance(realDtMs: number): void {
     if (!this.playing) return;
-    const limit = Math.min(this.computed, this.endAt ?? Infinity);
+    const limit = Math.min(this.computed, this.endAt ?? Infinity, this.range?.endMs ?? Infinity);
     const target = this.playhead + realDtMs * this.speed;
     this.playhead = Math.max(this.playhead, Math.min(target, limit));
     this.evict();
@@ -450,6 +466,7 @@ export class PlaybackStore {
     const start = this.playhead - history;
     if (start < this.windowStart + EVICT_STEP_MS) return;
     this.windowStart = start;
+    this.setSelection(this.range);
     this.flashes.evict(start);
     for (const [key, arrival] of this.pendingArrivals) if (arrival < start) this.pendingArrivals.delete(key);
     this.sortFlow();

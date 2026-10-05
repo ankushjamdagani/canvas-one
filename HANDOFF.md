@@ -56,6 +56,10 @@ Accepted limitations (by design, not debt): a router's routes must reach resourc
 
 ## Resume
 
+Playback time-range selection is implemented (D61; plan `docs/superpowers/plans/2026-10-04-playback-range.md`). The scissors tool enables start/end handles and a highlighted interval. Editing pauses/seeks to its start; Play stops exactly at its end, and Loop repeats it (including live stream history). Inspection remains unrestricted. Go live and Stop clear the range; eviction clamps/clears it, and a new recording resets it. Whole-run completion/save-once and Results at the playhead remain intact. Selection is not persisted and does not calculate range totals.
+
+Verification: TypeScript clean; 1,789 unit tests passed, 10 skipped; production build (Workspace 473.88 kB) and Storybook passed. Targeted playback browser 4 passed; isolated full production browser 122 passed, 4 dev-only skipped, two workers/no retries. Authoring connect tests passed, no rerun required. Desktop and 320 px touch screenshots inspected; independent source review passed.
+
 Lifecycle flashes are implemented (D60; plan `docs/superpowers/plans/2026-10-04-playback-flashes.md`). `stateAt` returns exact grouped send/arrival/outcome cues with a 240 ms simulated lifetime. Pause/seek/replay reconstruct them; reduced motion uses static symbols. Outbound arrivals require confirmed recorded admission/local phases, return cues use the recorded response leg endpoint, message settlement appears at its source, and completed cycles mark the workload entry node. Decorations preserve node geometry and hit areas. Lost returns without recorded response facts remain unrepresented; accounting and recording format are unchanged.
 
 Verification: TypeScript clean; 1,783 unit tests passed, 10 skipped; production build (Workspace 473.88 kB) and Storybook passed. Final isolated production Playwright: 121 passed, 4 dev-only skipped. One earlier authoring connection flake passed alone and in the final full suite. Normal/reduced send, arrival and outcome screenshots inspected. The runtime worktree is archived.

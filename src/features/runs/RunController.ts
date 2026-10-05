@@ -39,7 +39,7 @@ import {
 } from '../../domain/studio/runner/types';
 import type { PrepareIssue } from '../../domain/studio/runner/compile';
 import type { RunTransport } from './transport';
-import { HISTORY_MS, PlaybackStore } from './playback';
+import { HISTORY_MS, PlaybackStore, type PlaybackRange } from './playback';
 import { createEmptySummary } from './summary';
 import type {
   CompileResultMessage,
@@ -305,6 +305,13 @@ export class RunController {
   setLoop(loop: boolean): void { this.loop = loop; }
   getLoop(): boolean { return this.loop; }
 
+  setPlaybackRange(range: PlaybackRange | null): void {
+    const store = this.playback;
+    if (!store) return;
+    store.setSelection(range);
+    this.seek(store.selection?.startMs ?? store.playheadMs);
+  }
+
   seek(ms: number): void {
     const store = this.playback;
     if (!store) return;
@@ -326,6 +333,7 @@ export class RunController {
 
   goLive(): void {
     if (!this.playback?.isStream) return;
+    this.playback.setSelection(null);
     this.seek(this.playback.computedMs);
     if (!this.playback.ended) this.resume();
   }
@@ -346,6 +354,7 @@ export class RunController {
     if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'paused') && !this.state.stopping) {
       this.transport.postMessage({ type: 'control', runId: this.activeRunId, kind: 'stop' });
       if (this.playback) {
+        this.playback.setSelection(null);
         this.playback.playing = true;
         this.lastTickAt = this.clock.now();
         this.ensureClock();
@@ -372,6 +381,13 @@ export class RunController {
   }
 
   resume(): void {
+    const store = this.playback;
+    const range = store?.selection;
+    if (store && range && (store.playheadMs < range.startMs || store.playheadMs >= range.endMs)) {
+      store.seek(range.startMs);
+      this.rebuildVisibleEvents();
+      this.postPlayhead(store.playheadMs);
+    }
     if (this.playback?.ended && this.state.phase === 'done') {
       if (this.playback.atEnd()) {
         this.playback.seek(this.playback.windowStartMs);
@@ -733,6 +749,7 @@ export class RunController {
   }
 
   private postPlayhead(simulatedMs: number): void {
+    this.lastPlayheadPostMs = simulatedMs;
     if (!this.activeRunId) return;
     this.transport.postMessage({ type: 'playhead', runId: this.activeRunId, simulatedMs });
   }
@@ -770,9 +787,10 @@ export class RunController {
       this.setState({ events: [...this.bufferedEvents] });
       void this.handleTerminal(terminal).then(() => {
         if (this.playback !== store) return;
-        if (store.playing && this.loop && !store.isStream) {
-          store.seek(store.windowStartMs);
+        if (store.playing && this.loop && (!store.isStream || store.selection !== null)) {
+          store.seek(store.selection?.startMs ?? store.windowStartMs);
           this.rebuildVisibleEvents();
+          this.postPlayhead(store.playheadMs);
           this.lastTickAt = this.clock.now();
           this.ensureClock();
         } else {
@@ -782,9 +800,16 @@ export class RunController {
       });
       return;
     }
-    if (store.playing && store.atEnd() && store.ended && this.loop && !store.isStream && this.state.phase === 'done') {
-      store.seek(store.windowStartMs);
+    if (store.playing && store.atSelectionEnd() && !store.atEnd()) {
+      if (this.loop) {
+        store.seek(store.selection!.startMs);
+        this.rebuildVisibleEvents();
+        this.postPlayhead(store.playheadMs);
+      } else this.pause();
+    } else if (store.playing && store.atEnd() && store.ended && this.loop && (!store.isStream || store.selection !== null) && this.state.phase === 'done') {
+      store.seek(store.selection?.startMs ?? store.windowStartMs);
       this.rebuildVisibleEvents();
+      this.postPlayhead(store.playheadMs);
     } else if (store.atEnd() && store.ended && this.state.phase === 'done') {
       store.playing = false;
     }

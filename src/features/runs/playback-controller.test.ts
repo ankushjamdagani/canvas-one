@@ -86,6 +86,66 @@ function setup(emission: Emission, speed: number) {
 }
 
 describe('playback pacing (D57)', () => {
+  it('plays and loops a selected interval without saving again, then clears it', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 2000 } }, 16);
+    void controller.run(params);
+    await until(() => controller.getState().phase === 'done');
+    const store = controller.getPlayback()!;
+    controller.setPlaybackRange({ startMs: 200, endMs: 600 });
+    expect(store.playheadMs).toBe(200);
+    expect(store.playing).toBe(false);
+    controller.resume(); await advance(64);
+    expect(store.playheadMs).toBe(600);
+    expect(store.playing).toBe(false);
+    expect(store.atEnd()).toBe(false);
+    expect(saved).toHaveLength(1);
+    controller.seek(1000); controller.setLoop(true); controller.resume();
+    expect(store.playheadMs).toBe(200);
+    await advance(64);
+    expect(store.playheadMs).toBeGreaterThanOrEqual(200);
+    expect(store.playheadMs).toBeLessThan(600);
+    expect(store.playing).toBe(true);
+    controller.setLoop(false); controller.setPlaybackRange(null);
+    expect(store.selection).toBeNull();
+    controller.resume(); await until(() => !store.playing);
+    expect(store.atEnd()).toBe(true);
+    expect(saved).toHaveLength(1);
+    controller.reset();
+  }, 30000);
+
+  it('pauses an unfinished run at a selected end without releasing the whole result', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 8000 } }, 1);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
+    const store = controller.getPlayback()!;
+    controller.setPlaybackRange({ startMs: 100, endMs: 500 });
+    controller.resume(); await advance(640);
+    expect(store.playheadMs).toBe(500);
+    expect(store.playing).toBe(false);
+    expect(controller.getState().phase).toBe('paused');
+    expect(controller.getState().current?.terminal).toBeNull();
+    expect(saved).toHaveLength(0);
+    controller.setPlaybackSpeed(16); controller.setPlaybackRange(null); controller.resume();
+    await until(() => controller.getState().phase === 'done');
+    expect(saved).toHaveLength(1);
+    controller.reset();
+  }, 30000);
+
+  it('finalizes once when a selection ends at the whole-run end and loops from its start', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 3000 } }, 1);
+    void controller.run(params);
+    await until(() => controller.getPlayback()?.ended === true);
+    const store = controller.getPlayback()!;
+    controller.setPlaybackRange({ startMs: 500, endMs: store.endMs! });
+    controller.setPlaybackSpeed(16); controller.setLoop(true); controller.resume();
+    await until(() => controller.getState().phase === 'done');
+    await advance(32);
+    expect(saved).toHaveLength(1);
+    expect(store.playing).toBe(true);
+    expect(store.playheadMs).toBeGreaterThanOrEqual(500);
+    expect(store.playheadMs).toBeLessThan(store.endMs!);
+    controller.reset();
+  }, 30000);
   it('rejects unsupported speeds without changing the current speed', () => {
     const { controller } = setup({ mode: 'bulk', requests: 1, arrival: { spreadMs: 0 } }, 1);
     for (const speed of [0, Infinity, NaN, 3, -1]) expect(() => controller.setPlaybackSpeed(speed)).toThrow(RangeError);
@@ -152,12 +212,21 @@ describe('playback pacing (D57)', () => {
     controller.seek(0);
     const store = controller.getPlayback()!;
     expect(store.playing).toBe(false);
+    controller.setPlaybackRange({ startMs: 0, endMs: 500 });
+    controller.setLoop(true); controller.resume(); await advance(64);
+    expect(store.playing).toBe(true);
+    expect(store.playheadMs).toBeLessThan(500);
+    expect(saved).toHaveLength(0);
+    controller.setLoop(false);
     controller.goLive();
+    expect(store.selection).toBeNull();
     expect(store.playheadMs).toBe(store.computedMs);
     expect(store.playing).toBe(true);
     await advance(32);
     controller.pause();
+    controller.setPlaybackRange({ startMs: 0, endMs: 500 });
     controller.stop();
+    expect(store.selection).toBeNull();
     expect(store.playing).toBe(true);
     expect(controller.getState().stopping).toBe(true);
     await until(() => controller.getState().phase === 'done');

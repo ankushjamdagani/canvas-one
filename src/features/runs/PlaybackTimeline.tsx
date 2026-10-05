@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Cycle } from "../../domain/studio/runner/types";
 import type { Fault } from "../../domain/studio/model";
 import { Slider } from "../../components/ui/slider";
+import type { PlaybackRange } from "./playback";
 import {
   cycleBand,
   cycleDensity,
@@ -30,6 +31,8 @@ export function PlaybackTimeline({
   end,
   playhead,
   onSeek,
+  selection,
+  onSelectRange,
 }: {
   cycles: readonly Cycle[];
   faults: readonly Fault[];
@@ -37,6 +40,8 @@ export function PlaybackTimeline({
   end: number;
   playhead: number;
   onSeek(time: number): void;
+  selection: PlaybackRange | null;
+  onSelectRange(range: PlaybackRange): void;
 }) {
   const density = timelineUsesDensity(cycles.length);
   const bins = useMemo(
@@ -57,6 +62,17 @@ export function PlaybackTimeline({
         </span>
       </div>
       <div className="relative mt-1 border-y border-divider bg-sunken">
+        {selection && (
+          <div
+            data-testid="playback-range-highlight"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 border-x border-primary bg-primary/10"
+            style={{
+              left: `${timelinePosition(selection.startMs, start, end)}%`,
+              width: `${timelinePosition(selection.endMs, start, end) - timelinePosition(selection.startMs, start, end)}%`,
+            }}
+          />
+        )}
         <div className="max-h-24 overflow-y-auto" aria-label="Cycle recording">
           {density ? (
             <div
@@ -150,6 +166,30 @@ export function PlaybackTimeline({
         aria-label="Playback position"
         aria-valuetext={formatPlaybackTime(playhead)}
       />
+      {selection && (
+        <div data-testid="playback-range" className="mt-1">
+          <div className="flex justify-between font-mono text-[10px] text-secondary-text tabular-nums">
+            <span>{formatPlaybackTime(selection.startMs)}</span>
+            <span>{formatPlaybackTime(selection.endMs)}</span>
+          </div>
+          <Slider
+            min={start}
+            max={end}
+            step={1}
+            minStepsBetweenThumbs={1}
+            value={[selection.startMs, selection.endMs]}
+            onValueChange={([startMs, endMs]) =>
+              onSelectRange({ startMs, endMs })
+            }
+            thumbLabels={["Playback range start", "Playback range end"]}
+            thumbValueTexts={[
+              formatPlaybackTime(selection.startMs),
+              formatPlaybackTime(selection.endMs),
+            ]}
+            className="h-5 pointer-coarse:h-11"
+          />
+        </div>
+      )}
     </div>
   );
 }

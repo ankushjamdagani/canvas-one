@@ -66,6 +66,8 @@ Only a user answer or an identified lead decision settles a row. To change one, 
 
 | D60 | User (2026-10-04) | Add the deferred lifecycle flashes: send pulses, confirmed outbound arrival ticks, recorded return endpoint ticks/outcomes, message settlement and completed-cycle source outcomes. `stateAt` supplies exact grouped counts and a 240 ms simulated-time age; pause, seek and replay reconstruct the same cues. Reduced motion uses static symbols with the same information. Keep decorations outside measured node layout and hit areas; no packet stages, accounting changes or sampling. Missing lost-return facts remain unrepresented. The floating connection bar and long-stream bookkeeping audit remain outside scope; large-history eviction cost is accepted. Spec: [section 5](../../docs/superpowers/specs/2026-10-04-cycle-playback-design.md#5-traffic-states-on-the-canvas). |
 
+| D61 | User (2026-10-05) | Select a time interval of recorded playback with start/end handles. Play stops at the selected end; Loop repeats that interval, including retained stream history. Selection edits pause and seek to its start; inspection can seek outside, and the next Play returns to the range. Go live and Stop clear selection, preserving streaming/drain behavior. Clamp selection to retained/computed history; clear collapsed intervals on eviction. Keep it in memory only, reset with the recording, and preserve whole-run save-once/final-result behavior. Canvas and Results still reflect the actual playhead; no per-range totals or cycle filtering. Spec: [section 6.2](../../docs/superpowers/specs/2026-10-04-cycle-playback-design.md#62-controls). |
+
 ## Lead defaults
 
 Product details the lead set within confirmed scope. Contracts encode most of them.
