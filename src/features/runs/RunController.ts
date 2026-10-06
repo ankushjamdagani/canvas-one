@@ -343,6 +343,11 @@ export class RunController {
     return this.playback;
   }
 
+  /** Captured immutable run model; inspection labels/endpoints never follow authoring edits. */
+  getRecordedDocument(): Document | null {
+    return this.activeDocument;
+  }
+
   getPlaybackFaults(): readonly Fault[] {
     return this.playbackFaults;
   }

@@ -29,6 +29,7 @@ import { NoteNode } from './NoteNode';
 import { BoundaryFrameNode } from './BoundaryFrameNode';
 import { TrafficEdge } from './TrafficEdge';
 import { PlaybackTrafficContext, usePlaybackTraffic, type PlaybackSource } from './usePlaybackTraffic';
+import { SimulationHighlightContext, type SimulationHighlight } from './SimulationHighlight';
 import { FloatingDock } from './FloatingDock';
 import { SelectionBox } from './SelectionBox';
 import {
@@ -131,6 +132,7 @@ export interface CanvasViewProps {
   trafficEntryElementIds?: ReadonlySet<Id>;
   /** Recording read at the controller's playhead for transit and node occupancy. */
   playbackSource?: PlaybackSource | null;
+  simulationHighlight?: SimulationHighlight | null;
   /** D52: details of the projects linked-project nodes point at (absent id = unavailable). */
   /** D53: reads what a project exposes right now (for linking and for connecting to a linked node). */
   loadLinkedExposures?: (projectId: string) => Promise<readonly ProjectExposure[]>;
@@ -227,6 +229,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onRestoreDockDefaults,
   trafficEntryElementIds,
   playbackSource,
+  simulationHighlight,
   linkedProjects,
   loadLinkedExposures,
   onOpenLinkedProject,
@@ -1306,6 +1309,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       {(() => null)()}
 
       <PlaybackTrafficContext.Provider value={playbackTraffic}>
+      <SimulationHighlightContext.Provider value={simulationHighlight ?? null}>
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -1360,6 +1364,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         )}
       </ReactFlow>
+      </SimulationHighlightContext.Provider>
       </PlaybackTrafficContext.Provider>
 
       {/* Connect: rejected -- small inline message near the pointer/edge */}

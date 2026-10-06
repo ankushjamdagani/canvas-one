@@ -17,8 +17,8 @@
  * onReset are opaque callbacks; this component owns no run state.
  */
 
-import { useHeaderSideOffset } from '@/lib/useHeaderSideOffset';
-import * as React from 'react';
+import { useHeaderSideOffset } from "@/lib/useHeaderSideOffset";
+import * as React from "react";
 import {
   Activity,
   ChevronDown,
@@ -32,37 +32,38 @@ import {
   RotateCcw,
   Square,
   Trash2,
-} from 'lucide-react';
-import { cn } from '../../lib/utils';
-import type { Id } from '../../domain/studio/model';
+} from "lucide-react";
+import { cn } from "../../lib/utils";
+import type { Id } from "../../domain/studio/model";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '../../components/ui/popover';
+} from "../../components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '../../components/ui/tooltip';
-import type { ScenarioStatus } from '../runs/scenarioStatus';
+} from "../../components/ui/tooltip";
+import type { ScenarioStatus } from "../runs/scenarioStatus";
 import {
   findRunAllDisabledReason,
   formatCommitLineText,
   formatScenarioMode,
   getScenarioStatusColor,
-} from '../runs/view-models';
+} from "../runs/view-models";
 
 export interface ScenarioSwitcherEntry {
   readonly id: Id;
   readonly label: string;
-  readonly mode: 'logical' | 'timed';
+  readonly mode: "logical" | "timed";
   readonly status: ScenarioStatus;
 }
 
 /** The run phases the switcher renders; a subset of RunController's RunPhase (no 'done'). */
-export type ScenarioSwitcherRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving';
+export type ScenarioSwitcherRunPhase =
+  "idle" | "compiling" | "running" | "paused" | "saving";
 
 export interface ScenarioSwitcherProps {
   readonly scenarios: readonly ScenarioSwitcherEntry[];
@@ -78,6 +79,9 @@ export interface ScenarioSwitcherProps {
   /** D55: stop a timed run gracefully, keeping its results; `isStopping` while it drains. */
   readonly onStop?: () => void;
   readonly isStopping?: boolean;
+  /** Unified simulation bar: transport owns pause/resume; the joined action drains. */
+  readonly unified?: boolean;
+  readonly executionMode?: 'logical' | 'timed';
   readonly onNew: () => void;
   readonly onEdit: (scenarioId: Id) => void;
   readonly onRename: (scenarioId: Id) => void;
@@ -97,6 +101,8 @@ export function ScenarioSwitcher({
   onReset,
   onStop,
   isStopping,
+  unified = false,
+  executionMode,
   onNew,
   onEdit,
   onRename,
@@ -106,33 +112,40 @@ export function ScenarioSwitcher({
   const sideOffset = useHeaderSideOffset(popoverOpen);
 
   const selectedScenario =
-    scenarios.find((s) => s.id === selectedId) ?? (scenarios.length > 0 ? scenarios[0] : null);
+    scenarios.find((s) => s.id === selectedId) ??
+    (scenarios.length > 0 ? scenarios[0] : null);
 
-  const isRunning = runPhase === 'running' || runPhase === 'compiling' || runPhase === 'saving';
-  const isPaused = runPhase === 'paused';
+  const isRunning =
+    runPhase === "running" || runPhase === "compiling" || runPhase === "saving";
+  const isPaused = runPhase === "paused";
   const isExecutionActive = isRunning || isPaused;
 
   const totalScenarios = scenarios.length;
-  const passingCount = scenarios.filter((s) => s.status.kind === 'passed').length;
+  const passingCount = scenarios.filter(
+    (s) => s.status.kind === "passed",
+  ).length;
   const allPassing = totalScenarios > 0 && passingCount === totalScenarios;
 
   const notReadyReason = findRunAllDisabledReason(scenarios);
   const selectedNotReadyReason =
-    selectedScenario && selectedScenario.status.kind === 'not-ready'
-      ? (selectedScenario.status.issues[0]?.message ?? "Can't run this scenario")
+    selectedScenario && selectedScenario.status.kind === "not-ready"
+      ? (selectedScenario.status.issues[0]?.message ??
+        "Can't run this scenario")
       : null;
 
   const effectiveDisabledReason =
     disabledReason ??
     (totalScenarios === 0
-      ? 'Add a scenario to run'
+      ? "Add a scenario to run"
       : !selectedScenario
-        ? 'Select a scenario to run'
+        ? "Select a scenario to run"
         : selectedNotReadyReason);
 
-  const isRunDisabled = !!effectiveDisabledReason || totalScenarios === 0 || !selectedScenario;
+  const isRunDisabled =
+    !!effectiveDisabledReason || totalScenarios === 0 || !selectedScenario;
   const runAllDisabledReason = notReadyReason;
-  const isRunAllDisabled = isExecutionActive || isRunDisabled || !!runAllDisabledReason;
+  const isRunAllDisabled =
+    isExecutionActive || isRunDisabled || !!runAllDisabledReason;
 
   return (
     <div
@@ -147,23 +160,34 @@ export function ScenarioSwitcher({
             type="button"
             data-testid="scenario-switcher-trigger"
             className={cn(
-              'h-full min-w-0 pointer-coarse:min-w-11 px-2 sm:px-2.5 flex items-center gap-1.5 text-xs font-medium transition-colors hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring focus-visible:z-10 cursor-pointer',
-              !selectedScenario && 'text-secondary-text',
+              "h-full min-w-0 pointer-coarse:min-w-11 px-2 sm:px-2.5 flex items-center gap-1.5 text-xs font-medium transition-colors hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring focus-visible:z-10 cursor-pointer",
+              !selectedScenario && "text-secondary-text",
             )}
             aria-label={
-              selectedScenario ? `Selected scenario: ${selectedScenario.label}` : 'No scenario selected'
+              selectedScenario
+                ? `Selected scenario: ${selectedScenario.label}`
+                : "No scenario selected"
             }
           >
             {selectedScenario ? (
               <>
                 <span
-                  className={cn('size-2 rounded-full shrink-0', getScenarioStatusColor(selectedScenario.status).dotClass)}
+                  className={cn(
+                    "size-2 rounded-full shrink-0",
+                    getScenarioStatusColor(selectedScenario.status).dotClass,
+                  )}
                   aria-hidden="true"
                 />
-                {selectedScenario.mode === 'timed' ? (
-                  <Activity className="hidden sm:block size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
+                {selectedScenario.mode === "timed" ? (
+                  <Activity
+                    className="hidden sm:block size-3.5 text-secondary-text shrink-0"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <GitCommitHorizontal className="hidden sm:block size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
+                  <GitCommitHorizontal
+                    className="hidden sm:block size-3.5 text-secondary-text shrink-0"
+                    aria-hidden="true"
+                  />
                 )}
                 <span className="font-semibold text-foreground min-w-[3ch] max-w-[130px] truncate text-xs">
                   {selectedScenario.label}
@@ -172,7 +196,10 @@ export function ScenarioSwitcher({
             ) : (
               <span className="text-secondary-text text-xs">No scenario</span>
             )}
-            <ChevronDown className="hidden sm:block size-3 text-secondary-text shrink-0 ml-0.5" aria-hidden="true" />
+            <ChevronDown
+              className="hidden sm:block size-3 text-secondary-text shrink-0 ml-0.5"
+              aria-hidden="true"
+            />
           </button>
         </PopoverTrigger>
 
@@ -215,8 +242,10 @@ export function ScenarioSwitcher({
                   key={s.id}
                   data-testid={`scenario-row-${s.id}`}
                   className={cn(
-                    'group flex items-start justify-between rounded-control transition-colors border',
-                    isSelected ? 'bg-selected-tint/40 border-selected-edge' : 'border-transparent hover:bg-sunken',
+                    "group flex items-start justify-between rounded-control transition-colors border",
+                    isSelected
+                      ? "bg-selected-tint/40 border-selected-edge"
+                      : "border-transparent hover:bg-sunken",
                   )}
                 >
                   {/* The select action is its own button beside the row menu; nesting the menu
@@ -227,20 +256,34 @@ export function ScenarioSwitcher({
                     onClick={() => onSelect(s.id)}
                     aria-pressed={isSelected}
                   >
-                    <span className={cn('size-2 rounded-full shrink-0 mt-1', statusToken.dotClass)} aria-hidden="true" />
+                    <span
+                      className={cn(
+                        "size-2 rounded-full shrink-0 mt-1",
+                        statusToken.dotClass,
+                      )}
+                      aria-hidden="true"
+                    />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-foreground truncate text-xs">{s.label}</span>
+                        <span className="font-semibold text-foreground truncate text-xs">
+                          {s.label}
+                        </span>
                         <span className="inline-flex items-center gap-0.5 text-[10px] text-secondary-text font-normal">
-                          {s.mode === 'timed' ? (
+                          {s.mode === "timed" ? (
                             <Activity className="size-2.5" aria-hidden="true" />
                           ) : (
-                            <GitCommitHorizontal className="size-2.5" aria-hidden="true" />
+                            <GitCommitHorizontal
+                              className="size-2.5"
+                              aria-hidden="true"
+                            />
                           )}
                           {formatScenarioMode(s.mode)}
                         </span>
                       </div>
-                      <div data-testid={`scenario-status-${s.id}`} className="text-[11px] text-secondary-text mt-0.5">
+                      <div
+                        data-testid={`scenario-status-${s.id}`}
+                        className="text-[11px] text-secondary-text mt-0.5"
+                      >
                         {statusToken.label}
                       </div>
                     </div>
@@ -248,15 +291,32 @@ export function ScenarioSwitcher({
 
                   <div
                     className={cn(
-                      'flex items-center gap-0.5 shrink-0 p-2 pl-0 transition-opacity',
-                      isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100',
+                      "flex items-center gap-0.5 shrink-0 p-2 pl-0 transition-opacity",
+                      isSelected
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100",
                     )}
                   >
                     {(
                       [
-                        { label: 'Rename', icon: Pencil, run: () => onRename(s.id), tone: '' },
-                        { label: 'Edit', icon: SlidersHorizontal, run: () => onEdit(s.id), tone: '' },
-                        { label: 'Delete', icon: Trash2, run: () => onDelete(s.id), tone: 'text-destructive hover:text-destructive' },
+                        {
+                          label: "Rename",
+                          icon: Pencil,
+                          run: () => onRename(s.id),
+                          tone: "",
+                        },
+                        {
+                          label: "Edit",
+                          icon: SlidersHorizontal,
+                          run: () => onEdit(s.id),
+                          tone: "",
+                        },
+                        {
+                          label: "Delete",
+                          icon: Trash2,
+                          run: () => onDelete(s.id),
+                          tone: "text-destructive hover:text-destructive",
+                        },
                       ] as const
                     ).map(({ label, icon: Icon, run, tone }) => (
                       <button
@@ -270,7 +330,7 @@ export function ScenarioSwitcher({
                         aria-label={`${label} scenario ${s.label}`}
                         data-testid={`scenario-${label.toLowerCase()}-btn-${s.id}`}
                         className={cn(
-                          'size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors',
+                          "size-6 pointer-coarse:size-11 inline-flex items-center justify-center rounded-sm text-secondary-text hover:text-foreground hover:bg-sunken cursor-pointer transition-colors",
                           tone,
                         )}
                       >
@@ -283,7 +343,9 @@ export function ScenarioSwitcher({
             })}
 
             {totalScenarios === 0 && (
-              <div className="p-4 text-center text-secondary-text">No scenarios yet. Add a scenario to begin testing.</div>
+              <div className="p-4 text-center text-secondary-text">
+                No scenarios yet. Add a scenario to begin testing.
+              </div>
             )}
           </div>
 
@@ -291,10 +353,10 @@ export function ScenarioSwitcher({
             <div
               data-testid="scenario-commit-line"
               className={cn(
-                'mx-2.5 my-1.5 p-2 rounded-md border text-[11px] flex items-center gap-2',
+                "mx-2.5 my-1.5 p-2 rounded-md border text-[11px] flex items-center gap-2",
                 allPassing
-                  ? 'bg-selected-tint/40 border-selected-edge text-primary'
-                  : 'bg-risk-tint/40 border-risk-edge/50 text-risk-text',
+                  ? "bg-selected-tint/40 border-selected-edge text-primary"
+                  : "bg-risk-tint/40 border-risk-edge/50 text-risk-text",
               )}
               role="status"
             >
@@ -315,14 +377,36 @@ export function ScenarioSwitcher({
               <Plus className="size-3.5" aria-hidden="true" />
               New scenario
             </button>
-
           </div>
         </PopoverContent>
       </Popover>
 
       <div className="w-px h-full bg-control-border shrink-0" />
 
-      {isExecutionActive ? (
+      {unified && isExecutionActive ? (
+        <button
+          type="button"
+          data-testid="scenario-stop-btn"
+          onClick={(executionMode ?? selectedScenario?.mode) === "timed" ? onStop : onReset}
+          disabled={
+            isStopping || runPhase === "compiling" || runPhase === "saving"
+          }
+          title={
+            (executionMode ?? selectedScenario?.mode) === "timed"
+              ? "Stop new requests and drain in-flight work"
+              : "Cancel execution"
+          }
+          aria-label={
+            (executionMode ?? selectedScenario?.mode) === "timed"
+              ? "Stop the run and keep its results"
+              : "Cancel execution"
+          }
+          className="h-full shrink-0 px-3 flex items-center gap-1.5 text-xs font-semibold bg-clay text-primary-foreground disabled:opacity-50"
+        >
+          <Square className="size-3.5 fill-current" aria-hidden="true" />
+          <span>Stop</span>
+        </button>
+      ) : isExecutionActive ? (
         <div className="inline-flex items-center h-full">
           {isRunning ? (
             <button
@@ -348,20 +432,26 @@ export function ScenarioSwitcher({
             </button>
           )}
 
-          {selectedScenario?.mode === 'timed' && onStop ? (
+          {selectedScenario?.mode === "timed" && onStop ? (
             <>
               <div className="w-px h-full bg-control-border shrink-0" />
               <button
                 type="button"
                 data-testid="scenario-stop-btn"
                 onClick={onStop}
-                disabled={isStopping || runPhase === 'compiling' || runPhase === 'saving'}
+                disabled={
+                  isStopping ||
+                  runPhase === "compiling" ||
+                  runPhase === "saving"
+                }
                 className="h-full shrink-0 px-2 pointer-coarse:min-w-11 justify-center flex items-center gap-1 text-xs font-medium text-body hover:bg-sunken hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-secondary-text"
                 aria-label="Stop the run and keep its results"
                 title="Stop new requests, let work in flight finish, and keep the results"
               >
                 <Square className="size-3 fill-current" aria-hidden="true" />
-                <span className="hidden sm:inline">{isStopping ? 'Stopping…' : 'Stop'}</span>
+                <span className="hidden sm:inline">
+                  {isStopping ? "Stopping…" : "Stop"}
+                </span>
               </button>
             </>
           ) : null}
@@ -393,14 +483,16 @@ export function ScenarioSwitcher({
                     if (selectedScenario) onRun(selectedScenario.id);
                   }}
                   className={cn(
-                    'h-full shrink-0 px-2.5 sm:px-3 pointer-coarse:min-w-11 justify-center flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer',
-                    'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
-                    'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text',
+                    "h-full shrink-0 px-2.5 sm:px-3 pointer-coarse:min-w-11 justify-center flex items-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer",
+                    "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed",
+                    "disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text",
                   )}
                   aria-label="Run scenario simulation"
                 >
                   <Play className="size-3.5 fill-current" aria-hidden="true" />
-                  <span className="hidden sm:inline">Run</span>
+                  <span className={unified ? undefined : "hidden sm:inline"}>
+                    Run
+                  </span>
                 </button>
               </span>
             </TooltipTrigger>

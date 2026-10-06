@@ -115,9 +115,7 @@ test.describe('Studio Transfer E2E (RV-10b)', () => {
     await page.keyboard.press('Escape');
 
     await page.getByTestId('scenario-run-btn').click();
-    await expect(page.getByTestId('results-region')).toContainText('Saved', {
-      timeout: 15_000,
-    });
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 15_000 });
 
     await openExportMenu();
     await expect(page.getByTestId('export-menu-csv')).toBeEnabled();

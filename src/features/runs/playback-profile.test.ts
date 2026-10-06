@@ -76,6 +76,9 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           sample.map((r) => ({
             ...r,
             key: `${repeat}/${r.key}`,
+            cycleId: r.cycleId === undefined ? undefined : `${repeat}/${r.cycleId}`,
+            unitId: r.unitId === undefined ? undefined : `${repeat}/${r.unitId}`,
+            parentUnitId: r.parentUnitId === undefined || r.parentUnitId === null ? r.parentUnitId : `${repeat}/${r.parentUnitId}`,
             atMs: r.atMs + repeat * 10_000,
             arriveAtMs:
               r.arriveAtMs === null ? null : r.arriveAtMs + repeat * 10_000,
@@ -125,6 +128,23 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
       const timelineStart = performance.now();
       const timelineCycles = store.cyclesAt(end);
       const timelineReadMs = performance.now() - timelineStart;
+      const inspectionRange = { startMs: end - 10_000, endMs: end };
+      const inspectionColdStart = performance.now();
+      const inspectionCold = store.cyclesOverlappingRange(inspectionRange, { limit: 100 });
+      const inspectionColdMs = performance.now() - inspectionColdStart;
+      const inspectionWarmStart = performance.now();
+      store.cyclesOverlappingRange(inspectionRange, { limit: 100 });
+      const inspectionWarmMs = performance.now() - inspectionWarmStart;
+      const inspectionStatsStart = performance.now();
+      const inspectionStats = store.statisticsForRange(inspectionRange);
+      const inspectionStatsMs = performance.now() - inspectionStatsStart;
+      const broadInspectionStart = performance.now();
+      const broadInspection = store.cyclesOverlappingRange({ startMs: 0, endMs: end }, { limit: 200 });
+      const broadInspectionMs = performance.now() - broadInspectionStart;
+      const inspectCycleId = inspectionCold.rows[0]?.id;
+      const cycleEventStart = performance.now();
+      const cycleEventPage = inspectCycleId ? store.flowEventsForCycle(inspectCycleId, { limit: 100 }) : { rows: [], total: 0 };
+      const cycleEventPageMs = performance.now() - cycleEventStart;
       const densityStart = performance.now();
       cycleDensity(timelineCycles, 0, end);
       stuckMarkers(timelineCycles, 0, end);
@@ -230,6 +250,9 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
           flashLiveCombinedMaxMs: flashLiveTimings[59],
           resultMedianMs: resultTimings[30], resultP95Ms: resultTimings[57],
           timelineReadMs, timelineLayoutMs, timelineCycles: timelineCycles.length,
+          inspectionColdMs, inspectionWarmMs, inspectionStatsMs, inspectionStarts: inspectionStats.starts,
+          inspectionRows: inspectionCold.total, broadInspectionMs, broadInspectionRows: broadInspection.total,
+          cycleEventPageMs, cycleEventCount: cycleEventPage.total,
           timelineBatchReadMs,
           rollingEvictionMs, postEvictionReadMs,
           telemetryMs, observations, telemetryMeanMs: telemetryMs / observations,

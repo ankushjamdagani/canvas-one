@@ -26,13 +26,11 @@ import {
 import { cn } from '../../lib/utils';
 import type { Id } from '../../domain/studio/model';
 import type { RunCheckpoint, TraceEvent } from '../../domain/studio/runner/types';
-import { Separator } from '../../components/ui/separator';
 import type { RunPhase, SaveStatus, TerminalResult } from './RunController';
 import {
   formatChecksSummary,
   formatElapsed,
   formatMetricDisplay,
-  formatRootCountsSummary,
   formatStatusBadge,
 } from './view-models';
 
@@ -56,6 +54,8 @@ export interface ResultsRegionProps {
   readonly currentTimeMs?: number | null;
   readonly isExpanded?: boolean;
   readonly onToggleExpanded?: () => void;
+  /** The unified panel owns its disclosure and inspection navigation. */
+  readonly hideDetailsToggle?: boolean;
   /** Required: every element referenced by a metric or event must resolve to a label. Raw ids are never shown. */
   readonly elementLabels: Record<Id, string>;
   /**
@@ -95,6 +95,7 @@ export function ResultsRegion({
   currentTimeMs,
   isExpanded: controlledExpanded,
   onToggleExpanded,
+  hideDetailsToggle = false,
   elementLabels,
   assertionLabels,
   measured: controlledMeasured,
@@ -118,24 +119,11 @@ export function ResultsRegion({
       : (terminal?.measured ?? false));
   const summary = playbackSummary ?? terminal?.summary;
   const finalMeasured = isMeasured && playbackAtEnd;
+  const summaryAtMs = playbackSummary?.atMs ?? currentTimeMs ?? terminal?.summary?.elapsedMs ?? null;
 
   const mode = scenarioMode;
   const statusBadge = formatStatusBadge(runPhase, playbackAtEnd ? terminal?.status : undefined, scenarioName, runId);
   const checksSummary = finalMeasured ? formatChecksSummary(terminal?.checks) : '—';
-  const elapsedText =
-    playbackSummary && currentTimeMs != null ? formatElapsed(mode, null, currentTimeMs) : terminal
-      ? isMeasured
-        ? formatElapsed(mode, terminal.summary?.elapsedMs ?? null, currentTimeMs)
-        : '—'
-      : mode === 'logical'
-        ? 'logical'
-        : currentTimeMs != null
-          ? formatElapsed(mode, null, currentTimeMs)
-          : '—';
-
-  const rootCountsInfo = isMeasured
-    ? formatRootCountsSummary(summary?.rootCounts)
-    : { rootsLabel: '—', failuresCount: '—' };
   const messageCounts = isMeasured ? summary?.messageCounts : null;
   const elementMetrics = isMeasured ? (summary?.elementMetrics ?? []) : [];
   const generalMetrics = elementMetrics.filter((m) => m.elementId === null);
@@ -165,7 +153,7 @@ export function ResultsRegion({
               className={cn('size-2 rounded-full shrink-0', statusBadge.dotClass)}
               aria-hidden="true"
             />
-            <span className="font-semibold text-foreground text-xs whitespace-nowrap">
+            <span className="text-secondary-text text-xs whitespace-nowrap">
               {statusBadge.text}
             </span>
             {terminal && !isMeasured && terminal.reason && (
@@ -183,52 +171,6 @@ export function ResultsRegion({
             )}
           </div>
 
-          {/* Metric Columns: only show when running or measured terminal */}
-          {(!terminal || isMeasured) && (
-            <>
-              <Separator orientation="vertical" className="h-4 shrink-0 bg-control-border" />
-
-              <div className="flex items-center gap-4 text-xs font-mono shrink-0">
-                {/* CHECKS */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
-                  <span className="text-[10px] text-secondary-text uppercase tracking-wider font-sans">
-                    CHECKS
-                  </span>
-                  <span className="font-medium text-foreground">{checksSummary}</span>
-                </div>
-
-                <Separator orientation="vertical" className="h-4 bg-control-border hidden sm:block" />
-
-                {/* TIME / MODE */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
-                  <span className="text-[10px] text-secondary-text uppercase tracking-wider font-sans">
-                    TIME
-                  </span>
-                  <span className="font-medium text-foreground">{elapsedText}</span>
-                </div>
-
-                <Separator orientation="vertical" className="h-4 bg-control-border hidden sm:block" />
-
-                {/* ROOTS */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
-                  <span className="text-[10px] text-secondary-text uppercase tracking-wider font-sans">
-                    ROOTS
-                  </span>
-                  <span className="font-medium text-foreground">{rootCountsInfo.rootsLabel}</span>
-                </div>
-
-                <Separator orientation="vertical" className="h-4 bg-control-border hidden md:block" />
-
-                {/* FAILURES */}
-                <div className="hidden md:flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1.5">
-                  <span className="text-[10px] text-secondary-text uppercase tracking-wider font-sans">
-                    FAILURES
-                  </span>
-                  <span className="font-medium text-foreground">{rootCountsInfo.failuresCount}</span>
-                </div>
-              </div>
-            </>
-          )}
         </div>
 
         {/* Right Side: Persistence Status & Details Toggle */}
@@ -264,7 +206,7 @@ export function ResultsRegion({
           </div>
 
           {/* Details Button */}
-          <button
+          {!hideDetailsToggle && <button
             type="button"
             data-testid="results-details-toggle"
             onClick={toggleExpanded}
@@ -278,16 +220,20 @@ export function ResultsRegion({
             ) : (
               <ChevronUp className="size-3 text-secondary-text" aria-hidden="true" />
             )}
-          </button>
+          </button>}
         </div>
       </div>
 
       {isMeasured && summary?.cycles && (
         <div data-testid="results-cycles" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-divider px-4 py-1.5 font-mono text-[11px] tabular-nums">
-          <span>{summary.cycles.total} cycles · {summary.cycles.open} open</span>
-          {Object.entries(summary.cycles.byOutcome).filter(([, count]) => count > 0).map(([outcome, count]) => <span key={outcome}>{count} {outcome}</span>)}
-          <span>Response mean {summary.cycles.responseLatencyMs === null ? '—' : `${summary.cycles.responseLatencyMs.mean.toFixed(2)} ms`}</span>
-          <span>Completion mean {summary.cycles.completionLatencyMs === null ? '—' : `${summary.cycles.completionLatencyMs.mean.toFixed(2)} ms`}</span>
+          <span className="text-secondary-text">{playbackAtEnd ? 'Whole run' : `Through ${formatElapsed(mode, null, summaryAtMs)}`}:</span>
+          <span>{summary.cycles.total} all-work cycles</span>
+          <span>{summary.cycles.open} open</span>
+          <span>{summary.cycles.byOutcome.ok} successful</span>
+          <span>{Object.entries(summary.cycles.byOutcome).filter(([outcome]) => outcome !== 'ok').reduce((total, [, count]) => total + count, 0)} non-success</span>
+          <span>Mean response {summary.cycles.responseLatencyMs === null ? '—' : `${summary.cycles.responseLatencyMs.mean.toFixed(2)} ms`}</span>
+          <span>Mean all-work completion {summary.cycles.completionLatencyMs === null ? '—' : `${summary.cycles.completionLatencyMs.mean.toFixed(2)} ms`}</span>
+          <span>Whole-run checks {finalMeasured ? terminal ? checksSummary : 'pending' : 'not evaluated'}</span>
         </div>
       )}
 
@@ -300,7 +246,7 @@ export function ResultsRegion({
           tabIndex={0}
           role="region"
           aria-label="Run details"
-          className="border-t border-divider bg-panel max-h-[min(380px,40vh)] overflow-y-auto flex flex-col"
+          className="border-t border-divider bg-panel flex flex-col"
         >
           {terminal && !isMeasured ? (
             <div className="p-4 space-y-2">
@@ -365,41 +311,25 @@ export function ResultsRegion({
                       {/* Counts Card */}
                       <div className="p-3 rounded-control border border-control-border bg-background space-y-2">
                         <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                          EXECUTION SUMMARY
+                          EXECUTION DETAILS · {playbackAtEnd ? 'WHOLE RUN' : `THROUGH ${formatElapsed(mode, null, summaryAtMs)}`}
                         </span>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
+                          {finalMeasured && <div>
                             <span className="text-secondary-text">Consumed inputs: </span>
                             <span className="font-mono font-medium">
                               {finalMeasured && terminal?.summary?.consumedInputs != null
                                 ? terminal.summary.consumedInputs
                                 : '—'}
                             </span>
-                          </div>
-                          <div>
+                          </div>}
+                          {finalMeasured && <div>
                             <span className="text-secondary-text">Processed events: </span>
                             <span className="font-mono font-medium">
                               {finalMeasured && terminal?.summary?.processedEvents != null
                                 ? terminal.summary.processedEvents
                                 : '—'}
                             </span>
-                          </div>
-                          <div>
-                            <span className="text-secondary-text">Roots succeeded: </span>
-                            <span className="font-mono font-medium text-primary">
-                              {isMeasured && summary?.rootCounts.succeeded != null
-                                ? summary.rootCounts.succeeded
-                                : '—'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-secondary-text">Roots failed: </span>
-                            <span className="font-mono font-medium text-risk-text">
-                              {isMeasured && summary?.rootCounts.failed != null
-                                ? summary.rootCounts.failed
-                                : '—'}
-                            </span>
-                          </div>
+                          </div>}
                           {isMeasured && messageCounts && (
                             <>
                               <div>
@@ -425,15 +355,15 @@ export function ResultsRegion({
                           <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
                             RUN METRICS
                           </span>
+                          <p className="text-[11px] text-secondary-text">Counts except in-flight are cumulative. Throughput is an average rate; latency summarizes successful observations through the playhead.</p>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             {generalMetrics.map((m, idx) => {
                               const display = formatMetricDisplay(m);
                               return (
                                 <div key={`general-${m.key}-${idx}`}>
-                                  <span className="text-secondary-text">{m.key}: </span>
-                                  <span className="font-mono font-medium">
-                                    {display.available ? display.valueText : `Unavailable (${display.reason})`}
-                                  </span>
+                                  <span className="text-secondary-text">{m.scope === 'root' ? 'Root requests' : 'Messages'} · {m.key}: </span>
+                                  <span className="font-mono font-medium">{display.available ? display.valueText : `Unavailable (${display.reason})`}</span>
+                                  <span className="block text-[10px] text-secondary-text">{metricTimeBasis(m.key, playbackAtEnd)}</span>
                                 </div>
                               );
                             })}
@@ -444,7 +374,7 @@ export function ResultsRegion({
                       {/* Assertion Checks List */}
                       <div className="p-3 rounded-control border border-control-border bg-background space-y-2">
                         <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                          CHECKS {finalMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
+                          CHECKS · WHOLE RUN {finalMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
                         </span>
                         <div className="space-y-1.5 max-h-44 overflow-y-auto" tabIndex={0} role="region" aria-label="Checks">
                           {isMeasured &&
@@ -481,7 +411,7 @@ export function ResultsRegion({
                             ))}
                           {(!finalMeasured || !terminal?.checks || terminal.checks.length === 0) && (
                             <div className="text-xs text-secondary-text">
-                              {!finalMeasured ? 'Checks not evaluated.' : 'No checks configured for this scenario.'}
+                              {!finalMeasured ? 'Checks not evaluated.' : !terminal ? 'Checks pending.' : 'No checks configured for this scenario.'}
                             </div>
                           )}
                         </div>
@@ -491,7 +421,7 @@ export function ResultsRegion({
                     {/* Right Column: Event Log (21B look) */}
                     <div className="p-3 rounded-control border border-control-border bg-background flex flex-col h-full max-h-72">
                       <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold mb-2">
-                        EVENT LOG ({events.length})
+                        EVENT LOG ({events.length}) · {playbackAtEnd ? 'WHOLE RUN' : `THROUGH ${formatElapsed(mode, null, summaryAtMs)}`}
                       </span>
                       <div className="flex-1 overflow-y-auto space-y-1 text-xs font-mono" tabIndex={0} role="region" aria-label="Event log">
                         {events.map((evt) => {
@@ -547,14 +477,17 @@ export function ResultsRegion({
                     <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
                       ELEMENT METRICS
                     </span>
+                    <p className="text-[11px] text-secondary-text">Counters and successful-cohort latency summaries are cumulative through the playhead. Throughput and utilization are averages through that time; in-flight, queued, active, and cache entries are current at the playhead.</p>
 
                     <div className="border border-control-border rounded-control bg-background overflow-hidden">
                       <table className="w-full text-xs text-left">
                         <thead className="bg-sunken border-b border-control-border font-mono text-[10px] text-secondary-text uppercase">
                           <tr>
                             <th className="py-1.5 px-3">Element</th>
+                            <th className="py-1.5 px-3">Scope</th>
                             <th className="py-1.5 px-3">Metric</th>
                             <th className="py-1.5 px-3 text-right">Value</th>
+                            <th className="py-1.5 px-3">Time basis</th>
                             <th className="py-1.5 px-3">Status</th>
                           </tr>
                         </thead>
@@ -567,10 +500,12 @@ export function ResultsRegion({
                                 <td className="py-1.5 px-3 font-semibold text-foreground">
                                   {label}
                                 </td>
+                                <td className="py-1.5 px-3 text-secondary-text">{m.scope === 'root' ? 'Roots' : m.scope === 'message' ? 'Messages' : 'Component'}</td>
                                 <td className="py-1.5 px-3 text-secondary-text">{m.key}</td>
                                 <td className="py-1.5 px-3 text-right font-medium">
                                   {display.valueText}
                                 </td>
+                                <td className="py-1.5 px-3 text-secondary-text">{metricTimeBasis(m.key, playbackAtEnd)}</td>
                                 <td className="py-1.5 px-3 text-[11px]">
                                   {display.available ? (
                                     <span className="text-primary">Measured</span>
@@ -585,7 +520,7 @@ export function ResultsRegion({
                           })}
                           {componentMetrics.length === 0 && (
                             <tr>
-                              <td colSpan={4} className="py-4 text-center text-secondary-text font-sans">
+                              <td colSpan={6} className="py-4 text-center text-secondary-text font-sans">
                                 No component metrics recorded for this run.
                               </td>
                             </tr>
@@ -602,4 +537,12 @@ export function ResultsRegion({
       )}
     </footer>
   );
+}
+
+export function metricTimeBasis(key: string, atEnd: boolean): string {
+  const time = atEnd ? 'end' : 'playhead';
+  if (key === 'inFlight' || key === 'queued' || key === 'active' || key === 'cacheEntries') return `Current at ${time}`;
+  if (key === 'throughput' || key === 'utilization') return `Average through ${time}`;
+  if (key === 'meanLatencyMs' || key === 'p95LatencyMs') return `Successful cohort through ${time}`;
+  return `Cumulative through ${time}`;
 }

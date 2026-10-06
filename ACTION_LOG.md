@@ -2708,6 +2708,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Profile: real S06 600 req/s repeated to 120 s (1,992,156 flow records, 72,732 cycles/218,196 revisions). Warm p95 stateAt 0.183 ms, resultsAt 0.174 ms; timeline batch 0.337 ms, density/stuck layout 4.47 ms. Telemetry capture averaged 0.0495 ms per observed instant. Cold reconstruction/sorting 803 ms, first timeline read 23.7 ms. Inherited flow eviction remains expensive (~650 ms; next combined reads 11.8 ms in the synthetic zero-checkpoint profile); React rendering is excluded. No recording persistence or floating connection bar; sent/arrival/outcome flashes remain deferred.
 - Lesson: a batch may split one millisecond, so a partial checkpoint masked later same-time changes; checkpoint only complete instants and test the zero checkpoint too. The new timeline also squeezed a short viewport's canvas to zero: cap the whole Results region, not only its drawer. Old completion-only tests were ported to revision semantics; all checks reran after fixes.
 
+### Unified playback panel design proposal
+
+- Outcome: proposed one bottom panel above run Details, combining scenario selection/editing, one primary Run/Resume/Pause/Replay action, transport, timeline and results summary. Interactive conversation mockup includes bulk/stream/logical states and expandable Details; values are illustrative.
+- Files: conversation visualization `unified-playback.html` in the thread visualization directory; this log. App source unchanged; existing traffic edits preserved.
+- Platform: Codex, no subagents. Verification: read relevant source and graph navigation, JavaScript syntax checked; app tests/build not run for a design-only proposal. Browser rendering not verified.
+- Limitations: local design interactions only; scenario management shows preview destinations. Lesson: use an observed file anchor when patching cumulative logs, rather than assuming its heading.
+
 ### Playback lifecycle flashes (D60)
 
 - Outcome: added send pulses, confirmed descendant arrivals, recorded return endpoint outcomes, message settlement and completed-cycle source outcomes. Exact grouped counts use a 240 ms simulated lifetime; pause/seek/replay and static reduced-motion cues stay consistent. Shared SVG symbols sit outside measured node layout and port hit areas. Timestamp buckets prevent new full-history flash sorts; simulation/accounting are unchanged.
@@ -2718,6 +2725,21 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Limitations: lost returns without response facts cannot show return arrival/outcome; no facts are invented. Floating connection bar, long-stream bookkeeping audit and accepted large-history eviction optimization remain outside scope.
 - Lesson: test real adapter descendant phases, since arrival often appears as queued/processing rather than received. Profile alternating ingestion/reads, not only pre-ingested replay. Browser seeks must wait for the sought frame, and request arrival can coincide with return departure. Screenshot inspection caught node-layer occlusion; move endpoint decorations into the port gutter. Updated LESSONS.
 
+### Playback layout variants in the current theme
+
+- Outcome: three interactive alternatives (Compact strip, Timeline first, Scenario rail), all above Details. Replaced approximated colours with exact current Evergreen tokens and retained the app's light appearance.
+- Files: thread visualization `playback-variants.html`; ACTION_LOG.md and LESSONS.md. No app source changes. Platform: Codex, no subagents.
+- Verification: script syntax and headless Chromium checked all three layouts at 1024/736/320 px; no horizontal overflow or runtime errors; seek and Details collapse passed. Inspected desktop screenshot. App build/tests not run for a proposal.
+- Limitations: illustrative metrics and local interactions; scenario management is a preview. Lesson: existing-app proposals must copy the actual theme tokens rather than approximate the palette or invent a dark theme.
+
+### System design and architecture document (design.md)
+
+- Outcome: created authoritative `design.md` detailing the complete System Studio architecture, Evergreen Paper foundation design system (tokens, typography, geometry, WCAG contrast compliance), UI shell, pure domain model, discrete-event simulation kernel, commit DAG versioning, local-first IndexedDB persistence (format v9), data flows, and code symbol directory. Replaced outdated pre-revamp tokens and models.
+- Files: `design.md` (overwriting pre-revamp `DESIGN.md`), `ACTION_LOG.md`.
+- Platform: agy (lead).
+- Verification: verified file resolution on APFS, markdown structure, and consistency with `HANDOFF.md`, `specs/revamp/`, and active codebase.
+- Limitations: documentation update only; no application source code changed.
+
 ## 2026-10-05
 
 ### Recorded playback time-range selection (D61)
@@ -2727,3 +2749,278 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Platform: Codex lead with independent native critic/reviewer; no executor or nested agents. Source review passed.
 - Verification: `npx tsc -b` passed; `npm test` 1,789 passed/10 skipped; build passed (Workspace 473.88 kB); Storybook passed. Updated controller suite 13 passed, including live-range looping. Targeted production playback 4 passed; isolated full production browser 122 passed/4 dev-only skipped, two workers/no retries. Authoring connect tests passed, no rerun required. Keyboard range edits, stop/loop/clear, Go live and 320 px touch/canvas space covered; desktop/phone screenshots inspected.
 - Limitations: selection is restricted to retained/computed history, not persisted, and does not filter cycles or compute range totals. No simulation or accounting changes.
+
+### Unified simulation and playback panel design
+
+- Outcome: built an interactive design proposal with ready, running live, paused range, and completed specimens; one setup/execution row and collapsible transport/timeline area, distinct Run/Stop/Reset, labelled selectors, range handles/clear, Loop and Go Live. Included canvas context, responsive specimen and grouping/state annotations using actual foundation components and theme tokens.
+- Files: `artifacts/design/unified-simulation-panel/` source, exported preview and screenshots; ACTION_LOG.md and LESSONS.md. Platform: Codex, no subagents. Existing unrelated edits preserved; no application source changed.
+- Verification: standalone Vite production build passed (317 kB JS); Chromium checked four states at 1440/1024/736/390/320 px, stable recording height, 320×640 touch targets/cap, exact range end, loop, clear/reset, Go Live, Stop/drain and keyboard range edits; no runtime errors. Desktop and narrow screenshots inspected. App unit/build/Storybook/full production suite not run for a design-only artifact.
+- Limitations: illustrative history and cycle stepping, local prototype interactions only; no kernel, results or persistence integration. Preview served at localhost:5188.
+- Lesson: a fixed-width phone preview made a `1fr` track overflow at 320 px; use `minmax(0, 1fr)` and child constraints. Added the durable rule to LESSONS.md.
+
+### Concurrent cycle inspection in the playback proposal
+
+- Outcome: extended the same prototype with activity density and grouped failure overview, expandable concurrent horizontal cycle lanes, send/arrival/retry/failure/completion markers, failure/node filters, independent window selection and zoom, broad-window aggregation/drilldown, and selected-event details linked to the shared playhead and canvas highlights. Playback selection remains unchanged by inspection.
+- Files: proposal panel JSX/CSS, new cycles.jsx, verification script, README, exported preview/screenshots; ACTION_LOG.md. Platform: Codex, no subagents. No app or foundation source edits.
+- Verification: standalone production build passed (327 kB JS); Chromium playback regressions and cycle lanes/filter/seek/canvas/aggregation/zoom checks passed, including narrow inspector reflow and 320×640 touch canvas-height cap. Screenshot reviewed; app/Storybook/full production suites not run for this proposal.
+- Limitations: 144 deterministic illustrative cycles, not recorded kernel data. Dense inspection uses a fixed lane surface with internal scrolling; runtime integration remains outside this design task.
+
+### Gesture zoom and pinned synchronous/asynchronous cycle detail
+
+- Outcome: added an independent inspection brush with handles/panning, midpoint-anchored trackpad/touch pinch on overview and lanes, and Fit recording. Stable cycle labels/rows preview on hover/focus and pin on click/Enter/tap; fixed detail space separates the response path from asynchronous receipt/analytics branches, response latency from all-work time, and background failure from response success. Close/Escape dismisses the pin. Detail scrolling preserves the canvas budget.
+- Files: proposal cycles.jsx/panel.css, verification script, README and rebuilt preview/screenshots; ACTION_LOG.md/LESSONS.md. Platform: Codex, no subagents; application source unchanged.
+- Verification: standalone production build passed (334 kB JS); Chromium regression plus hover/pinning, response/background timings, async event inspection, native two-touch pinch on overview/lanes, trackpad wheel pinch, drag panning, Fit, range independence and narrow/touch cap checks passed. Flow screenshot inspected. App/Storybook suites not run for a proposal; no physical trackpad test.
+- Limitations: illustrative event history; runtime integration remains outside scope. Lesson: synthetic pointer events cannot establish native pointer capture; real touch emulation also changes coarse-pointer CSS, so measure gesture coordinates after enabling it and completing reflow. Updated the existing touch-verification rule.
+
+### Main timeline zoom and selectable cycle rows (correction)
+
+- Outcome: removed the secondary inspection brush/window controls and aggregate timeline. MainTimeline now owns midpoint pinch, zoom buttons, Hand/Shift-drag/horizontal-wheel pan, Fit, playhead, failure markers and range clipping. Cycle lanes use the same window. Full rows select/toggle inline sync/async expansion; hovering opens a foundation HoverCard with visual response/background summary and does not expand the row. Density is calculated from illustrative cycle history rather than arbitrary bar heights.
+- Files: new main-timeline.jsx, proposal panel/cycles/CSS, verification script, README and preview/screenshots; ACTION_LOG.md/LESSONS.md. Platform: Codex, no subagents; application source unchanged.
+- Verification: standalone production build and Chromium playback regression passed; one overview, shared scale, native touch/trackpad pinch without seeking, pan/Fit, full-row selection/expansion/collapse, hover popover with stable rows, keyboard/touch activation, event seeks, range preservation, desktop/narrow reflow and touch canvas cap checked. Screenshots reviewed. App/Storybook suites not run for a proposal.
+- Limitations: illustrative history and browser-emulated gestures, no physical trackpad or runtime integration. Lesson: user corrected duplicate timelines and hover expansion placement; keep zoom on the existing main timeline, share its viewport, and separate hover summaries from row expansion. Added durable rule.
+
+### Cycle groups and unified playback transport (browser comments)
+
+- Outcome: replaced the zoom-required empty state with cycle rows at every scale. Crowded views show up to 12 time-based groups with cycle/response/failure counts, average response time and hover summaries; groups expand into individual selectable cycles without zooming. Moved range selection, timestamps, Clear Selection and Loop beside Play/Pause, steps and speed in one responsive playback cluster.
+- Files: proposal panel/cycles/CSS, verification script, README and exported previews; ACTION_LOG.md/LESSONS.md. Platform: Codex, no subagents; app source unchanged.
+- Verification: standalone build and Chromium playback/gesture/row/hover regression passed. Group counts sum to all 144 sample cycles; expand/collapse works without zoom; range controls are inside playback. Desktop and 320×640 touch layout/canvas cap passed; screenshots reviewed. App/Storybook suites not run for a proposal.
+- Limitations: illustrative history; no runtime integration. Lesson: do not hide recordings behind a zoom-required placeholder. Render groups with summaries and expand them in place; range/loop are playback controls. Added durable rule.
+
+### Combined simulation button and direct timeline manipulation
+
+- Outcome: scenario selector and Run share a bordered control matching the supplied reference; Run becomes Stop during execution, with separate Reset. Desktop playback sits right in the requested previous/slower/play/stop/faster/next/loop order. Speed uses icon actions and a readout. Empty-space drag selects a range; playhead drag scrubs; endpoint timestamps appear on the timeline. Removed range tool, speed selector and recording-collapse control; an upward chevron reveals cycle details.
+- Files: proposal panel/main-timeline/CSS, verify.mjs, README and generated preview/screenshots; ACTION_LOG.md. Platform: Codex, no subagents; app source unchanged.
+- Verification: standalone build and Chromium checks passed for direct range drag, playhead drag, playback/end/loop, speed, cycle groups/expansion, keyboard and native touch zoom/pan, desktop and 320 px layout. App/Storybook suites not run for this proposal.
+- Limitations: illustrative history; no runtime integration or physical gesture testing. Lesson: narrow transport needs explicit rows with 44 px targets; timeline range drag tests must start in selection mode, because Hand intentionally pans.
+
+### Reselect within a range and bottom-centered cycle toggle
+
+- Outcome: range slider track no longer intercepts timeline drags; only handles capture range adjustment. Dragging inside a selected interval creates a replacement interval. Moved cycle-detail expand/collapse to a dedicated bottom-centered panel footer, outside the scrolling details area.
+- Files: proposal panel/main-timeline/CSS, verification script and generated previews; ACTION_LOG.md. Platform: Codex, no subagents.
+- Verification: standalone build and Chromium regression passed, including nested range drag, centered toggle, desktop/narrow layout, playback, cycle inspection and native touch gestures. App suites not run; prototype only.
+- Lesson: range overlays must pass pointer input through everywhere except their interactive handles.
+
+### Full-width request-cycle disclosure
+
+- Outcome: replaced the footer icon with a full-width “Inspect Request Cycles” button. It stays in the same slot below the timeline and above expanded cycle details; the entire row toggles it. Cycle details scroll independently below it.
+- Files: proposal panel/CSS/verification and generated previews; ACTION_LOG.md. Platform: Codex, no subagents. Verification: standalone build and Chromium regression; prototype only, app suites not run.
+- Lesson: disclosure triggers belong before their revealed content and remain in a stable slot when expanded.
+
+### Group only crowded cycle intervals
+
+- Outcome: crowded overall views now retain individual rows for time buckets with 12 or fewer cycles. Only locally crowded buckets show “N cycles” groups; views with 40 or fewer cycles remain entirely individual. Zoom and filtering naturally reveal individual rows.
+- Files: proposal cycles/verification and generated previews; ACTION_LOG.md/LESSONS.md. Platform: Codex, no subagents. Verification: standalone build and Chromium regression, including all 144 cycles accounted for across groups plus individual rows. App suites not run; prototype only.
+- Lesson: overall recording size must not force sparse time buckets into groups; apply the grouping threshold locally as well.
+
+### Unified simulation integration plan
+
+- Outcome: mapped current scenario management, execution/playback, Results, configuration inspector and canvas transit inspection; wrote a staged integration plan preserving their contracts. Incorporated confirmed tabs, automatic inspector opening, in-memory replay and mobile details sheet. Remaining execution/guard decisions are explicitly pending user answers.
+- Files: docs/superpowers/plans/2026-10-05-unified-simulation-integration.md; ACTION_LOG.md. Platform: Codex, graphify navigation plus direct source review, no subagents.
+- Verification: source/API cross-check and scoped diff whitespace check passed. No runtime edits; builds and tests not run. Limitation: background capture would require lookahead/retention/terminal changes; current telemetry needs an explicit cycle-detail association audit before implementation.
+
+### Correct simulation inspector scope
+
+- Outcome: rechecked ResultsRegion and Workspace composition; corrected the plan to integrate simulation Results inspection while leaving the right-side node/connection configuration inspector separate. Withdrew automatic configuration opening and related target/dirty-draft questions. Confirmed cycle events open a simulation detail subview with Back restoring context and independently highlight the canvas; mobile events stay within the simulation sheet.
+- Files: integration plan, ACTION_LOG.md, LESSONS.md. Platform: Codex, no subagents. Verification: source review and scoped whitespace check; no runtime changes or tests.
+- Lesson: an ambiguous “inspector” reference must not attach simulation inspection to authoring selection and draft guards.
+
+### Two-pane range and cycle simulation inspection
+
+- Outcome: revised integration plan: selecting a range opens bottom inspection with cycles on the left and range statistics on the right; selecting a cycle places all cycle/event inspection in the right pane. Superseded inline cycle details/top-level tabs; retained existing Results capabilities with explicit scopes and mobile sheet navigation. Range membership and interval-versus-lifetime statistics questions remain pending.
+- Files: integration plan, ACTION_LOG.md, LESSONS.md. Platform: Codex, no subagents. Verification: scoped documentation whitespace check; no runtime changes, builds/tests not run.
+- Lesson: range statistics introduce a real aggregation contract; cumulative means/percentiles cannot be subtracted to produce truthful interval values.
+
+### Unified simulation integration — execution started
+
+- Status: implementation in progress. Unified scenario/transport bar, one gesture timeline, explicit cycle telemetry and two-pane inspection are being integrated; existing Results and separate configuration drafts remain preserved. Execution defaults are recorded in the plan and pending user corrections.
+- Files: runs/scenarios/workspace UI and telemetry, focused unit/browser tests, integration plan. Platform: Codex lead with GPT-6 Luna timeline, inspection and test agents; native agents avoid the documented headless CLI permission limitation. No kernel or persisted schema changes.
+- Verification: timeline helper tests passed 9/9; full units and Storybook launched, production/browser acceptance and independent review pending.
+- Lesson: preserve range-summary and cycle-tab scopes separately; whole-run results need their own view and must not become per-cycle measurements.
+
+### Unified simulation integration — completed
+
+- Outcome: integrated scenario Run/Stop/Reset and ordered playback transport in one bottom panel; one gesture timeline supports replacement selections, timestamped handles and draggable playhead. Inspection shows overlapping range cycles and interval statistics, then all selected-cycle/event details on the right. Preserved Run results, checks, metrics, trace/save actions and separate configuration drafts; bounded phone sheets and container-width navigation keep the canvas usable. Added explicit causal telemetry, temporal overlap indexing and truthful all-work outcome labels without changing kernel accounting or persistence.
+- Files: runs/scenarios/workspace UI, runner telemetry types/adapter, timeline/query unit tests, browser fixtures and suites, accessibility audit, D62 contracts/plan, HANDOFF.md/LESSONS.md. Platform: Codex lead with GPT-6 Luna implementation, testing and independent review agents; lead completed acceptance after an agent usage-limit interruption. Existing DESIGN.md and prototype changes preserved.
+- Verification: 1,803 unit tests passed / 11 skipped; production build (Workspace 478.05 kB) and Storybook passed. Final isolated production Chromium: 126 passed / 4 dev-only skipped, two workers/no retries. Accessibility audit: every desktop/phone journey completed, no axe violations. Ready/live/completed/range/cycle/mobile/narrow screenshots inspected; independent source review accepted. Opt-in inspection/playback profiles passed at ~2M flow records and 72,732 distinct cycles; broad query ~14–17 ms cold / ~0.006 ms cached. Scoped diff whitespace check passed.
+- Limitations: replay remains in memory; inherited large-history cold reconstruction/flow compaction costs remain. Unanswered product questions use the documented execution defaults. Earlier browser runs exposed stale dropdown/slider helpers and an intermittent authoring connection gesture; helpers were migrated, focused authoring/playback/pace 29/29 and the final full suite passed.
+- Lesson: test helpers must wait for recording transport and loaded inspection before interacting after disclosure changes; responsive grid tracks must honor container width. Aggregate cycle outcomes include async descendants, and range completeness warnings require actual missing in-range evidence.
+
+### Compact adaptive timeline
+
+- Outcome: timeline now shows separated cycle-count bars with time chunks determined by visible duration and available width. Selection/playhead legends attach to on-track handles; start/end legends describe the visible window. Removed redundant timestamp and handle rows above the track. Retained range replacement, pinch/pan/zoom, keyboard seeking, failure density and authored fault windows.
+- Files: PlaybackTimeline.tsx; studio-playback/unified-simulation browser tests and shared fixture; HANDOFF.md/LESSONS.md/ACTION_LOG.md. Platform: Codex, no subagents; scoped refinement.
+- Verification: production build passed; 10 targeted timeline unit tests passed; 8 focused production browser tests passed with one worker/no retries. Adaptive zoom/bin sizing, selected handle legends, range playback, streams, native pinch and 320 px layout checked. Desktop/mobile screenshots inspected; scoped whitespace check passed. Full suite and Storybook not rerun; foundation components unchanged.
+- Lesson: repeated speed clicks must await the rendered speed after each step. Automatic fixture acceleration must not compete with suites controlling speed explicitly; earlier targeted runs exposed both races.
+
+### Timeline legends and resizable inspection
+
+- Outcome: moved selected endpoint legends below the timeline alongside visible-window bounds; removed above-track timestamps and the Activity density header. Centered timeline tools below the track. Added vertical canvas/simulation and timeline/inspection resizing plus horizontal cycle-list/detail resizing, with keyboard controls and bounded phone inspection retained.
+- Files: PlaybackTimeline.tsx, PlaybackPanel.tsx, CycleInspection.tsx, Workspace.tsx, vite.config.ts, playback/unified/selection browser tests, HANDOFF.md/LESSONS.md/ACTION_LOG.md. Platform: Codex lead with GPT-6 Luna resizing and independent review agents. Existing unrelated changes preserved.
+- Verification: 1,803 unit tests passed / 11 skipped; production build and Storybook passed; axe found no violations. Production browser suite: 126 passed / 4 skipped / one sticky-note test failed because its fixed drop point now hit a node. Corrected the empty-canvas drop location; isolated selection suite passed 8/8. All timeline, pinch, range, responsive and resize checks passed. Desktop, selected-range/resized and phone screenshots inspected; independent review accepted and scoped diff whitespace check passed.
+- Lesson: installed resize primitives interpret numeric constraints as pixels; use explicit percentage units for proportional layout limits. Production library separators may strip test IDs, so use accessible role/name. Canvas fit changes can move nodes under fixed drag coordinates; note tests must drop into empty space when checking unattached notes.
+
+### Timeline collapse and inspection data clarity
+
+- Outcome: aligned all timestamp legends on one baseline with collision spacing; desktop timeline tools overlay the top right on hover/focus, and touch tools sit outside the gesture area. Timeline can collapse to zero with its restore divider above inspection. Run results is first/default; range selection still opens cycles. Removed external duplicate results footer and replaced legacy roots/time columns with a single cycle/outcome/latency/check summary. Metrics identify cumulative, instantaneous, average or cohort scope; live frontiers remain playhead-scoped, checks are final/pending truthfully, interval and full-cycle data stay distinct. Preserved save/retry, staleness, trace/checks, component metrics and results.open.
+- Files: PlaybackTimeline.tsx, PlaybackPanel.tsx, ResultsRegion.tsx, CycleInspection.tsx, results-region.test.ts, Workspace.tsx, browser suites/a11y journey, integration plan and HANDOFF.md/LESSONS.md/ACTION_LOG.md. Platform: Codex lead with GPT-6 Luna timeline, data-audit and testing agents; cross-review and lead integration. Prior unrelated changes preserved.
+- Verification: 1,805 unit tests passed / 11 skipped; production build (Workspace 480.25 kB), Storybook and axe passed. Final isolated production Chromium: 127 passed / 4 dev-only skipped, two workers/no retries. Desktop/mobile/default-results/collapsed screenshots inspected; source review and scoped whitespace checks passed.
+- Lesson: hover overlays intercepted native touch pinch until controls moved outside the track; labels need CSS bounds while asynchronous width measurements update. A live recording frontier must never receive whole-run metric/check labels. Earlier browser failures included obsolete footer selectors, a missing hover before a toolbar click and an intermittent authoring drag; the final full suite passed.
+
+## 2026-10-04
+
+### Retro (Claude, scheduled)
+- **Range**: 2026-10-03 → 2026-10-03, 7 entries (git: 15 commits)
+- **Changed**: LESSONS.md +0 ~0 -0 (now 50 rules, at cap); the 2026-10-03 hover-hit-target and project-level-data/empty-space-drop lessons were already written in-task. Not promoted: "don't patch a port-model symptom in three places" and "migrate fixtures by script when a field moves" (one-off, product-specific); pacing-in-worker-loop (2026-10-04, outside range).
+
+## 2026-10-05
+
+### Retro (Claude, scheduled)
+- **Range**: 2026-10-04 → 2026-10-04, 14 entries (git: ~50 commits)
+- **Changed**: LESSONS.md +0 ~0 -0; the stage 3/4, flashes and design-proposal `Lesson:` lines were already written in-task. Not promoted: stretched-button card click via `page.mouse.click`, pacing in the worker loop, "read the existing cap path before designing" (one-off or too generic). Note: LESSONS.md holds ~66 bullets against the 50-rule cap (the "Timeline range interaction" block added 2026-10-05 is outside this range); merge in a manual `/retro`.
+
+### Compact simulation panel and inspection headers (Codex)
+- Outcome: Ready/closed panels fit measured visible content and release hidden inspection height to the canvas. Expanded details fill assigned space; closed manual resizing fills the chart while preserving explicit collapse. Removed empty timeline legend/fault spacing and moved cycle-view tabs into the left pane header, retaining navigation in narrow detail views.
+- Files: Workspace.tsx, PlaybackPanel.tsx, PlaybackTimeline.tsx, CycleInspection.tsx, unified-simulation.spec.ts, HANDOFF.md, LESSONS.md and ACTION_LOG.md. Codex lead with GPT-6 Luna implementation, review and browser-testing agents; unrelated changes preserved.
+- Verification: 1,805 unit passed / 11 skipped; production build (Workspace 480.29 kB), Storybook and axe passed. Correct production browser suite: 128 passed / 4 dev-only skipped, one new geometry fixture failed; corrected Home seek/viewport settling and final two focused checks passed. Desktop/phone screenshots inspected; source review and scoped diff checks passed.
+- Lesson: fixed percentages retain whitespace when detail content disappears; measure visible chrome and use remaining-height flex layouts. Browser executors must set TEST_PRODUCTION=1 explicitly, and timeline geometry fixtures must settle resized bounds and seek before dragging.
+
+### Timeline bar spacing and traffic behavior inventory (Codex)
+- Outcome: removed the 24px reserved strip above density bars and removed the canvas/simulation resize handle. Preserved timeline/inspection and horizontal inspection resizing. Audited current packet travel, directional density, occupancy, event/outcome flashes and inspection highlighting; documented ambiguities for the user's next design iteration without changing traffic semantics.
+- Files: PlaybackTimeline.tsx, Workspace.tsx, unified-simulation.spec.ts, traffic-visual-inventory.md, HANDOFF.md and ACTION_LOG.md. Codex lead with GPT-6 Luna read-only traffic audit; prior changes preserved.
+- Verification: production build passed (Workspace 479.19 kB); 11 focused production playback/inspection tests passed plus the added density-height check. Source inventory and scoped diff reviewed. No unit/Storybook rerun for these feature-layout edits; previous baseline retained.
+- Lesson: endpoint flash counts are events in a recent 240ms window, not concurrent active requests. Avoid reserving chart space for controls that already overlay the chart; distinguish aggregated recent events from occupancy in the forthcoming visual redesign.
+
+### Storybook simulation traffic coverage (Codex)
+- Outcome: retained existing primitive stories and added labeled flash states/controls, queue/waiting/processing examples, and 14 real NodeCard/TrafficEdge canvas stories for direction, async settlement, density threshold, occupancy, inspection/connection selection, paused frames and reduced motion. Found and fixed packet coordinates lost by object-spreading browser SVG DOMPoint; no visual-language redesign.
+- Files: SimulationTraffic.stories.tsx, TrafficFlash.stories.tsx, NodeOccupancy.stories.tsx, playbackTraffic.ts/test, traffic inventory, HANDOFF.md, LESSONS.md and ACTION_LOG.md. Codex lead; delegated lighter implementation never initialized and was interrupted, then completed by lead. Prior unrelated changes preserved.
+- Verification: TypeScript, app build and Storybook build passed; 7 placement/density unit tests and 5 production playback browser tests passed. All 25 relevant stories rendered without runtime errors; actual SVG packet position/direction checks passed and screenshots inspected. Scoped diff checks passed.
+- Lesson: plain-object geometry stubs hid the DOMPoint prototype-getter defect. Read x/y explicitly and verify rendering in a real browser.
+
+### Four traffic experience concepts (Codex)
+- Outcome: added a Storybook comparison gallery with four coherent directions across 30 states / 120 examples: directional lanes, pressure map, selected-request focus and route cohorts. Added missing cases for returned errors, async failure after response, mixed outcomes, slow tails, interrupted recordings and quiet intervals. Proposed cohort overview plus request focus; runtime remains unchanged. Documented temporal meanings, ownership and telemetry prerequisites.
+- Files: TrafficConcepts.stories.tsx, traffic-concepts.md, HANDOFF.md, LESSONS.md and ACTION_LOG.md. Codex lead; GPT-6 Luna performed independent read-only taxonomy and semantic review. Prior unrelated changes preserved.
+- Verification: TypeScript and Storybook build passed. Browser reviewed all 120 comparisons, pin/unpin, return direction, absence of completed active arrows, paused/reduced motion and 320px reflow. Desktop comparison screenshots inspected. Production unit/E2E suite not rerun for story-only proposals.
+- Lesson: concept fixtures can mislead as easily as runtime visuals. Review direction, current-versus-terminal cues, capacity provenance and unit-versus-cycle populations before comparing aesthetics. The first selector probe returned no options; corrected the accessible name and awaited the native select. Desktop grid was also corrected to fit its actual container.
+
+### Restart traffic review state by state (Codex)
+- Outcome: removed all rejected concept variants and their proposal document; created Traffic state lab with proposed state definitions, ready for incremental visual review. Existing production stories and runtime preserved.
+- Files: TrafficConcepts.stories.tsx and traffic-concepts.md removed; TrafficStateLab.stories.tsx added; HANDOFF.md, LESSONS.md and ACTION_LOG.md updated. Codex lead, no delegation needed for this scoped reset.
+- Verification: TypeScript passed; Storybook build passed and generated index contains the new state lab with no rejected concept entries. Runtime tests and browser visual review not performed for the definition-only page.
+- Lesson: agree on state semantics before producing visual variants; separate node activity, directional transport and request outcomes, with concurrency as context.
+
+### First traffic state: idle (Codex)
+- Outcome: added a production-component idle sample with before/after traffic cases. Illustrative cumulative totals change without changing current visuals. Documented low/high traffic readability, motion candidates, zoom independence and deferred historical spike placement.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md and ACTION_LOG.md. Codex lead; no runtime changes or subagents.
+- Verification: TypeScript and Storybook build passed; local browser rendered both nodes, changed totals and showed no 320px overflow. Scoped diff check passed. Runtime suites not rerun for story-only work.
+- Lesson: browser launch required the existing local-browser sandbox escalation. Screenshot review then caught faint text from an inappropriate muted token and incomplete narrow canvas fitting; corrected to secondary-text and refit on resize, with TypeScript/Storybook checks repeated.
+
+### Next two traffic states (Codex)
+- Outcome: added request-travelling and queued-at-receiver examples on the existing state lab. Low/high examples use bounded directional transport and separate queued/processing populations; illustrative transport can pause/resume and honors reduced motion. Queue bar references the declared fixture capacity.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, ACTION_LOG.md. Codex lead; scoped story-only implementation, no subagents or production changes.
+- Verification: TypeScript, Storybook build and scoped diff checks passed. Browser validated both states, high-traffic counts, paused motion and no 320px page overflow; desktop screenshot inspected. Runtime suites not rerun for design fixtures.
+
+### Travelling gradient and queue pressure proposal (Codex)
+- Outcome: refined the existing state lab with a directional travelling gradient and bounded density dots; exact in-flight count now lives at the receiver as incoming from its caller. Replaced the plain queue bar with an amber capacity rack, depth of shade and gentle high-backlog pressure pulse; processing remains separate. Pause/reduced motion cover both examples. Runtime remains unchanged.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead, no subagents.
+- Verification: TypeScript and Storybook builds passed. Final browser checks passed low/high density, node count, gradient/dot motion, pressure pulse, pause, reduced motion, all node bounds after 1200→320px resize, no overflow and no runtime errors. Desktop and phone screenshots inspected. Runtime suites not rerun for story-only work.
+- Lesson: page overflow checks missed clipped graph content. Screenshot review exposed a stale viewport; two-frame delay alone failed because useNodesInitialized stayed false in controlled fixtures. Removed that guard and used direct fitBounds, then verified every node against its canvas bounds.
+
+### Clarify traffic state ownership and simplify cues (Codex)
+- Outcome: moved outstanding synchronous-call count to the caller as awaiting response, removed receiver incoming labels, and named simultaneous caller/connection/receiver conditions in each example. Three direction dots remain fixed at both volumes; vivid cyan/blue gradient communicates transport. Queue footer retained, full colored outline removed, pressure pulse confined to its bottom accent. Runtime unchanged.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead, no subagents.
+- Verification: TypeScript, Storybook build and scoped diff checks passed. Browser passed fixed dot count, pending/queued ownership (84 = 80 + 4), gradient motion, footer-only pulse, pause/reduced motion and all node bounds after narrowing to 320px; no runtime errors or page overflow. Desktop screenshot inspected. Runtime suites not rerun for story-only proposals.
+- Lesson: moving transport counts to the receiver blurred their ownership. Label journey snapshots by component/connection and keep caller outstanding calls separate from downstream occupancy; dots should indicate movement without reproducing traffic population.
+
+### Processing and downstream-wait states (Codex)
+- Outcome: added green local processing slots (1/4 versus 4/4) and a three-node dependency-wait example. Payment service awaits Fraud check service while Fraud processes; callers retain named awaiting-response footers and idle links carry no transport animation. Shared pause/reduced-motion controls and explicit ownership preserved.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, ACTION_LOG.md. Codex lead; no production edits or subagents.
+- Verification: TypeScript, Storybook build and scoped diff checks passed. Browser checks passed both new states, low/high counts, no invented in-flight traffic, dependency ownership, pulse/pause/reduced motion, and node bounds after 320px resize. Existing transport/queue regression passed; both new desktop screenshots inspected. Runtime suites not rerun for story-only design examples.
+
+### Multi-downstream waiting design (Codex)
+- Outcome: extended the existing waiting state with fan-out, distinct waiting-request/pending-call counts, Fraud processing versus Orders queuing, per-request call inspection and a returned-call toggle that leaves parents blocked on remaining dependencies. Low/high cases and original one-downstream design preserved. No production changes.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead; no subagents.
+- Verification: TypeScript and Storybook builds passed; browser checked 4 parents/7 calls, returned-call decrement without premature parent completion, low returned branch becoming idle, inspection popover, idle links and 320px node bounds. Original processing/dependency regression passed; desktop fan-out screenshot inspected. Runtime suites not rerun for story-only work.
+- Lesson: read-only ReactFlow pane intercepted the new inspection button. Enabled pointer input only on its nodrag/nopan footer, then verified an actual browser click without force.
+
+### Pending dependencies and simultaneous node activities (Codex)
+- Outcome: waiting footers omit returned services and zero local-work rows; returned calls remain inspectable. Added Processing + waiting toggle with separate local occupancy and dependency counts, and corrected caller totals at low/high traffic. Architecture stays visible.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead; no subagents or production edits.
+- Verification: TypeScript and Storybook build passed. Chromium checks passed pending-only summary, returned-call inspection, simultaneous populations, narrow node bounds, fan-out and processing regressions; desktop screenshot inspected. Runtime suites not rerun for story-only work.
+- Lesson: current waiting summaries should list only blocking dependencies; completed branches belong in inspection history. Node activity populations coexist rather than selecting one exclusive state.
+
+### Compact node activity footers (Codex)
+- Outcome: removed idle footer; waiting rows show pending counts without downstream state. All active node footers expand on node hover/focus and support tap or Enter/Space pinning; mixed populations remain visible in compact headers.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead; no subagents or production changes.
+- Verification: TypeScript and Storybook builds passed. Chromium checked collapsed details, hover/focus expansion, keyboard pinning, pending-only summary and no idle footer. Runtime suites skipped for story-only change.
+- Lesson: node summaries should describe their own work; downstream local state belongs on its own node. Idle needs no footer and active details use progressive disclosure.
+
+### Theme traffic and direction variants (Codex)
+- Outcome: themed teal/slate connection gradients and dots; forward requests, backward responses and separated dual lanes. Fixed three dots per lane; dual caller pending counts include both populations.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead, no subagents; production untouched.
+- Verification: TypeScript and Storybook build passed; Chromium checked three modes, opposite motion, bounded high-traffic dots and pause. Runtime suites skipped for story-only changes.
+- Lesson: readable directional lanes and theme shades carry connection activity without vivid blue or volume-driven dot clutter.
+
+### Inline dependencies and next journey states (Codex)
+- Outcome: replaced dependency popover with bounded inline request/pending-branch list. Added response return/delivery/idle example and async message/processing/settlement example, with low/high traffic and motion pause. Caller remains idle during async side effects.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead, no subagents; production untouched.
+- Verification: TypeScript and Storybook build passed; Chromium checked inline dependencies, absence of popover, response delivery cue clearing, and async travel/processing/settlement without synchronous waiting. Runtime suites skipped for story-only work.
+- Lesson: pending request breakdown belongs inside the waiting list, rather than a separate overlay.
+
+## 2026-10-06
+
+### Traffic motion, repeated arrivals, failures and retries (Codex)
+- Outcome: thin theme tracks with bounded moving chevrons replace connection gradients/dots for forward/backward/dual modes. Response arrivals advance in small staggered increments while remaining waits decrease; pause freezes arrivals and final cues clear to idle. Added failures/rejections alongside healthy processing and retry delay/travel/recovery examples.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead; no subagents, production unchanged.
+- Verification: TypeScript and Storybook build passed. Chromium checked direction cues, bounded arrival increments, pause/resume, final idle, partial failures, admission rejection, retry delay/travel/recovery and no runtime errors. Direction and failure screenshots inspected. Runtime suites skipped for story-only work.
+- Lesson: repeated arrivals need a staggered sequence rather than a total-population event badge. A reused-line patch initially changed the wrong traffic controls; scoped context fixed it before the final build. Browser SVG assertions must target connection SVGs rather than Lucide node icons.
+
+### Refined gradient and dot direction cues (Codex)
+- Outcome: restored earlier theme gradient/dot language after user rejected chevrons; reduced band thickness/glow, rounded stream ends, bounded three dots per direction and separated dual streams. Other state examples unchanged.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead, no subagents; production untouched.
+- Verification: TypeScript and Storybook build passed; Chromium checked forward/backward/dual, opposing motion, fixed high-traffic dot count and pause.
+- Lesson: build on the visual language the user prefers; do not replace it wholesale after a request to rethink.
+
+### Stable footers and deadline/message outcomes (Codex)
+- Outcome: fixed-width activity wrappers and wrapped details prevent hover expansion widening; first footer fills behind rounded node corners. Added caller deadline timeout while downstream work continues, and async TTL expiry versus explicit delivery loss.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead, no subagents; production untouched.
+- Verification: TypeScript and Storybook builds passed; Chromium checked unchanged expanded widths, overlapping footer/corner geometry, deadline ownership, TTL/known-loss distinction and narrow footer wrapping. Runtime suites skipped for story-only changes.
+- Lesson: footer bounds must follow authored node width, not expanded text. Overflow assertions should inspect footer content independently of intentionally protruding connection handles.
+
+### Complete pending traffic-state inventory (Codex)
+- Outcome: added examples 12–18 for arrival/admission, returning errors, acknowledgements/loss/redelivery/duplicates, stuck work, all simultaneous node populations, late response/cancellation and exhausted retry/redelivery. Current counts and terminal events stay separate; historical-spike placement remains deferred.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, LESSONS.md, ACTION_LOG.md. Codex lead plus read-only gpt-6-luna pending_state_review; production untouched.
+- Verification: TypeScript and Storybook build passed. Chromium exercised every new low/high frame, footer wrapping/widths, concurrent accounting, error direction, late-response isolation and narrow canvases without runtime errors. Concurrent screenshot inspected. Production suites skipped for story-only changes.
+- Lesson: reviewer caught ACK/redelivery, cancellation styling, stuck-location and async-exhaustion scope ambiguities; corrected before verification. A rebuild reloaded the page during the first browser run; reran after build completion. Keep build and live-browser verification sequential.
+
+### Remove superseded traffic design gallery (Codex)
+- Outcome: removed Workspace/SimulationTraffic stories and docs; retained the current Traffic state lab and production components.
+- Files: deleted SimulationTraffic.stories.tsx; updated HANDOFF.md and ACTION_LOG.md. Codex, no subagents.
+- Verification: Storybook build passed; generated index contains zero old-gallery entries and retains State Definitions. Production suites skipped for story removal.
+
+### Audit all Storybook sections for superseded traffic designs (Codex)
+- Outcome: audited all registered stories across Design System, Patterns, UI and Workspace; removed remaining TrafficFlash and Node occupancy stories/docs. Retained the current Traffic state lab and unrelated examples; runtime components unchanged.
+- Files: deleted TrafficFlash.stories.tsx and NodeOccupancy.stories.tsx; updated HANDOFF.md, LESSONS.md and ACTION_LOG.md. Codex, no subagents.
+- Verification: Storybook build passed; built and served indexes both contain 142 entries, zero retired traffic entries and the current State Definitions story. Source reference scan and scoped diff check passed. Production suites skipped for story cleanup.
+- Lesson: the prior cleanup only removed the workspace gallery; audit standalone UI/design-system specimens and their docs too. Local server verification required sandbox network escalation.
+
+### Unify response-wait terminology (Codex)
+- Outcome: replaced awaiting response/requests waiting/dependency-wait labels with awaiting responses throughout the state lab. Expanded service rows name pending calls; queued work remains distinct.
+- Files: TrafficStateLab.stories.tsx, HANDOFF.md, ACTION_LOG.md. Codex, no subagents; production behavior unchanged.
+- Verification: Storybook build passed; obsolete terminology scan clean. Production tests skipped for copy-only changes.
+
+### Add live load examples per traffic state (Codex)
+- Outcome: all 18 state specimens now offer static/live modes; load ramps from sparse through sustained traffic and a burst, then drains to idle. Added 1,000/s and 5,000/s peaks, pause/restart/scrub, stable aggregate populations/event rates and directional streams. Fixtures are illustrative, not measured runner output; production integration and historical summaries remain outside scope.
+- Files: new LiveTrafficState.tsx; TrafficStateLab.stories.tsx, HANDOFF.md and ACTION_LOG.md. Codex, no subagents.
+- Verification: typecheck and Storybook build passed. Local Chromium checked all 18 burst and idle frames, footer widths, static return, direction modes, paused/reduced motion and narrow canvas bounds. Production suites skipped for isolated Storybook fixtures.
+- Lesson: initial hover check caught the canvas intercepting node events; applied existing LESSONS.md pointerEvents:auto rule. Responsive fitting follows the existing fixed-fixture fitBounds rule. A node-overflow assertion was narrowed to footer content because connection handles intentionally protrude.
+
+### Restore approved visuals in live traffic examples (Codex)
+- Outcome: removed separate generic live node/edge renderers. All live specimens reuse static state renderers, including queue racks, processing slots, icons, expansion, protocol labels and gradient/dot directions. Preserved dependency topology and async naming; canvas fit reserves expanded-footer height.
+- Files: TrafficStateLab.stories.tsx, LiveTrafficState.tsx, HANDOFF.md, ACTION_LOG.md, LESSONS.md. Codex, no subagents; production unchanged.
+- Verification: typecheck and Storybook build passed. Chromium checked all 18 burst/idle frames, hover widths and expanded bounds, shared queue rack/travel cues, direction modes, pause, reduced motion and narrow layout. Queue screenshot visually inspected. Production suites skipped for Storybook-only changes.
+- Lesson: structural checks had missed visual divergence; live variants must reuse approved rendering. Expanded-footer checks caught clipping and canvas fitting was corrected. A width assertion was separated from viewport zoom.
+
+### Separate node activities and complete footer hover behavior (Codex)
+- Outcome: queued and processing work appear in distinct sibling footer sections, including downstream queue specimens. Awaiting labels uniformly omit request(s). Node body and footers expand the same details on hover; focus and tap pinning retained, including fault nodes. Transition/response-delivery redesign recorded in DESIGN.md and the lab as future scope; existing transition cues unchanged.
+- Files: TrafficStateLab.stories.tsx, DESIGN.md, HANDOFF.md, ACTION_LOG.md. Codex, no subagents.
+- Verification: typecheck and Storybook build passed. Chromium verified direct footer/body hover, movement between footers, collapse on leave, separate queue/processing sections and corrected awaiting label; all 18 live-state checks passed. Production suites skipped for Storybook-only design changes.

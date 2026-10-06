@@ -8,6 +8,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import { PlaybackTrafficContext } from "./usePlaybackTraffic";
+import { SimulationHighlightContext } from "./SimulationHighlight";
 import { placeLeg, trafficDensity } from "./playbackTraffic";
 import type { LegAt } from "../runs/playback";
 import { TrafficFlash } from "../../components/ui/traffic-flash";
@@ -64,6 +65,7 @@ export function TrafficEdge({
   const connectionId = (data as { connection?: { id?: string } } | undefined)
     ?.connection?.id;
   const traffic = React.useContext(PlaybackTrafficContext);
+  const highlight = React.useContext(SimulationHighlightContext);
   const packets = traffic.legs.get(connectionId ?? "") ?? [];
   const density = trafficDensity(packets);
   const flashes = traffic.connectionFlashes.get(connectionId ?? "") ?? [];
@@ -116,6 +118,7 @@ export function TrafficEdge({
       onMouseLeave={() => setHovered(false)}
       data-testid={`edge-${id}`}
     >
+      {highlight?.connectionId === connectionId && <path data-testid="simulation-event-connection" d={edgePath} fill="none" className="stroke-primary pointer-events-none" strokeWidth={4} />}
       <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
       {flashes.map((flash, index) => {
         const side = flash.progress === 0 ? sourcePosition : targetPosition;

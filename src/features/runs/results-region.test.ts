@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ResultsRegion } from './ResultsRegion';
+import { metricTimeBasis, ResultsRegion } from './ResultsRegion';
 import type { TerminalResult } from './RunController';
 import { createEmptySummary } from './protocol';
 
 describe('ResultsRegion (Items 3, 4, 5)', () => {
+  it('keeps checks pending while the ended recording waits for its terminal result', () => {
+    const summary = createEmptySummary('timed');
+    const html = renderToStaticMarkup(React.createElement(ResultsRegion, {
+      scenarioMode: 'timed', runPhase: 'paused', terminal: null,
+      playbackAtEnd: true, currentTimeMs: 1000, isExpanded: true,
+      playbackSummary: { atMs: 1000, rootCounts: summary.rootCounts, messageCounts: summary.messageCounts, cycles: summary.cycles, elementMetrics: [] },
+      elementLabels: {}, assertionLabels: {},
+    }));
+    expect(html).toContain('Checks pending.');
+    expect(html).not.toContain('No checks configured');
+  });
   it('shows historical measurements and hides final checks and whole-run counters before the end', () => {
     const summary = createEmptySummary('timed');
     const terminal: TerminalResult = {
@@ -18,8 +29,9 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
       playbackSummary: { atMs: 1000, rootCounts: { ...summary.rootCounts, generated: 3, inFlight: 2, succeeded: 1 }, messageCounts: summary.messageCounts, cycles: { ...summary.cycles, total: 3, open: 2 }, elementMetrics: [] },
       currentTimeMs: 1000, isExpanded: true, elementLabels: {}, assertionLabels: {},
     }));
-    expect(html).toContain('font-medium text-foreground">3</span>');
-    expect(html).toMatch(/3(?:<!-- -->)? cycles/);
+    expect(html).toContain('3 all-work cycles');
+    expect(html).toContain('Through 1.0 s');
+    expect(html).toContain('Whole-run checks not evaluated');
     expect(html).toContain('Checks not evaluated.');
     expect(html).not.toContain('font-medium text-foreground">99</span>');
     expect(html).not.toContain('987');
@@ -52,9 +64,17 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(html).toContain('Scenario compile failed with 2 issues');
 
     // Does NOT show CHECKS, TIME, ROOTS, FAILURES metric columns or counts card
-    expect(html).not.toContain('EXECUTION SUMMARY');
+    expect(html).not.toContain('RUN SUMMARY');
     expect(html).not.toContain('0 roots');
     expect(html).not.toContain('0 of 0 passed');
+  });
+
+  it('labels metric scope and temporal basis without implying every value is cumulative', () => {
+    expect(metricTimeBasis('succeeded', false)).toBe('Cumulative through playhead');
+    expect(metricTimeBasis('inFlight', false)).toBe('Current at playhead');
+    expect(metricTimeBasis('throughput', false)).toBe('Average through playhead');
+    expect(metricTimeBasis('utilization', true)).toBe('Average through end');
+    expect(metricTimeBasis('meanLatencyMs', false)).toBe('Successful cohort through playhead');
   });
 
   it('Item 4: missing values show "—", never 0 before terminal or with measured:false', () => {

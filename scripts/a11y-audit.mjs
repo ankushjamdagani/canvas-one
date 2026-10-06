@@ -34,12 +34,13 @@ const states = {
   scenarioSwitcher: async (p) => { await open(p, 's05'); await p.getByTestId('scenario-switcher-trigger').click(); await p.getByTestId('scenario-switcher-popover').waitFor(); },
   scenarioEditor: async (p) => {
     await open(p, 's04'); await p.getByTestId('scenario-switcher-trigger').click();
-    await p.getByRole('button', { name: /^Edit / }).click(); await p.waitForTimeout(600);
+    await p.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: p.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click(); await p.waitForTimeout(600);
   },
   results: async (p) => {
     await open(p, 's04'); await p.getByTestId('scenario-run-btn').click();
-    await p.getByTestId('results-status-badge').filter({ hasText: 'completed' }).waitFor({ timeout: 20000 });
-    await p.getByTestId('results-details-toggle').click(); await p.waitForTimeout(300);
+    await p.getByTestId('playback-status').filter({ hasText: /completed/i }).waitFor({ timeout: 20000 });
+    await p.getByRole('button', { name: 'Inspect Request Cycles', exact: true }).click();
+    await p.getByRole('tab', { name: 'Run results', exact: true }).waitFor(); await p.waitForTimeout(300);
   },
 };
 const viewports = { desktop: { width: 1512, height: 982 }, phone: { width: 390, height: 844 } };

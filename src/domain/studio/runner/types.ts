@@ -234,9 +234,15 @@ export type RunSummary = {
  */
 export type FlowRecord = {
   readonly key: string;
+  /** Explicit lifecycle identity for cycle inspection; absent in older in-memory recordings. */
+  readonly cycleId?: string;
+  readonly unitId?: string;
+  readonly parentUnitId?: string | null;
+  readonly category?: 'root' | 'message';
+  readonly attempt?: number;
   /** Null for a workload admitted directly at a node, without an incoming connection. */
   readonly connectionId: Id | null;
-  /** The occupied node, supplied for local phase facts without an incoming connection. */
+  /** Node named by the lifecycle fact; present for direct and connection-backed activity. */
   readonly elementId?: Id;
   readonly phase: 'sent' | 'received' | 'queued' | 'processing' | 'settled' | 'response' | 'released';
   readonly atMs: number;

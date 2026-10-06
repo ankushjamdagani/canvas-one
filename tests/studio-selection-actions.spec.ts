@@ -219,6 +219,9 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     const canvasPane = page.locator('.react-flow__pane');
     const canvasBox = await canvasPane.boundingBox();
     expect(canvasBox).not.toBeNull();
+    // Use empty canvas space: fitted node positions change with pane height.
+    const dropX = canvasBox!.x + canvasBox!.width - 100;
+    const dropY = canvasBox!.y + 80;
 
     // Use HTML5 drag-and-drop dataTransfer dispatch onto canvas
     await dockNoteBtn.dispatchEvent('dragstart', {
@@ -230,8 +233,8 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     });
 
     await canvasPane.dispatchEvent('dragover', {
-      clientX: (canvasBox?.x ?? 0) + 300,
-      clientY: (canvasBox?.y ?? 0) + 200,
+      clientX: dropX,
+      clientY: dropY,
       dataTransfer: await page.evaluateHandle(() => {
         const dt = new DataTransfer();
         dt.setData('application/x-system-studio-note', 'note');
@@ -240,8 +243,8 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     });
 
     await canvasPane.dispatchEvent('drop', {
-      clientX: (canvasBox?.x ?? 0) + 300,
-      clientY: (canvasBox?.y ?? 0) + 200,
+      clientX: dropX,
+      clientY: dropY,
       dataTransfer: await page.evaluateHandle(() => {
         const dt = new DataTransfer();
         dt.setData('application/x-system-studio-note', 'note');
@@ -496,4 +499,3 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     expect(Math.abs(grpBox!.height - selBox!.height)).toBeLessThanOrEqual(2);
   });
 });
-

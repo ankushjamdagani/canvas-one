@@ -18,7 +18,7 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: "react-vendor", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
-            { name: "canvas-vendor", test: /node_modules[\\/](@xyflow|d3-[a-z-]+)[\\/]/ },
+            { name: "canvas-vendor", test: /node_modules[\\/](@xyflow|d3-[a-z-]+|react-resizable-panels)[\\/]/ },
             { name: "storage-vendor", test: /node_modules[\\/]dexie[\\/]/ },
           ],
         },

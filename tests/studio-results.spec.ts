@@ -14,32 +14,49 @@ async function openS04AndRun(page: Page) {
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
   await page.getByTestId('scenario-run-btn').click();
-  await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+  await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
+}
+
+async function openRunResults(page: Page) {
+  await page.getByRole('button', { name: /Inspect (Request Cycles|Run Results)/ }).first().click();
+  const tab = page.getByRole('tab', { name: 'Run results', exact: true });
+  await expect(tab).toBeVisible();
+  return page.getByTestId('results-region');
 }
 
 test.describe('RV-13b: Results region', () => {
-  test('completed-run strip shows status, checks, time and roots', async ({ page }) => {
+  test('Run results is first and default; summary shows measured run metrics', async ({ page }) => {
     await openS04AndRun(page);
+    const disclosure = page.getByRole('button', { name: 'Inspect Request Cycles', exact: true });
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    await disclosure.click();
+    const tabs = page.getByRole('tab');
+    await expect(tabs.nth(0)).toHaveText('Run results');
+    await expect(tabs.nth(1)).toHaveText('Request cycles');
+    await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
     const region = page.getByTestId('results-region');
-    await expect(region).toContainText('CHECKS');
-    await expect(region).toContainText('TIME');
-    await expect(region).toContainText('ROOTS');
+    await expect(region).toBeVisible();
     await expect(region.getByTestId('results-status-badge')).toContainText(/completed/i);
-    await expect(region).toContainText(/\d+ of \d+ passed/);
-    await expect(region).toContainText('Saved');
-    // No raw ids or placeholders leak into the strip.
+    const summary = region.getByTestId('results-cycles');
+    await expect(summary).toContainText(/Whole run/);
+    await expect(summary).toContainText(/\d+ all-work cycles/);
+    await expect(summary).toContainText(/\d+ successful/);
+    await expect(summary).toContainText(/\d+ non-success/);
+    await expect(summary).toContainText(/Mean response .* ms/);
+    await expect(summary).toContainText(/Mean all-work completion .* ms/);
+    await expect(summary).toContainText(/Whole-run checks/);
     await expect(region).not.toContainText(/undefined|NaN|\[object/);
+    await page.screenshot({ path: test.info().outputPath('run-results-desktop-default.png') });
   });
 
   test('Details switches between General metrics and component-first Components tab', async ({ page }) => {
     await openS04AndRun(page);
+    const disclosure = page.getByRole('button', { name: /Inspect (Request Cycles|Run Results)/ }).first();
+    await disclosure.click();
+    await page.getByRole('tab', { name: 'Run results', exact: true }).click();
     const region = page.getByTestId('results-region');
-    const toggle = page.getByTestId('results-details-toggle');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-    // General first (21B).
+    // General metrics are the initial view.
     await expect(region.getByRole('button', { name: 'General metrics' })).toBeVisible();
     await expect(region).toContainText(/Consumed inputs:\s*\d/);
 
@@ -57,19 +74,20 @@ test.describe('RV-13b: Results region', () => {
     // Elements are shown by their authored names, never raw ids.
     expect(await table.innerText()).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
 
-    // Back to General restores the general view; Details collapses.
+    // Back to General restores the general view; the inspection disclosure collapses.
     await region.getByRole('button', { name: 'General metrics' }).click();
     await expect(table).toBeHidden();
     await expect(region).toContainText(/Consumed inputs:\s*\d/);
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await disclosure.click();
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('390x844: the completed strip and expanded details stay within the viewport width', async ({ page }) => {
+  test('390x844: run results and summary stay within the viewport width', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openS04AndRun(page);
-    await page.getByTestId('results-details-toggle').click();
-    await expect(page.getByTestId('results-region').getByRole('button', { name: 'Components' })).toBeVisible();
+    const region = await openRunResults(page);
+    await expect(region.getByRole('button', { name: 'Components' })).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('run-results-mobile-default.png') });
     const overflows = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );

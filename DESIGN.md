@@ -1,238 +1,415 @@
----
-name: System studio
-description: A light docked workspace for learning architecture through seeded simulation.
-colors:
-  paper: "#fff"
-  canvas: "#fafbf9"
-  line: "#e1e7e3"
-  ink: "#243b41"
-  muted: "#677773"
-  teal: "#087f84"
-  teal-soft: "#e4f3f0"
-  amber: "#a76108"
-  amber-soft: "#fff3df"
-  teal-hover: "#086b70"
-  small-text: "#5e7267"
-  canvas-dots: "#d6e0dc"
-typography:
-  headline:
-    fontFamily: '"Inter Variable", sans-serif'
-    fontSize: "23px"
-    fontWeight: 550
-    lineHeight: 1.3
-    letterSpacing: "-0.8px"
-  title:
-    fontFamily: '"Inter Variable", sans-serif'
-    fontSize: "14px"
-    fontWeight: 600
-  body:
-    fontFamily: '"Inter Variable", sans-serif'
-    fontSize: "12px"
-    lineHeight: 1.7
-  node-label:
-    fontFamily: '"Inter Variable", sans-serif'
-    fontSize: "11px"
-    fontWeight: 650
-  metric:
-    fontFamily: '"Inter Variable", sans-serif'
-    fontSize: "18px"
-    fontWeight: 550
-    letterSpacing: "-0.4px"
-rounded:
-  tag: "4px"
-  control: "6px"
-  guide: "8px"
-  node: "9px"
-  panel: "10px"
-spacing:
-  control-gap: "7px"
-  node-gap: "12px"
-  guide-padding: "16px"
-  inspector-padding: "23px 20px"
-components:
-  button-primary:
-    backgroundColor: "{colors.teal}"
-    textColor: "{colors.paper}"
-    rounded: "{rounded.control}"
-    padding: "10px 19px"
-  button-primary-hover:
-    backgroundColor: "{colors.teal-hover}"
-  button-default:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.control}"
-    padding: "9px 11px"
-  input:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.control}"
-    padding: "10px 11px"
-  component-node:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.node}"
-    padding: "22px 15px"
-    width: "215px"
-  warning-tag:
-    backgroundColor: "{colors.amber-soft}"
-    textColor: "{colors.amber}"
-    rounded: "{rounded.tag}"
-    padding: "5px 7px"
+# System Studio — System Design & Architecture Specification
+
+## Future scope: traffic state transitions
+
+Deferred by user decision (2026-10-06): design the transitions between traffic states, including response-delivery acknowledgements, placement of arrival counts, repeated events under sustained load, and cue timing. Current work covers state presentation and shared node/footer hover behavior only. Historical spike placement also remains deferred.
+
+> **Document Version:** 2.0 (Post-Revamp & Interactive Playback)  
+> **Target Application:** System Studio (`system-design-planner`)  
+> **Status:** Authoritative Design & Technical Architecture Document  
+> **Theme:** Evergreen Paper (Light Mode Only, WCAG 2.2 AA Compliant)
+
 ---
 
-# Design System: System studio
-
-## Overview
-
-**Creative North Star: "Light docked workspace A"**
-
-The selected light docked workspace keeps architecture, configuration and observed results in one working surface. Warm white material, a quiet dotted canvas, compact cards and restrained teal and amber support learning through changes and replay.
-
-Operate mode is the dominant interaction posture: edit the graph, inspect a component, run a seeded workload and compare the result. Density belongs in useful controls and measurements, while the central graph retains room to pan.
-
-**Key Characteristics:**
-
-- Left library, central graph, right inspector and slim bottom metrics.
-- Warm white surfaces with fine borders and limited elevation.
-- Compact Inter typography and tabular numerical measurements.
-- Teal for action and selection; amber for pressure and warnings.
-
-## Colors
-
-Teal and amber sit against warm near-white surfaces with green-gray dividers and dark blue-green ink. Frontmatter values are extracted from `src/styles.css` and `ArchitectureCanvas.tsx`; CSS remains the implementation source of truth.
-
-- Primary: `teal` identifies the run action, selection, focus and suggestions. `teal-soft` provides a quiet action tint; `teal-hover` darkens the primary button on hover.
-- Secondary: `amber` and `amber-soft` signal predicted overload, observed queue pressure and validation. Pair status color with words or icons.
-- Neutral: `paper` supplies panels and cards, `canvas` the graph field, `line` dock separators, `ink` primary text and `muted` secondary copy. The `small-text` override strengthens small captions. `canvas-dots` is the graph grid color.
-
-## Typography
-
-Inter Variable with sans-serif fallback is the implemented family throughout. Its use matches the selected reference; preserve it. Root text is 13px. The experiment heading uses the headline role; panel headings use 14px/600, inspector explanation headings 20px/500 with 1.5 line height, and component labels 11px/650. Body paragraphs use 12px with 1.7 line height; inspector copy is usually 11px. Small captions range from 8px to 10px and use stronger secondary ink where overridden.
-
-Measurements use tabular numerals. Main metric values are 18px/550; units are smaller and visually secondary. No display type or decorative font is implemented.
-
-## Layout
-
-Desktop is a viewport-height three-column grid: 218px library, flexible central workspace with a 360px minimum, and 284px inspector. Minimum studio height is 650px. Library and inspector scroll independently. The center stacks toolbar, graph, experiment guide and a slim metrics strip. The graph has a 20px dotted grid with 1px dots; node cards are 215px wide with 12px internal gaps. Heading placement is 34px from the graph top and 33px from the left. Metrics use an 88px minimum row with 14px 24px padding.
-
-At 1600px and above, docks become 234px and 310px. At 1200px and below, they become 185px and 252px and secondary toolbar text recedes. At 900px and below, the library is 150px wide and the inspector moves below the central workspace. At 560px and below, the interface becomes a vertical document: compact horizontal library, 620px workspace, metrics and full-width inspector. Inspector fields share two columns; metric detail sections stack.
-
-Mobile initially centers a readable node at 0.9 zoom, allows a minimum zoom of 0.6 and provides a pan hint. It does not fit the whole architecture into a tiny overview. Adding nodes recenters on the selected node. Checkpoints use a native details/summary disclosure, initially closed on mobile and open on larger screens. On mobile its expanded list is capped at 120px and the save controls remain accessible.
-
-## Elevation & Depth
-
-Docked surfaces and graph cards rely on fine borders and tonal separation. Floating project and assumptions panels, toasts and errors alone use `0 12px 35px #203d3521`. The selected node uses a teal border and a 2px pale outline offset by 2px. Default nodes have no shadow.
-
-## Shapes
-
-Controls and inputs use 6px corners, tags 4px, experiment guides 8px, nodes 9px and floating panels 10px. Most surfaces use a 1px border. Circular forms are reserved for status dots, traffic icons, connection handles and warning badges. Compact line icons accompany labels and controls.
-
-## Components
-
-- **Library:** bordered rows introduce traffic, service, database and cache components. Project selection sits above; checkpoints and assumptions remain nearby.
-- **Toolbar:** neutral history/reset controls and one teal run/pause action. Autosave status remains a small operational cue.
-- **Graph node:** icon, name, configured rate/capacity and an external footnote. Before a run, footnotes describe the model; after a run, they show observed queue and utilization. An amber border and alert icon mark observed utilization above 95%.
-- **Connections:** smooth directed teal edges label configured-rate calculations with `expected`. Running edges animate; selection is amber. These labels are predictions, not measured throughput.
-- **Inspector:** configuration and explanation tabs share a dock. Inputs show units; explanation pairs predicted demand/capacity with teaching copy and a concrete next action. Measured node accounting appears only once a run has advanced. Preserve the explicit prediction-versus-simulation sentence.
-- **Metrics:** collapsed output shows completed requests/s, p95 latency, current queue, failed requests and simulated time where space allows. Unavailable results display an em dash. Expansion reveals observed queue history, request accounting and previous-run comparison. Latency describes successful requests only; throughput is completed requests divided by elapsed time. Compare runs only when workload seed, traffic, duration and timeout match.
-- **Feedback:** semantic status callouts, validation banners, save status, toasts and accessible focus outlines explain state. Buttons transition background and border over 0.15s; the running guide dot pulses over 1s. Reduced-motion mode suppresses transitions and animation.
-
-## Do's and Don'ts
-
-- Do preserve the docked workspace hierarchy and readable graph cards.
-- Do label configured-rate predictions as expected and measured values as simulation output.
-- Do show units, empty measurement states and explicit illustrative assumptions.
-- Do keep mobile cards readable through pan and zoom and retain checkpoint disclosure.
-- Don't introduce a marketing hero, decorative imagery or a new visual identity into the workspace.
-- Don't shrink the entire mobile graph to fit at the expense of readable labels.
-- Don't present predicted database arrivals or configured capacities as measured results.
-- Don't silently replace the explicit processing model with visual abstraction.
-
-
-## Expandable component detail (milestone 4)
-
-The compact 215 px node card retains its original footprint in the request path. A small right-hand chevron expands it downward, keeping connection handles at the header's 39 px center. The inspector offers the same action explicitly. Details reveal the existing model rather than introduce a new one: ten aggregate queue-occupancy segments, one processing slot, sampled state, fixed processing time and relevant counters. Cache branching labels describe configured hit/miss probabilities. A quiet “Same model · view only” footer preserves the distinction.
-
-Traffic connections use a persistent solid route plus small teal directional dots. A 1.2-second linear CSS loop travels one 24 px dash period and retains its phase through pause/resume. Renderer measurements are retained across worker updates so edges do not remount. The cue pauses on hidden pages and disappears under reduced-motion preferences or zero expected demand.
-
-On mobile, the introductory copy sits above a dedicated 380 px canvas area. Expanded cards are centered at readable scale, with no heading overlay on the revealed details. All expansion metadata belongs to project presentation, outside the simulation graph.
-
-
-## Workload controls (milestone 5)
-
-Traffic pattern is a three-button segmented choice in the existing inspector: Steady, Burst and Ramp. The selected control uses the existing soft-teal selection style. A compact configured-rate plot precedes the rate and timing inputs. Burst times share one row; mobile keeps rate fields full-width.
-
-Live metrics place configured traffic above observed queue history. Both plots stretch over the same time-axis width, with independent explicitly named vertical quantities. Configured rate is teal; queue length is amber. The comparison column explains burst recovery using observed counts, while cumulative latency remains clearly distinct from the final queue state. Edge labels and traffic cards show the instantaneous configured rate without altering animation phase.
-
-
-## Saved experiment results (milestone 6)
-
-Saved runs sit beside checkpoints in the library. A completed run offers an inline naming form. Selecting saved results opens a docked bottom panel, keeping the architecture visible above it. Native baseline/comparison selects lead into a measurement table and a shared-scale queue overlay: baseline amber, comparison teal. Workload matching and imported provenance appear beside the evidence; mismatched workloads suppress deltas.
-
-The desktop panel scrolls internally with a 460 px height cap. Canvas resizing reframes the graph with space reserved for its heading. Mobile keeps readable node scale and places the full results panel in document flow. Rename, restore and delete controls remain accessible below the measurements; deletion offers an inline undo action.
-
-
-## Editable service internals (milestone 8)
-
-The expanded service retains its queue, processor and observed counters. Two compact, labeled inputs below those measurements edit capacity and waiting slots. Apply changes commits both values in one action; Cancel/Escape discards the draft. A short note explains the run reset and Undo. Inputs inherit the workspace's fields, typography and focus treatment; canvas drag, pan and deletion keys do not intercept editing.
-
-Only service internals gain these controls. Database/cache views retain their view-only note. Mobile allocates 500 px to the canvas when service controls are present, preserving the readable 0.9 node scale and full access to inputs/actions. This is direct parameter editing, not nested graph editing.
-
-
-## Concurrent service workers (milestone 9)
-
-Expanded services add a Workers field to the existing atomic edit form. The capacity label explicitly says Per worker; a compact equation shows the applied worker count × rate = total req/s. The node header shows total capacity. The inspector uses the same worker-count and total-capacity domain helpers, labels capacity units req/s/worker and explains the shared queue.
-
-The processor block labels the configured slot count and sampled occupied count. Up to sixteen aggregate occupancy segments use teal for occupied slots, with an accessible meter and sampled-state wording; these segments do not identify individual worker histories. The queue remains one shared bounded FIFO. Service utilization is labeled worker utilization. Mobile provides a 580 px canvas when the service editor is expanded, keeping all sixteen slots and editing actions visible at readable scale.
-
-Saved-result contexts identify historical single-worker models. Comparisons explain model-version mismatches and suppress deltas while leaving original measurements intact. Other docks, components, traffic motion and the selected light design remain consistent.
-
-
-## Background jobs and subsystem composition
-
-The light docked workspace now offers an Experiment path selector. Job queue and worker cards reveal admission, attempt processing and retry settings; producer acknowledgement is explicitly distinct from completion. Job edges distinguish offered traffic from observed attempts. Subsystems use a lightly tinted dashed enclosure when expanded and a compact solid summary when collapsed. Header dragging moves members together. Names and controls remain in the left dock; mobile uses disclosures and a readable focused node rather than squeezing the whole subsystem into view. Renderer-only group dimensions are retained across samples to keep collapsed cards and boundary edges stable.
-
-
-## Guided experiments
-
-A compact library selector loads four concrete starters. The inspector's guide contains one learning question, three practical steps and an observed-results disclosure. Guide in the toolbar returns to it after component inspection. Findings use current measured queue, completion, attempt and failure counters; they do not claim real-system sizing. The guide is model metadata excluded from the simulation signature, preserving live runs when returning to free exploration and restoring the selected lesson with Undo/checkpoints. Mobile keeps native selectors and the coach in document flow.
-
-Viewport restoration considers canvas height and node identity changes. This preserves manual zoom for an unchanged workspace while reframing when switching starter graphs or returning from a differently sized results pane. Expanded controls remain inside the canvas.
-
-Finite caches retain the existing node and inspector layout. Their header shows LRU and the configured entry limit; internals distinguish observed cache decisions from configured fixed-probability routing. Traffic configuration exposes catalog size and uniform/hot-link popularity. Shrinking the catalog clamps the hot subset atomically. Live and saved result tables show observed hit rate using completed hits plus misses as denominator, alongside occupancy, evictions and expiry. Finite database demand remains unknown until measured. The mobile component library wraps within the dock.
-
-## Architecture component library
-
-Architecture diagram mode preserves the docked canvas but changes its job from executable experiment to system composition. The left library becomes a searchable catalog of 29 component types grouped by Clients, Edge, Compute, Data, Messaging and Operations. The generic custom component separates a 60-character type caption from its instance name. The diagram supports up to 100 components and 200 directed connections. Component cards retain the compact node grammar and Lucide stroke language; long type and instance labels wrap within their bounded card. Each card has an editable name and a 240-character responsibility or technology note. Touch-operable handles on both sides create free-form connections, while selecting an edge reveals an explicit Delete connection action in addition to keyboard deletion.
-
-Diagram edges intentionally omit request-rate labels and animation. The toolbar identifies the mode as diagram-only and disables run/reset actions, the bottom strip reports component and connection counts, and the inspector explains the boundary between visual architecture and exact simulation. Diagram components never acquire implied execution behavior; URL lookup, load-balanced lookup and background-job simulation remain unchanged. Mobile constrains the catalog to a scrollable two-column region so the canvas remains reachable and preserves the selected-edge delete action for touch use.
-
-Selected diagram connections open a compact canvas editor for a concise relationship label, protocol, and flow type. Synchronous paths are solid, asynchronous paths dashed, and data movement dotted; labels combine the relationship and protocol without introducing throughput claims. The same editor carries the touch-safe delete action.
-
-The selected-node inspector includes a 44px Duplicate component action. Duplication copies node-local configuration and metadata, offsets the copy deterministically, selects it and records one history entry. Connections, subsystem membership and expanded presentation state remain attached only to the original. At 100 components the action is disabled with an inline explanation.
-
-## Architecture templates
-
-A compact native disclosure above component search introduces three diagram starters without competing with the catalog. The empty initial selector prevents accidental replacement. Selecting an option reveals one sentence describing its learning purpose; the separate 44px Load template action performs the replacement. Helper text states that Undo restores the current diagram.
-
-Real-time chat uses a message-write spine with persistence and asynchronous notification branches. Ecommerce checkout separates catalog reads, external payment authorization and queued fulfillment. Event processing branches transformed events into archive and warehouse/analytics paths. All use the existing compact cards, labeled solid/dashed/dotted connections and left-to-right spacing. Desktop frames the complete graph; mobile keeps a readable first node and panning behavior. The templates are editable educational diagrams and never imply execution or production completeness.
-
-## Canvas organization
-
-A compact floating organizer keeps position tools inside the diagram canvas. Its selected count and Shift-click hint stay visible; a 44px **Select components** action opens named checkbox rows for touch and keyboard use. Two-card selections expose edge alignment, while three-card selections add equal-gap distribution. Disabled distribution explains insufficient space instead of overlapping cards. Multi-selection replaces the single-component inspector with a positions-only summary.
-
-Selected component cards retain the teal outline. Alignment does not reframe the viewport, and dragging any selected card translates the set as one history edit. Expanded diagram subsystem members remain selectable and their dashed boundary recomputes around new positions. Collapsed members and subsystem shells remain outside organization actions. Diagram subsystem headers name the boundary and component count; collapsed copy says **Architecture boundary**, reserving waiting/active counters for executable experiments.
-
-## Diagram image export
-
-Diagram image actions sit in the existing bottom guidance strip, keeping the canvas unobstructed. The copy states **Entire diagram · current subsystem view** and pairs two 44px actions for SVG and PNG. At narrower desktop widths the strip wraps; on mobile the actions share the available row. Pending, success, and retryable error feedback occupy a stable status line.
-
-Exports are clean white-background renditions of the full graph using its model positions, compact cards, typed connection paths, labels, and current subsystem collapse state. They omit editor selection, controls, footnotes, pan, and zoom. SVG keeps full vector dimensions and metadata titles. PNG rasterizes the same SVG at up to 2× scale after capping both sides to 8192 pixels and total area to 16 million pixels.
-
-## Canvas notes
-
-Canvas notes extend the existing light docked Operate workspace as restrained, typed design context. The card is 240px wide with an amber-soft fill, a `#dbc9a9` border and `#80500d` type ink; selection changes the border to teal. Titles and body copy wrap within the card, while long body text is truncated to seven lines on canvas. The note heading's collapse control, the organizer's Add canvas note action and inspector actions use a 44px minimum touch target.
-
-Adding a canvas note from the organizer selects it and opens the docked Canvas note inspector. The inspector edits type, title, text and semantic attachments to components, connections or subsystems, with Apply note and Cancel preserving the existing draft behavior. Full note text remains available in the inspector with the 1,000-character count; unavailable attachments remain explicit. The footer states that notes are design context with no simulation behavior, and note changes or deletion can be undone.
-
-On mobile, the organizer moves into document flow above the 380px canvas, so its controls cannot overlap the graph. The note editor follows the canvas and export controls in the same flow. Notes move, collapse, persist and export with the architecture while leaving simulation configuration and results unchanged.
+## 1. Executive Summary & Philosophy
+
+**System Studio** is an interactive, browser-based system architecture modeling, discrete-event simulation, and verification platform. It allows software architects, systems engineers, and learners to model complex distributed systems, execute realistic multi-scenario discrete-event simulations, inspect detailed packet/cycle lifecycles, and maintain architectural integrity using an immutable Git-like commit Directed Acyclic Graph (DAG) and 3-way semantic merging.
+
+### Creative North Star: "Evergreen Paper"
+Unlike traditional SaaS tools that lean on generic dashboards, heavy dark modes, or illustrative marketing fluff, System Studio is built as a **quiet, utilitarian, scan-friendly, paper-like studio**. It prioritizes high information density, strict control semantics, hairline borders, and predictable layout stability.
+
+### Core Architectural Axioms
+1. **Model / View Separation**: Canvas visual metadata (x/y coordinates, grouping boundaries, notes, colors) never enters the run manifest or affects simulation semantics.
+2. **Simulation Accounting Integrity**: Exact FIFO queuing, per-attempt latencies, caller retry draws, broker redeliveries, and stochastic service distributions are strictly modeled. Nothing is reported as passed or measured unless executed.
+3. **Off-Thread Discrete-Event Simulation**: The execution kernel runs strictly in a dedicated Web Worker via typed message protocols (`compile`, `start`, `control`, `step`, `terminal`), preventing main-thread UI jank.
+4. **Draft Safety & Isolation**: All inspector and configuration changes are held in isolated drafts (`DraftSession`). Unapplied drafts prevent runs until explicitly applied or discarded.
+5. **Verified Publication**: Committing or publishing to `main` requires completed, passing runs with matching exact-fingerprint receipts for every configured scenario.
+6. **Local-First & Portable Persistence**: State is stored in browser-local IndexedDB (`system-studio-local-v1`) with zero remote dependencies, and exports to a portable, checksummed format v9 bundle.
+
+---
+
+## 2. High-Level System Architecture
+
+System Studio is architected in four strict conceptual layers, preserving clean boundaries between rendering, workflow coordination, pure domain modeling, and off-thread simulation.
+
+```mermaid
+flowchart TB
+    subgraph UI_Layer["UI & Presentation Layer (React 19 + TypeScript)"]
+        direction TB
+        AppShell["App Shell & Navigation Router (src/App.tsx)"]
+        EntryScreen["Entry / Project Catalog (src/features/entry/)"]
+        Workspace["Workspace Shell (src/features/workspace/Workspace.tsx)"]
+        
+        subgraph StudioPanels["Studio Panels & Views"]
+            TopBar["TopBar & Branch Popover (TopBar.tsx)"]
+            CanvasView["Canvas View & Graph Renderer (CanvasView.tsx)"]
+            InspectorPanel["Inspector Panel & Draft System (features/inspector/)"]
+            ScenarioEditor["Scenario Editor & Workloads (features/scenarios/)"]
+            ResultsRegion["Results Region & Playback (features/runs/)"]
+            HistoryLadder["History Ladder & Publish Review (features/history/)"]
+            LibraryPanel["Catalog & Saved Parts (features/library/)"]
+        end
+
+        Foundation["Foundation UI Primitives & Design Tokens (src/components/ui/, src/styles.css)"]
+    end
+
+    subgraph State_Layer["Session & Coordination Controllers"]
+        SessionCtrl["SessionController (features/session/controller.ts)<br/>Autosave, Project & Branch State"]
+        RunCtrl["RunController (features/runs/RunController.ts)<br/>Scenario Runs, Fingerprints, Playhead"]
+        HistoryCtrl["History & Publish Controllers (features/history/)<br/>Commit DAG, 3-Way Merge, CAS Publish"]
+    end
+
+    subgraph Domain_Layer["Pure Domain Engine (src/domain/studio/)"]
+        StudioModel["Studio Model (domain/studio/model.ts)<br/>Elements, Ports, Connections, Scenarios"]
+        Readiness["Readiness & Validation (domain/studio/readiness.ts)<br/>Topology, Port Protocols, Constraints"]
+        Compiler["Manifest Compiler (domain/studio/manifest.ts)<br/>Strips View Metadata -> Canonical Manifest"]
+        Versioning["Versioning Domain (domain/versioning/)<br/>Diff, Merge, Commit DAG, Fingerprints"]
+        Parts["Parts Domain (domain/parts/)<br/>Selection Capture, ID Remap, Library"]
+    end
+
+    subgraph Simulation_Layer["Simulation Engine (Dedicated Web Worker)"]
+        WorkerEntry["Worker Dispatcher (src/simulation/open/worker.ts)"]
+        Protocol["Typed Protocol RPC (src/features/runs/protocol.ts)"]
+        Kernel["Open Simulation Kernel (src/simulation/open/kernel.ts)<br/>Discrete-Event Queue, Stochastic Engines, Faults"]
+        Telemetry["Telemetry & Playback Buffer (playback.ts)<br/>Cycle Frames, Lifecycle Flashes, Density Strips"]
+    end
+
+    subgraph Storage_Layer["Local Storage & Portable Bundles"]
+        DexieDB["Dexie IndexedDB (system-studio-local-v1)"]
+        StorageAdapter["Repository Adapter (persistence/studio/repository.ts)"]
+        PortableBundle["Format v9 Portable Exporter / Importer (persistence/studio/bundle.ts)"]
+    end
+
+    UI_Layer --> State_Layer
+    State_Layer --> Domain_Layer
+    State_Layer --> Simulation_Layer
+    State_Layer --> Storage_Layer
+    Simulation_Layer -.-> Kernel
+    Kernel -.-> Telemetry
+    Telemetry -.-> RunCtrl
+    Storage_Layer --> DexieDB
+```
+
+---
+
+## 3. Foundation Design System (Evergreen Paper)
+
+System Studio implements a **Foundation-First Design System** governed by [`.agents/rules/foundation-design-system.md`](file:///Users/ankushjamdagani/personal/system-design-planner/.agents/rules/foundation-design-system.md) and [`.agents/rules/frontend-guidance.md`](file:///Users/ankushjamdagani/personal/system-design-planner/.agents/rules/frontend-guidance.md).
+
+All visual styling, tokens, radii, borders, and interaction states are centralized in [`src/styles.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/styles.css) and 41 foundation components in [`src/components/ui/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui). Feature code in `src/features/*` orchestrates domain logic and layout; it never applies bespoke Tailwind overrides or utility styling hacks.
+
+### 3.1 Color Palette & Token Roles
+The design uses an **Evergreen paper** palette (light mode only, dark themes explicitly rejected per architectural decision D02/D24). All pairs meet WCAG 2.2 AA contrast standards (>= 4.5:1 for normal text, >= 3.0:1 for meaningful control boundaries).
+
+| Role | Token Variable | Hex Value | WCAG Contrast / Usage |
+|---|---|---|---|
+| **Canvas** | `--canvas` | `#FFFFFF` | Main diagram drawing surface (with `#DCD7CD` 20px dot grid) |
+| **Shell** | `--shell` | `#FBFAF7` | Application frame, navigation bar, footer |
+| **Panel** | `--panel` | `#F7F5F1` | Docked and floating tool panels (Inspector, History, Library) |
+| **Sunken** | `--sunken` | `#F2EFE9` | Recessed backgrounds, table headers, timeline track |
+| **Ink (Body)** | `--foreground` / `--ink` | `#16201D` | Primary text and headlines (14.2:1 against paper) |
+| **Secondary Ink** | `--secondary-text` | `#626D68` | Field labels, captions, metadata (4.94:1 against panel) |
+| **Primary (Action)** | `--primary` | `#0B5C54` | Primary commands, Run buttons, focused elements (7.53:1) |
+| **Primary Hover** | `--primary-hover` | `#0A4E47` | Active hover states on primary controls |
+| **Primary Pressed** | `--primary-pressed` | `#083F3A` | Active click/press states |
+| **Selected Tint** | `--accent` | `#EAEFEC` | Selection background in lists and cards |
+| **Selected Edge** | `--selected-edge` | `#A8CBC5` | Selection highlight border around nodes and rows |
+| **Branch / Async** | `--branch` | `#7C5FC0` | Versioning badges, async queues, messaging edges (4.54:1) |
+| **Branch Tint** | `--branch-tint` | `#F7F4FC` | Soft lavender fill for message tags and branch chips |
+| **Risk / Error** | `--risk` / `--risk-text` | `#A15B40` | Budget overruns, bottleneck alerts, failed SLA (4.62:1) |
+| **Risk Tint** | `--risk-tint` | `#FBF1EA` | Soft clay fill for warnings and failing metrics |
+| **Hairline Dividers** | `--border` | `#E7E3DB` | Clean structural dividing hairlines |
+| **Control Border** | `--control-border` | `#DCD7CD` | Default border for inputs, buttons, and segmented controls |
+| **Hover Border** | `--hover-border` | `#C6C0B4` | Border color on control hover |
+| **Canvas Note** | `--note` / `--note-edge` | `#FBF6E8` / `#E6DAB8` | Amber-toned sticky notes and annotations |
+
+### 3.2 Typography Tokens
+System Studio specifies three distinct type families imported locally (no external CDNs), with strict semantic allocation:
+
+1. **UI Sans (`--font-sans`):** `"IBM Plex Sans", system-ui, -apple-system, sans-serif`  
+   - Used for all interface chrome, button labels, panel titles, inspector inputs, and body text.
+   - Letter-spacing is strictly `0` (zero negative letter-spacing per design rules).
+2. **Numeric & Data Mono (`--font-mono`):** `"IBM Plex Mono", ui-monospace, monospace`  
+   - Used for all metrics, latencies, requests/s, ports, protocols, timestamps, and commit hashes.
+   - Fixed tabular numeral alignment prevents UI jitter during live simulation playback.
+3. **Display Serif (`--font-display`):** `"Newsreader Variable", Georgia, serif`  
+   - Used sparingly for the brand logo mark, project titles, and formal publication review summaries.
+
+### 3.3 Geometry, Elevation & Radii Tokens
+- **Corner Radii:**
+  - Tags & Small Badges: `4px`
+  - Form Controls, Buttons & Inputs: `7px`
+  - Node Cards on Canvas: `9px`
+  - Popovers & Dropdown Menus: `11px`
+  - Modal Dialogs & Major Cards: `12px`
+  - Canvas Floating Dock: `14px`
+- **Control Semantics:**
+  - Tools $\rightarrow$ Icon buttons with Lucide icons and hover tooltips.
+  - Modes $\rightarrow$ Segmented controls (e.g. Select vs Connect vs Pan).
+  - Binary Settings $\rightarrow$ Explicit toggles/checkboxes.
+  - Numbers $\rightarrow$ Steppers or validated numeric inputs with unit suffixes.
+  - Option Sets $\rightarrow$ Menus and select dropdowns.
+  - Views $\rightarrow$ Tab bars with hairline active indicators.
+
+---
+
+## 4. UI Shell & Presentation Architecture
+
+The user interface is hosted in [`src/features/workspace/Workspace.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/Workspace.tsx) and managed by modular panels dockable across left, right, bottom, or floating configurations.
+
+### 4.1 Shell Layout Breakdown
+```
++-----------------------------------------------------------------------------------------------+
+| TopBar: [App Mark] · [Project / Branch [DRAFT] ▾] · [⌘K Quick Options] · [History] [Library] [Run] |
++------------------+---------------------------------------------------------+------------------+
+|                  |                                                         |                  |
+| Docked Left      | Central Canvas (20px Dotted Paper Grid)                 | Docked Right     |
+| (Optional):      |                                                         | (Optional):      |
+| - Library /      |  [Node: Client] ──(HTTP)──> [Node: Gateway]             | - Inspector:     |
+|   Catalog        |                                   │                     |   Configuration, |
+| - Scenarios      |                                (gRPC)                   |   Measured run,  |
+| - Collapsed rail |                                   ▼                     |   Apply / Cancel |
+|                  |                           [Node: Service]               |                  |
+|                  |                                                         |                  |
+|                  | +-----------------------------------------------------+ |                  |
+|                  | | Canvas Dock: Undo Redo | Select Pan Node Edge | Fit | |                  |
+|                  | +-----------------------------------------------------+ |                  |
++------------------+---------------------------------------------------------+------------------+
+| Bottom Region: Results & Playback Controls                                                    |
+| [Play/Pause] [Seek] [Speed x1] [Timeline Density Strip] [Total Reqs | Latency p95 | Failures]  |
++-----------------------------------------------------------------------------------------------+
+```
+
+### 4.2 Main View Components
+- **TopBar ([`src/features/workspace/TopBar.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/TopBar.tsx)):** Houses project branding, editable project title, branch switch popover, Quick Options palette (`⌘K`), global undo/redo, and the primary "Run Simulation" trigger.
+- **CanvasView ([`src/features/workspace/CanvasView.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/CanvasView.tsx)):** Renders the infinite dotted workspace, component node cards (nominal width `176px`), ports with protocol badges, directional Bezier connection paths, and sticky notes.
+- **Canvas Dock ([`src/features/workspace/Dock.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace/Dock.tsx)):** Floating pill dock providing tool selection (Pointer, Pan, Node placement, Connect, Note, Zoom In/Out, Fit-to-screen).
+- **Inspector ([`src/features/inspector/InspectorPanel.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/inspector/InspectorPanel.tsx)):** Right dock providing dual tabs:
+  - *Configuration Tab:* Allows editing node name, capacity, service distribution, worker threads, port protocols, and route conditions. Changes trigger an isolated draft session requiring explicit `Apply` or `Cancel`.
+  - *Measured Tab:* Displays empirical post-simulation utilization, queue lengths, latency distributions, and drop counts for the selected component.
+- **Scenario Editor ([`src/features/scenarios/ScenarioEditor.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios/ScenarioEditor.tsx)):** Manages workloads, duration, warmup cycles, burst/ramp profiles, SLA assertions (latency thresholds, error rate caps), and fault injection schedules.
+- **Results & Playback Region ([`src/features/runs/ResultsRegion.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/runs/ResultsRegion.tsx)):** Synchronized playback panel with playhead scrubber, speed controls ($\times 0.25$ to $\times 16$), density strip for large cycle sets ($>200$ cycles), bottleneck indicators, and per-step telemetry inspection.
+- **History Ladder ([`src/features/history/HistoryPanel.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/history/HistoryPanel.tsx)):** Git-like commit tree displaying commit checkpoints, verification receipts, branch heads, 3-way merge conflict resolution, and atomic compare-and-set publication to `main`.
+- **Component Library ([`src/features/library/LibraryPanel.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library/LibraryPanel.tsx)):** Standard catalog of distributed system building blocks (Clients, Gateways, Load Balancers, Services, Caches, Queues, Databases, Object Storage) and reusable saved parts.
+
+---
+
+## 5. Domain Engine Architecture (`src/domain/`)
+
+The domain layer is pure TypeScript, completely decoupled from React, the DOM, and IndexedDB storage. It can run in any environment (main thread, Web Worker, or headless test runner).
+
+### 5.1 Document Model ([`src/domain/studio/model.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/studio/model.ts))
+The root document entity is the `StudioDocument`, representing a complete system specification:
+
+```typescript
+export interface StudioDocument {
+  readonly schema: 'studio-document/1';
+  readonly id: Id;
+  readonly title: string;
+  readonly elements: readonly ElementRecord[];
+  readonly connections: readonly ConnectionRecord[];
+  readonly relations: readonly StructuralRelationRecord[];
+  readonly schemas: readonly PayloadSchemaRecord[];
+  readonly fixtures: readonly FixtureRecord[];
+  readonly refinements: readonly RefinementRecord[];
+  readonly scenarios: readonly ScenarioRecord[];
+  readonly views: readonly ViewRecord[];
+}
+```
+
+Key Domain Entities:
+- **`ElementRecord`:** A discrete architectural building block (e.g. `service`, `database`, `queue`, `router`, `cache`, `client`). Contains typed ports (`in` and `out`), capacity limits, concurrency parameters, and operational behavior definitions.
+- **`Port`:** An attachment interface on an element specifying direction (`in`/`out`), transport protocol (e.g., `http`, `grpc`, `amqp`, `sql`, `redis`), routing path, and delivery guarantees (e.g., `at-least-once`, `fifo`).
+- **`ConnectionRecord`:** A directional edge connecting an `out` port to an `in` port. Models physical network links with configured latency, bandwidth, packet loss rate, and transport protocol.
+- **`ScenarioRecord`:** A self-contained simulation workload definition specifying the target entry elements, traffic profile (steady, Poisson, burst, ramp), duration, seed, fault injections, and SLA verification assertions.
+- **`ViewRecord`:** Presentation-only layouts specifying visual node coordinates, groupings, collapsed states, and canvas notes. Strictly excluded from simulation manifests.
+
+### 5.2 Readiness & Validation ([`src/domain/studio/readiness.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/studio/readiness.ts))
+The readiness engine validates graph integrity across five progressive stages:
+1. **Sketch:** Nodes and connections placed on canvas.
+2. **Behavior Specified:** Every element has assigned capacities, queue depths, and processing times.
+3. **Scenario Configured:** Entry points connected to workloads with specified request classes and rates.
+4. **Runnable:** Ports have compatible protocols, routes reach terminating resources, and no invalid synchronous cycles exist.
+5. **Verified:** Scenarios executed to completion, passing all SLA checks.
+
+### 5.3 Manifest Compiler ([`src/domain/studio/manifest.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/studio/manifest.ts))
+The manifest compiler strips all visual view metadata, validates the behavioral graph against scenario constraints, and generates an immutable, canonical **Run Manifest** (`RunManifest`) passed to the simulation worker.
+
+---
+
+## 6. Simulation & Execution Kernel (`src/simulation/open/`)
+
+The simulation engine is a deterministic, discrete-event simulation (DES) kernel executing inside a dedicated Web Worker ([`src/simulation/open/worker.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/simulation/open/worker.ts)) over a typed RPC protocol ([`src/features/runs/protocol.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/runs/protocol.ts)).
+
+### 6.1 Worker Protocol & Lifecycle
+```mermaid
+sequenceDiagram
+    autonumber
+    actor UI as RunController (Main Thread)
+    participant W as Web Worker (protocol.ts)
+    participant K as Discrete-Event Kernel (kernel.ts)
+
+    UI->>W: compile(StudioDocument, scenarioId)
+    W->>W: Compile Canonical RunManifest
+    W-->>UI: { status: "ready", fingerprint, estimatedSteps }
+
+    UI->>W: start({ runId, seed, speed, batchSize })
+    W->>K: Initialize Event Queue & Resources
+
+    loop Simulation Execution (Batch Ticks)
+        K->>K: Advance Event Queue (FIFO / Timers / Latencies)
+        K->>W: Emit Lifecycle Events & Telemetry
+        W-->>UI: run-step({ cycle, activeRequests, queueDepths, deltas })
+    end
+
+    alt User Pauses or Seeks
+        UI->>W: control({ action: "pause" | "seek" | "speed", targetCycle })
+        W->>K: Adjust Clock & Playhead
+        W-->>UI: playhead-ack({ currentCycle })
+    end
+
+    K->>W: Execution Terminated (Completed or Fault)
+    W-->>UI: terminal({ runReceipt, metricsSummary, passed })
+```
+
+### 6.2 Discrete-Event Mechanics
+- **Queue Accounting:** Bounded FIFO queues per resource with exact head-of-line blocking, slot reservation, and drop tracking.
+- **Service Distributions:** Supports deterministic processing times, exponential service rates, and lognormal heavy-tail distributions.
+- **Network Link Modeling:** Default 2ms network hops with packet serialization and transmission latency.
+- **Caller Retries:** Configurable retry counts with exponential backoff and randomized jitter.
+- **Broker Fanout & Redelivery:** Message queues support fanout broadcasting, consumer groups, message expiration (TTL), and unacknowledged redelivery.
+- **Fault Injection:** Injects node crashes, port partitions, latency spikes, and packet corruptions at precise simulated timestamps.
+
+### 6.3 Telemetry & Playback Synchronization
+- **Playhead Synchronization:** The playhead links the canvas traffic animations, timeline scrubber, and metrics results table to the exact simulated millisecond.
+- **Density Strip:** For long runs ($>200$ cycles), the timeline collapses individual cycle bands into a high-density heatmap strip highlighting bottleneck regions and SLA faults.
+- **Lifecycle Flashes:** Canvas nodes render subtle, transient visual cues for packet admissions, processing starts, and outcome completions (send, arrival, error).
+
+---
+
+## 7. Versioning & Commit DAG (`src/domain/versioning/`)
+
+System Studio incorporates a local Git-like version control engine for distributed system designs ([`src/domain/versioning/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/versioning)).
+
+### 7.1 Commit Graph & Branching
+- **Commit Records:** Immutable snapshot records storing parent commit IDs, author metadata, timestamp, document snapshot hash, and verification receipts.
+- **Branch Pointers:** Mutable local pointers (`main`, feature branches) referencing specific commit nodes.
+- **Working Snapshot:** Uncommitted drafts held in a branch-specific working buffer.
+
+### 7.2 Three-Way Semantic Merge ([`src/domain/versioning/merge.ts`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/versioning/merge.ts))
+When merging a feature branch into `main`:
+1. The engine computes the **Merge Base** (lowest common ancestor commit in the DAG).
+2. Performs element-by-element, port-by-port, and scenario-by-scenario 3-way diffing:
+   - Non-overlapping additions and updates merge automatically.
+   - Conflicting property changes on identical elements trigger explicit conflict records.
+3. The merged candidate document must pass readiness checks and execute all scenarios successfully before publication.
+
+### 7.3 Verified Publication & Compare-And-Set (CAS)
+- Committing or publishing to `main` requires completed, passing runs with **matching exact-fingerprint receipts** for every configured scenario.
+- Publication is executed as an atomic Compare-And-Set (CAS) transaction against IndexedDB: if `main` moved in another tab, the transaction aborts, prompting the user to rebase.
+
+---
+
+## 8. Local Storage & Bundle Architecture (`src/persistence/studio/`)
+
+System Studio uses a strictly local-first storage design. No diagrams or simulation runs are sent to remote servers.
+
+### 8.1 IndexedDB Database Schema
+- **Database Name:** `system-studio-local-v1` (managed via Dexie).
+- **Tables:**
+  - `projects`: Project metadata, active branch pointer, created/updated timestamps.
+  - `commits`: Immutable commit DAG entries.
+  - `branches`: Named branch heads referencing commit IDs.
+  - `workingCopies`: Active uncommitted document snapshots per branch.
+  - `runReceipts`: Cryptographically verified simulation execution results keyed by run fingerprint.
+  - `parts`: Reusable saved components and subgraphs.
+
+### 8.2 Portable Bundle Format v9 (`system-studio` v9)
+Projects export and import using a standardized, self-contained JSON format v9 bundle:
+- Uses Canonical JSON (`canonical-json-v1`) with sorted keys and stable float formatting.
+- Includes a SHA-256 integrity checksum over the document payload.
+- Legacy format bundles (v7/v8) are strictly rejected with typed errors; no automatic migration is performed, protecting data integrity.
+
+---
+
+## 9. End-to-End Data Flows
+
+### Flow 1: Visual Authoring to Canonical Manifest Compilation
+```
+[User Canvas Interaction] ──> [Workspace State Reducer]
+                                      │
+                                      ▼
+                             [StudioDocument Update]
+                                      │
+                           [Readiness Validator]
+                             ├──> Valid? ──No──> [Inline Inspector Diagnostics]
+                             │
+                            Yes
+                             │
+                             ▼
+                    [Manifest Compiler]
+                 (Strips View Coordinates/Notes)
+                             │
+                             ▼
+                    [Canonical RunManifest]
+```
+
+### Flow 2: Simulation Execution, Telemetry, and Playback
+```
+[RunController] ──> postMessage("start", RunManifest) ──> [Worker Kernel]
+                                                                │
+                                                    [Discrete-Event Queue]
+                                                                │
+[PlaybackPanel] <── postMessage("run-step", Telemetry) <───────┘
+       │
+       ├──> Updates Playhead Scrubber & Timeline Strip
+       ├──> Triggers Node Lifecycle Flashes on Canvas
+       └──> Updates Live Latency / Throughput / Queue Counters
+```
+
+### Flow 3: Scenario Verification, Commit DAG, and Publication
+```
+[Run Complete] ──> [Verify Scenario SLA Assertions]
+                          │
+                   All Passed?
+                    ├── No  ──> [Mark Failed, Block Commit]
+                    └── Yes ──> [Generate Cryptographic RunReceipt]
+                                      │
+                          [Create Immutable Commit]
+                                      │
+                         [3-Way Semantic Merge Review]
+                                      │
+                         [CAS Atomic Publish to Main]
+```
+
+---
+
+## 10. Core Architectural Invariants
+
+Preserve in all future development:
+1. **Model / View Separation**: Canvas visual metadata (x/y coordinates, group boundaries, sticky notes) never enters the run manifest or affects simulation semantics.
+2. **Simulation Accounting**: Strict separation between configured architecture and observed results; exact per-attempt latency, FIFO queuing, and retry draws. The retained open kernel (`src/simulation/open/`) is pinned by characterization goldens.
+3. **Draft Safety**: Unapplied inspector changes remain in isolated drafts (`DraftSession`). An invalid draft blocks simulation runs until explicitly applied or discarded.
+4. **Verified Publication**: Committing or publishing to `main` requires completed, passing runs with matching exact-fingerprint receipts for every configured scenario.
+5. **Portable Persistence**: Only format v9 bundles import; older versions (v7/v8) are rejected with a clear message. The legacy `system-studio` database is never touched.
+6. **Foundation-First UI**: Foundation components (`src/components/ui/`) and tokens (`src/styles.css`) are the core of the app. Never use ad-hoc Tailwind overrides in feature code.
+
+---
+
+## 11. Codebase Module Map & Navigation
+
+| Subsystem | Directory / Key Files | Primary Responsibility |
+|---|---|---|
+| **Foundation UI Primitives** | [`src/components/ui/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/components/ui) | 41 CVA-based accessible UI components (Button, Dialog, Popover, Input, Slider, Resizable, etc.). |
+| **Design Tokens & Theme** | [`src/styles.css`](file:///Users/ankushjamdagani/personal/system-design-planner/src/styles.css) | Core Evergreen paper design tokens, typography imports, and Tailwind v4 theme bindings. |
+| **App Shell & Entry** | [`src/App.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/App.tsx), [`src/features/entry/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/entry) | Navigation router, project catalog, template loaders, and lazy-loaded route boundaries. |
+| **Workspace & Canvas** | [`src/features/workspace/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/workspace) | CanvasView, docking system, tool dock, pan/zoom engine, and keyboard command registry. |
+| **Inspector & Drafts** | [`src/features/inspector/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/inspector) | Dual-tab property editor with atomic Apply/Cancel draft session management. |
+| **Scenario Management** | [`src/features/scenarios/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios) | Workload builders, burst/ramp traffic profiles, and SLA assertions. |
+| **Runs & Playback** | [`src/features/runs/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/runs) | `RunController`, `ResultsRegion`, `PlaybackPanel`, timeline density strip, and playhead synchronization. |
+| **History & Versioning** | [`src/features/history/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/history) | Git-like commit tree, branch switcher, 3-way merge conflict resolver, and publication review. |
+| **Parts & Library** | [`src/features/library/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library) | Component catalog, saved architecture templates, and reusable parts. |
+| **Domain Engine** | [`src/domain/studio/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/studio) | Pure domain model (`model.ts`), readiness checks (`readiness.ts`), and manifest compiler (`manifest.ts`). |
+| **Versioning Engine** | [`src/domain/versioning/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/domain/versioning) | Commit DAG, 3-way semantic merge (`merge.ts`), base discovery, and fingerprinting. |
+| **Simulation Kernel** | [`src/simulation/open/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/simulation/open) | Discrete-event simulation kernel (`kernel.ts`), worker entrypoint (`worker.ts`), and characterization tests. |
+| **Persistence & Storage** | [`src/persistence/studio/`](file:///Users/ankushjamdagani/personal/system-design-planner/src/persistence/studio) | Dexie IndexedDB adapter (`repository.ts`, `db.ts`) and format v9 portable bundle exporter. |

@@ -36,7 +36,10 @@ export function placeLeg(
   const before = path.getPointAtLength(Math.max(0, distance - 1));
   const after = path.getPointAtLength(Math.min(length, distance + 1));
   return {
-    ...point,
+    // SVG returns a DOMPoint whose coordinates are prototype getters.
+    // Object spread drops those coordinates in real browsers.
+    x: point.x,
+    y: point.y,
     heading:
       (Math.atan2(after.y - before.y, after.x - before.x) * 180) / Math.PI +
       (leg.direction === "back" ? 180 : 0),

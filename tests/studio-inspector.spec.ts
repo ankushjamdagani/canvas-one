@@ -81,7 +81,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
     await runBtn.click();
-    await expect(page.getByTestId('results-status-badge')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('playback-status')).toBeVisible({ timeout: 15000 });
 
     await page.getByTestId('inspector-close').click();
     await routerNode.click();

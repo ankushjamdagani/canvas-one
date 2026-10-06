@@ -1,4 +1,7 @@
 import * as React from "react";
+import type { GroupImperativeHandle, PanelImperativeHandle } from "react-resizable-panels";
+import type { FlowRecord } from "../../domain/studio/runner/types";
+import type { SimulationHighlight } from "./SimulationHighlight";
 import type { SessionController } from "../session/controller";
 import { formatStudioError } from "../session/formatError";
 import { TopBar } from "./TopBar";
@@ -91,6 +94,10 @@ import { createSelectionExport } from "./exportSelection";
 import { planAddProbe } from "./addProbePlan";
 import { planReplacePart } from "./replacePlan";
 import { ReplacePartDialog } from "./ReplacePartDialog";
+import {
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "../../components/ui/resizable";
 import {
   computeSessionRunDisabledReason,
   readScenarioSelection,
@@ -1132,10 +1139,12 @@ export function Workspace({
 
   const runControlSlot = (
     <ScenarioSwitcher
+      unified
+      executionMode={runController?.getRecordedDocument()?.scenarios.find(item => item.id === runControllerState?.current?.scenarioId)?.mode}
       scenarios={scenarioEntries}
       selectedId={selectedScenarioId}
       runPhase={scenarioRunPhase}
-      disabledReason={sessionRunDisabledReason}
+      disabledReason={!runController ? "Preparing simulation controls" : sessionRunDisabledReason}
       onSelect={handleSelectScenario}
       onRun={handleRunScenario}
       onRunAll={handleRunAll}
@@ -1161,14 +1170,17 @@ export function Workspace({
     return labels;
   }, [document]);
 
+  const recordedDocument = runController?.getRecordedDocument() ?? null;
+  const recordedElementLabels = React.useMemo(() => Object.fromEntries((recordedDocument?.elements ?? []).map(element => [element.id, element.label])), [recordedDocument]);
   const runningOrSelectedScenario = React.useMemo(() => {
     const runningId = runControllerState?.current?.scenarioId ?? null;
     const targetId = runningId ?? selectedScenarioId;
     return (
+      (runningId ? recordedDocument?.scenarios.find(scenario => scenario.id === runningId) : null) ??
       scenariosWithStatus.find((s) => s.scenario.id === targetId)?.scenario ??
       null
     );
-  }, [runControllerState, selectedScenarioId, scenariosWithStatus]);
+  }, [runControllerState, selectedScenarioId, scenariosWithStatus, recordedDocument]);
 
   // RV-05b MEASURED · LAST RUN: only for an element target, from the latest saved
   // run of the currently selected scenario (already exposed by loadScenarioStatuses
@@ -1220,6 +1232,38 @@ export function Workspace({
   // Results are normally contextual to a scenario. The explicit results.open
   // command can also reveal an honest empty state in a blank project.
   const [resultsRequested, setResultsRequested] = React.useState(false);
+  const [resultsOpenRequest, requestResultsOpen] = React.useReducer(value => value + 1, 0);
+  const [inspectionEvent, setInspectionEvent] = React.useState<FlowRecord | null>(null);
+  const [simulationDetailsOpen, setSimulationDetailsOpen] = React.useState(false);
+  const simulationDetailsOpenRef = React.useRef(false);
+  const workspaceResizeRef = React.useRef<GroupImperativeHandle | null>(null);
+  const simulationPanelRef = React.useRef<PanelImperativeHandle | null>(null);
+  const compactSimulationHeight = React.useRef(46);
+  const lastSimulationSize = React.useRef(60);
+  React.useEffect(() => setInspectionEvent(null), [runControllerState?.current?.runId]);
+  const simulationHighlight = React.useMemo<SimulationHighlight | null>(() => {
+    if (!inspectionEvent) return null;
+    const connection = recordedDocument?.connections.find(item => item.id === inspectionEvent.connectionId);
+    const currentConnection = document?.connections.find(item => item.id === inspectionEvent.connectionId);
+    const sameEndpoints = connection && currentConnection && connection.source.elementId === currentConnection.source.elementId && connection.source.portId === currentConnection.source.portId && connection.target.elementId === currentConnection.target.elementId && connection.target.portId === currentConnection.target.portId;
+    const ids = new Set<string>();
+    if (inspectionEvent.elementId) ids.add(inspectionEvent.elementId);
+    if (connection) { ids.add(connection.source.elementId); ids.add(connection.target.elementId); }
+    return { connectionId: sameEndpoints ? inspectionEvent.connectionId : null, elementIds: ids };
+  }, [inspectionEvent, document, recordedDocument]);
+  const connectionLabels = React.useMemo(() => Object.fromEntries((recordedDocument?.connections ?? []).map(connection => [connection.id, `${recordedElementLabels[connection.source.elementId] ?? 'Unavailable source'} → ${recordedElementLabels[connection.target.elementId] ?? 'Unavailable target'}`])), [recordedDocument, recordedElementLabels]);
+  const viewForInspectionEvent = React.useCallback((event: FlowRecord) => {
+    const connection = recordedDocument?.connections.find(item => item.id === event.connectionId);
+    const ids = new Set([event.elementId, connection?.source.elementId, connection?.target.elementId].filter((id): id is string => Boolean(id)));
+    const contains = (view: NonNullable<typeof document>["views"][number]) => view.placements.some(placement => ids.has(placement.elementId));
+    return document?.views.find(view => view.id === activeViewId && contains(view)) ?? document?.views.find(contains);
+  }, [document, recordedDocument, activeViewId]);
+  const locateInspectionEvent = React.useCallback((event: FlowRecord) => {
+    const view = viewForInspectionEvent(event);
+    if (!view) return;
+    setActiveViewId(view.id);
+    requestAnimationFrame(() => canvasViewRef.current?.fitView());
+  }, [viewForInspectionEvent]);
   // results.close hides the region until results.open or the next run starts.
   const [resultsDismissed, setResultsDismissed] = React.useState(false);
   const resultsRegionRef = React.useRef<HTMLDivElement>(null);
@@ -1227,13 +1271,35 @@ export function Workspace({
     !resultsDismissed &&
     (runningOrSelectedScenario !== null || resultsRequested);
   const runPhaseForResults = runControllerState?.phase ?? "idle";
+  const hasSimulation = Boolean(runControllerState?.current || resultsRequested || runPhaseForResults !== "idle");
+  const fitCompactSimulation = React.useCallback((height: number) => {
+    compactSimulationHeight.current = Math.ceil(height) + 1;
+    if (isMobileInspector || !simulationDetailsOpenRef.current)
+      simulationPanelRef.current?.resize(compactSimulationHeight.current);
+  }, [isMobileInspector]);
+  React.useEffect(() => {
+    if (isMobileInspector || !simulationDetailsOpen)
+      simulationPanelRef.current?.resize(compactSimulationHeight.current);
+  }, [simulationDetailsOpen, isMobileInspector, hasSimulation]);
+  const handleSimulationDetailsOpenChange = React.useCallback((open: boolean) => {
+    if (simulationDetailsOpenRef.current === open) return;
+    simulationDetailsOpenRef.current = open;
+    setSimulationDetailsOpen(open);
+    if (isMobileInspector) return;
+    const current = workspaceResizeRef.current;
+    if (!current) return;
+    if (open) {
+      const simulation = Math.max(44, Math.min(60, lastSimulationSize.current));
+      current.setLayout({ canvas: 100 - simulation, simulation });
+    }
+  }, [isMobileInspector]);
   React.useEffect(() => {
     if (runPhaseForResults === "compiling" || runPhaseForResults === "running")
       setResultsDismissed(false);
   }, [runPhaseForResults]);
 
   const staleRun = Boolean(
-    runControllerState?.current?.terminal &&
+    runControllerState?.current &&
     lastRunSnapshotId !== null &&
     sessionState.workingSnapshotId !== null &&
     lastRunSnapshotId !== sessionState.workingSnapshotId,
@@ -2379,6 +2445,7 @@ export function Workspace({
       "results.open": () => {
         setResultsDismissed(false);
         setResultsRequested(true);
+        requestResultsOpen();
         requestAnimationFrame(() => resultsRegionRef.current?.focus());
       },
       "results.close": () => setResultsDismissed(true),
@@ -3195,7 +3262,7 @@ export function Workspace({
           saveStatusText={saveStatusText}
           isSaving={isSaving}
           hasError={hasError}
-          runControl={runControl ?? runControlSlot}
+          runControl={runControl}
           transferActions={transferActions}
           onOpenHistory={openHistoryPanel}
           historyActive={panelState.panels.history.open}
@@ -3226,7 +3293,18 @@ export function Workspace({
               History and Library panels dock/float/collapse around the
               canvas through PanelHost (RV-03a); the inspector stays its own
               contextual region below (commands.md §5) and is never a panel. */}
-          <div className="flex-1 min-h-0 relative">
+          <ResizablePanelGroup
+            orientation="vertical"
+            className="min-h-0 flex-1"
+            groupRef={workspaceResizeRef}
+            defaultLayout={isMobileInspector ? { canvas: 62, simulation: 38 } : { canvas: 90, simulation: 10 }}
+            onLayoutChanged={(layout, meta) => {
+              if (meta.isUserInteraction && simulationDetailsOpenRef.current && layout.simulation !== undefined)
+                lastSimulationSize.current = layout.simulation;
+            }}
+          >
+          <ResizablePanel id="canvas" minSize="40%" className="min-h-0 relative">
+          <div className="h-full min-h-0 relative">
             <PanelHost
               state={panelState}
               dispatch={panelDispatch}
@@ -3280,6 +3358,7 @@ export function Workspace({
                     }
                     trafficEntryElementIds={trafficEntryElementIds}
                     playbackSource={runController}
+                    simulationHighlight={simulationHighlight}
                     linkedProjects={linkedProjects}
                     loadLinkedExposures={async (projectId) => {
                       const record = await repository.loadProject(projectId);
@@ -3320,6 +3399,8 @@ export function Workspace({
               }
             />
           </div>
+          </ResizablePanel>
+          <ResizablePanel id="simulation" panelRef={simulationPanelRef} minSize={!isMobileInspector && simulationDetailsOpen ? "44%" : hasSimulation ? 84 : 46} maxSize="60%" className="min-h-0 overflow-hidden">
 
           {/* 22C/22F publish review + compare-and-resolve, driven by the same
               proactively-prepared PublishController used for the 22E banner. */}
@@ -3354,16 +3435,28 @@ export function Workspace({
           )}
 
           {/* Results region sits below the canvas; explicit open can show its empty state. */}
-          {showResultsRegion && (
+          {(
             <div
               ref={resultsRegionRef}
               tabIndex={-1}
-              aria-label="Results"
-              className="outline-none shrink-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
+              aria-label={showResultsRegion ? "Results" : undefined}
+              className="outline-none h-full min-h-0 overflow-y-auto"
             >
               {runningOrSelectedScenario ? (
                 <PlaybackPanel
                   controller={runController}
+                  setup={runControlSlot}
+                  resultsVisible={showResultsRegion}
+                  resultsOpenRequest={resultsOpenRequest}
+                  onEventSelect={setInspectionEvent}
+                  connectionLabels={connectionLabels}
+                  onLocateEvent={locateInspectionEvent}
+                  canLocateEvent={event => Boolean(viewForInspectionEvent(event))}
+                  onReset={handleResetRun}
+                  mobile={isMobileInspector}
+                  onDetailsOpenChange={handleSimulationDetailsOpenChange}
+                  onCompactHeightChange={fitCompactSimulation}
+                  detailsBlocked={isMobileInspector && Boolean(panelState.activeOverlay === "library" || panelState.activeOverlay === "history")}
                   onRestart={() =>
                     void handleRunScenario(runningOrSelectedScenario.id)
                   }
@@ -3377,22 +3470,25 @@ export function Workspace({
                     runControllerState?.current?.saveStatus ?? "unsaved"
                   }
                   onRetrySave={() => void runController?.retrySave()}
-                  elementLabels={elementLabels}
+                  elementLabels={recordedDocument ? recordedElementLabels : elementLabels}
                   assertionLabels={assertionLabels}
                   staleRun={staleRun}
                 />
               ) : (
                 <section
-                  data-testid="results-empty"
+                  data-testid="playback-panel"
                   role="region"
-                  aria-label="Results"
-                  className="border-t border-border bg-panel p-4 text-sm text-secondary-text"
+                  aria-label="Simulation and playback"
+                  className="border-t border-border bg-shell p-2 text-sm text-secondary-text"
                 >
-                  No run selected yet.
+                  {runControlSlot}
+                  {resultsRequested && <p data-testid="results-empty">No run selected yet.</p>}
                 </section>
               )}
             </div>
           )}
+          </ResizablePanel>
+          </ResizablePanelGroup>
         </main>
 
         {/* RV-05b inspector: 320px right dock >= 768px (commands.md §7); a full-width
@@ -3437,6 +3533,7 @@ export function Workspace({
       {draft &&
       !draft.multi &&
       isMobileInspector &&
+      !simulationDetailsOpen &&
       panelState.activeOverlay !== "library" &&
       panelState.activeOverlay !== "history" ? (
         <div
@@ -3466,6 +3563,7 @@ export function Workspace({
       {scenarioDraft &&
       document &&
       isMobileInspector &&
+      !simulationDetailsOpen &&
       panelState.activeOverlay !== "library" &&
       panelState.activeOverlay !== "history" ? (
         <div

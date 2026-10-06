@@ -1,4 +1,12 @@
-import { test, expect } from './fixtures';
+import { test, expect, type Page } from './fixtures';
+
+async function openRunResults(page: Page) {
+  const disclosure = page.getByRole('button', { name: /Inspect (Request Cycles|Run Results)/ }).first();
+  await disclosure.click();
+  const tab = page.getByRole('tab', { name: 'Run results', exact: true });
+  await expect(tab).toBeVisible();
+  return page.getByTestId('results-region');
+}
 
 test.describe('Studio Runs E2E (RV-12d)', () => {
   test('S01: switcher lists Not run yet, Run passes, Run all passes, drag keeps Passed with a stale notice', async ({
@@ -13,7 +21,9 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
-    await expect(page.getByTestId('results-region')).toBeVisible();
+    await expect(page.getByTestId('playback-panel')).toBeVisible();
+    await expect(page.getByTestId('results-region')).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath('simulation-ready.png') });
 
     // Switcher lists all 3 scenarios, "Not run yet" before any run.
     const switcherTrigger = page.getByTestId('scenario-switcher-trigger');
@@ -39,12 +49,9 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     await expect(runBtn).toBeEnabled();
     await runBtn.click();
 
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', {
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, {
       timeout: 15000,
     });
-    await expect(page.getByTestId('results-region')).toContainText('Saved');
-    const checksTextAfterFirstRun = await page.getByTestId('results-region').textContent();
-    expect(checksTextAfterFirstRun ?? '').toMatch(/passed/i);
 
     // Switcher now shows that scenario Passed.
     await switcherTrigger.click();
@@ -84,7 +91,8 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     await page.mouse.up();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
-    await expect(page.getByTestId('results-stale-notice')).toContainText('Ran on an earlier version');
+    const results = await openRunResults(page);
+    await expect(results.getByTestId('results-stale-notice')).toContainText('Ran on an earlier version');
 
     await switcherTrigger.click();
     await expect(popover).toBeVisible();
@@ -102,18 +110,17 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     });
     await page.keyboard.press('Escape');
 
-    await page.getByTestId('results-details-toggle').click();
-    await expect(page.getByTestId('results-region')).toContainText('General metrics');
+    await expect(results).toContainText('General metrics');
 
     // Checks list shows the assertion's real label from the scenario that
     // ran ("Invalid cart" has "order-command" and "editing"), never
     // "Assertion <uuid>".
-    const detailsRegionText = (await page.getByTestId('results-region').textContent()) ?? '';
+    const detailsRegionText = (await results.textContent()) ?? '';
     expect(detailsRegionText).toMatch(/order-command|editing/);
     expect(detailsRegionText).not.toMatch(/Assertion [0-9a-f-]{8,}/);
 
     // Event log is fed the controller's buffered trace events, not an empty list.
-    await expect(page.getByTestId('results-region')).not.toContainText('No events recorded');
+    await expect(results).not.toContainText('No events recorded');
     expect(detailsRegionText).toMatch(/\d+ events recorded/);
     const eventsRecordedMatch = detailsRegionText.match(/(\d+) events recorded/);
     expect(Number(eventsRecordedMatch?.[1] ?? '0')).toBeGreaterThan(0);
@@ -156,9 +163,9 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
 
     // The last scenario's terminal is what the results strip shows; expand
     // Details and confirm real (non-"—") measured counts, not invented values.
-    await expect(page.getByTestId('results-status-badge')).not.toContainText('invalid');
-    await page.getByTestId('results-details-toggle').click();
-    const detailsText = (await page.getByTestId('results-region').textContent()) ?? '';
+    await expect(page.getByTestId('playback-status')).not.toContainText(/invalid/i);
+    const results = await openRunResults(page);
+    const detailsText = (await results.textContent()) ?? '';
     expect(detailsText).toMatch(/Consumed inputs:\s*\d/);
     expect(detailsText).toMatch(/Processed events:\s*\d/);
   });
@@ -198,8 +205,8 @@ test.describe('Studio Runs E2E (RV-12d)', () => {
     expect(hasHorizontalScroll).toBe(false);
 
     await expect(page.getByTestId('scenario-switcher')).toBeVisible();
-    // RV-12d review round 1: with no scenario and no run, ResultsRegion isn't
-    // rendered at all -- the canvas takes the full height instead.
+    // The unified panel keeps controls available, while Results waits for a run.
+    await expect(page.getByTestId('playback-panel')).toBeVisible();
     await expect(page.getByTestId('results-region')).toHaveCount(0);
     await expect(page.getByTestId('canvas-container')).toBeVisible();
 

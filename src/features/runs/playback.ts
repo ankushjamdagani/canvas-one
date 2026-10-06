@@ -10,6 +10,8 @@
 import type { Cycle, CycleOutcome, ElementMetric, FlowRecord, ResultDelta, RunCheckpoint } from '../../domain/studio/runner/types';
 import { CycleIndex } from './playback-history';
 import { FlashIndex, type FlashAt } from './playback-flashes';
+import { CycleOverlapIndex, cycleFlowEvents, cycleIntervalStatistics } from './cycle-inspection-query';
+import type { CycleActivePeriod, CycleActivityEvent, CycleIntervalStatistics } from './cycle-inspection-query';
 export type { FlashAt } from './playback-flashes';
 export type PlaybackRange = { readonly startMs: number; readonly endMs: number };
 
@@ -54,8 +56,18 @@ export class PlaybackStore {
   private readonly flashes = new FlashIndex();
   private readonly pendingArrivals = new Map<string, number>();
   private flow: FlowRecord[] = [];
+  private flowsByCycle = new Map<string, FlowRecord[]>();
+  private cyclesByComponent = new Map<string, Set<string>>();
+  private cycleInspectionCache = new Map<string, { version: number; rows: FlowRecord[] }>();
+  private cycleQueryCache: { key: string; result: { rows: Cycle[]; total: number } } | null = null;
+  private cycleStatsCache: { key: string; result: CycleIntervalStatistics } | null = null;
   private flowSorted = true;
   private readonly cyclesById = new Map<string, Cycle>();
+  private cycleActivityEvents: CycleActivityEvent[] = [];
+  private cyclePeriodsById = new Map<string, CycleActivePeriod[]>();
+  private readonly cycleOverlapIndex = new CycleOverlapIndex();
+  private cycleInspectionVersion = 0;
+  private flowVersion = 0;
   private cycleRevisions: { atMs: number; cycle: Cycle }[] = [];
   private readonly evictedCycles = {
     total: 0,
@@ -110,7 +122,18 @@ export class PlaybackStore {
   // --------------------------------------------------------------------------
 
   ingestFlow(records: readonly FlowRecord[]): void {
+    if (records.length) { this.version++; this.flowVersion++; }
     for (const r of records) {
+      if (r.cycleId !== undefined) {
+        const indexed = this.flowsByCycle.get(r.cycleId) ?? [];
+        indexed.push(r);
+        this.flowsByCycle.set(r.cycleId, indexed);
+        if (r.elementId !== undefined) {
+          const cycleIds = this.cyclesByComponent.get(r.elementId) ?? new Set<string>();
+          cycleIds.add(r.cycleId);
+          this.cyclesByComponent.set(r.elementId, cycleIds);
+        }
+      }
       const base = { connectionId: r.connectionId, elementId: null, outcome: null };
       if (r.connectionId !== null) {
         const arrivalKey = `${r.connectionId}\u0000${r.key}`;
@@ -154,9 +177,33 @@ export class PlaybackStore {
   }
 
   ingestCycles(cycles: readonly Cycle[]): void {
-    if (cycles.length) this.version++;
+    if (cycles.length) { this.version++; this.cycleInspectionVersion++; }
     for (const cycle of cycles) {
       const previous = this.cyclesById.get(cycle.id);
+      if (!previous) {
+        this.insertCycleActivity({ atMs: cycle.startedAtMs, kind: 'start', cycle });
+        this.cyclePeriodsById.set(cycle.id, [{ startMs: cycle.startedAtMs, endMs: null }]);
+        this.cycleOverlapIndex.add(cycle.id, cycle.startedAtMs, null);
+      }
+      if (cycle.responseAtMs !== null && previous?.responseAtMs == null) {
+        this.insertCycleActivity({ atMs: cycle.responseAtMs, kind: 'response', cycle });
+      }
+      if (cycle.completedAtMs !== null && previous?.completedAtMs !== cycle.completedAtMs) {
+        const atMs = cycle.observedAtMs ?? cycle.completedAtMs;
+        this.insertCycleActivity({ atMs, kind: 'completion', cycle });
+        const periods = this.cyclePeriodsById.get(cycle.id) ?? [];
+        let open = -1;
+        for (let i = periods.length - 1; i >= 0; i--) if (periods[i].endMs === null) { open = i; break; }
+        if (open >= 0) {
+          this.cyclePeriodsById.set(cycle.id, periods.map((period, index) => index === open ? { ...period, endMs: atMs } : period));
+          this.cycleOverlapIndex.closeMostRecent(cycle.id, atMs);
+        }
+      } else if (previous?.completedAtMs != null && cycle.completedAtMs === null) {
+        const atMs = cycle.observedAtMs ?? cycle.startedAtMs;
+        const periods = this.cyclePeriodsById.get(cycle.id) ?? [];
+        this.cyclePeriodsById.set(cycle.id, [...periods, { startMs: atMs, endMs: null }]);
+        this.cycleOverlapIndex.add(cycle.id, atMs, null);
+      }
       const elementId = this.options.workloadEntries?.get(cycle.workloadId);
       if (elementId !== undefined && cycle.completedAtMs !== null && cycle.outcome !== null &&
         (previous?.completedAtMs !== cycle.completedAtMs || previous?.outcome !== cycle.outcome)) {
@@ -175,6 +222,17 @@ export class PlaybackStore {
         const old = this.lowerBound(this.cycleEnds, previous.completedAtMs); this.cycleEnds.splice(old, 1);
       }
       if (cycle.completedAtMs !== null && previous?.completedAtMs !== cycle.completedAtMs) this.insertTime(this.cycleEnds, cycle.completedAtMs);
+    }
+  }
+
+  private insertCycleActivity(event: CycleActivityEvent): void {
+    const events = this.cycleActivityEvents;
+    const last = events[events.length - 1];
+    if (!last || last.atMs <= event.atMs) events.push(event);
+    else {
+      let lo = 0; let hi = events.length;
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (events[mid].atMs <= event.atMs) lo = mid + 1; else hi = mid; }
+      events.splice(lo, 0, event);
     }
   }
 
@@ -237,6 +295,71 @@ export class PlaybackStore {
   get endMs(): number | null {
     return this.endAt;
   }
+
+  /** Bounded, overlap-based cycle page for the simulation inspection range. */
+  cyclesOverlappingRange(range: PlaybackRange, options: { offset?: number; limit?: number; failuresOnly?: boolean; componentId?: string } = {}): { rows: Cycle[]; total: number } {
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const limit = Math.min(200, Math.max(1, Math.floor(options.limit ?? 50)));
+    const key = `${this.cycleInspectionVersion}/${range.startMs}/${range.endMs}/${offset}/${limit}/${options.failuresOnly === true}/${options.componentId ?? ''}`;
+    if (this.cycleQueryCache?.key === key) return this.cycleQueryCache.result;
+    const overlappingIds = this.cycleOverlapIndex.overlappingOrdered(range);
+    const componentCycles = options.componentId ? this.cyclesByComponent.get(options.componentId) : undefined;
+    let total = 0;
+    const rows: Cycle[] = [];
+    for (const id of overlappingIds) {
+      const cycle = this.cyclesById.get(id);
+      if (cycle && (!options.failuresOnly || (cycle.outcome !== null && cycle.outcome !== 'ok')) &&
+        (!options.componentId || componentCycles?.has(id))) {
+        if (total >= offset && rows.length < limit) rows.push(cycle);
+        total++;
+      }
+    }
+    const result = { rows, total };
+    this.cycleQueryCache = { key, result };
+    return result;
+  }
+
+  /** Range events count starts/responses/completions observed in [start,end). */
+  statisticsForRange(range: PlaybackRange): CycleIntervalStatistics {
+    const key = `${this.cycleInspectionVersion}/${range.startMs}/${range.endMs}`;
+    if (this.cycleStatsCache?.key === key) return this.cycleStatsCache.result;
+    const ids = this.cycleOverlapIndex.overlapping(range);
+    const cycles = [...ids].flatMap((id) => { const cycle = this.cyclesById.get(id); return cycle ? [cycle] : []; });
+    const periodsByCycle = new Map([...ids].map((id) => [id, this.cyclePeriodsById.get(id) ?? []]));
+    const result = cycleIntervalStatistics(cycles, range, { events: this.cycleActivityEvents, periodsByCycle });
+    this.cycleStatsCache = { key, result };
+    return result;
+  }
+
+  /** Indexed lifecycle details for one cycle, capped to keep detail rendering bounded. */
+  flowEventsForCycle(cycleId: string, options: { offset?: number; limit?: number } = {}): { rows: FlowRecord[]; total: number } {
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const limit = Math.min(500, Math.max(1, Math.floor(options.limit ?? 100)));
+    const cached = this.cycleInspectionCache.get(cycleId);
+    const events = cached?.version === this.flowVersion ? cached.rows : cycleFlowEvents(this.flowsByCycle.get(cycleId) ?? [], cycleId);
+    if (cached?.version !== this.flowVersion) {
+      this.cycleInspectionCache.delete(cycleId);
+      this.cycleInspectionCache.set(cycleId, { version: this.flowVersion, rows: events });
+      while (this.cycleInspectionCache.size > 16) this.cycleInspectionCache.delete(this.cycleInspectionCache.keys().next().value!);
+    }
+    return { rows: events.slice(offset, offset + limit), total: events.length };
+  }
+
+  componentActivityForCycle(cycleId: string): readonly { elementId: string; events: number }[] {
+    const counts = new Map<string, number>();
+    for (const event of this.flowsByCycle.get(cycleId) ?? []) {
+      if (event.elementId) counts.set(event.elementId, (counts.get(event.elementId) ?? 0) + 1);
+    }
+    return [...counts].map(([elementId, events]) => ({ elementId, events })).sort((a, b) => b.events - a.events);
+  }
+
+  cycleTouchesComponent(cycleId: string, elementId: string): boolean {
+    return this.cyclesByComponent.get(elementId)?.has(cycleId) ?? false;
+  }
+
+  get inspectionHistoryStartMs(): number { return this.windowStart; }
+  get inspectionVersion(): number { return this.cycleInspectionVersion; }
+  get flowInspectionVersion(): number { return this.flowVersion; }
 
   get isStream(): boolean {
     return this.options.historyMs !== null;
@@ -466,6 +589,9 @@ export class PlaybackStore {
     const start = this.playhead - history;
     if (start < this.windowStart + EVICT_STEP_MS) return;
     this.windowStart = start;
+    this.version++;
+    this.flowVersion++;
+    this.cycleInspectionCache.clear();
     this.setSelection(this.range);
     this.flashes.evict(start);
     for (const [key, arrival] of this.pendingArrivals) if (arrival < start) this.pendingArrivals.delete(key);
@@ -495,6 +621,7 @@ export class PlaybackStore {
         if (i < this.cursor) cursor++;
       }
       this.flow = retained;
+      this.rebuildCycleFlowIndex();
       this.cursor = cursor;
       this.transit.clear();
       for (const [i, r] of transit) this.transit.set(i, r);
@@ -525,6 +652,13 @@ export class PlaybackStore {
       if (i < this.resultsIndex.cursor) resultsConsumedRemoved++;
       return false;
     });
+    if (removedCycles.size) {
+      this.cycleInspectionVersion++;
+      this.cycleQueryCache = null;
+      this.cycleStatsCache = null;
+      for (const id of removedCycles) { this.cyclePeriodsById.delete(id); this.cycleOverlapIndex.remove(id); }
+      this.cycleActivityEvents = this.cycleActivityEvents.filter((event) => !removedCycles.has(event.cycle.id));
+    }
     this.timelineIndex.compact(removedCycles, timelineConsumedRemoved, start);
     this.resultsIndex.compact(removedCycles, resultsConsumedRemoved, start);
     if (this.resultsCache && this.resultsCache.atMs < start) this.resultsCache = null;
@@ -545,6 +679,22 @@ export class PlaybackStore {
       let lo = 0; let hi = this.resultDeltas.length;
       while (lo < hi) { const mid = (lo + hi) >>> 1; if (this.resultDeltas[mid].atMs <= this.resultsCache.atMs) lo = mid + 1; else hi = mid; }
       this.resultsCache.cursor = lo;
+    }
+  }
+
+  private rebuildCycleFlowIndex(): void {
+    this.flowsByCycle.clear();
+    this.cyclesByComponent.clear();
+    for (const record of this.flow) {
+      if (record.cycleId === undefined) continue;
+      const records = this.flowsByCycle.get(record.cycleId) ?? [];
+      records.push(record);
+      this.flowsByCycle.set(record.cycleId, records);
+      if (record.elementId !== undefined) {
+        const cycleIds = this.cyclesByComponent.get(record.elementId) ?? new Set<string>();
+        cycleIds.add(record.cycleId);
+        this.cyclesByComponent.set(record.elementId, cycleIds);
+      }
     }
   }
 }

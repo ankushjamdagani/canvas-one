@@ -4,7 +4,7 @@ import { test, expect, devices } from './fixtures';
  * RV-13 phone acceptance (D14 full phone editing; design.md "Touch targets";
  * requirements.md viewports). A 390×844 touch phone must keep every top-bar control
  * on screen — including the project menu — with coarse-pointer targets of at least
- * 44 px, and an expanded results panel must leave a usable canvas on short screens.
+ * 44 px, and the simulation inspection sheet must leave a usable canvas on short screens.
  */
 
 const { defaultBrowserType: _ignored, ...iPhone } = devices['iPhone 13'];
@@ -27,7 +27,6 @@ for (const example of ['s04', 's05'] as const) test(`390×844 touch (${example})
     'topbar-history-btn',
     'scenario-switcher-trigger',
     'scenario-run-btn',
-    'results-details-toggle',
   ];
   for (const id of ids) {
     const box = await page.getByTestId(id).boundingBox();
@@ -47,16 +46,19 @@ for (const example of ['s04', 's05'] as const) test(`390×844 touch (${example})
   await expect(page.getByTestId('project-menu-popover')).toBeVisible();
 });
 
-test('short viewport: expanded results details leave a usable canvas', async ({ page }) => {
+test('short viewport: simulation results sheet leaves a usable canvas', async ({ page }) => {
   await page.setViewportSize({ width: 756, height: 491 });
   await page.goto('/');
   await page.getByTestId('create-example-s04').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
   await page.getByTestId('scenario-run-btn').tap();
-  await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
-  await page.getByTestId('results-details-toggle').tap();
-  await expect(page.getByTestId('results-details-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
+  await page.getByRole('button', { name: /Inspect (Request Cycles|Run Results)/ }).first().tap();
+  const sheet = page.getByRole('dialog', { name: 'Simulation inspection' });
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('tab', { name: 'Run results', exact: true }).tap();
+  await expect(sheet).toContainText('General metrics');
 
   const canvasHeight = await page.locator('.react-flow').evaluate((el) => el.getBoundingClientRect().height);
   expect(canvasHeight).toBeGreaterThanOrEqual(150);

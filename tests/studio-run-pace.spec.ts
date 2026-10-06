@@ -43,7 +43,19 @@ async function setTraffic(page: Page, traffic: Traffic, entryLabel?: string) {
 
 /** Use the same speed control available to the user; the current recording stays in memory. */
 async function setSpeed(page: Page, value: string) {
-  await page.getByTestId('playback-speed').selectOption(value);
+  const speed = page.getByTestId('playback-speed');
+  await page.removeLocatorHandler(speed);
+  const apply = async () => {
+    const target = Number(value);
+    let current = Number((await speed.textContent())?.replace('×', ''));
+    while (current !== target) {
+      await page.getByRole('button', { name: current < target ? 'Faster playback' : 'Slower playback', exact: true }).click();
+      current = Number((await speed.textContent())?.replace('×', ''));
+    }
+    await expect(speed).toHaveText(`${target}×`);
+  };
+  if (await speed.isVisible()) await apply();
+  else await page.addLocatorHandler(speed, apply, { times: 1, noWaitAfter: true });
 }
 
 /** Give the existing SQL call enough real transit time to inspect its exact concurrent units. */
@@ -73,12 +85,11 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     // Nothing ends it by itself.
     await page.waitForTimeout(1500);
     await expect(page.getByTestId('scenario-stop-btn')).toBeVisible();
-    await expect(page.getByTestId('results-status-badge')).not.toContainText('completed');
+    await expect(page.getByTestId('playback-status')).not.toContainText(/completed/i);
 
     await page.getByTestId('scenario-stop-btn').click();
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
     await expect(page.getByTestId('scenario-stop-btn')).toHaveCount(0);
-    await expect(page.getByTestId('results-region')).toContainText('Saved');
   });
 
   test('a stream is not cut off by the event budget, and Stop still completes it', async ({ page }) => {
@@ -89,9 +100,9 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await page.getByTestId('scenario-run-btn').click();
     await page.waitForTimeout(8000);
     await expect(page.getByTestId('scenario-stop-btn')).toBeVisible();
-    await expect(page.getByTestId('results-status-badge')).not.toContainText('completed');
+    await expect(page.getByTestId('playback-status')).not.toContainText(/completed/i);
     await page.getByTestId('scenario-stop-btn').click();
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 40000 });
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 40000 });
   });
 
   test('a bulk sends that many requests and ends by itself when they have settled', async ({ page }) => {
@@ -99,7 +110,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await setTraffic(page, { mode: 'bulk', requests: 120 });
     await setSpeed(page, '16');
     await page.getByTestId('scenario-run-btn').click();
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
   });
 
   test('real time takes real time; faster playback advances the recording', async ({ page }) => {
@@ -110,14 +121,14 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     const start = Date.now();
     await page.getByTestId('scenario-run-btn').click();
     await page.waitForTimeout(1000);
-    await expect(page.getByTestId('results-status-badge')).not.toContainText('completed');
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 15000 });
+    await expect(page.getByTestId('playback-status')).not.toContainText(/completed/i);
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 15000 });
     expect(Date.now() - start).toBeGreaterThan(2500);
 
     await setSpeed(page, '16');
     const instantStart = Date.now();
     await page.getByTestId('scenario-run-btn').click();
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 15000 });
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 15000 });
     expect(Date.now() - instantStart).toBeLessThan(2500);
   });
 
@@ -150,7 +161,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
     await expect(page.getByTestId('node-occupancy').filter({ hasText: '5 queued' })).toHaveAttribute('data-active', '1');
     await page.screenshot({ path: test.info().outputPath('canvas-playback-occupancy.png') });
     await setSpeed(page, '16');
-    await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
     await expect(page.getByTestId('traffic-packet')).toHaveCount(0);
     await expect(page.getByTestId('node-occupancy')).toHaveCount(0);
   });
@@ -225,13 +236,13 @@ for (const reduced of [false, true]) test(`recorded flashes survive pause and se
   const edgeId = await configurePlaybackLink(page);
   await setSpeed(page, '16');
   await page.getByTestId('scenario-run-btn').click();
-  await expect(page.getByTestId('results-status-badge')).toContainText('completed', { timeout: 20000 });
+  await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
   const nodeOutcome = page.locator('.component-node [data-testid="traffic-flash"][data-kind="outcome"]');
   await expect(nodeOutcome.first()).toBeVisible();
   await expect(nodeOutcome.first()).toHaveAttribute('data-outcome', 'ok');
   await page.screenshot({ path: test.info().outputPath(`outcomes-${reduced ? 'reduced' : 'normal'}.png`) });
   const seeker = page.getByRole('slider', { name: 'Playback position' });
-  const root = page.locator('[data-slot="slider"]').filter({ has: seeker });
+  const root = page.getByTestId('timeline-track');
   const edge = page.getByTestId(`edge-${edgeId}`);
   // Pixel seek to a little after the recorded send/arrival: allow rounding while staying within 240 ms.
   const seek = async (ms: number) => {

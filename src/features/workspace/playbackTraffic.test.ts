@@ -11,6 +11,16 @@ const leg = (
   direction: LegAt["direction"] = "out",
 ): LegAt => ({ key: "unit", connectionId: "link", direction, progress });
 describe("canvas playback placement", () => {
+  it("preserves browser SVG point coordinates exposed as prototype getters", () => {
+    class SvgPoint {
+      constructor(private readonly distance: number) {}
+      get x() { return this.distance; }
+      get y() { return 10; }
+    }
+    const svgLine = { getTotalLength: () => 100, getPointAtLength: (distance: number) => new SvgPoint(distance) };
+    expect(placeLeg(svgLine, leg(0.25))).toEqual({ x: 25, y: 10, heading: 0 });
+    expect(placeLeg(svgLine, leg(0.25, 'back'))).toEqual({ x: 75, y: 10, heading: 180 });
+  });
   it("places departure, halfway and arrival on the recorded path", () => {
     expect(placeLeg(line, leg(0))).toEqual({ x: 0, y: 10, heading: 0 });
     expect(placeLeg(line, leg(0.5))).toEqual({ x: 50, y: 10, heading: 0 });

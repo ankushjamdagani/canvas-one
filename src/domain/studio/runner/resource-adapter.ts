@@ -78,12 +78,17 @@ type MutableCounts = {
 
 interface UnitContext {
   rootId: string;
+  cycleId: string;
+  parentUnitId: string | null;
+  category: 'root' | 'message';
   journeyId: Id;
   parentEventId: string | null;
   payloadRef: string;
   elementId: Id;
   entryPortId: Id | null;
 }
+
+type FlowIdentityContext = { cycleId: string; parentUnitId: string | null; category: 'root' | 'message' };
 
 export interface FaultPlacementValidationIssue {
   readonly code: 'invalid';
@@ -439,6 +444,8 @@ export class ResourceAdapter {
   private readonly resourceElements: Map<Id, Element>;
   private readonly bridgeConnByNode: Map<Id, Connection>;
   private readonly unitContexts = new Map<string, UnitContext>();
+  /** Lightweight identity ledger populated in the lifecycle hook before batched facts are consumed. */
+  private readonly flowUnitContexts = new Map<string, FlowIdentityContext>();
   private traceSequence = 0;
   private stepFacts: SimLifecycleFact[] = [];
   /** Live canvas view: connection of each packet announced by a `sent` fact, and the steps not yet drained. */
@@ -605,9 +612,35 @@ export class ResourceAdapter {
   private recordFlow(fact: SimLifecycleFact): void {
     const key = `${fact.unitIdentity}|${fact.path}`;
     const ms = (seconds: number) => Math.round(seconds * 1000);
+    if (fact.category === 'root') {
+      this.flowUnitContexts.set(fact.unitIdentity, { cycleId: fact.unitIdentity, parentUnitId: null, category: 'root' });
+    } else if (fact.kind === 'message_created' && fact.parentIdentity) {
+      const parent = this.flowUnitContexts.get(fact.parentIdentity);
+      const parentContext = this.unitContexts.get(fact.parentIdentity);
+      const cycleId = parent?.cycleId ?? parentContext?.cycleId;
+      if (cycleId !== undefined) this.flowUnitContexts.set(fact.unitIdentity, { cycleId, parentUnitId: fact.parentIdentity, category: 'message' });
+    } else if (fact.category === 'message' && !this.flowUnitContexts.has(fact.unitIdentity) && fact.parentIdentity) {
+      const parent = this.flowUnitContexts.get(fact.parentIdentity);
+      const parentContext = this.unitContexts.get(fact.parentIdentity);
+      const cycleId = parent?.cycleId ?? parentContext?.cycleId;
+      if (cycleId !== undefined) this.flowUnitContexts.set(fact.unitIdentity, { cycleId, parentUnitId: fact.parentIdentity, category: 'message' });
+    }
+    const flowContext = this.flowUnitContexts.get(fact.unitIdentity);
+    const ownContext = this.unitContexts.get(fact.unitIdentity);
+    const parentContext = fact.parentIdentity ? this.unitContexts.get(fact.parentIdentity) : undefined;
+    const cycleId = flowContext?.cycleId ?? ownContext?.cycleId ?? parentContext?.cycleId ??
+      (fact.category === 'root' ? fact.unitIdentity : undefined);
+    const category = flowContext?.category ?? fact.category ?? ownContext?.category;
+    const identity = {
+      ...(cycleId === undefined ? {} : { cycleId }),
+      unitId: fact.unitIdentity,
+      parentUnitId: category === 'root' ? null : fact.parentIdentity ?? flowContext?.parentUnitId ?? ownContext?.parentUnitId ?? null,
+      ...(category === undefined ? {} : { category }),
+      attempt: fact.attempt,
+    };
     if (fact.kind === 'sent' && fact.edgeId) {
       this.flowConnections.set(key, fact.edgeId);
-      this.flowRecords.push({ key, connectionId: fact.edgeId, phase: 'sent', atMs: ms(fact.time), arriveAtMs: fact.arriveAt === undefined ? null : ms(fact.arriveAt), outcome: null });
+      this.flowRecords.push({ ...identity, key, connectionId: fact.edgeId, elementId: fact.nodeId, phase: 'sent', atMs: ms(fact.time), arriveAtMs: fact.arriveAt === undefined ? null : ms(fact.arriveAt), outcome: null });
       return;
     }
     const connectionId = this.flowConnections.get(key) ?? null;
@@ -619,17 +652,22 @@ export class ResourceAdapter {
       : fact.kind === 'response_sent' ? 'response'
       : fact.kind === 'occupancy_released' ? 'released'
       : null;
-    if (!phase) return;
+    if (!phase) {
+      if (fact.kind === 'unit_settled') this.flowUnitContexts.delete(fact.unitIdentity);
+      return;
+    }
     if (phase === 'response' && connectionId === null) return;
     this.flowRecords.push({
+      ...identity,
       key,
       connectionId,
-      ...(connectionId === null ? { elementId: fact.nodeId } : {}),
+      elementId: fact.nodeId,
       phase,
       atMs: ms(fact.time),
       arriveAtMs: phase === 'response' && fact.arriveAt !== undefined ? ms(fact.arriveAt) : null,
       outcome: phase === 'settled' ? (fact.kind === 'rejected' ? 'rejected' : (fact.outcome ?? null)) : phase === 'response' ? (fact.outcome ?? null) : null,
     });
+    if (fact.kind === 'unit_settled') this.flowUnitContexts.delete(fact.unitIdentity);
     if (phase === 'released' && fact.operationReleased) this.flowConnections.delete(key);
   }
 
@@ -720,6 +758,9 @@ export class ResourceAdapter {
       this.workloadUnits.add(fact.unitIdentity);
       this.unitContexts.set(fact.unitIdentity, {
         rootId: fact.unitIdentity,
+        cycleId: fact.unitIdentity,
+        parentUnitId: null,
+        category: 'root',
         journeyId: fact.unitIdentity,
         parentEventId: null,
         payloadRef: WORKLOAD_PAYLOAD_REF,
@@ -736,6 +777,9 @@ export class ResourceAdapter {
       this.workloadUnits.add(fact.unitIdentity);
       this.unitContexts.set(fact.unitIdentity, {
         rootId: fact.unitIdentity,
+        cycleId: fact.unitIdentity,
+        parentUnitId: null,
+        category: 'root',
         journeyId: fact.unitIdentity,
         parentEventId: null,
         payloadRef: WORKLOAD_PAYLOAD_REF,
@@ -790,6 +834,9 @@ export class ResourceAdapter {
 
     this.unitContexts.set(fact.unitIdentity, {
       rootId: `${parentCtx.rootId}:${ordinal}`,
+      cycleId: parentCtx.cycleId,
+      parentUnitId: fact.parentIdentity!,
+      category: 'message',
       journeyId: parentCtx.journeyId,
       parentEventId: parentCtx.rootId,
       payloadRef: parentCtx.payloadRef,
@@ -821,6 +868,9 @@ export class ResourceAdapter {
     const entryPortId = this.getEntryPortId(input.entryElementId);
     this.unitContexts.set(input.rootId, {
       rootId: input.rootId,
+      cycleId: input.rootId,
+      parentUnitId: null,
+      category: 'root',
       journeyId: input.journeyId,
       parentEventId: input.parentEventId,
       payloadRef: input.payloadRef,

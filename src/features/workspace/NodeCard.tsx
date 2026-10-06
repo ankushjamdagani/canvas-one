@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useContext } from 'react';
 import { PlaybackTrafficContext } from './usePlaybackTraffic';
+import { SimulationHighlightContext } from './SimulationHighlight';
 import { NodeOccupancy } from '@/components/ui/node-occupancy';
 import { TrafficFlash } from '@/components/ui/traffic-flash';
 import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
@@ -12,6 +13,7 @@ import { getNodeCaption, getNodeIcon } from './nodeVisuals';
 
 export function NodeCard({ data, selected }: NodeProps) {
   const traffic = useContext(PlaybackTrafficContext);
+  const simulationHighlight = useContext(SimulationHighlightContext);
   const nodeData = data as ProjectedNodeData;
   if (nodeData.kind !== 'element') return null;
 
@@ -46,6 +48,7 @@ export function NodeCard({ data, selected }: NodeProps) {
       data-placement-id={placement.id}
       data-element-id={element.id}
       className={cn(
+        simulationHighlight?.elementIds.has(element.id) && 'ring-2 ring-primary ring-offset-2',
         'component-node relative block rounded-node border bg-background transition-all select-none',
         selected
           ? 'selected border-2 border-primary ring-2 ring-selected-edge ring-offset-1 shadow-none'
