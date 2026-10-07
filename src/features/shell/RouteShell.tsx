@@ -18,15 +18,16 @@ interface Page {
   baseDelay: number;
 }
 
-function PageA11y() {
+function PageA11y({ exiting }: { exiting: boolean }) {
   const isPresent = useIsPresent();
   const ref = React.useRef<HTMLSpanElement>(null);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const frame = ref.current?.parentElement;
     if (!frame) return;
-    // Leaving content must not take focus or be read while it animates away.
-    frame.inert = !isPresent;
-  }, [isPresent]);
+    // Leaving content (including the card-open fade before navigation) must not take focus,
+    // receive clicks or be read while it animates away.
+    frame.inert = !isPresent || exiting;
+  }, [isPresent, exiting]);
   return <span ref={ref} hidden />;
 }
 
@@ -150,7 +151,7 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
               document.querySelector<HTMLElement>(`[data-page-kind="${page.kind}"] h1`)?.focus({ preventScroll: true });
             }}
           >
-            <PageA11y />
+            <PageA11y exiting={phase === 'exit'} />
             <RevealScope baseDelay={page.baseDelay}>{renderPage(page.kind)}</RevealScope>
           </m.div>
         </AnimatePresence>

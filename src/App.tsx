@@ -230,6 +230,10 @@ function StudioShell({
     });
   }, [session]);
 
+  // The shell keeps rendering the project page while it animates out, after the URL has moved on.
+  const lastProjectRoute = React.useRef<Extract<typeof route, { kind: 'project' }> | null>(null);
+  if (route.kind === 'project') lastProjectRoute.current = route;
+
   const renderPage = (kind: PageKind): React.ReactNode => {
     if (kind === 'home') return <LandingPage />;
     if (kind === 'projects') {
@@ -237,8 +241,9 @@ function StudioShell({
         <EntryScreen session={session} repository={repository} mintId={MINT_ID} actor={actor} onOpenSuccess={goToProject} />
       );
     }
-    if (route.kind !== 'project') return null;
-    if (sessionState.projectId === route.projectId) {
+    const projectRoute = route.kind === 'project' ? route : lastProjectRoute.current;
+    if (!projectRoute) return null;
+    if (sessionState.projectId === projectRoute.projectId) {
       return (
         <Workspace
           session={session}
@@ -249,7 +254,7 @@ function StudioShell({
         />
       );
     }
-    if (openError?.projectId === route.projectId) {
+    if (openError?.projectId === projectRoute.projectId) {
       return (
         <div
           data-testid="project-route-error"

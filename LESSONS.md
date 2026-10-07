@@ -58,6 +58,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 
 ## Code
 - **Use `useIsPresent()` for exit-state reads; `usePresence()` obliges you to call `safeToRemove`.** An unused `usePresence()` inside an `AnimatePresence` child keeps the exiting page mounted forever. Why: 2026-10-07 route transitions (every project open hung).
+- **A shell's `renderPage` must not read live router state for a page that is animating out.** The URL changes first, so a null/other-route render unmounts the exiting page before `AnimatePresence` runs its exit (and any `usePresence` cleanup). Keep the last route for exit renders. Why: 2026-10-07 Codex review (project exit never ran).
 - **Full-bleed animation wrappers over absolutely positioned content need `pointer-events-none` plus `[&>*]:pointer-events-auto`.** A later `absolute inset-0` sibling covers earlier content and swallows clicks. Why: 2026-10-07 landing reveal wrappers.
 - **Animated transitions need client-side navigation: plain `<a href>` reloads the document.** `useInternalLinks` (RouteShell) intercepts known routes; verify new links navigate without a reload. Why: 2026-10-07 landing "Try Beta".
 

@@ -181,14 +181,23 @@ export function runCanvasEnter(root: HTMLElement, onReady: () => void): () => vo
   };
 }
 
-/** Bars slide away; nodes, edges and edge labels fade. Resolves when everything has finished. */
-export function runCanvasExit(root: HTMLElement): Promise<void> {
+/**
+ * Bars slide away; nodes, edges and edge labels fade. `done` resolves when everything has
+ * finished; `stop` cancels it and restores every touched element (the page became present again).
+ */
+export function runCanvasExit(root: HTMLElement): { done: Promise<void>; stop: () => void } {
   const t = collect(root);
-  const runs: { then(onResolve: () => void, onReject?: () => void): Promise<void> }[] = [];
-  if (t.topbar) runs.push(animate(t.topbar, { opacity: 0, y: -CANVAS.barOffset }, { duration: CANVAS.exitBar, ease: EASE.exit }));
-  if (t.bottom) runs.push(animate(t.bottom, { opacity: 0, y: CANVAS.barOffset }, { duration: CANVAS.exitBar, ease: EASE.exit }));
+  const runs: { stop(): void; then(onResolve: () => void, onReject?: () => void): Promise<void> }[] = [];
+  const touched: HTMLElement[] = [];
+  const track = <T extends { stop(): void; then(onResolve: () => void, onReject?: () => void): Promise<void> }>(el: HTMLElement | HTMLElement[], run: T) => {
+    touched.push(...(Array.isArray(el) ? el : [el]));
+    runs.push(run);
+  };
+  if (t.topbar) track(t.topbar, animate(t.topbar, { opacity: 0, y: -CANVAS.barOffset }, { duration: CANVAS.exitBar, ease: EASE.exit }));
+  if (t.bottom) track(t.bottom, animate(t.bottom, { opacity: 0, y: CANVAS.barOffset }, { duration: CANVAS.exitBar, ease: EASE.exit }));
   if (t.nodes.length) {
-    runs.push(
+    track(
+      t.nodes,
       animate(
         t.nodes,
         { opacity: 0, filter: 'blur(6px)' },
@@ -197,9 +206,16 @@ export function runCanvasExit(root: HTMLElement): Promise<void> {
     );
   }
   for (const layer of [t.edges, t.edgeLabels]) {
-    if (layer) runs.push(animate(layer, { opacity: 0 }, { duration: CANVAS.exitNode, delay: CANVAS.exitNodeDelay, ease: EASE.exit }));
+    if (layer) track(layer, animate(layer, { opacity: 0 }, { duration: CANVAS.exitNode, delay: CANVAS.exitNodeDelay, ease: EASE.exit }));
   }
-  return Promise.all(
+  const done = Promise.all(
     runs.map((run) => new Promise<void>((resolve, reject) => void run.then(resolve, reject))),
   ).then(() => undefined);
+  return {
+    done,
+    stop() {
+      runs.forEach((run) => run.stop());
+      clear(touched);
+    },
+  };
 }

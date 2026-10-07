@@ -29,6 +29,7 @@ export function BoardLayer({
 }) {
   const env = useMotionEnv();
   const playIntro = intro && !env.reduced;
+  const fadeSeconds = env.off ? 0.001 : env.reduced ? 0.12 : BOARD.fadeOut;
   // Once faded out on the project canvas the ground stops running and leaves the DOM.
   const [mounted, setMounted] = React.useState(visible);
   React.useEffect(() => {
@@ -36,9 +37,9 @@ export function BoardLayer({
       setMounted(true);
       return;
     }
-    const id = window.setTimeout(() => setMounted(false), BOARD.fadeOut * 1000);
+    const id = window.setTimeout(() => setMounted(false), fadeSeconds * 1000);
     return () => window.clearTimeout(id);
-  }, [visible]);
+  }, [visible, fadeSeconds]);
   const dots = React.useRef<HTMLDivElement>(null);
   const frame = React.useRef<HTMLDivElement>(null);
 
@@ -58,7 +59,13 @@ export function BoardLayer({
     void controls[1].then(() => {
       f.style.clipPath = '';
     });
-    return () => controls.forEach((c) => c.stop());
+    return () => {
+      controls.forEach((c) => c.stop());
+      d.style.opacity = '1';
+      d.style.transform = '';
+      f.style.opacity = '1';
+      f.style.clipPath = '';
+    };
   }, [playIntro]);
 
   React.useEffect(() => {
@@ -78,7 +85,12 @@ export function BoardLayer({
     void controls[0].then(() => {
       d.style.transform = '';
     });
-    return () => controls.forEach((c) => c.stop());
+    return () => {
+      controls.forEach((c) => c.stop());
+      d.style.opacity = '1';
+      d.style.transform = '';
+      f.style.opacity = '1';
+    };
   }, [shift.n, shift.dir, env.reduced]);
 
   return (
@@ -90,7 +102,7 @@ export function BoardLayer({
         'pointer-events-none absolute inset-0 z-0 transition-opacity',
         visible ? 'opacity-100' : 'opacity-0',
       )}
-      style={{ transitionDuration: `${BOARD.fadeOut}s` }}
+      style={{ transitionDuration: `${fadeSeconds}s` }}
     >
       {mounted && (
         <>

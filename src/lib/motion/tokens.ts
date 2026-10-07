@@ -1,9 +1,11 @@
 type Bezier = [number, number, number, number];
 
-export const EASE: { enter: Bezier; exit: Bezier; inOut: Bezier } = {
+export const EASE: { enter: Bezier; exit: Bezier; inOut: Bezier; fade: Bezier } = {
   enter: [0.22, 1, 0.36, 1],
   exit: [0.55, 0, 0.75, 0.2],
   inOut: [0.65, 0, 0.35, 1],
+  /** Material standard curve for overlay fades. */
+  fade: [0.4, 0, 0.2, 1],
 };
 
 export type RevealKind = 'content' | 'chrome';

@@ -34,7 +34,7 @@ export function CardOverlay({
       return () => c.stop();
     }
     if (state.stage === 'fade') {
-      const c = animate(el, { opacity: [1, 0] }, { duration: CARD.fadeDuration, ease: [0.4, 0, 0.2, 1] });
+      const c = animate(el, { opacity: [1, 0] }, { duration: CARD.fadeDuration, ease: EASE.fade });
       void c.then(onDone);
       return () => c.stop();
     }

@@ -30,9 +30,16 @@ export function useCanvasTransition(rootRef: React.RefObject<HTMLElement | null>
       safeToRemove?.();
       return;
     }
-    runCanvasExit(root).then(
-      () => safeToRemove?.(),
-      () => safeToRemove?.(),
+    let live = true;
+    const exit = runCanvasExit(root);
+    exit.done.then(
+      () => live && safeToRemove?.(),
+      () => live && safeToRemove?.(),
     );
+    // The page became present again (rapid Forward) or unmounted: undo the exit.
+    return () => {
+      live = false;
+      exit.stop();
+    };
   }, [isPresent, env.reduced, rootRef, safeToRemove]);
 }
