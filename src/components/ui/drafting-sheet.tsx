@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "./brand-mark";
 import { DraftingFrame, DraftingGround } from "./drafting-board";
 
 /** Shared public-page chrome, separate from the workspace's canvas and telemetry. */
@@ -24,10 +25,7 @@ export function DraftingSheet({
           href="/"
           className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-sm text-sm font-semibold text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary "
         >
-          <span
-            aria-hidden="true"
-            className="size-5 rounded-[5px] bg-linear-to-br from-primary to-[#2e7d6b]"
-          />
+          <BrandMark />
           System Studio
         </a>
         <span className="font-mono text-micro tracking-normal text-secondary-text max-[480px]:hidden">

@@ -7,7 +7,9 @@ test.describe('Project Canvas design (2026-10-07)', () => {
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('workspace-frame')).toBeVisible();
-    await expect(page.getByTestId('topbar-version')).toHaveText('v0.4.12');
+    await expect(page.getByTestId('topbar-version')).toHaveCount(0);
+    await expect(page.getByTestId('brand')).toBeVisible();
+    await expect(page.getByTestId('topbar-back')).toBeVisible();
     await expect(page.getByTestId('topbar-collaborators')).toBeVisible();
     await expect(page.getByTestId('topbar-share-btn')).toBeDisabled();
     // The canvas (and its dots) run beneath the floating top bar.

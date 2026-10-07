@@ -112,8 +112,8 @@ test('a project can be dragged from the Library onto the canvas, and the logo re
   await expect(page.getByTestId('connect-form-protocol').locator('option')).toHaveText(['HTTP / REST']);
   await page.keyboard.press('Escape');
 
-  // The logo goes to the project list.
-  await page.getByTestId('brand').click();
+  // The back button goes to the project list.
+  await page.getByTestId('topbar-back').click();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByTestId('existing-projects-list')).toBeVisible();
 });

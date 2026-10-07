@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+  ArrowLeft,
   ChevronDown,
   ChevronUp,
   Command as CommandIcon,
@@ -9,8 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/ui/kbd";
+import { BrandMark } from "@/components/ui/brand-mark";
 import { cn } from "@/lib/utils";
-import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import type {
   BranchRecord,
   ProjectRecord,
@@ -222,49 +223,24 @@ export function TopBar({
       role="banner"
     >
       <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 max-sm:min-w-min shrink min-[1000px]:pointer-events-auto">
-        {/* Brand mark */}
-        <button
-          type="button"
+        {/* Logo (static) and the way back to the project list */}
+        <BrandMark
           data-testid="brand"
+          className="max-sm:hidden"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          data-testid="topbar-back"
           aria-label="All projects"
           title="All projects"
           onClick={onAllProjects}
-          className="flex cursor-pointer items-center gap-2 rounded-control font-semibold text-sm text-foreground shrink-0 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:pointer-coarse:hidden"
+          className="h-8 shrink-0 gap-1.5 px-2 text-[13px] font-medium text-secondary-text hover:text-ink"
         >
-          <svg
-            className="size-5 shrink-0"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <defs>
-              <linearGradient
-                id="brand-mark-gradient"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="100%"
-              >
-                <stop offset="0%" stopColor="#0B5C54" />
-                <stop offset="100%" stopColor="#2E7D6B" />
-              </linearGradient>
-            </defs>
-            <rect
-              width="20"
-              height="20"
-              rx="5"
-              fill="url(#brand-mark-gradient)"
-            />
-          </svg>
-          <span className="hidden sm:inline">System Studio</span>
-        </button>
-        <span
-          data-testid="topbar-version"
-          className="hidden xl:inline font-mono text-[10px] text-[#8A938F] shrink-0"
-        >
-          {APP_VERSION_LABEL}
-        </span>
+          <ArrowLeft size={15} aria-hidden="true" />
+          <span className="hidden sm:inline">Projects</span>
+        </Button>
 
         {/* Vertical divider from brand mark */}
         <div
