@@ -8,6 +8,10 @@ export default defineConfig({
     baseURL,
     browserName: "chromium",
     viewport: { width: 1512, height: 982 },
+    storageState: {
+      cookies: [],
+      origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: "studio:motion", value: "off" }] }],
+    },
   },
   webServer: {
     command: production ? "npx vite preview --host 127.0.0.1 --port 5174" : "npm run dev -- --port 5173",
