@@ -32,6 +32,8 @@ import { PlaybackTrafficContext, usePlaybackTraffic, type PlaybackSource } from 
 import { SimulationHighlightContext, type SimulationHighlight } from './SimulationHighlight';
 import { FloatingDock } from './FloatingDock';
 import { SelectionBox } from './SelectionBox';
+import { CanvasCrosshair } from './CanvasCrosshair';
+import { rememberPart } from '../library/recentParts';
 import {
   projectDocumentToCanvas,
   type ProjectedNodeData,
@@ -901,6 +903,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         const entryId = e.dataTransfer.getData(CATALOG_ENTRY_MIME_TYPE);
         if (!entryId || !getEntry(entryId)) return;
         e.preventDefault();
+        rememberPart(entryId);
         const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
         await applyPlacement(entryId, flowPoint);
         return;
@@ -1249,7 +1252,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         <div
           data-testid="canvas-run-waits-notice"
           role="status"
-          className="absolute top-3 right-3 z-10 max-w-[280px] rounded-control border border-warning-edge bg-warning-tint px-3 py-2 text-xs text-warning-text"
+          className="absolute top-[calc(0.75rem+var(--topbar-inset,0px))] right-3 z-10 max-w-[280px] rounded-control border border-warning-edge bg-warning-tint px-3 py-2 text-xs text-warning-text"
         >
           Run waits until you Apply or Cancel the scenario changes.
         </div>
@@ -1258,7 +1261,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       {projection.hasMultipleViews && (
         <div
           data-testid="view-selector-container"
-          className="absolute top-3 left-3 z-10 flex items-center gap-2 px-2.5 py-1.5 rounded-control bg-panel border border-control-border shadow-raised"
+          className="absolute top-[calc(0.75rem+var(--topbar-inset,0px))] left-3 z-10 flex items-center gap-2 px-2.5 py-1.5 rounded-control bg-panel border border-control-border shadow-raised"
         >
           <span className="text-xs font-medium text-secondary-text">View:</span>
           <NativeSelect
@@ -1354,8 +1357,9 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             ]}
           />
         </ViewportPortal>
-        {/* Dotted grid on the same 26px pitch as snap-to-grid; dots use the control border tone so they read on the white canvas. */}
-        <Background variant={BackgroundVariant.Dots} color="var(--control-border)" gap={gridGap} size={GRID_DOT_PX / zoom} />
+        {/* Static drafting dots retain the same 26px pitch as snap-to-grid and zoom-dependent density. */}
+        <Background variant={BackgroundVariant.Dots} color="var(--grid)" gap={gridGap} size={GRID_DOT_PX / zoom} />
+        <CanvasCrosshair gap={gridGap} />
         {showMinimap && (
           <MiniMap
             nodeColor="#0B5C54"

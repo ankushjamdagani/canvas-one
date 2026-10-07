@@ -8,7 +8,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
   test('S04: router capacity draft -- invalid, valid Apply + Undo, dirty Run guard, navigation guard, measured metrics', async ({
     page,
   }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -37,7 +37,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
     const runBtn = page.getByTestId('scenario-run-btn');
     await expect(runBtn).toBeDisabled();
     await runBtn.hover();
-    await expect(page.getByText('Apply or Cancel configuration changes before running.')).toBeVisible();
+    await expect(runBtn).toHaveAttribute('title', 'Apply or Cancel configuration changes before running.');
 
     // Selecting another node while dirty -> guard dialog. Stay keeps the draft.
     const processorNode = page.locator(`[data-element-id="${PROCESSOR_A_ELEMENT_ID}"]`);
@@ -99,7 +99,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
 
   test('390x844: inspector renders as a bottom sheet, usable, no horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -126,7 +126,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
   });
 
   test('the inspector is a hosted panel: docks right, floats from its header menu, and closes with the draft', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await page.locator(`[data-element-id="${ROUTER_ELEMENT_ID}"]`).click();

@@ -203,7 +203,8 @@ export function Specimen() {
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              { name: "Canvas White", token: "--canvas", hex: "#FFFFFF" },
+              { name: "Drafting Paper", token: "--canvas", hex: evergreen.canvas },
+              { name: "Drafting Dots", token: "--grid", hex: evergreen.grid },
               { name: "Paper Shell", token: "--shell", hex: "#FBFAF7" },
               { name: "Studio Panel", token: "--panel", hex: "#F7F5F1" },
               { name: "Sunken Stone", token: "--sunken", hex: "#F2EFE9" },
@@ -255,7 +256,7 @@ export function Specimen() {
               { name: "Deep Ink", token: "--foreground", hex: "#16201D" },
               { name: "Body Ink", token: "--body", hex: "#4A544F" },
               { name: "Secondary", token: "--secondary-text", hex: "#626D68" },
-              { name: "Meta Muted", token: "--text-meta", hex: "#8A938F" },
+              { name: "Meta Muted", token: "--text-micro", hex: "#8A938F" },
               { name: "Disabled", token: "--text-disabled", hex: "#C0C6C1" },
             ].map((s) => (
               <div key={s.token} className="rounded-md border border-border bg-panel p-2.5 space-y-2 shadow-2xs">
@@ -341,7 +342,7 @@ export function Specimen() {
             Typography
           </h2>
           <span className="text-xs text-secondary-text hidden sm:inline">
-            Hierarchy paired with Newsreader, IBM Plex Sans, and IBM Plex Mono.
+            Newsreader headings, IBM Plex Mono interface text, Martian Mono measurements, and Caveat annotations.
           </span>
         </div>
 

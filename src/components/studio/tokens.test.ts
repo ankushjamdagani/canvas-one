@@ -33,11 +33,11 @@ describe("Evergreen tokens and styles.css single source check", () => {
 
   it("(a) asserts every Evergreen role variable in :root equals the value exported from tokens.ts", () => {
     // Surface & background roles
-    expect(rootVars["--background"]).toBe(evergreen.canvas);
+    expect(rootVars["--background"]).toBe(evergreen.controlSurface);
     expect(rootVars["--foreground"]).toBe(evergreen.ink);
     expect(rootVars["--card"]).toBe(evergreen.panel);
     expect(rootVars["--card-foreground"]).toBe(evergreen.ink);
-    expect(rootVars["--popover"]).toBe(evergreen.canvas);
+    expect(rootVars["--popover"]).toBe(evergreen.controlSurface);
     expect(rootVars["--popover-foreground"]).toBe(evergreen.ink);
 
     // Primary action role
@@ -45,6 +45,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
     // Directions board: text on action green is the shell colour (RV-17).
     expect(rootVars["--primary-foreground"]).toBe(evergreen.shell);
     expect(rootVars["--canvas"]).toBe(evergreen.canvas);
+    expect(rootVars["--grid"]).toBe(evergreen.grid);
     expect(rootVars["--hairline-soft"]).toBe(evergreen.hairlineSoft);
 
     // Secondary & muted roles

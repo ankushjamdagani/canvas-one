@@ -6,11 +6,11 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
   }) => {
     // 1. Boot -> entry has start tiles (empty project, starter template, import) above "Your projects".
     // No prompt box, no "Bring in what exists".
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await expect(page.getByTestId('no-projects-notice')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Start a project' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Start a project or pick up a sheet.' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Empty project' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Starter template' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Import .json' })).toBeVisible();
@@ -48,7 +48,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
 
     // Reload returns to the entry screen (session state is in-memory only);
     // the rename is durable there.
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const renamedItem = page
       .getByTestId('existing-projects-list')
@@ -179,7 +179,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1512, height: 982 });
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
 
     const s05CreateBtn = page.getByTestId('create-example-s05');
@@ -254,7 +254,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
   test('RV-12d review round 1: edge labels that would cover a node caption are hidden by default and reveal on hover', async ({
     page,
   }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     const s05CreateBtn = page.getByTestId('create-example-s05');
     await expect(s05CreateBtn).toBeVisible();
     await s05CreateBtn.click();

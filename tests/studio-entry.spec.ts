@@ -18,7 +18,7 @@ async function waitForIdle(page: Page) {
 }
 
 async function openEntry(page: Page) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
 }
 
@@ -71,7 +71,7 @@ test.describe('RV-13b: Entry screen', () => {
     await expect(page.locator('.component-node')).toHaveCount(1);
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const list = page.getByTestId('existing-projects-list');
     await expect(list).toContainText('RV-13b blank');
@@ -86,7 +86,7 @@ test.describe('RV-13b: Entry screen', () => {
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
-    await page.goto('/');
+    await page.goto('/projects');
 
     const card = page.locator('[data-testid^="project-item-"]').first();
     // The thumbnail is drawn from the saved placements, one rect pair per node.
@@ -100,12 +100,12 @@ test.describe('RV-13b: Entry screen', () => {
     await expect(page.getByTestId('workspace-root')).toBeVisible();
 
     // Empty project: clicking the tile text creates it.
-    await page.goto('/');
+    await page.goto('/projects');
     await clickCentre(page, page.getByRole('heading', { name: 'Empty project' }));
     await expect(page.getByTestId('workspace-root')).toBeVisible();
 
     // Import: clicking the tile text opens the file chooser.
-    await page.goto('/');
+    await page.goto('/projects');
     const chooser = page.waitForEvent('filechooser');
     await clickCentre(page, page.getByRole('heading', { name: 'Import .json' }));
     await chooser;
@@ -178,7 +178,7 @@ test.describe('RV-13b: Entry screen', () => {
 
 test.describe('routes', () => {
   test('project URLs deep-link, survive reload, follow back/forward and reject unknown ids', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page).toHaveURL(/\/project\/[^/]+(\/branch\/[^/]+)?$/);
@@ -189,7 +189,7 @@ test.describe('routes', () => {
     await expect(page).toHaveURL(projectUrl);
 
     await page.goBack();
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/projects$/);
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await page.goForward();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -198,6 +198,6 @@ test.describe('routes', () => {
     await expect(page.getByTestId('project-route-error')).toBeVisible();
     await page.goto('/not-a-route');
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+    await expect(page.getByTestId('landing-page')).toBeVisible();
   });
 });

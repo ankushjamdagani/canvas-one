@@ -2,7 +2,7 @@ import { expect, test } from './fixtures';
 
 test.describe('Studio scenario authoring (RV-05d)', () => {
   test('opens stored logical replies with guards, bindings, paths, and draggable steps', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s01').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
@@ -10,7 +10,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await page.getByTestId('scenario-switcher-trigger').click();
     const popover = page.getByTestId('scenario-switcher-popover');
     await expect(popover).toBeVisible();
-    await popover.locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
+    await popover.locator('[data-selected="true"]').getByRole('button', { name: /^Edit scenario/ }).click();
 
     const editor = page.getByTestId('scenario-editor');
     await expect(editor).toBeVisible();
@@ -43,11 +43,11 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
   });
 
   test('editing traffic tags the entry node and says Run waits for Apply or Cancel (board scenario_traffic_editor)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
     await page.getByTestId('scenario-switcher-trigger').click();
-    await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
+    await page.getByTestId('scenario-switcher-popover').locator('[data-selected="true"]').getByRole('button', { name: /^Edit scenario/ }).click();
     const editor = page.getByTestId('scenario-editor');
     await expect(editor).toBeVisible();
     await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(0);
@@ -64,11 +64,11 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
   });
 
   test('D50: traffic can burst; the burst fields start empty and must be filled', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
     await page.getByTestId('scenario-switcher-trigger').click();
-    await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
+    await page.getByTestId('scenario-switcher-popover').locator('[data-selected="true"]').getByRole('button', { name: /^Edit scenario/ }).click();
     const editor = page.getByTestId('scenario-editor');
     await editor.getByRole('button', { name: /Add traffic/ }).click();
     await editor.getByLabel('Sends').selectOption('stream');
@@ -93,12 +93,12 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
   });
 
   test('D51: a boundary reply can answer every matching request; the choice is saved', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s01').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
     const openEditor = async () => {
       await page.getByTestId('scenario-switcher-trigger').click();
-      await page.getByTestId('scenario-switcher-popover').locator('[data-testid^="scenario-row-"]', { has: page.locator('button[aria-pressed="true"]') }).getByRole('button', { name: /^Edit scenario/ }).click();
+      await page.getByTestId('scenario-switcher-popover').locator('[data-selected="true"]').getByRole('button', { name: /^Edit scenario/ }).click();
       const editor = page.getByTestId('scenario-editor');
       await expect(editor).toBeVisible();
       const boundaries = editor.getByTestId('scenario-section-boundaries');

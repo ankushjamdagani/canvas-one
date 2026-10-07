@@ -13,7 +13,7 @@ async function openLibrary(page: Page) {
 
 /** A blank project with one service whose HTTP type is exposed (D53: a project must expose a call connection type to be linked). */
 async function createExposingProject(page: Page, name: string) {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByRole('textbox', { name: 'Blank project name' }).fill(name);
   await page.getByTestId('create-blank-project-btn').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -49,7 +49,7 @@ test('a project can be linked into another as a read-only node that shows live d
   await page.keyboard.press('Escape');
 
   // Link it from another project through the Library's Projects tab.
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await waitForIdle(page);
@@ -114,17 +114,17 @@ test('a project can be dragged from the Library onto the canvas, and the logo re
 
   // The logo goes to the project list.
   await page.getByTestId('brand').click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByTestId('existing-projects-list')).toBeVisible();
 });
 
 test('a project that exposes nothing cannot be linked, and the Library says why', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByRole('textbox', { name: 'Blank project name' }).fill('Quiet system');
   await page.getByTestId('create-blank-project-btn').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
 
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await waitForIdle(page);
@@ -136,7 +136,7 @@ test('a project that exposes nothing cannot be linked, and the Library says why'
 });
 
 test('the connect form offers a connection type and a service can be connected with gRPC', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await waitForIdle(page);

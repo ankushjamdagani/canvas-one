@@ -19,7 +19,7 @@ export function DraftingBoard({
     addEventListener("resize", resize);
     return () => removeEventListener("resize", resize);
   }, []);
-  const scale = Math.min(size.w / 1440, size.h / 900);
+  const scale = Math.min(1, size.w / 1440, size.h / 900);
   return (
     <div
       className="drafting-board"

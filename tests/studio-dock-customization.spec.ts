@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures';
 
 test('dock customization reorders, hides, restores and persists across reload', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   const workspace = page.getByTestId('workspace-root');
   await expect(workspace).toHaveAttribute('data-dock-preference-state', 'ready');
@@ -17,7 +17,7 @@ test('dock customization reorders, hides, restores and persists across reload', 
   await tray.getByRole('button', { name: 'Hide Add note…' }).click();
   await expect(workspace).toHaveAttribute('data-dock-preference-state', 'ready');
   await expect(dock.getByTestId('dock-note-btn')).toHaveCount(0);
-  await page.goto('/');
+  await page.goto('/projects');
   const project = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]').first();
   await project.locator('[data-testid^="open-project-"]').click();
   await expect(workspace).toHaveAttribute('data-dock-preference-state', 'ready');
@@ -46,7 +46,7 @@ test('dock customization reorders, hides, restores and persists across reload', 
 
 test('narrow dock keeps primary tools and puts the rest in touch sized overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   const dock = page.getByTestId('canvas-floating-dock');
   await expect(dock.getByTestId('dock-select-btn')).toBeVisible();
@@ -66,7 +66,7 @@ test('narrow dock keeps primary tools and puts the rest in touch sized overflow'
 });
 
 test('16B more popover lists all non-sticky options with pin buttons and toggleable actions', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   const dock = page.getByTestId('canvas-floating-dock');
 
@@ -101,7 +101,7 @@ test('16B more popover lists all non-sticky options with pin buttons and togglea
 });
 
 test('customize toolbar shows 3 sections with disabled fixed left/right controls and working label toggle', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   const dock = page.getByTestId('canvas-floating-dock');
 
@@ -145,4 +145,3 @@ test('customize toolbar shows 3 sections with disabled fixed left/right controls
   await tray.getByRole('button', { name: 'Done' }).click();
   await expect(tray).toHaveCount(0);
 });
-

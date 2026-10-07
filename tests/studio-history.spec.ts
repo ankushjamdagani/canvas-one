@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './fixtures';
+import { runAll, savedRunCount } from './simulation-support';
 
 /**
  * RV-13b: History panel journeys (screens 22A-F; contracts/commands.md section 3,
@@ -18,7 +19,7 @@ async function waitForIdle(page: Page) {
 }
 
 async function openS04(page: Page) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('create-example-s04').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -41,17 +42,9 @@ async function editRouterCapacity(page: Page, value: string) {
 }
 
 async function runAllScenarios(page: Page) {
-  const trigger = page.getByTestId('scenario-switcher-trigger');
-  const popover = page.getByTestId('scenario-switcher-popover');
-  await trigger.click();
-  await page.getByTestId('scenario-run-all-btn').click();
-  const rows = popover.locator('[data-testid^="scenario-row-"]');
-  await expect(async () => {
-    if (!(await popover.isVisible())) await trigger.click();
-    for (let i = 0; i < 3; i++) await expect(rows.nth(i)).toContainText('Passed on this version');
-  }).toPass({ timeout: 60000 });
-  await page.keyboard.press('Escape');
-  await expect(popover).toBeHidden();
+  const before = await savedRunCount(page);
+  await runAll(page);
+  await expect.poll(() => savedRunCount(page), { timeout: 60000 }).toBe(before + 3);
 }
 
 async function commitWith(page: Page, message: string) {

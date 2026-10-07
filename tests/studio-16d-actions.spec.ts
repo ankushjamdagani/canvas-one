@@ -6,7 +6,7 @@ import { expect, test, type Page } from './fixtures';
  */
 
 async function openExample(page: Page, id: 's04' | 's05') {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId(`create-example-${id}`).click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');

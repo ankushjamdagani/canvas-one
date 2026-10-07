@@ -94,7 +94,7 @@ test.describe('Studio Transfer E2E (RV-10b)', () => {
   test('mounts Export under the project menu and enables CSV only for the displayed saved run', async ({
     page,
   }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s01').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
 
@@ -115,7 +115,7 @@ test.describe('Studio Transfer E2E (RV-10b)', () => {
     await page.keyboard.press('Escape');
 
     await page.getByTestId('scenario-run-btn').click();
-    await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 15_000 });
+    await expect(page.getByTestId('playback-status')).toContainText(/complete/i, { timeout: 15_000 });
 
     await openExportMenu();
     await expect(page.getByTestId('export-menu-csv')).toBeEnabled();
@@ -127,7 +127,7 @@ test.describe('Studio Transfer E2E (RV-10b)', () => {
     const s05 = loadS05Fixture();
     const bundleFilePath = await buildExportedS05BundleFile(s05);
 
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await expect(page.getByTestId('no-projects-notice')).toBeVisible();
 
@@ -171,7 +171,7 @@ test.describe('Studio Transfer E2E (RV-10b)', () => {
       JSON.stringify({ format: 'system-studio', version: 7, project: {} }),
     );
 
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
 
     await page.getByTestId('import-project-file-input').setInputFiles(oldFormatPath);

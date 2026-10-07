@@ -14,7 +14,7 @@ async function openNotes(page: Page) {
 
 test.describe('Studio selection actions and note dock (RV-04e)', () => {
   test('aligns, groups, undoes, and adds a note through registry commands', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -55,7 +55,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('Delete key and Quick options delete the selection through the registry', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -97,7 +97,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('wraps two nodes in a refinement boundary and restores them with one undo', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -127,7 +127,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('edits note inline, toggles node port expansion, and dismisses popovers on canvas click', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -207,7 +207,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('sticky notes linking, drag-and-drop from dock, and detachment', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -289,7 +289,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('align menu sections, group option visibility, and ungrouping', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -365,7 +365,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('treats sticky notes as first-class selection items: mixed selection, alignment, duplication, deletion, and grouping', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -455,7 +455,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
   });
 
   test('selection box and grouping box have identical uniform spacing and matching position', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s01').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);

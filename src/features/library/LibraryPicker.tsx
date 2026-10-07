@@ -4,7 +4,8 @@
  * Implements the compact catalog component picker opened from the dock:
  * - Search field filtering across label, tags, group, and models.
  * - Horizontal filter chips for catalog groups (All, Compute, Data, Messaging, Edge, Clients, Operations, ...).
- *   (Strictly excludes Platform team, team chips, Ours/patterns, and Recent per design-revalidation.md §2).
+ *   Plus a leading Recent chip (parts you placed, by click or drag). Platform team, team chips and
+ *   Ours/patterns stay excluded per design-revalidation.md §2; Recent was added by the Project Canvas design.
  * - 4-column card grid with visual previews, kind icons, labels, library captions, and "Not simulated" tags.
  * - Drag-and-drop support setting 'application/x-studio-catalog-entry' MIME type.
  * - Footer hints: "↵ place at centre · drag to position" and "Browse full library" button.
@@ -24,9 +25,12 @@ import {
   filterEntriesByGroup,
 } from './viewModel';
 import { CatalogEntryCard } from './CatalogEntryCard';
+import { readRecentParts, rememberPart } from './recentParts';
 import { useCatalogSelection } from './useCatalogSelection';
 
-const FILTER_CHIPS: readonly (CatalogGroup | 'All')[] = ['All', ...CANONICAL_GROUP_ORDER];
+type PickerFilter = CatalogGroup | 'All' | 'Recent';
+
+const FILTER_CHIPS: readonly PickerFilter[] = ['All', ...CANONICAL_GROUP_ORDER];
 
 export function LibraryPicker({
   onPlace,
@@ -38,21 +42,39 @@ export function LibraryPicker({
   className,
 }: LibraryPickerProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [activeGroup, setActiveGroup] = React.useState<CatalogGroup | 'All'>('All');
+  // Recent only tracks placements, so it is absent when the picker chooses a replacement.
+  const tracksRecent = actionLabel === 'Place';
+  const [recentIds, setRecentIds] = React.useState<readonly string[]>(() => (tracksRecent ? readRecentParts() : []));
+  // Opens on Recent once something has been placed; an empty Recent would hide the catalog.
+  const [activeGroup, setActiveGroup] = React.useState<PickerFilter>(recentIds.length > 0 ? 'Recent' : 'All');
+  const chips = tracksRecent ? (['Recent', ...FILTER_CHIPS] as const) : FILTER_CHIPS;
+  const place = React.useCallback(
+    (entryId: string) => {
+      if (tracksRecent) setRecentIds(rememberPart(entryId));
+      onPlace(entryId);
+    },
+    [onPlace, tracksRecent],
+  );
 
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const gridContainerRef = React.useRef<HTMLDivElement>(null);
 
   const filteredEntries = React.useMemo(() => {
     const result = filterEntries(CATALOG_ENTRIES.filter((entry) => entry.visualKind !== 'linked-project'), searchQuery);
-    return activeGroup === 'All' ? result : filterEntriesByGroup(result, activeGroup);
-  }, [searchQuery, activeGroup]);
+    if (activeGroup === 'All') return result;
+    if (activeGroup === 'Recent') {
+      // Searching widens Recent to the whole catalog so a query never dead-ends.
+      if (searchQuery.trim()) return result;
+      return recentIds.flatMap((id) => result.filter((entry) => entry.entryId === id));
+    }
+    return filterEntriesByGroup(result, activeGroup);
+  }, [searchQuery, activeGroup, recentIds]);
 
   const { selectedEntry, activate, onDragStart, onKeyDown } = useCatalogSelection({
     entries: filteredEntries,
     controlledSelectedId: selectedEntryId,
     onSelect,
-    onPlace,
+    onPlace: place,
     onClose,
     columns: 4,
     searchInputRef,
@@ -111,7 +133,7 @@ export function LibraryPicker({
           aria-label="Filter by group"
           className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
         >
-          {FILTER_CHIPS.map((chip) => {
+          {chips.map((chip) => {
             const isActive = activeGroup === chip;
             return (
               <button
@@ -145,7 +167,9 @@ export function LibraryPicker({
       >
         {filteredEntries.length === 0 ? (
           <div className="col-span-full py-8 text-center">
-            <p className="text-xs text-secondary-text mb-2">No matching components found</p>
+            <p className="text-xs text-secondary-text mb-2">
+              {activeGroup === 'Recent' && !searchQuery.trim() ? 'Nothing placed yet' : 'No matching components found'}
+            </p>
             <button
               type="button"
               onClick={() => {
@@ -167,7 +191,7 @@ export function LibraryPicker({
               compact
               selected={selectedEntry?.entryId === entry.entryId}
               onActivate={activate}
-              onPlace={onPlace}
+              onPlace={place}
               onDragStart={onDragStart}
             />
           ))
@@ -185,7 +209,7 @@ export function LibraryPicker({
           <button
             type="button"
             data-testid="library-picker-place-btn"
-            onClick={() => onPlace(selectedEntry.entryId)}
+            onClick={() => place(selectedEntry.entryId)}
             className="hidden pointer-coarse:inline-flex items-center min-h-11 px-3 rounded-md bg-primary text-primary-foreground font-medium"
           >
             {actionLabel} {selectedEntry.label}

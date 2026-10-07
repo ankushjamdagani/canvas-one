@@ -8,6 +8,22 @@ const make = (historyMs: number | null = null) => {
 };
 
 describe('playback range', () => {
+  it('bounds history while live review is stationary, and follows the edge past a selected interval', () => {
+    const store = make(1000);
+    store.setSelection({ startMs: 0, endMs: 6000 });
+    store.seek(2000); store.following = false; store.playing = true;
+    store.advance(1000);
+    expect(store.playheadMs).toBe(2000);
+    store.retainThrough(6000);
+    expect(store.windowStartMs).toBe(5000);
+    expect(store.playheadMs).toBe(5000);
+    expect(store.selection).toEqual({ startMs: 5000, endMs: 6000 });
+    store.following = true; store.seek(7000); store.advance(1000);
+    expect(store.playheadMs).toBe(8000);
+    expect(store.windowStartMs).toBe(7000);
+    expect(store.selection).toBeNull();
+  });
+
   it('stops exactly at the selected end while inspection can seek outside', () => {
     const store = make();
     store.setEnded(10000);

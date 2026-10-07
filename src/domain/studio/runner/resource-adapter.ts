@@ -434,6 +434,7 @@ function buildExecutionGraph(opts: {
  * Retained resource adapter over the simulation kernel.
  */
 export class ResourceAdapter {
+  private readonly observedBridgeFlows = new Map<string, { sent: FlowRecord; returnLatencyMs: number }>();
   readonly runId: string;
   private readonly sim: OpenSimulation;
   private lastOccupancyRates: Readonly<Record<string, number>> = {};
@@ -591,8 +592,8 @@ export class ResourceAdapter {
     this.sim = new OpenSimulation(graph, {
       traceHook: (fact) => {
         this.recordFlow(fact);
-        this.cycleTracker.record(fact);
-        if (fact.kind !== 'sent' && fact.kind !== 'response_sent' && fact.kind !== 'occupancy_released') this.stepFacts.push(fact);
+        if (fact.kind !== 'traffic') this.cycleTracker.record(fact);
+        if (fact.kind !== 'traffic' && fact.kind !== 'sent' && fact.kind !== 'response_sent' && fact.kind !== 'occupancy_released') this.stepFacts.push(fact);
       },
       disabledWorkloadIds,
       requireRunnable: hasActiveWorkloads,
@@ -638,6 +639,24 @@ export class ResourceAdapter {
       ...(category === undefined ? {} : { category }),
       attempt: fact.attempt,
     };
+    if (fact.kind === 'bridge_dispatch' && fact.frameId) {
+      const conn = this.bridgeConnByNode.get(fact.nodeId);
+      if (conn?.kind === 'call') {
+        const sent: FlowRecord = { ...identity, key: `${key}>bridge:${fact.frameId}`, connectionId: conn.id,
+          elementId: conn.target.elementId, phase: 'sent', atMs: ms(fact.time), arriveAtMs: ms(fact.time) + conn.config.latencyMs, outcome: null };
+        this.flowRecords.push(sent);
+        this.observedBridgeFlows.set(fact.frameId, { sent, returnLatencyMs: conn.config.returnLatencyMs });
+      }
+      return;
+    }
+    if (fact.kind === 'traffic' && fact.trafficPhase) {
+      this.flowRecords.push({ ...identity, key, ownerKey: `${fact.unitIdentity}|${fact.ownerPath ?? fact.path}`, connectionId: fact.edgeId ?? null,
+        ...(fact.targetNodeId === undefined ? {} : { targetElementId: fact.targetNodeId }),
+        elementId: fact.trafficPhase === 'outcome' && fact.edgeId ? undefined : fact.nodeId, phase: fact.trafficPhase, atMs: ms(fact.time), arriveAtMs: null,
+        ...(fact.arriveAt === undefined ? {} : { retryAtMs: ms(fact.arriveAt) }),
+        ...(fact.trafficOutcome === undefined ? {} : { trafficOutcome: fact.trafficOutcome }), outcome: null });
+      return;
+    }
     if (fact.kind === 'sent' && fact.edgeId) {
       this.flowConnections.set(key, fact.edgeId);
       this.flowRecords.push({ ...identity, key, connectionId: fact.edgeId, elementId: fact.nodeId, phase: 'sent', atMs: ms(fact.time), arriveAtMs: fact.arriveAt === undefined ? null : ms(fact.arriveAt), outcome: null });
@@ -663,7 +682,7 @@ export class ResourceAdapter {
       connectionId,
       elementId: fact.nodeId,
       phase,
-      atMs: ms(fact.time),
+      atMs: ms(fact.departAt ?? fact.time),
       arriveAtMs: phase === 'response' && fact.arriveAt !== undefined ? ms(fact.arriveAt) : null,
       outcome: phase === 'settled' ? (fact.kind === 'rejected' ? 'rejected' : (fact.outcome ?? null)) : phase === 'response' ? (fact.outcome ?? null) : null,
     });
@@ -689,6 +708,16 @@ export class ResourceAdapter {
   /** D56: units that have not settled, with where each is held. */
   unsettled(): ReturnType<OpenSimulation['unsettled']> {
     return this.sim.unsettled();
+  }
+
+  /** Called only when runner quiescence proves that these units cannot make progress. */
+  recordNoProgress(units: ReturnType<OpenSimulation['unsettled']>, atMs: number): void {
+    for (const unit of units) {
+      if (unit.phase !== 'waiting' || unit.path === undefined) continue;
+      const key = `${unit.identity}|${unit.path}`;
+      this.flowRecords.push({ key, ownerKey: key, unitId: unit.identity, category: unit.category,
+        elementId: unit.holderNodeId, connectionId: null, phase: 'no_progress', atMs, arriveAtMs: null, outcome: null });
+    }
   }
 
   /** D55: no workload arrives again; work in flight carries on. */
@@ -1085,12 +1114,19 @@ export class ResourceAdapter {
       this.journeyFailure ??= `settleCall for frame '${input.frameId}' carried no outcome`;
       return { events: [], outputs: [] };
     }
+    const late = this.sim.bridgeReplyIsLate(input.frameId);
     this.sim.settleCall({
       frameId: input.frameId,
       outcome: input.outcome as KernelOutcome,
       payloadRef: input.payloadRef,
       atMs: input.atMs,
     });
+    const observed = this.observedBridgeFlows.get(input.frameId);
+    if (observed) {
+      this.observedBridgeFlows.delete(input.frameId);
+      this.flowRecords.push({ ...observed.sent, phase: 'response', atMs: input.atMs,
+        arriveAtMs: input.atMs + (late ? 0 : observed.returnLatencyMs), outcome: input.outcome as KernelOutcome });
+    }
     return { events: [], outputs: [] };
   }
 

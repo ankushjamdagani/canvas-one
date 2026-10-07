@@ -17,7 +17,7 @@ async function openOurs(page: Page) {
 test("saved part survives reload, shares Library search, exports/imports, and places with one undo", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/projects");
   await page.getByTestId("create-example-s03").click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
   const nodes = page.locator(".component-node");
@@ -68,7 +68,7 @@ test("saved part survives reload, shares Library search, exports/imports, and pl
       exact: true,
     }),
   ).toHaveCount(2);
-  await page.goto("/");
+  await page.goto("/projects");
   await page.locator('[data-testid^="open-project-"]').first().click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
   await openOurs(page);
@@ -89,7 +89,7 @@ test("mobile Library supports saved-part preview and cancel without overflowing"
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/projects");
   await page.getByTestId("create-example-s03").click();
   await expect(page.getByTestId("workspace-root")).toBeVisible();
   await page.locator(".component-node").first().click();

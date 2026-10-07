@@ -23,7 +23,7 @@
 ## Intentional deviations (kept)
 
 - **Secondary text `#626D68`** instead of `#6B7671`; **stronger field border** `--input`; **solid focus outline** and a **2 px selected-node border**. These are design.md's accessibility corrections.
-- **Entry layout** (no prompt box, no "Bring in what exists") per D12; the 16E picker has no Recent/Patterns/team chips per design-revalidation §2.
+- **Entry layout** (no prompt box, no "Bring in what exists") per D12; the 16E picker has no Patterns/team chips per design-revalidation §2; a Recent chip was added by the 2026-10-07 Project Canvas design.
 - **Panels overlay below 1200 px** (commands.md §7), so boards drawn at 1122–1132 px show docked panels where the app shows an overlay. At 1512 px they dock.
 - **Top bar** has the scenario switcher and Run (D38) instead of "Run Simulation". Results content (charts, "vs run", p99, Stop run) follows the contracted metrics.
 

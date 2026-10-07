@@ -3,7 +3,7 @@ import { test, expect } from './fixtures';
 // RV-03q: 14A Quick options over the command registry (commands.md §1).
 test.describe('Studio Quick options (RV-03q)', () => {
   test('button and F2 open it; search, nested rename, branch switch and registry undo', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
@@ -81,7 +81,7 @@ test.describe('Studio Quick options (RV-03q)', () => {
   });
 
   test('panel close, results close and cancel-run rows route through the registry', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
@@ -117,7 +117,7 @@ test.describe('Studio Quick options (RV-03q)', () => {
   });
 
   test('history commands run from Quick options and share the draft availability reason', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');

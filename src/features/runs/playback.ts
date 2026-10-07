@@ -10,6 +10,7 @@
 import type { Cycle, CycleOutcome, ElementMetric, FlowRecord, ResultDelta, RunCheckpoint } from '../../domain/studio/runner/types';
 import { CycleIndex } from './playback-history';
 import { FlashIndex, type FlashAt } from './playback-flashes';
+import { TrafficIndex } from './playback-traffic';
 import { CycleOverlapIndex, cycleFlowEvents, cycleIntervalStatistics } from './cycle-inspection-query';
 import type { CycleActivePeriod, CycleActivityEvent, CycleIntervalStatistics } from './cycle-inspection-query';
 export type { FlashAt } from './playback-flashes';
@@ -28,6 +29,10 @@ export type PlaybackOptions = {
   readonly historyMs: number | null;
   readonly connectionChannels?: ReadonlyMap<string, string>;
   readonly workloadEntries?: ReadonlyMap<string, string>;
+  readonly nodeCapacities?: ReadonlyMap<string, number>;
+  readonly nodeNames?: ReadonlyMap<string, string>;
+  readonly nodeSlotHolds?: ReadonlyMap<string, boolean>;
+  readonly connectionEndpoints?: ReadonlyMap<string, { source: string; target: string }>;
 };
 
 export type LegAt = {
@@ -53,6 +58,7 @@ export type StateAt = {
 
 export class PlaybackStore {
   private readonly options: PlaybackOptions;
+  private readonly traffic: TrafficIndex;
   private readonly flashes = new FlashIndex();
   private readonly pendingArrivals = new Map<string, number>();
   private flow: FlowRecord[] = [];
@@ -98,6 +104,8 @@ export class PlaybackStore {
   /** Simulated seconds per real second. */
   speed = 1;
   playing = false;
+  /** Live recording may continue while the presentation stays on an earlier instant. */
+  following = true;
   private range: PlaybackRange | null = null;
 
   get selection(): PlaybackRange | null { return this.range; }
@@ -115,6 +123,7 @@ export class PlaybackStore {
 
   constructor(options: PlaybackOptions) {
     this.options = options;
+    this.traffic = new TrafficIndex(options);
   }
 
   // --------------------------------------------------------------------------
@@ -122,6 +131,7 @@ export class PlaybackStore {
   // --------------------------------------------------------------------------
 
   ingestFlow(records: readonly FlowRecord[]): void {
+    this.traffic.ingest(records);
     if (records.length) { this.version++; this.flowVersion++; }
     for (const r of records) {
       if (r.cycleId !== undefined) {
@@ -367,8 +377,8 @@ export class PlaybackStore {
 
   /** Moves the playhead by `realDtMs` of real time at `speed`, never past what is computed or the end of the run. */
   advance(realDtMs: number): void {
-    if (!this.playing) return;
-    const limit = Math.min(this.computed, this.endAt ?? Infinity, this.range?.endMs ?? Infinity);
+    if (!this.playing || (!this.ended && !this.following)) return;
+    const limit = Math.min(this.computed, this.endAt ?? Infinity, !this.ended && this.following ? Infinity : this.range?.endMs ?? Infinity);
     const target = this.playhead + realDtMs * this.speed;
     this.playhead = Math.max(this.playhead, Math.min(target, limit));
     this.evict();
@@ -445,6 +455,14 @@ export class PlaybackStore {
     }
 
     return { atMs, legs, flashes: this.flashes.read(atMs), nodes, cycles: { started, finished }, checkpoint };
+  }
+
+  trafficAt(atMs: number) { return this.traffic.read(atMs); }
+
+  /** Bound stream history by recording time even while reviewing an earlier instant. */
+  retainThrough(atMs: number): void {
+    this.evict(Math.min(atMs, this.computed));
+    this.playhead = Math.max(this.playhead, this.windowStart);
   }
 
   /** Visible cycle state at t; no response, completion or outcome from the future leaks backward. */
@@ -583,10 +601,10 @@ export class PlaybackStore {
     return lo;
   }
 
-  private evict(): void {
+  private evict(retainedAtMs = this.playhead): void {
     const history = this.options.historyMs;
     if (history === null) return;
-    const start = this.playhead - history;
+    const start = retainedAtMs - history;
     if (start < this.windowStart + EVICT_STEP_MS) return;
     this.windowStart = start;
     this.version++;
@@ -594,6 +612,7 @@ export class PlaybackStore {
     this.cycleInspectionCache.clear();
     this.setSelection(this.range);
     this.flashes.evict(start);
+    this.traffic.evict(start);
     for (const [key, arrival] of this.pendingArrivals) if (arrival < start) this.pendingArrivals.delete(key);
     this.sortFlow();
     const cut = this.firstAfter(start - 1); // first record with atMs >= start

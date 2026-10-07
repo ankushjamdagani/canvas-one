@@ -43,6 +43,22 @@ async function setupTestProject(repo: LocalRepository, projectId = crypto.random
 }
 
 describe('RunController (main thread)', () => {
+  it('explicit scenario-switch Save completes a logical run without a playback store', async () => {
+    const db = createStudioDatabase(`test-logical-switch-save-${crypto.randomUUID()}`);
+    const repo = new LocalRepository(db);
+    const params = await setupTestProject(repo);
+    const transport = new InProcessTransport();
+    const controller = new RunController({ repository: repo, transport, mintId: () => crypto.randomUUID() });
+    const run = controller.run({ ...params, document: s01Doc, scenarioId: s01Doc.scenarios[0].id });
+    expect(await controller.finishAndSaveRecording()).toBe(true);
+    expect((await run)?.status).toBe('completed');
+    expect(controller.getPlayback()).toBeNull();
+    const runId = controller.getState().current!.runId;
+    controller.reset();
+    expect(await repo.loadRun(params.projectId, runId)).not.toBeNull();
+    controller.destroy(); db.close();
+  });
+
   it('RunController constructor requires mintId and throws if missing', () => {
     const db = createStudioDatabase(`test-mintid-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);

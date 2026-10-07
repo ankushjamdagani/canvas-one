@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 
 test('create a branch from saved work and reopen a closed draft', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('blank-project-name-input').fill('Branch controls');
   await page.getByTestId('create-blank-project-btn').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();

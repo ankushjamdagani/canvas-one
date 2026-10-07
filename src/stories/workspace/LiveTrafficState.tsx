@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 
 type Row = { label: string; value: string; tone: 'work' | 'wait' | 'queue' | 'error'; ratio?: number };
-export type LiveFrame = { caller: Row[]; receiver: Row[]; forward: number; backward: number; summary: string };
-const names = ['Idle', 'Travelling', 'Queued work', 'Processing', 'Awaiting responses', 'Response delivery', 'Asynchronous work', 'Failure / rejection', 'Retry', 'Deadline', 'Expiry / loss', 'Admission', 'Error response', 'Acknowledgement / redelivery', 'Recorded stuck work', 'Concurrent populations', 'Late response / cancellation', 'Retries exhausted'];
+export type LiveFrame = { caller: Row[]; receiver: Row[]; forward: number; backward: number; summary: string; asynchronous?: boolean };
+const names = ['Idle', 'Travelling', 'Queued work', 'Processing', 'Awaiting responses', 'Issues', 'Retry scheduled'];
 
 // Illustrative frames, not a simulation or measured runner output. Rates use a fixed
 // one-second sample; counts are current populations and never cumulative totals.
@@ -19,7 +20,6 @@ function frameFor(state: number, time: number, peak: number): LiveFrame {
   const wait = (n = count) => row('Awaiting responses', n, 'wait');
   const work = () => row('Processing', processing, 'work', ' / 4 slots', processing / 4);
   const queue = () => row('Queued', queued, 'queue', ' / 100', queued / 100);
-  const eventRate = (label: string, tone: Row['tone'] = 'work', fraction = 1) => row(label, Math.max(rate ? 1 : 0, Math.round(rate * fraction)), tone, '/s');
   let caller: Row[] = [], receiver: Row[] = [], forward = 0, backward = 0;
   switch (state) {
     case 0: break;
@@ -27,19 +27,7 @@ function frameFor(state: number, time: number, peak: number): LiveFrame {
     case 2: caller = wait(queued + processing); receiver = [...queue(), ...work()]; break;
     case 3: caller = wait(processing); receiver = work(); break;
     case 4: caller = wait(); receiver = [...wait(), ...row('Fraud · pending calls', count, 'wait'), ...row('Orders · pending calls', Math.ceil(count / 2), 'wait')]; break;
-    case 5: caller = [...wait(), ...eventRate('Responses delivered')]; backward = rate; break;
-    case 6: receiver = [...work(), ...queue(), ...eventRate('Messages settled')]; forward = rate; break;
-    case 7: receiver = [...work(), ...eventRate('Processing failures', 'error', 0.08), ...eventRate('Rejected', 'error', 0.03)]; forward = rate; break;
-    case 8: caller = [...row('Retries scheduled', count, 'queue'), ...eventRate('Retry attempts', 'queue', 0.1)]; forward = Math.round(rate * 0.1); break;
-    case 9: caller = eventRate('Deadlines elapsed', 'error', 0.05); receiver = work(); break;
-    case 10: receiver = [...queue(), ...eventRate('TTL expiries', 'error', 0.05)]; break;
-    case 11: caller = wait(queued + processing); receiver = [...queue(), ...work(), ...eventRate('Admitted')]; forward = rate; break;
-    case 12: caller = [...wait(), ...eventRate('Error responses delivered', 'error', 0.08)]; backward = Math.round(rate * 0.08); break;
-    case 13: caller = [...row('Unacknowledged messages', count, 'wait'), ...eventRate('Redeliveries', 'queue', 0.04)]; backward = rate; forward = Math.round(rate * 0.04); break;
-    case 14: caller = wait(); receiver = row('Recorded blocked calls', count, 'error'); break;
-    case 15: caller = wait(count + queued + processing); receiver = [...work(), ...queue(), ...wait()]; forward = rate; backward = Math.round(rate * 0.9); break;
-    case 16: caller = eventRate('Late responses ignored', 'queue', 0.05); receiver = work(); backward = Math.round(rate * 0.05); break;
-    case 17: caller = eventRate('Retries exhausted', 'error', 0.03); break;
+    case 6: caller = row('Retry scheduled', count, 'queue'); break;
   }
   const phase = time < 4 ? 'Sparse' : time < 10 ? 'Sustained' : time < 15 ? 'Burst' : time < 20 ? 'Draining' : 'Idle';
   if (time >= 15) forward = 0;
@@ -52,6 +40,7 @@ export function StateLoadExample({ state, renderCanvas, children }: { state: num
   const [time, setTime] = useState(0);
   const [peak, setPeak] = useState(1000);
   const [direction, setDirection] = useState('forward');
+  const [asynchronous, setAsynchronous] = useState(false);
   const [progress, setProgress] = useState(0.4);
   useEffect(() => {
     if (!live || !playing || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -65,6 +54,8 @@ export function StateLoadExample({ state, renderCanvas, children }: { state: num
   }, [live, playing]);
   useEffect(() => { if (time >= 24) setPlaying(false); }, [time]);
   const frame = frameFor(state, time, peak);
+  frame.asynchronous = asynchronous;
+  if (asynchronous && state !== 6) frame.caller = [];
   if (state === 1 && direction === 'forward') frame.backward = 0;
   if (state === 1 && direction === 'backward') frame.forward = 0;
   return <div className="border-b border-divider py-2" data-live-state={state + 1}>
@@ -81,11 +72,12 @@ export function StateLoadExample({ state, renderCanvas, children }: { state: num
         <span className="text-xs font-mono">{time.toFixed(2)} s · {frame.summary}</span>
       </div>
       <label className="flex items-center gap-3 text-xs">Playhead <input aria-label={`${names[state]} load playhead`} className="min-w-0 flex-1" style={{ accentColor: 'var(--color-primary)' }} type="range" min="0" max="24" step="0.25" value={time} onChange={event => { setPlaying(false); setTime(Number(event.target.value)); }} /></label>
+      {[1,2,3,6].includes(state) && <label className="mt-2 flex items-center gap-2 text-xs"><Switch checked={asynchronous} onCheckedChange={setAsynchronous} />Asynchronous work</label>}
       {state === 1 && <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label="Live transport direction">{['forward', 'backward', 'dual'].map(value => <Button key={value} size="sm" variant={direction === value ? 'tint' : 'ghost'} aria-pressed={direction === value} onClick={() => setDirection(value)}>{value === 'forward' ? 'Requests →' : value === 'backward' ? 'Responses ←' : 'Both directions'}</Button>)}</div>}
-      <p className="mt-2 text-xs font-mono">{state === 6 ? 'Messages' : state === 13 ? 'Redeliveries' : 'Requests'} → {frame.forward.toLocaleString()}/s · {state === 13 ? 'Acknowledgements' : 'Responses'} ← {frame.backward.toLocaleString()}/s</p>
+      <p className="mt-2 text-xs font-mono">{asynchronous ? 'Messages' : 'Requests'} → {frame.forward.toLocaleString()}/s · {asynchronous ? 'Acknowledgements' : 'Responses'} ← {frame.backward.toLocaleString()}/s</p>
       {renderCanvas(frame, progress)}
       <p className="mt-2 text-xs text-secondary-text">Illustrative load fixture · sparse → sustained → burst → drain → idle. Rates use fixed one-second samples; footers show current populations. Repeated events update rates without per-request flashes. Hover a node for capacity details.</p>
-      <p className="mt-1 text-xs text-secondary-text">{state === 0 ? 'Idle stays visually quiet, including after earlier traffic.' : state === 14 ? 'Blocked calls are explicitly recorded; silence alone never implies a stuck request.' : 'Motion shows direction, not request count. Current activity clears at idle; earlier events belong in historical inspection.'}</p>
+      <p className="mt-1 text-xs text-secondary-text">{state === 0 ? 'Idle stays visually quiet, including after earlier traffic.' : 'Motion shows direction, not request count. Current activity clears at idle; earlier events belong in historical inspection.'}</p>
     </section>}
   </div>;
 }

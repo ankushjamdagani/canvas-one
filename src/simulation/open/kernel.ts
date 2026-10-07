@@ -32,6 +32,7 @@ export type SimLifecycleFactKind =
   | 'recovery_detected'
   | 'bridge_dispatch'
   | 'call_retry'
+  | 'traffic'
   /** A request or message leaves its sender along `edgeId`; `arriveAt` (seconds) is when it reaches the target, absent when the leg is lost. */
   | 'sent'
   /** A response leaves the target back along `edgeId`; `arriveAt` is when the caller receives it. */
@@ -40,6 +41,12 @@ export type SimLifecycleFactKind =
   | 'occupancy_released';
 
 export interface SimLifecycleFact {
+  trafficPhase?: 'await' | 'await_resolved' | 'retry' | 'outcome' | 'blocked' | 'unblocked' | 'reserved' | 'slot_released';
+  trafficOutcome?: 'success' | 'error' | 'rejected' | 'timeout' | 'expired' | 'cancelled' | 'retryExhausted' | 'redeliveryExhausted' | 'lost' | 'late';
+  ownerPath?: string;
+  targetNodeId?: string;
+  /** Observation-only delayed departure (publication ACK); no new kernel event. */
+  departAt?: number;
   kind: SimLifecycleFactKind;
   time: number;
   nodeId: string;
@@ -399,6 +406,8 @@ export class LatencyCollector {
 }
 
 export class OpenSimulation {
+  private readonly observedBlocked = new WeakMap<Op, Set<string>>();
+  private readonly observedBridgeFrames = new Map<string, Op>();
   protected plan: CompiledPlan;
   protected routeSelector = new RouteSelector();
   protected events = new SimpleEventHeap();
@@ -868,11 +877,12 @@ export class OpenSimulation {
   }
 
   /** D56: units that have not settled, with where each one is held. */
-  unsettled(): readonly { identity: string; category: 'root' | 'message'; holderNodeId: string; phase: OpPhase }[] {
+  unsettled(): readonly { identity: string; category: 'root' | 'message'; holderNodeId: string; path?: string; phase: OpPhase }[] {
     return [...this.liveUnits].map((u) => ({
       identity: u.identity,
       category: u.category,
       holderNodeId: u.rootOp?.nodeId ?? '',
+      path: u.rootOp?.path ?? '',
       phase: u.rootOp?.phase ?? 'transit',
     }));
   }
@@ -933,6 +943,7 @@ export class OpenSimulation {
   protected releaseOp(op: Op): void {
     if (op.released) return;
     op.released = true;
+    this.observedBlocked.delete(op);
     this.emitFact({
       kind: 'occupancy_released', time: this.currentTime, nodeId: op.nodeId,
       unitIdentity: op.unit.identity, attempt: op.attempt, path: op.path, operationReleased: true,
@@ -943,6 +954,22 @@ export class OpenSimulation {
     }
     this.liveOpsCount--;
     op.unit.ops.delete(op);
+  }
+
+  /** Observation only: never schedules work or changes simulation counters. */
+  protected traffic(op: Op, phase: NonNullable<SimLifecycleFact['trafficPhase']>, edgeId?: string, outcome?: SimLifecycleFact['trafficOutcome'], until?: number, targetNodeId?: string): void {
+    this.emitFact({ kind: 'traffic', trafficPhase: phase, trafficOutcome: outcome, time: this.currentTime,
+      nodeId: op.nodeId, unitIdentity: op.unit.identity, attempt: op.attempt, path: op.path,
+      ownerPath: op.path, edgeId, arriveAt: until, targetNodeId });
+  }
+
+  private observeBrokerBlock(op: Op): void {
+    const seen = this.observedBlocked.get(op) ?? new Set<string>();
+    for (const edge of this.plan.outgoing.get(op.nodeId) ?? []) {
+      if (op.subscription && edge.id !== op.subscription) continue;
+      if (!seen.has(edge.id)) { seen.add(edge.id); this.traffic(op, 'blocked', edge.id); }
+    }
+    this.observedBlocked.set(op, seen);
   }
 
   protected handleArrival(wl: WorkloadDefinition, ordinal: number, arrTime: number): void {
@@ -1110,6 +1137,7 @@ export class OpenSimulation {
       outcome,
       ...(payloadRef !== undefined ? { payloadRef } : {}),
     });
+    if (outcome === 'expired' && unit.rootOp) this.traffic(unit.rootOp, 'outcome', undefined, unit.category === 'root' ? 'timeout' : 'expired');
     const elapsedMs = (this.currentTime - unit.born) * 1000;
     if (unit.category === 'root') {
       this.rootsInFlight--;
@@ -1259,6 +1287,7 @@ export class OpenSimulation {
           path: op.path,
         });
       }
+      if (op !== op.unit.rootOp) this.traffic(op, 'outcome', undefined, 'rejected');
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
       return false;
@@ -1344,6 +1373,7 @@ export class OpenSimulation {
           attempt: op.attempt,
           path: op.path,
         });
+        if (candidates.length === 0) this.observeBrokerBlock(op);
         return true;
       }
 
@@ -1361,6 +1391,7 @@ export class OpenSimulation {
           path: op.path,
         });
       }
+      if (op !== op.unit.rootOp) this.traffic(op, 'outcome', undefined, 'rejected');
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
       return false;
@@ -1424,6 +1455,7 @@ export class OpenSimulation {
           path: op.path,
         });
       }
+      if (op !== op.unit.rootOp) this.traffic(op, 'outcome', undefined, 'rejected');
       this.finishOp(op, 'rejected');
       this.releaseOp(op);
     } else {
@@ -1447,6 +1479,7 @@ export class OpenSimulation {
       attempt: op.attempt,
       path: op.path,
     });
+    this.traffic(op, 'slot_released');
     this.dispatchDownstream(op);
   }
 
@@ -1549,6 +1582,7 @@ export class OpenSimulation {
         op.phase = 'retrying';
         nr.retrying.add(op);
         const retryTime = this.currentTime + node.behavior.retryDelayMs / 1000;
+        this.traffic(op, 'retry', undefined, undefined, retryTime);
         this.scheduleEvent(retryTime, 2, () => {
           if (op.done || op.unit.done) {
             nr.retrying.delete(op);
@@ -1559,6 +1593,7 @@ export class OpenSimulation {
           this.admitOp(op, true);
         });
       } else {
+        if (node.behavior.maxRetries > 0) this.traffic(op, 'outcome', undefined, 'retryExhausted');
         nr.counters.failed++;
         op.phase = 'settled';
         op.done = true;
@@ -1729,6 +1764,7 @@ export class OpenSimulation {
         op.phase = 'waiting';
         op.pendingChildren = 1;
         op.failedChild = false;
+        this.traffic(op, 'await', bridge.connectionId);
         this.openBridgeFrame(op, bridge, 1);
         return;
       }
@@ -1757,6 +1793,7 @@ export class OpenSimulation {
             path: op.path,
           });
         }
+        if (op !== op.unit.rootOp) this.traffic(op, 'outcome', undefined, 'rejected');
         this.finishOp(op, 'rejected');
         this.releaseOp(op);
         return;
@@ -1775,6 +1812,7 @@ export class OpenSimulation {
     if (dispatchingNode.behavior.type === 'router') {
       const nr = this.nodesRuntime.get(op.nodeId)!;
       nr.active.delete(op);
+      this.traffic(op, 'slot_released');
       nr.waitingSources.add(op);
       this.pumpQueue(op.nodeId);
     }
@@ -1805,7 +1843,8 @@ export class OpenSimulation {
    * backoff; the caller keeps waiting (and a non-router caller keeps its slot) meanwhile.
    * Only the final outcome reaches handleChildResponse.
    */
-  protected dispatchCallAttempt(op: Op, edge: ExecutionEdge, attemptNo: number, policy?: CallRetryPolicy | null): void {
+  protected dispatchCallAttempt(op: Op, edge: ExecutionEdge, attemptNo: number, policy?: CallRetryPolicy | null, logicalEdgeId = edge.id): void {
+    this.traffic(op, 'await', logicalEdgeId, undefined, undefined, edge.target);
     const em = this.edgeMetrics.get(edge.id)!;
     em.sent++;
     // The first attempt's route sets the policy for the whole retry chain, even when a
@@ -1824,6 +1863,7 @@ export class OpenSimulation {
     let hedgePending = false;
     const resolveAttempt = (childOutcome: Outcome) => {
       if (resolved) return;
+      if (childOutcome === 'expired') this.traffic(op, 'outcome', undefined, 'timeout');
       resolved = true;
       hedgePending = false;
       em.responses++;
@@ -1838,12 +1878,15 @@ export class OpenSimulation {
       }
       for (const nid of abandoned) this.pumpQueue(nid);
       if (childOutcome !== 'succeeded' && retry && attemptNo < retry.maxAttempts && !op.done && !op.unit.done) {
-        this.scheduleCallRetry(op, edge, attemptNo, retry);
+        this.scheduleCallRetry(op, edge, attemptNo, retry, logicalEdgeId);
         return;
       }
+      this.traffic(op, 'await_resolved', logicalEdgeId);
+      if (childOutcome !== 'succeeded' && retry && attemptNo >= retry.maxAttempts) this.traffic(op, 'outcome', undefined, 'retryExhausted');
       this.handleChildResponse(op, childOutcome);
     };
     if (gate === 'reject') {
+      this.traffic(op, 'outcome', edge.id, 'rejected');
       // Fails fast, as if the callee had turned the call away.
       em.rejected++;
       this.scheduleEvent(this.currentTime, 1, () => resolveAttempt('rejected'));
@@ -1852,7 +1895,7 @@ export class OpenSimulation {
     // One copy of the call has an outcome; the attempt succeeds with the first success and fails when no copy is left.
     const settleCopy = (copyOutcome: Outcome, atCaller: number) => {
       this.scheduleEvent(atCaller, 1, () => {
-        if (resolved) return;
+        if (resolved) { this.traffic(op, 'outcome', edge.id, 'late'); return; }
         if (copyOutcome === 'succeeded') {
           resolveAttempt('succeeded');
           return;
@@ -1892,7 +1935,7 @@ export class OpenSimulation {
               arriveAt: this.currentTime + responseLeg,
             });
             settleCopy(childOutcome, this.currentTime + responseLeg);
-          }
+          } else this.traffic(op, 'outcome', edge.id, 'lost');
         },
       };
       copies.push(childOp);
@@ -1953,7 +1996,7 @@ export class OpenSimulation {
   }
 
   /** Waits the backoff for `attemptNo`, then sends the next attempt (D49). */
-  protected scheduleCallRetry(op: Op, edge: ExecutionEdge, attemptNo: number, retry: NonNullable<ExecutionEdge['retry']>): void {
+  protected scheduleCallRetry(op: Op, edge: ExecutionEdge, attemptNo: number, retry: NonNullable<ExecutionEdge['retry']>, logicalEdgeId = edge.id): void {
     let delayMs = Math.min(retry.maxBackoffMs, retry.backoffMs * Math.pow(retry.backoffMultiplier, attemptNo - 1));
     if (retry.jitter) {
       const draw = makeRng((this.seed ^ hashString(`${op.unit.identity}:${op.path}>${edge.id}:${attemptNo}:jitter`)) >>> 0);
@@ -1970,9 +2013,10 @@ export class OpenSimulation {
       path: op.path,
       edgeId: edge.id,
     });
+    this.traffic(op, 'retry', logicalEdgeId, undefined, this.currentTime + delayMs / 1000);
     this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
       if (op.done || op.unit.done) return;
-      this.dispatchCallAttempt(op, this.retryRoute(op, edge), attemptNo + 1, retry);
+      this.dispatchCallAttempt(op, this.retryRoute(op, edge), attemptNo + 1, retry, logicalEdgeId);
     });
   }
 
@@ -2168,11 +2212,14 @@ export class OpenSimulation {
           const ackLeg = this.legSeconds(edge, edge.returnLatencyMs, 0, `${identity}:ack`);
           // A lost acknowledgement never reaches the publisher.
           if (ackLeg !== null) {
+            this.emitFact({ kind: 'response_sent', time: this.currentTime, departAt: arrivalTime + edge.ackDelayMs / 1000, nodeId: edge.target,
+              unitIdentity: identity, attempt: 0, path: msgOpPath, edgeId: edge.id,
+              outcome: admitted ? 'succeeded' : 'failed', arriveAt: arrivalTime + edge.ackDelayMs / 1000 + ackLeg });
             this.scheduleEvent(arrivalTime + edge.ackDelayMs / 1000 + ackLeg, 1, () => {
               em.responses++;
               this.handleChildResponse(parentOp, admitted ? 'succeeded' : 'failed');
             });
-          }
+          } else this.traffic(parentOp, 'outcome', edge.id, 'lost');
         }
       });
     };
@@ -2330,6 +2377,7 @@ export class OpenSimulation {
    */
   protected openBridgeFrame(op: Op, bridge: KernelBridgeConfig, attemptNo: number): void {
     const frameId = `bridge:${op.unit.identity}:${++this.bridgeFrameCounter}`;
+    this.observedBridgeFrames.set(frameId, op);
     op.bridgeFrameId = frameId;
     this.bridgePendingOps.set(frameId, op);
     this.bridgeAttempts.set(frameId, attemptNo);
@@ -2380,12 +2428,16 @@ export class OpenSimulation {
         path: op.path,
         edgeId: bridge.connectionId,
       });
+      this.traffic(op, 'retry', bridge.connectionId, undefined, this.currentTime + delayMs / 1000);
       this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
         if (op.done || op.unit.done) return;
         this.openBridgeFrame(op, bridge, attemptNo + 1);
       });
       return;
     }
+    this.traffic(op, 'await_resolved', bridge.connectionId);
+    if (outcome === 'expired') this.traffic(op, 'outcome', undefined, 'timeout');
+    if (outcome !== 'succeeded' && retry && attemptNo >= retry.maxAttempts) this.traffic(op, 'outcome', undefined, 'retryExhausted');
     this.completeBridgeChild(op, outcome, payloadRef);
   }
 
@@ -2420,7 +2472,14 @@ export class OpenSimulation {
    *   earlier path, so there is nothing further to apply.
    */
   public settleCall(input: { frameId: string; outcome: Outcome; payloadRef?: string; atMs?: number }): void {
+    const observed = this.observedBridgeFrames.get(input.frameId);
+    this.observedBridgeFrames.delete(input.frameId);
     if (this.abandonedBridgeFrames.delete(input.frameId)) {
+      if (observed) {
+        const bridge = this.bridgeByNode.get(observed.nodeId);
+        this.emitFact({ kind: 'traffic', trafficPhase: 'outcome', trafficOutcome: 'late', time: (input.atMs ?? this.currentTime * 1000) / 1000,
+          nodeId: observed.nodeId, unitIdentity: observed.unit.identity, attempt: observed.attempt, path: observed.path, edgeId: bridge?.connectionId });
+      }
       // D50: the caller gave up on this attempt; its reply is the frame's last event.
       this.resolvedBridgeFrames.delete(input.frameId);
       return;
@@ -2440,6 +2499,7 @@ export class OpenSimulation {
     }
 
     if (op.done) {
+      this.traffic(op, 'outcome', this.bridgeByNode.get(op.nodeId)?.connectionId, 'late');
       // Parent already settled elsewhere (outage/expiry) while the frame was open.
       return;
     }
@@ -2456,6 +2516,11 @@ export class OpenSimulation {
       }
       this.resolveBridgeAttempt(op, bridge, input.frameId, outcome, payloadRef);
     });
+  }
+
+  /** Read-only observation of a reply already abandoned by timeout or parent settlement. */
+  bridgeReplyIsLate(frameId: string): boolean {
+    return this.abandonedBridgeFrames.has(frameId) || this.bridgePendingOps.get(frameId)?.done === true;
   }
 
   /** Caller retries sent along one call edge (D49). */
@@ -2491,6 +2556,8 @@ export class OpenSimulation {
 
   protected cancelOp(op: Op, affectedNodes?: Set<string>): void {
     if (op.done) return;
+    this.traffic(op, 'outcome', undefined, 'cancelled');
+    this.traffic(op, 'await_resolved');
     if (op.publicationOnly) {
       op.done = true;
       op.phase = 'settled';
@@ -2659,6 +2726,8 @@ export class OpenSimulation {
     const em = this.edgeMetrics.get(edge.id)!;
 
     if (brokerOp.done || brokerOp.unit.done || brokerOp.unit.deadline <= this.currentTime) return;
+    for (const id of this.observedBlocked.get(brokerOp) ?? []) this.traffic(brokerOp, 'unblocked', id);
+    this.observedBlocked.delete(brokerOp);
     const routes = this.plan.outgoing.get(brokerOp.nodeId)!;
     brokerNr.competingCursor = (routes.indexOf(edge) + 1) % routes.length;
     brokerOp.phase = 'waiting';
@@ -2694,12 +2763,14 @@ export class OpenSimulation {
         if (childOutcome === 'succeeded') {
           this.completeLocalOp(brokerOp);
         } else if (!this.redeliver(brokerOp, edge)) {
+          if (edge.retry) this.traffic(brokerOp, 'outcome', edge.id, 'redeliveryExhausted');
           this.handleChildResponse(brokerOp, childOutcome);
         }
       },
     };
 
     consumerNr.active.add(childOp);
+    this.traffic(childOp, 'reserved');
     brokerOp.children.add(childOp);
     brokerOp.unit.ops.add(childOp);
     this.liveOpsCount++;
@@ -2752,6 +2823,7 @@ export class OpenSimulation {
       path: brokerOp.path,
       edgeId: edge.id,
     });
+    this.traffic(brokerOp, 'retry', edge.id, undefined, this.currentTime + delayMs / 1000);
     this.scheduleEvent(this.currentTime + delayMs / 1000, 2, () => {
       brokerNr.retrying.delete(brokerOp);
       if (brokerOp.done || brokerOp.unit.done) return;
@@ -2782,7 +2854,13 @@ export class OpenSimulation {
           const candidate = blocked.has(fifo) || op.unit.deadline <= this.currentTime
             ? undefined : this.getReadyBrokerConsumers(nodeId, op.subscription)[0];
           if (candidate) this.reserveBrokerConsumer(op, candidate);
-          else { blocked.add(fifo); nr.queue.push(op); }
+          else {
+            blocked.add(fifo); nr.queue.push(op);
+            // Only recorded consumer-capacity blockage, never an inference from queue size.
+            if (op.unit.deadline > this.currentTime && this.getReadyBrokerConsumers(nodeId, op.subscription).length === 0) {
+              this.observeBrokerBlock(op);
+            }
+          }
         }
       }
     } finally {

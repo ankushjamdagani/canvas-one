@@ -6,6 +6,7 @@ import {
 } from './features/session';
 import type { Actor, StudioRepository } from './persistence/studio';
 import { EntryScreen } from './features/entry';
+import { LandingPage } from './features/entry/LandingPage';
 import { lazyComponent, whenIdle } from '@/lib/lazyComponent';
 import { navigate, useRoute } from '@/lib/router';
 
@@ -178,7 +179,7 @@ function StudioShell({
 
   React.useEffect(() => whenIdle(() => void Workspace.preload()), []);
 
-  // Unknown paths fall back to the project list.
+  // Unknown paths fall back to the landing page.
   React.useEffect(() => {
     if (!known) navigate({ kind: 'home' }, { replace: true });
   }, [known]);
@@ -232,7 +233,7 @@ function StudioShell({
         <Workspace
           session={session}
           repository={repository}
-          onBackToProjects={() => navigate({ kind: 'home' })}
+          onBackToProjects={() => navigate({ kind: 'projects' })}
           mintId={MINT_ID}
           actor={actor}
         />
@@ -246,7 +247,7 @@ function StudioShell({
         >
           <h1 className="text-lg font-bold">Project unavailable</h1>
           <p className="text-xs text-secondary-text max-w-md">{openError.message}</p>
-          <Button size="sm" onClick={() => navigate({ kind: 'home' })}>
+          <Button size="sm" onClick={() => navigate({ kind: 'projects' })}>
             All projects
           </Button>
         </div>
@@ -261,6 +262,8 @@ function StudioShell({
       </div>
     );
   }
+
+  if (route.kind === 'home') return <LandingPage />;
 
   return (
     <EntryScreen

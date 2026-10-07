@@ -63,7 +63,7 @@ async function readLegacyDatabase(page: Page) {
 }
 
 test('the retired app database stays untouched while the new app creates and saves a project', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await seedLegacyDatabase(page);
 

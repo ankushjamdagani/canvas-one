@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { FlashAt, LegAt, NodeAt, PlaybackStore } from "../runs/playback";
+import type { TrafficNodeActivity, TrafficConnectionActivity } from '@/components/traffic/cells-and-lanes';
 
 type Traffic = {
   legs: ReadonlyMap<string, readonly LegAt[]>;
@@ -8,6 +9,8 @@ type Traffic = {
   nodeFlashes: ReadonlyMap<string, readonly FlashAt[]>;
   reduced: boolean;
   hasRun: boolean;
+  activities?: { nodes: ReadonlyMap<string, TrafficNodeActivity>; connections: ReadonlyMap<string, TrafficConnectionActivity> };
+  progress?: number;
 };
 const EMPTY: Traffic = {
   legs: new Map(),
@@ -30,34 +33,29 @@ export function usePlaybackTraffic(
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let hadStore = false;
+    let lastStore: PlaybackStore | null = null;
+    let lastAt = -Infinity;
+    let lastVersion = -1;
+    let lastReduced = media.matches;
     const read = () => {
       const store = source.getPlayback();
       if (store) {
-        const state = store.stateAt(store.playheadMs);
-        const legs = new Map<string, LegAt[]>();
-        for (const leg of state.legs) {
-          const list = legs.get(leg.connectionId);
-          if (list) list.push(leg);
-          else legs.set(leg.connectionId, [leg]);
+        if (store === lastStore && store.playheadMs === lastAt && store.version === lastVersion && media.matches === lastReduced) {
+          frame = requestAnimationFrame(read);
+          return;
         }
-        const connectionFlashes = new Map<string, FlashAt[]>();
-        const nodeFlashes = new Map<string, FlashAt[]>();
-        for (const flash of state.flashes) {
-          const map =
-            flash.connectionId === null ? nodeFlashes : connectionFlashes;
-          const id = flash.connectionId ?? flash.elementId;
-          if (id === null) continue;
-          const list = map.get(id);
-          if (list) list.push(flash);
-          else map.set(id, [flash]);
-        }
+        lastStore = store; lastAt = store.playheadMs; lastVersion = store.version; lastReduced = media.matches;
         setTraffic({
-          legs,
-          nodes: state.nodes,
-          connectionFlashes,
-          nodeFlashes,
+          // Retain the old provider shape for independently authored stories;
+          // production consumes aggregates rather than allocating per-unit decorations.
+          legs: EMPTY.legs,
+          nodes: EMPTY.nodes,
+          connectionFlashes: EMPTY.connectionFlashes,
+          nodeFlashes: EMPTY.nodeFlashes,
           reduced: media.matches,
           hasRun: true,
+          activities: store.trafficAt(store.playheadMs),
+          progress: (store.playheadMs % 1000) / 1000,
         });
       } else if (hadStore) setTraffic(EMPTY);
       hadStore = Boolean(store);

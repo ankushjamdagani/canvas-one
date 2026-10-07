@@ -15,7 +15,7 @@ async function waitForIdle(page: Page) {
 }
 
 async function openBlankProject(page: Page, name: string) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('blank-project-name-input').fill(name);
   await page.getByTestId('create-blank-project-btn').click();

@@ -944,7 +944,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
         <PopoverAnchor asChild><span className="absolute left-1/2 top-0" /></PopoverAnchor>
         <PopoverContent side="top" align="center" className="w-72 p-0 overflow-hidden rounded-popover border border-border bg-background shadow-popover" data-testid="dock-group-popover">
           <form onSubmit={(event) => { event.preventDefault(); void submitText(); }}>
-            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase">
               New subsystem group
             </div>
             <div className="p-3 bg-background">

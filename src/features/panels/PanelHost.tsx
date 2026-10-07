@@ -224,7 +224,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
       <div
         key="panel-canvas-slot-stable"
         data-slot="panel-canvas-slot"
-        className="relative flex-1 h-full min-w-0 overflow-hidden"
+        className="relative flex-1 h-[calc(100%+var(--topbar-inset,0px))] min-w-0 overflow-hidden -mt-[var(--topbar-inset,0px)]"
       >
         {canvas}
 

@@ -578,7 +578,7 @@ export function projectDocumentToCanvas(
       labelStyle: {
         fill: '#4A544F',
         fontSize: 10,
-        fontFamily: 'IBM Plex Sans, sans-serif',
+        fontFamily: 'var(--font-sans)',
         fontWeight: 500,
       },
       style: {

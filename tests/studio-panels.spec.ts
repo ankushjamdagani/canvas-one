@@ -33,7 +33,7 @@ async function waitForStableViewport(page: Page) {
 /** Opens the S05 example project (populated view, opens on its own draft
  * branch, so checkpoints/commits are available). */
 async function openS05Project(page: Page) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('create-example-s05').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -44,7 +44,7 @@ async function openS05Project(page: Page) {
 /** Creates a brand-new blank project (opens on one empty view labelled
  * "Main"), used where a placement gesture needs an uncluttered canvas. */
 async function openBlankProject(page: Page, name: string) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('blank-project-name-input').fill(name);
   await page.getByTestId('create-blank-project-btn').click();
@@ -188,7 +188,7 @@ test.describe('RV-12h: History and Library panels', () => {
       'ready',
     );
 
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const project = page.getByTestId('existing-projects-list').locator('[data-testid^="project-item-"]').first();
     await expect(project).toBeVisible();

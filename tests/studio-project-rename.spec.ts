@@ -4,7 +4,7 @@ test('13A rename: blank projects default to Untitled, taken names are flagged, s
   const suffix = Date.now();
   const taken = `Taken ${suffix}`;
 
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('blank-project-name-input').fill(taken);
   await page.getByTestId('create-blank-project-btn').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -21,8 +21,8 @@ test('13A rename: blank projects default to Untitled, taken names are flagged, s
   await expect(page.getByTestId('breadcrumb-project-btn').locator('svg')).toHaveCount(1);
   await expect(branchToggle.locator('svg')).toHaveCount(2);
   const header = page.getByTestId('workspace-topbar');
-  expect((await header.boundingBox())?.height).toBe(48);
-  await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  expect((await header.boundingBox())?.height).toBe(40);
+  await expect(header).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
   // Name taken: popover with the three rows, Enter does not save.
   await page.getByTestId('breadcrumb-project-btn').click();
@@ -49,7 +49,7 @@ test('13A rename: blank projects default to Untitled, taken names are flagged, s
 });
 
 test('14A quick options search matches whole words', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('blank-project-name-input').fill(`Search ${Date.now()}`);
   await page.getByTestId('create-blank-project-btn').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();

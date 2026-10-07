@@ -16,7 +16,7 @@ async function expectHeaderBelowTopBar(page: Page, name: string) {
 
 test.describe('Studio canvas collapse and expand (RV-04g)', () => {
   test('collapses a group, undoes, redoes and persists across reload', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -52,7 +52,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     await expect(nodes).toHaveCount(total - 2);
 
     // Persisted state survives a reload.
-    await page.goto('/');
+    await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     await page
       .getByTestId('existing-projects-list')
@@ -73,7 +73,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
   });
 
   test('toggles a single component from the node card expand toggle', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -91,7 +91,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
   });
 
   test('a group frame grows to contain an expanded member (measured heights, not the 76px estimate)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);

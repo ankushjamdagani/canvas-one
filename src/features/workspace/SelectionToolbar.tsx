@@ -143,7 +143,7 @@ function AlignSection<V extends string>({
 }) {
   return (
     <div>
-      <DropdownMenuLabel className="font-mono text-meta font-medium text-secondary-text uppercase px-2 py-0.5">
+      <DropdownMenuLabel className="font-mono text-micro font-medium text-secondary-text uppercase px-2 py-0.5">
         {title}
       </DropdownMenuLabel>
       <div className="flex items-center gap-1 px-1 py-0.5">
@@ -398,7 +398,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
                 void submitGroup();
               }}
             >
-              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase">
                 NEW GROUP
               </div>
               <div className="p-3 bg-background">
@@ -472,7 +472,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
                 void submitWrap();
               }}
             >
-              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-meta font-medium text-secondary-text uppercase">
+              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase">
                 WRAP IN BOUNDARY
               </div>
               <div className="p-3 bg-background">

@@ -2,8 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useContext } from 'react';
 import { PlaybackTrafficContext } from './usePlaybackTraffic';
 import { SimulationHighlightContext } from './SimulationHighlight';
-import { NodeOccupancy } from '@/components/ui/node-occupancy';
-import { TrafficFlash } from '@/components/ui/traffic-flash';
+import { CellsAndLanesNode } from '@/components/traffic/cells-and-lanes';
 import { ChevronsDownUp, ChevronsUpDown, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ProjectedNodeData } from './projection';
@@ -61,7 +60,7 @@ export function NodeCard({ data, selected }: NodeProps) {
       {trafficEntry ? (
         <span
           data-testid={`node-traffic-entry-${element.id}`}
-          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-primary/40 bg-selected-tint px-1.5 py-0.5 font-mono text-meta uppercase text-primary"
+          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-primary/40 bg-selected-tint px-1.5 py-0.5 font-mono text-micro uppercase text-primary"
         >
           Traffic enters here
         </span>
@@ -190,17 +189,10 @@ export function NodeCard({ data, selected }: NodeProps) {
         ) : null}
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-full mt-1">
-        <NodeOccupancy {...(traffic.nodes.get(element.id) ?? { queued: 0, active: 0 })} />
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 -top-7 flex gap-1">
-        {(traffic.nodeFlashes.get(element.id) ?? []).map((flash) => (
-          <svg key={`${flash.kind}:${flash.outcome}`} width={flash.count > 1 ? 38 + String(flash.count).length * 7 : 24} height={24}
-            className="shrink-0 overflow-visible" viewBox={`-12 -12 ${flash.count > 1 ? 38 + String(flash.count).length * 7 : 24} 24`}>
-            <TrafficFlash {...flash} reduced={traffic.reduced} />
-          </svg>
-        ))}
-      </div>
+      {traffic.activities?.nodes.get(element.id) && <div className="pointer-events-none absolute inset-x-0 top-full mt-1">
+        <CellsAndLanesNode label={linkedTitle} activityOnly activity={traffic.activities.nodes.get(element.id)!}
+          style={{ width: '100%', pointerEvents: 'auto' }} />
+      </div>}
       <Handle
         type="source"
         position={Position.Right}

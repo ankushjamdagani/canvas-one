@@ -82,10 +82,118 @@ function setup(emission: Emission, speed: number) {
     const deadline = Date.now() + maxMs;
     while (!what() && Date.now() < deadline) await advance(16);
   };
-  return { controller, params, advance, until, saved };
+  return { controller, params, advance, until, saved, repository };
 }
 
 describe('playback pacing (D57)', () => {
+  it('Stop preserves live bulk range review through drain and an explicit Save persists it', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 80000 } }, 1);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
+    const store = controller.getPlayback()!;
+    controller.setPlaybackRange({ startMs: 100, endMs: 500 });
+    controller.stop();
+    expect(store.playheadMs).toBe(100);
+    expect(store.selection).toEqual({ startMs: 100, endMs: 500 });
+    expect(store.playing).toBe(false);
+    expect(store.following).toBe(true);
+    await until(() => store.ended);
+    await advance(64);
+    expect(store.playheadMs).toBe(100);
+    expect(store.selection).toEqual({ startMs: 100, endMs: 500 });
+    expect(controller.getState().stopping).toBe(false);
+    expect(saved).toHaveLength(0);
+    expect(await controller.finishAndSaveRecording()).toBe(true);
+    expect(store.playheadMs).toBe(100);
+    expect(store.selection).toEqual({ startMs: 100, endMs: 500 });
+    expect(saved).toHaveLength(1);
+    controller.reset();
+  }, 30000);
+
+  it('saves a stream requested during compilation, and reset or replacement resolves pending Save as false', async () => {
+    const { controller, params, until, saved } = setup({ mode: 'stream', ratePerSecond: 2, profile: { kind: 'steady' } }, 16);
+    void controller.run(params);
+    const duringCompile = controller.finishAndSaveRecording();
+    await until(() => controller.getState().phase === 'done');
+    expect(await duringCompile).toBe(true);
+    expect(saved).toHaveLength(1);
+    void controller.run(params);
+    const resetSave = controller.finishAndSaveRecording();
+    controller.reset();
+    expect(await resetSave).toBe(false);
+    void controller.run(params);
+    const replacedSave = controller.finishAndSaveRecording();
+    void controller.run(params);
+    expect(await replacedSave).toBe(false);
+    controller.reset();
+  }, 30000);
+
+  it('advances the live recording frontier while reviewing, and explicit Pause freezes recording pacing', async () => {
+    const { controller, params, until, advance } = setup({ mode: 'stream', ratePerSecond: 2, profile: { kind: 'steady' } }, 16);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) >= 30_000);
+    const store = controller.getPlayback()!;
+    controller.seek(0);
+    const frontier = store.computedMs;
+    await advance(1024);
+    expect(store.playheadMs).toBe(0);
+    expect(store.computedMs).toBeGreaterThan(frontier);
+    expect(store.playing).toBe(true);
+    controller.pause();
+    await advance(64);
+    const pausedFrontier = store.computedMs;
+    await advance(1024);
+    expect(store.computedMs).toBe(pausedFrontier);
+    controller.setPlaybackRange({ startMs: 100, endMs: 500 });
+    controller.goLive();
+    expect(store.following).toBe(true);
+    expect(store.playing).toBe(false);
+    expect(store.selection).toEqual({ startMs: 100, endMs: 500 });
+    controller.resume();
+    await until(() => store.playheadMs > pausedFrontier);
+    expect(store.playheadMs).toBeGreaterThan(pausedFrontier);
+    controller.reset();
+  }, 30000);
+
+  it('keeps terminal arrival at the reviewed instant and explicitly saves the complete recording', async () => {
+    const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 8000 } }, 1);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
+    controller.seek(0);
+    await until(() => controller.getPlayback()?.ended === true);
+    const store = controller.getPlayback()!;
+    await advance(64);
+    expect(store.playheadMs).toBe(0);
+    expect(store.playing).toBe(false);
+    expect(saved).toHaveLength(0);
+    expect(await controller.finishAndSaveRecording()).toBe(true);
+    expect(store.playheadMs).toBe(0);
+    expect(saved).toHaveLength(1);
+    const persistedEvents = (saved[0] as unknown[])[2] as { atMs: number | null }[];
+    expect(persistedEvents.some(event => event.atMs !== null && event.atMs > 0)).toBe(true);
+    controller.reset();
+    expect(saved).toHaveLength(1);
+  }, 30000);
+
+  it('drains a reviewing stream for explicit Save and leaves a failed save available for retry', async () => {
+    const { controller, params, until, saved, repository } = setup({ mode: 'stream', ratePerSecond: 2, profile: { kind: 'steady' } }, 16);
+    void controller.run(params);
+    await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
+    controller.setPlaybackRange({ startMs: 100, endMs: 500 });
+    const store = controller.getPlayback()!;
+    const save = repository.saveRun;
+    repository.saveRun = async () => ({ status: 'failed', code: 'quota', issues: [] });
+    const first = controller.finishAndSaveRecording();
+    await until(() => controller.getState().phase === 'done');
+    expect(await first).toBe(false);
+    expect(store.ended).toBe(true);
+    expect(store.playheadMs).toBe(100);
+    expect(store.selection).toEqual({ startMs: 100, endMs: 500 });
+    repository.saveRun = save;
+    expect(await controller.finishAndSaveRecording()).toBe(true);
+    expect(saved).toHaveLength(1);
+    controller.reset();
+  }, 30000);
   it('plays and loops a selected interval without saving again, then clears it', async () => {
     const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 2000 } }, 16);
     void controller.run(params);
@@ -113,19 +221,20 @@ describe('playback pacing (D57)', () => {
     controller.reset();
   }, 30000);
 
-  it('pauses an unfinished run at a selected end without releasing the whole result', async () => {
+  it('keeps recording while a selected interval stays stationary, without releasing the whole result', async () => {
     const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 3, arrival: { spreadMs: 8000 } }, 1);
     void controller.run(params);
     await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
     const store = controller.getPlayback()!;
     controller.setPlaybackRange({ startMs: 100, endMs: 500 });
-    controller.resume(); await advance(640);
-    expect(store.playheadMs).toBe(500);
-    expect(store.playing).toBe(false);
-    expect(controller.getState().phase).toBe('paused');
+    const computed = store.computedMs;
+    await advance(640);
+    expect(store.playheadMs).toBe(100);
+    expect(store.following).toBe(false);
+    expect(store.computedMs).toBeGreaterThanOrEqual(computed);
     expect(controller.getState().current?.terminal).toBeNull();
     expect(saved).toHaveLength(0);
-    controller.setPlaybackSpeed(16); controller.setPlaybackRange(null); controller.resume();
+    controller.setPlaybackSpeed(16); controller.setPlaybackRange(null); controller.goLive(); controller.resume();
     await until(() => controller.getState().phase === 'done');
     expect(saved).toHaveLength(1);
     controller.reset();
@@ -205,13 +314,13 @@ describe('playback pacing (D57)', () => {
     controller.reset();
   }, 30000);
 
-  it('Stop resumes a paused stream and drains it; Go Live resumes at the edge', async () => {
+  it('Stop drains a paused stream without changing its reviewed time or range; end review then saves', async () => {
     const { controller, params, until, advance, saved } = setup({ mode: 'stream', ratePerSecond: 2, profile: { kind: 'steady' } }, 16);
     void controller.run(params);
     await until(() => (controller.getPlayback()?.computedMs ?? 0) > 1000);
     controller.seek(0);
     const store = controller.getPlayback()!;
-    expect(store.playing).toBe(false);
+    expect(store.playing).toBe(true);
     controller.setPlaybackRange({ startMs: 0, endMs: 500 });
     controller.setLoop(true); controller.resume(); await advance(64);
     expect(store.playing).toBe(true);
@@ -219,16 +328,29 @@ describe('playback pacing (D57)', () => {
     expect(saved).toHaveLength(0);
     controller.setLoop(false);
     controller.goLive();
-    expect(store.selection).toBeNull();
+    expect(store.selection).toEqual({ startMs: 0, endMs: 500 });
     expect(store.playheadMs).toBe(store.computedMs);
     expect(store.playing).toBe(true);
     await advance(32);
     controller.pause();
     controller.setPlaybackRange({ startMs: 0, endMs: 500 });
+    const reviewed = store.playheadMs;
+    const range = store.selection;
     controller.stop();
-    expect(store.selection).toBeNull();
-    expect(store.playing).toBe(true);
+    expect(store.selection).toEqual(range);
+    expect(store.playheadMs).toBe(reviewed);
+    expect(store.following).toBe(true);
+    expect(store.playing).toBe(false);
     expect(controller.getState().stopping).toBe(true);
+    await until(() => store.ended);
+    await advance(64);
+    expect(store.selection).toEqual(range);
+    expect(store.playheadMs).toBe(reviewed);
+    expect(store.playing).toBe(false);
+    expect(controller.getState().stopping).toBe(false);
+    expect(controller.getState().current?.terminal).toBeNull();
+    expect(saved).toHaveLength(0);
+    controller.goLive();
     await until(() => controller.getState().phase === 'done');
     expect(controller.getState().current?.terminal?.status).toBe('completed');
     expect(saved).toHaveLength(1);

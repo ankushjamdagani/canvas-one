@@ -1,19 +1,23 @@
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
-/** Move playback to its fastest public setting once a recording exposes transport. */
+export const speedTrigger = (page: Page) => page.locator('[data-testid="playback-panel"]:has([role="slider"][aria-disabled="false"]) [data-testid="playback-speed"]');
+
+/** Move playback to the source design's fastest public setting. */
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addLocatorHandler(
-      page.getByTestId("playback-speed"),
+      speedTrigger(page),
       async (speed) => {
-        const current = Number((await speed.textContent())?.replace("×", ""));
-        for (let value = current; value < 16; value *= 2) {
-          const faster = page.getByRole("button", { name: "Faster playback", exact: true });
-          await expect(faster).toBeEnabled({ timeout: 20000 });
-          await faster.click();
-          await expect(speed).toHaveText(`${value * 2}×`);
+        const group = page.getByRole('group', { name: 'Playback speed', exact: true });
+        if (await group.isVisible()) await group.getByRole('button', { name: '4×', exact: true }).click();
+        else {
+          for (let attempt = 0; attempt < 4 && await speed.innerText() !== '4×'; attempt++) {
+            const before = await speed.innerText();
+            await page.getByRole('button', { name: 'Playback speed', exact: true }).click();
+            await expect(speed).not.toHaveText(before);
+          }
         }
-        await expect(speed).toHaveText("16×");
+        await expect(speed).toHaveText("4×");
       },
       { times: 1, noWaitAfter: true },
     );

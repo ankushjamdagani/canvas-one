@@ -1,4 +1,5 @@
 import * as React from "react";
+import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import {
   ArrowRight,
   ArrowUp,
@@ -229,7 +230,7 @@ export function LandingPage() {
           <span aria-hidden="true" />
           System Studio
         </a>
-        <span className="lp-version">v0.4.12</span>
+        <span className="lp-version">{APP_VERSION_LABEL}</span>
         <nav aria-label="Main navigation">
           <span
             className="lp-collaborators"

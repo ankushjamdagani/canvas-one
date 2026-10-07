@@ -17,6 +17,7 @@ async function waitForStableViewport(page: Page) {
   let previous = await viewport.getAttribute('style');
   await expect
     .poll(async () => {
+      await page.waitForTimeout(150);
       const current = await viewport.getAttribute('style');
       const stable = current === previous;
       previous = current;
@@ -27,7 +28,7 @@ async function waitForStableViewport(page: Page) {
 
 /** Opens the S05 example project (populated view with scenario references). */
 async function openS05Project(page: Page) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('create-example-s05').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -42,7 +43,7 @@ async function openS05Project(page: Page) {
  * dense layout can cover the handles a drag targets.
  */
 async function openBlankProject(page: Page, name: string) {
-  await page.goto('/');
+  await page.goto('/projects');
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await page.getByTestId('blank-project-name-input').fill(name);
   await page.getByTestId('create-blank-project-btn').click();
@@ -125,6 +126,7 @@ async function connectOutcome(page: Page, edgeCountBefore: number): Promise<Conn
 /** One handle-to-handle drag. xyflow resolves the drop target from real
  * screen coordinates, so the pointer moves in steps and ends on the handle. */
 async function dragConnectOnce(page: Page, sourceElementId: string, targetElementId: string) {
+  await waitForStableViewport(page);
   const source = page.getByTestId(`node-handle-source-${sourceElementId}`);
   const target = page.getByTestId(`node-handle-target-${targetElementId}`);
   await expect(source).toBeVisible();

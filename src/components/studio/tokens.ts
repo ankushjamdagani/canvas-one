@@ -8,7 +8,8 @@
 
 export const evergreen = Object.freeze({
   // Surfaces
-  canvas: '#FFFFFF',
+  canvas: '#FBFAF7',
+  controlSurface: '#FFFFFF',
   shell: '#FBFAF7',
   panel: '#F7F5F1',
   sunken: '#F2EFE9',
@@ -41,7 +42,8 @@ export const evergreen = Object.freeze({
 
   // Lines & borders
   divider: '#E7E3DB',
-  hairlineSoft: '#EFEBE3', // internal dividers and the canvas dot grid
+  hairlineSoft: '#EFEBE3', // internal dividers
+  grid: '#D3CDC1', // static editor and animated public drafting dots
   controlBorder: '#DCD7CD',
   hoverBorder: '#C6C0B4',
   controlBorderStrong: '#948D80', // Darker step of the theme's warm border family; >=3:1 on canvas 3.29, shell 3.15, panel 3.02
@@ -74,6 +76,14 @@ export const evergreen = Object.freeze({
     popover: 11,
     card: 12,
     dock: 14,
+  }),
+
+  // Approved System Studio Landing language; names preserve existing utility APIs.
+  fonts: Object.freeze({
+    sans: '"IBM Plex Mono", ui-monospace, monospace',
+    mono: '"Martian Mono", ui-monospace, monospace',
+    display: '"Newsreader Variable", Georgia, serif',
+    handwritten: '"Caveat", cursive',
   }),
 
   // Typography (sizes in px)

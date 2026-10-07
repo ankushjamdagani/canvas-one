@@ -5,7 +5,7 @@ async function waitForIdle(page: Page) {
 }
 
 test('comments rest as bubbles, open on hover, stay open on click, change colour and render markdown', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await waitForIdle(page);

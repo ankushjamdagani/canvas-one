@@ -48,7 +48,11 @@ for (const width of [1440, 390, 320]) {
     await page.getByTestId("create-example-s04").click();
     await expect(page.getByTestId("workspace-root")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
-    await expect(page.locator("canvas[data-decoration]")).toHaveCount(0);
+    // Static dots; the only decorative canvas is the mouse-driven crosshair.
+    await expect(page.locator("canvas[data-decoration]")).toHaveCount(1);
+    await expect(
+      page.locator("canvas[data-decoration=canvas-crosshair]"),
+    ).toHaveCount(1);
     expect(
       await page
         .getByTestId("canvas-container")

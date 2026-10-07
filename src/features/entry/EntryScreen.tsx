@@ -12,7 +12,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { Segmented } from "@/components/ui/segmented";
-import { DraftingSheet } from "@/components/ui/drafting-sheet";
+import {
+  DraftingAvatar,
+  DraftingEmpty,
+  DraftingHeading,
+  DraftingMain,
+  DraftingNavDivider,
+  DraftingSheet,
+} from "@/components/ui/drafting-sheet";
 import type { SessionController } from "../session/controller";
 import { formatStudioError } from "../session/formatError";
 import { importProjectJson } from "../transfer";
@@ -124,7 +131,7 @@ function ProjectPreview({
       data-testid="project-thumbnail"
       data-empty={thumbnail ? undefined : "true"}
       aria-hidden="true"
-      className="project-preview"
+      className="h-22 overflow-hidden border-b border-hairline bg-background"
       style={DOT_BACKGROUND}
     >
       {thumbnail && (
@@ -489,22 +496,21 @@ export function EntryScreen({
             >
               Docs
             </Button>
-            <span className="drafting-divider" aria-hidden="true" />
-            <span
-              className="drafting-avatar"
+            <DraftingNavDivider />
+            <DraftingAvatar
               aria-label={`Local workspace: ${actor.displayName}`}
               title={actor.displayName}
             >
               {actor.displayName.slice(0, 1)}
-            </span>
+            </DraftingAvatar>
           </>
         }
       >
-        <main className="projects-main">
-          <div className="projects-intro">
-            <h1 className="projects-heading">
+        <DraftingMain>
+          <div className="flex flex-col gap-5">
+            <DraftingHeading>
               Start a project <em>or pick up a sheet.</em>
-            </h1>
+            </DraftingHeading>
 
             {errorMessage && (
               <div
@@ -519,11 +525,11 @@ export function EntryScreen({
             {/* Start tiles: empty project, starter templates, import */}
             <section
               aria-label="Start a project"
-              className="project-start-grid"
+              className="grid grid-cols-1 gap-4 min-[801px]:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)] [&>*]:min-h-44 [&>*]:min-w-0 [&>*]:rounded-xl"
             >
               <form
                 onSubmit={handleCreateBlankProject}
-                className="project-start-tile relative flex flex-col justify-between gap-3 bg-primary text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
+                className="relative flex flex-col p-5 justify-between gap-3 bg-primary text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
               >
                 <button
                   data-testid="create-blank-project-btn"
@@ -537,8 +543,8 @@ export function EntryScreen({
                 </span>
                 <div className="flex flex-col gap-3">
                   <div>
-                    <h2 className="text-[15px] font-semibold">Empty project</h2>
-                    <p className="mt-1 text-[12.5px] text-white/75">
+                    <h2 className="text-sm font-semibold">Empty project</h2>
+                    <p className="mt-1 text-xs text-white/75">
                       A blank canvas on main. Place parts from the library.
                     </p>
                   </div>
@@ -556,14 +562,14 @@ export function EntryScreen({
                 </div>
               </form>
 
-              <div className="project-template-tile flex flex-col gap-3 border border-border bg-background">
+              <div className="flex flex-col gap-3 border border-border bg-background p-4">
                 <div className="flex items-center gap-3">
                   <span className="grid size-8 place-items-center rounded-[8px] bg-purple-tint text-purple">
                     <LayoutTemplate size={18} aria-hidden="true" />
                   </span>
                   <h2
                     id="templates-heading"
-                    className="flex-1 text-base font-semibold"
+                    className="flex-1 text-sm font-semibold"
                   >
                     Starter template
                   </h2>
@@ -572,28 +578,28 @@ export function EntryScreen({
                   data-testid="templates-list"
                   role="list"
                   aria-labelledby="templates-heading"
-                  className="project-template-list"
+                  className="max-h-33 overflow-y-auto rounded-lg border border-hairline"
                 >
                   {EXAMPLE_CATALOG.map((example) => (
                     <div
                       key={example.id}
                       role="listitem"
                       data-testid={`template-row-${example.id}`}
-                      className="project-template-row"
+                      className="flex items-center gap-2 border-b border-hairline bg-background py-1.5 pr-2 pl-3 last:border-b-0 hover:bg-card"
                     >
                       <LayoutTemplate
                         size={13}
                         className="shrink-0 text-purple"
                         aria-hidden="true"
                       />
-                      <div className="project-template-meta">
+                      <div className="flex min-w-0 flex-1 items-center gap-2 max-[480px]:flex-col max-[480px]:items-start max-[480px]:gap-0.5">
                         <span
-                          className="text-[13px] font-medium"
+                          className="min-w-0 flex-1 truncate text-xs font-medium max-[480px]:max-w-full"
                           title={example.title}
                         >
                           {example.title}
                         </span>
-                        <span className="font-mono text-[9.5px] uppercase text-secondary-text shrink-0">
+                        <span className="font-mono text-micro uppercase text-secondary-text shrink-0">
                           {pluralize(example.componentCount, "component")}
                         </span>
                       </div>
@@ -617,7 +623,7 @@ export function EntryScreen({
 
               <div
                 className={cn(
-                  "project-start-tile bg-background relative flex flex-col justify-between border border-dashed transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
+                  "bg-background relative flex p-5 flex-col justify-between border border-dashed transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
                   dragActive
                     ? "border-primary bg-accent"
                     : "border-border hover:border-hover-border",
@@ -635,8 +641,8 @@ export function EntryScreen({
                   <Upload size={18} aria-hidden="true" />
                 </span>
                 <div>
-                  <h2 className="text-[15px] font-semibold">Import .json</h2>
-                  <p className="mt-1 text-[12.5px] text-secondary-text">
+                  <h2 className="text-sm font-semibold">Import .json</h2>
+                  <p className="mt-1 text-xs text-secondary-text">
                     Drop a Studio export anywhere on this page, or{" "}
                     <span className="font-medium text-primary">
                       {isImporting ? "importing…" : "browse"}
@@ -661,16 +667,16 @@ export function EntryScreen({
           {/* Your projects */}
           <section
             aria-labelledby="existing-projects-heading"
-            className="projects-list"
+            className="flex flex-1 flex-col"
           >
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <h2
                 id="existing-projects-heading"
-                className="text-[15px] font-semibold text-ink"
+                className="text-sm font-semibold text-ink"
               >
                 Your projects
               </h2>
-              <span className="font-mono text-[10px] tracking-[0.08em] text-secondary-text">
+              <span className="font-mono text-micro text-secondary-text">
                 {projectRows.length}
               </span>
               <div className="ml-auto flex flex-wrap items-center gap-3">
@@ -700,7 +706,7 @@ export function EntryScreen({
                 Loading projects…
               </div>
             ) : projectRows.length === 0 ? (
-              <div data-testid="no-projects-notice" className="projects-empty">
+              <DraftingEmpty data-testid="no-projects-notice">
                 <FolderOpen
                   size={24}
                   className="mx-auto text-secondary-text/70 mb-2"
@@ -709,7 +715,7 @@ export function EntryScreen({
                 <p className="mt-0.5">
                   Start from a template, or open an empty canvas.
                 </p>
-              </div>
+              </DraftingEmpty>
             ) : visibleRows.length === 0 ? (
               <p className="p-8 text-center text-xs text-secondary-text">
                 No projects match &ldquo;{query.trim()}&rdquo;.
@@ -717,7 +723,7 @@ export function EntryScreen({
             ) : (
               <div
                 data-testid="existing-projects-list"
-                className="project-grid"
+                className="grid grid-cols-1 gap-4 min-[481px]:grid-cols-2 min-[801px]:grid-cols-3 min-[1101px]:grid-cols-4"
               >
                 {visibleRows.map((row) => {
                   const confirming = confirmDeleteId === row.project.id;
@@ -725,7 +731,7 @@ export function EntryScreen({
                     <article
                       key={row.project.id}
                       data-testid={`project-item-${row.project.id}`}
-                      className="project-card group flex flex-col transition-colors"
+                      className="group relative flex min-w-0 flex-col overflow-hidden rounded-[9px] border border-border bg-card shadow-sm transition-colors hover:border-selected-edge hover:shadow-md"
                     >
                       {row.status === "ready" && row.target && (
                         <button
@@ -744,15 +750,15 @@ export function EntryScreen({
                         />
                       )}
                       <ProjectPreview thumbnail={row.thumbnail} />
-                      <div className="project-summary">
+                      <div className="pointer-events-none flex flex-col gap-1.5 px-3 py-2.5 [&_button]:pointer-events-auto [&_[role=group]]:pointer-events-auto">
                         <div className="flex items-baseline justify-between gap-3">
                           <h3
-                            className="m-0 min-w-0 truncate text-[13.5px] font-semibold text-ink"
+                            className="m-0 min-w-0 truncate text-xs font-semibold text-ink"
                             title={row.project.title}
                           >
                             {row.project.title}
                           </h3>
-                          <span className="shrink-0 text-[11px] text-secondary-text">
+                          <span className="shrink-0 text-micro tracking-normal text-secondary-text">
                             {formatUpdated(row.project.updatedAt, now)}
                           </span>
                         </div>
@@ -777,11 +783,11 @@ export function EntryScreen({
                               {row.branchName}
                             </span>
                             {row.target?.isDraft && (
-                              <span className="project-draft-badge">Draft</span>
+                              <span className="rounded-tag border border-risk-edge bg-risk-tint px-1.5 font-mono text-micro uppercase text-risk">Draft</span>
                             )}
                           </span>
                           {row.componentCount !== undefined && (
-                            <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-[9.5px] uppercase text-secondary-text">
+                            <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-micro uppercase text-secondary-text">
                               {pluralize(row.componentCount, "component")}
                             </span>
                           )}
@@ -838,7 +844,7 @@ export function EntryScreen({
               </div>
             )}
           </section>
-        </main>
+        </DraftingMain>
       </DraftingSheet>
     </div>
   );

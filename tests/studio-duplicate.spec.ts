@@ -6,7 +6,7 @@ async function waitForIdle(page: Page) {
 
 test.describe('Studio selection duplicate (RV-09a)', () => {
   test('duplicates two connected S05 nodes with one undo step', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);

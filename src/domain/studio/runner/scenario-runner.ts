@@ -1781,6 +1781,7 @@ export class ScenarioRunner {
       // Nothing is left that could settle the remaining work: report it as stuck, by where it is held.
       const stuck = this.adapter?.unsettled() ?? [];
       if (stuck.length > 0) {
+        this.adapter?.recordNoProgress(stuck, this.currentTimeMs);
         this.adapter?.cycleTracker.markStuck(stuck.map((u) => u.identity), this.currentTimeMs);
         return this.finishTimed('incomplete', this.describeStuck(stuck));
       }

@@ -83,10 +83,7 @@ import {
   NewScenarioDialog,
   type NewScenarioDialogProps,
 } from "../scenarios/NewScenarioDialog";
-import {
-  ScenarioSwitcher,
-  type ScenarioSwitcherEntry,
-} from "../scenarios/ScenarioSwitcher";
+import type { ScenarioSwitcherEntry } from "../scenarios/ScenarioSwitcher";
 import type { ScenarioDraftHandle } from "../scenarios/types";
 import { createBrowserDownloadSink, useTransferActions } from "../transfer";
 import { sanitizeFilenameStem } from "../transfer/filename";
@@ -1019,6 +1016,13 @@ export function Workspace({
       setNewScenarioDialogOpen(true);
     });
   }, [closeInspector, runGuarded]);
+  const handleDuplicateScenario = React.useCallback((scenarioId: Id) => {
+    runGuarded(() => {
+      closeInspector();
+      setInitialCopySourceId(scenarioId);
+      setNewScenarioDialogOpen(true);
+    });
+  }, [closeInspector, runGuarded]);
 
   const handleCreateScenario = React.useCallback(
     (params: Parameters<NewScenarioDialogProps["onCreate"]>[0]) => {
@@ -1132,34 +1136,6 @@ export function Workspace({
           sessionState.needsReload,
         );
 
-  const scenarioRunPhase =
-    runControllerState?.phase === "done"
-      ? "idle"
-      : (runControllerState?.phase ?? "idle");
-
-  const runControlSlot = (
-    <ScenarioSwitcher
-      unified
-      executionMode={runController?.getRecordedDocument()?.scenarios.find(item => item.id === runControllerState?.current?.scenarioId)?.mode}
-      scenarios={scenarioEntries}
-      selectedId={selectedScenarioId}
-      runPhase={scenarioRunPhase}
-      disabledReason={!runController ? "Preparing simulation controls" : sessionRunDisabledReason}
-      onSelect={handleSelectScenario}
-      onRun={handleRunScenario}
-      onRunAll={handleRunAll}
-      onPause={() => runController?.pause()}
-      onResume={() => runController?.resume()}
-      onReset={handleResetRun}
-      onStop={() => runController?.stop()}
-      isStopping={runControllerState?.stopping ?? false}
-      onNew={handleNewScenario}
-      onEdit={handleEditScenario}
-      onRename={handleRenameScenario}
-      onDelete={handleRequestDeleteScenario}
-    />
-  );
-
   // elementLabels: every element referenced by a run metric or event must
   // resolve to a real label (never a raw id).
   const elementLabels = React.useMemo(() => {
@@ -1238,8 +1214,17 @@ export function Workspace({
   const simulationDetailsOpenRef = React.useRef(false);
   const workspaceResizeRef = React.useRef<GroupImperativeHandle | null>(null);
   const simulationPanelRef = React.useRef<PanelImperativeHandle | null>(null);
+  const simulationViewportRef = React.useRef<HTMLElement>(null);
+  const [simulationViewportHeight, setSimulationViewportHeight] = React.useState(900);
+  const [simulationMobileLayout, setSimulationMobileLayout] = React.useState(isMobileInspector);
+  React.useEffect(() => {
+    const node = simulationViewportRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setSimulationViewportHeight(entry.contentRect.height));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [Boolean(document)]);
   const compactSimulationHeight = React.useRef(46);
-  const lastSimulationSize = React.useRef(60);
   React.useEffect(() => setInspectionEvent(null), [runControllerState?.current?.runId]);
   const simulationHighlight = React.useMemo<SimulationHighlight | null>(() => {
     if (!inspectionEvent) return null;
@@ -1274,25 +1259,22 @@ export function Workspace({
   const hasSimulation = Boolean(runControllerState?.current || resultsRequested || runPhaseForResults !== "idle");
   const fitCompactSimulation = React.useCallback((height: number) => {
     compactSimulationHeight.current = Math.ceil(height) + 1;
-    if (isMobileInspector || !simulationDetailsOpenRef.current)
+    if (simulationMobileLayout || !simulationDetailsOpenRef.current)
       simulationPanelRef.current?.resize(compactSimulationHeight.current);
-  }, [isMobileInspector]);
+  }, [simulationMobileLayout]);
   React.useEffect(() => {
-    if (isMobileInspector || !simulationDetailsOpen)
+    if (simulationMobileLayout || !simulationDetailsOpen)
       simulationPanelRef.current?.resize(compactSimulationHeight.current);
-  }, [simulationDetailsOpen, isMobileInspector, hasSimulation]);
+    else {
+      const reserve = Math.min(120, Math.max(40, simulationViewportHeight * .2));
+      simulationPanelRef.current?.resize(Math.min(552, simulationViewportHeight - reserve));
+    }
+  }, [simulationDetailsOpen, simulationMobileLayout, hasSimulation, simulationViewportHeight]);
   const handleSimulationDetailsOpenChange = React.useCallback((open: boolean) => {
     if (simulationDetailsOpenRef.current === open) return;
     simulationDetailsOpenRef.current = open;
     setSimulationDetailsOpen(open);
-    if (isMobileInspector) return;
-    const current = workspaceResizeRef.current;
-    if (!current) return;
-    if (open) {
-      const simulation = Math.max(44, Math.min(60, lastSimulationSize.current));
-      current.setLayout({ canvas: 100 - simulation, simulation });
-    }
-  }, [isMobileInspector]);
+  }, []);
   React.useEffect(() => {
     if (runPhaseForResults === "compiling" || runPhaseForResults === "running")
       setResultsDismissed(false);
@@ -3233,8 +3215,15 @@ export function Workspace({
       data-testid="workspace-root"
       data-panel-preference-state={panelPreferenceState}
       data-dock-preference-state={dockPreferenceState}
-      className="flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none"
+      className="relative flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none min-[1000px]:p-[23px] min-[1000px]:[--topbar-inset:53px]"
     >
+      {/* Project Canvas design: the sheet's double drafting frame. Wide
+          viewports only, so narrow layouts keep their full width. */}
+      <div
+        data-testid="workspace-frame"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[22px] hidden min-[1000px]:block border border-[var(--drafting-frame-edge,#c9c2b5)] shadow-[inset_0_0_0_4px_var(--shell),inset_0_0_0_5px_#e2ddd3]"
+      />
       {/* Top Bar (22A nav live) */}
       {projectRecord ? (
         <TopBar
@@ -3288,7 +3277,7 @@ export function Workspace({
           removed per D-observed shell structure — a rail only exists for
           collapsed panels (23F/23G), not built here. */}
       <div className="flex flex-1 w-full max-w-full min-h-0 overflow-hidden relative">
-        <main className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
+        <main ref={simulationViewportRef} className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
           {/* Canvas shrinks to make room for the results strip below it. The
               History and Library panels dock/float/collapse around the
               canvas through PanelHost (RV-03a); the inspector stays its own
@@ -3298,14 +3287,11 @@ export function Workspace({
             className="min-h-0 flex-1"
             groupRef={workspaceResizeRef}
             defaultLayout={isMobileInspector ? { canvas: 62, simulation: 38 } : { canvas: 90, simulation: 10 }}
-            onLayoutChanged={(layout, meta) => {
-              if (meta.isUserInteraction && simulationDetailsOpenRef.current && layout.simulation !== undefined)
-                lastSimulationSize.current = layout.simulation;
-            }}
           >
-          <ResizablePanel id="canvas" minSize="40%" className="min-h-0 relative">
+          <ResizablePanel id="canvas" minSize={Math.min(120, Math.max(40, simulationViewportHeight * .2))} className="min-h-0 relative">
           <div className="h-full min-h-0 relative">
             <PanelHost
+              className="min-[1000px]:pt-[var(--topbar-inset)]"
               state={panelState}
               dispatch={panelDispatch}
               commands={panelCommandRoutes}
@@ -3374,7 +3360,7 @@ export function Workspace({
                   {/* 22E draft behind main: a real conflict count from
                       PublishController.prepare(), never invented. */}
                   {behindMainInfo && !behindMainBannerDismissed && (
-                    <div className="absolute top-3 left-3 right-3 z-dock">
+                    <div className="absolute top-[calc(0.75rem+var(--topbar-inset,0px))] left-3 right-3 z-dock">
                       <DraftBehindMainBanner
                         conflictCount={behindMainInfo.conflictCount}
                         versionsPublishedSinceFork={
@@ -3400,7 +3386,7 @@ export function Workspace({
             />
           </div>
           </ResizablePanel>
-          <ResizablePanel id="simulation" panelRef={simulationPanelRef} minSize={!isMobileInspector && simulationDetailsOpen ? "44%" : hasSimulation ? 84 : 46} maxSize="60%" className="min-h-0 overflow-hidden">
+          <ResizablePanel id="simulation" panelRef={simulationPanelRef} minSize={simulationMobileLayout ? 152 : 52} className="min-h-0 overflow-hidden">
 
           {/* 22C/22F publish review + compare-and-resolve, driven by the same
               proactively-prepared PublishController used for the 22E banner. */}
@@ -3411,7 +3397,7 @@ export function Workspace({
               // usable); every other publish state is the modal review.
               className={
                 publishControllerState.status === "published"
-                  ? "pointer-events-none fixed inset-x-0 top-14 z-modal flex justify-center p-4"
+                  ? "pointer-events-none fixed inset-x-0 top-[calc(3.5rem+var(--topbar-inset,0px)/2+0.25rem)] z-modal flex justify-center p-4"
                   : "fixed inset-0 z-modal flex items-center justify-center bg-black/40 p-4"
               }
             >
@@ -3442,10 +3428,18 @@ export function Workspace({
               aria-label={showResultsRegion ? "Results" : undefined}
               className="outline-none h-full min-h-0 overflow-y-auto"
             >
-              {runningOrSelectedScenario ? (
                 <PlaybackPanel
                   controller={runController}
-                  setup={runControlSlot}
+                  scenarios={scenarioEntries}
+                  selectedScenarioId={selectedScenarioId}
+                  onScenarioSelect={handleSelectScenario}
+                  onNewScenario={handleNewScenario}
+                  onDuplicateScenario={handleDuplicateScenario}
+                  onEditScenario={handleEditScenario}
+                  onRenameScenario={handleRenameScenario}
+                  onDeleteScenario={handleRequestDeleteScenario}
+                  onRunScenario={handleRunScenario}
+                  runDisabledReason={!runController ? "Preparing simulation controls" : sessionRunDisabledReason}
                   resultsVisible={showResultsRegion}
                   resultsOpenRequest={resultsOpenRequest}
                   onEventSelect={setInspectionEvent}
@@ -3456,12 +3450,14 @@ export function Workspace({
                   mobile={isMobileInspector}
                   onDetailsOpenChange={handleSimulationDetailsOpenChange}
                   onCompactHeightChange={fitCompactSimulation}
+                  availableHeight={simulationViewportHeight}
+                  onLayoutModeChange={setSimulationMobileLayout}
                   detailsBlocked={isMobileInspector && Boolean(panelState.activeOverlay === "library" || panelState.activeOverlay === "history")}
                   onRestart={() =>
-                    void handleRunScenario(runningOrSelectedScenario.id)
+                    runningOrSelectedScenario && void handleRunScenario(runningOrSelectedScenario.id)
                   }
-                  scenarioName={runningOrSelectedScenario.label}
-                  scenarioMode={runningOrSelectedScenario.mode}
+                  scenarioName={runningOrSelectedScenario?.label}
+                  scenarioMode={runningOrSelectedScenario?.mode ?? "timed"}
                   runId={runControllerState?.current?.runId ?? null}
                   runPhase={runControllerState?.phase ?? "idle"}
                   terminal={runControllerState?.current?.terminal ?? null}
@@ -3474,17 +3470,6 @@ export function Workspace({
                   assertionLabels={assertionLabels}
                   staleRun={staleRun}
                 />
-              ) : (
-                <section
-                  data-testid="playback-panel"
-                  role="region"
-                  aria-label="Simulation and playback"
-                  className="border-t border-border bg-shell p-2 text-sm text-secondary-text"
-                >
-                  {runControlSlot}
-                  {resultsRequested && <p data-testid="results-empty">No run selected yet.</p>}
-                </section>
-              )}
             </div>
           )}
           </ResizablePanel>

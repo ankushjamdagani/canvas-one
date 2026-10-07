@@ -160,6 +160,9 @@ export class RunController {
   private clockHandle: unknown = null;
   private lastTickAt = 0;
   private lastPlayheadPostMs = -Infinity;
+  /** Worker pacing follows recording time, independently of the reviewed presentation. */
+  private recordingMs = 0;
+  private savingForSwitch = false;
   /** Trace events the worker has reported that the playhead has not reached yet. */
   private heldEvents: TraceEvent[] = [];
   private heldEventIndex = 0;
@@ -315,13 +318,13 @@ export class RunController {
   seek(ms: number): void {
     const store = this.playback;
     if (!store) return;
-    store.playing = false;
-    if (this.activeRunId && !store.ended) this.transport.postMessage({ type: 'control', runId: this.activeRunId, kind: 'pause' });
+    if (store.ended) store.playing = false;
     store.seek(ms);
+    store.following = store.atEdge();
+    if (store.following) this.recordingMs = Math.max(this.recordingMs, store.playheadMs);
     this.rebuildVisibleEvents();
-    this.postPlayhead(store.playheadMs);
-    if (this.state.phase === 'running') this.setState({ phase: 'paused' });
-    else this.setState({});
+    this.setState({});
+    if (store.atEnd() && this.pendingTerminal) this.tick();
   }
 
   stepCycle(direction: -1 | 1): void {
@@ -332,10 +335,11 @@ export class RunController {
   }
 
   goLive(): void {
-    if (!this.playback?.isStream) return;
-    this.playback.setSelection(null);
+    if (!this.playback) return;
     this.seek(this.playback.computedMs);
-    if (!this.playback.ended) this.resume();
+    this.playback.following = true;
+    this.recordingMs = Math.max(this.recordingMs, this.playback.playheadMs);
+    this.setState({});
   }
 
   /** D57: the current run's recording and playhead (timed runs), or null. */
@@ -359,13 +363,50 @@ export class RunController {
     if (this.activeRunId && (this.state.phase === 'running' || this.state.phase === 'paused') && !this.state.stopping) {
       this.transport.postMessage({ type: 'control', runId: this.activeRunId, kind: 'stop' });
       if (this.playback) {
-        this.playback.setSelection(null);
-        this.playback.playing = true;
+        this.playback.following = true;
+        this.playback.playing = false;
         this.lastTickAt = this.clock.now();
         this.ensureClock();
       }
-      this.setState({ stopping: true, ...(this.state.phase === 'paused' ? { phase: 'running' as const } : {}) });
+      this.setState({ stopping: !this.playback?.ended, ...(this.state.phase === 'paused' ? { phase: 'running' as const } : {}) });
     }
+  }
+
+  /** Explicit scenario-switch Save: drain and persist, retaining the reviewed instant until switching succeeds. */
+  async finishAndSaveRecording(): Promise<boolean> {
+    const current = this.state.current;
+    if (!current) return true;
+    if (current.saveStatus === 'saved') return true;
+    if (current.saveStatus === 'saving') {
+      return new Promise<boolean>((resolve) => {
+        const off = this.subscribe(state => {
+          if (state.current?.runId !== current.runId || state.phase === 'done') {
+            off();
+            resolve(state.current?.runId === current.runId && state.current.saveStatus === 'saved');
+          }
+        });
+      });
+    }
+    if (current.terminal) {
+      await this.retrySave();
+      return this.state.current?.runId === current.runId && this.state.current.saveStatus === 'saved';
+    }
+    this.savingForSwitch = true;
+    const result = new Promise<boolean>((resolve) => {
+      const off = this.subscribe((state) => {
+        if (state.current?.runId !== current.runId || state.phase === 'done') {
+          off();
+          this.savingForSwitch = false;
+          resolve(state.current?.runId === current.runId && state.current.saveStatus === 'saved');
+        }
+      });
+    });
+    if (this.pendingTerminal) {
+      const terminal = this.pendingTerminal;
+      this.pendingTerminal = null;
+      void this.handleTerminal(terminal, this.heldEvents);
+    } else this.stop();
+    return result;
   }
 
   pause(): void {
@@ -388,12 +429,12 @@ export class RunController {
   resume(): void {
     const store = this.playback;
     const range = store?.selection;
-    if (store && range && (store.playheadMs < range.startMs || store.playheadMs >= range.endMs)) {
+    if (store?.ended && range && (store.playheadMs < range.startMs || store.playheadMs >= range.endMs)) {
       store.seek(range.startMs);
       this.rebuildVisibleEvents();
       this.postPlayhead(store.playheadMs);
     }
-    if (this.playback?.ended && this.state.phase === 'done') {
+    if (this.playback?.ended) {
       if (this.playback.atEnd()) {
         this.playback.seek(this.playback.windowStartMs);
         this.rebuildVisibleEvents();
@@ -448,6 +489,7 @@ export class RunController {
     this.activeProjectId = null;
     this.activeDocument = null;
     this.activeTerminal = null;
+    this.savingForSwitch = false;
     this.bufferedEvents = [];
     this.endPlayback(true);
     this.runAllQueue = [];
@@ -487,7 +529,7 @@ export class RunController {
     return await this.persistTerminalRun(
       this.activeStartToken,
       this.activeTerminal,
-      this.bufferedEvents,
+      this.playback ? this.heldEvents : this.bufferedEvents,
       this.activeProjectId,
       this.activeDocument,
     );
@@ -597,6 +639,8 @@ export class RunController {
       workerSessionId: compileResult.plan.workerSessionId,
       interactive: scenario?.mode === 'timed' && this.runAllContext === null,
     });
+    // Save may have been requested while compilation was still pending.
+    if (this.savingForSwitch) this.stop();
 
     // Wait until terminal completes
     return await new Promise<TerminalResult | null>((resolve) => {
@@ -703,8 +747,13 @@ export class RunController {
         if (this.playback && update.measured) {
           // D57: the run has finished computing, but the playhead may be far behind. Keep the result until it arrives.
           this.playback.setEnded(Math.max(this.playback.computedMs, update.summary.elapsedMs ?? 0));
+          if (!this.playback.following) this.playback.playing = false;
           this.pendingTerminal = update;
-          if (this.playback.atEnd()) this.tick();
+          this.setState({ stopping: false });
+          if (this.savingForSwitch) {
+            this.pendingTerminal = null;
+            void this.handleTerminal(update, this.heldEvents);
+          } else if (this.playback.atEnd()) this.tick();
           break;
         }
         this.endPlayback(false);
@@ -722,9 +771,15 @@ export class RunController {
     this.endPlayback(true);
     const store = new PlaybackStore({
       connectionTargets: new Map(document.connections.map((c) => [c.id, c.target.elementId])),
+      connectionEndpoints: new Map(document.connections.map(c => [c.id, { source: c.source.elementId, target: c.target.elementId }])),
+      nodeNames: new Map(document.elements.map(e => [e.id, e.label])),
+      nodeCapacities: new Map(document.elements.map(e => [e.id, e.behavior.kind === 'resource' ? e.behavior.config.concurrency : 0])),
+      nodeSlotHolds: new Map(document.elements.map(e => [e.id, e.behavior.kind === 'resource' && !['source', 'router', 'broker'].includes(e.behavior.config.type)])),
       connectionChannels: new Map(document.connections.flatMap(c => {
-        const port = document.elements.find(e => e.id === c.source.elementId)?.ports.find(p => p.id === c.source.portId);
-        return port ? [[c.id, port.channel] as const] : [];
+        const source = document.elements.find(e => e.id === c.source.elementId);
+        const port = source?.ports.find(p => p.id === c.source.portId);
+        const delivery = source?.behavior.kind === 'resource' && source.behavior.config.type === 'broker';
+        return port ? [[c.id, delivery ? 'message' : port.channel] as const] : [];
       })),
       workloadEntries: new Map(workloads.map(w => [w.id, w.entry.elementId])),
       historyMs: workloads.some(w => w.enabled && w.emission.mode === 'stream') ? HISTORY_MS : null,
@@ -734,6 +789,7 @@ export class RunController {
     this.playback = store;
     this.lastTickAt = this.clock.now();
     this.lastPlayheadPostMs = -Infinity;
+    this.recordingMs = 0;
     this.heldEvents = [];
     this.heldEventIndex = 0;
     this.pendingTerminal = null;
@@ -754,6 +810,7 @@ export class RunController {
   }
 
   private postPlayhead(simulatedMs: number): void {
+    if (this.playback && !this.playback.ended) simulatedMs = Math.max(this.recordingMs, simulatedMs);
     this.lastPlayheadPostMs = simulatedMs;
     if (!this.activeRunId) return;
     this.transport.postMessage({ type: 'playhead', runId: this.activeRunId, simulatedMs });
@@ -766,7 +823,10 @@ export class RunController {
     if (this.clockHandle !== null) this.clock.cancel(this.clockHandle);
     this.clockHandle = null;
     const now = this.clock.now();
-    store.advance(now - this.lastTickAt);
+    const elapsed = now - this.lastTickAt;
+    if (!store.ended && this.state.phase === 'running') this.recordingMs += elapsed * this.speed;
+    if (!store.ended) store.retainThrough(this.recordingMs);
+    store.advance(elapsed);
     this.lastTickAt = now;
 
     let released = false;
@@ -779,9 +839,8 @@ export class RunController {
     }
     if (released) this.setState({ events: [...this.bufferedEvents] });
 
-    if (store.playheadMs - this.lastPlayheadPostMs >= PLAYHEAD_REPORT_MS) {
-      this.lastPlayheadPostMs = store.playheadMs;
-      this.postPlayhead(store.playheadMs);
+    if (!store.ended && this.recordingMs - this.lastPlayheadPostMs >= PLAYHEAD_REPORT_MS) {
+      this.postPlayhead(this.recordingMs);
     }
 
     if (store.atEnd() && this.pendingTerminal) {
@@ -805,7 +864,7 @@ export class RunController {
       });
       return;
     }
-    if (store.playing && store.atSelectionEnd() && !store.atEnd()) {
+    if (store.ended && store.playing && store.atSelectionEnd() && !store.atEnd()) {
       if (this.loop) {
         store.seek(store.selection!.startMs);
         this.rebuildVisibleEvents();
@@ -840,7 +899,7 @@ export class RunController {
     readonly summary: RunSummary;
     readonly reason: string | null;
     readonly measured?: boolean;
-  }): Promise<void> {
+  }, persistedEvents: readonly TraceEvent[] = this.bufferedEvents): Promise<void> {
     const isMeasured = terminalMsg.measured ?? false;
     const terminalResult: TerminalResult = {
       status: terminalMsg.status,
@@ -873,7 +932,7 @@ export class RunController {
       await this.persistTerminalRun(
         this.activeStartToken,
         terminalResult,
-        this.bufferedEvents,
+        persistedEvents,
         this.activeProjectId,
         this.activeDocument,
       );

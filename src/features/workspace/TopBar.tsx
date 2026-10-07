@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
+import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import type {
   BranchRecord,
   ProjectRecord,
@@ -213,10 +214,14 @@ export function TopBar({
       className={cn(
         "relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-12 min-h-12",
         "border-b border-border bg-background select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2",
+        // Framed sheet (1000px+): transparent bar floating over the canvas dots (the canvas
+        // extends beneath it; --topbar-inset offsets docked panels). Logo lines up with the
+        // Projects page header (x 40 / 56, y 36, 40px tall) inside the 23px frame inset.
+        "min-[1000px]:pointer-events-none min-[1000px]:absolute! min-[1000px]:inset-x-[23px]! min-[1000px]:top-[36px]! min-[1000px]:w-auto! min-[1000px]:h-10 min-[1000px]:min-h-10 min-[1000px]:border-b-0 min-[1000px]:bg-transparent min-[1000px]:px-[17px]! min-[1101px]:px-[33px]!",
       )}
       role="banner"
     >
-      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 max-sm:min-w-min shrink">
+      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 max-sm:min-w-min shrink min-[1000px]:pointer-events-auto">
         {/* Brand mark */}
         <button
           type="button"
@@ -224,7 +229,7 @@ export function TopBar({
           aria-label="All projects"
           title="All projects"
           onClick={onAllProjects}
-          className="flex cursor-pointer items-center gap-2 rounded-control font-semibold text-[14px] text-foreground shrink-0 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:pointer-coarse:hidden"
+          className="flex cursor-pointer items-center gap-2 rounded-control font-semibold text-sm text-foreground shrink-0 select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-sm:pointer-coarse:hidden"
         >
           <svg
             className="size-5 shrink-0"
@@ -252,8 +257,14 @@ export function TopBar({
               fill="url(#brand-mark-gradient)"
             />
           </svg>
-          <span className="hidden sm:inline">System studio</span>
+          <span className="hidden sm:inline">System Studio</span>
         </button>
+        <span
+          data-testid="topbar-version"
+          className="hidden xl:inline font-mono text-[10px] text-[#8A938F] shrink-0"
+        >
+          {APP_VERSION_LABEL}
+        </span>
 
         {/* Vertical divider from brand mark */}
         <div
@@ -290,7 +301,7 @@ export function TopBar({
                   aria-label="Project title"
                   aria-invalid={nameConflict !== null || undefined}
                   className={cn(
-                    "h-7 px-2.5 text-[13px] font-medium text-ink bg-background border rounded-[6px] outline-none focus:outline-none w-28 sm:w-44 truncate",
+                    "h-7 px-2.5 text-xs font-medium text-ink bg-background border rounded-[6px] outline-none focus:outline-none w-28 sm:w-44 truncate",
                     nameConflict
                       ? "border-risk-text shadow-[0_0_0_2px_rgba(176,72,40,0.15)]"
                       : "border-primary shadow-[0_0_0_2px_rgba(11,92,84,0.15)]",
@@ -328,7 +339,7 @@ export function TopBar({
                     type="button"
                     data-testid="breadcrumb-project-btn"
                     className={cn(
-                      "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
+                      "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-xs font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                       isOpen
                         ? "bg-accent border-selected-edge text-primary"
                         : "border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]",
@@ -357,7 +368,7 @@ export function TopBar({
             {/* RV-05b review round 1: dropped below sm so a 390px top bar has room
                 for the project name and the branch toggle without clipping. */}
             <span
-              className="hidden sm:inline text-[#C0C6C1] text-[11px] select-none shrink-0"
+              className="hidden sm:inline text-[#C0C6C1] text-xs select-none shrink-0"
               aria-hidden="true"
             >
               /
@@ -379,7 +390,7 @@ export function TopBar({
                   type="button"
                   data-testid="breadcrumb-branch-btn"
                   className={cn(
-                    "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-[13px] font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
+                    "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-xs font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                     isOpen
                       ? "bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]"
                       : "border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]",
@@ -399,7 +410,7 @@ export function TopBar({
                   <Badge
                     data-testid="breadcrumb-branch-state"
                     variant={isMainBranch ? "accent" : "risk"}
-                    className="text-[9.5px] font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
+                    className="text-micro font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
                   >
                     {isMainBranch ? "MAIN" : "DRAFT"}
                   </Badge>
@@ -421,7 +432,7 @@ export function TopBar({
             </BranchPopover>
 
             {isRenaming && (
-              <div className="hidden sm:flex items-center gap-2 text-[10.5px] font-mono text-secondary-text select-none shrink-0 pl-2">
+              <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-secondary-text select-none shrink-0 pl-2">
                 <span>↵ save</span>
                 <span>esc cancel</span>
               </div>
@@ -476,8 +487,47 @@ export function TopBar({
       {/* D38: Run + scenario switcher slot, owned by the runs lane */}
       <div
         data-slot="run-control"
-        className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink"
+        className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink min-[1000px]:pointer-events-auto"
       >
+        {/* Illustrative presence and sharing from the Project Canvas design: no
+            collaboration or sharing backend exists, so these are static. */}
+        <span
+          data-testid="topbar-collaborators"
+          className="hidden xl:flex items-center gap-3 shrink-0"
+          role="img"
+          aria-label="Illustrative collaborators"
+        >
+          <span className="flex" aria-hidden="true">
+            <span className="grid size-8 place-items-center rounded-full border-2 border-white bg-primary text-[11px] font-semibold text-white">
+              DK
+            </span>
+            <span className="-ml-2.5 grid size-8 place-items-center rounded-full border-2 border-white bg-[#7C5FC0] text-[11px] text-white">
+              ✦
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="flex items-center gap-1.5 font-mono text-[9.5px] tracking-[0.12em] text-primary"
+          >
+            <span className="size-1.5 rounded-full bg-[#2E7D6B] shadow-[0_0_0_3px_rgba(46,125,107,0.18),0_0_8px_rgba(46,125,107,0.6)]" />
+            LIVE
+          </span>
+        </span>
+        <div
+          className="hidden xl:block w-px h-5 bg-[#DCD7CD] shrink-0"
+          aria-hidden="true"
+        />
+        <Button
+          type="button"
+          data-testid="topbar-share-btn"
+          size="sm"
+          className="hidden xl:inline-flex h-7 px-3 text-xs shrink-0 disabled:bg-primary disabled:text-[#FBFAF7] disabled:opacity-100"
+          disabled
+          title="Sharing isn't available yet"
+        >
+          <span aria-hidden="true">↗</span>
+          Share
+        </Button>
         {onOpenQuickOptions && (
           <Button
             type="button"
@@ -492,7 +542,7 @@ export function TopBar({
             <CommandIcon className="size-3.5 sm:mr-1" aria-hidden="true" />
             <span className="hidden sm:inline">Quick options</span>
             {quickOptionsShortcut && (
-              <Kbd className="hidden lg:inline-flex ml-1.5 h-4 text-[10px]">
+              <Kbd className="hidden lg:inline-flex ml-1.5 h-4 text-micro">
                 {quickOptionsShortcut}
               </Kbd>
             )}

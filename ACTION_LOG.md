@@ -3148,3 +3148,29 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Files: drafting-board/sheet TSX+CSS, LandingPage, EntryScreen, DraftingBoard/DraftingSheet stories, DESIGN.md, studio-landing and studio-design-language specs.
 - Verification: tsc, entry/lib unit tests, production and Storybook builds passed; isolated production run of landing, design-language, entry, shell, transfer, storage-cutover and library specs: 44 passed, no retries. Full suite not rerun.
 - Limitations: sample's ⌘N/⌘O hints and "Shared with me" tab not added (no such features).
+
+### Type size pass: landing, projects, canvas header/footer (Claude)
+- Outcome: root cause of "too big" was a token collision: `--text-meta` was both a font-size (`@theme`) and a colour (`:root`), so every `text-meta` class silently fell back to inherited 13px. Font token renamed `--text-micro`; all `text-meta` uses migrated. Landing board scale capped at 1 (it upscaled to 1.8x on large monitors). Projects page drafting-sheet CSS deleted and rebuilt with Tailwind (`DraftingMain/Heading/Empty/NavDivider/Avatar` in `drafting-sheet.tsx`) using token sizes (`text-sm` titles, `text-xs` body, `text-micro` labels, `text-3xl/4xl` heading). TopBar and PlaybackPanel arbitrary px sizes replaced with tokens; Select trigger `text-base` to `text-xs`.
+- Files: styles.css, drafting-board.tsx, drafting-sheet.tsx (css removed), EntryScreen, TopBar, PlaybackPanel, select.tsx, InspectorPanel, NodeCard, FloatingDock, SelectionToolbar, DraftingSheet story.
+- Verification: tsc clean; build passed; isolated production suite 153 passed, 4 skipped; session.test timed out once under load, passed on rerun.
+- Limitations: landing-page.css keeps authored fixed-coordinate sizes (hero 66px) by design; its custom CSS not yet converted to Tailwind.
+- Lesson: a Tailwind v4 theme name must not exist as both `--text-*` size and colour; the class silently does nothing.
+
+### Incorporate System Studio Project Canvas design (Claude)
+- Outcome: unpacked `artifacts/design/System Studio Project Canvas.html` and diffed it against the editor. The sim footer (variant d), cells-and-lanes traffic and picker structure were already integrated. Added per user answers: static top-bar version tag, illustrative collaborators/LIVE and a disabled Share (≥1280px only); double drafting frame with 28px sheet inset (≥1000px only); mouse-only snapped crosshair with flow-coordinate label on the canvas (`CanvasCrosshair`); a Recent chip in the part picker (localStorage, placements made from the picker only). Dock deliberately untouched per user.
+- Files: appVersion.ts, TopBar, Workspace, CanvasView, CanvasCrosshair, LandingPage, LibraryPicker, recentParts(+test), studio-project-canvas spec, studio-design-language spec, visual-acceptance.md.
+- Verification: tsc clean; 1,834 unit tests passed (11 skipped); production build passed; isolated production suite 150 passed + 3 failures that were the superseded "no decorative canvas in editor" assertion, then updated; focused rerun of new and design-language specs 7 passed. No full-suite rerun after that assertion update.
+- Limitations: top bar keeps its white strip and border (design draws it transparent over dots); drag-placed parts do not enter Recent; Recent not the default chip (design default); design's Services/Patterns/Platform team chips not added; no commit made.
+
+### Project Canvas follow-up: transparent top bar, Recent default, simulation bar polish (Claude)
+- Outcome: top bar is transparent and 40px at ≥1000px, logo at x 40/56 and y 36 like the Projects page (label now "System Studio"). Picker opens on Recent once parts were placed (search widens it to the whole catalog); drag-placed parts enter Recent. Scenario menu rows now carry per-item Edit/Duplicate/Delete icons plus a New scenario row (Rename button dropped; Edit covers it). Desktop Run is joined to a red-tinted trash clear button after a run. Transport glyphs reduced to 12–14px, Run label 13px.
+- Files: TopBar, Workspace, CanvasView, LibraryPicker, PlaybackPanel; tests scenario-switch, project-rename, run-pace, scenarios, runs, simulation-support, project-canvas.
+- Verification: tsc clean; build passed; isolated production suite 151 passed before test fixes, then the 5 failures (strict-mode locators now matching per-row buttons, 40px transparent bar, removed Rename) fixed and rerun: 20 passed across the affected specs. No full-suite rerun after the fixes; unit tests not rerun.
+- Limitations: Run+clear joined state checked by tests only, not by screenshot (S05's scenario was not runnable in the pane); dots do not continue behind the top bar band's seam.
+- Lesson: per-row buttons in a list break `getByRole('button',{name:/Edit scenario/})` strict-mode locators; scope to the selected row.
+
+### Canvas under the top bar, Stop-run hover, scenario label (Claude)
+- Outcome: at ≥1000px the top bar floats over the canvas (absolute, click-through except its two clusters); the canvas slot extends beneath it via `--topbar-inset` (53px) so the grid dots run behind the header, with docked panels, canvas banners and the top toast offset by the same var. Stop run hover border is risk-coloured, not green. Scenario trigger reads "Traffic │ name" (muted label with a divider, semibold name) and row meta is lowercase.
+- Files: PanelHost, Workspace, TopBar, CanvasView, PlaybackPanel, studio-project-canvas spec.
+- Verification: tsc, build passed; full isolated production suite 155 passed, 1 failed (history banner hidden under the new header), fixed by offsetting top overlays; rerun of history, project-canvas, design-language specs 17+ passed. No full rerun after the fix. Popover and Stop-run hover not screenshot-checked.
+- Lesson: floating the header over the canvas hides every top-anchored canvas overlay; offset them with `--topbar-inset`.

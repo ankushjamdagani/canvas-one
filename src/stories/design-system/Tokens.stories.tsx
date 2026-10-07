@@ -49,7 +49,8 @@ export const ColorsAndSurfaces: StoryObj = {
 
     const lineTokens = [
       { name: 'divider', hex: evergreen.divider, role: 'Panel dividers and borders' },
-      { name: 'hairlineSoft', hex: evergreen.hairlineSoft, role: 'Canvas grid dots & subtle hairlines' },
+      { name: 'hairlineSoft', hex: evergreen.hairlineSoft, role: 'Subtle internal hairlines' },
+      { name: 'grid', hex: evergreen.grid, role: 'Static editor and animated public drafting dots' },
       { name: 'controlBorder', hex: evergreen.controlBorder, role: 'Input and control default borders' },
       { name: 'hoverBorder', hex: evergreen.hoverBorder, role: 'Control border hover state' },
       { name: 'controlBorderStrong', hex: evergreen.controlBorderStrong, role: 'High-contrast accessible borders' },
@@ -121,30 +122,37 @@ export const Typography: StoryObj = {
         <div>
           <h2 className="text-2xl font-semibold text-ink font-sans">Typography Scale</h2>
           <p className="text-xs text-secondary-text mt-1">
-            Designed for high density information architecture with three specialized font families.
+            Four local font families distinguish interface text, measurements, display headings, and handwritten annotations.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-card border border-control-border bg-shell">
             <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-text">UI & Controls</span>
-            <h4 className="text-base font-semibold mt-1">IBM Plex Sans</h4>
+            <h4 className="text-base font-sans font-semibold mt-1">IBM Plex Mono</h4>
             <p className="text-xs text-body mt-2 leading-relaxed">
               Used for all buttons, inputs, dialogs, and workspace cards. Crisp geometry and legible at small sizes.
             </p>
           </div>
           <div className="p-4 rounded-card border border-control-border bg-shell">
             <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-text">Data & Code</span>
-            <h4 className="text-base font-mono font-semibold mt-1">IBM Plex Mono</h4>
+            <h4 className="text-base font-mono font-semibold mt-1">Martian Mono</h4>
             <p className="text-xs text-body mt-2 leading-relaxed">
               Used for port labels, latency readouts, JSON configs, node IDs, and keyboard shortcuts.
             </p>
           </div>
           <div className="p-4 rounded-card border border-control-border bg-shell">
             <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-text">Editorial & Hero</span>
-            <h4 className="text-base font-serif font-semibold mt-1">Newsreader Variable</h4>
+            <h4 className="text-base font-display font-semibold mt-1">Newsreader Variable</h4>
             <p className="text-xs text-body mt-2 leading-relaxed">
               Provides warm editorial accents for hero titles and scenario narrative introductions.
+            </p>
+          </div>
+          <div className="p-4 rounded-card border border-control-border bg-shell">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-secondary-text">Handwritten Notes</span>
+            <h4 className="font-handwritten text-[24px] font-medium mt-1">Caveat</h4>
+            <p className="font-handwritten text-[21px] font-medium text-body mt-2 leading-snug">
+              Simulates queues, not code.
             </p>
           </div>
         </div>

@@ -233,6 +233,11 @@ export type RunSummary = {
  * stored in a run's trace). `key` identifies the packet; times are simulated ms.
  */
 export type FlowRecord = {
+  /** Additive presentation facts; the executable model and accounting are unchanged. */
+  readonly ownerKey?: string;
+  readonly targetElementId?: string;
+  readonly trafficOutcome?: 'success' | 'error' | 'rejected' | 'timeout' | 'expired' | 'cancelled' | 'retryExhausted' | 'redeliveryExhausted' | 'lost' | 'late';
+  readonly retryAtMs?: number;
   readonly key: string;
   /** Explicit lifecycle identity for cycle inspection; absent in older in-memory recordings. */
   readonly cycleId?: string;
@@ -244,7 +249,7 @@ export type FlowRecord = {
   readonly connectionId: Id | null;
   /** Node named by the lifecycle fact; present for direct and connection-backed activity. */
   readonly elementId?: Id;
-  readonly phase: 'sent' | 'received' | 'queued' | 'processing' | 'settled' | 'response' | 'released';
+  readonly phase: 'sent' | 'received' | 'queued' | 'processing' | 'settled' | 'response' | 'released' | 'await' | 'await_resolved' | 'retry' | 'outcome' | 'blocked' | 'unblocked' | 'reserved' | 'slot_released' | 'no_progress';
   readonly atMs: number;
   /** `sent` and `response`: when the leg ends; absent when the leg was lost. */
   readonly arriveAtMs: number | null;

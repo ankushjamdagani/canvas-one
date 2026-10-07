@@ -1,96 +1,93 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect } from "./fixtures";
+import { recording, tab, savedRunCount, runAll } from "./simulation-support";
 
-/**
- * RV-13b: Results region (7A completed-run strip, 21B general metrics,
- * 21D component-first metrics). studio-runs.spec.ts already asserts the
- * General metrics tab text and the strip/stale notice; this spec adds the
- * component-first tab, tab switching, and the mobile strip.
- */
-
-async function openS04AndRun(page: Page) {
-  await page.goto('/');
-  await expect(page.getByTestId('entry-screen-root')).toBeVisible();
-  await page.getByTestId('create-example-s04').click();
-  await expect(page.getByTestId('workspace-root')).toBeVisible();
-  await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+test('logical terminal result exposes measured components without fabricating a recording', async ({ page }) => {
+  await page.goto('/projects');
+  await page.getByTestId('create-example-s01').click();
   await page.getByTestId('scenario-run-btn').click();
-  await expect(page.getByTestId('playback-status')).toContainText(/completed/i, { timeout: 20000 });
-}
-
-async function openRunResults(page: Page) {
-  await page.getByRole('button', { name: /Inspect (Request Cycles|Run Results)/ }).first().click();
-  const tab = page.getByRole('tab', { name: 'Run results', exact: true });
-  await expect(tab).toBeVisible();
-  return page.getByTestId('results-region');
-}
-
-test.describe('RV-13b: Results region', () => {
-  test('Run results is first and default; summary shows measured run metrics', async ({ page }) => {
-    await openS04AndRun(page);
-    const disclosure = page.getByRole('button', { name: 'Inspect Request Cycles', exact: true });
-    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    await disclosure.click();
-    const tabs = page.getByRole('tab');
-    await expect(tabs.nth(0)).toHaveText('Run results');
-    await expect(tabs.nth(1)).toHaveText('Request cycles');
-    await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
-    const region = page.getByTestId('results-region');
-    await expect(region).toBeVisible();
-    await expect(region.getByTestId('results-status-badge')).toContainText(/completed/i);
-    const summary = region.getByTestId('results-cycles');
-    await expect(summary).toContainText(/Whole run/);
-    await expect(summary).toContainText(/\d+ all-work cycles/);
-    await expect(summary).toContainText(/\d+ successful/);
-    await expect(summary).toContainText(/\d+ non-success/);
-    await expect(summary).toContainText(/Mean response .* ms/);
-    await expect(summary).toContainText(/Mean all-work completion .* ms/);
-    await expect(summary).toContainText(/Whole-run checks/);
-    await expect(region).not.toContainText(/undefined|NaN|\[object/);
-    await page.screenshot({ path: test.info().outputPath('run-results-desktop-default.png') });
+  await expect.poll(() => savedRunCount(page)).toBe(1);
+  const pane = await tab(page, 'Components');
+  const components = pane.getByRole('region', { name: 'Measured component metrics' });
+  await expect(components).toContainText('Whole recorded result');
+  const metrics = await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('system-studio-local-v1');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const records = await new Promise<any[]>((resolve, reject) => {
+      const request = database.transaction('runs').objectStore('runs').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    return records[0].summary.elementMetrics as Array<{ key: string; value: number | null; available: boolean; scope: string }>;
   });
+  expect(metrics).toEqual([]);
+  await expect(components.locator('[aria-label^="Unavailable:"]')).not.toHaveCount(0);
+  await expect(pane.getByTestId('scope-started')).toHaveText('Unavailable');
+  await expect(pane.getByTestId('cycle-inspection-row')).toHaveCount(0);
+  await expect(pane).toContainText('Cycle telemetry unavailable');
+  await expect(page.getByRole('slider', { name: 'Simulation playhead', exact: true })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('playback-panel')).not.toContainText(/requests started per 0 ms|0\.0 s/i);
+  await page.screenshot({ path: test.info().outputPath('source-logical-inspection.png') });
+});
 
-  test('Details switches between General metrics and component-first Components tab', async ({ page }) => {
-    await openS04AndRun(page);
-    const disclosure = page.getByRole('button', { name: /Inspect (Request Cycles|Run Results)/ }).first();
-    await disclosure.click();
-    await page.getByRole('tab', { name: 'Run results', exact: true }).click();
-    const region = page.getByTestId('results-region');
-
-    // General metrics are the initial view.
-    await expect(region.getByRole('button', { name: 'General metrics' })).toBeVisible();
-    await expect(region).toContainText(/Consumed inputs:\s*\d/);
-
-    // Component-first (21D): a table of measured metrics per named element.
-    await region.getByRole('button', { name: 'Components' }).click();
-    const table = region.getByRole('table');
-    await expect(table).toBeVisible();
-    for (const header of ['Element', 'Metric', 'Value', 'Status']) {
-      await expect(table.getByRole('columnheader', { name: header })).toBeVisible();
-    }
-    const rows = table.getByRole('row');
-    await expect.poll(() => rows.count()).toBeGreaterThan(1);
-    await expect(table).toContainText('Measured');
-    await expect(table).not.toContainText(/undefined|NaN|\[object/);
-    // Elements are shown by their authored names, never raw ids.
-    expect(await table.innerText()).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
-
-    // Back to General restores the general view; the inspection disclosure collapses.
-    await region.getByRole('button', { name: 'General metrics' }).click();
-    await expect(table).toBeHidden();
-    await expect(region).toContainText(/Consumed inputs:\s*\d/);
-    await disclosure.click();
-    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+test('noninteractive timed Run all maps genuine terminal component metrics without a playback store', async ({ page }) => {
+  await page.goto('/projects');
+  await page.getByTestId('create-example-s04').click();
+  await runAll(page);
+  await expect.poll(() => savedRunCount(page), { timeout: 60000 }).toBe(3);
+  const metrics = await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('system-studio-local-v1');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const records = await new Promise<any[]>((resolve, reject) => {
+      const request = database.transaction('runs').objectStore('runs').getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    records.sort((a, b) => b.completedAt - a.completedAt);
+    return records[0].summary.elementMetrics as Array<{ key: string; value: number | null; available: boolean; scope: string }>;
   });
+  const pane = await tab(page, 'Components');
+  const components = pane.getByRole('region', { name: 'Measured component metrics' });
+  await expect(components).toContainText('Whole recorded result');
+  const observed = metrics.filter(metric => metric.available && metric.value !== null && metric.scope === 'element' && ['meanLatencyMs', 'p95LatencyMs'].includes(metric.key));
+  expect(observed.length).toBeGreaterThan(0);
+  for (const metric of observed) await expect(components).toContainText(`${metric.key === 'meanLatencyMs' ? 'mean' : 'p95'} ${metric.value!.toFixed(1)} ms`);
+  await expect(pane.getByTestId('scope-started')).toHaveText('Unavailable');
+  await expect(page.getByRole('slider', { name: 'Simulation playhead', exact: true })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('playback-time')).toHaveText('—');
+  await expect(page.getByTestId('playback-panel')).not.toContainText(/requests started per 0 ms|0\.0 s/i);
+  await page.screenshot({ path: test.info().outputPath('source-timed-terminal-inspection.png') });
+});
 
-  test('390x844: run results and summary stay within the viewport width', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await openS04AndRun(page);
-    const region = await openRunResults(page);
-    await expect(region.getByRole('button', { name: 'Components' })).toBeVisible();
-    await page.screenshot({ path: test.info().outputPath('run-results-mobile-default.png') });
-    const overflows = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    );
-    expect(overflows).toBe(false);
-  });
+test("source Summary shows observed counts and truthful scope", async ({
+  page,
+}) => {
+  await recording(page);
+  const pane = await tab(page, "Summary");
+  await expect(pane.getByTestId("scope-started")).toContainText("6");
+  await expect(pane.getByTestId("scope-completed")).toContainText("6");
+  await expect(pane.getByTestId("scope-failed")).toContainText("0");
+  await expect(pane.getByTestId("scope-open")).toContainText("0");
+  await expect(pane.getByTestId("scope-mean")).toContainText(/\d/);
+  await expect(pane.getByTestId("scope-p95")).toContainText(/\d/);
+  await expect(pane).not.toContainText(/undefined|NaN|\[object/);
+});
+
+test("source Components exposes authored names and measured observations", async ({
+  page,
+}) => {
+  await recording(page);
+  const pane = await tab(page, "Components");
+  await expect(pane).toContainText("Orders DB");
+  await expect(pane).toContainText(/mean/i);
+  await expect(pane).toContainText(/p95/i);
+  await expect(pane).toContainText(/fail/i);
+  await expect(pane).not.toContainText(/undefined|NaN|\[object/);
 });

@@ -1,301 +1,705 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, Clock3, Layers3, ListTree, MapPin } from 'lucide-react';
-import type { Cycle, FlowRecord } from '../../domain/studio/runner/types';
-import { Button } from '../../components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
-import type { PlaybackRange, PlaybackStore } from './playback';
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ChevronRight, Play, X } from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { Segmented } from "../../components/ui/segmented";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../../components/ui/tabs";
+import type {
+  Cycle,
+  FlowRecord,
+  ElementMetric,
+} from "../../domain/studio/runner/types";
+import type { PlaybackRange, PlaybackStore } from "./playback";
+import {
+  ComponentMetrics,
+  CycleWaterfall,
+  RecordedEventRows,
+  ScopeMetrics,
+  ScopeMetricRows,
+  scopeMetricRows,
+  shortCycleLabel,
+  formatSimulationTime,
+  formatSimulationLatency,
+} from "./SimulationInspection";
 
 export type CycleInspectionProps = {
-  store: PlaybackStore;
+  store: PlaybackStore | null;
   cycles: readonly Cycle[];
+  recordedResult?: boolean;
+  recordedMetrics?: readonly ElementMetric[];
   selection: PlaybackRange | null;
   elementLabels: Record<string, string>;
   connectionLabels?: Record<string, string>;
-  onSeek: (time: number) => void;
-  visibleWindow?: PlaybackRange;
-  onEventSelect?: (event: FlowRecord | null) => void;
   mobile?: boolean;
-  eventResetKey?: number;
+  inspectorHeight?: number;
   recordingChanged?: boolean;
-  onLocateEvent?: (event: FlowRecord) => void;
-  canLocateEvent?: (event: FlowRecord) => boolean;
-  navigation?: React.ReactNode;
+  onSeek(time: number): void;
+  onPlayFrom?(time: number): void;
+  onClearRange?(): void;
+  onClose?(): void;
+  onEventSelect?(event: FlowRecord | null): void;
+  eventResetKey?: number;
 };
 
-const fmtTime = (ms: number | null): string => ms === null ? '—' : `${(ms / 1000).toFixed(3)} s`;
-const fmtDuration = (ms: number | null): string => ms === null ? '—' : `${ms.toFixed(1)} ms`;
-const fmtOutcome = (cycle: Cycle): string => cycle.outcome ?? 'in progress';
-function EventRows({ events, labels, connectionLabels = {}, onSelect }: { events: readonly FlowRecord[]; labels: Record<string, string>; connectionLabels?: Record<string, string>; onSelect: (event: FlowRecord) => void }) {
-  if (events.length === 0) return <p className="py-4 text-sm text-secondary-text">No retained lifecycle events for this cycle.</p>;
-  return <ol className="divide-y divide-border" aria-label="Recorded lifecycle events">
-    {events.map((event, index) => {
-      const subject = event.elementId ? labels[event.elementId] ?? 'Component unavailable' : event.connectionId ? connectionLabels[event.connectionId] ?? 'Connection unavailable' : 'Unit';
-      return <li key={`${event.key}:${event.phase}:${event.atMs}:${index}`}>
-        <button type="button" onClick={() => onSelect(event)} className="grid w-full grid-cols-[5.5rem_minmax(0,1fr)] gap-2 px-2 py-2 text-left text-sm hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring">
-          <time className="font-mono text-xs text-secondary-text">{fmtTime(event.atMs)}</time>
-          <span className="min-w-0 truncate"><span className="font-medium">{event.phase}</span><span className="text-secondary-text"> · {subject}{event.outcome ? ` · ${event.outcome}` : ''}</span></span>
-        </button>
-      </li>;
-    })}
-  </ol>;
-}
-
-export function CycleInspection({ store, cycles, selection, elementLabels, connectionLabels, onSeek, visibleWindow, onEventSelect, mobile = false, eventResetKey = 0, recordingChanged = false, onLocateEvent, canLocateEvent, navigation }: CycleInspectionProps) {
-  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
-  const [tab, setTab] = useState('overview');
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(() => new Set());
-  const [cycleOffset, setCycleOffset] = useState(0);
-  const [eventOffset, setEventOffset] = useState(0);
-  const [mobilePane, setMobilePane] = useState<'list' | 'summary' | 'detail'>('list');
+export function CycleInspection({
+  store,
+  cycles,
+  recordedResult = false,
+  recordedMetrics = [],
+  selection,
+  elementLabels,
+  connectionLabels,
+  mobile = false,
+  inspectorHeight = 440,
+  recordingChanged = false,
+  onSeek,
+  onPlayFrom,
+  onClearRange,
+  onClose,
+}: CycleInspectionProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState("components");
+  const [mobileTab, setMobileTab] = useState("summary");
   const [failuresOnly, setFailuresOnly] = useState(false);
-  const [componentFilter, setComponentFilter] = useState('all');
-  const [listViewportWidth, setListViewportWidth] = useState(240);
-  const [columnWidth, setColumnWidth] = useState(288);
-  const [selectedEvent, setSelectedEvent] = useState<FlowRecord | null>(null);
-  const inspectionRoot = useRef<HTMLElement>(null);
-  const columnDrag = useRef<{ x: number; width: number } | null>(null);
-  const listViewport = useRef<HTMLDivElement>(null);
-  const listScrollTop = useRef(0);
+  const [offset, setOffset] = useState(0);
+  const [eventOffset, setEventOffset] = useState(0);
+  const start = store?.inspectionHistoryStartMs ?? 0;
+  const playhead = store?.playheadMs ?? 0;
+  const range = selection ?? { startMs: start, endMs: playhead + 0.000001 };
   useEffect(() => {
-    const node = listViewport.current;
-    if (!node || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => setListViewportWidth(Math.max(1, entries[0]?.contentRect.width ?? 240)));
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => { setCycleOffset(0); setSelectedCycleId(null); setSelectedEvent(null); setExpandedGroups(new Set()); setEventOffset(0); setMobilePane('list'); onEventSelect?.(null); }, [selection?.startMs, selection?.endMs]);
-  useEffect(() => { setSelectedEvent(null); onEventSelect?.(null); }, [eventResetKey]);
-  const selectedCycle = selectedCycleId ? cycles.find((cycle) => cycle.id === selectedCycleId) ?? store.cyclesOverlappingRange(selection ?? { startMs: -Infinity, endMs: Infinity }, { limit: 200 }).rows.find((cycle) => cycle.id === selectedCycleId) : undefined;
-  const query = useMemo(() => selection ? store.cyclesOverlappingRange(selection, { offset: cycleOffset, limit: 200, failuresOnly, componentId: componentFilter === 'all' ? undefined : componentFilter }) : { rows: [...cycles].filter((cycle) => (!failuresOnly || (cycle.outcome !== null && cycle.outcome !== 'ok')) && (componentFilter === 'all' || store.cycleTouchesComponent(cycle.id, componentFilter))).slice(cycleOffset, cycleOffset + 200), total: cycles.filter((cycle) => (!failuresOnly || (cycle.outcome !== null && cycle.outcome !== 'ok')) && (componentFilter === 'all' || store.cycleTouchesComponent(cycle.id, componentFilter))).length }, [store, selection?.startMs, selection?.endMs, cycleOffset, cycles, store.inspectionVersion, store.flowInspectionVersion, failuresOnly, componentFilter]);
-  const rows = query.rows;
-  const rangeStats = useMemo(() => selection ? store.statisticsForRange(selection) : null, [store, selection, store.inspectionVersion]);
-  const eventsQuery = useMemo(() => selectedCycle ? store.flowEventsForCycle(selectedCycle.id, { offset: eventOffset, limit: 100 }) : { rows: [], total: 0 }, [store, selectedCycle?.id, eventOffset, store.flowInspectionVersion]);
-  const events = eventsQuery.rows;
-  const componentActivity = useMemo(() => selectedCycle ? store.componentActivityForCycle(selectedCycle.id) : [], [store, selectedCycle?.id, store.flowInspectionVersion]);
-
-  const cycleSpan = cycles.reduce<{ startMs: number; endMs: number } | null>((span, cycle) => ({
-    startMs: span ? Math.min(span.startMs, cycle.startedAtMs) : cycle.startedAtMs,
-    endMs: span ? Math.max(span.endMs, cycle.startedAtMs + 1) : cycle.startedAtMs + 1,
-  }), null);
-  const spans = visibleWindow && visibleWindow.endMs > visibleWindow.startMs ? visibleWindow : selection ?? cycleSpan;
-  const bucketMs = spans ? Math.max(1, (spans.endMs - spans.startMs) * 16 / listViewportWidth) : 1;
-  const groups = useMemo(() => {
-    const grouped = new Map<number, Cycle[]>();
-    for (const cycle of rows) {
-      const bucket = Math.floor(((cycle.startedAtMs - (spans?.startMs ?? 0)) / bucketMs));
-      const group = grouped.get(bucket) ?? [];
-      group.push(cycle);
-      grouped.set(bucket, group);
-    }
-    return [...grouped.entries()].map(([bucket, members]) => ({ bucket, members }));
-  }, [rows, bucketMs, spans?.startMs]);
-
-  const chooseEvent = (event: FlowRecord) => {
-    onSeek(event.atMs);
-    setSelectedEvent(event);
-    onEventSelect?.(event);
+    setSelectedId(null);
+    setDetailTab("components");
+    setOffset(0);
+    setEventOffset(0);
+  }, [selection?.startMs, selection?.endMs, store]);
+  const selected = selectedId
+    ? cycles.find((cycle) => cycle.id === selectedId)
+    : undefined;
+  const cycleLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        cycles.map((cycle, index) => [
+          cycle.id,
+          shortCycleLabel(cycle, index + 1),
+        ]),
+      ),
+    [cycles],
+  );
+  const query = useMemo(
+    () =>
+      store?.cyclesOverlappingRange(range, {
+        offset,
+        limit: 120,
+        failuresOnly,
+      }) ?? { rows: [], total: 0 },
+    [
+      store,
+      range.startMs,
+      range.endMs,
+      offset,
+      failuresOnly,
+      store?.inspectionVersion,
+    ],
+  );
+  const all = useMemo(
+    () =>
+      store?.cyclesOverlappingRange(range, { limit: 1 }) ?? {
+        rows: [],
+        total: 0,
+      },
+    [store, range.startMs, range.endMs, store?.inspectionVersion],
+  );
+  const stats = useMemo(
+    () => store?.statisticsForRange(range),
+    [store, range.startMs, range.endMs, store?.inspectionVersion],
+  );
+  const metricRows = useMemo(
+    () =>
+      stats
+        ? scopeMetricRows(stats, cycles, range)
+        : [
+            "Started",
+            "Completed",
+            "Failed",
+            "Open at end",
+            "Mean latency",
+            "p95 latency",
+          ].map((label, index) => ({
+            id: ["started", "completed", "failed", "open", "mean", "p95"][
+              index
+            ],
+            label,
+            value: "Unavailable",
+          })),
+    [stats, cycles, range.startMs, range.endMs],
+  );
+  const wholeRange = {
+    startMs: start,
+    endMs: (store?.computedMs ?? 0) + 0.000001,
   };
-  const selectCycle = (cycle: Cycle) => { setSelectedCycleId(cycle.id); setMobilePane('detail'); setSelectedEvent(null); setEventOffset(0); setTab('overview'); onEventSelect?.(null); };
-  const backToCycle = () => { setSelectedEvent(null); onEventSelect?.(null); };
-  const backToList = () => { setSelectedCycleId(null); setSelectedEvent(null); setMobilePane('list'); onEventSelect?.(null); requestAnimationFrame(() => { if (listViewport.current) listViewport.current.scrollTop = listScrollTop.current; }); };
-  const backToRange = () => { setSelectedCycleId(null); setSelectedEvent(null); setMobilePane('summary'); onEventSelect?.(null); };
-  const showList = !mobile || mobilePane === 'list';
-  const showDetail = !mobile || mobilePane !== 'list';
-
-  const resizeColumn = (next: number) => {
-    const width = inspectionRoot.current?.getBoundingClientRect().width ?? 900;
-    setColumnWidth(Math.max(192, Math.min(Math.min(520, width - 248), next)));
+  const wholeRows =
+    mobile && store
+      ? scopeMetricRows(
+          store.statisticsForRange(wholeRange),
+          cycles,
+          wholeRange,
+        )
+      : metricRows;
+  const eventsQuery = useMemo(
+    () =>
+      selected && store
+        ? store.flowEventsForCycle(selected.id, {
+            offset: eventOffset,
+            limit: 120,
+          })
+        : { rows: [], total: 0 },
+    [store, selected?.id, eventOffset, store?.flowInspectionVersion],
+  );
+  const scopeEvents = useMemo(() => {
+    if (
+      !store ||
+      (mobile ? mobileTab !== "events" : selected || detailTab !== "events")
+    )
+      return { rows: [], total: 0 };
+    const failedIds = new Set(
+      cycles
+        .filter((cycle) => cycle.outcome !== null && cycle.outcome !== "ok")
+        .map((cycle) => cycle.id),
+    );
+    const events = store
+      .flowBetween(range.startMs - 0.000001, range.endMs - 0.000001)
+      .filter(
+        (event) =>
+          !failuresOnly || (event.cycleId && failedIds.has(event.cycleId)),
+      );
+    return {
+      rows: events.slice(eventOffset, eventOffset + 120),
+      total: events.length,
+    };
+  }, [
+    store,
+    mobile,
+    mobileTab,
+    selected?.id,
+    detailTab,
+    range.startMs,
+    range.endMs,
+    failuresOnly,
+    cycles,
+    eventOffset,
+    store?.flowInspectionVersion,
+  ]);
+  const clearCycle = () => {
+    setSelectedId(null);
+    setDetailTab("components");
+    setEventOffset(0);
   };
-  return <TooltipProvider delayDuration={300}><section ref={inspectionRoot} className="grid h-full min-h-0 overflow-hidden bg-background text-foreground" style={{ gridTemplateColumns: mobile ? 'minmax(0, 1fr)' : `minmax(12rem, ${columnWidth}px) 8px minmax(0, 1fr)` }} aria-label="Cycle inspection">
-      <div id="cycle-list-pane" className={`min-w-0 min-h-0 flex-col border-r border-border max-[720px]:border-r-0 max-[720px]:border-b ${showList ? 'flex' : 'hidden'}`}>
-        {navigation}
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-          <h3 className="text-sm font-semibold">{selection ? 'Cycles in range' : 'Recorded cycles'}</h3>
-          <div className="flex items-center gap-2"><span className="text-xs text-secondary-text">{query.total.toLocaleString()}</span>{selection && <Button size="sm" variant="ghost" onClick={() => { setSelectedCycleId(null); setSelectedEvent(null); setMobilePane('summary'); onEventSelect?.(null); }}>Range summary</Button>}</div>
-        </div>
-        <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
-          <span className="text-xs text-secondary-text">Show</span>
-          <Button size="sm" variant={failuresOnly ? 'ghost' : 'tint'} aria-pressed={!failuresOnly} onClick={() => { setFailuresOnly(false); setCycleOffset(0); }}>All</Button>
-          <Button size="sm" variant={failuresOnly ? 'tint' : 'ghost'} aria-pressed={failuresOnly} onClick={() => { setFailuresOnly(true); setCycleOffset(0); }}>Non-success</Button>
-        </div>
-        <div className="border-b border-border px-3 py-1.5"><Select value={componentFilter} onValueChange={(value) => { setComponentFilter(value); setCycleOffset(0); }}><SelectTrigger aria-label="Filter by component" className="h-8 text-sm"><SelectValue placeholder="All components" /></SelectTrigger><SelectContent><SelectItem value="all">All components</SelectItem>{Object.entries(elementLabels).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}</SelectContent></Select></div>
-        <div ref={listViewport} onScroll={(event) => { listScrollTop.current = event.currentTarget.scrollTop; }} className="min-h-0 flex-1 overflow-y-auto">
-          {groups.length === 0 ? <p className="px-3 py-5 text-sm text-secondary-text">No cycles in this interval.</p> : groups.map(({ bucket, members }) => {
-            // Group a collision only after it exceeds the visible row budget; small clusters stay individual.
-            const crowded = members.length >= 8 && rows.length > 24;
-            const expanded = expandedGroups.has(bucket);
-            if (crowded) return <div key={bucket} className="border-b border-border">
-              <button type="button" className="flex min-h-10 w-full items-center gap-2 px-3 text-left text-sm hover:bg-sunken" aria-expanded={expanded} onClick={() => setExpandedGroups((current) => { const next = new Set(current); if (next.has(bucket)) next.delete(bucket); else next.add(bucket); return next; })}>
-                {expanded ? <ChevronDown aria-hidden="true" className="size-4" /> : <ChevronRight aria-hidden="true" className="size-4" />}
-                <span className="font-medium">{members.length} cycles in this page</span><span className="text-xs text-secondary-text">{fmtTime(Math.min(...members.map((cycle) => cycle.startedAtMs)))}–{fmtTime(Math.max(...members.map((cycle) => cycle.startedAtMs)))}</span><span className="ml-auto text-xs text-secondary-text">{summarizeOutcomes(members)}</span>
-              </button>
-              {expanded && members.map((cycle) => <CycleRow key={cycle.id} cycle={cycle} selected={cycle.id === selectedCycleId} onSelect={selectCycle} />)}
-            </div>;
-            return members.map((cycle) => <CycleRow key={cycle.id} cycle={cycle} selected={cycle.id === selectedCycleId} onSelect={selectCycle} />);
-          })}
-          {query.total > 200 && <div className="flex items-center justify-between gap-2 border-t border-border p-2"><Button size="sm" variant="ghost" disabled={cycleOffset === 0} onClick={() => setCycleOffset((offset) => Math.max(0, offset - 200))}>Previous</Button><span className="text-xs text-secondary-text">{cycleOffset + 1}–{Math.min(cycleOffset + rows.length, query.total)} of {query.total.toLocaleString()}</span><Button size="sm" variant="ghost" disabled={cycleOffset + rows.length >= query.total} onClick={() => setCycleOffset((offset) => offset + 200)}>Next</Button></div>}
-        </div>
+  const chooseCycle = (cycle: Cycle) => {
+    setSelectedId(cycle.id);
+    setDetailTab("timeline");
+    setEventOffset(0);
+  };
+  const scopeLabel = store
+    ? `${formatSimulationTime(range.startMs)}–${formatSimulationTime(selection?.endMs ?? playhead)}`
+    : "—";
+  const pageControls = query.total > 120 && (
+    <div className="flex items-center justify-between border-t border-border px-3 py-1 text-[10px] text-secondary-text">
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={offset === 0}
+        onClick={() => setOffset(Math.max(0, offset - 120))}
+      >
+        Previous
+      </Button>
+      <span>
+        {offset + 1}–{Math.min(offset + query.rows.length, query.total)} /{" "}
+        {query.total}
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={offset + query.rows.length >= query.total}
+        onClick={() => setOffset(offset + 120)}
+      >
+        Next
+      </Button>
+    </div>
+  );
+  const cycleList = (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {query.rows.map((cycle, index) => {
+          const latency =
+            cycle.completedAtMs === null
+              ? null
+              : cycle.completedAtMs - cycle.startedAtMs;
+          const shortId = cycleLabels[cycle.id];
+          const outcome = cycle.outcome ?? "open";
+          const failed = cycle.outcome !== null && cycle.outcome !== "ok";
+          const tag = (
+            <span
+              className={`justify-self-end rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] ${failed ? "bg-risk-tint text-risk-text" : cycle.outcome === null ? "bg-accent text-primary" : "bg-sunken text-secondary-text"}`}
+            >
+              {outcome}
+            </span>
+          );
+          return (
+            <button
+              key={cycle.id}
+              type="button"
+              data-testid="cycle-inspection-row"
+              data-cycle-id={cycle.id}
+              title={cycle.id}
+              aria-label={`Inspect request cycle ${cycle.id}`}
+              aria-pressed={cycle.id === selectedId}
+              onClick={() => chooseCycle(cycle)}
+              className={
+                mobile
+                  ? "flex h-[52px] w-full items-center gap-2.5 border-b border-border px-4 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring"
+                  : "grid h-[30px] w-full grid-cols-[62px_70px_minmax(0,1fr)_64px] items-center gap-2 border-b border-border px-4 text-left font-mono text-[11px] hover:bg-sunken aria-pressed:bg-accent aria-pressed:shadow-[inset_2px_0_0_var(--primary)] focus-visible:outline-2 focus-visible:outline-ring"
+              }
+            >
+              {mobile ? (
+                <>
+                  <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                    <span className="font-mono text-[13px]">{shortId}</span>
+                    <span className="font-mono text-[11px] text-secondary-text">
+                      {formatSimulationTime(cycle.startedAtMs)} ·{" "}
+                      {formatSimulationLatency(latency)}
+                    </span>
+                  </span>
+                  {tag}
+                  <ChevronRight className="size-4 text-secondary-text" />
+                </>
+              ) : (
+                <>
+                  <span>{shortId}</span>
+                  <time className="text-secondary-text">
+                    {formatSimulationTime(cycle.startedAtMs)}
+                  </time>
+                  <span
+                    className="flex min-w-0 items-center gap-1.5"
+                    title="All-work completion latency"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-1 shrink-0 rounded-sm ${failed ? "bg-risk/40" : "bg-primary/35"}`}
+                      style={{
+                        width: `${Math.min(90, ((latency ?? 0) / 1000) * 90)}px`,
+                      }}
+                    />
+                    <span className="whitespace-nowrap text-secondary-text">
+                      {formatSimulationLatency(latency)}
+                    </span>
+                  </span>
+                  {tag}
+                </>
+              )}
+            </button>
+          );
+        })}
+        {query.rows.length === 0 && (
+          <p className="px-4 py-6 text-[13px] text-secondary-text">
+            {store
+              ? `No ${failuresOnly ? "failed " : ""}cycles in this scope.`
+              : recordedResult
+                ? "Cycle telemetry unavailable for this recorded result."
+                : "Nothing recorded yet. Run the scenario to see results here."}
+          </p>
+        )}
       </div>
-
-      {!mobile && <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize cycle list and inspection details"
-        aria-valuemin={192}
-        aria-valuemax={Math.min(520, (inspectionRoot.current?.getBoundingClientRect().width ?? 900) - 248)}
-        aria-valuenow={columnWidth}
-        aria-controls="cycle-list-pane cycle-inspection-detail"
-        data-testid="cycle-inspection-resize"
-        tabIndex={0}
-        className="relative z-10 flex w-2 cursor-col-resize touch-none items-center justify-center bg-background focus-visible:outline-2 focus-visible:outline-ring after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border"
-        onPointerDown={(event) => { columnDrag.current = { x: event.clientX, width: columnWidth }; event.currentTarget.setPointerCapture(event.pointerId); }}
-        onPointerMove={(event) => { if (columnDrag.current) resizeColumn(columnDrag.current.width + event.clientX - columnDrag.current.x); }}
-        onPointerUp={() => { columnDrag.current = null; }}
-        onPointerCancel={() => { columnDrag.current = null; }}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowLeft') { event.preventDefault(); resizeColumn(columnWidth - (event.shiftKey ? 32 : 12)); }
-          else if (event.key === 'ArrowRight') { event.preventDefault(); resizeColumn(columnWidth + (event.shiftKey ? 32 : 12)); }
-          else if (event.key === 'Home') { event.preventDefault(); resizeColumn(192); }
-          else if (event.key === 'End') { event.preventDefault(); resizeColumn(520); }
-        }}
-      ><span aria-hidden="true" className="h-8 w-0.5 rounded-full bg-muted-foreground/50" /></div>}
-
-      <div id="cycle-inspection-detail" className={`min-w-0 min-h-0 overflow-y-auto p-3 ${showDetail ? 'block' : 'hidden'}`}>
-        {mobile && !showList && navigation}
-        {recordingChanged && <p role="status" className="mb-3 rounded-control border border-border bg-sunken px-2.5 py-2 text-xs text-secondary-text">Recorded on an earlier version of this design.</p>}
-        {mobile && mobilePane === 'summary' && <Button size="sm" variant="ghost" className="mb-2" onClick={() => { setMobilePane('list'); requestAnimationFrame(() => { if (listViewport.current) listViewport.current.scrollTop = listScrollTop.current; }); }}><ArrowLeft aria-hidden="true" />Back to cycles</Button>}
-        {mobile && mobilePane === 'detail' && <Button size="sm" variant="ghost" className="mb-2" onClick={backToList}><ArrowLeft aria-hidden="true" />Cycle list</Button>}
-        {selectedEvent && selectedCycle ? <div>
-          <Button size="sm" variant="ghost" className="-ml-2 mb-2" onClick={backToCycle}><ArrowLeft aria-hidden="true" />Back to cycle</Button>
-          <h3 className="mb-3 text-sm font-semibold">Recorded event detail</h3>
-          <dl className="grid grid-cols-[minmax(7rem,0.65fr)_minmax(0,1.35fr)] gap-x-3 gap-y-2 text-sm">
-            <dt className="text-secondary-text">Observed time</dt><dd className="font-mono">{fmtTime(selectedEvent.atMs)}</dd>
-            <dt className="text-secondary-text">Event</dt><dd>{selectedEvent.phase}</dd>
-            <dt className="text-secondary-text">Unit</dt><dd>{selectedEvent.category === 'root' ? 'Root request' : selectedEvent.category === 'message' ? 'Descendant message' : 'Unavailable'}</dd>
-            <dt className="text-secondary-text">Component</dt><dd>{selectedEvent.elementId ? elementLabels[selectedEvent.elementId] ?? 'Component unavailable' : 'Not recorded'}</dd>
-            <dt className="text-secondary-text">Connection</dt><dd>{selectedEvent.connectionId ? connectionLabels?.[selectedEvent.connectionId] ?? 'Connection unavailable' : 'Not recorded'}</dd>
-            <dt className="text-secondary-text">Attempt</dt><dd>{selectedEvent.attempt === undefined ? 'Unavailable' : selectedEvent.attempt + 1}</dd>
-            <dt className="text-secondary-text">Outcome</dt><dd>{selectedEvent.outcome ?? 'Not recorded'}</dd>
-          </dl>
-          <Tooltip>
-            <TooltipTrigger asChild><span className="mt-4 inline-flex"><Button size="sm" variant="outline" disabled={!canLocateEvent?.(selectedEvent)} onClick={() => onLocateEvent?.(selectedEvent)}><MapPin aria-hidden="true" />Locate on canvas</Button></span></TooltipTrigger>
-            <TooltipContent>{canLocateEvent?.(selectedEvent) ? 'Show this recorded event on the canvas' : 'Recorded endpoints are not placed in the current canvas'}</TooltipContent>
-          </Tooltip>
-        </div> : mobile && mobilePane === 'list' ? <p className="py-3 text-sm text-secondary-text">Select a cycle or open Range summary.</p> : selectedCycle ? <>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="min-w-0"><Button size="sm" variant="ghost" onClick={backToRange} className="-ml-2 mb-1"><ArrowLeft aria-hidden="true" />Range summary</Button><h3 className="text-sm font-semibold">Selected cycle</h3></div>
-            <span className="rounded-control bg-sunken px-2 py-1 text-xs">{fmtOutcome(selectedCycle)}</span>
+      {pageControls}
+    </>
+  );
+  const eventList = (rows: readonly FlowRecord[], total: number) => (
+    <>
+      <RecordedEventRows
+        events={rows}
+        labels={elementLabels}
+        connectionLabels={connectionLabels}
+        mobile={mobile}
+        includeCycleId={!selected}
+        cycleLabels={cycleLabels}
+      />
+      {total > 120 && (
+        <div className="mt-2 flex items-center justify-between text-[10px] text-secondary-text">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={eventOffset === 0}
+            onClick={() => setEventOffset(Math.max(0, eventOffset - 120))}
+          >
+            Previous events
+          </Button>
+          <span>
+            {eventOffset + 1}–{Math.min(eventOffset + rows.length, total)} /{" "}
+            {total}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={eventOffset + rows.length >= total}
+            onClick={() => setEventOffset(eventOffset + 120)}
+          >
+            More events
+          </Button>
+        </div>
+      )}
+    </>
+  );
+  const cycleDetails = selected && (
+    <section
+      aria-label="Selected cycle"
+      className={
+        mobile
+          ? "flex flex-col gap-4 px-4 pb-5 pt-1.5"
+          : "flex flex-col gap-3.5"
+      }
+    >
+      {mobile && (
+        <>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="h-11 px-0 text-sm text-primary"
+              onClick={clearCycle}
+            >
+              <ArrowLeft className="size-4" />
+              Cycles
+            </Button>
+            <span className="flex-1" />
+            <Button
+              variant="outline"
+              className="h-9 rounded-[8px] px-3 text-[13px]"
+              onClick={() => onPlayFrom?.(selected.startedAtMs)}
+            >
+              Play from {formatSimulationTime(selected.startedAtMs)}
+            </Button>
           </div>
-          <p className="mb-2 text-xs text-secondary-text">Cycle details cover its full recorded lifetime, including events after the current playhead.</p>
-          {store.isStream && selectedCycle.startedAtMs < store.inspectionHistoryStartMs && <p role="status" className="mb-2 rounded-control border border-border bg-sunken px-2.5 py-2 text-xs text-secondary-text">This cycle began before the retained-history boundary. Some earlier lifecycle details may have been evicted.</p>}
-          <Tabs value={tab} onValueChange={setTab} className="flex h-full min-h-0 flex-col">
-            <TabsList aria-label="Cycle details" className="w-full shrink-0 justify-start">
-              <TabsTrigger value="overview" className="px-2 text-sm"><ListTree className="mr-1 size-4" aria-hidden="true" />Overview</TabsTrigger>
-              <TabsTrigger value="components" className="px-2 text-sm"><Layers3 className="mr-1 size-4" aria-hidden="true" />Components</TabsTrigger>
-              <TabsTrigger value="events" className="px-2 text-sm">Event log</TabsTrigger>
-            </TabsList>
-            <TabsContent value="overview" className="min-h-0 flex-1 overflow-y-auto">
-              <dl className="grid grid-cols-[minmax(8rem,0.7fr)_minmax(0,1.3fr)] gap-x-3 gap-y-2 py-2 text-sm">
-                <dt className="text-secondary-text">Started</dt><dd>{fmtTime(selectedCycle.startedAtMs)}</dd>
-                <dt className="text-secondary-text">Response reached source</dt><dd>{fmtTime(selectedCycle.responseAtMs)}</dd>
-                <dt className="text-secondary-text">Response latency</dt><dd>{fmtDuration(selectedCycle.responseAtMs === null ? null : selectedCycle.responseAtMs - selectedCycle.startedAtMs)}</dd>
-                <dt className="text-secondary-text">All work complete</dt><dd>{fmtTime(selectedCycle.completedAtMs)}</dd>
-                <dt className="text-secondary-text">Completion latency</dt><dd>{fmtDuration(selectedCycle.completedAtMs === null ? null : selectedCycle.completedAtMs - selectedCycle.startedAtMs)}</dd>
-                <dt className="text-secondary-text">All-work outcome</dt><dd>{fmtOutcome(selectedCycle)}</dd>
-              </dl>
-              <h4 className="mb-1 mt-3 text-sm font-semibold">Causal flow</h4>
-              <p className="mb-2 text-xs text-secondary-text">Descendant messages follow recorded parent links and can run before the response reaches the source.</p>
-              <p className="mb-1 text-xs text-secondary-text">Previewing {events.length} of {eventsQuery.total.toLocaleString()} retained events.</p>
-              <CausalFlow events={events} labels={elementLabels} connectionLabels={connectionLabels} cycleId={selectedCycle.id} onSelect={chooseEvent} />
-              {eventsQuery.total > events.length && <Button size="sm" variant="ghost" className="mt-2" onClick={() => setTab('events')}>Open all {eventsQuery.total.toLocaleString()} events</Button>}
-            </TabsContent>
-            <TabsContent value="components" className="min-h-0 flex-1 overflow-y-auto">
-              <h4 className="mb-2 text-sm font-semibold">Measured cycle activity</h4>
-              <p className="mb-2 text-xs text-secondary-text">Counts below come from retained lifecycle facts for this cycle.</p>
-              <ComponentCounts activity={componentActivity} labels={elementLabels} />
-            </TabsContent>
-            <TabsContent value="events" className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mb-2 flex justify-between text-xs text-secondary-text"><span>Recorded lifecycle events</span><span>{eventsQuery.total.toLocaleString()}</span></div>
-              <EventRows events={events} labels={elementLabels} connectionLabels={connectionLabels} onSelect={chooseEvent} />
-              {eventsQuery.total > 100 && <div className="flex items-center justify-between gap-2 border-t border-border pt-2"><Button size="sm" variant="ghost" disabled={eventOffset === 0} onClick={() => setEventOffset((offset) => Math.max(0, offset - 100))}>Previous events</Button><span className="text-xs text-secondary-text">{eventOffset + 1}–{Math.min(eventOffset + events.length, eventsQuery.total)}</span><Button size="sm" variant="ghost" disabled={eventOffset + events.length >= eventsQuery.total} onClick={() => setEventOffset((offset) => offset + 100)}>More events</Button></div>}
-            </TabsContent>
-          </Tabs>
-        </> : selection && rangeStats ? <>
-          <div className="mb-3 flex items-center gap-2"><Clock3 className="size-4 text-secondary-text" aria-hidden="true" /><h3 className="text-sm font-semibold">Range activity</h3></div>
-          <p className="mb-3 text-xs text-secondary-text">Activity is counted when it occurs in [{fmtTime(selection.startMs)}, {fmtTime(selection.endMs)}). Latency means use only cycles whose response or completion occurred in this interval. The cycle list includes lifetimes that overlap it.</p>
-          <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm">
-            <dt className="text-secondary-text">Starts in interval</dt><dd className="text-right tabular-nums">{rangeStats.starts}</dd>
-            <dt className="text-secondary-text">Responses in interval</dt><dd className="text-right tabular-nums">{rangeStats.responses}</dd>
-            <dt className="text-secondary-text">Completions in interval</dt><dd className="text-right tabular-nums">{rangeStats.completions}</dd>
-            <dt className="text-secondary-text">Non-success completions</dt><dd className="text-right tabular-nums">{rangeStats.failures}</dd>
-            <dt className="text-secondary-text">Open at interval start / end</dt><dd className="text-right tabular-nums">{rangeStats.activeAtStart} / {rangeStats.activeAtEnd}</dd>
-            <dt className="text-secondary-text">Peak concurrent cycles</dt><dd className="text-right tabular-nums">{rangeStats.peakConcurrency}</dd>
-            <dt className="text-secondary-text">Response latency mean · response cohort</dt><dd className="text-right tabular-nums">{rangeStats.responseLatenciesMs.length ? `${mean(rangeStats.responseLatenciesMs).toFixed(1)} ms` : 'Unavailable'}</dd>
-            <dt className="text-secondary-text">Completion latency mean · completion cohort</dt><dd className="text-right tabular-nums">{rangeStats.completionLatenciesMs.length ? `${mean(rangeStats.completionLatenciesMs).toFixed(1)} ms` : 'Unavailable'}</dd>
+          <h3
+            className="-mt-2 flex items-center gap-2.5 text-lg font-semibold"
+            title={selected.id}
+          >
+            {cycleLabels[selected.id]}
+            <span className="rounded-[4px] bg-sunken px-1.5 py-0.5 font-mono text-[10px] text-secondary-text">
+              {selected.outcome ?? "open"}
+            </span>
+          </h3>
+        </>
+      )}
+      {(mobile || detailTab === "timeline") && (
+        <>
+          <dl
+            className={
+              mobile ? "grid grid-cols-2 gap-3" : "grid grid-cols-4 gap-6"
+            }
+          >
+            {[
+              ["Started", formatSimulationTime(selected.startedAtMs)],
+              ["Settled", formatSimulationTime(selected.completedAtMs)],
+              [
+                "Latency",
+                formatSimulationLatency(
+                  selected.completedAtMs === null
+                    ? null
+                    : selected.completedAtMs - selected.startedAtMs,
+                ),
+              ],
+              [
+                "Retries",
+                eventsQuery.total > 120 ||
+                (store?.isStream && selected.startedAtMs < start)
+                  ? "Unavailable"
+                  : String(
+                      eventsQuery.rows.filter(
+                        (event) => event.phase === "retry",
+                      ).length,
+                    ),
+              ],
+            ].map(([label, value]) => (
+              <div key={label} className="flex min-w-0 flex-col gap-[3px]">
+                <dt className="font-mono text-[9px] uppercase text-secondary-text">
+                  {label}
+                </dt>
+                <dd
+                  className={`font-mono ${mobile ? "text-sm" : "text-[13px]"}`}
+                >
+                  {value}
+                </dd>
+              </div>
+            ))}
           </dl>
-          <p className="mt-3 text-xs text-secondary-text">{rangeStats.responseLatenciesMs.length} response and {rangeStats.completionLatenciesMs.length} completion latency samples.</p>
-        </> : <p className="py-5 text-sm text-secondary-text">Select a time range or cycle to inspect recorded activity.</p>}
-      </div>
-    </section></TooltipProvider>;
-}
-
-function CycleRow({ cycle, selected, onSelect }: { cycle: Cycle; selected: boolean; onSelect: (cycle: Cycle) => void }) {
-  const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const duration = Math.max(1, (cycle.completedAtMs ?? cycle.responseAtMs ?? cycle.startedAtMs + 1) - cycle.startedAtMs);
-  const responsePosition = cycle.responseAtMs === null ? null : Math.max(0, Math.min(100, ((cycle.responseAtMs - cycle.startedAtMs) / duration) * 100));
-  const openPopover = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setOpen(true); };
-  const closePopover = () => { if (closeTimer.current) clearTimeout(closeTimer.current); closeTimer.current = setTimeout(() => setOpen(false), 120); };
-  return <Popover open={open} onOpenChange={setOpen}>
-    <PopoverTrigger asChild><button type="button" data-testid="cycle-inspection-row" data-cycle-id={cycle.id} aria-label={`Inspect request cycle ${cycle.id}`} onClick={(event) => { event.preventDefault(); setOpen(false); onSelect(cycle); }} onMouseEnter={openPopover} onMouseLeave={closePopover} onFocus={openPopover} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closePopover(); }} aria-pressed={selected} className="flex min-h-10 w-full items-center justify-between gap-2 border-b border-border px-3 pl-9 text-left text-sm hover:bg-sunken aria-pressed:bg-accent focus-visible:outline-2 focus-visible:outline-ring">
-      <span className="min-w-0 truncate text-xs">Request · {fmtTime(cycle.startedAtMs)}</span><span className="shrink-0 text-xs text-secondary-text" title="All-work outcome, including asynchronous descendants">{fmtOutcome(cycle)}</span>
-    </button></PopoverTrigger>
-    <PopoverContent side="right" className="w-64 p-3 text-sm" onMouseEnter={openPopover} onMouseLeave={closePopover} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()}>
-      <span className="mb-2 block text-xs font-semibold">Cycle timing · all-work outcome: {fmtOutcome(cycle)}</span>
-      <span className="mb-1 block text-xs">Response {fmtDuration(cycle.responseAtMs === null ? null : cycle.responseAtMs - cycle.startedAtMs)}</span>
-      <span className="relative mb-2 block h-1.5 overflow-hidden rounded-full bg-sunken"><span className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: `${responsePosition ?? 0}%` }} /></span>
-      <span className="mb-1 block text-xs">All work {fmtDuration(cycle.completedAtMs === null ? null : cycle.completedAtMs - cycle.startedAtMs)}</span>
-      <span className="relative block h-1.5 overflow-hidden rounded-full bg-sunken"><span className="absolute inset-y-0 left-0 w-full rounded-full bg-foreground" /></span>
-    </PopoverContent>
-  </Popover>;
-}
-
-function ComponentCounts({ activity, labels }: { activity: readonly { elementId: string; events: number }[]; labels: Record<string, string> }) {
-  if (!activity.length) return <p className="text-sm text-secondary-text">Component activity is unavailable because no retained lifecycle fact identifies a component.</p>;
-  return <dl className="divide-y divide-border">{activity.map(({ elementId, events }) => <div key={elementId} className="flex justify-between gap-3 py-2 text-sm"><dt className="truncate">{labels[elementId] ?? 'Component unavailable'}</dt><dd className="shrink-0 font-mono">{events} events</dd></div>)}</dl>;
-}
-
-function CausalFlow({ events, labels, connectionLabels, cycleId, onSelect }: { events: readonly FlowRecord[]; labels: Record<string, string>; connectionLabels?: Record<string, string>; cycleId: string; onSelect: (event: FlowRecord) => void }) {
-  const rootEvents = events.filter((event) => event.unitId === event.cycleId);
-  const messageGroups = new Map<string, FlowRecord[]>();
-  for (const event of events) {
-    if (event.category !== 'message') continue;
-    const parent = event.parentUnitId ?? 'parent unavailable';
-    const group = messageGroups.get(parent) ?? [];
-    group.push(event);
-    messageGroups.set(parent, group);
-  }
-  const unitStarts = new Map<string, number>();
-  for (const event of events) if (event.category === 'message') unitStarts.set(event.unitId ?? '', Math.min(unitStarts.get(event.unitId ?? '') ?? Infinity, event.atMs));
-  const branchNumber = new Map([...unitStarts.entries()].sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])).map(([unitId], index) => [unitId, index + 1]));
-  return <div className="space-y-3">
-    <section><h5 className="mb-1 text-xs font-semibold uppercase text-secondary-text">Synchronous response path</h5><EventRows events={rootEvents} labels={labels} connectionLabels={connectionLabels} onSelect={onSelect} /></section>
-    <section><h5 className="mb-1 text-xs font-semibold uppercase text-secondary-text">Asynchronous descendants</h5>
-      {messageGroups.size === 0 ? <p className="py-2 text-sm text-secondary-text">No descendant message activity recorded.</p> : [...messageGroups.entries()].sort((a, b) => a[1][0].atMs - b[1][0].atMs).map(([parent, rows]) => <details key={parent} className="border-y border-border">
-        <summary className="cursor-pointer px-2 py-2 text-sm">{rows.length} events from {parent === cycleId ? 'the root request' : `message branch ${branchNumber.get(parent) ?? 'unavailable'}`} · first observed {fmtTime(Math.min(...rows.map((event) => event.atMs)))}</summary>
-        <EventRows events={rows} labels={labels} connectionLabels={connectionLabels} onSelect={onSelect} />
-      </details>)}
+          <CycleWaterfall
+            cycle={selected}
+            events={eventsQuery.rows}
+            labels={elementLabels}
+            mobile={mobile}
+          />
+          <p className="text-[10px] text-secondary-text">
+            Full recorded all-work lifetime · source response{" "}
+            {formatSimulationTime(selected.responseAtMs)}.{" "}
+            {store?.isStream && selected.startedAtMs < start
+              ? "Earlier lifecycle facts may be evicted."
+              : ""}
+          </p>
+        </>
+      )}
+      {(mobile || detailTab === "events") &&
+        eventList(eventsQuery.rows, eventsQuery.total)}
     </section>
-  </div>;
-}
-
-function mean(values: readonly number[]): number { return values.reduce((sum, value) => sum + value, 0) / values.length; }
-
-function summarizeOutcomes(cycles: readonly Cycle[]): string {
-  const complete = cycles.filter((cycle) => cycle.outcome !== null).length;
-  const failed = cycles.filter((cycle) => cycle.outcome !== null && cycle.outcome !== 'ok').length;
-  return `${complete} complete · ${failed} non-success`;
+  );
+  if (mobile)
+    return (
+      <section
+        aria-label="Simulation inspection"
+        className="relative z-[2] flex shrink-0 flex-col overflow-hidden rounded-t-[16px] border-t border-border bg-background shadow-[0_-14px_28px_-20px_rgba(22,32,29,0.35)]"
+        style={{ height: inspectorHeight }}
+      >
+        <div className="flex shrink-0 justify-center pb-0.5 pt-2">
+          <span className="h-1 w-9 rounded-sm bg-control-border-strong" />
+        </div>
+        <div className="flex shrink-0 items-center gap-2 pb-2 pl-4 pr-2 pt-0.5">
+          <span className="flex h-7 min-w-0 items-center gap-1.5 rounded-[6px] bg-sunken px-2 font-mono text-[10px] text-secondary-text">
+            <span className="truncate">
+              {selection ? "RANGE" : "THROUGH PLAYHEAD"} {scopeLabel}
+            </span>
+            {selection && (
+              <button
+                type="button"
+                onClick={onClearRange}
+                aria-label="Clear range"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </span>
+          <span className="flex-1" />
+          <label
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-[8px] border px-2.5 text-[13px] ${failuresOnly ? "border-risk/30 bg-risk-tint text-risk-text" : "border-control-border-strong"}`}
+          >
+            <input
+              type="checkbox"
+              className="size-3 accent-primary"
+              checked={failuresOnly}
+              onChange={(event) => {
+                setFailuresOnly(event.target.checked);
+                setOffset(0);
+              }}
+            />
+            Failures
+          </label>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11 rounded-[8px]"
+            aria-label="Close inspection"
+            onClick={onClose}
+          >
+            <X />
+          </Button>
+        </div>
+        <Segmented
+          aria-label="Simulation inspection"
+          className="mx-4 mb-2.5 flex shrink-0 rounded-[9px] border-0"
+          options={[
+            {
+              id: "summary",
+              label: "Summary",
+              className: "h-10 flex-1 text-[13px]",
+            },
+            {
+              id: "cycles",
+              label: "Cycles",
+              className: "h-10 flex-1 text-[13px]",
+            },
+            {
+              id: "parts",
+              label: "Parts",
+              className: "h-10 flex-1 text-[13px]",
+            },
+            {
+              id: "events",
+              label: "Events",
+              className: "h-10 flex-1 text-[13px]",
+            },
+          ]}
+          value={mobileTab}
+          onChange={(value) => {
+            setMobileTab(value);
+            clearCycle();
+            setOffset(0);
+          }}
+        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-border">
+          {!store && !recordedResult ? (
+            <p className="p-4 text-sm text-secondary-text">
+              Nothing recorded yet. Run the scenario to see results here.
+            </p>
+          ) : mobileTab === "summary" ? (
+            <div className="flex flex-col gap-3.5 px-4 pb-5 pt-3.5">
+              <ScopeMetricRows rows={metricRows} cards />
+              <p className="text-[13px] leading-relaxed text-secondary-text">
+                {store
+                  ? "Starts and completions observed in this interval. Latency uses successful all-work completions."
+                  : "Cycle and timeline telemetry are unavailable for this recorded result."}
+              </p>
+              <div className="border-t border-border pt-2.5">
+                <h3 className="mb-1 font-mono text-[9px] text-secondary-text">
+                  {store?.ended || recordedResult
+                    ? "WHOLE RECORDING"
+                    : "RECORDED SO FAR"}
+                </h3>
+                <ScopeMetricRows rows={wholeRows} prefix="whole" />
+              </div>
+            </div>
+          ) : mobileTab === "cycles" ? (
+            selected ? (
+              cycleDetails
+            ) : (
+              cycleList
+            )
+          ) : mobileTab === "parts" ? (
+            <div className="px-4">
+              <ComponentMetrics
+                store={store}
+                labels={elementLabels}
+                recordedMetrics={recordedMetrics}
+                mobile
+              />
+            </div>
+          ) : (
+            <div className="px-4">
+              {eventList(scopeEvents.rows, scopeEvents.total)}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  return (
+    <section
+      aria-label="Simulation inspection"
+      className="grid min-h-0 flex-1 grid-cols-[280px_420px_minmax(0,1fr)] overflow-hidden bg-background"
+    >
+      <aside
+        data-testid="simulation-scope-pane"
+        className="min-h-0 overflow-y-auto border-r border-border bg-shell p-4"
+      >
+        {(stats || recordedResult) && (
+          <ScopeMetrics
+            range={{ ...range, endMs: selection?.endMs ?? playhead }}
+            selection={selection}
+            available={Boolean(store)}
+            rows={metricRows}
+            onClear={() => onClearRange?.()}
+            historyStart={store?.isStream ? start : undefined}
+          />
+        )}
+        {recordingChanged && (
+          <p className="mt-3 text-[10px] text-secondary-text">
+            Recorded on an earlier design version.
+          </p>
+        )}
+      </aside>
+      <section
+        aria-label="Request cycles"
+        id="cycle-list-pane"
+        className="flex min-h-0 flex-col border-r border-border"
+      >
+        <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border pl-4 pr-3">
+          <h3 className="text-[13px] font-semibold">Request cycles</h3>
+          <span className="font-mono text-[10px] text-secondary-text">
+            {store ? all.total : "—"}
+          </span>
+          <span className="flex-1" />
+          <Segmented
+            aria-label="Cycle outcome filter"
+            className="border-0"
+            options={["All", "Failed"]}
+            value={failuresOnly ? "Failed" : "All"}
+            onChange={(value) => {
+              setFailuresOnly(value === "Failed");
+              setOffset(0);
+            }}
+          />
+        </header>
+        {cycleList}
+      </section>
+      <section
+        id="cycle-inspection-detail"
+        className="flex min-h-0 min-w-0 flex-col"
+      >
+        <Tabs
+          className="flex min-h-0 flex-1 flex-col"
+          value={detailTab}
+          onValueChange={(value) => {
+            setDetailTab(value);
+            setEventOffset(0);
+          }}
+        >
+          <TabsList
+            aria-label={selected ? "Cycle details" : "Scope details"}
+            className="flex h-10 w-full shrink-0 items-stretch gap-[18px] px-5"
+          >
+            {selected && (
+              <span
+                className="flex items-center gap-2 text-[13px] font-semibold"
+                title={selected.id}
+              >
+                Cycle {cycleLabels[selected.id]}
+                <button
+                  type="button"
+                  aria-label="Back to range"
+                  onClick={clearCycle}
+                >
+                  <X className="size-3 text-secondary-text" />
+                </button>
+              </span>
+            )}
+            <TabsTrigger
+              value={selected ? "timeline" : "components"}
+              className="px-0 py-0 text-[13px]"
+            >
+              {selected ? "Timeline" : "Components"}
+            </TabsTrigger>
+            <TabsTrigger value="events" className="px-0 py-0 text-[13px]">
+              Events
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent
+            value={selected ? "timeline" : "components"}
+            forceMount
+            hidden={detailTab !== (selected ? "timeline" : "components")}
+            className="mt-0 min-h-0 flex-1 overflow-y-auto px-5 py-3.5"
+          >
+            {detailTab !== "events" &&
+              (selected
+                ? cycleDetails
+                : (store || recordedResult) && (
+                    <ComponentMetrics
+                      store={store}
+                      labels={elementLabels}
+                      recordedMetrics={recordedMetrics}
+                    />
+                  ))}
+          </TabsContent>
+          <TabsContent
+            value="events"
+            forceMount
+            hidden={detailTab !== "events"}
+            className="mt-0 min-h-0 flex-1 overflow-y-auto px-5 py-3.5"
+          >
+            {detailTab === "events" &&
+              (selected
+                ? cycleDetails
+                : eventList(scopeEvents.rows, scopeEvents.total))}
+          </TabsContent>
+        </Tabs>
+      </section>
+    </section>
+  );
 }

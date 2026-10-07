@@ -172,8 +172,8 @@ export function LibraryPanel({
       </div>
 
       {/* 3. Filter Bar & List/Grid Toggle (12A/12B) */}
-      <div className="flex items-end justify-between px-4 pb-0 text-xs">
-        <div role="tablist" aria-label="Library source" className="flex min-w-0 items-end gap-3 -mb-px">
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 px-4 pb-0 text-xs">
+        <div role="tablist" aria-label="Library source" className="flex w-max max-w-full shrink-0 items-end gap-3 -mb-px overflow-x-auto">
           {(['standard', ...(renderSavedParts ? ['ours'] : []), ...(renderLinkedProjects ? ['projects'] : [])] as LibraryTab[]).map((id) => {
             const selectedTab = tab === id;
             return (

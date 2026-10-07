@@ -6,11 +6,55 @@
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 @import "@fontsource/ibm-plex-mono/latin-600.css";
 @import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
+
+/* Local faces extracted from the approved System Studio Landing export. */
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./assets/fonts/martian-mono-cyrillic-ext.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./assets/fonts/martian-mono-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./assets/fonts/martian-mono-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CD-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("./assets/fonts/martian-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/caveat-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 @theme inline {
-  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "Martian Mono", ui-monospace, monospace;
   --font-display: "Newsreader Variable", Georgia, serif;
+  --font-handwritten: "Caveat", cursive;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -78,6 +122,7 @@
   /* Aliases for utilities already used in components (design.md Evergreen roles). */
   --color-ink: var(--foreground);
   --color-canvas: var(--canvas);
+  --color-grid: var(--grid);
   --color-selected-tint: var(--accent);
   --color-divider: var(--border);
   --color-hairline: var(--hairline);
@@ -216,9 +261,9 @@
   --text-ui: 13px;
   --text-ui--line-height: 1.55;
   /* Mono metadata labels (design system: uppercase Plex Mono 9–10px, 0.08–0.14em tracking). */
-  --text-meta: 10px;
-  --text-meta--line-height: 1.4;
-  --text-meta--letter-spacing: 0.1em;
+  --text-micro: 10px;
+  --text-micro--line-height: 1.4;
+  --text-micro--letter-spacing: 0.1em;
 
   /* Evergreen node-kind stripe colours (specs/revamp/design.md "Canvas objects":
      stripe colour is the node kind, never derived from node names). Keyed by the
@@ -299,7 +344,8 @@
   --tint-pressed: #D3E0DB;
   --risk-edge: #E0C9B6;
   --branch-edge: #C9B9E4;
-  --canvas: #FFFFFF;
+  --canvas: #FBFAF7;
+  --grid: #D3CDC1;
   --hairline-soft: #EFEBE3;
 
   /* Evergreen direct role additions from System Studio Design System.dc.html */
@@ -332,7 +378,7 @@
   --ring-danger: 0 0 0 3px #B4674A;
   --ring-danger-soft: 0 0 0 3px rgba(180, 103, 74, 0.18);
 
-  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   color: var(--foreground);
   background: var(--shell);
   font-synthesis: none;
@@ -560,6 +606,14 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
   }
+}
+
+/* Float shared traffic inspection above neighboring cards without changing measured geometry. */
+.react-flow__node:has([data-cells-lanes-node][aria-expanded="true"]) {
+  z-index: 1001 !important;
+}
+.react-flow__edgelabel-renderer > div:has([data-traffic-connection-inspection][aria-expanded="true"]) {
+  z-index: 1002 !important;
 }
 
 /* Live traffic: dashes run along a connection in the direction requests travel. */

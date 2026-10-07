@@ -29,7 +29,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     data-slot="select-trigger"
     className={cn(
-      "flex h-8 pointer-coarse:h-11 w-full items-center justify-between gap-2 rounded-control border border-input bg-shell px-3 py-1 text-base shadow-sm transition-colors hover:bg-background data-[state=open]:bg-background data-[state=open]:border-primary focus-visible:bg-background focus-visible:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-risk-text focus-visible:aria-invalid:outline-risk-text disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text disabled:border-control-border cursor-pointer select-none [&>span]:line-clamp-1",
+      "flex h-8 pointer-coarse:h-11 w-full items-center justify-between gap-2 rounded-control border border-input bg-shell px-3 py-1 text-xs shadow-sm transition-colors hover:bg-background data-[state=open]:bg-background data-[state=open]:border-primary focus-visible:bg-background focus-visible:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:border-risk-text focus-visible:aria-invalid:outline-risk-text disabled:cursor-not-allowed disabled:bg-sunken disabled:text-secondary-text disabled:border-control-border cursor-pointer select-none [&>span]:line-clamp-1",
       className
     )}
     {...props}
@@ -124,7 +124,7 @@ const SelectLabel = React.forwardRef<
     ref={ref}
     data-slot="select-label"
     className={cn(
-      "px-2.5 py-1.5 font-mono text-meta uppercase tracking-wide font-medium text-secondary-text",
+      "px-2.5 py-1.5 font-mono text-micro uppercase tracking-wide font-medium text-secondary-text",
       className
     )}
     {...props}

@@ -24,7 +24,7 @@ export const Introduction: StoryObj = {
           <Badge variant="neutral">DESIGN SYSTEM V9</Badge>
           <StatusDot status="live" label="Evergreen Light Palette" />
         </div>
-        <h1 className="text-4xl font-serif font-bold text-ink sm:text-5xl">
+        <h1 className="text-4xl font-display font-bold text-ink sm:text-5xl">
           Evergreen Design System
         </h1>
         <p className="text-base text-body max-w-3xl leading-relaxed">
@@ -45,7 +45,7 @@ export const Introduction: StoryObj = {
               </div>
               <CardTitle className="text-sm">Warm Paper Palette</CardTitle>
               <CardDescription className="text-xs">
-                Light-only tactile surfaces (#FBFAF7 shell, #FFFFFF canvas, #F7F5F1 panel, #F2EFE9 sunken). Zero dark-mode ambiguity.
+                Warm #FBFAF7 shell and canvas, white controls, #F7F5F1 panels, and #F2EFE9 wells. Static #D3CDC1 editor dots preserve the 26px snap geometry.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -98,9 +98,9 @@ export const Introduction: StoryObj = {
             <p className="text-[11px] text-secondary-text">From raised cards to floating dock and modal frame shadows.</p>
           </div>
           <div className="p-4 rounded-card border border-border bg-background space-y-1">
-            <div className="text-2xl font-bold font-mono text-foreground">3</div>
+            <div className="text-2xl font-bold font-mono text-foreground">4</div>
             <div className="text-xs font-semibold">Font Families</div>
-            <p className="text-[11px] text-secondary-text">IBM Plex Sans, IBM Plex Mono, and Newsreader Variable.</p>
+            <p className="text-[11px] text-secondary-text">IBM Plex Mono for UI, Martian Mono for measurements, Newsreader for headings, Caveat for annotations.</p>
           </div>
         </div>
       </div>
