@@ -92,7 +92,7 @@ Traffic/playback transitions; dialog/popover/panel motion; scroll-linked effects
 
 1. E2E disables motion with `localStorage['studio:motion'] = 'off'` (Playwright `storageState`), not a `window` global; the landing demo's existing reduced-motion tests make a global `reducedMotion` emulation unsuitable.
 2. The Workspace keeps its own frame, padding and static dots. The shell board fades out beneath the card overlay and its ground unmounts after the fade; the Workspace height model is untouched. This supersedes "replace `workspace-frame`" in Architecture §7.
-3. Canvas edges fade in as a group instead of drawing along `pathLength`; `TrafficEdge` renders multi-layer lanes.
+3. Canvas edges draw along their path with a hand-driven `stroke-dashoffset` on each `.react-flow__edge-path` (restored afterwards), picked up with a MutationObserver because ReactFlow renders edges after nodes; edge labels fade in once drawn. Exit still fades.
 4. `Reveal` has two kinds (`content`, `chrome`); node/edge/bar choreography is imperative (`canvasTransition.ts`) because ReactFlow owns node `transform`.
 5. Rapid navigation relies on `AnimatePresence mode="wait"` last-wins behaviour, covered by an e2e test; there is no custom queue.
 6. The board frame intro is a clip-path sweep of the existing frame.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canvasEnterDelays } from './canvasTransition';
+import { canvasEdgeDelay, canvasEnterDelays } from './canvasTransition';
 
 describe('canvasEnterDelays', () => {
   it('uses the showcase 110 ms node stagger for small canvases', () => {
@@ -14,5 +14,13 @@ describe('canvasEnterDelays', () => {
   it('starts bars after edges: edgeDelay + min(edges,4)*140ms + 520ms', () => {
     expect(canvasEnterDelays(3, 3).barDelay).toBeCloseTo(0.26 + 3 * 0.14 + 0.52, 5);
     expect(canvasEnterDelays(3, 99).barDelay).toBeCloseTo(0.26 + 4 * 0.14 + 0.52, 5);
+  });
+});
+
+describe('canvasEdgeDelay', () => {
+  it('staggers edge drawing 140 ms apart after the 260 ms edge start, capped at four steps', () => {
+    expect(canvasEdgeDelay(0)).toBeCloseTo(0.26, 5);
+    expect(canvasEdgeDelay(2)).toBeCloseTo(0.26 + 0.28, 5);
+    expect(canvasEdgeDelay(9)).toBeCloseTo(0.26 + 0.56, 5);
   });
 });

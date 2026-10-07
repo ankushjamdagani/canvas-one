@@ -4,6 +4,11 @@ import { CANVAS, CARD, EASE } from '@/lib/motion/tokens';
 export const ENTERING_ATTR = 'data-canvas-entering';
 const EDGE_STAGGER = 0.14;
 
+/** Seconds after the enter starts at which edge `index` begins drawing. */
+export function canvasEdgeDelay(index: number) {
+  return CANVAS.edgeDelay + Math.min(index, 4) * EDGE_STAGGER;
+}
+
 export function canvasEnterDelays(nodeCount: number, edgeCount: number) {
   const nodeStep = nodeCount > 0 ? Math.min(CANVAS.nodeStagger, CANVAS.nodeStaggerBudget / nodeCount) : CANVAS.nodeStagger;
   const barDelay = CANVAS.edgeDelay + Math.min(edgeCount, 4) * EDGE_STAGGER + CANVAS.barGap;
@@ -14,6 +19,8 @@ interface Targets {
   /** First child of each ReactFlow node wrapper: the wrapper's own transform positions the node. */
   nodes: HTMLElement[];
   edges: HTMLElement | null;
+  edgePaths: SVGPathElement[];
+  edgeLabels: HTMLElement | null;
   topbar: HTMLElement | null;
   bottom: HTMLElement | null;
 }
@@ -22,6 +29,8 @@ function collect(root: HTMLElement): Targets {
   return {
     nodes: Array.from(root.querySelectorAll<HTMLElement>('.react-flow__node > :first-child')),
     edges: root.querySelector<HTMLElement>('.react-flow__edges'),
+    edgePaths: Array.from(root.querySelectorAll<SVGPathElement>('.react-flow__edge-path')),
+    edgeLabels: root.querySelector<HTMLElement>('.react-flow__edgelabel-renderer'),
     topbar: root.querySelector<HTMLElement>('[data-testid="workspace-topbar"]'),
     bottom: root.querySelector<HTMLElement>('[data-testid="playback-panel"]'),
   };
@@ -35,8 +44,39 @@ function clear(els: HTMLElement[]) {
   });
 }
 
+interface DrawnEdge {
+  path: SVGPathElement;
+  dasharray: string;
+  dashoffset: string;
+  marker: string | null;
+}
+
+/** Hides the stroke with a dash gap (and the arrow head) so it can be drawn along its length. */
+function prepareEdge(path: SVGPathElement): DrawnEdge & { length: number } {
+  const length = Math.ceil(path.getTotalLength()) + 1;
+  const saved = {
+    path,
+    length,
+    dasharray: path.style.strokeDasharray,
+    dashoffset: path.style.strokeDashoffset,
+    marker: path.getAttribute('marker-end'),
+  };
+  path.style.strokeDasharray = `${length} ${length}`;
+  path.style.strokeDashoffset = String(length);
+  path.removeAttribute('marker-end');
+  return saved;
+}
+
+function restoreEdge(edge: DrawnEdge) {
+  edge.path.style.strokeDasharray = edge.dasharray;
+  edge.path.style.strokeDashoffset = edge.dashoffset;
+  if (!edge.dasharray) edge.path.style.removeProperty('stroke-dasharray');
+  if (!edge.dashoffset) edge.path.style.removeProperty('stroke-dashoffset');
+  if (edge.marker) edge.path.setAttribute('marker-end', edge.marker);
+}
+
 /**
- * Hides, then animates nodes (stagger), edges (fade) and bars (slide). Waits for ReactFlow to
+ * Hides, then animates nodes (stagger), edges (drawn along their path) and bars (slide). Waits for ReactFlow to
  * render its first nodes, then calls `onReady` (the card overlay starts fading) before animating.
  */
 export function runCanvasEnter(root: HTMLElement, onReady: () => void): () => void {
@@ -45,18 +85,23 @@ export function runCanvasEnter(root: HTMLElement, onReady: () => void): () => vo
   let stopped = false;
   const controls: { stop(): void }[] = [];
   let hidden: HTMLElement[] = [];
+  const drawn: DrawnEdge[] = [];
+  const drawnPaths = new Set<SVGPathElement>();
+  let observer: MutationObserver | null = null;
+  let observerTimer = 0;
 
   const start = () => {
     const t = collect(root);
-    hidden = [...t.nodes, t.edges, t.topbar, t.bottom].filter((el): el is HTMLElement => !!el);
+    hidden = [...t.nodes, t.edgeLabels, t.topbar, t.bottom].filter((el): el is HTMLElement => !!el);
     hidden.forEach((el) => {
       el.style.opacity = '0';
     });
+    // Strokes are hidden before the edge layer becomes visible, so nothing flashes.
     root.removeAttribute(ENTERING_ATTR);
     onReady();
 
     const edgeCount = root.querySelectorAll('.react-flow__edge').length;
-    const { nodeStep, barDelay } = canvasEnterDelays(t.nodes.length, edgeCount);
+    const { nodeStep, barDelay } = canvasEnterDelays(t.nodes.length, Math.max(edgeCount, 3));
     const gap = CARD.enterGap;
     const blur = t.nodes.length <= CANVAS.maxBlurNodes;
 
@@ -72,10 +117,35 @@ export function runCanvasEnter(root: HTMLElement, onReady: () => void): () => vo
       controls.push(c);
       void c.then(() => clear(t.nodes));
     }
-    if (t.edges) {
-      const c = animate(t.edges, { opacity: [0, 1] }, { duration: CANVAS.edgeDuration, delay: gap + CANVAS.edgeDelay, ease: EASE.inOut });
+    // ReactFlow renders edges after it has measured nodes, so some arrive after this point:
+    // prepare them in the same task (before paint) and draw them with the same stagger.
+    const drawEdge = (path: SVGPathElement) => {
+      if (drawnPaths.has(path)) return;
+      drawnPaths.add(path);
+      const edge = prepareEdge(path);
+      drawn.push(edge);
+      const c = animate(edge.length, 0, {
+        duration: CANVAS.edgeDuration,
+        delay: gap + canvasEdgeDelay(drawnPaths.size - 1),
+        ease: EASE.inOut,
+        onUpdate: (value) => {
+          edge.path.style.strokeDashoffset = String(value);
+        },
+      });
       controls.push(c);
-      void c.then(() => clear([t.edges!]));
+      void c.then(() => restoreEdge(edge));
+    };
+    t.edgePaths.forEach(drawEdge);
+    const edgesRoot = t.edges ?? root;
+    observer = new MutationObserver(() => {
+      root.querySelectorAll<SVGPathElement>('.react-flow__edge-path').forEach(drawEdge);
+    });
+    observer.observe(edgesRoot, { childList: true, subtree: true });
+    observerTimer = window.setTimeout(() => observer?.disconnect(), 1500);
+    if (t.edgeLabels) {
+      const c = animate(t.edgeLabels, { opacity: [0, 1] }, { duration: 0.4, delay: gap + canvasEdgeDelay(4) + CANVAS.edgeDuration, ease: EASE.enter });
+      controls.push(c);
+      void c.then(() => clear([t.edgeLabels!]));
     }
     if (t.topbar) {
       const c = animate(t.topbar, { opacity: [0, 1], y: [-CANVAS.barOffset, 0] }, { duration: CANVAS.barDuration, delay: gap + barDelay, ease: EASE.enter });
@@ -104,11 +174,14 @@ export function runCanvasEnter(root: HTMLElement, onReady: () => void): () => vo
     cancelAnimationFrame(frame);
     controls.forEach((c) => c.stop());
     clear(hidden);
+    observer?.disconnect();
+    window.clearTimeout(observerTimer);
+    drawn.forEach(restoreEdge);
     root.removeAttribute(ENTERING_ATTR);
   };
 }
 
-/** Bars slide away, nodes and edges fade. Resolves when everything has finished. */
+/** Bars slide away; nodes, edges and edge labels fade. Resolves when everything has finished. */
 export function runCanvasExit(root: HTMLElement): Promise<void> {
   const t = collect(root);
   const runs: { then(onResolve: () => void, onReject?: () => void): Promise<void> }[] = [];
@@ -123,7 +196,9 @@ export function runCanvasExit(root: HTMLElement): Promise<void> {
       ),
     );
   }
-  if (t.edges) runs.push(animate(t.edges, { opacity: 0 }, { duration: CANVAS.exitNode, delay: CANVAS.exitNodeDelay, ease: EASE.exit }));
+  for (const layer of [t.edges, t.edgeLabels]) {
+    if (layer) runs.push(animate(layer, { opacity: 0 }, { duration: CANVAS.exitNode, delay: CANVAS.exitNodeDelay, ease: EASE.exit }));
+  }
   return Promise.all(
     runs.map((run) => new Promise<void>((resolve, reject) => void run.then(resolve, reject))),
   ).then(() => undefined);
