@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { animate } from 'motion/react';
 import { DraftingFrame, DraftingGround } from '@/components/ui/drafting-board';
-import { cn } from '@/lib/utils';
 import { useMotionEnv } from '@/lib/motion/env';
 import { BOARD, EASE } from '@/lib/motion/tokens';
 
@@ -13,7 +12,7 @@ export interface BoardShift {
 
 /**
  * Ground (dots) and double frame behind every page. Mounted once by `RouteShell`, so the
- * board survives page swaps; it fades out on the project canvas, which paints its own sheet.
+ * frame survives page swaps; only the animated dots fade on the project canvas.
  */
 export function BoardLayer({
   visible,
@@ -30,90 +29,91 @@ export function BoardLayer({
   const env = useMotionEnv();
   const playIntro = intro && !env.reduced;
   const fadeSeconds = env.off ? 0.001 : env.reduced ? 0.12 : BOARD.fadeOut;
-  // Once faded out on the project canvas the ground stops running and leaves the DOM.
   const [mounted, setMounted] = React.useState(visible);
   React.useEffect(() => {
     if (visible) {
       setMounted(true);
       return;
     }
-    const id = window.setTimeout(() => setMounted(false), fadeSeconds * 1000);
-    return () => window.clearTimeout(id);
+    const timer = window.setTimeout(() => setMounted(false), fadeSeconds * 1000);
+    return () => window.clearTimeout(timer);
   }, [visible, fadeSeconds]);
   const dots = React.useRef<HTMLDivElement>(null);
   const frame = React.useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!playIntro) return;
     const d = dots.current;
     const f = frame.current;
     if (!d || !f) return;
     const controls = [
       animate(d, { opacity: [0, 1], scale: [BOARD.dotsScale, 1] }, { duration: BOARD.dotsIntro, ease: EASE.enter }),
-      animate(
-        f,
-        { opacity: [0, 1], clipPath: ['inset(0 100% 0 0)', 'inset(0 0% 0 0)'] },
-        { duration: BOARD.frameIntro, delay: BOARD.frameDelay, ease: EASE.inOut },
-      ),
+      ...Array.from(f.querySelectorAll<HTMLElement>('.drafting-frame-side')).map((side) =>
+        animate(side, { [side.classList.contains('drafting-frame-top') || side.classList.contains('drafting-frame-bottom') ? 'scaleX' : 'scaleY']: [0, 1] },
+          { duration: BOARD.frameIntro, delay: BOARD.frameDelay, ease: EASE.inOut })),
+      animate(f.querySelector<HTMLElement>('.drafting-frame-ring')!, { opacity: [0, 1], scale: [0.995, 1] },
+        { duration: BOARD.ringDuration, delay: BOARD.ringDelay, ease: EASE.enter }),
     ];
-    void controls[1].then(() => {
-      f.style.clipPath = '';
-    });
     return () => {
       controls.forEach((c) => c.stop());
       d.style.opacity = '1';
       d.style.transform = '';
-      f.style.opacity = '1';
-      f.style.clipPath = '';
+      f.querySelectorAll<HTMLElement>('.drafting-frame-side, .drafting-frame-ring').forEach((el) => {
+        el.style.transform = '';
+        el.style.opacity = '1';
+      });
     };
   }, [playIntro]);
 
   React.useEffect(() => {
     if (!shift.n || env.reduced) return;
     const d = dots.current;
-    const f = frame.current;
-    if (!d || !f) return;
-    const controls = [
-      animate(
-        d,
-        { y: [0, 0, -BOARD.shiftPx * shift.dir], opacity: [1, 0.35, 1] },
-        { duration: BOARD.shiftDuration, ease: EASE.inOut, times: [0, 0.45, 1] },
-      ),
-      animate(f, { opacity: [1, 0.25, 1] }, { duration: BOARD.shiftDuration, ease: EASE.inOut, times: [0, 0.45, 1] }),
-    ];
+    if (!d) return;
+    const control = animate(
+      d,
+      { y: [0, 0, -BOARD.shiftPx * shift.dir], opacity: [1, 0.35, 1] },
+      { duration: BOARD.shiftDuration, ease: EASE.inOut, times: [0, 0.45, 1] },
+    );
     // The grid repeats every 24 px, so snapping back is invisible.
-    void controls[0].then(() => {
+    void control.then(() => {
       d.style.transform = '';
     });
     return () => {
-      controls.forEach((c) => c.stop());
+      control.stop();
       d.style.opacity = '1';
       d.style.transform = '';
-      f.style.opacity = '1';
     };
-  }, [shift.n, shift.dir, env.reduced]);
+  }, [shift.n, shift.dir, env.reduced, mounted]);
+
+  // Frame choreography continues even after the hidden dot canvas is released.
+  React.useEffect(() => {
+    if (!shift.n || env.reduced) return;
+    const ring = frame.current?.querySelector<HTMLElement>('.drafting-frame-ring');
+    if (!ring) return;
+    const control = animate(ring, { opacity: [1, 0.25, 1] }, {
+      duration: BOARD.shiftDuration, ease: EASE.inOut, times: [0, 0.45, 1],
+    });
+    return () => {
+      control.stop();
+      ring.style.opacity = '1';
+    };
+  }, [shift.n, env.reduced]);
 
   return (
     <div
       data-testid="route-board"
       data-intro={String(playIntro)}
       aria-hidden="true"
-      className={cn(
-        'pointer-events-none absolute inset-0 z-0 transition-opacity',
-        visible ? 'opacity-100' : 'opacity-0',
-      )}
-      style={{ transitionDuration: `${fadeSeconds}s` }}
+      className="pointer-events-none absolute inset-0"
     >
-      {mounted && (
-        <>
-          <div ref={dots} className="absolute inset-0" style={{ opacity: playIntro ? 0 : 1 }}>
-            <DraftingGround paused={paused || !visible} pointerSource="document" />
-          </div>
-          <div ref={frame} className="absolute inset-0" style={{ opacity: playIntro ? 0 : 1 }}>
-            <DraftingFrame />
-          </div>
-        </>
-      )}
+      <div className="absolute inset-0 z-0 transition-opacity" style={{ opacity: visible ? 1 : 0, transitionDuration: `${fadeSeconds}s` }}>
+        {mounted && <div ref={dots} className="absolute inset-0" style={{ opacity: playIntro && !shift.n ? 0 : 1 }}>
+          <DraftingGround paused={paused || !visible} pointerSource="document" />
+        </div>}
+      </div>
+      <div ref={frame} data-testid={visible ? 'route-frame' : 'workspace-frame'} className={`absolute inset-0 z-20 ${visible ? '' : 'max-[999px]:hidden'}`}>
+        <DraftingFrame />
+      </div>
     </div>
   );
 }

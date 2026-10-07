@@ -284,7 +284,9 @@ export function EntryScreen({
     trimmedBlankName.length >= 1 && trimmedBlankName.length <= 80;
 
   // Blank project creator ("Open an empty canvas")
-  const handleCreateBlankProject = async (e?: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateBlankProject = async (
+    e?: React.FormEvent<HTMLFormElement>,
+  ) => {
     if (e) e.preventDefault();
     if (!isBlankNameValid || isSubmitting) return;
 
@@ -330,7 +332,10 @@ export function EntryScreen({
   };
 
   // Template creator
-  const handleCreateExample = async (example: ExampleCatalogEntry, row?: HTMLElement | null) => {
+  const handleCreateExample = async (
+    example: ExampleCatalogEntry,
+    row?: HTMLElement | null,
+  ) => {
     if (isSubmitting) return;
 
     if (row) shell?.beginOpen(row);
@@ -363,7 +368,11 @@ export function EntryScreen({
   };
 
   // Open existing project passing exact branchId
-  const handleOpenProject = async (projectId: string, branchId: string, source?: HTMLElement | null) => {
+  const handleOpenProject = async (
+    projectId: string,
+    branchId: string,
+    source?: HTMLElement | null,
+  ) => {
     if (isSubmitting) return;
 
     if (source) shell?.beginOpen(source);
@@ -497,7 +506,9 @@ export function EntryScreen({
       }}
       onDrop={handleDrop}
     >
-      <RevealScope contentCount={3}>
+      <RevealScope
+        contentCount={5 + Math.max(1, Math.min(visibleRows.length, 12))}
+      >
         <DraftingSheet
           page="Projects"
           navigation={
@@ -539,14 +550,14 @@ export function EntryScreen({
               )}
 
               {/* Start tiles: empty project, starter templates, import */}
-              <Reveal
-                as="section"
-                kind="content"
-                index={1}
+              <section
                 aria-label="Start a project"
                 className="grid grid-cols-1 gap-4 min-[801px]:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)] [&>*]:min-h-44 [&>*]:min-w-0 [&>*]:rounded-xl"
               >
-                <form
+                <Reveal
+                  as="form"
+                  kind="content"
+                  index={1}
                   onSubmit={handleCreateBlankProject}
                   className="relative flex flex-col p-5 justify-between gap-3 bg-primary text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
                 >
@@ -579,9 +590,13 @@ export function EntryScreen({
                       className="relative z-10 h-9 pointer-coarse:h-11 w-full rounded-control border border-white/25 bg-white/10 px-3 text-xs text-white placeholder:text-white/55 outline-none focus-visible:border-white/70 focus-visible:bg-white focus-visible:text-ink focus-visible:placeholder:text-secondary-text"
                     />
                   </div>
-                </form>
+                </Reveal>
 
-                <div className="flex flex-col gap-3 border border-border bg-background p-4">
+                <Reveal
+                  kind="content"
+                  index={2}
+                  className="flex flex-col gap-3 border border-border bg-background p-4"
+                >
                   <div className="flex items-center gap-3">
                     <span className="grid size-8 place-items-center rounded-[8px] bg-purple-tint text-purple">
                       <LayoutTemplate size={18} aria-hidden="true" />
@@ -631,7 +646,12 @@ export function EntryScreen({
                           className="h-7 px-2.5 text-xs font-medium shrink-0"
                           aria-label={`Create ${example.title}`}
                           disabled={isSubmitting}
-                          onClick={(e) => handleCreateExample(example, e.currentTarget.closest('[data-example-row]'))}
+                          onClick={(e) =>
+                            handleCreateExample(
+                              example,
+                              e.currentTarget.closest("[data-example-row]"),
+                            )
+                          }
                         >
                           <span>Create</span>
                           <ArrowRight size={12} aria-hidden="true" />
@@ -639,9 +659,11 @@ export function EntryScreen({
                       </div>
                     ))}
                   </div>
-                </div>
+                </Reveal>
 
-                <div
+                <Reveal
+                  kind="content"
+                  index={3}
                   className={cn(
                     "bg-background relative flex p-5 flex-col justify-between border border-dashed transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
                     dragActive
@@ -680,19 +702,20 @@ export function EntryScreen({
                       onChange={handleImportFileInputChange}
                     />
                   </div>
-                </div>
-              </Reveal>
+                </Reveal>
+              </section>
             </div>
 
             {/* Your projects */}
-            <Reveal
-              as="section"
-              kind="content"
-              index={2}
+            <section
               aria-labelledby="existing-projects-heading"
               className="flex flex-1 flex-col"
             >
-              <div className="mb-4 flex flex-wrap items-center gap-3">
+              <Reveal
+                kind="content"
+                index={4}
+                className="mb-4 flex flex-wrap items-center gap-3"
+              >
                 <h2
                   id="existing-projects-heading"
                   className="text-sm font-semibold text-ink"
@@ -722,36 +745,50 @@ export function EntryScreen({
                     ]}
                   />
                 </div>
-              </div>
+              </Reveal>
 
               {loadingProjects ? (
-                <div className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border">
+                <Reveal
+                  index={5}
+                  className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border"
+                >
                   Loading projects…
-                </div>
+                </Reveal>
               ) : projectRows.length === 0 ? (
-                <DraftingEmpty data-testid="no-projects-notice">
-                  <FolderOpen
-                    size={24}
-                    className="mx-auto text-secondary-text/70 mb-2"
-                  />
-                  <p className="font-medium text-ink">No saved projects yet</p>
-                  <p className="mt-0.5">
-                    Start from a template, or open an empty canvas.
-                  </p>
-                </DraftingEmpty>
+                <Reveal index={5} className="flex flex-1 flex-col">
+                  <DraftingEmpty data-testid="no-projects-notice">
+                    <FolderOpen
+                      size={24}
+                      className="mx-auto text-secondary-text/70 mb-2"
+                    />
+                    <p className="font-medium text-ink">
+                      No saved projects yet
+                    </p>
+                    <p className="mt-0.5">
+                      Start from a template, or open an empty canvas.
+                    </p>
+                  </DraftingEmpty>
+                </Reveal>
               ) : visibleRows.length === 0 ? (
-                <p className="p-8 text-center text-xs text-secondary-text">
+                <Reveal
+                  as="p"
+                  index={5}
+                  className="p-8 text-center text-xs text-secondary-text"
+                >
                   No projects match &ldquo;{query.trim()}&rdquo;.
-                </p>
+                </Reveal>
               ) : (
                 <div
                   data-testid="existing-projects-list"
                   className="grid grid-cols-1 gap-4 min-[481px]:grid-cols-2 min-[801px]:grid-cols-3 min-[1101px]:grid-cols-4"
                 >
-                  {visibleRows.map((row) => {
+                  {visibleRows.map((row, index) => {
                     const confirming = confirmDeleteId === row.project.id;
                     return (
-                      <article
+                      <Reveal
+                        as="article"
+                        kind="content"
+                        index={5 + Math.min(index, 11)}
                         key={row.project.id}
                         data-testid={`project-item-${row.project.id}`}
                         className="group relative flex min-w-0 flex-col overflow-hidden rounded-[9px] border border-border bg-card shadow-sm transition-colors hover:border-selected-edge hover:shadow-md"
@@ -767,7 +804,7 @@ export function EntryScreen({
                               handleOpenProject(
                                 row.project.id,
                                 row.target!.branchId,
-                                e.currentTarget.closest('article'),
+                                e.currentTarget.closest("article"),
                               )
                             }
                             className="absolute inset-0 z-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait"
@@ -866,12 +903,12 @@ export function EntryScreen({
                             )}
                           </div>
                         </div>
-                      </article>
+                      </Reveal>
                     );
                   })}
                 </div>
               )}
-            </Reveal>
+            </section>
           </DraftingMain>
         </DraftingSheet>
       </RevealScope>

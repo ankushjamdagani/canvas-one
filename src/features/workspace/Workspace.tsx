@@ -158,6 +158,7 @@ import { expansionStateOf, planExpansion } from "./expandPlans";
 import { planWrapInBoundary, wrapBoundaryCrossingEndpoints } from "./wrapPlan";
 import { Button } from "@/components/ui/button";
 import { useCanvasTransition } from "./useCanvasTransition";
+import { useRouteShell } from "@/lib/motion/shell-context";
 import {
   Dialog,
   DialogContent,
@@ -312,6 +313,7 @@ export function Workspace({
 }: WorkspaceProps) {
   const workspaceRootRef = React.useRef<HTMLDivElement>(null);
   useCanvasTransition(workspaceRootRef);
+  const routeShell = useRouteShell();
 
   // Read session state via useSyncExternalStore
   const sessionState = React.useSyncExternalStore(
@@ -3224,11 +3226,13 @@ export function Workspace({
     >
       {/* Project Canvas design: the sheet's double drafting frame. Wide
           viewports only, so narrow layouts keep their full width. */}
-      <div
-        data-testid="workspace-frame"
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-[22px] hidden min-[1000px]:block border border-[var(--drafting-frame-edge,#c9c2b5)] shadow-[inset_0_0_0_4px_var(--shell),inset_0_0_0_5px_#e2ddd3]"
-      />
+      {!routeShell && (
+        <div
+          data-testid="workspace-frame"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-[22px] hidden min-[1000px]:block border border-[var(--drafting-frame-edge,#c9c2b5)] shadow-[inset_0_0_0_4px_var(--shell),inset_0_0_0_5px_#e2ddd3]"
+        />
+      )}
       {/* Top Bar (22A nav live) */}
       {projectRecord ? (
         <TopBar

@@ -1242,6 +1242,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     <div
       ref={containerRef}
       data-testid="canvas-container"
+      data-canvas-node-count={projection.nodes.length}
+      data-canvas-edge-count={projection.edges.length}
       tabIndex={0}
       onKeyDown={handleCanvasKeyDown}
       onDragOver={handleCanvasDragOver}

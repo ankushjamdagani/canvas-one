@@ -10,6 +10,7 @@ export function useCanvasTransition(rootRef: React.RefObject<HTMLElement | null>
   const env = useMotionEnv();
   const [isPresent, safeToRemove] = usePresence();
   const markReady = shell?.markReady;
+  const stopEnter = React.useRef<(() => void) | null>(null);
 
   React.useLayoutEffect(() => {
     const root = rootRef.current;
@@ -18,20 +19,23 @@ export function useCanvasTransition(rootRef: React.RefObject<HTMLElement | null>
       return;
     }
     root.setAttribute(ENTERING_ATTR, '');
-    return runCanvasEnter(root, () => markReady?.());
+    stopEnter.current = runCanvasEnter(root, () => markReady?.(), env.coarse);
+    return () => { stopEnter.current?.(); stopEnter.current = null; };
     // Runs once per mount: route changes remount the page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   React.useEffect(() => {
     if (isPresent) return;
+    stopEnter.current?.();
+    stopEnter.current = null;
     const root = rootRef.current;
     if (!root || env.reduced) {
       safeToRemove?.();
       return;
     }
     let live = true;
-    const exit = runCanvasExit(root);
+    const exit = runCanvasExit(root, env.coarse);
     exit.done.then(
       () => live && safeToRemove?.(),
       () => live && safeToRemove?.(),
@@ -41,5 +45,5 @@ export function useCanvasTransition(rootRef: React.RefObject<HTMLElement | null>
       live = false;
       exit.stop();
     };
-  }, [isPresent, env.reduced, rootRef, safeToRemove]);
+  }, [isPresent, env.reduced, env.coarse, rootRef, safeToRemove]);
 }

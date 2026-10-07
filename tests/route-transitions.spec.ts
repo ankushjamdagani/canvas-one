@@ -15,10 +15,15 @@ test('the board persists across home and projects and swaps page content', async
   await page.goto('/');
   await expect(page.getByTestId('landing-page')).toBeVisible();
   await expect(page.getByTestId('route-board')).toHaveAttribute('data-intro', 'true');
+  await expect(page.locator('.drafting-frame-side')).toHaveCount(4);
+  await expect(page.locator('.drafting-frame-ring')).toHaveCount(1);
   await page.getByTestId('route-board').evaluate((el) => ((el as unknown as { __id: string }).__id = 'same'));
   await page.getByRole('link', { name: 'Try Beta' }).last().click();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+  await expect(page.locator('[data-reveal-kind="content"][data-reveal-index="1"]')).toHaveCount(1);
+  await expect(page.locator('[data-reveal-kind="content"][data-reveal-index="2"]')).toHaveCount(1);
+  await expect(page.locator('[data-reveal-kind="content"][data-reveal-index="3"]')).toHaveCount(1);
   await expect(page.locator('[data-page-kind="home"]')).toHaveCount(0);
   expect(await page.getByTestId('route-board').evaluate((el) => (el as unknown as { __id: string }).__id)).toBe('same');
   await page.goBack();
@@ -46,6 +51,13 @@ test('opening a project grows a card overlay, then the canvas enters and back re
   await expect(page.getByTestId('route-card-overlay')).toHaveCount(0, { timeout: 10000 });
   expect(await overlaySeen(page)).toBe(true);
   await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await expect.poll(async () => {
+    const box = await page.locator('.react-flow__node > :first-child').first().boundingBox();
+    return !!box && box.width > 80 && box.height > 20;
+  }).toBe(true);
+  await expect(page.locator('.drafting-frame')).toHaveCount(1);
+  await expect(page.getByTestId('workspace-frame')).toBeVisible();
+  await expect.poll(() => page.getByTestId('canvas-floating-dock').evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
   // Enter animations finish on their own and leave no inline opacity/transform/filter behind.
   await expect
     .poll(() => page.locator('.react-flow__node > :first-child').first().evaluate((el) => (el as HTMLElement).style.cssText), { timeout: 8000 })
@@ -54,6 +66,28 @@ test('opening a project grows a card overlay, then the canvas enters and back re
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
   await expect(page.locator('[data-page-kind="project"]')).toHaveCount(0);
+});
+
+test('canvas connections draw into the sheet and restore their authored strokes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const observed = { draw: false, dockHidden: false };
+    (window as unknown as { __motionObserved: typeof observed }).__motionObserved = observed;
+    const sample = () => {
+      const dock = document.querySelector('[data-testid="canvas-floating-dock"]');
+      if (dock && Number(getComputedStyle(dock).opacity) < 0.05) observed.dockHidden = true;
+      document.querySelectorAll<SVGPathElement>('.react-flow__edge-path, [data-cells-lanes-connection] > path').forEach((path) => {
+        if (Number(path.style.strokeDashoffset) > 1) observed.draw = true;
+      });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.goto('/projects');
+  await page.getByTestId('create-example-s04').click();
+  await expect(page.getByTestId('workspace-root')).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __motionObserved: { draw: boolean } }).__motionObserved.draw)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { __motionObserved: { dockHidden: boolean } }).__motionObserved.dockHidden)).toBe(true);
+  await expect.poll(() => page.locator('.react-flow__edge-path').evaluateAll((paths) => paths.length > 0 && paths.every((path) => !(path as SVGPathElement).style.strokeDashoffset))).toBe(true);
 });
 
 test('going back keeps the project page mounted while it animates out, and a quick Forward restores it cleanly', async ({ page }) => {

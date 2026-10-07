@@ -225,7 +225,7 @@ export function LandingPage() {
               action: "running sim",
             };
   return (
-    <RevealScope contentCount={2}>
+    <RevealScope contentCount={4}>
       <DraftingBoard paused={paused}>
         <header className="lp-header">
           <Reveal as="a" kind="chrome" index={0} href="/" className="lp-brand">
@@ -267,14 +267,13 @@ export function LandingPage() {
           </Reveal>
         </header>
         <DraftingStage>
-          <Reveal
-            as="main"
-            kind="content"
-            index={0}
+          <main
             data-testid="landing-page"
             className="relative min-[1000px]:pointer-events-none min-[1000px]:absolute min-[1000px]:inset-0 min-[1000px]:[&>*]:pointer-events-auto"
           >
-            <div
+            <Reveal
+              kind="content"
+              index={0}
               className="lp-hero"
               style={{
                 left: hero.x,
@@ -345,16 +344,21 @@ export function LandingPage() {
                   {...pointerProps}
                 />
               ))}
-            </div>
-            <p
+            </Reveal>
+            <Reveal
+              as="p"
+              kind="content"
+              index={1}
               className="lp-copy"
               style={{ left: hero.x + 19, top: hero.y + hero.h + 35 }}
             >
               AI agents sketch topologies, isolate hot paths, and simulate
               backpressure directly on an infinite browser drafting sheet in
               real time.
-            </p>
-            <div
+            </Reveal>
+            <Reveal
+              kind="content"
+              index={2}
               className="lp-actions"
               style={{ left: hero.x + 18, top: hero.y + hero.h + 166 }}
             >
@@ -390,8 +394,11 @@ export function LandingPage() {
                   <code>npx system-studio@preview</code>
                 </p>
               )}
-            </div>
-            <figure
+            </Reveal>
+            <Reveal
+              as="figure"
+              kind="content"
+              index={3}
               className="lp-demo"
               data-paused={paused}
               aria-label="Illustrative architecture and traffic, not measured results"
@@ -606,11 +613,11 @@ export function LandingPage() {
                   </p>
                 </aside>
               )}
-            </figure>
-          </Reveal>
+            </Reveal>
+          </main>
           <Reveal
-            kind="content"
-            index={1}
+            kind="chrome"
+            index={3}
             className="relative min-[1000px]:pointer-events-none min-[1000px]:absolute min-[1000px]:inset-0 min-[1000px]:[&>*]:pointer-events-auto"
           >
             <div
@@ -678,31 +685,37 @@ export function LandingPage() {
               Zero cloud egress
             </footer>
           </Reveal>
-          {[
-            { name: "You", ...you },
-            { name: `Claude · ${claude.action}`, ...claude },
-          ].map((cursor, index) => (
-            <div
-              key={index}
-              className={`lp-cursor ${index ? "lp-claude" : ""}`}
-              style={{
-                left: cursor.x,
-                top: cursor.y,
-                opacity: index && (t < 2900 || t >= 13200) ? 0 : 1,
-              }}
-              aria-hidden="true"
-            >
-              <svg width="18" height="20" viewBox="0 0 18 20">
-                <path
-                  d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z"
-                  fill={index ? "#7C5FC0" : "#0B5C54"}
-                  stroke="white"
-                  strokeWidth="1.2"
-                />
-              </svg>
-              <span>{cursor.name}</span>
-            </div>
-          ))}
+          <Reveal
+            kind="chrome"
+            index={4}
+            className="pointer-events-none absolute inset-0"
+          >
+            {[
+              { name: "You", ...you },
+              { name: `Claude · ${claude.action}`, ...claude },
+            ].map((cursor, index) => (
+              <div
+                key={index}
+                className={`lp-cursor ${index ? "lp-claude" : ""}`}
+                style={{
+                  left: cursor.x,
+                  top: cursor.y,
+                  opacity: index && (t < 2900 || t >= 13200) ? 0 : 1,
+                }}
+                aria-hidden="true"
+              >
+                <svg width="18" height="20" viewBox="0 0 18 20">
+                  <path
+                    d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z"
+                    fill={index ? "#7C5FC0" : "#0B5C54"}
+                    stroke="white"
+                    strokeWidth="1.2"
+                  />
+                </svg>
+                <span>{cursor.name}</span>
+              </div>
+            ))}
+          </Reveal>
         </DraftingStage>
       </DraftingBoard>
     </RevealScope>

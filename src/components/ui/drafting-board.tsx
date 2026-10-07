@@ -4,7 +4,15 @@ import { cn } from "@/lib/utils";
 import "./drafting-board.css";
 
 export function DraftingFrame() {
-  return <div className="drafting-frame" aria-hidden="true" />;
+  return (
+    <div className="drafting-frame" aria-hidden="true">
+      <span className="drafting-frame-side drafting-frame-top" />
+      <span className="drafting-frame-side drafting-frame-bottom" />
+      <span className="drafting-frame-side drafting-frame-left" />
+      <span className="drafting-frame-side drafting-frame-right" />
+      <span className="drafting-frame-ring" />
+    </div>
+  );
 }
 
 /** Full-viewport drafting surface; place a `DraftingStage` inside for fixed-coordinate content. */
@@ -114,7 +122,8 @@ export function DraftingGround({
     const leave = () => {
       pointer = null;
     };
-    const source: HTMLElement = pointerSource === "document" ? document.documentElement : board;
+    const source: HTMLElement =
+      pointerSource === "document" ? document.documentElement : board;
     source.addEventListener("pointermove", move);
     source.addEventListener("pointerleave", leave);
     const draw = (now: number) => {

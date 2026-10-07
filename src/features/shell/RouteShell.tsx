@@ -14,13 +14,15 @@ const PAGE_VARIANTS = { hidden: {}, enter: {}, exit: {} };
 
 interface Page {
   kind: PageKind;
+  shift?: BoardShift;
   /** Seconds the page waits before its reveals start. */
   baseDelay: number;
 }
 
-function PageA11y({ exiting }: { exiting: boolean }) {
+function PageA11y({ exiting, onMount }: { exiting: boolean; onMount: () => void }) {
   const isPresent = useIsPresent();
   const ref = React.useRef<HTMLSpanElement>(null);
+  React.useLayoutEffect(onMount, [onMount]);
   React.useLayoutEffect(() => {
     const frame = ref.current?.parentElement;
     if (!frame) return;
@@ -43,6 +45,7 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
     baseDelay: intro && !env.reduced ? BOARD.pageDelay : 0,
   }));
   const [shift, setShift] = React.useState<BoardShift>({ dir: 0, n: 0 });
+  const [boardVisible, setBoardVisible] = React.useState(target !== 'project');
   const [groundPaused, setGroundPaused] = React.useState(false);
   const [phase, setPhase] = React.useState<'enter' | 'exit'>('enter');
   const [overlay, setOverlay] = React.useState<OverlayState | null>(null);
@@ -104,14 +107,17 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
   const onOverlayGrown = React.useCallback(() => grown.current.resolve(), []);
 
   React.useEffect(() => {
+    if (target !== 'project' && overlayRef.current && overlayRef.current.stage !== 'cancel') {
+      cancelOpen();
+    }
     if (target === page.kind) return;
     let alive = true;
     void (async () => {
       if (target === 'project' && overlayRef.current?.stage === 'grow') await grown.current.promise;
       if (!alive) return;
-      setShift((s) => ({ dir: pageDirection(page.kind, target) || 1, n: s.n + 1 }));
       swapped.current = true;
-      setPage({ kind: target, baseDelay: overlayRef.current ? 0 : BOARD.shiftDelay });
+      setPage({ kind: target, baseDelay: overlayRef.current ? 0 : BOARD.shiftDelay,
+        shift: { dir: pageDirection(page.kind, target) || 1, n: performance.now() } });
       setPhase('enter');
       const o = overlayRef.current;
       if (o && o.stage === 'grow') update({ ...o, stage: 'hold' });
@@ -119,7 +125,12 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
     return () => {
       alive = false;
     };
-  }, [target, page.kind, update]);
+  }, [target, page.kind, update, cancelOpen]);
+
+  const mountedPage = React.useCallback(() => {
+    setBoardVisible(page.kind !== 'project');
+    if (page.shift) setShift(page.shift);
+  }, [page.kind, page.shift]);
 
   // The overlay never outlives a stuck workspace.
   React.useEffect(() => {
@@ -136,7 +147,7 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
   return (
     <RouteShellContext.Provider value={api}>
       <div className="relative isolate min-h-svh bg-shell">
-        <BoardLayer visible={page.kind !== 'project'} intro={intro} shift={shift} paused={groundPaused} />
+        <BoardLayer visible={boardVisible} intro={intro} shift={shift} paused={groundPaused} />
         <AnimatePresence mode="wait">
           <m.div
             key={page.kind}
@@ -151,7 +162,7 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
               document.querySelector<HTMLElement>(`[data-page-kind="${page.kind}"] h1`)?.focus({ preventScroll: true });
             }}
           >
-            <PageA11y exiting={phase === 'exit'} />
+            <PageA11y exiting={phase === 'exit'} onMount={mountedPage} />
             <RevealScope baseDelay={page.baseDelay}>{renderPage(page.kind)}</RevealScope>
           </m.div>
         </AnimatePresence>

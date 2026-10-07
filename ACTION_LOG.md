@@ -3189,3 +3189,19 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Verification: tsc clean; 1,863 unit tests passed (11 skipped); production build passed; isolated full production suite 162 passed, 4 skipped, 0 failed, no retries, 2 workers; edge drawing frames screenshotted.
 - Limitations: reviewer could not run tsc/vitest in its read-only sandbox (lead ran them); no second review round after the fixes.
 - Lesson: a render prop that reads live router state unmounts an exiting page before `AnimatePresence` can animate it; retain the last route for exit renders.
+
+### Transition reference fidelity repair (Codex)
+- Outcome: matched supplied transition choreography with four frame-side draws, delayed inner ring, individual content/card reveals, persistent frame, post-exit board shift, card-overlay continuity and canvas/control staging. Graph counts bound late node/edge timing; empty canvas readiness is distinct. Approved layout and simulation behavior preserved.
+- Files: shared drafting board/Reveal, entry pages, shell, Workspace/CanvasView, canvas transition helpers, motion browser/unit checks and LESSONS.
+- Platform/subagents: Codex lead; native shell, canvas and independent review agents after configured agy preflight failed to start in sandbox.
+- Verification: 1,865 unit tests pass (11 skipped); production and Storybook builds pass; final isolated fixed-build production suite: 161 passed, 2 authoring failures, 4 skipped. Affected authoring/phone/real-speed transition rerun: 23 passed with no source changes. Desktop, phone, empty canvas and animated child geometry/styles inspected; independent final review clear.
+- Limitations: full suite remains subject to intermittent connection-gesture and undo assertions; the passing rerun does not establish their fix. Source artifact preserved; no commit requested. Preview: http://127.0.0.1:5187/.
+- Lesson: real-speed screenshots and child geometry exposed collapsed cards that wrapper visibility missed; explicit transform identities and native completion restore authored styles reliably.
+- Lesson: a rebuild overlapped an earlier browser run and one phone entry timed out; keep served dist fixed throughout verification. Rendered-reference and isolated-suite rules in LESSONS guided verification.
+
+### Impeccable technical audit (Codex)
+- Outcome: documented 16/20 sampled health score, one P1 and four P2 findings: phone badge contrast, live reduced-motion preference, paused/hidden ground redraws, phone H1 and duplicated semantic colors. No UI fixes.
+- Files: `docs/audits/2026-10-07-impeccable-audit.md`, this log; pre-existing edits preserved.
+- Platform/subagents: Codex, isolated production Chromium; no subagents.
+- Verification: production build passed; detector warning verified as intentional keycap; one browser audit probe completed, Axe/reflow measured across desktop/phone public pages and S04 editor; landing/editor screenshots inspected. Temporary probe/config removed.
+- Limitations: no full unit/e2e suite, Lighthouse, physical/synthesized touch, text scaling or overlay keyboard journey. LESSONS' fresh isolated build and viewport-versus-touch rules guided verification.

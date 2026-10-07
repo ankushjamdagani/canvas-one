@@ -42,6 +42,7 @@ export const revealVariants = {
     opacity: 1,
     y: 0,
     filter: blur(0),
+    transitionEnd: { filter: 'none' },
     transition: { duration: c.enter.duration, delay: c.enter.delay, ease: EASE.enter },
   }),
   exit: (c: Custom) => ({
@@ -62,12 +63,15 @@ const TAGS = {
   article: m.article,
   main: m.main,
   footer: m.footer,
+  p: m.p,
+  figure: m.figure,
+  form: m.form,
 } as const;
 export type RevealTag = keyof typeof TAGS;
 
 type HtmlProps = Omit<
   React.HTMLAttributes<HTMLElement>,
-  'onAnimationStart' | 'onDrag' | 'onDragStart' | 'onDragEnd' | 'style'
+  'onAnimationStart' | 'onDrag' | 'onDragStart' | 'onDragEnd' | 'style' | 'onSubmit'
 >;
 export type RevealProps = HtmlProps & {
   as?: RevealTag;
@@ -76,6 +80,7 @@ export type RevealProps = HtmlProps & {
   index?: number;
   style?: React.CSSProperties;
   href?: string;
+  onSubmit?: React.ComponentProps<'form'>['onSubmit'];
 };
 
 /**
@@ -92,17 +97,14 @@ export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...r
     }),
     [kind, index, scope, env],
   );
-  const ref = React.useRef<HTMLElement | null>(null);
   const Tag = TAGS[as] as React.ElementType;
   return (
     <Tag
       {...rest}
-      ref={ref}
       variants={revealVariants}
       custom={custom}
-      onAnimationComplete={(definition: unknown) => {
-        if (definition === 'enter' && ref.current) ref.current.style.filter = 'none';
-      }}
+      data-reveal-kind={kind}
+      data-reveal-index={index}
     >
       {children}
     </Tag>

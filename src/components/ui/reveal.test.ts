@@ -11,7 +11,7 @@ describe('Reveal', () => {
     const html = renderToStaticMarkup(
       React.createElement(Reveal, { as: 'span', className: 'x', 'data-testid': 't' } as never, 'hi'),
     );
-    expect(html).toBe('<span class="x" data-testid="t">hi</span>');
+    expect(html).toBe('<span class="x" data-testid="t" data-reveal-kind="content" data-reveal-index="0">hi</span>');
   });
 
   it('inherits unspecified scope fields', () => {

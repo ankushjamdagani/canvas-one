@@ -614,6 +614,7 @@ body {
 [data-canvas-entering] .react-flow__edges,
 [data-canvas-entering] .react-flow__edgelabel-renderer,
 [data-canvas-entering] [data-testid="workspace-topbar"],
+[data-canvas-entering] [data-testid="canvas-floating-dock"],
 [data-canvas-entering] [data-testid="playback-panel"] {
   opacity: 0;
 }
