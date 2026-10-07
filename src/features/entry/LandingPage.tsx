@@ -273,7 +273,7 @@ export function LandingPage() {
             <span className="lp-dimension" aria-hidden="true">
               TEXT · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
             </span>
-            <h1>
+            <h1 tabIndex={-1} className="outline-none">
               Think in architecture.<em>Let agents draw the system.</em>
             </h1>
             {["TL", "TR", "BL", "BR"].map((corner) => (

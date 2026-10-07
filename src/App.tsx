@@ -9,6 +9,9 @@ import { EntryScreen } from './features/entry';
 import { LandingPage } from './features/entry/LandingPage';
 import { lazyComponent, whenIdle } from '@/lib/lazyComponent';
 import { navigate, useRoute } from '@/lib/router';
+import { RouteShell } from './features/shell';
+import type { PageKind } from '@/lib/motion/direction';
+import { ShellReady } from '@/lib/motion/shell-context';
 
 // The workspace (canvas, panels, history, runs) is its own chunk: the entry screen renders
 // without it, and it is prefetched once the browser is idle so opening a project stays fast.
@@ -227,7 +230,14 @@ function StudioShell({
     });
   }, [session]);
 
-  if (route.kind === 'project') {
+  const renderPage = (kind: PageKind): React.ReactNode => {
+    if (kind === 'home') return <LandingPage />;
+    if (kind === 'projects') {
+      return (
+        <EntryScreen session={session} repository={repository} mintId={MINT_ID} actor={actor} onOpenSuccess={goToProject} />
+      );
+    }
+    if (route.kind !== 'project') return null;
     if (sessionState.projectId === route.projectId) {
       return (
         <Workspace
@@ -245,6 +255,7 @@ function StudioShell({
           data-testid="project-route-error"
           className="min-h-screen w-full flex flex-col items-center justify-center gap-3 bg-shell text-ink p-6 text-center"
         >
+          <ShellReady />
           <h1 className="text-lg font-bold">Project unavailable</h1>
           <p className="text-xs text-secondary-text max-w-md">{openError.message}</p>
           <Button size="sm" onClick={() => navigate({ kind: 'projects' })}>
@@ -261,17 +272,7 @@ function StudioShell({
         Opening project…
       </div>
     );
-  }
+  };
 
-  if (route.kind === 'home') return <LandingPage />;
-
-  return (
-    <EntryScreen
-      session={session}
-      repository={repository}
-      mintId={MINT_ID}
-      actor={actor}
-      onOpenSuccess={goToProject}
-    />
-  );
+  return <RouteShell renderPage={renderPage} />;
 }

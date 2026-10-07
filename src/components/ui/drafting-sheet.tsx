@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useRouteShell } from "@/lib/motion/shell-context";
 import { BrandMark } from "./brand-mark";
 import { DraftingFrame, DraftingGround } from "./drafting-board";
 
@@ -13,13 +14,21 @@ export function DraftingSheet({
   page: string;
   navigation?: ReactNode;
 }) {
+  const shell = useRouteShell();
   return (
     <div
       data-page={page}
-      className="relative isolate flex min-h-svh flex-col bg-shell px-6 pt-6 pb-11 font-sans text-ink min-[481px]:px-10 min-[481px]:pt-9 min-[481px]:pb-[76px] min-[1101px]:px-14"
+      className={cn(
+        "relative isolate flex min-h-svh flex-col px-6 pt-6 pb-11 font-sans text-ink min-[481px]:px-10 min-[481px]:pt-9 min-[481px]:pb-[76px] min-[1101px]:px-14",
+        shell ? "bg-transparent" : "bg-shell",
+      )}
     >
-      <DraftingGround />
-      <DraftingFrame />
+      {!shell && (
+        <>
+          <DraftingGround />
+          <DraftingFrame />
+        </>
+      )}
       <header className="flex h-10 flex-none items-center gap-3">
         <a
           href="/"
@@ -93,8 +102,9 @@ export function DraftingHeading({
   return (
     <h1
       {...props}
+      tabIndex={-1}
       className={cn(
-        "font-display text-3xl font-light text-balance tracking-normal [&_em]:text-primary [&_em]:italic max-[480px]:[&_em]:block min-[800px]:text-4xl",
+        "font-display text-3xl font-light text-balance tracking-normal outline-none [&_em]:text-primary [&_em]:italic max-[480px]:[&_em]:block min-[800px]:text-4xl",
         className,
       )}
     />

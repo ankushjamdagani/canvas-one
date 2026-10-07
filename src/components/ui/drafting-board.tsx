@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useRouteShell } from "@/lib/motion/shell-context";
+import { cn } from "@/lib/utils";
 import "./drafting-board.css";
 
 export function DraftingFrame() {
@@ -13,6 +15,13 @@ export function DraftingBoard({
   children: React.ReactNode;
   paused?: boolean;
 }) {
+  const shell = useRouteShell();
+  const setGroundPaused = shell?.setGroundPaused;
+  React.useEffect(() => {
+    if (!setGroundPaused) return;
+    setGroundPaused(paused);
+    return () => setGroundPaused(false);
+  }, [paused, setGroundPaused]);
   const [size, setSize] = React.useState({ w: innerWidth, h: innerHeight });
   React.useEffect(() => {
     const resize = () => setSize({ w: innerWidth, h: innerHeight });
@@ -22,11 +31,15 @@ export function DraftingBoard({
   const scale = Math.min(1, size.w / 1440, size.h / 900);
   return (
     <div
-      className="drafting-board"
+      className={cn("drafting-board", shell && "drafting-board--in-shell")}
       style={{ "--board-scale": scale } as React.CSSProperties}
     >
-      <DraftingGround paused={paused} />
-      <DraftingFrame />
+      {!shell && (
+        <>
+          <DraftingGround paused={paused} />
+          <DraftingFrame />
+        </>
+      )}
       {children}
     </div>
   );
@@ -37,7 +50,13 @@ export function DraftingStage({ children }: { children: React.ReactNode }) {
   return <div className="drafting-stage">{children}</div>;
 }
 
-export function DraftingGround({ paused = false }: { paused?: boolean }) {
+export function DraftingGround({
+  paused = false,
+  pointerSource = "board",
+}: {
+  paused?: boolean;
+  pointerSource?: "board" | "document";
+}) {
   const ref = React.useRef<HTMLCanvasElement>(null);
   const running = React.useRef(!paused);
   running.current = !paused;
@@ -95,8 +114,9 @@ export function DraftingGround({ paused = false }: { paused?: boolean }) {
     const leave = () => {
       pointer = null;
     };
-    board.addEventListener("pointermove", move);
-    board.addEventListener("pointerleave", leave);
+    const source: HTMLElement = pointerSource === "document" ? document.documentElement : board;
+    source.addEventListener("pointermove", move);
+    source.addEventListener("pointerleave", leave);
     const draw = (now: number) => {
       const dt =
         running.current && !reduced ? Math.min(50, now - previous) / 1000 : 0;
@@ -275,10 +295,10 @@ export function DraftingGround({ paused = false }: { paused?: boolean }) {
       cancelAnimationFrame(frame);
       observer.disconnect();
       media.removeEventListener("change", motionChange);
-      board.removeEventListener("pointermove", move);
-      board.removeEventListener("pointerleave", leave);
+      source.removeEventListener("pointermove", move);
+      source.removeEventListener("pointerleave", leave);
     };
-  }, []);
+  }, [pointerSource]);
   return (
     <canvas
       ref={ref}

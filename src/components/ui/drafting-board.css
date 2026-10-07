@@ -8,6 +8,10 @@
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+/* The route shell paints the shared ground and frame behind every page. */
+.drafting-board--in-shell {
+  background: transparent;
+}
 .drafting-board-ground {
   position: absolute;
   inset: 0;
