@@ -65,3 +65,26 @@ export function useRoute(): { route: Route; known: boolean } {
     return { route: parsed ?? { kind: 'home' }, known: parsed !== null };
   }, [pathname]);
 }
+
+/**
+ * Turns plain `<a href>` clicks on known app routes into client-side navigations, so the
+ * shell can animate between pages instead of the browser reloading the document.
+ */
+export function useInternalLinks() {
+  React.useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!anchor || (anchor.target && anchor.target !== '_self') || anchor.hasAttribute('download')) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      const next = parseRoute(url.pathname);
+      if (!next) return;
+      event.preventDefault();
+      navigate(next);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
+}

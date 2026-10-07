@@ -9,6 +9,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRouteShell } from "@/lib/motion/shell-context";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { Segmented } from "@/components/ui/segmented";
@@ -199,6 +200,7 @@ export function EntryScreen({
   onOpenSuccess,
   actor,
 }: EntryScreenProps) {
+  const shell = useRouteShell();
   const [projectRows, setProjectRows] = React.useState<
     readonly ProjectRowItem[]
   >([]);
@@ -282,10 +284,12 @@ export function EntryScreen({
     trimmedBlankName.length >= 1 && trimmedBlankName.length <= 80;
 
   // Blank project creator ("Open an empty canvas")
-  const handleCreateBlankProject = async (e?: React.FormEvent) => {
+  const handleCreateBlankProject = async (e?: React.FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
     if (!isBlankNameValid || isSubmitting) return;
 
+    const tile = e?.currentTarget ?? null;
+    if (tile) shell?.beginOpen(tile);
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -311,12 +315,14 @@ export function EntryScreen({
       if (res.status === "applied") {
         onOpenSuccess?.();
       } else {
+        shell?.cancelOpen();
         setErrorMessage(
           formatStudioError(res, "Failed to create blank project"),
         );
       }
     } catch (err) {
       console.error("Unexpected error creating blank project:", err);
+      shell?.cancelOpen();
       setErrorMessage("An unexpected error occurred while creating project");
     } finally {
       setIsSubmitting(false);
@@ -324,9 +330,10 @@ export function EntryScreen({
   };
 
   // Template creator
-  const handleCreateExample = async (example: ExampleCatalogEntry) => {
+  const handleCreateExample = async (example: ExampleCatalogEntry, row?: HTMLElement | null) => {
     if (isSubmitting) return;
 
+    if (row) shell?.beginOpen(row);
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -339,12 +346,14 @@ export function EntryScreen({
       if (res.status === "applied") {
         onOpenSuccess?.();
       } else {
+        shell?.cancelOpen();
         setErrorMessage(
           formatStudioError(res, "Failed to create example project"),
         );
       }
     } catch (err) {
       console.error("Unexpected error creating example project:", err);
+      shell?.cancelOpen();
       setErrorMessage(
         "An unexpected error occurred while creating example project",
       );
@@ -354,9 +363,10 @@ export function EntryScreen({
   };
 
   // Open existing project passing exact branchId
-  const handleOpenProject = async (projectId: string, branchId: string) => {
+  const handleOpenProject = async (projectId: string, branchId: string, source?: HTMLElement | null) => {
     if (isSubmitting) return;
 
+    if (source) shell?.beginOpen(source);
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -365,10 +375,12 @@ export function EntryScreen({
       if (res.status === "ready") {
         onOpenSuccess?.();
       } else {
+        shell?.cancelOpen();
         setErrorMessage(formatStudioError(res, "Failed to open project"));
       }
     } catch (err) {
       console.error("Unexpected error opening project:", err);
+      shell?.cancelOpen();
       setErrorMessage("An unexpected error occurred while opening project");
     } finally {
       setIsSubmitting(false);
@@ -591,6 +603,7 @@ export function EntryScreen({
                       <div
                         key={example.id}
                         role="listitem"
+                        data-example-row
                         data-testid={`template-row-${example.id}`}
                         className="flex items-center gap-2 border-b border-hairline bg-background py-1.5 pr-2 pl-3 last:border-b-0 hover:bg-card"
                       >
@@ -618,7 +631,7 @@ export function EntryScreen({
                           className="h-7 px-2.5 text-xs font-medium shrink-0"
                           aria-label={`Create ${example.title}`}
                           disabled={isSubmitting}
-                          onClick={() => handleCreateExample(example)}
+                          onClick={(e) => handleCreateExample(example, e.currentTarget.closest('[data-example-row]'))}
                         >
                           <span>Create</span>
                           <ArrowRight size={12} aria-hidden="true" />
@@ -750,10 +763,11 @@ export function EntryScreen({
                             data-branch-id={row.target.branchId}
                             aria-label={`Open ${row.project.title}`}
                             disabled={isSubmitting}
-                            onClick={() =>
+                            onClick={(e) =>
                               handleOpenProject(
                                 row.project.id,
                                 row.target!.branchId,
+                                e.currentTarget.closest('article'),
                               )
                             }
                             className="absolute inset-0 z-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait"
