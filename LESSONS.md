@@ -57,6 +57,9 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **In zsh, unquoted `$VAR` holding several paths is one word; loop over them explicitly.** A multi-file `cp`/`checkout` silently did nothing. Why: 2026-09-29 RV-17 before/after build.
 
 ## Code
+- **Use `useIsPresent()` for exit-state reads; `usePresence()` obliges you to call `safeToRemove`.** An unused `usePresence()` inside an `AnimatePresence` child keeps the exiting page mounted forever. Why: 2026-10-07 route transitions (every project open hung).
+- **Full-bleed animation wrappers over absolutely positioned content need `pointer-events-none` plus `[&>*]:pointer-events-auto`.** A later `absolute inset-0` sibling covers earlier content and swallows clicks. Why: 2026-10-07 landing reveal wrappers.
+- **Animated transitions need client-side navigation: plain `<a href>` reloads the document.** `useInternalLinks` (RouteShell) intercepts known routes; verify new links navigate without a reload. Why: 2026-10-07 landing "Try Beta".
 
 - **Keep playback state valid across checkpoint and eviction boundaries.** Preserve unfinished occupancy, reset a cached frame when a jump moves the retained boundary past it, and checkpoint only complete observable instants. Test initial and same-millisecond deltas across worker batches. Why: 2026-10-04 stages 3/4 found disappearing queues, stale active counts and partial checkpoints masking later measurements.
 

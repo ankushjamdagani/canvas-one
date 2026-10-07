@@ -87,3 +87,14 @@ A `busy` flag from the showcase is replaced by AnimatePresence + a shell-level `
 ## Out of scope
 
 Traffic/playback transitions; dialog/popover/panel motion; scroll-linked effects; a router library; per-branch switch animation; new landing content.
+
+## Amendments (2026-10-07, from the implementation plan and build)
+
+1. E2E disables motion with `localStorage['studio:motion'] = 'off'` (Playwright `storageState`), not a `window` global; the landing demo's existing reduced-motion tests make a global `reducedMotion` emulation unsuitable.
+2. The Workspace keeps its own frame, padding and static dots. The shell board fades out beneath the card overlay and its ground unmounts after the fade; the Workspace height model is untouched. This supersedes "replace `workspace-frame`" in Architecture §7.
+3. Canvas edges fade in as a group instead of drawing along `pathLength`; `TrafficEdge` renders multi-layer lanes.
+4. `Reveal` has two kinds (`content`, `chrome`); node/edge/bar choreography is imperative (`canvasTransition.ts`) because ReactFlow owns node `transform`.
+5. Rapid navigation relies on `AnimatePresence mode="wait"` last-wins behaviour, covered by an e2e test; there is no custom queue.
+6. The board frame intro is a clip-path sweep of the existing frame.
+7. Plain `<a href>` links to known routes (landing "Try Beta", brand links) are intercepted by `useInternalLinks` so they navigate client-side; without it those links reloaded the document and no transition could play.
+8. Focus moves to the page heading only after a route change, never on first load, so the first Tab still reaches the header brand link.
