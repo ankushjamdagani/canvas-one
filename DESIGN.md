@@ -1,5 +1,31 @@
 # System Studio — System Design & Architecture Specification
 
+## Approved drafting language (2026-10-07)
+
+`artifacts/design/System Studio Landing.html` supplies the application-wide typography and warm drafting surface. IBM Plex Mono carries interface text, Martian Mono carries measurements, Newsreader carries display headings, and Caveat carries handwritten annotations. Fonts are served locally; the bundled Martian Mono and Caveat assets are extracted into `src/assets/fonts/` without a CDN dependency. Shared CSS roles and `evergreen.fonts` expose the same family contracts.
+
+Public drafting pages use the source's dotted ground, frame, animated traffic and crosshair. `DraftingBoard` fills the viewport (dots and frame span the whole screen) and a `DraftingStage` keeps authored 1440×900 coordinates scaled to fit and centred; items that depend on resizable content, such as the landing lede, position relative to it rather than at fixed coordinates. `DraftingSheet` (Projects) is a flow layout with no animation toggle; the empty projects notice grows to fill the remaining viewport height (minimum 240px). The starter-template list always shows three rows and scrolls, with no expand control. Project cards follow `Projects Page.html`: paper body, 12px dotted thumbnail, mono uppercase component count and Draft badge. The editor uses the same `#FBFAF7` paper and `#D3CDC1` dots with a static ground so motion remains reserved for actual simulation traffic. Its existing 26px snapping geometry and zoom-dependent grid density/dot size are preserved. Controls remain white and semantic state colors retain their established meanings.
+
+## Cells and lanes
+
+Approved alternative: native components in `src/components/traffic/cells-and-lanes.tsx`, public imports from `@/components/traffic`, separate `Design System/Cells and lanes → Guide`. Four stable cells show queue, processing slots, awaits and scheduled retries. Floating hover/focus/tap inspection preserves node dimensions. Chevron/square/diamond/ring shapes identify requests, messages, error returns and late returns; forward is above, return below. High traffic uses bounded markers plus aggregate bands. Source palette and sunken outcome trays are preserved.
+
+The new design's rates cover the trailing ten simulation seconds and remain distinct from current populations. Source idle slots remain visible. The current visualization is retained as a separate importable option with its existing expanding footers and one-second samples. No production switch, transition design or historical total placement is included. The exported HTML preview and unselected alternatives are no longer registered on Fundamentals.
+
+## Traffic state lab: reduced vocabulary
+
+Outcome placement preview: attach node outcomes to the node where recorded, with timeout and retry exhaustion at the caller. Attach transport outcomes and returning error/late-response details to the connection. Preserve current activity alongside these summaries; low load uses event counts and high/live load uses fixed one-second rates. Causes expand on hover/focus, without per-event flashes.
+
+The durable design-system guide is `Design System/Traffic visualization → Fundamentals`. It reuses shared Storybook visuals and presents core specimens plus short usage rules. The temporary Workspace lab stays available until the user requests deletion; deleting it will not remove the guide’s renderers.
+
+Coverage modes: Low, High and Live traffic. Live fixtures change populations and one-second outcome rates through sparse/sustained/burst/drain/idle, with pause/restart/scrub. The core node activities include all three coexisting populations and pending services. Connections include idle, both directions and explicit blockage, with shared sync/message/ACK presentation. Success, error, timeout, expiry and cancellation remain separate outcome summaries. Specimens are illustrative independent frames, not measured simulation output or cumulative history.
+
+A single failure-detail selector supplies compact examples for processing error, admission rejection, loss, error response, retry/redelivery exhaustion, late response and recorded stuck work. These reuse current activity and transport; they are causes/conditions, not eight new node states. Failed work is removed from active populations, other work may continue, late returns do not restore waits, and only explicit evidence supports stuck work. Terminal events use counts/rates; moving responses use current in-flight counts.
+
+The Storybook design lab has seven sections: idle, travelling, queued, processing, awaiting responses, issues/outcomes, and retry scheduling. Processing, queueing and awaiting responses are concurrent populations; transport owns direction. Sync and async use the same queue, processing and transport visuals. Async work does not create a synchronous response wait; recorded ACKs reuse return transport and redelivery reuses retry scheduling.
+
+Error, timeout, expiry and recorded cancellation remain distinct outcomes, summarized separately from current activity. Processing errors, admission rejection, loss and exhausted attempts are inspectable causes rather than more node states. Explicit transport blockage is a current connection condition; “stuck” is a diagnosis requiring evidence, not a state inferred from silence. Heavy-load outcomes use fixed one-second rates, never persistent failed populations. Request IDs belong in request inspection; waiting footers summarize outstanding calls by service. Delivery increment badges are removed. This is a Storybook proposal, not production integration.
+
 ## Future scope: traffic state transitions
 
 Deferred by user decision (2026-10-06): design the transitions between traffic states, including response-delivery acknowledgements, placement of arrival counts, repeated events under sustained load, and cue timing. Current work covers state presentation and shared node/footer hover behavior only. Historical spike placement also remains deferred.
@@ -103,7 +129,7 @@ The design uses an **Evergreen paper** palette (light mode only, dark themes exp
 
 | Role | Token Variable | Hex Value | WCAG Contrast / Usage |
 |---|---|---|---|
-| **Canvas** | `--canvas` | `#FFFFFF` | Main diagram drawing surface (with `#DCD7CD` 20px dot grid) |
+| **Canvas** | `--canvas` | `#FBFAF7` | Warm diagram drawing surface; static `--grid: #D3CDC1` dots, existing 26px editor snap |
 | **Shell** | `--shell` | `#FBFAF7` | Application frame, navigation bar, footer |
 | **Panel** | `--panel` | `#F7F5F1` | Docked and floating tool panels (Inspector, History, Library) |
 | **Sunken** | `--sunken` | `#F2EFE9` | Recessed backgrounds, table headers, timeline track |
@@ -124,16 +150,18 @@ The design uses an **Evergreen paper** palette (light mode only, dark themes exp
 | **Canvas Note** | `--note` / `--note-edge` | `#FBF6E8` / `#E6DAB8` | Amber-toned sticky notes and annotations |
 
 ### 3.2 Typography Tokens
-System Studio specifies three distinct type families imported locally (no external CDNs), with strict semantic allocation:
+System Studio specifies four distinct type families imported locally (no external CDNs), with strict semantic allocation:
 
-1. **UI Sans (`--font-sans`):** `"IBM Plex Sans", system-ui, -apple-system, sans-serif`  
+1. **UI (`--font-sans`, retained utility name):** `"IBM Plex Mono", ui-monospace, monospace`
    - Used for all interface chrome, button labels, panel titles, inspector inputs, and body text.
    - Letter-spacing is strictly `0` (zero negative letter-spacing per design rules).
-2. **Numeric & Data Mono (`--font-mono`):** `"IBM Plex Mono", ui-monospace, monospace`  
+2. **Numeric & Data Mono (`--font-mono`):** `"Martian Mono", ui-monospace, monospace`
    - Used for all metrics, latencies, requests/s, ports, protocols, timestamps, and commit hashes.
    - Fixed tabular numeral alignment prevents UI jitter during live simulation playback.
 3. **Display Serif (`--font-display`):** `"Newsreader Variable", Georgia, serif`  
    - Used sparingly for the brand logo mark, project titles, and formal publication review summaries.
+4. **Handwritten (`--font-handwritten`):** `"Caveat", cursive`, weight 500.
+   - Used for drafting annotations and the public-page handwritten local execution note.
 
 ### 3.3 Geometry, Elevation & Radii Tokens
 - **Corner Radii:**
@@ -188,7 +216,7 @@ The user interface is hosted in [`src/features/workspace/Workspace.tsx`](file://
   - *Configuration Tab:* Allows editing node name, capacity, service distribution, worker threads, port protocols, and route conditions. Changes trigger an isolated draft session requiring explicit `Apply` or `Cancel`.
   - *Measured Tab:* Displays empirical post-simulation utilization, queue lengths, latency distributions, and drop counts for the selected component.
 - **Scenario Editor ([`src/features/scenarios/ScenarioEditor.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/scenarios/ScenarioEditor.tsx)):** Manages workloads, duration, warmup cycles, burst/ramp profiles, SLA assertions (latency thresholds, error rate caps), and fault injection schedules.
-- **Results & Playback Region ([`src/features/runs/ResultsRegion.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/runs/ResultsRegion.tsx)):** Synchronized playback panel with playhead scrubber, speed controls ($\times 0.25$ to $\times 16$), density strip for large cycle sets ($>200$ cycles), bottleneck indicators, and per-step telemetry inspection.
+- **Results & Playback Region ([`src/features/runs/PlaybackPanel.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/runs/PlaybackPanel.tsx)):** Follows final desktop d and mobile m in `artifacts/design/Simulation Footer copy.html`: compact transport and request-start histogram, desktop scope/cycle/detail panes, and mobile inline Summary/Cycles/Parts/Events inspection. Component observations use approved recorded successful-cohort mean/p95 and average utilization. Selected-cycle bars use retained processing intervals and actual attempt ordinals; missing cycle/time observations remain unavailable, while noninteractive timed results can use measured terminal component metrics. Recording continues during review; explicit Pause pauses, Stop retains range/time while draining, and scenario switches ask Save/Discard/Cancel in place. Scenario authoring stays in the scenario popover, reset sits beside Re-run, and recording-dependent controls are disabled before recording. Narrow controls scroll; short inspection panes cap their height and scroll. Legacy results/check/filter/resize/zoom UI is removed as approved. Native Storybook and production desktop/mobile layouts passed visual and browser acceptance.
 - **History Ladder ([`src/features/history/HistoryPanel.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/history/HistoryPanel.tsx)):** Git-like commit tree displaying commit checkpoints, verification receipts, branch heads, 3-way merge conflict resolution, and atomic compare-and-set publication to `main`.
 - **Component Library ([`src/features/library/LibraryPanel.tsx`](file:///Users/ankushjamdagani/personal/system-design-planner/src/features/library/LibraryPanel.tsx)):** Standard catalog of distributed system building blocks (Clients, Gateways, Load Balancers, Services, Caches, Queues, Databases, Object Storage) and reusable saved parts.
 

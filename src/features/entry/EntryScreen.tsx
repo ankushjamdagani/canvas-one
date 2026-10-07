@@ -6,11 +6,13 @@ import {
   LayoutTemplate,
   Trash2,
   Upload,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";
 import { Segmented } from "@/components/ui/segmented";
+import { DraftingSheet } from "@/components/ui/drafting-sheet";
 import type { SessionController } from "../session/controller";
 import { formatStudioError } from "../session/formatError";
 import { importProjectJson } from "../transfer";
@@ -56,6 +58,8 @@ export type ProjectRowItem = {
   /** Preview of the opened branch's first view; null when nothing is placed. */
   readonly thumbnail?: ProjectThumbnail | null;
   readonly errorMessage?: string;
+  readonly branchName?: string;
+  readonly componentCount?: number;
 };
 
 const DEFAULT_PROJECT_TITLE = "Untitled";
@@ -98,24 +102,29 @@ const THUMB_ACCENTS = [
 
 function accentFor(kind: string): string {
   let h = 0;
-  for (let i = 0; i < kind.length; i += 1) h = (h * 31 + kind.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < kind.length; i += 1)
+    h = (h * 31 + kind.charCodeAt(i)) >>> 0;
   return THUMB_ACCENTS[h % THUMB_ACCENTS.length];
 }
 
 const DOT_BACKGROUND = {
-  backgroundImage:
-    "radial-gradient(circle, rgba(60,70,65,0.16) 1px, transparent 1px)",
-  backgroundSize: "18px 18px",
+  backgroundImage: "radial-gradient(circle, #E4DFD6 1px, transparent 1.2px)",
+  backgroundSize: "12px 12px",
+  backgroundPosition: "6px 6px",
 } as const;
 
 /** The project's placed nodes and connections, scaled to the card. */
-function ProjectPreview({ thumbnail }: { thumbnail: ProjectThumbnail | null | undefined }) {
+function ProjectPreview({
+  thumbnail,
+}: {
+  thumbnail: ProjectThumbnail | null | undefined;
+}) {
   return (
     <div
       data-testid="project-thumbnail"
       data-empty={thumbnail ? undefined : "true"}
       aria-hidden="true"
-      className="h-[132px] overflow-hidden border-b border-hairline bg-canvas"
+      className="project-preview"
       style={DOT_BACKGROUND}
     >
       {thumbnail && (
@@ -224,6 +233,8 @@ export function EntryScreen({
               project,
               status: "ready",
               target,
+              branchName: opened?.label,
+              componentCount: snapshot?.document.elements.length,
               mainHeadId: main?.headCommitId ?? null,
               thumbnail: snapshot ? buildThumbnail(snapshot.document) : null,
             };
@@ -431,7 +442,9 @@ export function EntryScreen({
   const visibleRows = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
     const rows = needle
-      ? projectRows.filter((r) => r.project.title.toLowerCase().includes(needle))
+      ? projectRows.filter((r) =>
+          r.project.title.toLowerCase().includes(needle),
+        )
       : [...projectRows];
     rows.sort((a, b) =>
       sort === "name"
@@ -452,7 +465,7 @@ export function EntryScreen({
   return (
     <div
       data-testid="entry-screen-root"
-      className="min-h-screen w-full max-w-full overflow-x-hidden bg-shell text-ink flex flex-col items-center select-none"
+      className="min-h-screen w-full max-w-full text-ink"
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes("Files")) {
           e.preventDefault();
@@ -464,360 +477,369 @@ export function EntryScreen({
       }}
       onDrop={handleDrop}
     >
-      <header className="w-full h-12 border-b border-border bg-background px-4 sm:px-8 flex items-center shrink-0">
-        <div className="flex items-center gap-2.5">
-          <svg
-            className="size-5 shrink-0"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <defs>
-              <linearGradient
-                id="entry-brand-gradient"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="100%"
-              >
-                <stop offset="0%" stopColor="#0B5C54" />
-                <stop offset="100%" stopColor="#2E7D6B" />
-              </linearGradient>
-            </defs>
-            <rect
-              width="20"
-              height="20"
-              rx="5"
-              fill="url(#entry-brand-gradient)"
-            />
-          </svg>
-          <span className="font-semibold text-sm">System studio</span>
-        </div>
-      </header>
-
-      <main className="w-full max-w-[1280px] px-4 sm:px-8 py-8 sm:py-12 flex flex-col gap-8">
-        <h1
-          className="text-[40px] leading-tight font-normal text-ink"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          Start a project
-        </h1>
-
-        {errorMessage && (
-          <div
-            data-testid="entry-error-banner"
-            className="p-3 rounded-card border border-risk-edge bg-risk-tint text-destructive text-xs"
-            role="alert"
-          >
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Start tiles: empty project, starter templates, import */}
-        <section
-          aria-label="Start a project"
-          className="grid grid-cols-1 lg:grid-cols-[1fr_1.45fr_1fr] gap-5"
-        >
-          <form
-            onSubmit={handleCreateBlankProject}
-            className="relative flex min-h-[264px] flex-col justify-between rounded-[14px] bg-primary p-7 text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
-          >
-            <button
-              data-testid="create-blank-project-btn"
-              type="submit"
-              aria-label="Create empty project"
-              className="absolute inset-0 cursor-pointer rounded-[14px] outline-none disabled:cursor-not-allowed"
-              disabled={!isBlankNameValid || isSubmitting}
-            />
-            <span className="grid size-11 place-items-center rounded-[10px] bg-white/15">
-              <Plus size={18} aria-hidden="true" />
+      <DraftingSheet
+        page="Projects"
+        navigation={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled
+              title="Documentation link is not configured"
+            >
+              Docs
+            </Button>
+            <span className="drafting-divider" aria-hidden="true" />
+            <span
+              className="drafting-avatar"
+              aria-label={`Local workspace: ${actor.displayName}`}
+              title={actor.displayName}
+            >
+              {actor.displayName.slice(0, 1)}
             </span>
-            <div className="flex flex-col gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Empty project</h2>
-                <p className="mt-1 text-sm text-white/75">
-                  A blank canvas on main. Place parts from the library.
+          </>
+        }
+      >
+        <main className="projects-main">
+          <div className="projects-intro">
+            <h1 className="projects-heading">
+              Start a project <em>or pick up a sheet.</em>
+            </h1>
+
+            {errorMessage && (
+              <div
+                data-testid="entry-error-banner"
+                className="p-3 rounded-card border border-risk-edge bg-risk-tint text-destructive text-xs"
+                role="alert"
+              >
+                {errorMessage}
+              </div>
+            )}
+
+            {/* Start tiles: empty project, starter templates, import */}
+            <section
+              aria-label="Start a project"
+              className="project-start-grid"
+            >
+              <form
+                onSubmit={handleCreateBlankProject}
+                className="project-start-tile relative flex flex-col justify-between gap-3 bg-primary text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
+              >
+                <button
+                  data-testid="create-blank-project-btn"
+                  type="submit"
+                  aria-label="Create empty project"
+                  className="absolute inset-0 cursor-pointer rounded-[12px] outline-none disabled:cursor-not-allowed"
+                  disabled={!isBlankNameValid || isSubmitting}
+                />
+                <span className="grid size-8 place-items-center rounded-[8px] bg-white/15">
+                  <Plus size={18} aria-hidden="true" />
+                </span>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <h2 className="text-[15px] font-semibold">Empty project</h2>
+                    <p className="mt-1 text-[12.5px] text-white/75">
+                      A blank canvas on main. Place parts from the library.
+                    </p>
+                  </div>
+                  <input
+                    data-testid="blank-project-name-input"
+                    aria-label="Blank project name"
+                    type="text"
+                    placeholder={DEFAULT_PROJECT_TITLE}
+                    value={blankProjectName}
+                    onChange={(e) => setBlankProjectName(e.target.value)}
+                    maxLength={80}
+                    disabled={isSubmitting}
+                    className="relative z-10 h-9 pointer-coarse:h-11 w-full rounded-control border border-white/25 bg-white/10 px-3 text-xs text-white placeholder:text-white/55 outline-none focus-visible:border-white/70 focus-visible:bg-white focus-visible:text-ink focus-visible:placeholder:text-secondary-text"
+                  />
+                </div>
+              </form>
+
+              <div className="project-template-tile flex flex-col gap-3 border border-border bg-background">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-8 place-items-center rounded-[8px] bg-purple-tint text-purple">
+                    <LayoutTemplate size={18} aria-hidden="true" />
+                  </span>
+                  <h2
+                    id="templates-heading"
+                    className="flex-1 text-base font-semibold"
+                  >
+                    Starter template
+                  </h2>
+                </div>
+                <div
+                  data-testid="templates-list"
+                  role="list"
+                  aria-labelledby="templates-heading"
+                  className="project-template-list"
+                >
+                  {EXAMPLE_CATALOG.map((example) => (
+                    <div
+                      key={example.id}
+                      role="listitem"
+                      data-testid={`template-row-${example.id}`}
+                      className="project-template-row"
+                    >
+                      <LayoutTemplate
+                        size={13}
+                        className="shrink-0 text-purple"
+                        aria-hidden="true"
+                      />
+                      <div className="project-template-meta">
+                        <span
+                          className="text-[13px] font-medium"
+                          title={example.title}
+                        >
+                          {example.title}
+                        </span>
+                        <span className="font-mono text-[9.5px] uppercase text-secondary-text shrink-0">
+                          {pluralize(example.componentCount, "component")}
+                        </span>
+                      </div>
+                      <Button
+                        data-testid={`create-example-${example.id}`}
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 px-2.5 text-xs font-medium shrink-0"
+                        aria-label={`Create ${example.title}`}
+                        disabled={isSubmitting}
+                        onClick={() => handleCreateExample(example)}
+                      >
+                        <span>Create</span>
+                        <ArrowRight size={12} aria-hidden="true" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                className={cn(
+                  "project-start-tile bg-background relative flex flex-col justify-between border border-dashed transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
+                  dragActive
+                    ? "border-primary bg-accent"
+                    : "border-border hover:border-hover-border",
+                )}
+              >
+                <button
+                  data-testid="import-project-btn"
+                  type="button"
+                  aria-label="Import project"
+                  className="absolute inset-0 cursor-pointer rounded-[12px] outline-none disabled:cursor-wait"
+                  disabled={isImporting}
+                  onClick={() => importFileInputRef.current?.click()}
+                />
+                <span className="grid size-8 place-items-center rounded-[8px] bg-sunken text-secondary-text">
+                  <Upload size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-[15px] font-semibold">Import .json</h2>
+                  <p className="mt-1 text-[12.5px] text-secondary-text">
+                    Drop a Studio export anywhere on this page, or{" "}
+                    <span className="font-medium text-primary">
+                      {isImporting ? "importing…" : "browse"}
+                    </span>
+                    .
+                  </p>
+                  <input
+                    ref={importFileInputRef}
+                    data-testid="import-project-file-input"
+                    type="file"
+                    accept=".json,application/json"
+                    aria-label="Import project file"
+                    className="hidden"
+                    disabled={isImporting}
+                    onChange={handleImportFileInputChange}
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* Your projects */}
+          <section
+            aria-labelledby="existing-projects-heading"
+            className="projects-list"
+          >
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <h2
+                id="existing-projects-heading"
+                className="text-[15px] font-semibold text-ink"
+              >
+                Your projects
+              </h2>
+              <span className="font-mono text-[10px] tracking-[0.08em] text-secondary-text">
+                {projectRows.length}
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-3">
+                <SearchField
+                  aria-label="Search projects"
+                  value={query}
+                  placeholder="Search projects"
+                  shortcut=""
+                  onChange={setQuery}
+                  onClear={() => setQuery("")}
+                  className="w-full sm:w-[240px] bg-background"
+                />
+                <Segmented
+                  aria-label="Sort projects"
+                  value={sort}
+                  onChange={(v) => setSort(v as ProjectSort)}
+                  options={[
+                    { id: "recent", label: "Recent" },
+                    { id: "name", label: "A–Z" },
+                  ]}
+                />
+              </div>
+            </div>
+
+            {loadingProjects ? (
+              <div className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border">
+                Loading projects…
+              </div>
+            ) : projectRows.length === 0 ? (
+              <div data-testid="no-projects-notice" className="projects-empty">
+                <FolderOpen
+                  size={24}
+                  className="mx-auto text-secondary-text/70 mb-2"
+                />
+                <p className="font-medium text-ink">No saved projects yet</p>
+                <p className="mt-0.5">
+                  Start from a template, or open an empty canvas.
                 </p>
               </div>
-              <input
-                data-testid="blank-project-name-input"
-                aria-label="Blank project name"
-                type="text"
-                placeholder={DEFAULT_PROJECT_TITLE}
-                value={blankProjectName}
-                onChange={(e) => setBlankProjectName(e.target.value)}
-                maxLength={80}
-                disabled={isSubmitting}
-                className="relative z-10 h-9 pointer-coarse:h-11 w-full rounded-control border border-white/25 bg-white/10 px-3 text-xs text-white placeholder:text-white/55 outline-none focus-visible:border-white/70 focus-visible:bg-white focus-visible:text-ink focus-visible:placeholder:text-secondary-text"
-              />
-            </div>
-          </form>
-
-          <div className="flex min-h-[264px] flex-col gap-3 rounded-[14px] border border-border bg-background p-5">
-            <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-[10px] bg-purple-tint text-purple">
-                <LayoutTemplate size={18} aria-hidden="true" />
-              </span>
-              <h2
-                id="templates-heading"
-                className="flex-1 text-base font-semibold"
+            ) : visibleRows.length === 0 ? (
+              <p className="p-8 text-center text-xs text-secondary-text">
+                No projects match &ldquo;{query.trim()}&rdquo;.
+              </p>
+            ) : (
+              <div
+                data-testid="existing-projects-list"
+                className="project-grid"
               >
-                Starter template
-              </h2>
-              <span className="text-xs font-medium text-primary">
-                All {EXAMPLE_CATALOG.length}
-              </span>
-            </div>
-            <div
-              data-testid="templates-list"
-              role="list"
-              aria-labelledby="templates-heading"
-              className="max-h-[156px] overflow-y-auto rounded-card border border-hairline"
-            >
-              {EXAMPLE_CATALOG.map((example) => (
-                <div
-                  key={example.id}
-                  role="listitem"
-                  data-testid={`template-row-${example.id}`}
-                  className="flex items-center gap-3 border-b border-hairline px-3 py-2.5 last:border-b-0"
-                >
-                  <LayoutTemplate
-                    size={13}
-                    className="shrink-0 text-secondary-text"
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {example.title}
-                  </span>
-                  <span className="font-mono text-[10px] text-secondary-text">
-                    {pluralize(example.componentCount, "component")}
-                  </span>
-                  <Button
-                    data-testid={`create-example-${example.id}`}
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs font-medium shrink-0"
-                    aria-label={`Create ${example.title}`}
-                    disabled={isSubmitting}
-                    onClick={() => handleCreateExample(example)}
-                  >
-                    <span>Create</span>
-                    <ArrowRight size={12} aria-hidden="true" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div
-            className={cn(
-              "relative flex min-h-[264px] flex-col justify-between rounded-[14px] border border-dashed bg-background p-7 transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
-              dragActive
-                ? "border-primary bg-accent"
-                : "border-border hover:border-hover-border",
-            )}
-          >
-            <button
-              data-testid="import-project-btn"
-              type="button"
-              aria-label="Import project"
-              className="absolute inset-0 cursor-pointer rounded-[14px] outline-none disabled:cursor-wait"
-              disabled={isImporting}
-              onClick={() => importFileInputRef.current?.click()}
-            />
-            <span className="grid size-11 place-items-center rounded-[10px] bg-sunken text-secondary-text">
-              <Upload size={18} aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="text-lg font-semibold">Import .json</h2>
-              <p className="mt-1 text-sm text-secondary-text">
-                Drop a Studio export anywhere on this page, or{" "}
-                <span className="font-medium text-primary">
-                  {isImporting ? "importing…" : "browse"}
-                </span>
-                .
-              </p>
-              <input
-                ref={importFileInputRef}
-                data-testid="import-project-file-input"
-                type="file"
-                accept=".json,application/json"
-                aria-label="Import project file"
-                className="hidden"
-                disabled={isImporting}
-                onChange={handleImportFileInputChange}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Your projects */}
-        <section aria-labelledby="existing-projects-heading">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <h2
-              id="existing-projects-heading"
-              className="text-base font-semibold text-ink"
-            >
-              Your projects
-            </h2>
-            <span className="font-mono text-xs text-secondary-text">
-              {projectRows.length}
-            </span>
-            <div className="ml-auto flex flex-wrap items-center gap-3">
-              <SearchField
-                aria-label="Search projects"
-                value={query}
-                placeholder="Search projects"
-                shortcut=""
-                onChange={setQuery}
-                onClear={() => setQuery("")}
-                className="w-full sm:w-[320px] bg-background"
-              />
-              <Segmented
-                aria-label="Sort projects"
-                value={sort}
-                onChange={(v) => setSort(v as ProjectSort)}
-                options={[
-                  { id: "recent", label: "Recent" },
-                  { id: "name", label: "A–Z" },
-                ]}
-              />
-            </div>
-          </div>
-
-          {loadingProjects ? (
-            <div className="p-6 text-center text-xs text-secondary-text bg-background rounded-card border border-border">
-              Loading projects…
-            </div>
-          ) : projectRows.length === 0 ? (
-            <div
-              data-testid="no-projects-notice"
-              className="p-8 text-center text-xs text-secondary-text bg-background rounded-card border border-border"
-            >
-              <FolderOpen
-                size={24}
-                className="mx-auto text-secondary-text/70 mb-2"
-              />
-              <p className="font-medium text-ink">No saved projects yet</p>
-              <p className="mt-0.5">
-                Start from a template, or open an empty canvas.
-              </p>
-            </div>
-          ) : visibleRows.length === 0 ? (
-            <p className="p-8 text-center text-xs text-secondary-text">
-              No projects match &ldquo;{query.trim()}&rdquo;.
-            </p>
-          ) : (
-            <div
-              data-testid="existing-projects-list"
-              className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4"
-            >
-              {visibleRows.map((row) => {
-                const confirming = confirmDeleteId === row.project.id;
-                return (
-                  <article
-                    key={row.project.id}
-                    data-testid={`project-item-${row.project.id}`}
-                    className="group relative flex flex-col overflow-hidden rounded-[12px] border border-border bg-background transition-colors hover:border-hover-border"
-                  >
-                    {row.status === "ready" && row.target && (
-                      <button
-                        type="button"
-                        data-testid={`open-project-${row.project.id}`}
-                        data-branch-id={row.target.branchId}
-                        aria-label={`Open ${row.project.title}`}
-                        disabled={isSubmitting}
-                        onClick={() =>
-                          handleOpenProject(
-                            row.project.id,
-                            row.target!.branchId,
-                          )
-                        }
-                        className="absolute inset-0 z-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait"
-                      />
-                    )}
-                    <ProjectPreview thumbnail={row.thumbnail} />
-                    <div className="flex flex-col gap-2.5 p-4">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <h3 className="min-w-0 truncate text-[15px] font-semibold text-ink">
-                          {row.project.title}
-                        </h3>
-                        <span className="shrink-0 text-xs text-secondary-text">
-                          {formatUpdated(row.project.updatedAt, now)}
-                        </span>
-                      </div>
-
-                      {row.status === "error" && (
-                        <span
-                          data-testid={`project-error-${row.project.id}`}
-                          className="text-xs text-destructive font-medium"
-                          role="alert"
-                        >
-                          {row.errorMessage}
-                        </span>
+                {visibleRows.map((row) => {
+                  const confirming = confirmDeleteId === row.project.id;
+                  return (
+                    <article
+                      key={row.project.id}
+                      data-testid={`project-item-${row.project.id}`}
+                      className="project-card group flex flex-col transition-colors"
+                    >
+                      {row.status === "ready" && row.target && (
+                        <button
+                          type="button"
+                          data-testid={`open-project-${row.project.id}`}
+                          data-branch-id={row.target.branchId}
+                          aria-label={`Open ${row.project.title}`}
+                          disabled={isSubmitting}
+                          onClick={() =>
+                            handleOpenProject(
+                              row.project.id,
+                              row.target!.branchId,
+                            )
+                          }
+                          className="absolute inset-0 z-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait"
+                        />
                       )}
-
-                      <div className="flex min-h-7 items-center justify-between gap-2">
-                        <span className="font-mono text-[10px] uppercase text-secondary-text">
-                          {row.target?.isDraft ? "Draft · " : ""}Rev{" "}
-                          {row.project.revision}
-                        </span>
-                        {confirming ? (
-                          <div
-                            role="group"
-                            aria-label={`Confirm delete ${row.project.title}`}
-                            className="relative z-10 flex items-center gap-1.5"
+                      <ProjectPreview thumbnail={row.thumbnail} />
+                      <div className="project-summary">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <h3
+                            className="m-0 min-w-0 truncate text-[13.5px] font-semibold text-ink"
+                            title={row.project.title}
                           >
-                            <Button
-                              data-testid={`confirm-delete-project-${row.project.id}`}
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="h-7 px-2.5 text-xs font-semibold"
-                              disabled={deletingId !== null}
-                              onClick={() => void handleDeleteProject(row)}
+                            {row.project.title}
+                          </h3>
+                          <span className="shrink-0 text-[11px] text-secondary-text">
+                            {formatUpdated(row.project.updatedAt, now)}
+                          </span>
+                        </div>
+
+                        {row.status === "error" && (
+                          <span
+                            data-testid={`project-error-${row.project.id}`}
+                            className="text-xs text-destructive font-medium"
+                            role="alert"
+                          >
+                            {row.errorMessage}
+                          </span>
+                        )}
+
+                        <div className="flex min-h-7 items-center justify-between gap-2">
+                          <span className="min-w-0 flex flex-wrap items-center gap-1.5 text-xs text-secondary-text">
+                            <GitBranch size={12} aria-hidden="true" />
+                            <span
+                              className="max-w-[110px] truncate"
+                              title={row.branchName}
                             >
-                              {deletingId === row.project.id
-                                ? "Deleting…"
-                                : "Delete"}
-                            </Button>
+                              {row.branchName}
+                            </span>
+                            {row.target?.isDraft && (
+                              <span className="project-draft-badge">Draft</span>
+                            )}
+                          </span>
+                          {row.componentCount !== undefined && (
+                            <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-[9.5px] uppercase text-secondary-text">
+                              {pluralize(row.componentCount, "component")}
+                            </span>
+                          )}
+                          {confirming ? (
+                            <div
+                              role="group"
+                              aria-label={`Confirm delete ${row.project.title}`}
+                              className="relative z-10 flex items-center gap-1.5"
+                            >
+                              <Button
+                                data-testid={`confirm-delete-project-${row.project.id}`}
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs font-semibold"
+                                disabled={deletingId !== null}
+                                onClick={() => void handleDeleteProject(row)}
+                              >
+                                {deletingId === row.project.id
+                                  ? "Deleting…"
+                                  : "Delete"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs"
+                                disabled={deletingId !== null}
+                                onClick={() => setConfirmDeleteId(null)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
                             <Button
+                              data-testid={`delete-project-${row.project.id}`}
                               type="button"
                               variant="ghost"
-                              size="sm"
-                              className="h-7 px-2.5 text-xs"
-                              disabled={deletingId !== null}
-                              onClick={() => setConfirmDeleteId(null)}
+                              size="icon"
+                              className="relative z-10 size-7 text-secondary-text hover:text-destructive"
+                              aria-label={`Delete ${row.project.title}`}
+                              title="Delete project"
+                              disabled={isSubmitting || deletingId !== null}
+                              onClick={() => setConfirmDeleteId(row.project.id)}
                             >
-                              Cancel
+                              <Trash2 size={13} aria-hidden="true" />
                             </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            data-testid={`delete-project-${row.project.id}`}
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="relative z-10 size-7 text-secondary-text hover:text-destructive"
-                            aria-label={`Delete ${row.project.title}`}
-                            title="Delete project"
-                            disabled={isSubmitting || deletingId !== null}
-                            onClick={() => setConfirmDeleteId(row.project.id)}
-                          >
-                            <Trash2 size={13} aria-hidden="true" />
-                          </Button>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </main>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </main>
+      </DraftingSheet>
     </div>
   );
 }
