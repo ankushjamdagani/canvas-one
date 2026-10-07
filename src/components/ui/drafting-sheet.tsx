@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useRouteShell } from "@/lib/motion/shell-context";
 import { BrandMark } from "./brand-mark";
 import { DraftingFrame, DraftingGround } from "./drafting-board";
+import { Reveal } from "./reveal";
 
 /** Shared public-page chrome, separate from the workspace's canvas and telemetry. */
 export function DraftingSheet({
@@ -30,22 +31,33 @@ export function DraftingSheet({
         </>
       )}
       <header className="flex h-10 flex-none items-center gap-3">
-        <a
+        <Reveal
+          as="a"
+          kind="chrome"
+          index={0}
           href="/"
-          className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-sm text-sm font-semibold text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary "
+          className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-sm text-sm font-semibold text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         >
           <BrandMark />
           System Studio
-        </a>
-        <span className="font-mono text-micro tracking-normal text-secondary-text max-[480px]:hidden">
+        </Reveal>
+        <Reveal
+          as="span"
+          kind="chrome"
+          index={1}
+          className="font-mono text-micro tracking-normal text-secondary-text max-[480px]:hidden"
+        >
           v0.4.12
-        </span>
-        <nav
+        </Reveal>
+        <Reveal
+          as="nav"
+          kind="chrome"
+          index={2}
           aria-label="Main navigation"
           className="ml-auto flex items-center gap-2 min-[481px]:gap-4"
         >
           {navigation}
-        </nav>
+        </Reveal>
       </header>
       {children}
     </div>

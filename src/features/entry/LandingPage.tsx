@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
+import { Reveal, RevealScope } from "@/components/ui/reveal";
 import "./landing-page.css";
 
 type Point = { x: number; y: number };
@@ -224,266 +225,82 @@ export function LandingPage() {
               action: "running sim",
             };
   return (
-    <DraftingBoard paused={paused}>
-      <header className="lp-header">
-        <a href="/" className="lp-brand">
-          <span aria-hidden="true" />
-          System Studio
-        </a>
-        <span className="lp-version">{APP_VERSION_LABEL}</span>
-        <nav aria-label="Main navigation">
-          <span
-            className="lp-collaborators"
-            aria-label="Illustrative collaborators"
-          >
-            <span className="lp-avatars">
-              <i>Y</i>
-              <i>✦</i>
+    <RevealScope contentCount={2}>
+      <DraftingBoard paused={paused}>
+        <header className="lp-header">
+          <Reveal as="a" kind="chrome" index={0} href="/" className="lp-brand">
+            <span aria-hidden="true" />
+            System Studio
+          </Reveal>
+          <Reveal as="span" kind="chrome" index={1} className="lp-version">
+            {APP_VERSION_LABEL}
+          </Reveal>
+          <Reveal as="nav" kind="chrome" index={2} aria-label="Main navigation">
+            <span
+              className="lp-collaborators"
+              aria-label="Illustrative collaborators"
+            >
+              <span className="lp-avatars">
+                <i>Y</i>
+                <i>✦</i>
+              </span>
+              <b>You &amp; Claude</b>
+              <small>
+                <i />
+                LIVE
+              </small>
             </span>
-            <b>You &amp; Claude</b>
-            <small>
-              <i />
-              LIVE
-            </small>
-          </span>
-          <span className="lp-divider" />
-          <Button
-            variant="ghost"
-            className="lp-github"
-            disabled
-            title="Repository link is not configured"
-          >
-            GitHub
-          </Button>
-          <Button asChild variant="outline" className="lp-header-beta">
-            <a href="/projects">
-              Try Beta <ArrowRight />
-            </a>
-          </Button>
-        </nav>
-      </header>
-      <DraftingStage>
-        <main data-testid="landing-page">
-          <div
-            className="lp-hero"
-            style={{ left: hero.x, top: hero.y, width: hero.w, height: hero.h }}
-            onPointerDown={(event) => startDrag(event, "hero")}
-            {...pointerProps}
-          >
-            <span className="lp-dimension" aria-hidden="true">
-              TEXT · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
-            </span>
-            <h1 tabIndex={-1} className="outline-none">
-              Think in architecture.<em>Let agents draw the system.</em>
-            </h1>
-            {["TL", "TR", "BL", "BR"].map((corner) => (
-              <button
-                key={corner}
-                className={`lp-handle lp-handle-${corner}`}
-                aria-label={`Resize heading ${corner}`}
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  startDrag(event, "hero", corner);
-                }}
-                onKeyDown={(event) => {
-                  if (
-                    [
-                      "ArrowRight",
-                      "ArrowLeft",
-                      "ArrowUp",
-                      "ArrowDown",
-                    ].includes(event.key)
-                  ) {
-                    event.preventDefault();
-                    setHero((value) => {
-                      const dx =
-                        event.key === "ArrowRight"
-                          ? 8
-                          : event.key === "ArrowLeft"
-                            ? -8
-                            : 0;
-                      const dy =
-                        event.key === "ArrowDown"
-                          ? 8
-                          : event.key === "ArrowUp"
-                            ? -8
-                            : 0;
-                      const left = corner.includes("L"),
-                        top = corner.includes("T");
-                      const w = Math.max(
-                        240,
-                        Math.min(1300, value.w + (left ? -dx : dx)),
-                      );
-                      const h = Math.max(
-                        90,
-                        Math.min(700, value.h + (top ? -dy : dy)),
-                      );
-                      return {
-                        x: left ? value.x + value.w - w : value.x,
-                        y: top ? value.y + value.h - h : value.y,
-                        w,
-                        h,
-                      };
-                    });
-                  }
-                }}
-                {...pointerProps}
-              />
-            ))}
-          </div>
-          <p
-            className="lp-copy"
-            style={{ left: hero.x + 19, top: hero.y + hero.h + 35 }}
-          >
-            AI agents sketch topologies, isolate hot paths, and simulate
-            backpressure directly on an infinite browser drafting sheet in real
-            time.
-          </p>
-          <div
-            className="lp-actions"
-            style={{ left: hero.x + 18, top: hero.y + hero.h + 166 }}
-          >
-            <Button asChild className="lp-beta">
+            <span className="lp-divider" />
+            <Button
+              variant="ghost"
+              className="lp-github"
+              disabled
+              title="Repository link is not configured"
+            >
+              GitHub
+            </Button>
+            <Button asChild variant="outline" className="lp-header-beta">
               <a href="/projects">
                 Try Beta <ArrowRight />
               </a>
             </Button>
-            <Button
-              variant="outline"
-              className="lp-command"
-              aria-label={
-                copied ? "Command copied" : "Copy npx system-studio@preview"
-              }
-              onClick={() => {
-                setCopyError(false);
-                if (!navigator.clipboard) {
-                  setCopyError(true);
-                  return;
-                }
-                void navigator.clipboard
-                  .writeText("npx system-studio@preview")
-                  .then(() => setCopied(true))
-                  .catch(() => setCopyError(true));
-              }}
-            >
-              <span>$</span>npx system-studio@preview
-              {copied ? <Check /> : <Copy />}
-            </Button>
-            {copyError && (
-              <p role="alert">
-                Could not copy. Copy this command manually:{" "}
-                <code>npx system-studio@preview</code>
-              </p>
-            )}
-          </div>
-          <figure
-            className="lp-demo"
-            data-paused={paused}
-            aria-label="Illustrative architecture and traffic, not measured results"
+          </Reveal>
+        </header>
+        <DraftingStage>
+          <Reveal
+            as="main"
+            kind="content"
+            index={0}
+            data-testid="landing-page"
+            className="relative min-[1000px]:pointer-events-none min-[1000px]:absolute min-[1000px]:inset-0 min-[1000px]:[&>*]:pointer-events-auto"
           >
-            <svg
-              className="lp-connections"
-              viewBox="0 0 1440 900"
-              aria-hidden="true"
+            <div
+              className="lp-hero"
+              style={{
+                left: hero.x,
+                top: hero.y,
+                width: hero.w,
+                height: hero.h,
+              }}
+              onPointerDown={(event) => startDrag(event, "hero")}
+              {...pointerProps}
             >
-              {edges.map((edge) => (
-                <g key={edge.id}>
-                  <path
-                    data-edge={edge.id}
-                    d={edge.d}
-                    stroke={edge.color}
-                    strokeDasharray={edge.color === "#7C5FC0" ? "4 4" : "3 3"}
-                    fill="none"
-                  />
-                  {!paused &&
-                    !reduced &&
-                    Array.from({ length: edge.count }, (_, i) => (
-                      <circle key={i} r="3" fill={edge.color}>
-                        <animateMotion
-                          dur={`${edge.duration}s`}
-                          repeatCount="indefinite"
-                          path={edge.d}
-                          begin={`${(-edge.duration / edge.count) * i}s`}
-                        />
-                      </circle>
-                    ))}
-                </g>
-              ))}
-            </svg>
-            <svg
-              className="lp-mobile-connections"
-              viewBox="0 0 320 740"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              {edges.map((edge) => {
-                const endpoints: Record<string, [number, number]> = {
-                  ingress: [69, 140],
-                  direct: [209, 440],
-                  "buffer-in": [209, 280],
-                  "buffer-out": [accepted ? 348 : 382, 440],
-                };
-                const [from, to] = endpoints[edge.id];
-                const d = `M 160 ${from} V ${to}`;
-                return (
-                  <g key={edge.id}>
-                    <path
-                      d={d}
-                      fill="none"
-                      stroke={edge.color}
-                      strokeDasharray={edge.color === "#7C5FC0" ? "4 4" : "3 3"}
-                    />
-                    {!paused &&
-                      !reduced &&
-                      Array.from({ length: edge.count }, (_, i) => (
-                        <circle key={i} r="3" fill={edge.color}>
-                          <animateMotion
-                            dur={`${edge.duration}s`}
-                            repeatCount="indefinite"
-                            path={d}
-                            begin={`${(-edge.duration / edge.count) * i}s`}
-                          />
-                        </circle>
-                      ))}
-                  </g>
-                );
-              })}
-            </svg>
-            {[
-              {
-                id: "ING-01",
-                title: "Client Ingress",
-                label: "Throughput",
-                value: "1,200 req/s",
-              },
-              {
-                id: "GW-01",
-                title: "Edge Gateway",
-                label: "Queue",
-                value: q === 0 ? "0 dropped" : `${(q / 1000).toFixed(1)}k ▲`,
-              },
-              {
-                id: "BUF-01",
-                title: "Async Buffer",
-                label: "BUF-01",
-                value: "Zero-Copy Bus",
-              },
-              {
-                id: "WRK-04",
-                title: "Worker Pool",
-                label: "P99 Latency",
-                value: `${p99} ms`,
-              },
-            ].map((node) =>
-              node.id === "BUF-01" && !visible ? null : (
-                <div
-                  key={node.id}
-                  className={`lp-node ${node.id === "BUF-01" ? (accepted ? "lp-buffer accepted" : "lp-buffer suggested") : ""}`}
-                  style={{ left: nodes[node.id].x, top: nodes[node.id].y }}
-                  tabIndex={0}
-                  aria-label={`Move ${node.title} demo node`}
+              <span className="lp-dimension" aria-hidden="true">
+                TEXT · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
+              </span>
+              <h1 tabIndex={-1} className="outline-none">
+                Think in architecture.<em>Let agents draw the system.</em>
+              </h1>
+              {["TL", "TR", "BL", "BR"].map((corner) => (
+                <button
+                  key={corner}
+                  className={`lp-handle lp-handle-${corner}`}
+                  aria-label={`Resize heading ${corner}`}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    startDrag(event, "hero", corner);
+                  }}
                   onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return;
                     if (
                       [
                         "ArrowRight",
@@ -493,187 +310,401 @@ export function LandingPage() {
                       ].includes(event.key)
                     ) {
                       event.preventDefault();
-                      setNodes((value) => ({
-                        ...value,
-                        [node.id]: {
-                          x: Math.max(
-                            40,
-                            Math.min(
-                              1200,
-                              value[node.id].x +
-                                (event.key === "ArrowRight"
-                                  ? 8
-                                  : event.key === "ArrowLeft"
-                                    ? -8
-                                    : 0),
-                            ),
-                          ),
-                          y: Math.max(
-                            100,
-                            Math.min(
-                              680,
-                              value[node.id].y +
-                                (event.key === "ArrowDown"
-                                  ? 8
-                                  : event.key === "ArrowUp"
-                                    ? -8
-                                    : 0),
-                            ),
-                          ),
-                        },
-                      }));
+                      setHero((value) => {
+                        const dx =
+                          event.key === "ArrowRight"
+                            ? 8
+                            : event.key === "ArrowLeft"
+                              ? -8
+                              : 0;
+                        const dy =
+                          event.key === "ArrowDown"
+                            ? 8
+                            : event.key === "ArrowUp"
+                              ? -8
+                              : 0;
+                        const left = corner.includes("L"),
+                          top = corner.includes("T");
+                        const w = Math.max(
+                          240,
+                          Math.min(1300, value.w + (left ? -dx : dx)),
+                        );
+                        const h = Math.max(
+                          90,
+                          Math.min(700, value.h + (top ? -dy : dy)),
+                        );
+                        return {
+                          x: left ? value.x + value.w - w : value.x,
+                          y: top ? value.y + value.h - h : value.y,
+                          w,
+                          h,
+                        };
+                      });
                     }
                   }}
                   {...pointerProps}
-                >
-                  <header onPointerDown={(event) => startDrag(event, node.id)}>
-                    {node.id === "BUF-01" && <Sparkles />}
-                    <b>{node.title}</b>
-                    <span>
-                      {node.id === "BUF-01"
-                        ? accepted
-                          ? "ACCEPTED"
-                          : "SUGGESTED"
-                        : node.id}
-                    </span>
-                  </header>
-                  <p>
-                    <span>{node.label}</span>
-                    <strong
-                      className={
-                        (node.id === "GW-01" && q > 0) ||
-                        (node.id === "WRK-04" && p99 >= 60)
-                          ? "lp-hot"
-                          : ""
-                      }
-                    >
-                      {node.value}
-                    </strong>
-                  </p>
-                  {node.id === "BUF-01" && !accepted && (
-                    <div className="lp-buffer-actions">
-                      <Button
-                        onClick={() => {
-                          setOverride("accepted");
-                          setTime(7200);
-                        }}
-                      >
-                        Accept
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setOverride("dismissed")}
-                      >
-                        Dismiss
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ),
-            )}
-            {noteVisible && (
-              <aside
-                className="lp-note"
-                style={{
-                  left: nodes["BUF-01"].x + 236,
-                  top: nodes["BUF-01"].y - 10,
+                />
+              ))}
+            </div>
+            <p
+              className="lp-copy"
+              style={{ left: hero.x + 19, top: hero.y + hero.h + 35 }}
+            >
+              AI agents sketch topologies, isolate hot paths, and simulate
+              backpressure directly on an infinite browser drafting sheet in
+              real time.
+            </p>
+            <div
+              className="lp-actions"
+              style={{ left: hero.x + 18, top: hero.y + hero.h + 166 }}
+            >
+              <Button asChild className="lp-beta">
+                <a href="/projects">
+                  Try Beta <ArrowRight />
+                </a>
+              </Button>
+              <Button
+                variant="outline"
+                className="lp-command"
+                aria-label={
+                  copied ? "Command copied" : "Copy npx system-studio@preview"
+                }
+                onClick={() => {
+                  setCopyError(false);
+                  if (!navigator.clipboard) {
+                    setCopyError(true);
+                    return;
+                  }
+                  void navigator.clipboard
+                    .writeText("npx system-studio@preview")
+                    .then(() => setCopied(true))
+                    .catch(() => setCopyError(true));
                 }}
               >
-                <b>Agent Claude · Note</b>
-                <p>
-                  Decoupled Edge Gateway from Worker Pool via Async Buffer (
-                  <strong>BUF-01</strong>). Prevents backpressure cascade during
-                  Poisson spikes.
+                <span>$</span>npx system-studio@preview
+                {copied ? <Check /> : <Copy />}
+              </Button>
+              {copyError && (
+                <p role="alert">
+                  Could not copy. Copy this command manually:{" "}
+                  <code>npx system-studio@preview</code>
                 </p>
-              </aside>
-            )}
-          </figure>
-        </main>
-        <div className="lp-toolbar" role="region" aria-label="Demo controls">
-          <span className="lp-select" title="Select">
-            <MousePointer2 />
-          </span>
-          <span title="Pan">
-            <Hand />
-          </span>
-          <span title="Draw">
-            <Pencil />
-          </span>
-          <i />
-          <Button
-            aria-label={paused ? "Run demo" : "Pause demo"}
-            onClick={() => setPaused((value) => !value)}
+              )}
+            </div>
+            <figure
+              className="lp-demo"
+              data-paused={paused}
+              aria-label="Illustrative architecture and traffic, not measured results"
+            >
+              <svg
+                className="lp-connections"
+                viewBox="0 0 1440 900"
+                aria-hidden="true"
+              >
+                {edges.map((edge) => (
+                  <g key={edge.id}>
+                    <path
+                      data-edge={edge.id}
+                      d={edge.d}
+                      stroke={edge.color}
+                      strokeDasharray={edge.color === "#7C5FC0" ? "4 4" : "3 3"}
+                      fill="none"
+                    />
+                    {!paused &&
+                      !reduced &&
+                      Array.from({ length: edge.count }, (_, i) => (
+                        <circle key={i} r="3" fill={edge.color}>
+                          <animateMotion
+                            dur={`${edge.duration}s`}
+                            repeatCount="indefinite"
+                            path={edge.d}
+                            begin={`${(-edge.duration / edge.count) * i}s`}
+                          />
+                        </circle>
+                      ))}
+                  </g>
+                ))}
+              </svg>
+              <svg
+                className="lp-mobile-connections"
+                viewBox="0 0 320 740"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                {edges.map((edge) => {
+                  const endpoints: Record<string, [number, number]> = {
+                    ingress: [69, 140],
+                    direct: [209, 440],
+                    "buffer-in": [209, 280],
+                    "buffer-out": [accepted ? 348 : 382, 440],
+                  };
+                  const [from, to] = endpoints[edge.id];
+                  const d = `M 160 ${from} V ${to}`;
+                  return (
+                    <g key={edge.id}>
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke={edge.color}
+                        strokeDasharray={
+                          edge.color === "#7C5FC0" ? "4 4" : "3 3"
+                        }
+                      />
+                      {!paused &&
+                        !reduced &&
+                        Array.from({ length: edge.count }, (_, i) => (
+                          <circle key={i} r="3" fill={edge.color}>
+                            <animateMotion
+                              dur={`${edge.duration}s`}
+                              repeatCount="indefinite"
+                              path={d}
+                              begin={`${(-edge.duration / edge.count) * i}s`}
+                            />
+                          </circle>
+                        ))}
+                    </g>
+                  );
+                })}
+              </svg>
+              {[
+                {
+                  id: "ING-01",
+                  title: "Client Ingress",
+                  label: "Throughput",
+                  value: "1,200 req/s",
+                },
+                {
+                  id: "GW-01",
+                  title: "Edge Gateway",
+                  label: "Queue",
+                  value: q === 0 ? "0 dropped" : `${(q / 1000).toFixed(1)}k ▲`,
+                },
+                {
+                  id: "BUF-01",
+                  title: "Async Buffer",
+                  label: "BUF-01",
+                  value: "Zero-Copy Bus",
+                },
+                {
+                  id: "WRK-04",
+                  title: "Worker Pool",
+                  label: "P99 Latency",
+                  value: `${p99} ms`,
+                },
+              ].map((node) =>
+                node.id === "BUF-01" && !visible ? null : (
+                  <div
+                    key={node.id}
+                    className={`lp-node ${node.id === "BUF-01" ? (accepted ? "lp-buffer accepted" : "lp-buffer suggested") : ""}`}
+                    style={{ left: nodes[node.id].x, top: nodes[node.id].y }}
+                    tabIndex={0}
+                    aria-label={`Move ${node.title} demo node`}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (
+                        [
+                          "ArrowRight",
+                          "ArrowLeft",
+                          "ArrowUp",
+                          "ArrowDown",
+                        ].includes(event.key)
+                      ) {
+                        event.preventDefault();
+                        setNodes((value) => ({
+                          ...value,
+                          [node.id]: {
+                            x: Math.max(
+                              40,
+                              Math.min(
+                                1200,
+                                value[node.id].x +
+                                  (event.key === "ArrowRight"
+                                    ? 8
+                                    : event.key === "ArrowLeft"
+                                      ? -8
+                                      : 0),
+                              ),
+                            ),
+                            y: Math.max(
+                              100,
+                              Math.min(
+                                680,
+                                value[node.id].y +
+                                  (event.key === "ArrowDown"
+                                    ? 8
+                                    : event.key === "ArrowUp"
+                                      ? -8
+                                      : 0),
+                              ),
+                            ),
+                          },
+                        }));
+                      }
+                    }}
+                    {...pointerProps}
+                  >
+                    <header
+                      onPointerDown={(event) => startDrag(event, node.id)}
+                    >
+                      {node.id === "BUF-01" && <Sparkles />}
+                      <b>{node.title}</b>
+                      <span>
+                        {node.id === "BUF-01"
+                          ? accepted
+                            ? "ACCEPTED"
+                            : "SUGGESTED"
+                          : node.id}
+                      </span>
+                    </header>
+                    <p>
+                      <span>{node.label}</span>
+                      <strong
+                        className={
+                          (node.id === "GW-01" && q > 0) ||
+                          (node.id === "WRK-04" && p99 >= 60)
+                            ? "lp-hot"
+                            : ""
+                        }
+                      >
+                        {node.value}
+                      </strong>
+                    </p>
+                    {node.id === "BUF-01" && !accepted && (
+                      <div className="lp-buffer-actions">
+                        <Button
+                          onClick={() => {
+                            setOverride("accepted");
+                            setTime(7200);
+                          }}
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setOverride("dismissed")}
+                        >
+                          Dismiss
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ),
+              )}
+              {noteVisible && (
+                <aside
+                  className="lp-note"
+                  style={{
+                    left: nodes["BUF-01"].x + 236,
+                    top: nodes["BUF-01"].y - 10,
+                  }}
+                >
+                  <b>Agent Claude · Note</b>
+                  <p>
+                    Decoupled Edge Gateway from Worker Pool via Async Buffer (
+                    <strong>BUF-01</strong>). Prevents backpressure cascade
+                    during Poisson spikes.
+                  </p>
+                </aside>
+              )}
+            </figure>
+          </Reveal>
+          <Reveal
+            kind="content"
+            index={1}
+            className="relative min-[1000px]:pointer-events-none min-[1000px]:absolute min-[1000px]:inset-0 min-[1000px]:[&>*]:pointer-events-auto"
           >
-            {paused ? <Play /> : <Pause />}
-            {paused ? "Run 100µs" : "Pause"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Reset demo"
-            onClick={reset}
-          >
-            <RotateCcw />
-          </Button>
-        </div>
-        <div
-          className="lp-prompt"
-          role="region"
-          aria-label="Collaboration prompt"
-        >
-          <Sparkles />
-          <span
-            style={{
-              color: t >= 3000 ? "#7C5FC0" : t >= 332 ? "#16201D" : "#A3ABA6",
-            }}
-          >
-            {prompt}
-          </span>
-          <small>@ 2 nodes</small>
-          <Button
-            size="icon"
-            aria-label="Replay collaboration demo"
-            onClick={() => {
-              reset();
-              setPaused(false);
-            }}
-          >
-            <ArrowUp />
-          </Button>
-        </div>
-        <footer className="lp-local">
-          100% In-browser Web Worker
-          <br />
-          Simulates queues, not code
-          <br />
-          Zero cloud egress
-        </footer>
-        {[
-          { name: "You", ...you },
-          { name: `Claude · ${claude.action}`, ...claude },
-        ].map((cursor, index) => (
-          <div
-            key={index}
-            className={`lp-cursor ${index ? "lp-claude" : ""}`}
-            style={{
-              left: cursor.x,
-              top: cursor.y,
-              opacity: index && (t < 2900 || t >= 13200) ? 0 : 1,
-            }}
-            aria-hidden="true"
-          >
-            <svg width="18" height="20" viewBox="0 0 18 20">
-              <path
-                d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z"
-                fill={index ? "#7C5FC0" : "#0B5C54"}
-                stroke="white"
-                strokeWidth="1.2"
-              />
-            </svg>
-            <span>{cursor.name}</span>
-          </div>
-        ))}
-      </DraftingStage>
-    </DraftingBoard>
+            <div
+              className="lp-toolbar"
+              role="region"
+              aria-label="Demo controls"
+            >
+              <span className="lp-select" title="Select">
+                <MousePointer2 />
+              </span>
+              <span title="Pan">
+                <Hand />
+              </span>
+              <span title="Draw">
+                <Pencil />
+              </span>
+              <i />
+              <Button
+                aria-label={paused ? "Run demo" : "Pause demo"}
+                onClick={() => setPaused((value) => !value)}
+              >
+                {paused ? <Play /> : <Pause />}
+                {paused ? "Run 100µs" : "Pause"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Reset demo"
+                onClick={reset}
+              >
+                <RotateCcw />
+              </Button>
+            </div>
+            <div
+              className="lp-prompt"
+              role="region"
+              aria-label="Collaboration prompt"
+            >
+              <Sparkles />
+              <span
+                style={{
+                  color:
+                    t >= 3000 ? "#7C5FC0" : t >= 332 ? "#16201D" : "#A3ABA6",
+                }}
+              >
+                {prompt}
+              </span>
+              <small>@ 2 nodes</small>
+              <Button
+                size="icon"
+                aria-label="Replay collaboration demo"
+                onClick={() => {
+                  reset();
+                  setPaused(false);
+                }}
+              >
+                <ArrowUp />
+              </Button>
+            </div>
+            <footer className="lp-local">
+              100% In-browser Web Worker
+              <br />
+              Simulates queues, not code
+              <br />
+              Zero cloud egress
+            </footer>
+          </Reveal>
+          {[
+            { name: "You", ...you },
+            { name: `Claude · ${claude.action}`, ...claude },
+          ].map((cursor, index) => (
+            <div
+              key={index}
+              className={`lp-cursor ${index ? "lp-claude" : ""}`}
+              style={{
+                left: cursor.x,
+                top: cursor.y,
+                opacity: index && (t < 2900 || t >= 13200) ? 0 : 1,
+              }}
+              aria-hidden="true"
+            >
+              <svg width="18" height="20" viewBox="0 0 18 20">
+                <path
+                  d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z"
+                  fill={index ? "#7C5FC0" : "#0B5C54"}
+                  stroke="white"
+                  strokeWidth="1.2"
+                />
+              </svg>
+              <span>{cursor.name}</span>
+            </div>
+          ))}
+        </DraftingStage>
+      </DraftingBoard>
+    </RevealScope>
   );
 }
