@@ -608,6 +608,15 @@ body {
   }
 }
 
+/* Project canvas enter: hidden until ReactFlow has rendered, then animated in
+   (features/workspace/canvasTransition.ts removes the attribute). */
+[data-canvas-entering] .react-flow__node,
+[data-canvas-entering] .react-flow__edges,
+[data-canvas-entering] [data-testid="workspace-topbar"],
+[data-canvas-entering] [data-testid="playback-panel"] {
+  opacity: 0;
+}
+
 /* Float shared traffic inspection above neighboring cards without changing measured geometry. */
 .react-flow__node:has([data-cells-lanes-node][aria-expanded="true"]) {
   z-index: 1001 !important;

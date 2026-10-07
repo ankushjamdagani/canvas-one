@@ -157,6 +157,7 @@ import {
 import { expansionStateOf, planExpansion } from "./expandPlans";
 import { planWrapInBoundary, wrapBoundaryCrossingEndpoints } from "./wrapPlan";
 import { Button } from "@/components/ui/button";
+import { useCanvasTransition } from "./useCanvasTransition";
 import {
   Dialog,
   DialogContent,
@@ -309,6 +310,9 @@ export function Workspace({
   actor,
   runControl,
 }: WorkspaceProps) {
+  const workspaceRootRef = React.useRef<HTMLDivElement>(null);
+  useCanvasTransition(workspaceRootRef);
+
   // Read session state via useSyncExternalStore
   const sessionState = React.useSyncExternalStore(
     session.subscribe,
@@ -3212,6 +3216,7 @@ export function Workspace({
 
   return (
     <div
+      ref={workspaceRootRef}
       data-testid="workspace-root"
       data-panel-preference-state={panelPreferenceState}
       data-dock-preference-state={dockPreferenceState}
