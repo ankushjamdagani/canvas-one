@@ -5,11 +5,16 @@ import '@xyflow/react/dist/style.css';
 import './styles.css';
 import App from './App';
 import { MotionProvider } from './lib/motion/MotionProvider';
+import { ThemeProvider, initializeTheme } from './lib/theme';
+
+initializeTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <MotionProvider>
-      <App />
-    </MotionProvider>
+    <ThemeProvider>
+      <MotionProvider>
+        <App />
+      </MotionProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 );

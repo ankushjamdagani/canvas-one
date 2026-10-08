@@ -82,7 +82,7 @@ export const LibraryRow = React.forwardRef<HTMLDivElement, LibraryRowProps>(
           className={cn(
             "size-[26px] shrink-0 rounded-control flex items-center justify-center text-xs transition-colors",
             isAccent
-              ? "bg-accent border border-selected-edge text-primary"
+              ? "bg-accent border border-selected-edge text-accent-foreground"
               : isDisabled
               ? "bg-sunken border border-hairline text-text-disabled"
               : "bg-sunken border border-border text-body"
@@ -97,7 +97,7 @@ export const LibraryRow = React.forwardRef<HTMLDivElement, LibraryRowProps>(
               isDisabled
                 ? "text-text-disabled"
                 : isDragging
-                ? "text-primary"
+                ? "text-accent-foreground"
                 : "text-foreground"
             )}
           >
@@ -110,7 +110,7 @@ export const LibraryRow = React.forwardRef<HTMLDivElement, LibraryRowProps>(
                 isDisabled
                   ? "text-text-disabled"
                   : isDragging
-                  ? "text-[#6B8F87]"
+                  ? "text-accent-foreground"
                   : "text-secondary-text"
               )}
             >

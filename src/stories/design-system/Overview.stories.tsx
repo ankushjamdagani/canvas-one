@@ -40,7 +40,7 @@ export const Introduction: StoryObj = {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-shell border-control-border">
             <CardHeader className="pb-3">
-              <div className="size-8 rounded-control bg-accent text-primary flex items-center justify-center mb-2">
+              <div className="size-8 rounded-control bg-accent text-accent-foreground flex items-center justify-center mb-2">
                 <Palette className="size-4" />
               </div>
               <CardTitle className="text-sm">Warm Paper Palette</CardTitle>
@@ -52,7 +52,7 @@ export const Introduction: StoryObj = {
 
           <Card className="bg-shell border-control-border">
             <CardHeader className="pb-3">
-              <div className="size-8 rounded-control bg-selected-tint text-primary flex items-center justify-center mb-2">
+              <div className="size-8 rounded-control bg-selected-tint text-accent-foreground flex items-center justify-center mb-2">
                 <ShieldCheck className="size-4" />
               </div>
               <CardTitle className="text-sm">WCAG 2.2 AA Contrast</CardTitle>

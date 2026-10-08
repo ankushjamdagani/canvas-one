@@ -36,7 +36,7 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         className={cn(
           "flex items-center gap-2 rounded-control border bg-panel px-2.5 py-1.5 text-xs transition-colors",
           isActive
-            ? "border-primary bg-background shadow-ring-soft"
+            ? "border-ring bg-background shadow-ring-soft"
             : "border-border hover:border-hover-border",
           disabled && "cursor-not-allowed bg-sunken border-hairline opacity-60",
           className
@@ -70,7 +70,7 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
               e.stopPropagation();
               onClear?.();
             }}
-            className="text-secondary-text hover:text-foreground cursor-pointer rounded p-0.5 outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            className="text-secondary-text hover:text-foreground cursor-pointer rounded p-0.5 outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <X className="size-3" />
           </button>

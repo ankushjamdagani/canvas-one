@@ -91,7 +91,7 @@ export function ProjectMenu({
         {/* Rename project */}
         <DropdownMenuItem
           data-testid="project-menu-rename"
-          className="text-primary bg-[#EAEFEC] hover:bg-[#DFE8E4] focus:bg-[#DFE8E4] data-[highlighted]:bg-[#DFE8E4] font-semibold cursor-pointer"
+          className="text-accent-foreground bg-accent hover:bg-tint-hover focus:bg-tint-hover data-[highlighted]:bg-tint-hover font-semibold cursor-pointer"
           onSelect={() => {
             onRenameProject();
           }}

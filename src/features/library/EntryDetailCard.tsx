@@ -32,11 +32,10 @@ export function EntryDetailCard({ entry, className }: EntryDetailCardProps) {
       <div className="px-3.5 py-2.5 bg-panel border-b border-hairline flex items-center justify-between gap-2 shrink-0">
         <span
           className="text-[10.5px] font-mono font-medium uppercase tracking-widest text-secondary-text"
-          style={detail.stripeColor ? { color: detail.stripeColor } : undefined}
         >
           {detail.group.toUpperCase()}
         </span>
-        <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-primary/40 text-primary bg-accent/60">
+        <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-primary/40 text-accent-foreground bg-accent">
           {detail.badge}
         </span>
       </div>

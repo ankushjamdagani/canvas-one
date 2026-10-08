@@ -48,7 +48,7 @@ export function SelectionBox({ selectedIds }: SelectionBoxProps) {
   return (
     <div
       data-testid="canvas-selection-box"
-      className="absolute rounded-card border-2 border-dashed border-primary bg-primary/[0.04] pointer-events-none select-none z-0"
+      className="absolute rounded-card border-2 border-dashed border-ring bg-primary/[0.04] pointer-events-none select-none z-0"
       style={{
         transform: `translate(${rect.x}px, ${rect.y}px)`,
         width: rect.width,

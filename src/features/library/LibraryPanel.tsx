@@ -151,7 +151,7 @@ export function LibraryPanel({
             }}
             placeholder="Search parts, tags, models..."
             aria-label="Search components"
-            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-18 text-xs rounded-md bg-sunken border border-control-border text-foreground placeholder:text-secondary-text focus:border-control-border-strong focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-18 text-xs rounded-md bg-sunken border border-control-border text-foreground placeholder:text-secondary-text focus:border-control-border-strong focus:bg-background focus:outline-none focus:ring-1 focus:ring-ring transition-all"
           />
           {searchQuery.trim().length > 0 && (
             <div className="absolute right-2.5 flex items-center gap-1.5 text-[11px] font-mono text-secondary-text">
@@ -222,7 +222,7 @@ export function LibraryPanel({
             aria-pressed={view === 'list'}
             className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
               view === 'list'
-                ? 'bg-white text-foreground shadow-sm'
+                ? 'bg-background text-foreground shadow-sm'
                 : 'text-secondary-text hover:text-foreground'
             }`}
           >
@@ -237,7 +237,7 @@ export function LibraryPanel({
             aria-pressed={view === 'grid'}
             className={`flex items-center gap-1 px-2 py-0.5 pointer-coarse:min-h-11 rounded text-[11px] font-medium transition-all ${
               view === 'grid'
-                ? 'bg-white text-foreground shadow-sm'
+                ? 'bg-background text-foreground shadow-sm'
                 : 'text-secondary-text hover:text-foreground'
             }`}
           >
@@ -259,7 +259,7 @@ export function LibraryPanel({
         hidden={tab !== 'standard'}
         aria-label="Component catalog entries"
         tabIndex={0}
-        className="p-4 space-y-4 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+        className="p-4 space-y-4 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         {filteredEntries.length === 0 ? (
           /* Empty state: clear search way out */
@@ -271,7 +271,7 @@ export function LibraryPanel({
               type="button"
               onClick={() => setSearchQuery('')}
               aria-label="Clear search"
-              className="px-3 py-1.5 text-xs font-medium rounded-md border border-control-border bg-white hover:bg-sunken text-primary shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              className="px-3 py-1.5 text-xs font-medium rounded-md border border-control-border bg-background hover:bg-sunken text-primary shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               Clear search
             </button>
@@ -282,7 +282,6 @@ export function LibraryPanel({
               {/* Group header with line and count */}
               <div className="flex items-center gap-2 text-[10.5px] font-mono uppercase tracking-widest text-secondary-text">
                 <span
-                  style={section.stripeColor ? { color: section.stripeColor } : undefined}
                   className="font-medium"
                 >
                   {section.group.toUpperCase()}
@@ -335,7 +334,7 @@ export function LibraryPanel({
               {(() => {
                 const Icon = getNodeIcon(selectedEntry.visualKind);
                 return (
-                  <div className="w-7 h-7 rounded bg-white border border-border flex items-center justify-center flex-shrink-0 text-foreground">
+                  <div className="w-7 h-7 rounded bg-background border border-border flex items-center justify-center flex-shrink-0 text-foreground">
                     <Icon className="w-3.5 h-3.5" />
                   </div>
                 );
@@ -354,7 +353,7 @@ export function LibraryPanel({
               type="button"
               onClick={() => onPlace(selectedEntry.entryId)}
               aria-label={`Place ${selectedEntry.label} on canvas`}
-              className="px-4 py-2 pointer-coarse:min-h-11 rounded-control bg-primary hover:bg-primary-hover text-white text-xs font-medium shadow-xs transition-colors flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none flex items-center gap-1.5"
+              className="px-4 py-2 pointer-coarse:min-h-11 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-medium shadow-xs transition-colors flex-shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:outline-none flex items-center gap-1.5"
             >
               <span>Place on canvas</span>
             </button>

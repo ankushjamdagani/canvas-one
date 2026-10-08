@@ -354,7 +354,7 @@ export function CommitPanel({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs font-semibold text-primary hover:text-primary-hover px-2"
+                  className="h-7 text-xs font-semibold text-primary hover:text-primary hover:underline px-2"
                   disabled={anyNotReady}
                   title={anyNotReady ? 'Run all is disabled while any scenario is not ready' : undefined}
                   onClick={onRunAll}

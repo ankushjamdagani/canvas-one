@@ -291,7 +291,7 @@ function StartingStateSection({ document, scenario, onChange }: StartingStateSec
     <div className="space-y-1.5 pt-2">
       <div className="flex items-center justify-between">
         <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Starting state</div>
-        <button type="button" className="text-[11px] text-primary hover:text-primary-hover" onClick={addOverride}>
+        <button type="button" className="text-[11px] text-primary hover:text-primary hover:underline" onClick={addOverride}>
           + Add override
         </button>
       </div>

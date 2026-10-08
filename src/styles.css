@@ -87,6 +87,7 @@
   --color-primary-pressed: var(--primary-pressed);
   --color-selected-edge: var(--selected-edge);
   --color-branch: var(--branch);
+  --color-branch-text: var(--branch-text);
   --color-branch-tint: var(--branch-tint);
   --color-risk: var(--risk);
   --color-risk-text: var(--risk-text);
@@ -203,20 +204,21 @@
   --z-index-tooltip: 80;
   --z-index-toast: 80;
 
-  /* Elevation tokens from artifacts/design/Copy of Elegant and modern design refresh (1)/tokens/shape.css */
-  --shadow-raised: 0 1px 2px rgba(22, 32, 29, 0.08);
-  --shadow-lifted: 0 6px 14px -8px rgba(22, 32, 29, 0.30);
-  --shadow-popover: 0 18px 32px -16px rgba(22, 32, 29, 0.32);
-  --shadow-floating: 0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06);
-  --shadow-frame: 0 24px 48px -20px rgba(22, 32, 29, 0.24);
-  --shadow-toast: 0 18px 32px -16px rgba(22, 32, 29, 0.50);
+  /* Elevation tokens: reference CSS vars so themes can override them.
+     --tw-shadow-* are set by applyTokens() on :root at runtime. */
+  --shadow-raised: var(--tw-shadow-raised);
+  --shadow-lifted: var(--tw-shadow-lifted);
+  --shadow-popover: var(--tw-shadow-popover);
+  --shadow-floating: var(--tw-shadow-floating);
+  --shadow-frame: var(--tw-shadow-frame);
+  --shadow-toast: var(--tw-shadow-toast);
 
   /* Focus and selection ring shadows */
-  --shadow-ring-soft: 0 0 0 3px rgba(11, 92, 84, 0.10);
-  --shadow-ring: 0 0 0 3px rgba(11, 92, 84, 0.18);
-  --shadow-ring-strong: 0 0 0 3px rgba(11, 92, 84, 0.28);
-  --shadow-ring-danger: 0 0 0 3px rgba(180, 103, 74, 0.28);
-  --shadow-ring-danger-soft: 0 0 0 3px rgba(180, 103, 74, 0.12);
+  --shadow-ring-soft: var(--tw-shadow-ring-soft);
+  --shadow-ring: var(--tw-shadow-ring);
+  --shadow-ring-strong: var(--tw-shadow-ring-strong);
+  --shadow-ring-danger: var(--tw-shadow-ring-danger);
+  --shadow-ring-danger-soft: var(--tw-shadow-ring-danger-soft);
 
   /* Animation tokens */
   --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out infinite;
@@ -279,6 +281,43 @@
 }
 
 :root {
+  --brand-mark: linear-gradient(140deg, #0B5C54, #2E7D6B);
+  --action-text: #0B5C54;
+  --thumbnail-risk: #B5623F;
+  --thumbnail-body: #3A4A45;
+  --thumbnail-dot: #E4DFD6;
+  --thumbnail-line: rgba(60,70,65,0.35);
+  --landing-muted: #6b7671;
+  --landing-muted-light: #7d8681;
+  --landing-proposal-edge: #e4dcf3;
+  --landing-note-fill: #efe4c6;
+  --branch-active-fill: #E9DFF8;
+  --branch-active-edge: #C7B4EA;
+  --branch-active-text: #5B3E9B;
+  --branch-hover-fill: #F3EEFB;
+  --branch-hover-edge: #E0D5F2;
+  --note-ink: #3A3424;
+  --action-rgb: 11,92,84;
+  --risk-rgb: 180,103,74;
+  --drafting-frame-edge: #c9c2b5;
+  --drafting-inner-edge: #e2ddd3;
+  /* Shadow/ring color triplets — overridden by applyTokens() per theme */
+  --sh-rgb: 22, 32, 29;
+  --action-rgb: 11, 92, 84;
+  --risk-rgb: 180, 103, 74;
+  /* Default (Evergreen light) shadow/ring values */
+  --tw-shadow-raised: 0 1px 2px rgba(22, 32, 29, 0.08);
+  --tw-shadow-lifted: 0 6px 14px -8px rgba(22, 32, 29, 0.30);
+  --tw-shadow-popover: 0 18px 32px -16px rgba(22, 32, 29, 0.32);
+  --tw-shadow-floating: 0 20px 44px -18px rgba(22, 32, 29, 0.38), 0 2px 6px rgba(22, 32, 29, 0.06);
+  --tw-shadow-frame: 0 24px 48px -20px rgba(22, 32, 29, 0.24);
+  --tw-shadow-toast: 0 18px 32px -16px rgba(22, 32, 29, 0.50);
+  --tw-shadow-ring-soft: 0 0 0 3px rgba(11, 92, 84, 0.10);
+  --tw-shadow-ring: 0 0 0 3px rgba(11, 92, 84, 0.18);
+  --tw-shadow-ring-strong: 0 0 0 3px rgba(11, 92, 84, 0.28);
+  --tw-shadow-ring-danger: 0 0 0 3px rgba(180, 103, 74, 0.28);
+  --tw-shadow-ring-danger-soft: 0 0 0 3px rgba(180, 103, 74, 0.12);
+
   --background: #FFFFFF;
   --foreground: #16201D;
   --card: #F7F5F1;
@@ -313,6 +352,7 @@
   --primary-pressed: #083F3A;
   --selected-edge: #A8CBC5;
   --branch: #7C5FC0;
+  --branch-text: #7C5FC0;
   --branch-tint: #F7F4FC;
   --risk: #B4674A;
   --risk-text: #A15B40;
@@ -355,6 +395,8 @@
   --text-placeholder: #8A938F;
   --text-disabled: #C0C6C1;
   --text-on-ink: #F7F5F1;
+  --branch-foreground: #FFFFFF;
+  --branch-solid: #7C5FC0;
   --text-on-green: #FBFAF7;
   --text-primary: #16201D;
   --text-body: #4A544F;
@@ -372,7 +414,7 @@
   --purple-tint: #F3EDF7;
   --purple-edge: #C6B6D6;
 
-  /* Ring shadows */
+  /* Authored Evergreen rings; nondefault themes override these roles. */
   --ring-soft: 0 0 0 3px rgba(11, 92, 84, 0.18);
   --ring-strong: 0 0 0 3px #0B5C54;
   --ring-danger: 0 0 0 3px #B4674A;
@@ -389,6 +431,15 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Action fill and action text are distinct in fluorescent palettes. */
+@layer utilities {
+  .text-primary { color: var(--action-text); }
+  .text-branch { color: var(--branch-text); }
+  .text-purple { color: var(--branch-text); }
+  .text-green { color: var(--action-text); }
+  .text-clay { color: var(--risk-text); }
 }
 
 * {
@@ -453,8 +504,8 @@ body {
   }
 }
 ::selection {
-  background: var(--selected-edge);
-  color: var(--foreground);
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 @utility scrollbar-none {
   scrollbar-width: none;
@@ -475,11 +526,11 @@ body {
   height: 8px;
   width: 8px;
   border: none;
-  background: var(--primary);
+  background: var(--ring);
 }
 /* Selection is action green plus a heavier stroke, never colour alone (design.md). */
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--primary) !important;
+  stroke: var(--ring) !important;
   stroke-width: 2.5 !important;
 }
 

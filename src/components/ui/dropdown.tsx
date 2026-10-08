@@ -115,7 +115,7 @@ const dropdownItemVariants = cva(
     variants: {
       variant: {
         default: "text-foreground data-[highlighted]:text-foreground",
-        selected: "bg-accent text-primary font-semibold [&_svg]:text-primary",
+        selected: "bg-accent text-accent-foreground font-semibold [&_svg]:text-accent-foreground",
         destructive:
           "text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive [&_svg]:text-destructive",
       },
@@ -156,7 +156,7 @@ const DropdownSubTrigger = React.forwardRef<
     ref={ref}
     data-slot="dropdown-sub-trigger"
     className={cn(
-      "flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=open]:bg-accent data-[state=open]:text-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not(.ml-auto)]:size-3.5 [&_svg:not(.ml-auto)]:text-secondary-text data-[state=open]:[&_svg:not(.ml-auto)]:text-primary",
+      "flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=open]:bg-accent data-[state=open]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not(.ml-auto)]:size-3.5 [&_svg:not(.ml-auto)]:text-secondary-text data-[state=open]:[&_svg:not(.ml-auto)]:text-accent-foreground",
       inset && "pl-8",
       className
     )}
@@ -241,7 +241,7 @@ const DropdownCheckboxItem = React.forwardRef<
     ref={ref}
     data-slot="dropdown-checkbox-item"
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
       className
     )}
     checked={checked}
@@ -265,7 +265,7 @@ const DropdownRadioItem = React.forwardRef<
     ref={ref}
     data-slot="dropdown-radio-item"
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
       className
     )}
     {...props}
@@ -349,7 +349,7 @@ export function DropdownMenuPanel({
           const variantClass = item.danger
             ? "text-destructive hover:bg-destructive/10"
             : item.selected
-            ? "bg-accent text-primary font-semibold [&_svg]:text-primary"
+            ? "bg-accent text-accent-foreground font-semibold [&_svg]:text-accent-foreground"
             : "text-foreground hover:bg-sunken";
 
           return (

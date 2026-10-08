@@ -399,7 +399,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                       <span className="text-xs text-foreground font-normal whitespace-nowrap">{def.label.replace('…', '')}</span>
                       <button
                         type="button"
-                        className="size-5 rounded-xs flex items-center justify-center border border-primary/30 bg-selected-tint hover:bg-selected-tint/80 text-primary hover:text-primary/90 transition-colors shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ml-1"
+                        className="size-5 rounded-xs flex items-center justify-center border border-primary/30 bg-selected-tint hover:bg-selected-tint/80 text-accent-foreground hover:text-accent-foreground transition-colors shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ml-1"
                         aria-label={`Add ${def.label}`}
                         title={`Add ${def.label}`}
                         disabled={!canAdd}
@@ -485,7 +485,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                 return (
                   <React.Fragment key={id}>
                     {isDropTarget && (
-                      <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-primary font-mono text-[9.5px] tracking-wider select-none shrink-0 animate-in fade-in duration-150">
+                      <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-accent-foreground font-mono text-[9.5px] tracking-wider select-none shrink-0 animate-in fade-in duration-150">
                         DROP HERE
                       </div>
                     )}
@@ -542,7 +542,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
               })}
 
               {(dropTarget === 'dock' || dropTarget === 'cluster') && (
-                <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-primary font-mono text-[9.5px] tracking-wider select-none shrink-0 animate-in fade-in duration-150">
+                <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-accent-foreground font-mono text-[9.5px] tracking-wider select-none shrink-0 animate-in fade-in duration-150">
                   DROP HERE
                 </div>
               )}
@@ -720,7 +720,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                           key={id}
                           className={cn(
                             "group flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-control text-[13px] transition-colors",
-                            isPinned ? "bg-selected-tint text-primary" : "text-foreground hover:bg-sunken"
+                            isPinned ? "bg-selected-tint text-accent-foreground" : "text-foreground hover:bg-sunken"
                           )}
                         >
                           <button
@@ -736,14 +736,14 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                             )}
                           >
                             <Icon
-                              className={cn("size-3.5 shrink-0", isPinned ? "text-primary" : "text-secondary-text")}
+                              className={cn("size-3.5 shrink-0", isPinned ? "text-accent-foreground" : "text-secondary-text")}
                               aria-hidden="true"
                             />
-                            <span className={cn("truncate text-[13px]", isPinned ? "font-semibold text-primary" : "font-normal text-foreground")}>
+                            <span className={cn("truncate text-[13px]", isPinned ? "font-semibold text-accent-foreground" : "font-normal text-foreground")}>
                               {def.label.replace('…', '')}
                             </span>
                             {shortcutText && (
-                              <span className={cn("ml-auto font-mono text-[10px] shrink-0 mr-1", isPinned ? "text-primary/70" : "text-secondary-text")}>
+                              <span className={cn("ml-auto font-mono text-[10px] shrink-0 mr-1", isPinned ? "text-accent-foreground" : "text-secondary-text")}>
                                 {shortcutText}
                               </span>
                             )}
@@ -771,7 +771,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                                 : "text-secondary-text/70 hover:text-primary hover:bg-sunken"
                             )}
                           >
-                            <Pin className={cn("size-3.5", isPinned ? "fill-primary text-primary rotate-45" : "text-secondary-text/70")} />
+                            <Pin className={cn("size-3.5", isPinned ? "fill-current text-accent-foreground rotate-45" : "text-secondary-text/70")} />
                           </Button>
                         </div>
                       );

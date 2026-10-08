@@ -51,7 +51,7 @@ export const ArchitectureGuide: StoryObj = {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <Card className="bg-shell border-control-border">
             <CardHeader className="p-4 space-y-2">
-              <div className="size-7 rounded-control bg-accent text-primary flex items-center justify-center font-mono font-bold text-xs">
+              <div className="size-7 rounded-control bg-accent text-accent-foreground flex items-center justify-center font-mono font-bold text-xs">
                 1
               </div>
               <CardTitle className="text-xs font-bold">Identify Need</CardTitle>
@@ -63,7 +63,7 @@ export const ArchitectureGuide: StoryObj = {
 
           <Card className="bg-shell border-control-border">
             <CardHeader className="p-4 space-y-2">
-              <div className="size-7 rounded-control bg-selected-tint text-primary flex items-center justify-center font-mono font-bold text-xs">
+              <div className="size-7 rounded-control bg-selected-tint text-accent-foreground flex items-center justify-center font-mono font-bold text-xs">
                 2
               </div>
               <CardTitle className="text-xs font-bold">Check Foundation</CardTitle>
@@ -143,7 +143,7 @@ export const ArchitectureGuide: StoryObj = {
             <p className="text-xs text-body leading-relaxed">
               Updating the base primitive <code className="font-mono text-[11px] bg-background px-1 py-0.5 rounded">src/components/ui/dialog.tsx</code> with <code className="font-mono text-[11px]">bg-background</code>, <code className="font-mono text-[11px]">rounded-popover</code> (11px), and <code className="font-mono text-[11px]">shadow-floating</code> instantly harmonized every dialog across the entire application with zero redundant classes.
             </p>
-            <div className="rounded-md bg-selected-tint/60 border border-primary/30 p-2.5 font-mono text-[11px] text-primary">
+            <div className="rounded-md bg-selected-tint/60 border border-primary/30 p-2.5 font-mono text-[11px] text-accent-foreground">
               <code>{`// In src/components/ui/dialog.tsx\nclassName="rounded-popover border border-border bg-background shadow-floating ..."`}</code>
             </div>
             <p className="text-[11px] text-primary font-medium">

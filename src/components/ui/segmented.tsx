@@ -53,7 +53,7 @@ export const Segmented = React.forwardRef<HTMLDivElement, SegmentedProps>(
               disabled={isOptDisabled}
               onClick={() => !isOptDisabled && onChange?.(id)}
               className={cn(
-                "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-all outline-none focus-visible:ring-1 focus-visible:ring-primary cursor-pointer inline-flex items-center justify-center shrink-0",
+                "rounded-[5px] px-2.5 py-1 text-xs font-medium transition-all outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer inline-flex items-center justify-center shrink-0",
                 isSelected
                   ? "bg-background text-primary font-semibold shadow-xs"
                   : "text-secondary-text hover:text-foreground bg-transparent",

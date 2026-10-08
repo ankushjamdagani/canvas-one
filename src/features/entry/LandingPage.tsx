@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
+import { ThemePopover } from "@/lib/theme/ThemePopover";
 import "./landing-page.css";
 
 type Point = { x: number; y: number };
@@ -91,7 +92,7 @@ export function LandingPage() {
     {
       id: "ingress",
       d: curve(nodes["ING-01"], 69, nodes["GW-01"]),
-      color: "#0B5C54",
+      color: "var(--primary)",
       duration: 1.6,
       count: 3,
     },
@@ -100,7 +101,7 @@ export function LandingPage() {
           {
             id: "direct",
             d: curve(nodes["GW-01"], 69, nodes["WRK-04"]),
-            color: "#B4674A",
+            color: "var(--risk)",
             duration: 3.2,
             count: 2,
           },
@@ -111,14 +112,14 @@ export function LandingPage() {
           {
             id: "buffer-in",
             d: curve(nodes["GW-01"], 69, nodes["BUF-01"]),
-            color: accepted ? "#0B5C54" : "#7C5FC0",
+            color: accepted ? "var(--primary)" : "var(--branch)",
             duration: 1.1,
             count: accepted ? 2 : 0,
           },
           {
             id: "buffer-out",
             d: curve(nodes["BUF-01"], accepted ? 68 : 102, nodes["WRK-04"]),
-            color: accepted ? "#0B5C54" : "#7C5FC0",
+            color: accepted ? "var(--primary)" : "var(--branch)",
             duration: 1.1,
             count: accepted ? 2 : 0,
           },
@@ -264,6 +265,7 @@ export function LandingPage() {
                 Try Beta <ArrowRight />
               </a>
             </Button>
+            <ThemePopover />
           </Reveal>
         </header>
         <DraftingStage>
@@ -414,7 +416,7 @@ export function LandingPage() {
                       data-edge={edge.id}
                       d={edge.d}
                       stroke={edge.color}
-                      strokeDasharray={edge.color === "#7C5FC0" ? "4 4" : "3 3"}
+                      strokeDasharray={edge.color === "var(--branch)" ? "4 4" : "3 3"}
                       fill="none"
                     />
                     {!paused &&
@@ -454,7 +456,7 @@ export function LandingPage() {
                         fill="none"
                         stroke={edge.color}
                         strokeDasharray={
-                          edge.color === "#7C5FC0" ? "4 4" : "3 3"
+                          edge.color === "var(--branch)" ? "4 4" : "3 3"
                         }
                       />
                       {!paused &&
@@ -660,7 +662,7 @@ export function LandingPage() {
               <span
                 style={{
                   color:
-                    t >= 3000 ? "#7C5FC0" : t >= 332 ? "#16201D" : "#A3ABA6",
+                    t >= 3000 ? "var(--branch-text)" : t >= 332 ? "var(--foreground)" : "var(--secondary-text)",
                 }}
               >
                 {prompt}
@@ -707,7 +709,7 @@ export function LandingPage() {
                 <svg width="18" height="20" viewBox="0 0 18 20">
                   <path
                     d="M1 1 L1 16 L5 12 L8 19 L11 18 L8 11 L14 11 Z"
-                    fill={index ? "#7C5FC0" : "#0B5C54"}
+                    fill={index ? "var(--branch-solid)" : "var(--primary)"}
                     stroke="white"
                     strokeWidth="1.2"
                   />

@@ -105,8 +105,8 @@ function previewSeed(id: string, index: number): number {
 const THUMB_ACCENTS = [
   "var(--primary)",
   "var(--purple)",
-  "#B5623F",
-  "#3A4A45",
+  "var(--thumbnail-risk)",
+  "var(--thumbnail-body)",
 ] as const;
 
 function accentFor(kind: string): string {
@@ -117,7 +117,7 @@ function accentFor(kind: string): string {
 }
 
 const DOT_BACKGROUND = {
-  backgroundImage: "radial-gradient(circle, #E4DFD6 1px, transparent 1.2px)",
+  backgroundImage: "radial-gradient(circle, var(--thumbnail-dot) 1px, transparent 1.2px)",
   backgroundSize: "12px 12px",
   backgroundPosition: "6px 6px",
 } as const;
@@ -149,7 +149,7 @@ function ProjectPreview({
               y1={e.y1}
               x2={e.x2}
               y2={e.y2}
-              stroke="rgba(60,70,65,0.35)"
+              stroke="var(--thumbnail-line)"
               strokeWidth={3}
               vectorEffect="non-scaling-stroke"
               style={{ strokeWidth: 1.25 }}
@@ -559,7 +559,7 @@ export function EntryScreen({
                   kind="content"
                   index={1}
                   onSubmit={handleCreateBlankProject}
-                  className="relative flex flex-col p-5 justify-between gap-3 bg-primary text-white transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-selected-edge"
+                  className="relative flex flex-col p-5 justify-between gap-3 bg-primary text-primary-foreground transition-colors hover:bg-primary-hover focus-within:ring-2 focus-within:ring-ring"
                 >
                   <button
                     data-testid="create-blank-project-btn"
@@ -574,7 +574,7 @@ export function EntryScreen({
                   <div className="flex flex-col gap-3">
                     <div>
                       <h2 className="text-sm font-semibold">Empty project</h2>
-                      <p className="mt-1 text-xs text-white/75">
+                      <p className="mt-1 text-xs text-primary-foreground">
                         A blank canvas on main. Place parts from the library.
                       </p>
                     </div>
@@ -587,7 +587,7 @@ export function EntryScreen({
                       onChange={(e) => setBlankProjectName(e.target.value)}
                       maxLength={80}
                       disabled={isSubmitting}
-                      className="relative z-10 h-9 pointer-coarse:h-11 w-full rounded-control border border-white/25 bg-white/10 px-3 text-xs text-white placeholder:text-white/55 outline-none focus-visible:border-white/70 focus-visible:bg-white focus-visible:text-ink focus-visible:placeholder:text-secondary-text"
+                      className="relative z-10 h-9 pointer-coarse:h-11 w-full rounded-control border border-control-border-strong bg-background px-3 text-xs text-foreground placeholder:text-secondary-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     />
                   </div>
                 </Reveal>
@@ -665,9 +665,9 @@ export function EntryScreen({
                   kind="content"
                   index={3}
                   className={cn(
-                    "bg-background relative flex p-5 flex-col justify-between border border-dashed transition-colors focus-within:ring-2 focus-within:ring-selected-edge",
+                    "bg-background relative flex p-5 flex-col justify-between border border-dashed transition-colors focus-within:ring-2 focus-within:ring-ring",
                     dragActive
-                      ? "border-primary bg-accent"
+                      ? "border-ring bg-accent text-accent-foreground"
                       : "border-border hover:border-hover-border",
                   )}
                 >
@@ -684,9 +684,9 @@ export function EntryScreen({
                   </span>
                   <div>
                     <h2 className="text-sm font-semibold">Import .json</h2>
-                    <p className="mt-1 text-xs text-secondary-text">
+                    <p className={cn('mt-1 text-xs', dragActive ? 'text-accent-foreground' : 'text-secondary-text')}>
                       Drop a Studio export anywhere on this page, or{" "}
-                      <span className="font-medium text-primary">
+                      <span className={cn('font-medium', dragActive ? 'text-accent-foreground' : 'text-primary')}>
                         {isImporting ? "importing…" : "browse"}
                       </span>
                       .

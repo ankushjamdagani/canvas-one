@@ -236,7 +236,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
               {/* Dock right */}
               <DropdownMenuItem
                 onClick={handleDockRight}
-                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isDockedRight && 'bg-accent/70 font-medium text-foreground')}
+                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isDockedRight && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground')}
                 data-slot="menu-item-dock-right"
               >
                 <PanelRight className="size-3.5 text-secondary-text shrink-0" />
@@ -247,7 +247,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
               {/* Dock left */}
               <DropdownMenuItem
                 onClick={handleDockLeft}
-                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isDockedLeft && 'bg-accent/70 font-medium text-foreground')}
+                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isDockedLeft && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground')}
                 data-slot="menu-item-dock-left"
               >
                 <PanelLeft className="size-3.5 text-secondary-text shrink-0" />
@@ -258,7 +258,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
               {/* Float */}
               <DropdownMenuItem
                 onClick={handleFloat}
-                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isFloat && 'bg-accent/70 font-medium text-foreground')}
+                className={cn('text-[13px] gap-2.5 px-2.5 py-1.5 rounded-control', isFloat && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground')}
                 data-slot="menu-item-float"
               >
                 <AppWindow className="size-3.5 text-secondary-text shrink-0" />
@@ -336,7 +336,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             data-slot="menu-item-dock-right"
             className={cn(
               'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground',
-              isDockedRight && 'bg-accent/70 font-medium text-foreground'
+              isDockedRight && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground'
             )}
           >
             <PanelRight className="size-4 mr-2 text-secondary-text" />
@@ -349,7 +349,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             data-slot="menu-item-dock-left"
             className={cn(
               'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground',
-              isDockedLeft && 'bg-accent/70 font-medium text-foreground'
+              isDockedLeft && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground'
             )}
           >
             <PanelLeft className="size-4 mr-2 text-secondary-text" />
@@ -362,7 +362,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             data-slot="menu-item-float"
             className={cn(
               'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground',
-              isFloat && 'bg-accent/70 font-medium text-foreground'
+              isFloat && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground'
             )}
           >
             <AppWindow className="size-4 mr-2 text-secondary-text" />

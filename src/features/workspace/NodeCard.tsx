@@ -50,7 +50,7 @@ export function NodeCard({ data, selected }: NodeProps) {
         simulationHighlight?.elementIds.has(element.id) && 'ring-2 ring-primary ring-offset-2',
         'component-node relative block rounded-node border bg-background transition-all select-none',
         selected
-          ? 'selected border-2 border-primary ring-2 ring-selected-edge ring-offset-1 shadow-none'
+          ? 'selected border-2 border-ring ring-2 ring-selected-edge ring-offset-1 shadow-none'
           : 'border-control-border hover:border-hover-border hover:shadow-lifted',
       )}
       style={{
@@ -60,7 +60,7 @@ export function NodeCard({ data, selected }: NodeProps) {
       {trafficEntry ? (
         <span
           data-testid={`node-traffic-entry-${element.id}`}
-          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-primary/40 bg-selected-tint px-1.5 py-0.5 font-mono text-micro uppercase text-primary"
+          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-ring/40 bg-selected-tint px-1.5 py-0.5 font-mono text-micro uppercase text-accent-foreground"
         >
           Traffic enters here
         </span>

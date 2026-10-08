@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 import '@xyflow/react/dist/style.css';
 import '../src/styles.css';
 import { TooltipProvider } from '../src/components/ui/tooltip';
+import { ThemeProvider } from '../src/lib/theme';
 
 const preview: Preview = {
   parameters: {
@@ -29,11 +30,11 @@ const preview: Preview = {
   },
   decorators: [
     (Story) => (
-      <TooltipProvider delayDuration={200}>
+      <ThemeProvider><TooltipProvider delayDuration={200}>
         <div className="font-sans text-ink antialiased">
           <Story />
         </div>
-      </TooltipProvider>
+      </TooltipProvider></ThemeProvider>
     ),
   ],
 };

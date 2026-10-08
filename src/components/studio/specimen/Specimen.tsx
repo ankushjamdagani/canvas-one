@@ -168,7 +168,7 @@ export function Specimen() {
     <div className="min-h-screen bg-shell text-foreground p-8 max-w-6xl mx-auto space-y-16 font-sans">
       <header className="space-y-3 border-b border-border pb-8">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs font-semibold tracking-wider text-primary uppercase bg-accent px-2 py-0.5 rounded-tag border border-border">
+          <span className="font-mono text-xs font-semibold tracking-wider text-accent-foreground uppercase bg-accent px-2 py-0.5 rounded-tag border border-border">
             System Studio
           </span>
           <span className="font-mono text-xs text-muted-foreground">Evergreen v2.0</span>
@@ -1088,7 +1088,7 @@ export function Specimen() {
               Rail Items · Outer Spine on Active
             </h3>
             <div className="flex items-center gap-4">
-              <div className="w-12 py-2 rounded-md flex flex-col items-center gap-1 bg-accent relative text-primary">
+              <div className="w-12 py-2 rounded-md flex flex-col items-center gap-1 bg-accent relative text-accent-foreground">
                 <span className="absolute -left-1 top-2.5 bottom-2.5 w-0.5 bg-primary rounded-full" />
                 <Library className="size-4" />
                 <span className="font-mono text-[9.5px]">PARTS</span>

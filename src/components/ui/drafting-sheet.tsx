@@ -4,6 +4,7 @@ import { useRouteShell } from "@/lib/motion/shell-context";
 import { BrandMark } from "./brand-mark";
 import { DraftingFrame, DraftingGround } from "./drafting-board";
 import { Reveal } from "./reveal";
+import { ThemePopover } from "@/lib/theme/ThemePopover";
 
 /** Shared public-page chrome, separate from the workspace's canvas and telemetry. */
 export function DraftingSheet({
@@ -57,6 +58,7 @@ export function DraftingSheet({
           className="ml-auto flex items-center gap-2 min-[481px]:gap-4"
         >
           {navigation}
+          <ThemePopover />
         </Reveal>
       </header>
       {children}
@@ -83,7 +85,7 @@ export function DraftingAvatar({
     <span
       {...props}
       className={cn(
-        "grid size-7 place-items-center rounded-full border-2 border-background bg-primary text-micro font-semibold tracking-normal text-white ring-1 ring-border",
+        "grid size-7 place-items-center rounded-full border-2 border-background bg-primary text-micro font-semibold tracking-normal text-primary-foreground ring-1 ring-border",
         className,
       )}
     />

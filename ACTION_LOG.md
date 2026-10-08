@@ -3205,3 +3205,55 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Platform/subagents: Codex, isolated production Chromium; no subagents.
 - Verification: production build passed; detector warning verified as intentional keycap; one browser audit probe completed, Axe/reflow measured across desktop/phone public pages and S04 editor; landing/editor screenshots inspected. Temporary probe/config removed.
 - Limitations: no full unit/e2e suite, Lighthouse, physical/synthesized touch, text scaling or overlay keyboard journey. LESSONS' fresh isolated build and viewport-versus-touch rules guided verification.
+
+### Global theme switcher (Codex / Claude)
+- Outcome: integrated 14 supplied palettes in both modes, saved preferences, named keyboard-accessible rows and landing/projects/workspace controls. Layouts and existing Evergreen light tokens preserved; shared production colour roles migrated.
+- Files: shared theme module/switcher, foundation styles/brand/frame, entry/workspace/traffic consumers, Storybook, Vite vendor split and theme tests; source export untouched.
+- Platform/subagents: Claude Sonnet first implementation via `/delegate` in isolated worktree; Codex corrected/integrated after Claude session quota; native independent reviewer.
+- Verification: 1,909 full unit tests pass (11 skipped), plus 66 final focused tests including two added preference/role cases; production/Storybook builds pass; isolated fixed-build production suite: 168 passed, 4 dev-only skipped, no retries. All 28 variants reconcile with source; zero changes to existing default CSS tokens; desktop/320px screenshots and independent source review clear. Temporary config removed; preview 5187.
+- Limitations: alternate reference layouts are outside this colour/mode switcher scope. Claude's correction run was blocked by its session quota; Codex finished the reviewed changes.
+- Lesson: copied palettes contained invented derived variants and default-role drift; mechanically evaluate the supplied source variants and compare the existing default tokens. Settled controls are required for contrast audits during theme transitions.
+
+## 2026-10-08
+
+### Combined colour schemes and accessibility review
+- Outcome: all 14 schemes share one list; audited both modes across landing/projects/workspace and open panels. Corrected normal, selected, hover, pressed and focus colours, control boundaries, notes, scenario creation and selected request cycles through shared roles and foundation controls.
+- Files: theme switcher/mapping, shared controls/styles/class merger, entry/library/workspace/history/scenario/run consumers, permanent theme journeys and Storybook interaction specimen; audit report, HANDOFF and LESSONS. Raw supplied palettes preserved.
+- Platform/subagents: Codex implementation and production/Storybook Chromium audits; native independent reviewer, no unresolved findings.
+- Verification: full unit run 1,941 passed / 11 skipped, final focused run 80 passed; production and Storybook builds passed. Final isolated fixed-build production suite 196 passed / 4 dev-only skipped / zero failures or retries, including all 28 expanded theme journeys. Shared-control audit: 784 contrast measurements and 28 axe scans, zero failures. Desktop/phone screenshots inspected; diff check clean.
+- Limitations: colour/state audit covers listed production journeys, not full WCAG certification or every possible authored graph. An intermediate run had three known connection-gesture failures; final isolated run passed them without domain changes. Temporary config removed; preview 5187 retained.
+- Lesson: selected descendants need their paired foreground, and custom typography aliases must be registered with the class merger to preserve semantic text colours. Wait for colour transitions before measuring contrast; keep the served build fixed during browser verification.
+
+### Animated landing proposal contrast follow-up
+- Outcome: checked the screenshot's later proposal state in every scheme/mode; fixed Accept's conflicting CSS fill, branch-filled avatar/cursor/send foregrounds, prompt text, Dismiss boundary and landing focus ring. Shared primary button states preserved.
+- Files: theme mapping/default branch foreground, landing CSS/TSX, theme role test, `tests/landing-theme-states.spec.ts`, audit report, HANDOFF and LESSONS.
+- Platform/subagents: Codex, isolated production Chromium; no subagents.
+- Verification: 74 theme unit tests pass; production/Storybook builds pass; final isolated browser run 40 passed (all 28 proposal-state journeys plus theme and transition regressions), no retries/failures. Text, button/icon and focus contrast measured; diff check clean. Temporary config removed.
+- Limitations: scoped follow-up; whole-app suite was not repeated. Preview 5187 retained.
+- Lesson: initial landing scans missed controls shown later in the animation, while axe omitted aria-hidden collaborator labels. Wait for the actual proposal/note and measure visible labels/icons explicitly. A synthetic-clock probe missed React's mounted timer; the final tests wait for real rendered state instead.
+
+### Consistent light Claude foregrounds
+- Outcome: Claude header avatar, prompt submit icon and cursor labels now use white in every theme. Shared `--branch-solid` adjusts fill luminance to keep white contrast at least 4.5:1; authored raw palettes remain unchanged.
+- Files: theme mapping/default token, landing CSS/cursor arrow, unit/browser assertions, HANDOFF and audit report.
+- Platform/subagents: Codex; no subagents.
+- Verification: production build, 74 theme unit tests and all 28 production browser variants passed; hover/pressed/focus contrast and explicit white foreground assertions pass. Diff check clean; temporary config removed.
+- Limitations: scoped tests; no repeat of full application suite or Storybook build for this token-only visual correction.
+- Lesson: meeting contrast with automatically chosen dark foregrounds did not match the requested visual treatment; preserve light foregrounds by adjusting their paired fill when specified.
+
+### Six saved layout presets
+- Outcome: added Workbench, Studio, Islands, Blueprint, Ledger and Tiles to the shared appearance menu. Independent saved layout preference, cross-tab synchronization, keyboard choices and foundation typography/radii/grid/shadows/chrome geometry. Desktop tool rails retain actions, labels and zoom; mobile stays stacked; keyed Ledger footer follows canvas in DOM order. Panels/graph coordinates/playback remain functional. Desk/shell text contrast corrected.
+- Files: shared layout module/CSS/provider/switcher, workspace/header/dock/canvas/drafting-ground hooks, foundation colour roles, unit/browser checks and updated fixed-layout expectations; layout audit, HANDOFF and LESSONS.
+- Platform/subagents: Codex implementation; Claude Sonnet read-only review completed after initial login failure and a timed-out review; native independent reviewer confirmed final corrections.
+- Verification: 1,943 unit tests passed / 11 skipped; final production and Storybook builds passed. Initial full browser run: 202 passed / 29 failed / 4 skipped, exposing fixed-layout expectations, desk contrast, clipped zoom and one intermittent connection gesture. After correction, affected production run: 69 passed / one connection-gesture failure; all 7 layout tests (168 combinations on projects and workspace), 28 expanded theme journeys, frame/transition/design-language/rename/shell checks passed. The isolated failing gesture rerun passed without source changes. Desktop/phone screenshots inspected; diff check clean.
+- Limitations: whole-app suite not repeated after final corrections; the passing gesture rerun does not establish a flake fix. Reference Workbench panel reservation is dynamic and playback stays below canvas; Islands uses bundled Inter. Raw palettes preserved, no commit requested.
+- Lesson: important utility geometry beat layout CSS and native translate clipped rails; labelled zoom groups need bounded grid layout. Include desk backgrounds in text-role derivation and move keyed headers in DOM rather than relying on CSS order. Headless Claude review needed explicit read/search permissions to complete.
+- Final confirmation: Ledger's 28-combination journey passed again with settled desktop/phone screenshots; temporary browser config removed.
+
+### Undo layout presets
+- Outcome: reverted the six-layout task at user request; restored prior workspace geometry and theme-only menu. Earlier theme/accessibility and white Claude foreground fixes preserved.
+- Files: layout foundation/provider/menu/workspace hooks and layout-specific tests removed or restored; HANDOFF updated. Codex; no delegation.
+- Verification: 93 focused theme/token tests passed; production build and diff whitespace check passed. Full browser suite not rerun for the rollback.
+
+### Commit theme switcher and accessibility work
+- Outcome: committed the current theme switcher, colour/state accessibility fixes and consistent white Claude foregrounds after the requested layout rollback.
+- Platform: Codex; no subagents. Verification: diff reviewed and whitespace check passed; preceding rollback build and 93 focused tests passed. No push requested.

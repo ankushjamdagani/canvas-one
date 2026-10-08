@@ -9,8 +9,8 @@ const badgeVariants = cva(
       variant: {
         // Board tag tones
         neutral: "border-border bg-sunken text-body",
-        success: "border-selected-edge bg-accent text-primary",
-        accent: "border-selected-edge bg-accent text-primary",
+        success: "border-selected-edge bg-accent text-accent-foreground",
+        accent: "border-selected-edge bg-accent text-accent-foreground",
         branch: "border-branch-edge bg-branch-tint text-branch",
         risk: "border-risk-edge bg-risk-tint text-risk-text",
         warning: "border-warning-edge bg-warning-tint text-warning-text",
@@ -19,7 +19,7 @@ const badgeVariants = cva(
           "rounded-full border-transparent bg-primary px-2 py-0.5 font-sans text-xs font-semibold normal-case tracking-normal text-primary-foreground",
 
         // Legacy aliases retained so existing app usages keep compiling.
-        default: "border-selected-edge bg-accent text-primary",
+        default: "border-selected-edge bg-accent text-accent-foreground",
         secondary: "border-border bg-sunken text-body",
         destructive: "border-risk-edge bg-risk-tint text-risk-text",
         outline: "border-border bg-transparent text-foreground",

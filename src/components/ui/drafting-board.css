@@ -57,7 +57,7 @@
 .drafting-frame-ring {
   position: absolute;
   inset: 5px;
-  border: 1px solid #e2ddd3;
+  border: 1px solid var(--drafting-inner-edge);
 }
 .drafting-stage {
   position: absolute;

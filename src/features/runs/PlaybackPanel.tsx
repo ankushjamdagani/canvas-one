@@ -472,7 +472,7 @@ export function PlaybackPanel({
                   key={scenario.id}
                   data-testid={`scenario-item-${scenario.id}`}
                   data-selected={selected}
-                  className={`flex items-center gap-2 rounded-[7px] pr-1.5 hover:bg-sunken ${selected ? "bg-accent" : ""}`}
+                  className={`flex items-center gap-2 rounded-[7px] pr-1.5 ${selected ? "bg-accent" : "hover:bg-sunken"}`}
                 >
                   <button
                     type="button"
@@ -481,10 +481,10 @@ export function PlaybackPanel({
                     onClick={() => selectScenario(scenario)}
                     className="flex min-h-[44px] min-w-0 flex-1 flex-col justify-center gap-0.5 rounded-[7px] py-2 pl-2.5 text-left focus-visible:outline-2 focus-visible:outline-ring"
                   >
-                    <span className="truncate text-xs font-medium">
+                    <span className={`truncate text-xs font-medium ${selected ? 'text-accent-foreground' : 'text-foreground'}`}>
                       {scenario.label}
                     </span>
-                    <span className="font-mono text-micro text-secondary-text">
+                    <span className={`font-mono text-micro ${selected ? 'text-accent-foreground' : 'text-secondary-text'}`}>
                       {scenario.mode} simulation
                     </span>
                   </button>
@@ -498,7 +498,7 @@ export function PlaybackPanel({
                         title={label}
                         aria-label={`${label} scenario ${scenario.label}`}
                         disabled={!callback}
-                        className={`size-[26px] rounded-[6px] text-secondary-text [&_svg]:size-3 ${tone}`}
+                        className={`size-[26px] rounded-[6px] bg-background text-secondary-text [&_svg]:size-3 ${tone}`}
                         onClick={() => {
                           setMenuOpen(false);
                           callback?.(scenario.id);
@@ -518,7 +518,7 @@ export function PlaybackPanel({
                   setMenuOpen(false);
                   onNewScenario();
                 }}
-                className="mt-1 flex w-full items-center gap-2 rounded-b-[7px] border-t border-border px-2.5 py-2.5 text-left text-xs font-medium text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+                className="mt-1 flex w-full items-center gap-2 rounded-b-[7px] border-t border-border px-2.5 py-2.5 text-left text-xs font-medium text-primary hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <Plus className="size-3.5" aria-hidden="true" />
                 New scenario

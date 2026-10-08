@@ -450,7 +450,7 @@ export function SavedParts({
         {visible.map((part) => (
           <article
             key={part.id}
-            className="min-w-0 rounded-lg border border-border bg-white p-2.5 text-xs"
+            className="min-w-0 rounded-lg border border-border bg-background p-2.5 text-xs"
           >
             <button
               type="button"

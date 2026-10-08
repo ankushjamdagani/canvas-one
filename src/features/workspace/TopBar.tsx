@@ -24,6 +24,7 @@ import { lazyComponent } from "@/lib/lazyComponent";
 import { RenameConflictPopover, RenamedNotice } from "./ProjectRenameFeedback";
 import { BranchPopover, type BranchActionOutcome } from "./BranchPopover";
 import type { TransferActions } from "../transfer";
+import { ThemeButton } from "@/lib/theme/ThemePopover";
 
 export interface TopBarProps {
   project: ProjectRecord;
@@ -317,8 +318,8 @@ export function TopBar({
                     className={cn(
                       "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-xs font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                       isOpen
-                        ? "bg-accent border-selected-edge text-primary"
-                        : "border-transparent text-ink hover:bg-[#F2EFE9] hover:border-[#E7E3DB]",
+                        ? "bg-accent border-selected-edge text-accent-foreground"
+                        : "border-transparent text-ink hover:bg-sunken hover:border-hairline",
                     )}
                     title={project.title}
                   >
@@ -344,7 +345,7 @@ export function TopBar({
             {/* RV-05b review round 1: dropped below sm so a 390px top bar has room
                 for the project name and the branch toggle without clipping. */}
             <span
-              className="hidden sm:inline text-[#C0C6C1] text-xs select-none shrink-0"
+              className="hidden sm:inline text-text-disabled text-xs select-none shrink-0"
               aria-hidden="true"
             >
               /
@@ -368,8 +369,8 @@ export function TopBar({
                   className={cn(
                     "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-xs font-medium transition-colors min-w-0 shrink-0 pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                     isOpen
-                      ? "bg-[#E9DFF8] border-[#C7B4EA] text-[#5B3E9B]"
-                      : "border-transparent text-[#7C5FC0] hover:bg-[#F3EEFB] hover:border-[#E0D5F2]",
+                      ? "bg-[var(--branch-active-fill)] border-[var(--branch-active-edge)] text-[var(--branch-active-text)]"
+                      : "border-transparent text-branch hover:bg-[var(--branch-hover-fill)] hover:border-[var(--branch-hover-edge)]",
                   )}
                   title={branchLabel}
                 >
@@ -377,7 +378,7 @@ export function TopBar({
                     size={12}
                     className={cn(
                       "shrink-0",
-                      isOpen ? "text-[#5B3E9B]" : "text-[#7C5FC0]",
+                      isOpen ? "text-[var(--branch-active-text)]" : "text-branch",
                     )}
                   />
                   <span className="hidden sm:inline font-semibold truncate max-w-[110px] sm:max-w-[180px]">
@@ -393,7 +394,7 @@ export function TopBar({
                   {isOpen ? (
                     <ChevronUp
                       size={11}
-                      className="text-[#5B3E9B] shrink-0"
+                      className="text-branch shrink-0"
                       aria-hidden="true"
                     />
                   ) : (
@@ -474,7 +475,7 @@ export function TopBar({
           aria-label="Illustrative collaborators"
         >
           <span className="flex" aria-hidden="true">
-            <span className="grid size-8 place-items-center rounded-full border-2 border-white bg-primary text-[11px] font-semibold text-white">
+            <span className="grid size-8 place-items-center rounded-full border-2 border-white bg-primary text-[11px] font-semibold text-primary-foreground">
               DK
             </span>
             <span className="-ml-2.5 grid size-8 place-items-center rounded-full border-2 border-white bg-[#7C5FC0] text-[11px] text-white">
@@ -490,14 +491,14 @@ export function TopBar({
           </span>
         </span>
         <div
-          className="hidden xl:block w-px h-5 bg-[#DCD7CD] shrink-0"
+          className="hidden xl:block w-px h-5 bg-control-border shrink-0"
           aria-hidden="true"
         />
         <Button
           type="button"
           data-testid="topbar-share-btn"
           size="sm"
-          className="hidden xl:inline-flex h-7 px-3 text-xs shrink-0 disabled:bg-primary disabled:text-[#FBFAF7] disabled:opacity-100"
+          className="hidden xl:inline-flex h-7 px-3 text-xs shrink-0 disabled:bg-primary disabled:text-primary-foreground disabled:opacity-100"
           disabled
           title="Sharing isn't available yet"
         >
@@ -540,6 +541,7 @@ export function TopBar({
             <span className="hidden sm:inline">History</span>
           </Button>
         )}
+        <ThemeButton className="min-[1000px]:pointer-events-auto" />
         {runControl ?? null}
       </div>
     </header>

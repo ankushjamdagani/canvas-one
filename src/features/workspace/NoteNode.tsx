@@ -115,7 +115,7 @@ export function NoteNode({ data, selected }: NodeProps) {
           className={cn(
             'pointer-events-none relative size-8 rounded-full border shadow-raised flex items-center justify-center text-secondary-text transition-colors',
             toneStyle.card,
-            selected && 'ring-2 ring-selected-edge ring-offset-1 border-primary',
+            selected && 'ring-2 ring-ring ring-offset-1 border-ring',
           )}
         >
           <MessageSquare className="size-3.5" aria-hidden="true" />
@@ -149,14 +149,14 @@ export function NoteNode({ data, selected }: NodeProps) {
       className={cn(
         'group note-card rounded-card p-2.5 border shadow-raised select-none transition-all text-xs leading-relaxed relative text-foreground',
         toneStyle.card,
-        selected && 'ring-2 ring-selected-edge ring-offset-1 border-primary',
+        selected && 'ring-2 ring-ring ring-offset-1 border-ring',
       )}
       style={{
         width: nodeData.width,
       }}
     >
       {/* Top action bar: visible on hover or when selected */}
-      <div className="flex items-center justify-between gap-1 mb-1 opacity-70 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center justify-between gap-1 mb-1 opacity-100 group-hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-1 min-w-0">
           {isAttached ? (
             <span
@@ -219,7 +219,7 @@ export function NoteNode({ data, selected }: NodeProps) {
                           setLinkMenuOpen(false);
                           nodeData.onAttach?.(el.id);
                         }}
-                        className="w-full text-left px-2 py-1 rounded text-xs hover:bg-selected-tint hover:text-primary transition-colors cursor-pointer truncate"
+                        className="w-full text-left px-2 py-1 rounded text-xs hover:bg-selected-tint hover:text-accent-foreground transition-colors cursor-pointer truncate"
                       >
                         {el.label}
                       </button>
@@ -291,7 +291,7 @@ export function NoteNode({ data, selected }: NodeProps) {
                       className={cn(
                         'size-5 rounded-full border flex items-center justify-center cursor-pointer hover:scale-110 transition-transform',
                         NOTE_TONE_STYLES[tone].swatch,
-                        nodeData.tone === tone && 'ring-2 ring-selected-edge ring-offset-1',
+                        nodeData.tone === tone && 'ring-2 ring-ring ring-offset-1',
                       )}
                     >
                       {nodeData.tone === tone && <Check className="size-2.5 text-primary" aria-hidden="true" />}
@@ -374,7 +374,7 @@ export function NoteNode({ data, selected }: NodeProps) {
                 setIsEditing(false);
               }
             }}
-            className="w-full bg-background/80 rounded border border-primary p-1.5 text-xs text-foreground font-sans outline-none resize-none leading-relaxed"
+            className="w-full bg-background/80 rounded border border-ring p-1.5 text-xs text-foreground font-sans outline-none resize-none leading-relaxed"
             rows={Math.max(2, editText.split('\n').length)}
           />
           <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-secondary-text">
@@ -391,4 +391,3 @@ export function NoteNode({ data, selected }: NodeProps) {
     </div>
   );
 }
-

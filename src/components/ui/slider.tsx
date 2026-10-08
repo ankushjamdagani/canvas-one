@@ -62,7 +62,7 @@ const Slider = React.forwardRef<
           <SliderPrimitive.Range
             data-slot="slider-range"
             className={cn(
-              "absolute h-full bg-primary data-[orientation=vertical]:w-full",
+              "absolute h-full bg-ring data-[orientation=vertical]:w-full",
             )}
           />
         </SliderPrimitive.Track>
@@ -72,7 +72,7 @@ const Slider = React.forwardRef<
             data-slot="slider-thumb"
             aria-label={thumbLabels?.[index] ?? label}
             aria-valuetext={thumbValueTexts?.[index] ?? valueText}
-            className="block size-3.5 pointer-coarse:size-5 shrink-0 rounded-full border border-primary bg-background shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:border-hairline disabled:bg-panel cursor-pointer"
+            className="block size-3.5 pointer-coarse:size-5 shrink-0 rounded-full border border-ring bg-background shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:border-hairline disabled:bg-panel cursor-pointer"
           />
         ))}
       </SliderPrimitive.Root>

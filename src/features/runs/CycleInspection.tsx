@@ -243,7 +243,7 @@ export function CycleInspection({
           const failed = cycle.outcome !== null && cycle.outcome !== "ok";
           const tag = (
             <span
-              className={`justify-self-end rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] ${failed ? "bg-risk-tint text-risk-text" : cycle.outcome === null ? "bg-accent text-primary" : "bg-sunken text-secondary-text"}`}
+              className={`justify-self-end rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] ${failed ? "bg-risk-tint text-risk-text" : cycle.outcome === null ? "bg-accent text-accent-foreground" : "bg-sunken text-secondary-text"}`}
             >
               {outcome}
             </span>
@@ -261,7 +261,7 @@ export function CycleInspection({
               className={
                 mobile
                   ? "flex h-[52px] w-full items-center gap-2.5 border-b border-border px-4 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-ring"
-                  : "grid h-[30px] w-full grid-cols-[62px_70px_minmax(0,1fr)_64px] items-center gap-2 border-b border-border px-4 text-left font-mono text-[11px] hover:bg-sunken aria-pressed:bg-accent aria-pressed:shadow-[inset_2px_0_0_var(--primary)] focus-visible:outline-2 focus-visible:outline-ring"
+                  : "grid h-[30px] w-full grid-cols-[62px_70px_minmax(0,1fr)_64px] items-center gap-2 border-b border-border px-4 text-left font-mono text-[11px] hover:bg-sunken aria-pressed:bg-accent aria-pressed:hover:bg-accent aria-pressed:text-accent-foreground aria-pressed:shadow-[inset_2px_0_0_var(--ring)] focus-visible:outline-2 focus-visible:outline-ring"
               }
             >
               {mobile ? (
@@ -279,7 +279,7 @@ export function CycleInspection({
               ) : (
                 <>
                   <span>{shortId}</span>
-                  <time className="text-secondary-text">
+                  <time className={cycle.id === selectedId ? 'text-accent-foreground' : 'text-secondary-text'}>
                     {formatSimulationTime(cycle.startedAtMs)}
                   </time>
                   <span
@@ -293,7 +293,7 @@ export function CycleInspection({
                         width: `${Math.min(90, ((latency ?? 0) / 1000) * 90)}px`,
                       }}
                     />
-                    <span className="whitespace-nowrap text-secondary-text">
+                    <span className={`whitespace-nowrap ${cycle.id === selectedId ? 'text-accent-foreground' : 'text-secondary-text'}`}>
                       {formatSimulationLatency(latency)}
                     </span>
                   </span>

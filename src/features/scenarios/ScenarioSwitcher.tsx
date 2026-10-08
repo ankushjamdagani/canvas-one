@@ -223,7 +223,7 @@ export function ScenarioSwitcher({
                 }}
                 disabled={isRunAllDisabled}
                 title={runAllDisabledReason ?? undefined}
-                className="inline-flex items-center gap-1.5 font-semibold text-primary hover:text-primary-hover active:text-primary-pressed transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-secondary-text"
+                className="inline-flex items-center gap-1.5 font-semibold text-primary hover:text-primary hover:underline active:text-primary transition-colors cursor-pointer disabled:cursor-not-allowed disabled:text-secondary-text"
                 aria-label={`Run all ${totalScenarios} scenarios`}
               >
                 <Play className="size-3.5 fill-current" aria-hidden="true" />
@@ -244,7 +244,7 @@ export function ScenarioSwitcher({
                   className={cn(
                     "group flex items-start justify-between rounded-control transition-colors border",
                     isSelected
-                      ? "bg-selected-tint/40 border-selected-edge"
+                      ? "bg-selected-tint border-selected-edge text-accent-foreground [&_.text-foreground]:text-accent-foreground [&_.text-secondary-text]:text-accent-foreground"
                       : "border-transparent hover:bg-sunken",
                   )}
                 >
@@ -355,7 +355,7 @@ export function ScenarioSwitcher({
               className={cn(
                 "mx-2.5 my-1.5 p-2 rounded-md border text-[11px] flex items-center gap-2",
                 allPassing
-                  ? "bg-selected-tint/40 border-selected-edge text-primary"
+                  ? "bg-selected-tint border-selected-edge text-accent-foreground"
                   : "bg-risk-tint/40 border-risk-edge/50 text-risk-text",
               )}
               role="status"
@@ -401,7 +401,7 @@ export function ScenarioSwitcher({
               ? "Stop the run and keep its results"
               : "Cancel execution"
           }
-          className="h-full shrink-0 px-3 flex items-center gap-1.5 text-xs font-semibold bg-clay text-primary-foreground disabled:opacity-50"
+          className="h-full shrink-0 px-3 flex items-center gap-1.5 text-xs font-semibold bg-destructive text-destructive-foreground disabled:opacity-50"
         >
           <Square className="size-3.5 fill-current" aria-hidden="true" />
           <span>Stop</span>

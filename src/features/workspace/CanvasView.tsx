@@ -1364,8 +1364,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         <CanvasCrosshair gap={gridGap} />
         {showMinimap && (
           <MiniMap
-            nodeColor="#0B5C54"
-            maskColor="rgba(247, 245, 241, 0.7)"
+            nodeColor="var(--primary)"
+            maskColor="color-mix(in srgb, var(--panel) 70%, transparent)"
             className="!bottom-20 !right-4 rounded-lg border border-border bg-background shadow-floating"
           />
         )}
@@ -1378,7 +1378,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         <div
           data-testid="connect-rejected-message"
           role="status"
-          className="fixed z-tooltip max-w-xs px-2.5 py-1.5 rounded-control bg-destructive text-white text-xs shadow-raised pointer-events-none"
+          className="fixed z-tooltip max-w-xs px-2.5 py-1.5 rounded-control bg-destructive text-destructive-foreground text-xs shadow-raised pointer-events-none"
           style={{ left: rejectMessage.x + 12, top: rejectMessage.y + 12 }}
         >
           {rejectMessage.text}

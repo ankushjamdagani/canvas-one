@@ -17,7 +17,7 @@ const buttonVariants = cva(
         secondary:
           "font-semibold border border-hover-border bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary-hover hover:border-border-pressed active:bg-secondary-pressed active:border-border-pressed focus-visible:border-primary disabled:bg-panel disabled:text-secondary-text disabled:border-hairline",
         tint:
-          "font-medium border border-selected-edge bg-accent text-primary hover:bg-tint-hover hover:border-tint-hover-edge active:bg-tint-pressed active:text-primary-pressed focus-visible:border-primary disabled:bg-panel disabled:text-secondary-text disabled:border-hairline",
+          "font-medium border border-selected-edge bg-accent text-accent-foreground hover:bg-tint-hover hover:border-tint-hover-edge active:bg-tint-pressed active:text-accent-foreground focus-visible:border-primary disabled:bg-panel disabled:text-secondary-text disabled:border-hairline",
         ghost:
           "font-medium text-body hover:bg-sunken hover:text-foreground active:bg-desk disabled:bg-transparent disabled:text-secondary-text disabled:border-transparent",
         link: "font-medium text-primary underline-offset-4 hover:underline disabled:text-secondary-text",

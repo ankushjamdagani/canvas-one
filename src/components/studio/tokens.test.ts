@@ -202,10 +202,15 @@ describe("Evergreen tokens and styles.css single source check", () => {
     }
   });
 
-  it("(h) asserts elevation shadow tokens in @theme equal evergreen.shadow", () => {
-    expect(themeVars["--shadow-raised"]).toBe(evergreen.shadow.raised);
-    expect(themeVars["--shadow-popover"]).toBe(evergreen.shadow.popover);
-    expect(themeVars["--shadow-floating"]).toBe(evergreen.shadow.floating);
+  it("(h) asserts elevation shadow tokens: @theme uses var() indirection; :root holds Evergreen defaults", () => {
+    // Shadow tokens in @theme reference --tw-shadow-* vars so applyTokens() can override at runtime.
+    expect(themeVars["--shadow-raised"]).toBe("var(--tw-shadow-raised)");
+    expect(themeVars["--shadow-popover"]).toBe("var(--tw-shadow-popover)");
+    expect(themeVars["--shadow-floating"]).toBe("var(--tw-shadow-floating)");
+    // The :root defaults must match the Evergreen values from tokens.ts.
+    expect(rootVars["--tw-shadow-raised"]).toBe(evergreen.shadow.raised);
+    expect(rootVars["--tw-shadow-popover"]).toBe(evergreen.shadow.popover);
+    expect(rootVars["--tw-shadow-floating"]).toBe(evergreen.shadow.floating);
   });
 
   it("(i) asserts nodeKindColor covers exactly the six componentCatalog layers, lowercased", () => {

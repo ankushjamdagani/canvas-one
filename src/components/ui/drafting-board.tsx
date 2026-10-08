@@ -1,3 +1,4 @@
+import { readActionRgb } from '@/lib/theme/color';
 import * as React from "react";
 import { useRouteShell } from "@/lib/motion/shell-context";
 import { cn } from "@/lib/utils";
@@ -171,9 +172,9 @@ export function DraftingGround({
             cross.y + 260,
           );
         for (const gradient of [horizontal, vertical]) {
-          gradient.addColorStop(0, "rgba(11,92,84,0)");
-          gradient.addColorStop(0.5, `rgba(11,92,84,${a})`);
-          gradient.addColorStop(1, "rgba(11,92,84,0)");
+          gradient.addColorStop(0, `rgba(${readActionRgb()},0)`);
+          gradient.addColorStop(0.5, `rgba(${readActionRgb()},${a})`);
+          gradient.addColorStop(1, `rgba(${readActionRgb()},0)`);
         }
         ctx.lineWidth = 1;
         ctx.setLineDash([2, 4]);
@@ -188,10 +189,10 @@ export function DraftingGround({
         ctx.lineTo(cross.x, cross.y + 260);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.strokeStyle = `rgba(11,92,84,${1.3 * a})`;
+        ctx.strokeStyle = `rgba(${readActionRgb()},${1.3 * a})`;
         ctx.strokeRect(cross.x - 3.5, cross.y - 3.5, 7, 7);
         ctx.font = '9px "Martian Mono", monospace';
-        ctx.fillStyle = `rgba(11,92,84,${1.2 * a})`;
+        ctx.fillStyle = `rgba(${readActionRgb()},${1.2 * a})`;
         ctx.fillText(
           `${Math.round(tx * 10)} · ${Math.round(ty * 10)}`,
           cross.x + 9,
@@ -266,7 +267,7 @@ export function DraftingGround({
           continue;
         }
         if (!reduced) {
-          ctx.fillStyle = `rgba(11,92,84,${0.75 * fade * trail.alpha})`;
+          ctx.fillStyle = `rgba(${readActionRgb()},${0.75 * fade * trail.alpha})`;
           ctx.beginPath();
           ctx.arc(trail.x, trail.y, 1.3 + 0.9 * fade, 0, Math.PI * 2);
           ctx.fill();

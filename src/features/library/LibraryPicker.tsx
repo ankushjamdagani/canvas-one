@@ -87,7 +87,7 @@ export function LibraryPicker({
       tabIndex={0}
       onKeyDown={onKeyDown}
       className={cn(
-        'flex flex-col w-full max-w-[640px] rounded-popover border border-border bg-background shadow-popover overflow-hidden text-foreground font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary',
+        'flex flex-col w-full max-w-[640px] rounded-popover border border-border bg-background shadow-popover overflow-hidden text-foreground font-sans select-none focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         className,
       )}
       data-testid="library-picker"
@@ -114,7 +114,7 @@ export function LibraryPicker({
             }}
             placeholder="Search components, tags, groups..."
             aria-label="Search components"
-            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-16 text-xs rounded-md bg-white border border-control-border text-foreground placeholder:text-secondary-text focus:border-control-border-strong focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+            className="w-full h-8 pointer-coarse:h-11 pl-8 pr-16 text-xs rounded-md bg-background border border-control-border text-foreground placeholder:text-secondary-text focus:border-control-border-strong focus:outline-none focus:ring-1 focus:ring-ring transition-all"
           />
           {searchQuery.trim().length > 0 && (
             <button
@@ -144,10 +144,10 @@ export function LibraryPicker({
                 aria-label={`Filter by ${chip}`}
                 onClick={() => setActiveGroup(chip)}
                 className={cn(
-                  'shrink-0 px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none',
+                  'shrink-0 px-2.5 py-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors border cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                   isActive
-                    ? 'bg-accent border-primary text-primary font-semibold shadow-2xs'
-                    : 'bg-white border-control-border text-secondary-text hover:bg-sunken hover:text-foreground',
+                    ? 'bg-accent border-primary text-accent-foreground font-semibold shadow-2xs'
+                    : 'bg-background border-control-border text-secondary-text hover:bg-sunken hover:text-foreground',
                 )}
               >
                 {chip}
@@ -163,7 +163,7 @@ export function LibraryPicker({
         role="listbox"
         aria-label="Component grid"
         tabIndex={0}
-        className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 max-h-[300px] overflow-y-auto bg-background focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+        className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 max-h-[300px] overflow-y-auto bg-background focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         {filteredEntries.length === 0 ? (
           <div className="col-span-full py-8 text-center">

@@ -33,7 +33,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-sub-trigger"
     className={cn(
-      "flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=open]:bg-accent data-[state=open]:text-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not(.ml-auto)]:size-3.5 [&_svg:not(.ml-auto)]:text-secondary-text data-[state=open]:[&_svg:not(.ml-auto)]:text-primary",
+      "flex cursor-pointer select-none items-center gap-2.5 rounded-[7px] px-2.5 py-2 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=open]:bg-accent data-[state=open]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not(.ml-auto)]:size-3.5 [&_svg:not(.ml-auto)]:text-secondary-text data-[state=open]:[&_svg:not(.ml-auto)]:text-accent-foreground",
       inset && "pl-8",
       className
     )}
@@ -183,7 +183,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-checkbox-item"
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-[7px] py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+      "relative flex cursor-pointer select-none items-center rounded-[7px] py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
       className
     )}
     checked={checked}
@@ -208,7 +208,7 @@ const DropdownMenuRadioItem = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-radio-item"
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-[7px] py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+      "relative flex cursor-pointer select-none items-center rounded-[7px] py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
       className
     )}
     {...props}

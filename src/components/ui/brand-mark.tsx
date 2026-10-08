@@ -6,7 +6,8 @@ export function BrandMark({ className, ...props }: React.ComponentProps<"span">)
     <span
       aria-hidden="true"
       {...props}
-      className={cn("inline-block size-5 shrink-0 rounded-[5px] bg-linear-to-br from-primary to-[#2e7d6b]", className)}
+      className={cn("inline-block size-5 shrink-0 rounded-[5px]", className)}
+      style={{ background: 'var(--brand-mark)', ...props.style }}
     />
   );
 }

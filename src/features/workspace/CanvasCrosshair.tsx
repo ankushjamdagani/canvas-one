@@ -1,3 +1,4 @@
+import { readActionRgb } from '@/lib/theme/color';
 import * as React from "react";
 import { useStore } from "@xyflow/react";
 
@@ -61,9 +62,9 @@ export function CanvasCrosshair({ gap }: { gap: number }) {
         const h = ctx.createLinearGradient(cross.x - 360, 0, cross.x + 360, 0);
         const v = ctx.createLinearGradient(0, cross.y - 260, 0, cross.y + 260);
         for (const g of [h, v]) {
-          g.addColorStop(0, "rgba(11,92,84,0)");
-          g.addColorStop(0.5, `rgba(11,92,84,${a})`);
-          g.addColorStop(1, "rgba(11,92,84,0)");
+          g.addColorStop(0, `rgba(${readActionRgb()},0)`);
+          g.addColorStop(0.5, `rgba(${readActionRgb()},${a})`);
+          g.addColorStop(1, `rgba(${readActionRgb()},0)`);
         }
         ctx.lineWidth = 1;
         ctx.setLineDash([2, 4]);
@@ -78,10 +79,10 @@ export function CanvasCrosshair({ gap }: { gap: number }) {
         ctx.lineTo(cross.x, cross.y + 260);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.strokeStyle = `rgba(11,92,84,${1.3 * a})`;
+        ctx.strokeStyle = `rgba(${readActionRgb()},${1.3 * a})`;
         ctx.strokeRect(cross.x - 3.5, cross.y - 3.5, 7, 7);
         ctx.font = '9px "Martian Mono", monospace';
-        ctx.fillStyle = `rgba(11,92,84,${1.2 * a})`;
+        ctx.fillStyle = `rgba(${readActionRgb()},${1.2 * a})`;
         ctx.fillText(
           `${Math.round((tx - vx) / zoom)} · ${Math.round((ty - vy) / zoom)}`,
           cross.x + 9,

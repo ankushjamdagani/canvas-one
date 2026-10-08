@@ -54,8 +54,8 @@ export function CatalogEntryCard({
         'group relative flex p-2 rounded-lg border transition-all cursor-pointer select-none',
         variant === 'row' ? 'items-center gap-2.5' : 'flex-col min-w-0',
         selected
-          ? 'border-primary bg-accent/60 ring-1 ring-primary'
-          : 'border-border bg-white hover:border-control-border-strong hover:bg-sunken/50',
+          ? 'border-primary bg-accent ring-1 ring-ring'
+          : 'border-border bg-background hover:border-control-border-strong hover:bg-sunken/50',
       )}
     >
       {variant === 'row' ? (
@@ -83,10 +83,10 @@ export function CatalogEntryCard({
       )}
 
       <div className={variant === 'row' ? 'flex-1 min-w-0' : undefined}>
-        <div className="text-xs font-semibold text-foreground truncate leading-tight">{entry.label}</div>
+        <div className={cn('text-xs font-semibold truncate leading-tight', selected ? 'text-accent-foreground' : 'text-foreground')}>{entry.label}</div>
         <div
           className={cn(
-            'font-mono text-secondary-text truncate mt-0.5',
+            'font-mono truncate mt-0.5', selected ? 'text-accent-foreground' : 'text-secondary-text',
             variant === 'row' ? 'text-[11px]' : 'text-[10px]',
           )}
         >
@@ -106,7 +106,7 @@ export function CatalogEntryCard({
               Not simulated
             </span>
           )}
-          <span className="text-[10px] font-mono text-secondary-text opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className={cn('text-[10px] font-mono opacity-0 group-hover:opacity-100 transition-opacity', selected ? 'text-accent-foreground' : 'text-secondary-text')}>
             drag
           </span>
         </div>

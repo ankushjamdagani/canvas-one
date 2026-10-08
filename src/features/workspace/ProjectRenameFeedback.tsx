@@ -123,7 +123,7 @@ export function RenamedNotice({ open, title, onUndo, onDismiss, children }: Rena
           type="button"
           data-testid="rename-undo"
           onClick={onUndo}
-          className="shrink-0 text-[13px] font-semibold text-primary hover:text-primary-hover cursor-pointer"
+          className="shrink-0 text-[13px] font-semibold text-primary hover:text-primary hover:underline cursor-pointer"
         >
           Undo
         </button>

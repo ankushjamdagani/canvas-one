@@ -216,7 +216,7 @@ export const RadiiAndShadows: StoryObj = {
                 className="flex flex-col items-center p-3 text-center rounded-card border border-control-border bg-shell"
               >
                 <div
-                  className="size-16 border-2 border-primary bg-accent flex items-center justify-center font-mono text-xs font-semibold text-primary mb-2"
+                  className="size-16 border-2 border-primary bg-accent flex items-center justify-center font-mono text-xs font-semibold text-accent-foreground mb-2"
                   style={{ borderRadius: r.px }}
                 >
                   {r.px}

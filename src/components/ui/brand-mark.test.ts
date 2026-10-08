@@ -8,6 +8,6 @@ describe('BrandMark', () => {
     const html = renderToStaticMarkup(React.createElement(BrandMark, { className: 'size-5' }));
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('size-5');
-    expect(html).toContain('to-[#2e7d6b]');
+    expect(html).toContain('background:var(--brand-mark)');
   });
 });

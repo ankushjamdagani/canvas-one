@@ -264,7 +264,7 @@ export function HistoryLadder({
   const restoreLink = (id: string) => (
     <button
       type="button"
-      className="shrink-0 text-xs font-medium text-primary hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      className="shrink-0 text-xs font-medium text-primary hover:text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
       disabled={isMain}
       title={isMain ? mainRestoreDisabledReason : undefined}
       onClick={() => beginRestore(id)}

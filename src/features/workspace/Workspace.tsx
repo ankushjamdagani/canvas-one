@@ -3230,7 +3230,7 @@ export function Workspace({
         <div
           data-testid="workspace-frame"
           aria-hidden="true"
-          className="pointer-events-none absolute inset-[22px] hidden min-[1000px]:block border border-[var(--drafting-frame-edge,#c9c2b5)] shadow-[inset_0_0_0_4px_var(--shell),inset_0_0_0_5px_#e2ddd3]"
+          className="pointer-events-none absolute inset-[22px] hidden min-[1000px]:block border border-[var(--drafting-frame-edge,#c9c2b5)] shadow-[inset_0_0_0_4px_var(--shell),inset_0_0_0_5px_var(--drafting-inner-edge)]"
         />
       )}
       {/* Top Bar (22A nav live) */}

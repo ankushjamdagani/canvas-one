@@ -132,7 +132,7 @@ export function QuickOptionRow({
       title={reason ?? undefined}
       className={cn(
         'group flex items-center gap-2.5 min-h-9 px-2.5 py-1.5 rounded-control text-[13px] cursor-pointer select-none outline-none',
-        'data-[selected=true]:bg-accent data-[selected=true]:text-primary',
+        'data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground',
         showsReason && 'cursor-not-allowed text-secondary-text',
         isCurrent && 'cursor-default',
       )}

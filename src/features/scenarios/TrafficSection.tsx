@@ -203,7 +203,7 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
                     <span className="text-[11px] font-medium text-secondary-text">Classes</span>
                     <button
                       type="button"
-                      className="text-[11px] text-primary hover:text-primary-hover"
+                      className="text-[11px] text-primary hover:text-primary hover:underline"
                       onClick={() => updateWorkload(workload.id, (w) => ({ ...w, classes: [...w.classes, newRequestClass(mintId)] }))}
                     >
                       + Add class

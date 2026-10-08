@@ -102,7 +102,7 @@ export function InspectorPanel({
                 style={(!draft.notSimulated && draft.stripeColor) ? {
                   backgroundColor: computeTagColors(draft.stripeColor).backgroundColor,
                   borderColor: computeTagColors(draft.stripeColor).borderColor,
-                  color: computeTagColors(draft.stripeColor).color,
+                  color: 'var(--foreground)',
                 } : undefined}
               >
                 {draft.kindTag}

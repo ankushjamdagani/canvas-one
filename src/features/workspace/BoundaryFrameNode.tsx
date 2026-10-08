@@ -16,7 +16,7 @@ export function BoundaryFrameNode({ data, selected }: NodeProps) {
       data-testid={`boundary-frame-${nodeData.element.id}`}
       data-placement-id={nodeData.placement.id}
       data-element-id={nodeData.element.id}
-      className={`boundary-frame relative rounded-card bg-selected-tint/20 select-none ${selected ? 'border-2 border-primary ring-2 ring-selected-edge ring-offset-1' : 'border border-primary'}`}
+      className={`boundary-frame relative rounded-card bg-selected-tint/20 select-none ${selected ? 'border-2 border-ring ring-2 ring-ring ring-offset-1' : 'border border-ring'}`}
       style={{ width: nodeData.width, height: nodeData.height }}
     >
       <div className="nodrag nopan pointer-events-auto absolute left-3 top-0 -translate-y-1/2 z-10 flex h-6 items-center gap-1.5 rounded-tag border border-primary/30 bg-panel px-2 text-[11px] font-semibold text-ink shadow-xs">

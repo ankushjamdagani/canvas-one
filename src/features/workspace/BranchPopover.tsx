@@ -243,16 +243,16 @@ export function BranchPopover({
                   <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
                     Current branch
                   </span>
-                  <span className="flex-1 h-px bg-[#EFEBE3]" />
+                  <span className="flex-1 h-px bg-hairline-soft" />
                 </div>
                 <div
                   data-testid="branch-current-row"
-                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-control bg-[#F7F4FC] border border-[#C9B9E4]"
+                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-control bg-branch-tint border border-branch-edge"
                 >
-                  <GitBranch size={14} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
+                  <GitBranch size={14} className="text-branch shrink-0" aria-hidden="true" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[13px] font-semibold text-[#7C5FC0] truncate">
+                      <span className="text-[13px] font-semibold text-branch truncate">
                         {branchLabel(project, current)}
                       </span>
                       <Badge
@@ -266,7 +266,7 @@ export function BranchPopover({
                       edited {formatRelativeTime(project.updatedAt ? Math.max(current.createdAt, project.updatedAt) : current.createdAt)}
                     </div>
                   </div>
-                  <Check size={14} className="text-[#7C5FC0] shrink-0" aria-hidden="true" />
+                  <Check size={14} className="text-branch shrink-0" aria-hidden="true" />
                 </div>
               </div>
             )}
@@ -277,7 +277,7 @@ export function BranchPopover({
                 <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
                   Switch to
                 </span>
-                <span className="flex-1 h-px bg-[#EFEBE3]" />
+                <span className="flex-1 h-px bg-hairline-soft" />
                 <span className="font-mono text-[9px] text-secondary-text">{others.length}</span>
               </div>
 
@@ -298,7 +298,7 @@ export function BranchPopover({
                         key={b.id}
                         role="group"
                         aria-label={`Branch ${branchLabel(project, b)}`}
-                        className="flex items-center gap-1 rounded-[8px] hover:bg-[#F2EFE9] transition-colors group"
+                        className="flex items-center gap-1 rounded-[8px] hover:bg-sunken transition-colors group"
                       >
                         <button
                           type="button"
@@ -315,7 +315,7 @@ export function BranchPopover({
                           }}
                         >
                           {isMain ? (
-                            <Home size={13} className="text-[#0B5C54] shrink-0" aria-hidden="true" />
+                            <Home size={13} className="text-primary shrink-0" aria-hidden="true" />
                           ) : (
                             <GitBranch size={13} className="text-secondary-text shrink-0" aria-hidden="true" />
                           )}
@@ -391,7 +391,7 @@ export function BranchPopover({
                   setCreating(true);
                   setActionError(null);
                 }}
-                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary-hover disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 text-[12.5px] font-semibold text-primary hover:text-primary hover:underline disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 <Plus size={14} aria-hidden="true" />
                 <span>New branch from here</span>

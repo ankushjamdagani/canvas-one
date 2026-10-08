@@ -203,17 +203,17 @@ function RadioCardOption({
       htmlFor={id}
       className={cn(
         'flex items-start gap-2 rounded-control border p-3 text-xs cursor-pointer',
-        selected ? 'border-selected-edge bg-selected-tint/40' : 'border-control-border',
+        selected ? 'border-selected-edge bg-selected-tint' : 'border-control-border',
         disabled && 'opacity-60 cursor-not-allowed',
       )}
     >
       <RadioGroupItem id={id} value={value} disabled={disabled} className="mt-0.5" />
       <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5 font-semibold text-foreground">
+        <div className={cn('flex items-center gap-1.5 font-semibold', selected ? 'text-accent-foreground' : 'text-foreground')}>
           {icon}
           {title}
         </div>
-        <p className="text-secondary-text">{description}</p>
+        <p className={selected ? 'text-accent-foreground' : 'text-secondary-text'}>{description}</p>
       </div>
     </label>
   );
