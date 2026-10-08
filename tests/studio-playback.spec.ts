@@ -64,7 +64,7 @@ test("source selected range can play, loop and clear without changing recording"
   await recording(page);
   await range(page);
   const pane = await tab(page, "Summary");
-  await expect(pane).toContainText('RANGE');
+  await expect(pane).toContainText('Range');
   await page
     .getByRole("button", { name: "Loop selected range", exact: true })
     .click();
@@ -79,7 +79,7 @@ test("source selected range can play, loop and clear without changing recording"
     .getByRole("button", { name: "Pause playback", exact: true })
     .click();
   await pane.getByRole('button', { name: 'Clear', exact: true }).click();
-  await expect(pane).toContainText('THROUGH PLAYHEAD');
+  await expect(pane).toContainText('Through playhead');
 });
 
 test("Back to live resumes a paused stream and Stop drains it", async ({
@@ -134,7 +134,7 @@ test('finite bulk recording advances while reviewing a selected range', async ({
   await page.getByRole('button', { name: 'Stop run', exact: true }).click();
   await expect(page.getByTestId('playback-status')).toContainText(/stopped/i, { timeout: 20000 });
   const pane = await tab(page, 'Summary');
-  await expect(pane).toContainText('RANGE');
+  await expect(pane).toContainText('Range');
   await pane.getByRole('button', { name: 'Clear', exact: true }).click();
   const starts = Number(await pane.getByTestId('scope-started').innerText());
   const completions = Number(await pane.getByTestId('scope-completed').innerText());
@@ -150,14 +150,14 @@ test('Stop drains while preserving reviewed time and selected range; End saves t
   await range(page, .2, .6);
   const pane = await inspect(page);
   const reviewedAt = await seeker.getAttribute('aria-valuenow');
-  await expect(pane).toContainText('RANGE');
+  await expect(pane).toContainText('Range');
   await expect(page.getByRole('button', { name: 'Loop selected range', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Loop selected range', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Loop selected range', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Stop run', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Re-run scenario', exact: true })).toBeVisible({ timeout: 20000 });
   await expect(seeker).toHaveAttribute('aria-valuenow', reviewedAt!);
-  await expect(pane).toContainText('RANGE');
+  await expect(pane).toContainText('Range');
   expect(await savedRunCount(page)).toBe(0);
   await page.getByRole('button', { name: 'End of recording', exact: true }).click();
   await expect.poll(() => savedRunCount(page)).toBe(1);

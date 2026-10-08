@@ -4,10 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { BrandMark } from './brand-mark';
 
 describe('BrandMark', () => {
-  it('is a decorative gradient square', () => {
+  it('uses the decorative neutral face for the logo', () => {
     const html = renderToStaticMarkup(React.createElement(BrandMark, { className: 'size-5' }));
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('size-5');
-    expect(html).toContain('background:var(--brand-mark)');
+    expect(html).toContain('data-expression="base"');
+    expect(html).toContain('viewBox="0 0 48 48"');
   });
 });

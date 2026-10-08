@@ -60,7 +60,7 @@ export function NodeCard({ data, selected }: NodeProps) {
       {trafficEntry ? (
         <span
           data-testid={`node-traffic-entry-${element.id}`}
-          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-ring/40 bg-selected-tint px-1.5 py-0.5 font-mono text-micro uppercase text-accent-foreground"
+          className="absolute left-0 -top-6 whitespace-nowrap rounded-tag border border-ring/40 bg-selected-tint px-1.5 py-0.5 font-mono text-micro text-accent-foreground"
         >
           Traffic enters here
         </span>
@@ -128,22 +128,22 @@ export function NodeCard({ data, selected }: NodeProps) {
             <div className="flex items-center gap-1.5 min-w-0">
               <span
                 data-testid={`node-linked-badge-${element.id}`}
-                className="shrink-0 rounded-tag border border-control-border bg-sunken px-1 font-mono text-[9px] uppercase tracking-wider text-secondary-text"
+                className="shrink-0 rounded-tag border border-control-border bg-sunken px-1 font-mono text-micro tracking-wider text-secondary-text"
               >
                 Linked
               </span>
               {linked.state === 'available' && linked.team ? (
-                <span className="truncate font-mono text-[10px] text-secondary-text leading-snug">{linked.team}</span>
+                <span className="truncate font-mono text-micro text-secondary-text leading-snug">{linked.team}</span>
               ) : null}
             </div>
             {linked.state === 'available' ? (
               <>
                 {linked.description ? (
-                  <span className="line-clamp-2 text-[11px] leading-snug text-secondary-text">{linked.description}</span>
+                  <span className="line-clamp-2 text-caption leading-snug text-secondary-text">{linked.description}</span>
                 ) : null}
               </>
             ) : (
-              <span className="font-mono text-[10px] text-risk-text leading-snug">
+              <span className="font-mono text-micro text-risk-text leading-snug">
                 {linked.state === 'loading' ? 'Loading project…' : 'Project unavailable'}
               </span>
             )}
@@ -151,7 +151,7 @@ export function NodeCard({ data, selected }: NodeProps) {
               type="button"
               data-testid={`node-linked-open-${element.id}`}
               disabled={!nodeData.onOpenLinked}
-              className="nodrag nopan pointer-events-auto mt-0.5 inline-flex w-fit items-center gap-1 rounded-control border border-control-border bg-background px-2 py-0.5 text-[11px] font-medium text-primary hover:bg-sunken disabled:cursor-not-allowed disabled:text-secondary-text disabled:opacity-60 cursor-pointer"
+              className="nodrag nopan pointer-events-auto mt-0.5 inline-flex w-fit items-center gap-1 rounded-control border border-control-border bg-background px-2 py-0.5 text-caption font-medium text-primary hover:bg-sunken disabled:cursor-not-allowed disabled:text-secondary-text disabled:opacity-60 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 nodeData.onOpenLinked?.();
@@ -168,7 +168,7 @@ export function NodeCard({ data, selected }: NodeProps) {
               can run longer than the old bare visualKind text, so this wraps
               rather than clipping (the card has no fixed height). */}
           <span
-            className="text-[10px] font-mono text-secondary-text leading-snug break-words"
+            className="text-micro font-mono text-secondary-text leading-snug break-words"
             data-testid={`node-caption-${element.id}`}
           >
             {caption}
@@ -182,7 +182,7 @@ export function NodeCard({ data, selected }: NodeProps) {
           <div
             data-testid={`node-ports-${element.id}`}
             aria-label="Port summary"
-            className="mt-0.5 pt-1 border-t border-control-border text-[10px] font-mono text-secondary-text leading-snug break-words"
+            className="mt-0.5 pt-1 border-t border-control-border text-micro font-mono text-secondary-text leading-snug break-words"
           >
             {portSummary}
           </div>

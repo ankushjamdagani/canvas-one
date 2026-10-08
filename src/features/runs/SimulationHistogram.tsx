@@ -62,21 +62,21 @@ export function SimulationHistogram({
         <div className="mb-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 font-mono text-[9px] text-secondary-text">
           <span>
             {hasRun
-              ? `REQUESTS STARTED PER ${(duration / 80).toFixed(0)} MS`
-              : "REQUEST TIMELINE"}
+              ? `Requests started per ${(duration / 80).toFixed(0)} ms`
+              : "Request timeline"}
           </span>
           {hasRun && (
             <>
               <span className="flex items-center gap-1">
                 <span className="size-2 rounded-sm bg-primary/50" />
-                SUCCEEDED
+                Succeeded
               </span>
               <span className="flex items-center gap-1">
                 <span className="size-2 rounded-sm bg-risk" />
-                FAILED
+                Failed
               </span>
               <span className="ml-auto">
-                DRAG TO SELECT A RANGE · CLICK TO MOVE THE PLAYHEAD
+                Drag to select a range · click to move the playhead
               </span>
             </>
           )}

@@ -42,7 +42,7 @@ const PopoverHeader = React.forwardRef<
     ref={ref}
     data-slot="popover-header"
     className={cn(
-      "px-3 py-2.5 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase tracking-wide flex items-center justify-between shrink-0",
+      "px-3 py-2.5 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text tracking-wide flex items-center justify-between shrink-0",
       className
     )}
     {...props}
@@ -71,7 +71,7 @@ const PopoverFooter = React.forwardRef<
     ref={ref}
     data-slot="popover-footer"
     className={cn(
-      "px-3 py-2 bg-panel border-t border-hairline text-[11px] text-secondary-text flex items-center justify-between shrink-0",
+      "px-3 py-2 bg-panel border-t border-hairline text-caption text-secondary-text flex items-center justify-between shrink-0",
       className
     )}
     {...props}

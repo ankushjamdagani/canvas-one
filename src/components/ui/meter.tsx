@@ -22,7 +22,7 @@ export const Meter = React.forwardRef<HTMLDivElement, MeterProps>(
         {...props}
       >
         {label && (
-          <span className="w-[74px] shrink-0 font-mono text-[9.5px] text-secondary-text truncate uppercase tracking-wider">
+          <span className="w-[74px] shrink-0 font-mono text-[9.5px] text-secondary-text truncate tracking-wider">
             {label}
           </span>
         )}

@@ -1,0 +1,13 @@
+@keyframes cf-blink{0%,42%,50%,100%{transform:scaleY(1)}46%{transform:scaleY(0.12)}}
+@keyframes cf-pulse{0%,100%{transform:scale(1)}50%{transform:scale(0.6)}}
+@keyframes cf-look{0%,15%,100%{transform:translate(0,0)}25%,45%{transform:translate(1.8px,-1.8px)}55%,75%{transform:translate(-1.8px,-0.8px)}85%{transform:translate(0,0)}}
+@keyframes cf-scan{0%,100%{transform:translateX(-2.5px)}50%{transform:translateX(2.5px)}}
+@keyframes cf-tp{0%,10%,30%,100%{transform:scale(1)}20%{transform:scale(0.55)}}
+@keyframes cf-eq{0%,100%{transform:scaleY(0.35)}50%{transform:scaleY(1)}}
+@keyframes cf-hop{0%,60%,100%{transform:translateY(0)}20%{transform:translateY(-2.5px)}40%{transform:translateY(0)}}
+@keyframes cf-shake{0%,30%,100%{transform:translateX(0)}5%,15%,25%{transform:translateX(-1.5px)}10%,20%{transform:translateX(1.5px)}}
+@keyframes cf-fade{0%,100%{opacity:0.45}50%{opacity:0.75}}
+
+.canvas-one-face[data-animate="false"] *, .canvas-one-face[data-paused="true"] * { animation: none !important; }
+.canvas-one-face[data-transition="false"] * { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .canvas-one-face * { animation: none !important; transition: none !important; } }

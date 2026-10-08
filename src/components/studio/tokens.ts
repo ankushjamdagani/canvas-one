@@ -88,8 +88,8 @@ export const evergreen = Object.freeze({
 
   // Typography (sizes in px)
   type: Object.freeze({
-    xs: 11.5,
-    sm: 12.5,
+    xs: 13,
+    sm: 13,
     base: 13,
     lg: 15,
     xl: 18,
@@ -106,6 +106,8 @@ export const evergreen = Object.freeze({
     title: 18,
     subtitle: 15,
     ui: 13,
+    caption: 12,
+    micro: 10,
   }),
 
   // Elevation shadows

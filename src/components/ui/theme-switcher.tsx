@@ -31,14 +31,14 @@ export function ThemePopover({ className }: { className?: string }) {
       <Button type="button" variant="ghost" size="icon" aria-label="Change theme"
         title="Change theme" className={cn('shrink-0', className)} data-testid="theme-trigger"><Palette /></Button>
     </PopoverTrigger>
-    <PopoverContent align="end" sideOffset={8} aria-label="Theme" data-testid="theme-popover"
-      className="w-[480px] max-w-[calc(100vw-24px)] max-h-[min(680px,calc(100dvh-96px))] overflow-y-auto p-3">
+    <PopoverContent align="end" sideOffset={8} collisionPadding={28} aria-label="Theme" data-testid="theme-popover"
+      className="w-[480px] max-w-[calc(100vw-56px)] max-h-[min(680px,var(--radix-popover-content-available-height))] overflow-y-auto p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-meta font-mono text-secondary-text">MODE</span>
+        <span className="text-meta font-mono text-secondary-text">Mode</span>
         <Segmented options={MODES} value={mode} aria-label="Color mode"
           onChange={(value) => { if (value === 'light' || value === 'dark') setMode(value); }} />
       </div>
-      <span className="mb-2 block text-meta font-mono text-secondary-text">COLOUR</span>
+      <span className="mb-2 block text-meta font-mono text-secondary-text">Colour</span>
       <Radio.Root value={paletteId} onValueChange={setPaletteId} aria-label="Color palette"
         onKeyDown={navigateRadios}
         className="grid grid-cols-2 gap-1 max-[479px]:grid-cols-1">
@@ -52,7 +52,7 @@ export function ThemePopover({ className }: { className?: string }) {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-xs font-medium text-ink group-data-[state=checked]:text-accent-foreground">{palette.name}</span>
-                <span className="block text-micro font-mono text-secondary-text group-data-[state=checked]:text-accent-foreground">{palette.note}</span>
+                <span className="block text-micro font-mono text-secondary-text group-data-[state=checked]:text-accent-foreground">{palette.note.charAt(0) + palette.note.slice(1).toLowerCase()}</span>
               </span>
               <Radio.Indicator className="shrink-0 text-accent-foreground"><Check size={13} /></Radio.Indicator>
             </Radio.Item>

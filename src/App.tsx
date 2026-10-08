@@ -7,6 +7,7 @@ import {
 import type { Actor, StudioRepository } from './persistence/studio';
 import { EntryScreen } from './features/entry';
 import { LandingPage } from './features/entry/LandingPage';
+import { BrandPage } from './features/entry/BrandPage';
 import { lazyComponent, whenIdle } from '@/lib/lazyComponent';
 import { navigate, useRoute } from '@/lib/router';
 import { RouteShell } from './features/shell';
@@ -150,7 +151,7 @@ export default function App() {
         data-testid="boot-loading-screen"
         className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
       >
-        Loading CanvasOne…
+        Loading Canvas One…
       </div>
     );
   }
@@ -236,6 +237,7 @@ function StudioShell({
 
   const renderPage = (kind: PageKind): React.ReactNode => {
     if (kind === 'home') return <LandingPage />;
+    if (kind === 'brand') return <BrandPage />;
     if (kind === 'projects') {
       return (
         <EntryScreen session={session} repository={repository} mintId={MINT_ID} actor={actor} onOpenSuccess={goToProject} />

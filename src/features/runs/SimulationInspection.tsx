@@ -89,7 +89,7 @@ export function ScopeMetricRows({
           <dt
             className={
               cards
-                ? "font-mono text-[9px] uppercase text-secondary-text"
+                ? "font-mono text-[9px] text-secondary-text"
                 : "text-[13px] text-secondary-text"
             }
           >
@@ -127,7 +127,7 @@ export function ScopeMetrics({
       className="flex flex-col gap-3.5"
     >
       <div className="flex items-center justify-between font-mono text-[9px] text-secondary-text">
-        <span>{selection ? "RANGE" : "THROUGH PLAYHEAD"}</span>
+        <span>{selection ? "Range" : "Through playhead"}</span>
         {selection && (
           <button
             type="button"
@@ -388,7 +388,7 @@ export function RecordedEventRows({
                 {event.outcome ?? event.phase}
               </span>
               <span className="text-[10px] text-secondary-text">
-                {event.phase.toUpperCase()} · {subject}
+                {event.phase} · {subject}
               </span>
             </span>
           </>
@@ -398,7 +398,7 @@ export function RecordedEventRows({
               {formatSimulationTime(event.atMs)}
             </time>
             <span
-              className="truncate text-[9px] uppercase text-secondary-text"
+              className="truncate text-[9px] text-secondary-text"
               title={event.phase}
             >
               {event.phase}

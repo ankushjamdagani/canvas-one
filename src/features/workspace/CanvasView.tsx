@@ -1359,8 +1359,9 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             ]}
           />
         </ViewportPortal>
-        {/* Static drafting dots retain the same 26px pitch as snap-to-grid and zoom-dependent density. */}
-        <Background variant={BackgroundVariant.Dots} color="var(--grid)" gap={gridGap} size={GRID_DOT_PX / zoom} />
+        {/* Background centres its pattern at half the gap and places each dot at its
+            radius. Cancel both offsets so visible dots land on snapped flow coordinates. */}
+        <Background variant={BackgroundVariant.Dots} color="var(--grid)" gap={gridGap} size={GRID_DOT_PX / zoom} offset={GRID_DOT_PX / (2 * zoom) - gridGap / 2} />
         <CanvasCrosshair gap={gridGap} />
         {showMinimap && (
           <MiniMap

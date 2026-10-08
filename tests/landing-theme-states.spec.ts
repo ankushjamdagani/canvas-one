@@ -30,9 +30,10 @@ for (const palette of PALETTES) for (const mode of ['light', 'dark'] as const) {
     }
     await scan('proposal:rest');
     for (const selector of ['.lp-cursor span', '.lp-claude span', '.lp-avatars i', '.lp-avatars i + i']) await contrast(selector, 4.5);
-    for (const selector of ['.lp-claude span', '.lp-avatars i + i', '.lp-prompt button']) {
+    for (const selector of ['.lp-claude > span', '.lp-avatars i + i']) {
       expect(await page.locator(selector).first().evaluate(el => getComputedStyle(el).color)).toBe('rgb(255, 255, 255)');
     }
+    await expect(page.locator('.lp-prompt button .canvas-one-face')).toBeVisible();
     for (const button of [accept, page.getByRole('button', { name: 'Dismiss', exact: true }), page.getByRole('button', { name: 'Replay collaboration demo' })]) {
       await button.hover();
       await page.waitForTimeout(200); // Let authored colour transitions settle.

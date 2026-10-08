@@ -6,7 +6,7 @@ test.describe('Studio Quick options (RV-03q)', () => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Draft');
 
     // Top-bar button opens the dialog; the key hint is F2, never ⌘K.
     const button = page.getByTestId('topbar-quick-options-btn');
@@ -72,12 +72,12 @@ test.describe('Studio Quick options (RV-03q)', () => {
 
     // Branch switch from Quick options: current row is marked, main switches.
     await page.keyboard.press('F2');
-    await expect(page.getByTestId('quick-options-group-branch')).toContainText('CURRENT');
+    await expect(page.getByTestId('quick-options-group-branch')).toContainText('Current');
     await page.getByTestId('quick-options-input').fill('main');
-    const mainRow = page.locator('[data-command-id="branch.switch"]', { hasText: 'MAIN' });
+    const mainRow = page.locator('[data-command-id="branch.switch"]', { hasText: 'Main' });
     await mainRow.click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
   });
 
   test('panel close, results close and cancel-run rows route through the registry', async ({ page }) => {
@@ -121,7 +121,7 @@ test.describe('Studio Quick options (RV-03q)', () => {
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Draft');
 
     // Checkpoints are not a user flow: Quick options offers commit, not "Save checkpoint".
     await page.keyboard.press('F2');

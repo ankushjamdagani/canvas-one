@@ -81,7 +81,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
     <div data-testid="scenario-editor" className="flex flex-col h-full text-xs">
       {hosted ? null : (
         <div className="flex items-center justify-between px-3 py-2 border-b border-divider">
-          <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Scenario</span>
+          <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">Scenario</span>
           <button type="button" onClick={onClose} aria-label="Close editor" className="inline-flex items-center justify-center text-secondary-text hover:text-foreground pointer-coarse:size-11">
             <X className="size-4" aria-hidden="true" />
           </button>
@@ -129,7 +129,7 @@ export function ScenarioEditor({ document, handle, onChange, onApply, onCancel, 
 
         {/* Run settings */}
         <section data-testid="scenario-section-run-settings" className="space-y-2">
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Run settings</div>
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">Run settings</div>
 
           <p className="text-[11px] text-secondary-text">
             {scenario.mode === 'timed'

@@ -161,7 +161,7 @@ export function NoteNode({ data, selected }: NodeProps) {
           {isAttached ? (
             <span
               data-testid={`note-attached-indicator-${nodeData.note.id}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-tag bg-primary/10 border border-primary/20 text-primary font-mono text-[9px] font-medium max-w-[170px]"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-tag bg-accent border border-selected-edge text-accent-foreground font-mono text-[9px] font-medium max-w-[170px]"
               title={`Sticky linked to ${nodeData.attachedElementLabel || 'component node'}`}
             >
               <Pin className="size-2.5 rotate-45 shrink-0" />
@@ -206,7 +206,7 @@ export function NoteNode({ data, selected }: NodeProps) {
                   className="absolute left-0 top-full mt-1 z-modal w-44 rounded-card border border-control-border bg-panel shadow-floating p-1 text-xs"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="px-2 py-1 text-[10px] font-mono text-secondary-text uppercase">
+                  <div className="px-2 py-1 text-[10px] font-mono text-secondary-text ">
                     Link to component
                   </div>
                   <div className="max-h-36 overflow-y-auto space-y-0.5">
@@ -229,7 +229,7 @@ export function NoteNode({ data, selected }: NodeProps) {
               )}
             </div>
           ) : (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-secondary-text">
+            <span className="font-mono text-[9px] tracking-wider text-secondary-text">
               Note
             </span>
           )}

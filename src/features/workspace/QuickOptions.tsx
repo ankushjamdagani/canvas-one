@@ -40,7 +40,7 @@ export interface QuickOptionsContentProps {
 
 const GROUP_HEADING_CLASSES =
   '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 ' +
-  '[&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase ' +
+  '[&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10px] ' +
   '[&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-secondary-text';
 
 /**

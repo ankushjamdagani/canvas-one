@@ -31,12 +31,12 @@ export function EntryDetailCard({ entry, className }: EntryDetailCardProps) {
       {/* Header: Category / Group header + STANDARD badge */}
       <div className="px-3.5 py-2.5 bg-panel border-b border-hairline flex items-center justify-between gap-2 shrink-0">
         <span
-          className="text-[10.5px] font-mono font-medium uppercase tracking-widest text-secondary-text"
+          className="text-[10.5px] font-mono font-medium tracking-widest text-secondary-text"
         >
-          {detail.group.toUpperCase()}
+          {detail.group}
         </span>
-        <span className="text-[10px] font-mono font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border border-primary/40 text-accent-foreground bg-accent">
-          {detail.badge}
+        <span className="text-[10px] font-mono font-semibold tracking-wider px-1.5 py-0.5 rounded border border-primary/40 text-accent-foreground bg-accent">
+          Standard
         </span>
       </div>
 
@@ -54,8 +54,8 @@ export function EntryDetailCard({ entry, className }: EntryDetailCardProps) {
 
         {/* DEFAULTS row */}
         <div className="border-t border-hairline pt-2.5 mb-2.5">
-          <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-secondary-text mb-1">
-            DEFAULTS
+          <div className="text-[10px] font-mono font-semibold tracking-wider text-secondary-text mb-1">
+            Defaults
           </div>
           <div className="text-xs font-mono text-body break-words">
             {detail.defaults}
@@ -64,8 +64,8 @@ export function EntryDetailCard({ entry, className }: EntryDetailCardProps) {
 
         {/* DOES NOT MODEL row */}
         <div className="border-t border-hairline pt-2.5">
-          <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-secondary-text mb-1">
-            DOES NOT MODEL
+          <div className="text-[10px] font-mono font-semibold tracking-wider text-secondary-text mb-1">
+            Does not model
           </div>
           <div className="text-xs text-body leading-relaxed">
             {detail.doesNotModel}

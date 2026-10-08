@@ -142,7 +142,7 @@ export function InspectorPanel({
           <>
             {/* CONFIGURATION */}
             <section className="px-4 py-3" aria-label="Configuration">
-              <h3 className="text-micro font-mono font-medium text-secondary-text uppercase mb-2.5">
+              <h3 className="text-micro font-mono font-medium text-secondary-text mb-2.5">
                 Configuration
               </h3>
               <div className="flex flex-col gap-3">
@@ -177,7 +177,7 @@ export function InspectorPanel({
             {/* MEASURED · LAST RUN (elements only) */}
             {measured ? (
             <section className="px-4 py-3 border-t border-divider" aria-label="Measured, last run" data-testid="inspector-measured">
-              <h3 className="text-micro font-mono font-medium text-secondary-text uppercase mb-2.5">
+              <h3 className="text-micro font-mono font-medium text-secondary-text mb-2.5">
                 Measured · Last run
               </h3>
               {measured.emptyMessage ? (
@@ -192,7 +192,7 @@ export function InspectorPanel({
                       data-testid={`inspector-metric-${row.key}`}
                       className="rounded-control border border-control-border bg-sunken px-2.5 py-2"
                     >
-                      <div className="text-[10px] font-mono uppercase tracking-wide text-secondary-text">
+                      <div className="text-[10px] font-mono tracking-wide text-secondary-text">
                         {row.label}
                       </div>
                       <div

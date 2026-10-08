@@ -1,13 +1,14 @@
 import { cn } from "@/lib/utils";
+import { CanvasOneFace } from './canvas-one-face';
 
-/** CanvasOne logo square. Decorative: pair it with visible text or a labelled control. */
+/** Neutral Canvas One logo. Pair it with visible text or a labelled control. */
 export function BrandMark({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       aria-hidden="true"
       {...props}
-      className={cn("inline-block size-5 shrink-0 rounded-[5px]", className)}
-      style={{ background: 'var(--brand-mark)', ...props.style }}
-    />
+      className={cn("inline-flex size-[22px] shrink-0 text-ink [&>svg]:size-full", className)}
+      style={props.style}
+    ><CanvasOneFace expression="base" size={22} animate={false} style={{width:'100%',height:'100%'}} /></span>
   );
 }

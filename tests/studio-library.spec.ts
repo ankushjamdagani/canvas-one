@@ -93,10 +93,10 @@ test.describe('RV-13b: Library panel', () => {
     await queue.hover();
     const detail = page.getByTestId('entry-detail-card');
     await expect(detail).toBeVisible();
-    await expect(detail).toContainText('DEFAULTS');
-    await expect(detail).toContainText('DOES NOT MODEL');
+    await expect(detail).toContainText('Defaults');
+    await expect(detail).toContainText('Does not model');
 
-    const defaults = (await detail.innerText()).split('DEFAULTS')[1]?.split('DOES NOT MODEL')[0] ?? '';
+    const defaults = (await detail.innerText()).split('Defaults')[1]?.split('Does not model')[0] ?? '';
     expect(defaults.trim().length).toBeGreaterThan(0);
     // Raw camelCase config keys (queueLimit, retryDelayMs, ...) must never reach the user.
     expect(defaults).not.toMatch(/[a-z][A-Z]/);

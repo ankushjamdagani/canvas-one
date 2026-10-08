@@ -168,22 +168,22 @@ export function Specimen() {
     <div className="min-h-screen bg-shell text-foreground p-8 max-w-6xl mx-auto space-y-16 font-sans">
       <header className="space-y-3 border-b border-border pb-8">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs font-semibold tracking-wider text-accent-foreground uppercase bg-accent px-2 py-0.5 rounded-tag border border-border">
-            CanvasOne
+          <span className="font-mono text-xs font-semibold tracking-wider text-accent-foreground bg-accent px-2 py-0.5 rounded-tag border border-border">
+            Canvas One
           </span>
           <span className="font-mono text-xs text-muted-foreground">Evergreen v2.0</span>
         </div>
         <h1 className="font-display text-4xl sm:text-5xl font-normal tracking-normal text-foreground">
-          CanvasOne Design System
+          Canvas One Design System
         </h1>
         <p className="text-sm text-secondary-text max-w-3xl leading-relaxed">
-          Visual foundations, core components, and interaction states for the CanvasOne canvas and simulator.
+          Visual foundations, core components, and interaction states for the Canvas One canvas and simulator.
           Conforming to <code className="font-mono text-xs bg-panel px-1.5 py-0.5 rounded border border-border">System Studio Design System.dc.html</code>.
         </p>
       </header>
 
       {/* ──────────────────────────────────────────────────────────
-          01 PALETTE
+          01 Palette
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-colours" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -198,7 +198,7 @@ export function Specimen() {
 
         {/* Surface & Canvas */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Surface &amp; Canvas
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -223,7 +223,7 @@ export function Specimen() {
 
         {/* Accent & Action */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Accent &amp; Action
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
@@ -248,7 +248,7 @@ export function Specimen() {
 
         {/* Text & Foreground */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Text &amp; Foreground
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -272,7 +272,7 @@ export function Specimen() {
 
         {/* Borders & Dividers */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Borders &amp; Dividers
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -296,7 +296,7 @@ export function Specimen() {
 
         {/* Node Kinds (D35 Decision) */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Node Kinds · D35 Decision Stripes
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
@@ -333,7 +333,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          02 TYPOGRAPHY
+          02 Typography
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-typography" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -349,13 +349,13 @@ export function Specimen() {
         <div className="border border-border rounded-lg bg-panel p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-baseline pb-6 border-b border-hairline">
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Display · 46px</span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Display · 46px</span>
               <div className="font-display text-4xl sm:text-5xl font-normal tracking-normal text-foreground leading-none">
-                CanvasOne
+                Canvas One
               </div>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Heading · 28px</span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Heading · 28px</span>
               <div className="font-display text-2xl font-normal tracking-normal text-foreground">
                 Discrete-event simulator
               </div>
@@ -364,19 +364,19 @@ export function Specimen() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 border-b border-hairline">
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Title · 18px / 600</span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Title · 18px / 600</span>
               <div className="text-lg font-semibold text-foreground">
                 Order Processing Topology
               </div>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Subtitle · 15px / 400</span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Subtitle · 15px / 400</span>
               <div className="text-sm font-normal text-secondary-text">
                 Architecture and simulation metrics
               </div>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">UI Body · 13px / 400</span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">UI Body · 13px / 400</span>
               <div className="text-xs font-normal text-body leading-relaxed">
                 Evergreen paper foundation with light-only surfaces and high-contrast text.
               </div>
@@ -385,19 +385,19 @@ export function Specimen() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Label · 11.5px / 600</span>
-              <div className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Label · 13px / 600</span>
+              <div className="text-xs font-semibold text-foreground tracking-wider">
                 Connection Status
               </div>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Micro / Meta · 10px Mono</span>
-              <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                P99 LATENCY · 142MS
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Micro / Meta · 10px Mono</span>
+              <div className="font-mono text-[10px] tracking-widest text-muted-foreground">
+                P99 latency · 142ms
               </div>
             </div>
             <div className="space-y-1">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Mono Code · 12px</span>
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">Mono Code · 12px</span>
               <div className="font-mono text-xs text-foreground bg-shell p-2 rounded border border-hairline">
                 simulate(reqs=1000, rps=620)
               </div>
@@ -409,7 +409,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          03 GEOMETRY & ELEVATION
+          03 Geometry & elevation
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-radii" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -442,7 +442,7 @@ export function Specimen() {
 
         {/* Elevation tiers */}
         <div className="space-y-3 pt-2">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Elevation · 6 Depth Tiers
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
@@ -469,7 +469,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          04 INTERACTION & MOTION
+          04 Interaction & motion
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-interaction" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -484,7 +484,7 @@ export function Specimen() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Focus Rings · 2px Accessible Outlines
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -507,7 +507,7 @@ export function Specimen() {
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Motion · Restrained 0.8s Spin
             </h3>
             <div className="flex items-center gap-6 h-full pb-2">
@@ -530,7 +530,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          05 CORE ACTIONS
+          05 Core actions
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-buttons" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -611,12 +611,12 @@ export function Specimen() {
 
         {/* Tone x State Matrix */}
         <div className="border border-border rounded-lg bg-panel p-5 space-y-4 overflow-x-auto">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Button Tone × State Matrix
           </h3>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-border text-muted-foreground font-mono text-[10px] uppercase">
+              <tr className="border-b border-border text-muted-foreground font-mono text-[10px] ">
                 <th className="py-2 pr-4">Tone</th>
                 <th className="py-2 px-3">Rest</th>
                 <th className="py-2 px-3">Hover</th>
@@ -723,7 +723,7 @@ export function Specimen() {
         {/* StatusDot, KeyHint, Tags, CountBadge */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               StatusDot &amp; KeyHint
             </h3>
             <div className="flex flex-wrap items-center gap-5">
@@ -741,7 +741,7 @@ export function Specimen() {
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 id="heading-badges" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 id="heading-badges" className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Badges
             </h3>
             <div className="flex flex-wrap items-center gap-2">
@@ -764,7 +764,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          06 FORMS & INPUTS
+          06 Forms & inputs
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-inputs" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -779,7 +779,7 @@ export function Specimen() {
 
         {/* 6 States Matrix for TextInput */}
         <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             TextInput · 6 Interaction States
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -803,7 +803,7 @@ export function Specimen() {
 
             <div className="space-y-1.5">
               <Label htmlFor="input-filled">Input (Filled)</Label>
-              <Input id="input-filled" type="text" defaultValue="CanvasOne Service" />
+              <Input id="input-filled" type="text" defaultValue="Canvas One Service" />
               <span className="text-[10px] text-muted-foreground">White fill with value</span>
             </div>
 
@@ -837,7 +837,7 @@ export function Specimen() {
         {/* SearchField, Stepper, Select */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="border border-border rounded-lg bg-panel p-5 space-y-3">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               SearchField
             </h3>
             <SearchField
@@ -855,7 +855,7 @@ export function Specimen() {
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-3">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Stepper
             </h3>
             <div className="space-y-3">
@@ -871,7 +871,7 @@ export function Specimen() {
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-3">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Select &amp; Native Select
             </h3>
             <div className="space-y-3">
@@ -909,7 +909,7 @@ export function Specimen() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             {/* Checkbox */}
             <div className="space-y-3">
-              <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Checkbox</h4>
+              <h4 className="font-mono text-[10px] tracking-wider text-muted-foreground">Checkbox</h4>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Checkbox id="checkbox-off" />
@@ -936,7 +936,7 @@ export function Specimen() {
 
             {/* Radio */}
             <div className="space-y-3">
-              <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Radio Group</h4>
+              <h4 className="font-mono text-[10px] tracking-wider text-muted-foreground">Radio Group</h4>
               <RadioGroup defaultValue="radio-on">
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="radio-off" id="radio-off" />
@@ -955,7 +955,7 @@ export function Specimen() {
 
             {/* Switch */}
             <div className="space-y-3">
-              <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Toggle / Switch</h4>
+              <h4 className="font-mono text-[10px] tracking-wider text-muted-foreground">Toggle / Switch</h4>
               <div className="space-y-3">
                 <div className="flex items-center gap-2.5">
                   <Switch id="switch-off" aria-label="Debug logging (Off)" />
@@ -974,7 +974,7 @@ export function Specimen() {
 
             {/* Slider */}
             <div className="space-y-3">
-              <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Slider</h4>
+              <h4 className="font-mono text-[10px] tracking-wider text-muted-foreground">Slider</h4>
               <div className="space-y-3">
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
@@ -1004,7 +1004,7 @@ export function Specimen() {
 
         {/* Textareas */}
         <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             Textarea States
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -1031,7 +1031,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          07 NAVIGATION
+          07 Navigation
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-tabs" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -1067,7 +1067,7 @@ export function Specimen() {
         {/* Segmented Control & RailItem */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Segmented Control
             </h3>
             <div className="flex items-center gap-4">
@@ -1084,14 +1084,14 @@ export function Specimen() {
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Rail Items · Outer Spine on Active
             </h3>
             <div className="flex items-center gap-4">
               <div className="w-12 py-2 rounded-md flex flex-col items-center gap-1 bg-accent relative text-accent-foreground">
                 <span className="absolute -left-1 top-2.5 bottom-2.5 w-0.5 bg-primary rounded-full" />
                 <Library className="size-4" />
-                <span className="font-mono text-[9.5px]">PARTS</span>
+                <span className="font-mono text-[9.5px]">Parts</span>
               </div>
               <div className="w-12 py-2 rounded-md flex flex-col items-center gap-1 hover:bg-sunken text-secondary-text">
                 <Sparkles className="size-4" />
@@ -1099,7 +1099,7 @@ export function Specimen() {
               </div>
               <div className="w-12 py-2 rounded-md flex flex-col items-center gap-1 hover:bg-sunken text-secondary-text">
                 <SlidersHorizontal className="size-4" />
-                <span className="font-mono text-[9.5px]">RUNS</span>
+                <span className="font-mono text-[9.5px]">Runs</span>
               </div>
             </div>
           </div>
@@ -1108,7 +1108,7 @@ export function Specimen() {
         {/* Breadcrumb & DropdownMenu */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Breadcrumb
             </h3>
             <Breadcrumb>
@@ -1118,7 +1118,7 @@ export function Specimen() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="#system-studio">CanvasOne</BreadcrumbLink>
+                  <BreadcrumbLink href="#system-studio">Canvas One</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -1129,7 +1129,7 @@ export function Specimen() {
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Dropdown Menu · Standardized Structure
             </h3>
             <div className="flex flex-wrap items-start gap-6">
@@ -1139,7 +1139,7 @@ export function Specimen() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64">
                   <DropdownMenuHeader>
-                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] font-semibold text-secondary-text">
+                    <span className="font-mono text-[9px] tracking-[0.12em] font-semibold text-secondary-text">
                       Project Actions
                     </span>
                     <span className="font-mono text-[9px] text-muted-foreground">v2.0</span>
@@ -1173,7 +1173,7 @@ export function Specimen() {
                     <DropdownMenuShortcut className="text-destructive font-mono text-[10px]">⌦</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuFooter>
-                    <span className="text-secondary-text text-[11px]">CanvasOne</span>
+                    <span className="text-secondary-text text-[11px]">Canvas One</span>
                     <span className="font-mono text-[10px] text-primary">⌘K</span>
                   </DropdownMenuFooter>
                 </DropdownMenuContent>
@@ -1181,7 +1181,7 @@ export function Specimen() {
 
               {/* Declarative DropdownMenuPanel Preview */}
               <DropdownMenuPanel
-                heading="NODE CONTEXT MENU"
+                heading="Node context menu"
                 width={250}
                 items={[
                   { icon: <Plus className="size-3.5" />, label: "Add probe", shortcut: "P" },
@@ -1204,7 +1204,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          08 FEEDBACK
+          08 Feedback
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-alerts" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -1219,7 +1219,7 @@ export function Specimen() {
 
         {/* InlineAlert 3 Tones */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
             InlineAlert · 3 Coloured Spine Tones
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1338,7 +1338,7 @@ export function Specimen() {
 
           {/* Toast Notification Preview */}
           <div className="pt-2">
-            <h4 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-3">
+            <h4 className="font-mono text-[10px] tracking-wider text-muted-foreground mb-3">
               Canvas Toast · Ink Fill &amp; Green Action
             </h4>
             <ToastProvider>
@@ -1362,18 +1362,18 @@ export function Specimen() {
         {/* Meters & EmptyState */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Meter Components
             </h3>
             <div className="space-y-4">
-              <Meter label="THROUGHPUT" percent={68} readout="680 req/s" tone="green" />
-              <Meter label="QUEUE DEPTH" percent={92} readout="920 / 1000" tone="clay" />
-              <Meter label="CPU CORE" percent={34} readout="34%" tone="green" />
+              <Meter label="Throughput" percent={68} readout="680 req/s" tone="green" />
+              <Meter label="Queue depth" percent={92} readout="920 / 1000" tone="clay" />
+              <Meter label="CPU core" percent={34} readout="34%" tone="green" />
             </div>
           </div>
 
           <div className="border border-border rounded-lg bg-panel p-5 space-y-4">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               EmptyState
             </h3>
             <EmptyState
@@ -1390,7 +1390,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          09 SURFACES & PANELS
+          09 Surfaces & panels
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-surfaces" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -1406,11 +1406,11 @@ export function Specimen() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* LibraryRow 6 States */}
           <div className="border border-border rounded-lg bg-panel p-5 space-y-3">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
               LibraryRow · 6 Interaction States
             </h3>
             <div className="space-y-2">
-              <LibraryRow state="rest" title="Redis Cache Cluster" meta="DATA · IN-MEMORY LRU" />
+              <LibraryRow state="rest" title="Redis Cache Cluster" meta="Data · in-memory LRU" />
               <LibraryRow state="hover" title="PostgreSQL Replica" meta="DATA · RELATIONAL" />
               <LibraryRow state="selected" title="Event Broker (Kafka)" meta="MESSAGING · PARTITIONED" />
               <LibraryRow state="dragging" title="API Gateway" meta="EDGE · RATE-LIMITED" />
@@ -1422,7 +1422,7 @@ export function Specimen() {
           {/* AvatarStack & Inspector Header */}
           <div className="space-y-6">
             <div className="border border-border rounded-lg bg-panel p-5 space-y-3">
-              <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
                 AvatarStack · Collaborator Overlay
               </h3>
               <div className="space-y-4">
@@ -1432,7 +1432,7 @@ export function Specimen() {
             </div>
 
             <div className="border border-border rounded-lg bg-panel p-5 space-y-3">
-              <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
                 Card &amp; ScrollArea Preview
               </h3>
               <Card>
@@ -1464,7 +1464,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          10 CANVAS COMPONENTS
+          10 Canvas components
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-canvas" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -1481,14 +1481,14 @@ export function Specimen() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
             {/* Component Node Preview */}
             <div className="space-y-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
                 Component Node
               </span>
               <div className="rounded-node border border-control-border bg-background p-3 relative shadow-2xs hover:shadow-lifted transition-all">
                 <div className="absolute inset-x-0 top-0 h-[3px] rounded-t-node bg-[#56773A]" />
                 <div className="flex items-center justify-between text-xs font-semibold mt-1">
                   <span>Order Worker</span>
-                  <Badge variant="neutral" className="text-[9px] py-0">COMPUTE</Badge>
+                  <Badge variant="neutral" className="text-[9px] py-0">Compute</Badge>
                 </div>
                 <p className="text-[11px] text-secondary-text mt-1.5">
                   Processes orders from Kafka queue.
@@ -1502,7 +1502,7 @@ export function Specimen() {
 
             {/* Sticky Note Preview */}
             <div className="space-y-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
                 Sticky Note
               </span>
               <div className="rounded-card border border-note-edge bg-note p-3 text-xs leading-relaxed shadow-raised">
@@ -1515,11 +1515,11 @@ export function Specimen() {
 
             {/* Boundary Frame Preview */}
             <div className="space-y-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
                 Boundary / Group
               </span>
               <div className="rounded-card border-2 border-dashed border-border bg-background/50 p-4 h-28 flex flex-col justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
                   Ingestion Subsystem
                 </span>
                 <span className="text-xs text-secondary-text">
@@ -1531,7 +1531,7 @@ export function Specimen() {
 
           {/* Floating Dock Preview */}
           <div className="space-y-2 pt-2">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="font-mono text-[10px] tracking-wider text-muted-foreground">
               Floating Dock
             </span>
             <div className="rounded-dock border border-border bg-background p-1 shadow-floating inline-flex items-center gap-1">
@@ -1560,7 +1560,7 @@ export function Specimen() {
       <Separator />
 
       {/* ──────────────────────────────────────────────────────────
-          11 RULES OF USE
+          11 Rules of use
           ────────────────────────────────────────────────────────── */}
       <section aria-labelledby="heading-rules" className="space-y-6">
         <div className="flex items-baseline gap-3">
@@ -1599,7 +1599,7 @@ export function Specimen() {
 
       {/* Legacy Command, Progress, Resizable coverage to keep tests passing */}
       <section className="space-y-6 pt-4 border-t border-hairline">
-        <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
           Auxiliary Layout &amp; Command Primitives
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -7,7 +7,7 @@ test("source range scope and selected cycle lifetime remain distinct", async ({
   await recording(page);
   await range(page, 0.2, 0.8);
   const pane = await tab(page, "Summary");
-  await expect(pane).toContainText('RANGE');
+  await expect(pane).toContainText('Range');
   const intervalCompleted = await pane
     .getByTestId("scope-completed")
     .innerText();

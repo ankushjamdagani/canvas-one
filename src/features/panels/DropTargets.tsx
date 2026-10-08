@@ -50,7 +50,7 @@ export const DropTargets: React.FC<DropTargetsProps> = ({
         <div
           data-slot="drop-badge-left"
           className={cn(
-            'mt-4 px-3 py-1 rounded-full font-mono text-xs uppercase tracking-wider transition-all shadow-sm',
+            'mt-4 px-3 py-1 rounded-full font-mono text-xs tracking-wider transition-all shadow-sm',
             activeTarget === 'left'
               ? 'bg-primary text-primary-foreground font-semibold ring-2 ring-primary/20 scale-105'
               : 'bg-card text-secondary-text border border-border'
@@ -84,7 +84,7 @@ export const DropTargets: React.FC<DropTargetsProps> = ({
         <div
           data-slot="drop-badge-right"
           className={cn(
-            'mt-4 px-3 py-1 rounded-full font-mono text-xs uppercase tracking-wider transition-all shadow-sm',
+            'mt-4 px-3 py-1 rounded-full font-mono text-xs tracking-wider transition-all shadow-sm',
             activeTarget === 'right'
               ? 'bg-primary text-primary-foreground font-semibold ring-2 ring-primary/20 scale-105'
               : 'bg-card text-secondary-text border border-border'

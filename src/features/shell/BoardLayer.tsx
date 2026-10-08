@@ -106,12 +106,12 @@ export function BoardLayer({
       aria-hidden="true"
       className="pointer-events-none absolute inset-0"
     >
-      <div className="absolute inset-0 z-0 transition-opacity" style={{ opacity: visible ? 1 : 0, transitionDuration: `${fadeSeconds}s` }}>
+      <div className="fixed inset-0 z-0 transition-opacity" style={{ opacity: visible ? 1 : 0, transitionDuration: `${fadeSeconds}s` }}>
         {mounted && <div ref={dots} className="absolute inset-0" style={{ opacity: playIntro && !shift.n ? 0 : 1 }}>
           <DraftingGround paused={paused || !visible} pointerSource="document" />
         </div>}
       </div>
-      <div ref={frame} data-testid={visible ? 'route-frame' : 'workspace-frame'} className={`absolute inset-0 z-20 ${visible ? '' : 'max-[999px]:hidden'}`}>
+      <div ref={frame} data-testid={visible ? 'route-frame' : 'workspace-frame'} className={`fixed inset-0 z-20 ${visible ? '' : 'max-[999px]:hidden'}`}>
         <DraftingFrame />
       </div>
     </div>

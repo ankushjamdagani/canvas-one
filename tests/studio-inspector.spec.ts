@@ -21,7 +21,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
     const inspector = page.getByTestId('inspector-panel');
     await expect(inspector).toBeVisible();
     await expect(inspector).toContainText('Router');
-    await expect(page.getByTestId('inspector-kind-tag')).toContainText('ROUTER');
+    await expect(page.getByTestId('inspector-kind-tag')).toContainText('Router');
 
     const capacityInput = page.getByTestId('inspector-field-config.capacity');
     await expect(capacityInput).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('Studio Inspector E2E (RV-05b)', () => {
     await page.getByTestId('guard-discard').click();
     await expect(guardDialog).toBeHidden();
     await expect(inspector).toContainText('A');
-    await expect(page.getByTestId('inspector-kind-tag')).toContainText('PROCESSOR');
+    await expect(page.getByTestId('inspector-kind-tag')).toContainText('Processor');
 
     // Re-select the router and apply a valid capacity.
     await routerNode.click();

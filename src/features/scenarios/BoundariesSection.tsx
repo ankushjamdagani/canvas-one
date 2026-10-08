@@ -161,7 +161,7 @@ export function BoundariesSection({
     <section data-testid="scenario-section-boundaries" className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">
             What happens during the run
           </div>
           <div className="text-[11px] text-secondary-text">Replies from outside this scenario's scope.</div>
@@ -493,7 +493,7 @@ function ResponseFields({
         </label>
       </div>
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
+        <span className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">
           Payload bindings
         </span>
         <Button type="button" size="sm" variant="ghost" onClick={() => setAddingBinding(true)}>

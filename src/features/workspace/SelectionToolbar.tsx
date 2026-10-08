@@ -143,7 +143,7 @@ function AlignSection<V extends string>({
 }) {
   return (
     <div>
-      <DropdownMenuLabel className="font-mono text-micro font-medium text-secondary-text uppercase px-2 py-0.5">
+      <DropdownMenuLabel className="font-mono text-micro font-medium text-secondary-text px-2 py-0.5">
         {title}
       </DropdownMenuLabel>
       <div className="flex items-center gap-1 px-1 py-0.5">
@@ -366,7 +366,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
         data-testid="selection-count"
         className="h-7 px-2 inline-flex items-center rounded-tag bg-sunken font-mono text-[10px] font-semibold tracking-wide text-secondary-text"
       >
-        {count} {count === 1 ? 'PART' : 'PARTS'}
+        {count} {count === 1 ? 'Part' : 'Parts'}
       </span>
 
       {count > 1 && context.selectedGroupIds.length === 0 && (
@@ -398,8 +398,8 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
                 void submitGroup();
               }}
             >
-              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase">
-                NEW GROUP
+              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text ">
+                New group
               </div>
               <div className="p-3 bg-background">
                 <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-group-label">
@@ -472,8 +472,8 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
                 void submitWrap();
               }}
             >
-              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase">
-                WRAP IN BOUNDARY
+              <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text ">
+                Wrap in boundary
               </div>
               <div className="p-3 bg-background">
                 <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="selection-wrap-label">
@@ -509,7 +509,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-[152px] p-0 overflow-hidden shadow-popover">
-          <DropdownMenuHeader className="px-3 py-2 text-secondary-text">ALIGN & DISTRIBUTE</DropdownMenuHeader>
+          <DropdownMenuHeader className="px-3 py-2 text-secondary-text">Align & distribute</DropdownMenuHeader>
           <div className="p-1.5 bg-background space-y-1">
             <AlignSection
               title="Horizontal Alignment"
@@ -582,7 +582,7 @@ export function SelectionToolbar({ context, executeCommand, mintId, className, s
           <TooltipContent side="top">More selection actions</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="end" className="w-64 p-0 overflow-hidden">
-          <DropdownMenuHeader className="px-3 py-2 text-secondary-text">SELECTION ACTIONS</DropdownMenuHeader>
+          <DropdownMenuHeader className="px-3 py-2 text-secondary-text">Selection actions</DropdownMenuHeader>
           <div className="p-1.5 bg-background space-y-0.5">
             {OVERFLOW_PRIMARY.map((item) => overflowItem(item))}
           </div>

@@ -124,7 +124,7 @@ const SelectLabel = React.forwardRef<
     ref={ref}
     data-slot="select-label"
     className={cn(
-      "px-2.5 py-1.5 font-mono text-micro uppercase tracking-wide font-medium text-secondary-text",
+      "px-2.5 py-1.5 font-mono text-micro tracking-wide font-medium text-secondary-text",
       className
     )}
     {...props}
@@ -140,7 +140,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     data-slot="select-item"
     className={cn(
-      "relative flex w-full cursor-default select-none items-center justify-between gap-2.5 rounded-control py-1.5 pl-2.5 pr-2.5 text-[13px] outline-none transition-colors data-[highlighted]:bg-sunken data-[highlighted]:text-foreground data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[state=checked]:font-semibold data-[disabled]:pointer-events-none data-[disabled]:bg-sunken data-[disabled]:text-secondary-text",
+      "relative flex w-full cursor-default select-none items-center justify-between gap-2.5 rounded-control py-1.5 pl-2.5 pr-2.5 text-ui outline-none transition-colors data-[highlighted]:bg-sunken data-[highlighted]:text-foreground data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[state=checked]:font-semibold data-[disabled]:pointer-events-none data-[disabled]:bg-sunken data-[disabled]:text-secondary-text",
       className
     )}
     {...props}

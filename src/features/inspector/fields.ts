@@ -319,25 +319,29 @@ export function fieldsForElement(element: Element): readonly FieldSpec<Element>[
   return [...elementLabelDescriptionFields(), ...behaviorFields(element), ...portSettingsFields(element)];
 }
 
-/** Uppercase kind tag(s) for the inspector header, per D42 caption words. */
+/** Sentence-case kind tags for the inspector header. */
+function kindCaption(kind: string): string {
+  const words = kind.replaceAll('-', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 export function kindTagForElement(element: Element): { readonly tag: string; readonly notSimulated: boolean } {
   const behavior = element.behavior;
-  if (element.visualKind === 'linked-project') return { tag: 'LINKED PROJECT', notSimulated: false };
+  if (element.visualKind === 'linked-project') return { tag: 'Linked project', notSimulated: false };
   switch (behavior.kind) {
     case 'unmodeled':
-      return { tag: 'NOT SIMULATED', notSimulated: true };
+      return { tag: 'Not simulated', notSimulated: true };
     case 'resource':
-      return { tag: behavior.config.type.toUpperCase(), notSimulated: false };
+      return { tag: kindCaption(behavior.config.type), notSimulated: false };
     case 'machine':
-      return { tag: 'STATE MACHINE', notSimulated: false };
+      return { tag: 'State machine', notSimulated: false };
     case 'pipeline':
-      return { tag: 'DATA PIPELINE', notSimulated: false };
+      return { tag: 'Data pipeline', notSimulated: false };
     case 'decision':
-      return { tag: 'DECISION', notSimulated: false };
+      return { tag: 'Decision', notSimulated: false };
     case 'host':
-      return { tag: 'HOST', notSimulated: false };
+      return { tag: 'Host', notSimulated: false };
     default:
-      return { tag: element.visualKind.toUpperCase(), notSimulated: false };
+      return { tag: kindCaption(element.visualKind), notSimulated: false };
   }
 }
 
@@ -514,5 +518,5 @@ function shouldShowReadonly(connection: Connection, field: FieldSpec<Connection>
 }
 
 export function kindTagForConnection(connection: Connection): string {
-  return connection.kind.toUpperCase();
+  return kindCaption(connection.kind);
 }

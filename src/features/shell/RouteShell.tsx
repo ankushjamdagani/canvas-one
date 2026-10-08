@@ -128,6 +128,7 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
   }, [target, page.kind, update, cancelOpen]);
 
   const mountedPage = React.useCallback(() => {
+    if (swapped.current) window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     setBoardVisible(page.kind !== 'project');
     if (page.shift) setShift(page.shift);
   }, [page.kind, page.shift]);

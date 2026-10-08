@@ -264,14 +264,14 @@ describe('fieldsForElement: non-resource behaviors', () => {
 });
 
 describe('kindTagForElement', () => {
-  it('resource elements show the ResourceConfig type uppercased', () => {
-    expect(kindTagForElement(processorElement()).tag).toBe('PROCESSOR');
+  it('resource elements show the ResourceConfig type in sentence case', () => {
+    expect(kindTagForElement(processorElement()).tag).toBe('Processor');
   });
 
-  it('unmodeled elements are tagged NOT SIMULATED with notSimulated=true', () => {
+  it('unmodeled elements are tagged Not simulated with notSimulated=true', () => {
     const el = processorElement({ behavior: { kind: 'unmodeled', version: 1, reason: 'x' } });
     const result = kindTagForElement(el);
-    expect(result.tag).toBe('NOT SIMULATED');
+    expect(result.tag).toBe('Not simulated');
     expect(result.notSimulated).toBe(true);
   });
 });
@@ -475,8 +475,8 @@ describe('fieldsForElement: port settings (D53)', () => {
 });
 
 describe('kindTagForConnection', () => {
-  it('uppercases the connection kind', () => {
-    expect(kindTagForConnection(callConnection())).toBe('CALL');
+  it('uses sentence case for the connection kind', () => {
+    expect(kindTagForConnection(callConnection())).toBe('Call');
   });
 });
 
@@ -492,6 +492,6 @@ describe('linked-project elements (D52)', () => {
   });
 
   it('tags the header as a linked project, not as a processor', () => {
-    expect(kindTagForElement(linked)).toEqual({ tag: 'LINKED PROJECT', notSimulated: false });
+    expect(kindTagForElement(linked)).toEqual({ tag: 'Linked project', notSimulated: false });
   });
 });

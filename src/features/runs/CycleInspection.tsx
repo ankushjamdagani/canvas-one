@@ -423,7 +423,7 @@ export function CycleInspection({
               ],
             ].map(([label, value]) => (
               <div key={label} className="flex min-w-0 flex-col gap-[3px]">
-                <dt className="font-mono text-[9px] uppercase text-secondary-text">
+                <dt className="font-mono text-[9px] text-secondary-text">
                   {label}
                 </dt>
                 <dd
@@ -466,7 +466,7 @@ export function CycleInspection({
         <div className="flex shrink-0 items-center gap-2 pb-2 pl-4 pr-2 pt-0.5">
           <span className="flex h-7 min-w-0 items-center gap-1.5 rounded-[6px] bg-sunken px-2 font-mono text-[10px] text-secondary-text">
             <span className="truncate">
-              {selection ? "RANGE" : "THROUGH PLAYHEAD"} {scopeLabel}
+              {selection ? "Range" : "Through playhead"} {scopeLabel}
             </span>
             {selection && (
               <button
@@ -551,8 +551,8 @@ export function CycleInspection({
               <div className="border-t border-border pt-2.5">
                 <h3 className="mb-1 font-mono text-[9px] text-secondary-text">
                   {store?.ended || recordedResult
-                    ? "WHOLE RECORDING"
-                    : "RECORDED SO FAR"}
+                    ? "Whole recording"
+                    : "Recorded so far"}
                 </h3>
                 <ScopeMetricRows rows={wholeRows} prefix="whole" />
               </div>
@@ -587,7 +587,9 @@ export function CycleInspection({
     >
       <aside
         data-testid="simulation-scope-pane"
-        className="min-h-0 overflow-y-auto border-r border-border bg-shell p-4"
+        aria-label="Simulation summary"
+        tabIndex={0}
+        className="min-h-0 overflow-y-auto border-r border-border bg-shell p-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
         {(stats || recordedResult) && (
           <ScopeMetrics

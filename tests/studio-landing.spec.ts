@@ -15,13 +15,13 @@ test("landing preserves supplied copy and opens projects with working history", 
   );
   await expect(page.getByText("You & Claude", { exact: true })).toBeVisible();
   await page
-    .getByRole("button", { name: "Copy npx canvasone@preview" })
+    .getByRole("button", { name: "Copy npx canvas-one@preview" })
     .click();
   await expect(
     page.getByRole("button", { name: "Command copied" }),
   ).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-    "npx canvasone@preview",
+    "npx canvas-one@preview",
   );
   await page.getByRole("link", { name: "Try Beta" }).last().click();
   await expect(page).toHaveURL(/\/projects$/);
@@ -40,14 +40,14 @@ test("illustrative demo pauses, accepts, dismisses and resets", async ({
   const figure = page.getByRole("figure");
   await expect(page.getByLabel("Move Edge Gateway demo node")).toBeVisible();
   await page.clock.runFor(5000);
-  await expect(figure).toContainText("SUGGESTED");
+  await expect(figure).toContainText("Suggested");
   await page.getByRole("button", { name: "Pause demo" }).click();
   await expect(figure).toHaveAttribute("data-paused", "true");
   const frozen = await figure.innerText();
   await page.clock.runFor(1800);
   expect(await figure.innerText()).toBe(frozen);
   await page.getByRole("button", { name: "Accept", exact: true }).click();
-  await expect(figure).toContainText("ACCEPTED");
+  await expect(figure).toContainText("Accepted");
   await page.getByRole("button", { name: "Reset demo" }).click();
   await page.getByRole("button", { name: "Run demo" }).click();
   await page.clock.runFor(4000);
@@ -55,7 +55,7 @@ test("illustrative demo pauses, accepts, dismisses and resets", async ({
   await expect(figure).not.toContainText("Async Buffer");
   await page.getByRole("button", { name: "Reset demo" }).click();
   await page.clock.runFor(4000);
-  await expect(figure).toContainText("SUGGESTED");
+  await expect(figure).toContainText("Suggested");
 });
 
 for (const width of [1440, 800, 390, 320]) {
@@ -75,7 +75,7 @@ for (const width of [1440, 800, 390, 320]) {
       ).toBe(true);
       await page.keyboard.press("Tab");
       await expect(
-        page.getByRole("link", { name: "CanvasOne", exact: true }),
+        page.getByRole("link", { name: "Canvas One", exact: true }),
       ).toBeFocused();
       const audit = await new AxeBuilder({ page }).analyze();
       expect(audit.violations).toEqual([]);
@@ -163,10 +163,10 @@ test("unavailable clipboard shows a usable fallback instead of throwing", async 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Copy npx canvasone@preview" })
+    .getByRole("button", { name: "Copy npx canvas-one@preview" })
     .click();
   await expect(page.getByRole("alert")).toContainText(
-    "npx canvasone@preview",
+    "npx canvas-one@preview",
   );
   expect(errors).toEqual([]);
 });
@@ -186,7 +186,7 @@ test("landing follows authored board geometry and timed collaboration sequence",
   await expect(page.getByLabel("Move Async Buffer demo node")).toHaveCount(0);
   await page.clock.runFor(4000);
   await expect(page.getByLabel("Move Async Buffer demo node")).toContainText(
-    "SUGGESTED",
+    "Suggested",
   );
   await expect(page.locator(".lp-note")).toHaveCount(0);
   await page.clock.runFor(1000);
@@ -200,7 +200,7 @@ test("landing follows authored board geometry and timed collaboration sequence",
   });
   await page.clock.runFor(4000);
   await expect(page.getByLabel("Move Async Buffer demo node")).toContainText(
-    "ACCEPTED",
+    "Accepted",
   );
   await expect(page.getByLabel("Move Edge Gateway demo node")).toContainText(
     "0 dropped",
@@ -216,7 +216,7 @@ test("landing follows authored board geometry and timed collaboration sequence",
   await handle.focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".lp-dimension")).toHaveText(
-    "TEXT · H1 · 808 × 176",
+    "Text · H1 · 808 × 176",
   );
   const box = await handle.boundingBox();
   await page.mouse.move(box!.x + 4, box!.y + 4);
@@ -224,7 +224,7 @@ test("landing follows authored board geometry and timed collaboration sequence",
   await page.mouse.move(box!.x + 24, box!.y + 14);
   await page.mouse.up();
   await expect(page.locator(".lp-dimension")).toHaveText(
-    "TEXT · H1 · 828 × 186",
+    "Text · H1 · 828 × 186",
   );
   await page.clock.runFor(5000);
   await expect(page.getByLabel("Move Async Buffer demo node")).toHaveCount(0);
@@ -241,6 +241,6 @@ test("landing board fills a wide viewport and the lede follows the heading", asy
   expect(board!.height).toBeGreaterThanOrEqual(900);
   const hero = await page.locator(".lp-hero").boundingBox();
   const copy = await page.locator(".lp-copy").boundingBox();
-  expect(copy!.y).toBeCloseTo(hero!.y + hero!.height + 35, 0);
+  expect(copy!.y).toBeCloseTo(hero!.y + hero!.height + 46, 0);
   expect(copy!.x).toBeCloseTo(hero!.x + 19, 0);
 });

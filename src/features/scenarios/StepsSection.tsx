@@ -96,7 +96,7 @@ export function StepsSection({ document, scenario, onChange, mintId, issues = []
     <section data-testid="scenario-section-steps" className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Steps, in order</div>
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">Steps, in order</div>
           <div className="text-[11px] text-secondary-text">Each step waits until the previous one settles.</div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={addStep} disabled={entriesWithFixtures.length === 0}>
@@ -290,7 +290,7 @@ function StartingStateSection({ document, scenario, onChange }: StartingStateSec
   return (
     <div className="space-y-1.5 pt-2">
       <div className="flex items-center justify-between">
-        <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">Starting state</div>
+        <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">Starting state</div>
         <button type="button" className="text-[11px] text-primary hover:text-primary hover:underline" onClick={addOverride}>
           + Add override
         </button>

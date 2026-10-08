@@ -76,8 +76,8 @@ describe('QuickOptionsContent (14A)', () => {
     }
     expect(html).toContain('Rename project');
     expect(html).toContain('All projects');
-    expect(html).toContain('CURRENT');
-    expect(html).toContain('MAIN');
+    expect(html).toContain('Current');
+    expect(html).toContain('Main');
     expect(html).toContain('Run all scenarios');
     expect(html).toContain('Open history');
     expect(html).toContain('↑↓ move');

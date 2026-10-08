@@ -3,6 +3,7 @@ import * as React from 'react';
 /** Routes the app understands. `branchId: null` means the project's main branch. */
 export type Route =
   | { readonly kind: 'home' }
+  | { readonly kind: 'brand' }
   | { readonly kind: 'projects' }
   | { readonly kind: 'project'; readonly projectId: string; readonly branchId: string | null };
 
@@ -15,6 +16,7 @@ export function parseRoute(pathname: string): Route | null {
     }
   });
   if (parts.length === 0) return { kind: 'home' };
+  if (parts.length === 1 && parts[0] === 'brand') return { kind: 'brand' };
   if (parts.length === 1 && parts[0] === 'projects') return { kind: 'projects' };
   if (parts[0] !== 'project' || !parts[1]) return null;
   if (parts.length === 2) return { kind: 'project', projectId: parts[1], branchId: null };
@@ -26,6 +28,7 @@ export function parseRoute(pathname: string): Route | null {
 
 export function formatRoute(route: Route): string {
   if (route.kind === 'home') return '/';
+  if (route.kind === 'brand') return '/brand';
   if (route.kind === 'projects') return '/projects';
   const project = `/project/${encodeURIComponent(route.projectId)}`;
   return route.branchId ? `${project}/branch/${encodeURIComponent(route.branchId)}` : project;
@@ -79,6 +82,7 @@ export function useInternalLinks() {
       if (!anchor || (anchor.target && anchor.target !== '_self') || anchor.hasAttribute('download')) return;
       const url = new URL(anchor.href, window.location.href);
       if (url.origin !== window.location.origin) return;
+      if (url.hash) return;
       const next = parseRoute(url.pathname);
       if (!next) return;
       event.preventDefault();

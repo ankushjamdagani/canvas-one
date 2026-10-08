@@ -53,7 +53,7 @@ test('create a branch from saved work and reopen a closed draft', async ({ page 
   // just as it does after a real publish updates the branch row.
   await page.getByTestId('breadcrumb-branch-btn').click();
   await page.locator('button[data-testid^="branch-switch-"]').filter({ hasText: 'main' }).click();
-  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
   await page.getByTestId('breadcrumb-branch-btn').click();
   const closedRow = page.getByTestId(`branch-switch-${closedBranchId}`).locator('..');
   await expect(closedRow.getByRole('button', { name: 'Reopen and switch to Cache experiment' })).toBeVisible();
@@ -61,5 +61,5 @@ test('create a branch from saved work and reopen a closed draft', async ({ page 
 
   await expect(page.getByTestId('breadcrumb-branch-btn')).toContainText('Cache experiment');
   await expect(page.getByTestId('branch-popover')).toHaveCount(0);
-  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Draft');
 });

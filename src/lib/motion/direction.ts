@@ -1,6 +1,6 @@
-export type PageKind = 'home' | 'projects' | 'project';
+export type PageKind = 'home' | 'brand' | 'projects' | 'project';
 
-const ORDER: Record<PageKind, number> = { home: 0, projects: 1, project: 2 };
+const ORDER: Record<PageKind, number> = { home: 0, brand: 1, projects: 1, project: 2 };
 
 /** +1 when moving deeper into the app, -1 when moving back out. */
 export function pageDirection(from: PageKind, to: PageKind): -1 | 0 | 1 {

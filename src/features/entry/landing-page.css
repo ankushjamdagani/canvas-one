@@ -17,12 +17,8 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.lp-brand > span {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  background: var(--brand-mark);
-}
+.lp-brand .brand-wordmark { font-size: 16px; }
+.lp-brand-link { padding: 0 4px; font-size: 12.5px; }
 .lp-version {
   font:
     10px var(--font-mono),
@@ -61,6 +57,9 @@
   left: -10px;
   background: var(--branch-solid);
   color: var(--branch-foreground);
+  --face-paper: var(--branch-solid);
+  --face-ai: var(--branch-solid);
+  --face-risk: white;
 }
 .lp-collaborators b {
   font-size: 12.5px;
@@ -130,7 +129,7 @@
   font:
     9px var(--font-mono),
     monospace;
-  color: var(--action-text);
+  color: var(--accent-foreground);
   letter-spacing: 0.08em;
   background: var(--accent);
   border: 1px solid var(--selected-edge);
@@ -180,9 +179,9 @@
 .lp-copy {
   position: absolute;
   width: 440px;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.75;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.6;
   text-wrap: pretty;
   color: var(--body);
   margin: 0;
@@ -352,7 +351,7 @@
 }
 .lp-buffer p strong {
   font-weight: 400;
-  color: var(--landing-muted);
+  color: var(--body);
 }
 .lp-buffer-actions {
   padding: 0 8px 8px;
@@ -498,18 +497,23 @@
   background: var(--branch-solid);
   color: var(--branch-foreground);
 }
+.lp-prompt-active button {
+  background: var(--background);
+  color: var(--branch-text);
+  --face-paper: var(--background);
+  --face-ai: var(--background);
+}
+.lp-prompt-active button .canvas-one-face { transform: scaleY(-1); }
 .lp-local {
   position: absolute;
   left: 700px;
   top: 372px;
   margin: 0;
   font: 500 21px/1.15 var(--font-handwritten);
-  color: var(--landing-muted-light);
+  color: var(--secondary-text);
   text-align: right;
   transform: rotate(-3deg);
   transform-origin: right top;
-  opacity: 0.85;
-  mix-blend-mode: multiply;
   pointer-events: none;
 }
 .lp-cursor {
@@ -523,14 +527,14 @@
 .lp-cursor svg {
   display: block;
 }
-.lp-cursor span {
+.lp-cursor > span {
   position: absolute;
   left: 14px;
   top: 16px;
   font:
     600 10px var(--font-mono),
     monospace;
-  color: var(--text-on-ink);
+  color: var(--primary-foreground);
   background: var(--primary);
   border-radius: 4px;
   padding: 2px 6px;
@@ -539,9 +543,19 @@
 .lp-claude {
   transition-duration: 1100ms;
 }
-.lp-claude span {
+.lp-claude > span {
   background: var(--branch-solid);
   color: var(--branch-foreground);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 4px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1.5px var(--background);
+  --face-paper: var(--branch-solid);
+  --face-ai: var(--branch-solid);
+  --face-risk: white;
 }
 .drafting-board :focus-visible {
   outline: 2px solid var(--ring);

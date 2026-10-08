@@ -151,7 +151,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     );
 
     // General tab contains run-level metric
-    expect(generalHtml).toContain('RUN METRICS');
+    expect(generalHtml).toContain('Run metrics');
     expect(generalHtml).toContain('250.0 req/s');
 
     // Now test Components tab rendering

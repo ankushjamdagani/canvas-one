@@ -97,9 +97,9 @@ const ICONS: Readonly<Record<CommandIconKey, LucideIcon>> = {
 };
 
 const BADGE_TEXT: Readonly<Record<NonNullable<QuickOption['badge']>, string>> = {
-  current: 'CURRENT',
-  main: 'MAIN',
-  closed: 'CLOSED',
+  current: 'Current',
+  main: 'Main',
+  closed: 'Closed',
 };
 
 export function QuickOptionRow({

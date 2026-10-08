@@ -35,7 +35,7 @@ export function LinkedProjects({
         if (event.key !== 'Escape') event.stopPropagation();
       }}
     >
-      <div className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-widest text-secondary-text">
+      <div className="flex items-center gap-2 font-mono text-[10.5px] tracking-widest text-secondary-text">
         <span className="font-medium">Linked projects</span>
         <div className="h-px flex-1 bg-border" />
         <span className="text-[10px]">{visible.length}</span>

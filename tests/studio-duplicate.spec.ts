@@ -22,7 +22,7 @@ test.describe('Studio selection duplicate (RV-09a)', () => {
     const validateOrder = nodes.filter({ hasText: 'Validate order' });
     await orderEntry.click();
     await validateOrder.click({ modifiers: ['Shift'] });
-    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toHaveText('2 Parts');
 
     await page.getByTestId('selection-duplicate-btn').click();
     const confirmation = page.getByTestId('duplicate-confirm-dialog');

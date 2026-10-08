@@ -275,26 +275,26 @@ export function PlaybackPanel({
     Boolean(controllerState?.stopping);
   const status =
     results.runPhase === "compiling"
-      ? "PREPARING"
+      ? "Preparing"
       : controllerState?.stopping
-        ? "DRAINING"
+        ? "Draining"
         : results.runPhase === "saving"
-          ? "SAVING"
+          ? "Saving"
           : store?.ended
             ? store.playing
-              ? "REPLAY"
+              ? "Replay"
               : stopped
-                ? "STOPPED"
-                : "COMPLETE"
+                ? "Stopped"
+                : "Complete"
             : active
               ? store?.playing === false || results.runPhase === "paused"
-                ? "PAUSED"
+                ? "Paused"
                 : store && !store.following
-                  ? "LIVE · REVIEWING"
-                  : "LIVE"
+                  ? "Live · reviewing"
+                  : "Live"
               : hasRun
-                ? "COMPLETE"
-                : "READY";
+                ? "Complete"
+                : "Ready";
   const selectedScenario =
     scenarios.find((scenario) => scenario.id === selectedScenarioId) ??
     scenarios[0];
@@ -386,15 +386,15 @@ export function PlaybackPanel({
             className={
               mobile
                 ? "hidden"
-                : "border-r border-border pr-2 text-xs font-normal text-secondary-text"
+                : "border-r border-border pr-2 text-xs font-normal text-inherit"
             }
           >
             Traffic
           </span>
-          <span className="min-w-0 truncate font-semibold text-foreground">
+          <span className="min-w-0 truncate font-semibold text-inherit">
             {selectedScenario?.label ?? results.scenarioName ?? "No scenario"}
           </span>
-          <ChevronDown className="size-3 text-secondary-text" />
+          <ChevronDown className="size-3 text-inherit" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -547,7 +547,7 @@ export function PlaybackPanel({
       }
       disabled={busy || (!active && Boolean(disabledRunReason))}
       variant={active ? "tint" : mobile && hasRun ? "outline" : "default"}
-      className={`${mobile ? (hasRun ? "size-11 rounded-[10px] px-0" : "h-11 w-20 rounded-[10px] px-0") : `h-8 shrink-0 px-3.5 text-[13px] [&_svg]:size-3 ${joinClear ? "rounded-l-[7px] rounded-r-none" : "rounded-[7px]"}`} ${active ? "border-risk/30 bg-risk-tint text-risk-text hover:border-risk hover:bg-risk-tint focus-visible:border-risk" : ""}`}
+      className={`${mobile ? (hasRun ? "size-11 rounded-[10px] px-0" : "h-11 w-20 rounded-[10px] px-0") : `h-8 shrink-0 px-3.5 text-ui [&_svg]:size-3 ${joinClear ? "rounded-l-[7px] rounded-r-none" : "rounded-[7px]"}`} ${active ? "border-risk/30 bg-risk-tint text-risk-text hover:border-risk hover:bg-risk-tint focus-visible:border-risk" : ""}`}
       onClick={() => {
         if (active) {
           setStopped(true);
@@ -692,7 +692,7 @@ export function PlaybackPanel({
     <span
       data-testid="playback-status"
       role="status"
-      className={`flex shrink-0 items-center gap-[5px] whitespace-nowrap font-mono text-micro ${status.startsWith("LIVE") ? "text-primary" : "text-secondary-text"}`}
+      className={`flex shrink-0 items-center gap-[5px] whitespace-nowrap font-mono text-micro ${status.startsWith("Live") ? "text-primary" : "text-secondary-text"}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {status}

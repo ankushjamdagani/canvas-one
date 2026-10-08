@@ -28,7 +28,7 @@ export const Introduction: StoryObj = {
           Evergreen Design System
         </h1>
         <p className="text-base text-body max-w-3xl leading-relaxed">
-          The design language of CanvasOne: an editorial warm-paper canvas engineered for discrete-event simulation, distributed systems diagramming, and high-density performance telemetry.
+          The design language of Canvas One: an editorial warm-paper canvas engineered for discrete-event simulation, distributed systems diagramming, and high-density performance telemetry.
         </p>
       </div>
 

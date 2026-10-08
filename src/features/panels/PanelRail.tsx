@@ -126,7 +126,7 @@ export const PanelRail: React.FC<PanelRailProps> = ({
                   <span
                     data-slot="rail-item-label"
                     style={{ writingMode: 'vertical-rl' }}
-                    className="font-mono text-[11px] tracking-widest uppercase text-secondary-text group-hover:text-foreground py-1 rotate-180"
+                    className="font-mono text-[11px] tracking-widest text-secondary-text group-hover:text-foreground py-1 rotate-180"
                   >
                     {item.title}
                   </span>

@@ -88,7 +88,7 @@ export function TrafficSection({ document, scenario, onChange, mintId, issues = 
     <section data-testid="scenario-section-traffic" className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">
             What goes in
           </div>
           <div className="text-[11px] text-secondary-text">Traffic sent into an entry point.</div>

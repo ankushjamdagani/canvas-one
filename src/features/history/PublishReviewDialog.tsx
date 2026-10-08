@@ -249,7 +249,7 @@ export function PublishReviewBody({
               Run evidence for exactly this state
             </span>
           </span>
-          <Badge variant="risk" className="text-[10px] px-1.5 py-0 uppercase">
+          <Badge variant="risk" className="text-[10px] px-1.5 py-0 ">
             Required
           </Badge>
         </div>
@@ -348,7 +348,7 @@ export function PublishReviewBody({
               </span>
               <span id="review-conflicts-header">Conflicts with main</span>
             </span>
-            <span className="text-[10px] font-mono uppercase tracking-wide text-risk-text">
+            <span className="text-[10px] font-mono tracking-wide text-risk-text">
               Blocks publishing
             </span>
           </div>

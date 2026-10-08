@@ -351,9 +351,9 @@ export function HistoryLadder({
         {/* 3. NOW · NOT COMMITTED block (22A) */}
         {!publishedMain && (!behindMain || workingEdits.length > 0) && (
           <section aria-labelledby="now-not-committed-header" className="space-y-2">
-            <div className="flex items-center justify-between font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-secondary-text">
+            <div className="flex items-center justify-between font-mono text-[9.5px] font-medium tracking-[0.12em] text-secondary-text">
               <span id="now-not-committed-header" className="text-risk-text">
-                NOW · NOT COMMITTED
+                Now · not committed
               </span>
               <span data-testid="working-edits-count" className="normal-case tracking-normal text-[11px]">
                 {workingEdits.length} edit{workingEdits.length === 1 ? '' : 's'}
@@ -385,7 +385,7 @@ export function HistoryLadder({
                             <span className={cn('truncate', isLatest && 'font-semibold')}>{editLabel}</span>
                           </div>
                           {isLatest && (
-                            <span className="font-mono text-[9px] uppercase tracking-[0.08em] text-risk-text shrink-0">
+                            <span className="font-mono text-[9px] tracking-[0.08em] text-risk-text shrink-0">
                               Latest
                             </span>
                           )}
@@ -444,8 +444,8 @@ export function HistoryLadder({
                 <button type="button" className="rounded px-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label="Clear history filter" onClick={onClearFilter}>×</button>
               </div>
             )}
-            <div className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-secondary-text">
-              <span id="commits-header">COMMITS ({displayCommits.length})</span>
+            <div className="font-mono text-[9.5px] font-medium tracking-[0.12em] text-secondary-text">
+              <span id="commits-header">Commits ({displayCommits.length})</span>
             </div>
 
             {displayCommits.length === 0 ? (
@@ -528,8 +528,8 @@ export function HistoryLadder({
         {/* 6. PUBLISHED ON MAIN Section */}
         {publications.length > 0 && (
           <section aria-labelledby="published-on-main-header" className="space-y-2">
-            <div className="font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-secondary-text">
-              <span id="published-on-main-header">PUBLISHED ON MAIN</span>
+            <div className="font-mono text-[9.5px] font-medium tracking-[0.12em] text-secondary-text">
+              <span id="published-on-main-header">Published on main</span>
             </div>
             <div className="space-y-2">
               {orderedPublications.map((pub, index) => (
@@ -548,11 +548,11 @@ export function HistoryLadder({
                     <div className="min-w-0">
                       <span className="block text-[13px] font-medium text-foreground truncate">{pub.metadata.title}</span>
                       <p className="font-mono text-[10.5px] text-secondary-text">{formatPublicationDate(pub.createdAt)}</p>
-                      {commits.find((commit) => commit.id === pub.commitId)?.evidence.length ? <p className="text-[10px] font-mono text-primary">REFERENCE · {computeEvidenceSummary(commits.find((commit) => commit.id === pub.commitId)!)}</p> : null}
+                      {commits.find((commit) => commit.id === pub.commitId)?.evidence.length ? <p className="text-[10px] font-mono text-primary">Reference · {computeEvidenceSummary(commits.find((commit) => commit.id === pub.commitId)!)}</p> : null}
                     </div>
                   </div>
                   <span className="font-mono text-[10.5px] text-secondary-text shrink-0">
-                    {index === 0 && isMain ? 'CURRENT' : null}
+                    {index === 0 && isMain ? 'Current' : null}
                     {index > 0 && onComparePublication && <button type="button" className="ml-2 text-primary" onClick={() => onComparePublication(pub)}>Compare</button>}
                   </span>
                 </div>

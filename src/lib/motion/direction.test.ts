@@ -3,6 +3,8 @@ import { pageDirection } from './direction';
 
 describe('pageDirection', () => {
   it.each([
+    ['home', 'brand', 1],
+    ['brand', 'home', -1],
     ['home', 'projects', 1],
     ['projects', 'project', 1],
     ['home', 'project', 1],

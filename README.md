@@ -1,4 +1,4 @@
-# CanvasOne
+# Canvas One
 
 ### Authored architecture revisions
 

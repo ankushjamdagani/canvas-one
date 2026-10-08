@@ -110,7 +110,7 @@ const DropdownContent = React.forwardRef<
 DropdownContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 const dropdownItemVariants = cva(
-  "relative flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-secondary-text",
+  "relative flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-ui font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-secondary-text",
   {
     variants: {
       variant: {
@@ -156,7 +156,7 @@ const DropdownSubTrigger = React.forwardRef<
     ref={ref}
     data-slot="dropdown-sub-trigger"
     className={cn(
-      "flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=open]:bg-accent data-[state=open]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not(.ml-auto)]:size-3.5 [&_svg:not(.ml-auto)]:text-secondary-text data-[state=open]:[&_svg:not(.ml-auto)]:text-accent-foreground",
+      "flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-ui font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=open]:bg-accent data-[state=open]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not(.ml-auto)]:size-3.5 [&_svg:not(.ml-auto)]:text-secondary-text data-[state=open]:[&_svg:not(.ml-auto)]:text-accent-foreground",
       inset && "pl-8",
       className
     )}
@@ -193,7 +193,7 @@ const DropdownShortcut = ({
   <span
     data-slot="dropdown-shortcut"
     className={cn(
-      "ml-auto font-mono text-[10px] tracking-normal text-secondary-text",
+      "ml-auto font-mono text-micro tracking-normal text-secondary-text",
       className
     )}
     {...props}
@@ -224,7 +224,7 @@ const DropdownLabel = React.forwardRef<
     ref={ref}
     data-slot="dropdown-label"
     className={cn(
-      "px-2.5 pt-2 pb-1 font-mono text-[9px] uppercase tracking-[0.12em] font-semibold text-secondary-text select-none",
+      "px-2.5 pt-2 pb-1 font-mono text-micro tracking-[0.12em] font-semibold text-secondary-text select-none",
       inset && "pl-8",
       className
     )}
@@ -241,7 +241,7 @@ const DropdownCheckboxItem = React.forwardRef<
     ref={ref}
     data-slot="dropdown-checkbox-item"
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-ui font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
       className
     )}
     checked={checked}
@@ -265,7 +265,7 @@ const DropdownRadioItem = React.forwardRef<
     ref={ref}
     data-slot="dropdown-radio-item"
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-[13px] font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+      "relative flex cursor-pointer select-none items-center rounded-control py-2 pl-8 pr-2.5 text-ui font-medium outline-none transition-colors data-[highlighted]:bg-sunken data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
       className
     )}
     {...props}
@@ -333,7 +333,7 @@ export function DropdownMenuPanel({
       {(header || heading) && (
         <DropdownHeader>
           {header ?? (
-            <span className="font-mono text-[9px] uppercase tracking-[0.12em] font-semibold text-secondary-text">
+            <span className="font-mono text-micro tracking-[0.12em] font-semibold text-secondary-text">
               {heading}
             </span>
           )}
@@ -370,7 +370,7 @@ export function DropdownMenuPanel({
                   : undefined
               }
               className={cn(
-                "relative flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-[13px] font-medium outline-none transition-colors",
+                "relative flex cursor-pointer select-none items-center gap-2.5 rounded-control px-2.5 py-2 text-ui font-medium outline-none transition-colors",
                 item.disabled && "pointer-events-none opacity-50 cursor-not-allowed",
                 variantClass
               )}
@@ -378,7 +378,7 @@ export function DropdownMenuPanel({
               {item.icon && <span className="shrink-0 [&>svg]:size-3.5">{item.icon}</span>}
               <span className="flex-1 truncate">{item.label}</span>
               {item.shortcut && (
-                <span className="ml-auto font-mono text-[10px] text-secondary-text">{item.shortcut}</span>
+                <span className="ml-auto font-mono text-micro text-secondary-text">{item.shortcut}</span>
               )}
               {item.selected && !item.shortcut && (
                 <Check className="ml-auto size-3.5 text-primary shrink-0" aria-hidden="true" />

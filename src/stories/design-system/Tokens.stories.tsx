@@ -107,8 +107,9 @@ export const Typography: StoryObj = {
   name: 'Typography Scale',
   render: () => {
     const scales = [
-      { token: 'text-xs', size: '11.5px', sample: 'Metadata, badges, port indicators, timestamp pills' },
-      { token: 'text-sm', size: '12.5px', sample: 'Secondary body text, table row details, tooltip copy' },
+      { token: 'text-micro', size: '10px', sample: 'Metadata, shortcuts, port indicators, timestamps' },
+      { token: 'text-caption', size: '12px', sample: 'Supporting copy, table row details, hints' },
+      { token: 'text-xs / sm', size: '13px', sample: 'Legacy aliases for UI labels, independent of control size' },
       { token: 'text-base / ui', size: '13px', sample: 'Default UI controls, buttons, form inputs, node labels' },
       { token: 'text-lg / subtitle', size: '15px', sample: 'Section subheadings, dialog descriptions, modal titles' },
       { token: 'text-xl / title', size: '18px', sample: 'Inspector panel title, scenario names, primary drawer headers' },

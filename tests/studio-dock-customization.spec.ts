@@ -76,7 +76,7 @@ test('16B more popover lists all non-sticky options with pin buttons and togglea
   await expect(popover).toBeVisible();
 
   // Header verification
-  await expect(popover.getByText('MORE TOOLS')).toBeVisible();
+  await expect(popover.getByText('More tools')).toBeVisible();
   await expect(popover.getByText('PIN TO DOCK')).toBeVisible();
 
   // Check presence of non-sticky items with pin buttons
@@ -112,7 +112,7 @@ test('customize toolbar shows 3 sections with disabled fixed left/right controls
   await expect(tray).toBeVisible();
 
   // Slots count in header reflects max 10 center controls
-  await expect(tray.getByText(/SLOTS? LEFT/)).toBeVisible();
+  await expect(tray.getByText(/slots? left/)).toBeVisible();
 
   // Test label toggle in customize toolbar
   const labelSwitch = tray.getByTestId('dock-labels-toggle');

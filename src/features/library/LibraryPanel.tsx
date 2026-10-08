@@ -280,11 +280,11 @@ export function LibraryPanel({
           groupedSections.map((section) => (
             <div key={section.group} className="space-y-2">
               {/* Group header with line and count */}
-              <div className="flex items-center gap-2 text-[10.5px] font-mono uppercase tracking-widest text-secondary-text">
+              <div className="flex items-center gap-2 text-[10.5px] font-mono tracking-widest text-secondary-text">
                 <span
                   className="font-medium"
                 >
-                  {section.group.toUpperCase()}
+                  {section.group}
                 </span>
                 <div className="flex-1 h-px bg-border" />
                 <span className="text-[10px] text-secondary-text">

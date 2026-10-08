@@ -50,7 +50,7 @@ export function RenameConflictPopover({
         className="w-[min(310px,calc(100vw-24px))] p-0 overflow-hidden"
       >
         <div className="px-3.5 pt-3 pb-2.5 border-b border-hairline">
-          <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-secondary-text">
+          <div className="font-mono text-[9px] tracking-[0.12em] text-secondary-text">
             Renaming project
           </div>
           <p role="alert" className="mt-1 text-[13px] leading-snug text-risk-text">

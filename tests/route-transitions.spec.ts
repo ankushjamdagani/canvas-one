@@ -11,6 +11,22 @@ const trackOverlay = (page: Page) =>
   });
 const overlaySeen = (page: Page) => page.evaluate(() => !!(window as unknown as { __overlaySeen?: boolean }).__overlaySeen);
 
+test('landing and brand fade content, preserve the board and reset deep scroll', async ({page}) => {
+  await page.goto('/');
+  await page.getByTestId('route-board').evaluate(el=>el.setAttribute('data-preserved','yes'));
+  await page.getByRole('link',{name:'Brand',exact:true}).click();
+  await expect(page.locator('.brand-page')).toBeVisible();
+  await expect.poll(()=>page.locator('.brand-page').evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
+  await page.locator('#states').scrollIntoViewIfNeeded();
+  expect(await page.locator('[data-page="brand"]').evaluate(el=>el.scrollTop)).toBeGreaterThan(1000);
+  await page.locator('[data-page="brand"]').evaluate(el=>el.scrollTo(0,0));
+  await page.getByRole('link',{name:'Canvas One',exact:true}).click();
+  await expect(page.getByTestId('landing-page')).toBeVisible();
+  await expect(page.locator('[data-page-kind]')).toHaveCount(1);
+  await expect(page.getByTestId('route-board')).toHaveAttribute('data-preserved','yes');
+  await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(0);
+});
+
 test('the board persists across home and projects and swaps page content', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('landing-page')).toBeVisible();

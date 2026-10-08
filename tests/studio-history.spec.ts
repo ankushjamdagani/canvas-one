@@ -70,7 +70,7 @@ async function publishMajor(page: Page, title: string) {
   await dialog.getByLabel('Title').fill(title);
   await dialog.getByTestId('publish-review-button').click();
   await dialog.getByTestId('publish-confirm-button').click();
-  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
 }
 
 test.describe('RV-13b: History panel', () => {
@@ -86,7 +86,7 @@ test.describe('RV-13b: History panel', () => {
     await openS04(page);
     const ladder = await openHistory(page);
     await switchBranch(page, 'main');
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
 
     const commit = ladder.getByRole('button', { name: /^Commit/ });
     await expect(commit).toBeDisabled();
@@ -130,7 +130,7 @@ test.describe('RV-13b: History panel', () => {
     await expect(card).toHaveCount(1);
     await expect(card).toContainText(/current/i);
     await expect(card.getByTestId('evidence-summary-text')).toContainText('3 scenarios passed');
-    await expect(page.getByTestId('history-ladder').getByText('COMMITS (1)')).toBeVisible();
+    await expect(page.getByTestId('history-ladder').getByText('Commits (1)')).toBeVisible();
   });
 
   test('Run remaining inside the Commit panel updates its passing count live', async ({ page }) => {
@@ -169,10 +169,10 @@ test.describe('RV-13b: History panel', () => {
     await dialog.getByTestId('publish-confirm-button').click();
 
     // Published state: on main at 1.0.0, listed as CURRENT, nothing to undo.
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
     const ladder = page.getByTestId('history-ladder');
     await expect(ladder).toContainText('up to date · 1.0.0');
-    await expect(ladder.getByText('PUBLISHED ON MAIN')).toBeVisible();
+    await expect(ladder.getByText('Published on main')).toBeVisible();
     await expect(ladder.locator('[data-testid^="publication-card-"]')).toContainText('Router capacity 77');
     await expect(ladder.getByRole('button', { name: /Start a new draft from 1\.0\.0/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /undo publish/i })).toHaveCount(0);
@@ -192,7 +192,7 @@ test.describe('RV-13b: History panel', () => {
     await start.click();
     // D40: main never holds edits; the action creates and opens a draft.
     await expect(page.getByTestId('breadcrumb-branch-btn')).toContainText('Draft from main');
-    await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('Main');
   });
 
   test('22D: the published notice names the version after publishing', async ({ page }) => {
@@ -265,7 +265,7 @@ test.describe('RV-13b: History panel', () => {
     await expect(dialog.getByTestId('publish-review-button')).toBeEnabled();
     await dialog.getByTestId('publish-review-button').click();
     await dialog.getByTestId('publish-confirm-button').click();
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
     await expect(page.getByTestId('history-ladder')).toContainText('up to date · 2.0.0');
   });
 

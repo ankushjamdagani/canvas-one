@@ -1,5 +1,4 @@
 import * as React from "react";
-import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import {
   ArrowRight,
   ArrowUp,
@@ -14,9 +13,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PublicHeader } from '@/components/ui/public-header';
+import { CanvasOneFace, type FaceExpression } from '@/components/ui/canvas-one-face';
 import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
-import { ThemePopover } from "@/lib/theme/ThemePopover";
 import "./landing-page.css";
 
 type Point = { x: number; y: number };
@@ -225,49 +225,30 @@ export function LandingPage() {
               y: nodes["WRK-04"].y + 60,
               action: "running sim",
             };
+  const aiActive = t >= 3000 && !accepted;
+  const aiExpression: FaceExpression = aiActive
+    ? t < 4800 ? 'squint' : t < 7200 ? 'thought' : 'pixel'
+    : 'base';
   return (
     <RevealScope contentCount={4}>
       <DraftingBoard paused={paused}>
-        <header className="lp-header">
-          <Reveal as="a" kind="chrome" index={0} href="/" className="lp-brand">
-            <span aria-hidden="true" />
-            CanvasOne
-          </Reveal>
-          <Reveal as="span" kind="chrome" index={1} className="lp-version">
-            {APP_VERSION_LABEL}
-          </Reveal>
-          <Reveal as="nav" kind="chrome" index={2} aria-label="Main navigation">
+        <PublicHeader page="landing" className="lp-header" collaborators={<>
             <span
               className="lp-collaborators"
               aria-label="Illustrative collaborators"
             >
               <span className="lp-avatars">
                 <i>Y</i>
-                <i>✦</i>
+                <i><CanvasOneFace expression={aiExpression} size={18} animate={!paused && !reduced} /></i>
               </span>
               <b>You &amp; Claude</b>
               <small>
                 <i />
-                LIVE
+                Live
               </small>
             </span>
             <span className="lp-divider" />
-            <Button
-              variant="ghost"
-              className="lp-github"
-              disabled
-              title="Repository link is not configured"
-            >
-              GitHub
-            </Button>
-            <Button asChild variant="outline" className="lp-header-beta">
-              <a href="/projects">
-                Try Beta <ArrowRight />
-              </a>
-            </Button>
-            <ThemePopover />
-          </Reveal>
-        </header>
+        </>} />
         <DraftingStage>
           <main
             data-testid="landing-page"
@@ -287,7 +268,7 @@ export function LandingPage() {
               {...pointerProps}
             >
               <span className="lp-dimension" aria-hidden="true">
-                TEXT · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
+                Text · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
               </span>
               <h1 tabIndex={-1} className="outline-none">
                 Think in architecture.<em>Let agents draw the system.</em>
@@ -352,7 +333,7 @@ export function LandingPage() {
               kind="content"
               index={1}
               className="lp-copy"
-              style={{ left: hero.x + 19, top: hero.y + hero.h + 35 }}
+              style={{ left: hero.x + 19, top: hero.y + hero.h + 46 }}
             >
               AI agents sketch topologies, isolate hot paths, and simulate
               backpressure directly on an infinite browser drafting sheet in
@@ -373,7 +354,7 @@ export function LandingPage() {
                 variant="outline"
                 className="lp-command"
                 aria-label={
-                  copied ? "Command copied" : "Copy npx canvasone@preview"
+                  copied ? "Command copied" : "Copy npx canvas-one@preview"
                 }
                 onClick={() => {
                   setCopyError(false);
@@ -382,18 +363,18 @@ export function LandingPage() {
                     return;
                   }
                   void navigator.clipboard
-                    .writeText("npx canvasone@preview")
+                    .writeText("npx canvas-one@preview")
                     .then(() => setCopied(true))
                     .catch(() => setCopyError(true));
                 }}
               >
-                <span>$</span>npx canvasone@preview
+                <span>$</span>npx canvas-one@preview
                 {copied ? <Check /> : <Copy />}
               </Button>
               {copyError && (
                 <p role="alert">
                   Could not copy. Copy this command manually:{" "}
-                  <code>npx canvasone@preview</code>
+                  <code>npx canvas-one@preview</code>
                 </p>
               )}
             </Reveal>
@@ -560,8 +541,8 @@ export function LandingPage() {
                       <span>
                         {node.id === "BUF-01"
                           ? accepted
-                            ? "ACCEPTED"
-                            : "SUGGESTED"
+                            ? "Accepted"
+                            : "Suggested"
                           : node.id}
                       </span>
                     </header>
@@ -654,7 +635,7 @@ export function LandingPage() {
               </Button>
             </div>
             <div
-              className="lp-prompt"
+              className={`lp-prompt ${aiActive ? 'lp-prompt-active' : ''}`}
               role="region"
               aria-label="Collaboration prompt"
             >
@@ -676,11 +657,11 @@ export function LandingPage() {
                   setPaused(false);
                 }}
               >
-                <ArrowUp />
+                {aiActive ? <CanvasOneFace expression={aiExpression} size={30} animate={!paused && !reduced} /> : <ArrowUp />}
               </Button>
             </div>
             <footer className="lp-local">
-              100% In-browser Web Worker
+              100% in-browser Web Worker
               <br />
               Simulates queues, not code
               <br />
@@ -694,7 +675,7 @@ export function LandingPage() {
           >
             {[
               { name: "You", ...you },
-              { name: `Claude · ${claude.action}`, ...claude },
+              { name: claude.action, ...claude },
             ].map((cursor, index) => (
               <div
                 key={index}
@@ -714,7 +695,7 @@ export function LandingPage() {
                     strokeWidth="1.2"
                   />
                 </svg>
-                <span>{cursor.name}</span>
+                <span>{index === 1 && <CanvasOneFace expression={aiExpression} size={16} animate={!paused && !reduced} />}{cursor.name}</span>
               </div>
             ))}
           </Reveal>

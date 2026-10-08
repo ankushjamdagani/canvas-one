@@ -63,7 +63,7 @@ export function FaultsSection({ document, scenario, onChange, mintId, issues = [
     <section data-testid="scenario-section-faults" className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">
             What happens during the run
           </div>
           <div className="text-[11px] text-secondary-text">Optional outages.</div>
@@ -87,7 +87,7 @@ export function FaultsSection({ document, scenario, onChange, mintId, issues = [
               issues={issues.filter(i => i.path?.[0] === 'faults' && i.path?.[1] === scenario.faults.findIndex(f => f.id === fault.id))}
               summary={
                 <span className="flex items-center gap-2">
-                  <span className="rounded-tag bg-riskTint px-1.5 py-0.5 text-[10px] font-bold text-risk-text tracking-wider uppercase">Outage</span>
+                  <span className="rounded-tag bg-riskTint px-1.5 py-0.5 text-[10px] font-bold text-risk-text tracking-wider ">Outage</span>
                   <span className="text-secondary-text">{summarizeFault(fault, document)}</span>
                 </span>
               }

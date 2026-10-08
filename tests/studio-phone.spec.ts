@@ -42,7 +42,7 @@ for (const example of ['s04', 's05'] as const) test(`390×844 touch (${example})
   const chip = (await page.getByTestId('breadcrumb-chip').boundingBox())!;
   const badge = (await page.getByTestId('breadcrumb-branch-state').boundingBox())!;
   expect(badge.x + badge.width).toBeLessThanOrEqual(chip.x + chip.width - 1);
-  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+  await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Draft');
 
   await page.getByTestId('breadcrumb-project-btn').tap();
   await expect(page.getByTestId('project-menu-popover')).toBeVisible();

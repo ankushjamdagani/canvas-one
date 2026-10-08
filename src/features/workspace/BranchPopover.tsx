@@ -240,7 +240,7 @@ export function BranchPopover({
             {current && (
               <div className="px-2 pt-2.5 pb-1.5 flex flex-col gap-1">
                 <div className="flex items-center gap-2 px-1.5 pb-1">
-                  <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
+                  <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text ">
                     Current branch
                   </span>
                   <span className="flex-1 h-px bg-hairline-soft" />
@@ -259,7 +259,7 @@ export function BranchPopover({
                         variant={current.id === project.mainBranchId ? 'accent' : 'risk'}
                         className="text-[9px] font-mono tracking-[0.1em] px-1 py-0 h-4 shrink-0"
                       >
-                        {current.id === project.mainBranchId ? 'LIVE' : 'DRAFT'}
+                        {current.id === project.mainBranchId ? 'Live' : 'Draft'}
                       </Badge>
                     </div>
                     <div className="font-mono text-[9.5px] text-secondary-text mt-0.5">
@@ -274,7 +274,7 @@ export function BranchPopover({
             {/* SWITCH TO */}
             <div className="px-2 pt-1 pb-1 flex flex-col gap-1">
               <div className="flex items-center gap-2 px-1.5 pb-1">
-                <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text uppercase">
+                <span className="font-mono text-[9px] font-semibold tracking-[0.12em] text-secondary-text ">
                   Switch to
                 </span>
                 <span className="flex-1 h-px bg-hairline-soft" />
@@ -329,7 +329,7 @@ export function BranchPopover({
                                   variant="accent"
                                   className="text-[9px] font-mono tracking-[0.1em] px-1 py-0 h-4 shrink-0"
                                 >
-                                  LIVE
+                                  Live
                                 </Badge>
                               )}
                               {isClosed && (
@@ -337,7 +337,7 @@ export function BranchPopover({
                                   variant="secondary"
                                   className="text-[9px] font-mono tracking-[0.1em] px-1 py-0 h-4 shrink-0"
                                 >
-                                  MERGED
+                                  Merged
                                 </Badge>
                               )}
                             </div>

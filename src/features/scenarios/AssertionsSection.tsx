@@ -100,7 +100,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
     <section data-testid="scenario-section-assertions" className="space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">What should be true</div>
+          <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">What should be true</div>
           <div className="text-[11px] text-secondary-text">The run passes only if every check passes.</div>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={addAssertion}>

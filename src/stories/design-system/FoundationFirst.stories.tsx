@@ -28,7 +28,7 @@ export const ArchitectureGuide: StoryObj = {
           The Foundation-First Architecture
         </h1>
         <p className="text-base text-body max-w-3xl leading-relaxed">
-          Foundation components (<code className="font-mono text-xs bg-sunken px-1.5 py-0.5 rounded">src/components/ui/</code>) and design tokens (<code className="font-mono text-xs bg-sunken px-1.5 py-0.5 rounded">src/styles.css</code>) form the core of the CanvasOne UI. Every visual refinement or styling change must be evaluated at the foundation level first.
+          Foundation components (<code className="font-mono text-xs bg-sunken px-1.5 py-0.5 rounded">src/components/ui/</code>) and design tokens (<code className="font-mono text-xs bg-sunken px-1.5 py-0.5 rounded">src/styles.css</code>) form the core of the Canvas One UI. Every visual refinement or styling change must be evaluated at the foundation level first.
         </p>
       </div>
 

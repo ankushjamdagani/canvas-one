@@ -23,7 +23,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     const second = page.locator('.component-node').nth(1);
     await first.click();
     await second.click({ modifiers: ['Shift'] });
-    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toHaveText('2 Parts');
 
     await page.getByTestId('selection-align-btn').click();
     await page.getByTestId('selection-align-left').click();
@@ -64,7 +64,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     // the dependency confirmation first (deletePlan.ts).
     const checkout = page.locator('.component-node', { hasText: 'Checkout' });
     await checkout.click();
-    await expect(page.getByTestId('selection-count')).toHaveText('1 PART');
+    await expect(page.getByTestId('selection-count')).toHaveText('1 Part');
 
     // Quick options lists the registry command with its key hint and runs it.
     await page.getByTestId('topbar-quick-options-btn').click();
@@ -106,7 +106,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     const worker = page.locator('.component-node', { hasText: 'Fulfillment worker' });
     await queue.click();
     await worker.click({ modifiers: ['Shift'] });
-    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toHaveText('2 Parts');
 
     await page.getByTestId('selection-wrap-btn').click();
     const input = page.getByTestId('selection-wrap-input');
@@ -202,7 +202,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
       await page.mouse.up();
       await waitForIdle(page);
       await expect(page.getByTestId('selection-count')).toBeVisible();
-      await expect(page.getByTestId('selection-count')).toContainText('PARTS');
+      await expect(page.getByTestId('selection-count')).toContainText('Parts');
     }
   });
 
@@ -348,7 +348,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await boundary.locator('span', { hasText: 'Test Cluster' }).click();
     await waitForIdle(page);
     await expect(page.getByTestId('selection-count')).toBeVisible();
-    await expect(page.getByTestId('selection-count')).toContainText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toContainText('2 Parts');
 
     // Exactly 1 option available: Ungroup is visible, Group is NOT visible
     await expect(page.getByTestId('selection-ungroup-btn')).toBeVisible();
@@ -385,13 +385,13 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await note.click();
     await waitForIdle(page);
     await expect(page.getByTestId('selection-count')).toBeVisible();
-    await expect(page.getByTestId('selection-count')).toHaveText('1 PART');
+    await expect(page.getByTestId('selection-count')).toHaveText('1 Part');
 
     // 3. Shift-click a node to create a mixed selection (1 note + 1 node): toolbar shows 2 PARTS
     const node = page.locator('.component-node').first();
     await node.click({ modifiers: ['Shift'] });
     await waitForIdle(page);
-    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toHaveText('2 Parts');
 
     // 4. Align mixed selection (top alignment)
     await page.getByTestId('selection-align-btn').click();
@@ -419,7 +419,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await waitForIdle(page);
     await boundary.locator('span', { hasText: 'Mixed Note Group' }).click();
     await waitForIdle(page);
-    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toHaveText('2 Parts');
     await expect(page.getByTestId('selection-ungroup-btn')).toBeVisible();
 
     // 6. Ungroup
@@ -431,7 +431,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     await note.click();
     await node.click({ modifiers: ['Shift'] });
     await waitForIdle(page);
-    await expect(page.getByTestId('selection-count')).toHaveText('2 PARTS');
+    await expect(page.getByTestId('selection-count')).toHaveText('2 Parts');
 
     // A duplicate rests as a bubble (possibly under another note), so count both forms.
     const noteCount = () => page.locator('.note-card, [data-testid^="note-bubble-"]');
@@ -448,7 +448,7 @@ test.describe('Studio selection actions and note dock (RV-04e)', () => {
     const notes = page.locator('.note-card');
     await notes.last().click({ force: true });
     await waitForIdle(page);
-    await expect(page.getByTestId('selection-count')).toHaveText('1 PART');
+    await expect(page.getByTestId('selection-count')).toHaveText('1 Part');
     await page.keyboard.press('Delete');
     await waitForIdle(page);
     await expect(noteCount()).toHaveCount(initialNoteCount);

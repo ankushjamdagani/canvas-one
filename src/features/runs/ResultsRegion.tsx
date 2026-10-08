@@ -310,8 +310,8 @@ export function ResultsRegion({
                     <div className="space-y-4">
                       {/* Counts Card */}
                       <div className="p-3 rounded-control border border-control-border bg-background space-y-2">
-                        <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                          EXECUTION DETAILS · {playbackAtEnd ? 'WHOLE RUN' : `THROUGH ${formatElapsed(mode, null, summaryAtMs)}`}
+                        <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold">
+                          Execution details · {playbackAtEnd ? 'Whole run' : `Through ${formatElapsed(mode, null, summaryAtMs)}`}
                         </span>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {finalMeasured && <div>
@@ -352,8 +352,8 @@ export function ResultsRegion({
                       {/* Run-level Metrics (elementId === null) */}
                       {generalMetrics.length > 0 && (
                         <div className="p-3 rounded-control border border-control-border bg-background space-y-2">
-                          <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                            RUN METRICS
+                          <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold">
+                            Run metrics
                           </span>
                           <p className="text-[11px] text-secondary-text">Counts except in-flight are cumulative. Throughput is an average rate; latency summarizes successful observations through the playhead.</p>
                           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -373,8 +373,8 @@ export function ResultsRegion({
 
                       {/* Assertion Checks List */}
                       <div className="p-3 rounded-control border border-control-border bg-background space-y-2">
-                        <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                          CHECKS · WHOLE RUN {finalMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
+                        <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold">
+                          Checks · whole run {finalMeasured && terminal ? `(${terminal.checks.length})` : '(—)'}
                         </span>
                         <div className="space-y-1.5 max-h-44 overflow-y-auto" tabIndex={0} role="region" aria-label="Checks">
                           {isMeasured &&
@@ -420,8 +420,8 @@ export function ResultsRegion({
 
                     {/* Right Column: Event Log (21B look) */}
                     <div className="p-3 rounded-control border border-control-border bg-background flex flex-col h-full max-h-72">
-                      <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold mb-2">
-                        EVENT LOG ({events.length}) · {playbackAtEnd ? 'WHOLE RUN' : `THROUGH ${formatElapsed(mode, null, summaryAtMs)}`}
+                      <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold mb-2">
+                        Event log ({events.length}) · {playbackAtEnd ? 'Whole run' : `Through ${formatElapsed(mode, null, summaryAtMs)}`}
                       </span>
                       <div className="flex-1 overflow-y-auto space-y-1 text-xs font-mono" tabIndex={0} role="region" aria-label="Event log">
                         {events.map((evt) => {
@@ -437,7 +437,7 @@ export function ResultsRegion({
                             >
                               <div className="flex items-center gap-2 truncate">
                                 <span className="text-secondary-text shrink-0">{timeStr}</span>
-                                <span className="text-secondary-text text-[10px] uppercase shrink-0">
+                                <span className="text-secondary-text text-[10px] shrink-0">
                                   {evt.kind}
                                 </span>
                                 <span className="font-medium text-foreground">{evt.code}</span>
@@ -450,7 +450,7 @@ export function ResultsRegion({
                               {evt.outcome && (
                                 <span
                                   className={cn(
-                                    'text-[10px] uppercase font-semibold px-1 rounded',
+                                    'text-[10px] font-semibold px-1 rounded',
                                     evt.outcome === 'succeeded' && 'bg-primary/10 text-primary',
                                     (evt.outcome === 'failed' || evt.outcome === 'rejected') &&
                                       'bg-risk-tint text-risk-text',
@@ -474,14 +474,14 @@ export function ResultsRegion({
                 ) : (
                   /* Components Tab View (21D screen look) */
                   <div className="col-span-1 md:col-span-2 space-y-2">
-                    <span className="font-mono text-[10px] tracking-wider text-secondary-text uppercase font-semibold">
-                      ELEMENT METRICS
+                    <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold">
+                      Element metrics
                     </span>
                     <p className="text-[11px] text-secondary-text">Counters and successful-cohort latency summaries are cumulative through the playhead. Throughput and utilization are averages through that time; in-flight, queued, active, and cache entries are current at the playhead.</p>
 
                     <div className="border border-control-border rounded-control bg-background overflow-hidden">
                       <table className="w-full text-xs text-left">
-                        <thead className="bg-sunken border-b border-control-border font-mono text-[10px] text-secondary-text uppercase">
+                        <thead className="bg-sunken border-b border-control-border font-mono text-[10px] text-secondary-text ">
                           <tr>
                             <th className="py-1.5 px-3">Element</th>
                             <th className="py-1.5 px-3">Scope</th>

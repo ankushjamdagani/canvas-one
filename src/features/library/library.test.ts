@@ -272,9 +272,9 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).toContain('aria-label="Search components"');
 
       // Group headers & counts
-      expect(html).toContain('COMPUTE');
-      expect(html).toContain('DATA');
-      expect(html).toContain('MESSAGING');
+      expect(html).toContain('Compute');
+      expect(html).toContain('Data');
+      expect(html).toContain('Messaging');
 
       // Specific entries and captions
       expect(html).toContain('Service');
@@ -382,16 +382,16 @@ describe('Library Feature (RV-06b)', () => {
       );
 
       // Badges & title
-      expect(html).toContain('MESSAGING');
-      expect(html).toContain('STANDARD');
+      expect(html).toContain('Messaging');
+      expect(html).toContain('Standard');
       expect(html).toContain('Queue');
 
       // models text
       expect(html).toContain(queueEntry.models);
 
       // DEFAULTS and DOES NOT MODEL sections
-      expect(html).toContain('DEFAULTS');
-      expect(html).toContain('DOES NOT MODEL');
+      expect(html).toContain('Defaults');
+      expect(html).toContain('Does not model');
       expect(html).toContain(queueEntry.doesNotModel);
 
       // Footnote shortcut hints

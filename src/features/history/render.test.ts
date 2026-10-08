@@ -74,10 +74,10 @@ describe('HistoryLadder static markup (22A)', () => {
 
   it('shows the published main ladder with current release and draft actions (22D)', () => {
     const html = renderToStaticMarkup(React.createElement(HistoryLadder, { isMain: true, branchName: 'main', publications, onStartDraft: vi.fn(), onEditMain: vi.fn() }));
-    expect(html).toContain('CURRENT');
+    expect(html).toContain('Current');
     expect(html).toContain('Start a new draft from 2.2.1');
     expect(html).toContain('Edit main directly');
-    expect(html).not.toContain('NOW · NOT COMMITTED');
+    expect(html).not.toContain('Now · not committed');
     expect(html).not.toContain('open-publish-button');
   });
 
@@ -116,15 +116,15 @@ describe('HistoryLadder static markup (22A)', () => {
     );
 
     expect(html).toContain('feature/checkout');
-    expect(html).toContain('NOW');
-    expect(html).toContain('NOT COMMITTED');
+    expect(html).toContain('Now');
+    expect(html).toContain('not committed');
     expect(html).toContain('Renamed queue to Order queue');
     expect(html).not.toContain('CHECKPOINTS');
     expect(html).not.toContain('Save checkpoint');
-    expect(html).toContain('COMMITS');
+    expect(html).toContain('Commits');
     expect(html).toContain('2 fields changed');
     expect(html).toContain('scenario');
-    expect(html).toContain('PUBLISHED ON MAIN');
+    expect(html).toContain('Published on main');
     expect(html).toContain('2.2.1');
     expect(html).toContain('Commit');
     expect(html).toContain('Publish draft to main');
@@ -280,11 +280,11 @@ describe('CommitPanel static markup (scenario_commit_gate.png)', () => {
       }),
     );
 
-    expect(html).toContain('CHANGES');
+    expect(html).toContain('Changes');
     expect(html).toContain('Order queue');
     expect(html).toContain('capacity 2');
     expect(html).toContain('Commit message');
-    expect(html).toContain('EVERY SCENARIO MUST PASS');
+    expect(html).toContain('Every scenario must pass');
     expect(html).toContain('Scenario 0');
     expect(html).toContain('Scenario 1');
     expect(html).toContain('Run');

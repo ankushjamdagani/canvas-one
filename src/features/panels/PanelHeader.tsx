@@ -326,7 +326,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
           data-slot="panel-dropdown-menu"
           className="absolute right-3 top-10 z-popover min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0"
         >
-          <div className="px-2 py-1.5 font-mono text-xs uppercase tracking-wide font-semibold text-secondary-text">
+          <div className="px-2 py-1.5 font-mono text-xs tracking-wide font-semibold text-secondary-text">
             {title} {isFloating ? 'panel' : 'tab'}
           </div>
           <div className="-mx-1 my-1 h-px bg-border" />
@@ -335,7 +335,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             onClick={handleDockRight}
             data-slot="menu-item-dock-right"
             className={cn(
-              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground',
+              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors hover:bg-sunken text-foreground',
               isDockedRight && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground'
             )}
           >
@@ -348,7 +348,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             onClick={handleDockLeft}
             data-slot="menu-item-dock-left"
             className={cn(
-              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground',
+              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors hover:bg-sunken text-foreground',
               isDockedLeft && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground'
             )}
           >
@@ -361,7 +361,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             onClick={handleFloat}
             data-slot="menu-item-float"
             className={cn(
-              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground',
+              'relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors hover:bg-sunken text-foreground',
               isFloat && 'bg-accent hover:bg-accent font-medium text-accent-foreground [&_svg]:text-accent-foreground'
             )}
           >
@@ -374,7 +374,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             type="button"
             onClick={handleCollapse}
             data-slot="menu-item-collapse"
-            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground"
+            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors hover:bg-sunken text-foreground"
           >
             <ArrowRightToLine className="size-4 mr-2 text-secondary-text" />
             <span>Collapse to rail</span>
@@ -383,7 +383,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             type="button"
             onClick={handleResetWidth}
             data-slot="menu-item-reset-width"
-            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground"
+            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors hover:bg-sunken text-foreground"
           >
             <ArrowLeftRight className="size-4 mr-2 text-secondary-text" />
             <span>Reset width</span>
@@ -393,7 +393,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
             type="button"
             onClick={handleClose}
             data-slot="menu-item-close"
-            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-base outline-none transition-colors hover:bg-sunken text-foreground"
+            className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] outline-none transition-colors hover:bg-sunken text-foreground"
           >
             <X className="size-4 mr-2 text-secondary-text" />
             <span>Close tab</span>

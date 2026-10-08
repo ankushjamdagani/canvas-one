@@ -1,66 +1,44 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useRouteShell } from "@/lib/motion/shell-context";
-import { BrandMark } from "./brand-mark";
+import { PublicHeader } from "./public-header";
 import { DraftingFrame, DraftingGround } from "./drafting-board";
 import { Reveal } from "./reveal";
-import { ThemePopover } from "@/lib/theme/ThemePopover";
 
 /** Shared public-page chrome, separate from the workspace's canvas and telemetry. */
 export function DraftingSheet({
   children,
   page,
   navigation,
+  sectionNavigation,
 }: {
   children: ReactNode;
   page: string;
   navigation?: ReactNode;
+  sectionNavigation?: ReactNode;
 }) {
   const shell = useRouteShell();
   return (
     <div
       data-page={page}
       className={cn(
-        "relative isolate flex min-h-svh flex-col px-6 pt-6 pb-11 font-sans text-ink min-[481px]:px-10 min-[481px]:pt-9 min-[481px]:pb-[76px] min-[1101px]:px-14",
+        "relative isolate flex min-h-svh flex-col pb-11 font-sans text-ink min-[481px]:pb-[76px]",
+        page === "brand"
+          ? "px-8 pt-8 min-[1000px]:px-14 min-[1000px]:pt-9"
+          : "px-6 pt-6 min-[481px]:px-10 min-[481px]:pt-9 min-[1101px]:px-14",
         shell ? "bg-transparent" : "bg-shell",
       )}
     >
       {!shell && (
-        <>
+        <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
           <DraftingGround />
           <DraftingFrame />
-        </>
+        </div>
       )}
-      <header className="flex h-10 flex-none items-center gap-3">
-        <Reveal
-          as="a"
-          kind="chrome"
-          index={0}
-          href="/"
-          className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-sm text-sm font-semibold text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
-        >
-          <BrandMark />
-          CanvasOne
-        </Reveal>
-        <Reveal
-          as="span"
-          kind="chrome"
-          index={1}
-          className="font-mono text-micro tracking-normal text-secondary-text max-[480px]:hidden"
-        >
-          v0.4.12
-        </Reveal>
-        <Reveal
-          as="nav"
-          kind="chrome"
-          index={2}
-          aria-label="Main navigation"
-          className="ml-auto flex items-center gap-2 min-[481px]:gap-4"
-        >
-          {navigation}
-          <ThemePopover />
-        </Reveal>
-      </header>
+      <PublicHeader page={page === 'brand' ? 'brand' : 'projects'} owner={navigation} />
+      {sectionNavigation && (
+        <Reveal kind="chrome" index={3} className="mt-5 w-full min-w-0">{sectionNavigation}</Reveal>
+      )}
       {children}
     </div>
   );

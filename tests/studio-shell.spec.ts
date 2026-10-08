@@ -26,7 +26,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('breadcrumb-project-btn')).toHaveText('S05 Fullstack');
     // Newly created projects open their starter draft branch, not main
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Draft');
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
     // No permanent left activity rail
@@ -74,7 +74,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await mainSwitchBtn.click();
 
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
 
     // 5. Drag a node while on main -> D40 auto-drafts a new branch; main unchanged
     const node = page.locator('.component-node').first();
@@ -88,7 +88,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await page.mouse.up();
     await page.waitForTimeout(300);
 
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('DRAFT');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Draft');
     await expect(page.getByTestId('breadcrumb-branch-btn')).toContainText('Draft from main');
     await expect(page.getByTestId('save-status')).toContainText('Saved');
 
@@ -104,13 +104,13 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     // The card opens the newest draft (the drag above auto-created one); switch to main.
     await item.locator('[data-testid^="open-project-"]').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
-    await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('Main');
     await page.getByTestId('breadcrumb-branch-btn').click();
     await page
       .getByTestId('branch-switch-list')
       .locator('[data-testid^="branch-switch-"]', { hasText: 'main' })
       .click();
-    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('MAIN');
+    await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
     // Fresh mount here (Workspace/CanvasView were unmounted while on the entry
     // screen) -> let the camera fit settle before reading positions.
     await page.waitForTimeout(400);

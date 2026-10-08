@@ -230,7 +230,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
         {(compact || showLabels) && (
           <span className={compact ? "flex flex-col items-start text-left" : "text-xs font-medium whitespace-nowrap"}>
             <span>{def.label.replace('…', '')}</span>
-            {compact && !state.enabled && <span className="text-[10px] text-secondary-text">{state.reason}</span>}
+            {compact && !state.enabled && <span className="text-micro text-secondary-text">{state.reason}</span>}
           </span>
         )}
       </Button>
@@ -315,8 +315,8 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                 <Settings2 className="size-3.5 text-primary shrink-0" aria-hidden="true" />
                 <span>Customising toolbar</span>
               </div>
-              <span className="font-mono text-[10px] text-secondary-text tracking-wider uppercase select-none">
-                {slotsLeft} {slotsLeft === 1 ? 'SLOT' : 'SLOTS'} LEFT · DRAG TO REORDER
+              <span className="font-mono text-micro text-secondary-text tracking-wider select-none">
+                {slotsLeft} {slotsLeft === 1 ? 'slot' : 'slots'} left · drag to reorder
               </span>
             </div>
             <div className="ml-auto flex items-center gap-2 shrink-0">
@@ -369,8 +369,8 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
             }}
           >
             <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-              <span className="font-mono text-[9px] tracking-[0.12em] text-secondary-text font-semibold mr-1 select-none shrink-0 self-center">
-                SHELF
+              <span className="font-mono text-micro tracking-[0.12em] text-secondary-text font-semibold mr-1 select-none shrink-0 self-center">
+                Shelf
               </span>
               {shelfCommandIds.length === 0 ? (
                 <span className="text-xs text-secondary-text italic py-1">All commands in dock</span>
@@ -485,8 +485,8 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                 return (
                   <React.Fragment key={id}>
                     {isDropTarget && (
-                      <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-accent-foreground font-mono text-[9.5px] tracking-wider select-none shrink-0 animate-in fade-in duration-150">
-                        DROP HERE
+                      <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-accent-foreground font-mono text-micro tracking-wider select-none shrink-0 animate-in fade-in duration-150">
+                        Drop here
                       </div>
                     )}
                     <div
@@ -542,8 +542,8 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
               })}
 
               {(dropTarget === 'dock' || dropTarget === 'cluster') && (
-                <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-accent-foreground font-mono text-[9.5px] tracking-wider select-none shrink-0 animate-in fade-in duration-150">
-                  DROP HERE
+                <div className="flex items-center justify-center h-8 px-3 rounded-lg border border-dashed border-primary bg-selected-tint text-accent-foreground font-mono text-micro tracking-wider select-none shrink-0 animate-in fade-in duration-150">
+                  Drop here
                 </div>
               )}
 
@@ -702,9 +702,9 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
               >
                 <div data-testid="dock-more-popover" className="flex flex-col">
                   {/* 16B Header */}
-                  <div className="flex items-center justify-between px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-secondary-text select-none shrink-0">
-                    <span>MORE TOOLS</span>
-                    <span>PIN TO DOCK</span>
+                  <div className="flex items-center justify-between px-2.5 py-1.5 font-mono text-micro tracking-[0.12em] text-secondary-text select-none shrink-0">
+                    <span>More tools</span>
+                    <span>Pin to dock</span>
                   </div>
 
                   {/* Non-sticky options with pin buttons */}
@@ -719,7 +719,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                         <div
                           key={id}
                           className={cn(
-                            "group flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-control text-[13px] transition-colors",
+                            "group flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-control text-ui transition-colors",
                             isPinned ? "bg-selected-tint text-accent-foreground" : "text-foreground hover:bg-sunken"
                           )}
                         >
@@ -739,11 +739,11 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                               className={cn("size-3.5 shrink-0", isPinned ? "text-accent-foreground" : "text-secondary-text")}
                               aria-hidden="true"
                             />
-                            <span className={cn("truncate text-[13px]", isPinned ? "font-semibold text-accent-foreground" : "font-normal text-foreground")}>
+                            <span className={cn("truncate text-ui", isPinned ? "font-semibold text-accent-foreground" : "font-normal text-foreground")}>
                               {def.label.replace('…', '')}
                             </span>
                             {shortcutText && (
-                              <span className={cn("ml-auto font-mono text-[10px] shrink-0 mr-1", isPinned ? "text-accent-foreground" : "text-secondary-text")}>
+                              <span className={cn("ml-auto font-mono text-micro shrink-0 mr-1", isPinned ? "text-accent-foreground" : "text-secondary-text")}>
                                 {shortcutText}
                               </span>
                             )}
@@ -783,10 +783,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
 
                   {/* 16B Toggleable actions */}
                   <div className="flex flex-col gap-0.5 px-0.5 shrink-0">
-                    <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] hover:bg-sunken transition-colors">
+                    <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-ui hover:bg-sunken transition-colors">
                       <div className="flex items-center gap-2.5">
                         <Hash className="size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
-                        <label htmlFor="dock-more-snap-grid-toggle" className="font-medium text-[13px] text-foreground cursor-pointer select-none">
+                        <label htmlFor="dock-more-snap-grid-toggle" className="font-medium text-ui text-foreground cursor-pointer select-none">
                           Snap to grid
                         </label>
                       </div>
@@ -800,10 +800,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                       />
                     </div>
 
-                    <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] hover:bg-sunken transition-colors">
+                    <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-ui hover:bg-sunken transition-colors">
                       <div className="flex items-center gap-2.5">
                         <Map className="size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
-                        <label htmlFor="dock-more-minimap-toggle" className="font-medium text-[13px] text-foreground cursor-pointer select-none">
+                        <label htmlFor="dock-more-minimap-toggle" className="font-medium text-ui text-foreground cursor-pointer select-none">
                           Minimap
                         </label>
                       </div>
@@ -817,10 +817,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                       />
                     </div>
 
-                    <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-[13px] hover:bg-sunken transition-colors">
+                    <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-ui hover:bg-sunken transition-colors">
                       <div className="flex items-center gap-2.5">
                         <Type className="size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
-                        <label htmlFor="dock-more-labels-toggle" className="font-medium text-[13px] text-foreground cursor-pointer select-none">
+                        <label htmlFor="dock-more-labels-toggle" className="font-medium text-ui text-foreground cursor-pointer select-none">
                           Command labels
                         </label>
                       </div>
@@ -847,7 +847,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                         setMoreOpen(false);
                         setCustomizing(true);
                       }}
-                      className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-control text-[13px] font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left"
+                      className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-control text-ui font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left"
                     >
                       <Settings2 className="size-3.5 text-primary shrink-0" aria-hidden="true" />
                       <span>Customise toolbar…</span>
@@ -861,7 +861,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                         setMoreOpen(false);
                         onRestoreDefaults();
                       }}
-                      className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-control text-[13px] font-medium text-secondary-text hover:text-foreground hover:bg-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer text-left"
+                      className="flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-control text-ui font-medium text-secondary-text hover:text-foreground hover:bg-sunken disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer text-left"
                     >
                       <RotateCcw className="size-3.5 text-secondary-text shrink-0" aria-hidden="true" />
                       <span>Restore defaults</span>
@@ -944,7 +944,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
         <PopoverAnchor asChild><span className="absolute left-1/2 top-0" /></PopoverAnchor>
         <PopoverContent side="top" align="center" className="w-72 p-0 overflow-hidden rounded-popover border border-border bg-background shadow-popover" data-testid="dock-group-popover">
           <form onSubmit={(event) => { event.preventDefault(); void submitText(); }}>
-            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text uppercase">
+            <div className="px-3 py-2 bg-panel border-b border-hairline font-mono text-micro font-medium text-secondary-text ">
               New subsystem group
             </div>
             <div className="p-3 bg-background">

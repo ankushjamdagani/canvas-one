@@ -230,7 +230,7 @@ export function GuardBuilder({
 
   return (
     <div className="space-y-2 rounded-control border border-control-border bg-sunken p-2">
-      <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text uppercase">{label}</div>
+      <div className="font-mono text-[10px] font-medium tracking-wider text-secondary-text ">{label}</div>
       <GuardDraftEditor document={document} inputSchemaId={inputSchemaId} draft={draft} onChange={update} />
     </div>
   );

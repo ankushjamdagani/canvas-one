@@ -72,7 +72,7 @@ test('a project can be linked into another as a read-only node that shows live d
 
   // Inspector is read-only for the linked node.
   await node.click();
-  await expect(page.getByTestId('inspector-kind-tag')).toHaveText('LINKED PROJECT');
+  await expect(page.getByTestId('inspector-kind-tag')).toHaveText('Linked project');
   await expect(page.getByTestId('inspector-panel').locator('input, textarea')).toHaveCount(0);
 
   // Open navigates to the linked project.

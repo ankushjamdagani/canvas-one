@@ -38,7 +38,7 @@ export interface ProjectMenuProps {
  *
  * Implements specs and aesthetics from Screens 13A & 18B:
  * - 268px width menu with subtle border and elevation shadow
- * - Standardized faded gray top header with uppercase mono category and metadata subtitle
+ * - Standardized faded gray top header with mono category and metadata subtitle
  * - Pure white body section with standardized 14px icon sizing and consistent row spacing
  * - Rename project with shortcut hint (⌘R)
  * - Duplicate, Move to team, Settings, Export (submenu opening to the right), All projects, Delete
@@ -77,13 +77,13 @@ export function ProjectMenu({
         className="w-[268px]"
       >
         <DropdownMenuHeader className="flex-col items-start gap-0.5 px-3 py-2.5">
-          <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-secondary-text">
-            PROJECT
+          <div className="font-mono text-micro tracking-normal text-secondary-text">
+            Project
           </div>
-          <div className="text-[13.5px] font-semibold text-ink truncate w-full">
+          <div className="text-ui font-semibold text-ink truncate w-full">
             {projectTitle}
           </div>
-          <div className="font-mono text-[9.5px] text-secondary-text">
+          <div className="font-mono text-micro tracking-normal text-secondary-text">
             {team ? `${team} · ` : ''}{branchCount} {branchCount === 1 ? 'branch' : 'branches'}
           </div>
         </DropdownMenuHeader>

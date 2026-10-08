@@ -631,7 +631,7 @@ export function CompareAndResolvePanel({
         <div className="w-56 border-r border-border overflow-y-auto shrink-0 py-2">
           {unresolvedRecords.length > 0 && (
             <div className="px-3 pb-2">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-1 pb-1">
+              <p className="text-[10px] font-mono tracking-wider text-muted-foreground px-1 pb-1">
                 Unresolved
               </p>
               {unresolvedRecords.map((r) => (
@@ -658,7 +658,7 @@ export function CompareAndResolvePanel({
           )}
           {filter === 'all' && autoMergedRecords.length > 0 && (
             <div className="px-3 pb-2">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground px-1 pb-1">
+              <p className="text-[10px] font-mono tracking-wider text-muted-foreground px-1 pb-1">
                 Auto-merged · {autoMergedRecords.length}
               </p>
               {autoMergedRecords.map((r) => (
@@ -683,7 +683,7 @@ export function CompareAndResolvePanel({
           <div className="px-4 text-[11px] text-muted-foreground">Unchanged · {unchangedCount}</div>
           {resolvedFields.length > 0 && (
             <div className="px-3 py-2">
-              <p className="text-[10px] uppercase text-muted-foreground">Resolved</p>
+              <p className="text-[10px] text-muted-foreground">Resolved</p>
               {resolvedFields.map((field) => (
                 <button
                   key={`${field.recordId}:${field.path.join('.')}`}

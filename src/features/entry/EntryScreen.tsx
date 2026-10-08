@@ -19,7 +19,6 @@ import {
   DraftingEmpty,
   DraftingHeading,
   DraftingMain,
-  DraftingNavDivider,
   DraftingSheet,
 } from "@/components/ui/drafting-sheet";
 import type { SessionController } from "../session/controller";
@@ -513,15 +512,6 @@ export function EntryScreen({
           page="Projects"
           navigation={
             <>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled
-                title="Documentation link is not configured"
-              >
-                Docs
-              </Button>
-              <DraftingNavDivider />
               <DraftingAvatar
                 aria-label={`Local workspace: ${actor.displayName}`}
                 title={actor.displayName}
@@ -634,7 +624,7 @@ export function EntryScreen({
                           >
                             {example.title}
                           </span>
-                          <span className="font-mono text-micro uppercase text-secondary-text shrink-0">
+                          <span className="font-mono text-micro text-secondary-text shrink-0">
                             {pluralize(example.componentCount, "component")}
                           </span>
                         </div>
@@ -844,13 +834,13 @@ export function EntryScreen({
                                 {row.branchName}
                               </span>
                               {row.target?.isDraft && (
-                                <span className="rounded-tag border border-risk-edge bg-risk-tint px-1.5 font-mono text-micro uppercase text-risk">
+                                <span className="rounded-tag border border-risk-edge bg-risk-tint px-1.5 font-mono text-micro text-risk">
                                   Draft
                                 </span>
                               )}
                             </span>
                             {row.componentCount !== undefined && (
-                              <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-micro uppercase text-secondary-text">
+                              <span className="ml-auto shrink-0 whitespace-nowrap font-mono text-micro text-secondary-text">
                                 {pluralize(row.componentCount, "component")}
                               </span>
                             )}

@@ -237,7 +237,7 @@ export function TopBar({
           aria-label="All projects"
           title="All projects"
           onClick={onAllProjects}
-          className="h-8 shrink-0 gap-1.5 px-2 text-[13px] font-medium text-secondary-text hover:text-ink"
+          className="h-8 shrink-0 gap-1.5 px-2 text-ui font-medium text-secondary-text hover:text-ink"
         >
           <ArrowLeft size={15} aria-hidden="true" />
           <span className="hidden sm:inline">Projects</span>
@@ -389,7 +389,7 @@ export function TopBar({
                     variant={isMainBranch ? "accent" : "risk"}
                     className="text-micro font-mono tracking-[0.1em] px-1.5 py-0 h-4 shrink-0 normal-case max-[400px]:px-0.5"
                   >
-                    {isMainBranch ? "MAIN" : "DRAFT"}
+                    {isMainBranch ? "Main" : "Draft"}
                   </Badge>
                   {isOpen ? (
                     <ChevronUp
@@ -475,19 +475,19 @@ export function TopBar({
           aria-label="Illustrative collaborators"
         >
           <span className="flex" aria-hidden="true">
-            <span className="grid size-8 place-items-center rounded-full border-2 border-white bg-primary text-[11px] font-semibold text-primary-foreground">
+            <span className="grid size-8 place-items-center rounded-full border-2 border-white bg-primary text-caption font-semibold text-primary-foreground">
               DK
             </span>
-            <span className="-ml-2.5 grid size-8 place-items-center rounded-full border-2 border-white bg-[#7C5FC0] text-[11px] text-white">
+            <span className="-ml-2.5 grid size-8 place-items-center rounded-full border-2 border-white bg-[#7C5FC0] text-caption text-white">
               ✦
             </span>
           </span>
           <span
             aria-hidden="true"
-            className="flex items-center gap-1.5 font-mono text-[9.5px] tracking-[0.12em] text-primary"
+            className="flex items-center gap-1.5 font-mono text-micro tracking-[0.12em] text-primary"
           >
             <span className="size-1.5 rounded-full bg-[#2E7D6B] shadow-[0_0_0_3px_rgba(46,125,107,0.18),0_0_8px_rgba(46,125,107,0.6)]" />
-            LIVE
+            Live
           </span>
         </span>
         <div
