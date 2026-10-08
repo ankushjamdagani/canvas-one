@@ -380,7 +380,7 @@ describe('Export/import round trip and rejections (RV-16b, storage.md §4/§9)',
         if (res.status === 'failed') {
           expect(res.code).toBe('unsupported-version');
           expect(JSON.stringify(res)).not.toContain('undefined');
-          expect(JSON.stringify(res)).toContain("isn't a System Studio project export");
+          expect(JSON.stringify(res)).toContain("isn't a CanvasOne project export");
         }
         expect(projectCount).toBe(0);
       }

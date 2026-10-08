@@ -22,7 +22,7 @@ function LanguageSpecimen() {
           style={{ position: "absolute", left: 80, top: 80, maxWidth: 720 }}
         >
           <h1 className="font-display text-5xl font-light">
-            System Studio <em className="text-primary">drafting language</em>
+            CanvasOne <em className="text-primary">drafting language</em>
           </h1>
           <p className="mt-6">
             IBM Plex Mono for interface labels, controls and prose.

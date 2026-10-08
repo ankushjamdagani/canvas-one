@@ -150,7 +150,7 @@ export default function App() {
         data-testid="boot-loading-screen"
         className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
       >
-        Loading System Studio…
+        Loading CanvasOne…
       </div>
     );
   }

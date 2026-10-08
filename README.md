@@ -1,4 +1,4 @@
-# System studio
+# CanvasOne
 
 ### Authored architecture revisions
 

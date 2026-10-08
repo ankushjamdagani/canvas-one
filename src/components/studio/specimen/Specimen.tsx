@@ -169,15 +169,15 @@ export function Specimen() {
       <header className="space-y-3 border-b border-border pb-8">
         <div className="flex items-center gap-3">
           <span className="font-mono text-xs font-semibold tracking-wider text-accent-foreground uppercase bg-accent px-2 py-0.5 rounded-tag border border-border">
-            System Studio
+            CanvasOne
           </span>
           <span className="font-mono text-xs text-muted-foreground">Evergreen v2.0</span>
         </div>
         <h1 className="font-display text-4xl sm:text-5xl font-normal tracking-normal text-foreground">
-          System Studio Design System
+          CanvasOne Design System
         </h1>
         <p className="text-sm text-secondary-text max-w-3xl leading-relaxed">
-          Visual foundations, core components, and interaction states for the System Studio canvas and simulator.
+          Visual foundations, core components, and interaction states for the CanvasOne canvas and simulator.
           Conforming to <code className="font-mono text-xs bg-panel px-1.5 py-0.5 rounded border border-border">System Studio Design System.dc.html</code>.
         </p>
       </header>
@@ -351,7 +351,7 @@ export function Specimen() {
             <div className="space-y-1">
               <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Display · 46px</span>
               <div className="font-display text-4xl sm:text-5xl font-normal tracking-normal text-foreground leading-none">
-                System Studio
+                CanvasOne
               </div>
             </div>
             <div className="space-y-1">
@@ -803,7 +803,7 @@ export function Specimen() {
 
             <div className="space-y-1.5">
               <Label htmlFor="input-filled">Input (Filled)</Label>
-              <Input id="input-filled" type="text" defaultValue="System Studio Service" />
+              <Input id="input-filled" type="text" defaultValue="CanvasOne Service" />
               <span className="text-[10px] text-muted-foreground">White fill with value</span>
             </div>
 
@@ -1118,7 +1118,7 @@ export function Specimen() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="#system-studio">System Studio</BreadcrumbLink>
+                  <BreadcrumbLink href="#system-studio">CanvasOne</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -1173,7 +1173,7 @@ export function Specimen() {
                     <DropdownMenuShortcut className="text-destructive font-mono text-[10px]">⌦</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuFooter>
-                    <span className="text-secondary-text text-[11px]">System Studio</span>
+                    <span className="text-secondary-text text-[11px]">CanvasOne</span>
                     <span className="font-mono text-[10px] text-primary">⌘K</span>
                   </DropdownMenuFooter>
                 </DropdownMenuContent>

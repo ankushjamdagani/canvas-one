@@ -3257,3 +3257,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 ### Commit theme switcher and accessibility work
 - Outcome: committed the current theme switcher, colour/state accessibility fixes and consistent white Claude foregrounds after the requested layout rollback.
 - Platform: Codex; no subagents. Verification: diff reviewed and whitespace check passed; preceding rollback build and 93 focused tests passed. No push requested.
+
+### Rename app to CanvasOne
+- Outcome: renamed landing/shared headers, loading text, browser metadata, private package metadata, README, Storybook specimens and export messaging; updated displayed/copied preview command. Existing persistence keys, portable formats and export suffixes retained for compatibility; original design references preserved.
+- Files: index.html, package.json/lock, README, App, shared branding, landing, specimens/stories, SVG/import messaging, corresponding tests, HANDOFF and ACTION_LOG. Platform: Codex; graphify navigation, no subagents.
+- Verification: production and Storybook builds passed; 28 focused transfer/import tests and all 11 production landing browser tests passed, including clipboard, keyboard/accessibility and 320–1440px reflow; scoped diff reviewed and whitespace check passed. Full runtime suite not rerun; no npm package published.
+- Lesson: local preview binding requires sandbox escalation; production browser checks passed after the authorized retry.
+
+### Commit CanvasOne rename and push
+- Outcome: isolated the CanvasOne rename for commit; unrelated architecture/naming work reserved for stash. Target remote: https://github.com/ankushjamdagani/canvas-one.git.
+- Platform: Codex; no subagents. Verification: scoped staged diff/whitespace review; preceding production/Storybook builds, 28 unit checks and 11 browser checks passed.

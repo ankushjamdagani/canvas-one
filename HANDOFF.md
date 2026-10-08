@@ -1,5 +1,7 @@
 # Development handoff
 
+App renamed to CanvasOne (2026-10-08): landing/shared headers, loading state, browser metadata, README, private package metadata, Storybook specimens and user-facing export copy use CanvasOne. Landing's displayed/copyable command is `npx canvasone@preview`; no npm publication performed. Preserve existing `system-studio` storage keys, portable format identifiers and export suffixes for compatibility; historical specs/design artifact names remain unchanged.
+
 Claude foreground preference (2026-10-08): header Claude avatar, prompt submit icon and every Claude cursor label use white foreground consistently. New `--branch-solid` darkens the authored branch hue only where needed for 4.5:1 white contrast; raw branch palettes remain unchanged. Browser regression asserts white foreground on all three elements across every palette/mode.
 
 Animated landing proposal follow-up (2026-10-08): Accept now retains the shared primary button fill/states; branch-filled send/collaborator/avatar elements use new contrast-corrected `--branch-foreground`, prompt copy uses branch text and landing focus uses ring. Permanent `tests/landing-theme-states.spec.ts` explicitly reaches and pauses the later proposal/note state in all 28 variants, including computed contrast for aria-hidden cursor labels. See the audit report/action log for confirmation.

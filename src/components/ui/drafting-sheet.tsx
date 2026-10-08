@@ -40,7 +40,7 @@ export function DraftingSheet({
           className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-sm text-sm font-semibold text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         >
           <BrandMark />
-          System Studio
+          CanvasOne
         </Reveal>
         <Reveal
           as="span"

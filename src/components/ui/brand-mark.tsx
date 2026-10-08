@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** System Studio logo square. Decorative: pair it with visible text or a labelled control. */
+/** CanvasOne logo square. Decorative: pair it with visible text or a labelled control. */
 export function BrandMark({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span

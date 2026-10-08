@@ -231,7 +231,7 @@ export function LandingPage() {
         <header className="lp-header">
           <Reveal as="a" kind="chrome" index={0} href="/" className="lp-brand">
             <span aria-hidden="true" />
-            System Studio
+            CanvasOne
           </Reveal>
           <Reveal as="span" kind="chrome" index={1} className="lp-version">
             {APP_VERSION_LABEL}
@@ -373,7 +373,7 @@ export function LandingPage() {
                 variant="outline"
                 className="lp-command"
                 aria-label={
-                  copied ? "Command copied" : "Copy npx system-studio@preview"
+                  copied ? "Command copied" : "Copy npx canvasone@preview"
                 }
                 onClick={() => {
                   setCopyError(false);
@@ -382,18 +382,18 @@ export function LandingPage() {
                     return;
                   }
                   void navigator.clipboard
-                    .writeText("npx system-studio@preview")
+                    .writeText("npx canvasone@preview")
                     .then(() => setCopied(true))
                     .catch(() => setCopyError(true));
                 }}
               >
-                <span>$</span>npx system-studio@preview
+                <span>$</span>npx canvasone@preview
                 {copied ? <Check /> : <Copy />}
               </Button>
               {copyError && (
                 <p role="alert">
                   Could not copy. Copy this command manually:{" "}
-                  <code>npx system-studio@preview</code>
+                  <code>npx canvasone@preview</code>
                 </p>
               )}
             </Reveal>

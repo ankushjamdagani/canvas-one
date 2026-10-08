@@ -1,5 +1,5 @@
 /**
- * Portable bundle validation for System Studio transfer (RV-16b).
+ * Portable bundle validation for CanvasOne transfer (RV-16b).
  *
  * Implements specs/revamp/contracts/storage.md §1 (versions), §4 (Portable bundle),
  * §6 (limits, including the Transfer row) and run-identity.md §5 (evidence inventory).
@@ -366,7 +366,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
           'invalid-literal',
           typeof format === 'string'
             ? `Unsupported portable format '${format}'`
-            : "This file isn't a System Studio project export.",
+            : "This file isn't a CanvasOne project export.",
           ['format'],
         ),
       ],

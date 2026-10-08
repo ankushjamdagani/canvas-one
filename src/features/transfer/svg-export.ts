@@ -325,7 +325,7 @@ export function renderDiagramSvg(document: Document, viewId?: string | null): st
     throw new Error('Diagram dimensions exceed limit; move elements closer together before exporting.');
   }
 
-  const titleText = xmlEscape(`${document.title || 'System Studio'} — Diagram`);
+  const titleText = xmlEscape(`${document.title || 'CanvasOne'} — Diagram`);
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" ` +

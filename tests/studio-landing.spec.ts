@@ -15,13 +15,13 @@ test("landing preserves supplied copy and opens projects with working history", 
   );
   await expect(page.getByText("You & Claude", { exact: true })).toBeVisible();
   await page
-    .getByRole("button", { name: "Copy npx system-studio@preview" })
+    .getByRole("button", { name: "Copy npx canvasone@preview" })
     .click();
   await expect(
     page.getByRole("button", { name: "Command copied" }),
   ).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-    "npx system-studio@preview",
+    "npx canvasone@preview",
   );
   await page.getByRole("link", { name: "Try Beta" }).last().click();
   await expect(page).toHaveURL(/\/projects$/);
@@ -75,7 +75,7 @@ for (const width of [1440, 800, 390, 320]) {
       ).toBe(true);
       await page.keyboard.press("Tab");
       await expect(
-        page.getByRole("link", { name: "System Studio", exact: true }),
+        page.getByRole("link", { name: "CanvasOne", exact: true }),
       ).toBeFocused();
       const audit = await new AxeBuilder({ page }).analyze();
       expect(audit.violations).toEqual([]);
@@ -163,10 +163,10 @@ test("unavailable clipboard shows a usable fallback instead of throwing", async 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Copy npx system-studio@preview" })
+    .getByRole("button", { name: "Copy npx canvasone@preview" })
     .click();
   await expect(page.getByRole("alert")).toContainText(
-    "npx system-studio@preview",
+    "npx canvasone@preview",
   );
   expect(errors).toEqual([]);
 });
