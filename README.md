@@ -5,7 +5,8 @@
 <h1 align="center">Canvas One</h1>
 
 <p align="center">
-  An infinite drafting sheet for system design. Sketch an architecture, give each part real behaviour, and run it to see where queues build up and requests fail.
+  <b>Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.</b><br />
+  A collaborative visual whiteboard for system design, code walkthroughs, architectural code reviews, deep-dive explanations, and engineering onboarding.
 </p>
 
 <p align="center">
@@ -19,11 +20,12 @@
 
 ## What it does
 
-- **Model on a canvas.** Place components from a catalog of 29 kinds (clients, edge, compute, data, messaging, operations), connect them, group them into subsystems and annotate them with notes.
-- **Give parts behaviour.** Configure capacity, queueing, concurrency, failures, retries, caches, brokers and workloads. Scenarios describe the traffic to apply.
-- **Simulate.** A seeded, deterministic discrete-event simulation runs in a Web Worker. Replay it, scrub the timeline, and inspect individual requests and cycles. Nothing is reported as passed or measured unless it ran.
-- **Keep history.** Projects have branches, commits and three-way merges. Publishing to `main` requires passing runs for every scenario.
-- **Stay local.** Projects live in your browser's IndexedDB. There is no account, no server and no network traffic for your designs. Export a project as a portable JSON bundle to back it up or move it.
+- **Beyond chat.** An infinite visual whiteboard where engineers and AI agents interact visually. Move beyond narrow, text-only chat prompts to explore architectures, trace execution flows, and reason about code spatially.
+- **System design & simulation.** Place components from a catalog of 29 kinds (clients, edge, compute, data, messaging, operations), connect them, group them into subsystems, and annotate them with notes. Configure capacity, queueing, concurrency, retries, and workloads, then run seeded, deterministic discrete-event simulations in a Web Worker to identify bottlenecks before writing code.
+- **Code walkthroughs & flow tracing.** Map repositories into clear component topologies. Trace request journeys, async event chains, and state mutations across service and module boundaries.
+- **Architectural code review.** Review changes as visual topological deltas rather than raw line-by-line diffs. Inspect blast radius and downstream impact across queues, schemas, and dependencies.
+- **System explanation & onboarding.** Break down complex distributed protocols into animated visual flows. Give new engineers guided, interactive tours of the system with living architecture context.
+- **Keep history & stay local.** Projects live in your browser's IndexedDB with branches, commits, and three-way merges. No accounts, no cloud tracking, and portable JSON export/import.
 
 The simulator models performance behaviour. It does not execute your application code or reproduce a specific cloud provider, so treat results as a learning aid rather than a capacity plan.
 

@@ -39,7 +39,7 @@ Deferred by user decision (2026-10-06): design the transitions between traffic s
 
 ## 1. Executive Summary & Philosophy
 
-**Canvas One** is an interactive, browser-based system architecture modeling, discrete-event simulation, and verification platform. It allows software architects, systems engineers, and learners to model complex distributed systems, execute realistic multi-scenario discrete-event simulations, inspect detailed packet/cycle lifecycles, and maintain architectural integrity using an immutable Git-like commit Directed Acyclic Graph (DAG) and 3-way semantic merging.
+**Canvas One** is the shared visual canvas for engineers and AI to think, architect, and review systems together. Beyond text chat, it provides a collaborative whiteboard for system design, code walkthroughs, architectural code reviews, visual explanation, and engineering onboarding, paired with an off-thread discrete-event simulation engine and an immutable Git-like commit Directed Acyclic Graph (DAG) with 3-way semantic merging.
 
 ### Creative North Star: "Evergreen Paper"
 Unlike traditional SaaS tools that lean on generic dashboards, heavy dark modes, or illustrative marketing fluff, Canvas One is built as a **quiet, utilitarian, scan-friendly, paper-like studio**. It prioritizes high information density, strict control semantics, hairline borders, and predictable layout stability.

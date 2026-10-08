@@ -12,17 +12,28 @@ User-selected React, TypeScript, Vite, React Flow, Zustand, custom discrete-even
 
 ## Users
 
-People learning system architecture by changing a model and observing cause and effect.
+Software engineers, system architects, and technical teams designing systems, understanding complex codebases, and collaborating with AI agents beyond text-only chat.
 
 ## Product Purpose
 
-An editable infinite canvas for frontend, backend and whole-system architecture. First experiment: URL shortener with traffic, redirect service, database and optional cache.
+Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.
+
+Canvas One provides an infinite visual whiteboard where humans and AI agents interact visually across five core engineering workflows:
+1. **System Design & Simulation:** Visually drafting topologies, stress-testing distributed architectures, and simulating capacity, bottlenecks, queue backpressure, and failure modes before writing code.
+2. **Code Walkthroughs:** Tracing request lifecycles, execution paths, and component boundaries across repositories.
+3. **Code Review:** Evaluating architectural diffs and blast-radius impacts of PRs rather than just line-by-line syntax changes.
+4. **System Explanation:** Visual Q&A and interactive breakdowns of complex protocols, state transitions, and background pipelines.
+5. **Engineering Onboarding:** Guided visual tours of systems and living architectural documentation that stays anchored to real designs.
 
 Diagram organization supports multi-selection through Shift-click and a visible touch/keyboard checklist. Selected real components move together and can align or distribute in one undoable position edit; collapsed subsystem members and subsystem shells are excluded. Diagram subsystem summaries describe architecture boundaries rather than simulation counters.
 
 Diagram-only SVG and PNG downloads render the complete architecture independently of the editor viewport. They retain component and connection metadata and the current subsystem collapse state. SVG provides a portable vector rendition; PNG uses a white background and bounded high-resolution scale. JSON remains the editable project backup.
 
 Canvas notes are implemented as typed design context separate from executable components. The five types are decision, assumption, future scope, question and general note; notes support an 80-character title, a 1,000-character body, collapse/expand, movement, deletion, and optional links to nodes, connections or subsystems. Notes persist with projects, checkpoints and JSON exports without entering simulation semantics. SVG/PNG exports include the note layout; visible copy is compact and full note content is retained in SVG titles.
+
+## Positioning
+
+The shared visual thinking surface for human–AI software engineering. While conversational AI tools force architectural reasoning into flat, ephemeral text chat, Canvas One gives engineers and AI a shared spatial canvas to visually co-design, simulate, inspect, and verify software before and alongside code generation.
 
 ## Capabilities and Constraints
 
@@ -40,10 +51,12 @@ Tentative name Canvas One. User selected light layout A, docked workspace. Prese
 
 ## Product Principles
 
-- Learning cause and effect comes first.
-- Simulation assumptions are visible.
-- Identical seeded workloads make comparison interpretable.
-- Domain, simulation, persistence and rendering remain independent.
+- **Spatial over textual:** Complex software systems are networks, flows, and state transitions—represent them spatially on the canvas rather than trapped in text paragraphs.
+- **Architecture before code:** Formulate, inspect, and agree on the design and implementation plan with AI before jumping into code synthesis.
+- **Bi-directional fluency:** The canvas is equally readable and writable by humans and AI agents—neither is a passive spectator.
+- **Truthful & grounded:** Diagrams and simulations reflect verified code structures, real contracts, and deterministic simulations—never hand-waved or invented.
+- **Learning cause and effect comes first:** Simulation assumptions are visible; identical seeded workloads make comparison interpretable.
+- **Domain, simulation, persistence and rendering remain independent.**
 
 ## Open Decisions
 

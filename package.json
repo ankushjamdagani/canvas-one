@@ -1,5 +1,6 @@
 {
   "name": "canvasone",
+  "description": "Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.",
   "private": true,
   "license": "MIT",
   "author": "Ankush Jamdagani",

@@ -12,8 +12,11 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PublicHeader } from '@/components/ui/public-header';
-import { CanvasOneFace, type FaceExpression } from '@/components/ui/canvas-one-face';
+import { PublicHeader } from "@/components/ui/public-header";
+import {
+  CanvasOneFace,
+  type FaceExpression,
+} from "@/components/ui/canvas-one-face";
 import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
 import "./landing-page.css";
@@ -37,7 +40,7 @@ export function LandingPage() {
     "accepted" | "dismissed" | null
   >(null);
   const [nodes, setNodes] = React.useState(initialNodes),
-    [hero, setHero] = React.useState({ x: 104, y: 168, w: 800, h: 176 });
+    [hero, setHero] = React.useState({ x: 104, y: 168, w: 722, h: 136 });
   const drag = React.useRef<{
     start: Point;
     point: Point;
@@ -219,28 +222,44 @@ export function LandingPage() {
             };
   const aiActive = t >= 3000 && !accepted;
   const aiExpression: FaceExpression = aiActive
-    ? t < 4800 ? 'squint' : t < 7200 ? 'thought' : 'pixel'
-    : 'base';
+    ? t < 4800
+      ? "squint"
+      : t < 7200
+        ? "thought"
+        : "pixel"
+    : "base";
   return (
     <RevealScope contentCount={4}>
       <DraftingBoard paused={paused}>
-        <PublicHeader page="landing" className="lp-header" collaborators={<>
-            <span
-              className="lp-collaborators"
-              aria-label="Illustrative collaborators"
-            >
-              <span className="lp-avatars">
-                <i>Y</i>
-                <i><CanvasOneFace expression={aiExpression} size={18} animate={!paused && !reduced} /></i>
+        <PublicHeader
+          page="landing"
+          className="lp-header"
+          collaborators={
+            <>
+              <span
+                className="lp-collaborators"
+                aria-label="Illustrative collaborators"
+              >
+                <span className="lp-avatars">
+                  <i>Y</i>
+                  <i>
+                    <CanvasOneFace
+                      expression={aiExpression}
+                      size={18}
+                      animate={!paused && !reduced}
+                    />
+                  </i>
+                </span>
+                <b>You &amp; Claude</b>
+                <small>
+                  <i />
+                  Live
+                </small>
               </span>
-              <b>You &amp; Claude</b>
-              <small>
-                <i />
-                Live
-              </small>
-            </span>
-            <span className="lp-divider" />
-        </>} />
+              <span className="lp-divider" />
+            </>
+          }
+        />
         <DraftingStage>
           <main
             data-testid="landing-page"
@@ -263,7 +282,8 @@ export function LandingPage() {
                 Text · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
               </span>
               <h1 tabIndex={-1} className="outline-none">
-                Think in architecture.<em>Let agents draw the system.</em>
+                Beyond chat.
+                <em>Where engineers and AI architect systems together.</em>
               </h1>
               {["TL", "TR", "BL", "BR"].map((corner) => (
                 <button
@@ -327,9 +347,8 @@ export function LandingPage() {
               className="lp-copy"
               style={{ left: hero.x + 19, top: hero.y + hero.h + 46 }}
             >
-              AI agents sketch topologies, isolate hot paths, and simulate
-              backpressure directly on an infinite browser drafting sheet in
-              real time.
+              The collaborative whiteboard canvas for engineers and AI to design
+              architectures, trace execution flows, and review systems together.
             </Reveal>
             <Reveal
               kind="content"
@@ -369,7 +388,9 @@ export function LandingPage() {
                       data-edge={edge.id}
                       d={edge.d}
                       stroke={edge.color}
-                      strokeDasharray={edge.color === "var(--branch)" ? "4 4" : "3 3"}
+                      strokeDasharray={
+                        edge.color === "var(--branch)" ? "4 4" : "3 3"
+                      }
                       fill="none"
                     />
                     {!paused &&
@@ -607,7 +628,7 @@ export function LandingPage() {
               </Button>
             </div>
             <div
-              className={`lp-prompt ${aiActive ? 'lp-prompt-active' : ''}`}
+              className={`lp-prompt ${aiActive ? "lp-prompt-active" : ""}`}
               role="region"
               aria-label="Collaboration prompt"
             >
@@ -615,7 +636,11 @@ export function LandingPage() {
               <span
                 style={{
                   color:
-                    t >= 3000 ? "var(--branch-text)" : t >= 332 ? "var(--foreground)" : "var(--secondary-text)",
+                    t >= 3000
+                      ? "var(--branch-text)"
+                      : t >= 332
+                        ? "var(--foreground)"
+                        : "var(--secondary-text)",
                 }}
               >
                 {prompt}
@@ -629,7 +654,15 @@ export function LandingPage() {
                   setPaused(false);
                 }}
               >
-                {aiActive ? <CanvasOneFace expression={aiExpression} size={30} animate={!paused && !reduced} /> : <ArrowUp />}
+                {aiActive ? (
+                  <CanvasOneFace
+                    expression={aiExpression}
+                    size={30}
+                    animate={!paused && !reduced}
+                  />
+                ) : (
+                  <ArrowUp />
+                )}
               </Button>
             </div>
             <footer className="lp-local">
@@ -667,7 +700,16 @@ export function LandingPage() {
                     strokeWidth="1.2"
                   />
                 </svg>
-                <span>{index === 1 && <CanvasOneFace expression={aiExpression} size={16} animate={!paused && !reduced} />}{cursor.name}</span>
+                <span>
+                  {index === 1 && (
+                    <CanvasOneFace
+                      expression={aiExpression}
+                      size={16}
+                      animate={!paused && !reduced}
+                    />
+                  )}
+                  {cursor.name}
+                </span>
               </div>
             ))}
           </Reveal>
