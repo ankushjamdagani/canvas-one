@@ -61,7 +61,7 @@ function createTestDocument(id: Id, title = 'Untitled'): Document {
   };
 }
 
-describe('Session Layer (RV-12c1)', () => {
+describe('Session Layer', () => {
   it('creates from saved work or the branch head and reopens with a fresh revision before switching', async () => {
     const db = new StudioDatabase(`test-branch-controls-${Date.now()}-${idCounter++}`);
     await db.open();
@@ -218,7 +218,7 @@ describe('Session Layer (RV-12c1)', () => {
     expect(state.lastError).toBeNull();
   });
 
-  it('D43(a): createProject with no views seeds one empty "Main" view (id from mintId, not a client default)', async () => {
+  it('createProject with no views seeds one empty "Main" view (id from mintId, not a client default)', async () => {
     const dbName = `test-blank-view-${Date.now()}-${idCounter++}`;
     const mintId = createMintId();
     const bootResult = await openStudioRepository({ dbName, mintId });
@@ -249,7 +249,7 @@ describe('Session Layer (RV-12c1)', () => {
     expect(view?.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('D43(a): createProject with an existing view (e.g. a template) is left untouched', async () => {
+  it('createProject with an existing view (e.g. a template) is left untouched', async () => {
     const dbName = `test-template-views-${Date.now()}-${idCounter++}`;
     const mintId = createMintId();
     const bootResult = await openStudioRepository({ dbName, mintId });
@@ -1128,8 +1128,8 @@ describe('Session Layer (RV-12c1)', () => {
     expect(controller.getState().status).toBe('empty');
   });
 
-  describe('RV-12c1 Review Round 1 Requirements', () => {
-    it('Item 1: Branch/Bootstrap command returning applied with null branchRevision throws contract violation error', async () => {
+  describe('Session invariants', () => {
+    it('Branch/Bootstrap command returning applied with null branchRevision throws contract violation error', async () => {
       const mintId = createMintId();
       const boot = await openStudioRepository({ dbName: `test-r1-item1-${Date.now()}-${idCounter++}`, mintId });
       if (!boot.ok) throw new Error('Boot failed');
@@ -1156,7 +1156,7 @@ describe('Session Layer (RV-12c1)', () => {
       ).rejects.toThrow(/contract violation.*branchRevision/i);
     });
 
-    it('Item 2: on branch/snapshot load failure after applied, sets needsReload: true, lastError: missing, and refuses further apply/undo/redo', async () => {
+    it('on branch/snapshot load failure after applied, sets needsReload: true, lastError: missing, and refuses further apply/undo/redo', async () => {
       const mintId = createMintId();
       const boot = await openStudioRepository({ dbName: `test-r1-item2-${Date.now()}-${idCounter++}`, mintId });
       if (!boot.ok) throw new Error('Boot failed');
@@ -1206,7 +1206,7 @@ describe('Session Layer (RV-12c1)', () => {
       expect((controller.getState() as any).needsReload).toBe(false);
     });
 
-    it('Item 3: computeInverseChanges returns {ok:false, issues} with change index when prior missing; apply returns invalid without sending command', async () => {
+    it('computeInverseChanges returns {ok:false, issues} with change index when prior missing; apply returns invalid without sending command', async () => {
       const mintId = createMintId();
       const doc = createTestDocument(mintId(), 'Test Doc');
       const missingId = mintId();
@@ -1238,7 +1238,7 @@ describe('Session Layer (RV-12c1)', () => {
       expect(execSpy).not.toHaveBeenCalled();
     });
 
-    it('Item 4: UndoEntry carries only {label, inverseChanges, forwardChanges}', async () => {
+    it('UndoEntry carries only {label, inverseChanges, forwardChanges}', async () => {
       const mintId = createMintId();
       const boot = await openStudioRepository({ dbName: `test-r1-item4-${Date.now()}-${idCounter++}`, mintId });
       if (!boot.ok) throw new Error('Boot failed');
@@ -1263,7 +1263,7 @@ describe('Session Layer (RV-12c1)', () => {
       expect('forward' in entry).toBe(false);
     });
 
-    it('Item 5: openProject has in-flight guard, status loading in state, concurrent apply returns busy', async () => {
+    it('openProject has in-flight guard, status loading in state, concurrent apply returns busy', async () => {
       const mintId = createMintId();
       const boot = await openStudioRepository({ dbName: `test-r1-item5-${Date.now()}-${idCounter++}`, mintId });
       if (!boot.ok) throw new Error('Boot failed');
@@ -1312,7 +1312,7 @@ describe('Session Layer (RV-12c1)', () => {
       expect(controller.getState().status).toBe('ready');
     });
 
-    it('Item 6: openStudioRepository requires mintId in options', async () => {
+    it('openStudioRepository requires mintId in options', async () => {
       // @ts-expect-error testing missing options
       await expect(openStudioRepository()).rejects.toThrow(TypeError);
       // @ts-expect-error testing missing mintId in options
@@ -1322,7 +1322,7 @@ describe('Session Layer (RV-12c1)', () => {
     });
   });
 
-  describe('RV-03s: D40 auto-draft from main + workingSnapshotId pairing', () => {
+  describe('auto-draft from main and workingSnapshotId pairing', () => {
     it('first edit on main creates "Draft from main", switches to it, applies the edit there; main is unchanged; one undo entry reverts only the edit', async () => {
       const dbName = `test-d40-${Date.now()}-${idCounter++}`;
       const mintId = createMintId();
@@ -1336,8 +1336,8 @@ describe('Session Layer (RV-12c1)', () => {
       });
 
       await controller.createProject({
-        title: 'D40 Project',
-        initialDocument: createTestDocument(mintId(), 'D40 Project'),
+        title: 'Main draft Project',
+        initialDocument: createTestDocument(mintId(), 'Main draft Project'),
       });
       const { projectId, mainBranchId } = controller.getState();
       expect(projectId).toBeDefined();
@@ -1398,8 +1398,8 @@ describe('Session Layer (RV-12c1)', () => {
       });
 
       await controller.createProject({
-        title: 'D40 Collision Project',
-        initialDocument: createTestDocument(mintId(), 'D40 Collision Project'),
+        title: 'Main draft Collision Project',
+        initialDocument: createTestDocument(mintId(), 'Main draft Collision Project'),
       });
       const { projectId, mainBranchId } = controller.getState();
 

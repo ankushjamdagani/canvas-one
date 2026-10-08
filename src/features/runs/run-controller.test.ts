@@ -12,7 +12,7 @@ import { InProcessTransport } from './inProcessTransport';
 import { RunController } from './RunController';
 
 const s01Doc = JSON.parse(
-  readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
 ) as Document;
 
 const testActor: Actor = {
@@ -112,7 +112,7 @@ describe('RunController (main thread)', () => {
     db.close();
   });
 
-  it('RV-12d review round 1: exposes the buffered trace events on state, clearing them on the next run and on reset', async () => {
+  it('exposes the buffered trace events on state, clearing them on the next run and on reset', async () => {
     const db = createStudioDatabase(`test-run-events-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, branchId, snapshotId } = await setupTestProject(repo);

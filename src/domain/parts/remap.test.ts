@@ -24,7 +24,7 @@ function collectIdentityValues(value: unknown, output = new Set<string>()): Set<
 
 describe('remapContent', () => {
   it('remaps every fixture identity/reference and leaves labels and literal payloads exact', () => {
-    const source = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s05.json'), 'utf8')) as Document;
+    const source = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s05.json'), 'utf8')) as Document;
     const capture = captureSelection(source, source.views[0].id, {
       elementIds: source.elements.map((element) => element.id),
       noteIds: [],
@@ -130,7 +130,7 @@ describe('remapContent', () => {
   });
 
   it('rejects a mint that collides with any source identity', () => {
-    const source = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s03.json'), 'utf8')) as Document;
+    const source = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s03.json'), 'utf8')) as Document;
     const capture = captureSelection(source, source.views[0].id, { elementIds: [source.elements[0].id], noteIds: [] });
     expect(capture.ok).toBe(true);
     if (!capture.ok) return;

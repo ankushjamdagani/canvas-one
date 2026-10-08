@@ -33,11 +33,11 @@ import {
   panelReducer,
 } from './panels';
 
-describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
+describe('Workspace Panel Reducer & Geometry', () => {
   // ==========================================================================
-  // 1. Exported Named Constants (§7)
+  // 1. Exported Named Constants
   // ==========================================================================
-  describe('Exported Named Constants citing specs/revamp/contracts/commands.md §7', () => {
+  describe('Exported Named Constants', () => {
     it('has exact breakpoint numbers', () => {
       expect(BREAKPOINT_MOBILE).toBe(768);
       expect(BREAKPOINT_DESKTOP).toBe(1200);
@@ -609,7 +609,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
   // ==========================================================================
   // 5. Auto-Collapse LRU with Tie by ID and Announce
   // ==========================================================================
-  describe('Auto-Collapse LRU with tie by ID and announce effect (§7)', () => {
+  describe('Auto-Collapse LRU with tie by ID and announce effect', () => {
     it('collapses least-recently-focused auxiliary panel when occupancy exceeds width at >=1200 px', () => {
       // At 1200 px:
       // Fixed: Canvas (480) + Rail (44) + Gutters (16) + Inspector (320) = 860 px
@@ -747,7 +747,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       });
     });
 
-    it('restoring width restores preferred state without emitting focus or save effects (§7)', () => {
+    it('restoring width restores preferred state without emitting focus or save effects', () => {
       const collapsedState = createInitialPanelState({
         viewport: { width: 1200, height: 900 },
         sideWidths: { left: 440, right: 440 },
@@ -783,7 +783,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       expect(restoredLayout.panels.history).toBe('docked-right');
       expect(restoredLayout.panels.library).toBe('docked-left');
 
-      // §7: "When width returns, restore the preferred state without stealing focus."
+      // "When width returns, restore the preferred state without stealing focus."
       // "restoring width does not emit a focus effect."
       expect(restoreResult.effects.some((e) => e.type === 'focus')).toBe(false);
       expect(restoreResult.effects.some((e) => e.type === 'save')).toBe(false);
@@ -874,7 +874,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
       });
 
       const layout = effectiveLayout(state);
-      // §7: "Auxiliary panels are single overlays."
+      // "Auxiliary panels are single overlays."
       expect(layout.panels.library).toBe('overlay');
       expect(layout.panels.history).toBe('hidden');
       // Inspector takes 320 if canvas >= 360: 1024 - 320 - 44 - 16 = 644 >= 360 -> docked
@@ -933,7 +933,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
 
       const layout = effectiveLayout(state);
       expect(layout.inspector).toBe('overlay');
-      // At most one overlay at a time (§7)
+      // At most one overlay at a time
       expect(layout.panels.library).toBe('overlay');
       expect(layout.panels.history).toBe('hidden');
     });
@@ -942,7 +942,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
   // ==========================================================================
   // 7. Floating Rect Clamping and Below-Min -> Overlay
   // ==========================================================================
-  describe('Floating Rect Clamping and Below-Min -> Overlay (§7)', () => {
+  describe('Floating Rect Clamping and Below-Min -> Overlay', () => {
     it('clamps floating panel coordinates and dimensions within viewport margins', () => {
       const viewport = { width: 1440, height: 900 };
       // Try to place panel out-of-bounds (negative x/y, oversized dimensions)
@@ -978,7 +978,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
         },
       });
 
-      // §7: "Below the minimum, switch to an overlay."
+      // "Below the minimum, switch to an overlay."
       const layout = effectiveLayout(state);
       expect(layout.panels.library).toBe('overlay');
     });
@@ -1035,9 +1035,9 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
   });
 
   // ==========================================================================
-  // 8. Stacking Fit / No-Fit (§7)
+  // 8. Stacking Fit / No-Fit
   // ==========================================================================
-  describe('Stacking Fit / No-Fit (§7)', () => {
+  describe('Stacking Fit / No-Fit', () => {
     it('fits both stacked panels when available height >= 400 px', () => {
       // 900 - 54 = 846 px available height >= 400 px (200 px * 2)
       const state = createInitialPanelState({
@@ -1067,7 +1067,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
 
     it('collapses least-recently-focused panel to a collapsed header when available height < 400 px', () => {
       // 350 - 54 = 296 px available height < 400 px
-      // §7: "if both don't fit, show one expanded panel and the other as a collapsed header"
+      // "if both don't fit, show one expanded panel and the other as a collapsed header"
       const state = createInitialPanelState({
         viewport: { width: 1440, height: 350 },
         lastFocusedSequence: { library: 2, history: 1 }, // History least recently focused
@@ -1132,7 +1132,7 @@ describe('Workspace Panel Reducer & Geometry (RV-03a)', () => {
   // ==========================================================================
   // 9. Responsive Override Does Not Mutate Preferences
   // ==========================================================================
-  describe('Responsive Override Does Not Mutate Preferences (§7)', () => {
+  describe('Responsive Override Does Not Mutate Preferences', () => {
     it('keeps desktop preferences deep-equal before and after mobile override (390 px)', () => {
       const state = createInitialPanelState({
         viewport: { width: 1440, height: 900 },

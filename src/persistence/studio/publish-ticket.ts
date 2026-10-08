@@ -1,12 +1,11 @@
 /**
- * Publish ticket for System Studio (RV-08e).
+ * Publish ticket for System Studio.
  *
- * Implements specs/revamp/contracts/storage.md §5 & specs/revamp/contracts/commands.md:
- * "Candidates are controller-owned and can't come from portable input, so publish
- *  goes through CandidateController.publish(ctx, command)... hands the repository
- *  a publish ticket minted in a module-private WeakMap registry (same pattern as token.ts)
- *  bound to the candidate's IDs, tokens, snapshotId and merged document.
- *  The repository rejects any ticket not found in the registry."
+ * Candidates are controller-owned and cannot come from portable input, so publish goes
+ * through CandidateController.publish(ctx, command), which hands the repository a publish
+ * ticket minted in a module-private WeakMap registry (same pattern as token.ts) bound to
+ * the candidate's IDs, tokens, snapshotId and merged document. The repository rejects any
+ * ticket not found in the registry.
  */
 
 import type { Document, Id } from '../../domain/studio/model';

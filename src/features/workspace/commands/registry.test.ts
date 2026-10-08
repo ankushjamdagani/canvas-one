@@ -1,6 +1,6 @@
 /**
- * RV-03q command registry: exhaustiveness, availability, shortcut matching and
- * the 14A Quick options list (commands.md §1, design-revalidation.md §2).
+ * Command registry: exhaustiveness, availability, shortcut matching and
+ * the Quick options list.
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -248,7 +248,7 @@ describe('availability', () => {
     ).toMatchObject({ enabled: false, code: 'busy' });
   });
 
-  it('gates canvas.expand / canvas.collapse on the target state (RV-04g)', () => {
+  it('gates canvas.expand / canvas.collapse on the target state', () => {
     const ctx = makeContext({ activeViewId: 'v', expansionState: { g: true, p: false } });
     const group = { viewId: 'v', target: { kind: 'group', id: 'g' } } as const;
     const placement = { viewId: 'v', target: { kind: 'placement', id: 'p' } } as const;
@@ -424,7 +424,7 @@ describe('history command availability', () => {
     expect(getAvailability('history.commit', onMain(), { message: 'x' })).toMatchObject({
       enabled: false,
       code: 'main-branch',
-      reason: 'Main never holds edits (D40): edit main directly to create a draft',
+      reason: 'Main never holds edits: edit main directly to create a draft',
     });
     expect(getAvailability('history.restore', onMain(), { targetId: 'cp', label: 'x' })).toMatchObject({
       enabled: false,

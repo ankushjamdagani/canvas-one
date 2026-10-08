@@ -42,7 +42,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
 
     // Primary action role
     expect(rootVars["--primary"]).toBe(evergreen.primary);
-    // Directions board: text on action green is the shell colour (RV-17).
+    // Text on action green is the shell colour.
     expect(rootVars["--primary-foreground"]).toBe(evergreen.shell);
     expect(rootVars["--canvas"]).toBe(evergreen.canvas);
     expect(rootVars["--grid"]).toBe(evergreen.grid);
@@ -222,8 +222,8 @@ describe("Evergreen tokens and styles.css single source check", () => {
     }
   });
 
-  it("(j) asserts nodeKindColor equals the decision D35 stripe colours exactly", () => {
-    // D35: a dedicated six-colour set, deliberately distinct from the semantic
+  it("(j) asserts nodeKindColor equals the stripe colours exactly", () => {
+    // A dedicated six-colour set, deliberately distinct from the semantic
     // primary/branch/risk roles used elsewhere in Evergreen.
     expect(nodeKindColor.clients).toBe("#4F6D8F");
     expect(nodeKindColor.edge).toBe("#2B7A83");
@@ -233,7 +233,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
     expect(nodeKindColor.operations).toBe("#5F646B");
   });
 
-  it("(k) asserts D35 stripe colours are NOT the semantic primary/branch/risk roles", () => {
+  it("(k) asserts stripe colours are NOT the semantic primary/branch/risk roles", () => {
     const semanticRoles = [evergreen.primary, evergreen.branch, evergreen.risk];
     for (const color of Object.values(nodeKindColor)) {
       expect(semanticRoles).not.toContain(color);
@@ -241,7 +241,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
   });
 
   it("(k2) asserts each node-kind colour reaches >=3:1 contrast against white and the panel surface", () => {
-    // Non-text, meaningful state/kind indicator bar (design.md Accessibility corrections).
+    // Non-text, meaningful state/kind indicator bar.
     for (const [layer, color] of Object.entries(nodeKindColor)) {
       expect(contrastRatio(color, "#FFFFFF"), `${layer} vs #FFFFFF`).toBeGreaterThanOrEqual(3.0);
       expect(contrastRatio(color, evergreen.panel), `${layer} vs panel`).toBeGreaterThanOrEqual(3.0);
@@ -259,7 +259,7 @@ describe("Evergreen tokens and styles.css single source check", () => {
 
 });
 
-describe("computeTagColors (inspector kind tag, D44 O4)", () => {
+describe("computeTagColors (inspector kind tag)", () => {
   for (const [layer, stripe] of Object.entries(nodeKindColor)) {
     it(`${layer}: tag text reaches 4.5:1 on its tinted background composited on the panel`, () => {
       const tag = computeTagColors(stripe);

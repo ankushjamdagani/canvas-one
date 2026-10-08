@@ -1,9 +1,5 @@
 /**
- * Round-trip reload test (RV-08f).
- *
- * Implements specs/revamp/contracts/storage.md §9 Acceptance, Storage row:
- * "quota failure; stale writes; old DB untouched; unsupported versions rejected;
- *  round-trip reload; malformed IDs and references."
+ * Round-trip reload test.
  *
  * Builds a real history through the repository (project -> two branches -> edits ->
  * checkpoints -> commits with evidence -> prepare -> candidate runs -> publish branch A;
@@ -30,7 +26,7 @@ import { mintRunStartToken } from './token';
 import { CandidateController, createCandidateController } from './candidates';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type PublicationMetadata, type ProjectCreateCommand } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -162,7 +158,7 @@ async function publishBranch(
   return { publicationId, publishRes, candidateId: prep.value.candidateId };
 }
 
-describe('Round-trip reload (RV-08f, storage.md §9)', () => {
+describe('Round-trip reload', () => {
   it('preserves history, heads, snapshots, receipts, publications and the version rule across a fresh Dexie connection', async () => {
     const dbName = `${DB_NAME}-roundtrip-${crypto.randomUUID()}`;
     const db1 = createStudioDatabase(dbName);

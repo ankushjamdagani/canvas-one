@@ -1,5 +1,5 @@
 /**
- * D56: a run ends when every bulk has sent its requests and everything has settled; a stream ends
+ * A run ends when every bulk has sent its requests and everything has settled; a stream ends
  * only at Stop. Built with the app's own planners, stepped like the worker steps it.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -65,7 +65,7 @@ async function runToEnd(doc: Document, beforeEachStep?: (runner: ScenarioRunner,
   return { runner, steps, result: runner.getResult() };
 }
 
-describe('bulk runs (D56)', () => {
+describe('bulk runs', () => {
   it('complete by themselves once every cycle has settled', async () => {
     const { result } = await runToEnd(build(bulk(50, { spreadMs: 500 })));
     expect(result.status).toBe('completed');
@@ -105,7 +105,7 @@ describe('bulk runs (D56)', () => {
   });
 });
 
-describe('stream runs and Stop (D56)', () => {
+describe('stream runs and Stop', () => {
   it('never end by themselves', async () => {
     const doc = build(stream(20));
     const runner = new ScenarioRunner(doc, doc.scenarios[0].id, 'stream');
@@ -154,9 +154,9 @@ describe('stream runs and Stop (D56)', () => {
   });
 });
 
-describe('a stored example as cycles (D56)', () => {
+describe('a stored example as cycles', () => {
   it('S06 orders each get a response and a completion, and every cycle succeeds', async () => {
-    const doc = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+    const doc = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s06.json'), 'utf8')) as Document;
     const scenario = doc.scenarios[0];
     const small: Document = {
       ...doc,
@@ -172,7 +172,7 @@ describe('a stored example as cycles (D56)', () => {
   });
 });
 
-describe('work that can never settle (D56)', () => {
+describe('work that can never settle', () => {
   it('is reported stuck, by where it is held, and ends the run incomplete', async () => {
     const doc = build(bulk(3));
     const holder = doc.elements[0];
@@ -193,7 +193,7 @@ describe('work that can never settle (D56)', () => {
   });
 });
 
-describe('stream traces truncate instead of ending the run (D57)', () => {
+describe('stream traces truncate instead of ending the run', () => {
   const tinyBudgets = { ...DEFAULT_SCENARIO_BUDGETS, maxEvents: 200, maxTraceRows: 50 };
   const withBudgets = (doc: Document): Document => ({ ...doc, scenarios: [{ ...doc.scenarios[0], budgets: tinyBudgets }] });
 
@@ -217,7 +217,7 @@ describe('stream traces truncate instead of ending the run (D57)', () => {
   });
 });
 
-describe('checkpoints and cycle draining (D57)', () => {
+describe('checkpoints and cycle draining', () => {
   it('checkpoint() reports cumulative counts and cycle summary at the current clock', async () => {
     const doc = build(bulk(40, { spreadMs: 2000 }));
     ready(doc);

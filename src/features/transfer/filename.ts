@@ -1,9 +1,8 @@
 /**
- * Bounded ASCII-safe filename sanitization for System Studio exports (RV-10a).
+ * Bounded ASCII-safe filename sanitization for System Studio exports.
  *
- * Implements specs/revamp/contracts/parts-and-export.md §2:
- * "Download filename stem comes from a bounded ASCII-safe title (fallback `system-studio`),
- *  never directory syntax."
+ * The download filename stem comes from a bounded ASCII-safe title (fallback
+ * `system-studio`) and never contains directory syntax.
  */
 
 /**

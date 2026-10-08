@@ -12,7 +12,7 @@ import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../
 import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 
 const s01Doc = JSON.parse(
-  readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
 ) as Document;
 
 const testActor: Actor = {

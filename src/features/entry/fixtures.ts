@@ -1,10 +1,10 @@
 import type { Document } from '../../domain/studio/model';
-import s01 from '../../../specs/revamp/fixtures/s01.json';
-import s02 from '../../../specs/revamp/fixtures/s02.json';
-import s03 from '../../../specs/revamp/fixtures/s03.json';
-import s04 from '../../../specs/revamp/fixtures/s04.json';
-import s05 from '../../../specs/revamp/fixtures/s05.json';
-import s06 from '../../../specs/revamp/fixtures/s06.json';
+import s01 from './examples/s01.json';
+import s02 from './examples/s02.json';
+import s03 from './examples/s03.json';
+import s04 from './examples/s04.json';
+import s05 from './examples/s05.json';
+import s06 from './examples/s06.json';
 
 export type ReferenceExample = {
   readonly id: string;

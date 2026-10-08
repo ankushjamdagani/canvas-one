@@ -1,9 +1,5 @@
 /**
- * Tests for Mermaid v1 Flowchart Exporter (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("Mermaid v1")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
+ * Tests for Mermaid v1 Flowchart Exporter.
  *
  * Verification:
  * - Mermaid label escaping: letters, digits, spaces, non-ASCII letters, decimal entity encoding #NN;

@@ -1,6 +1,6 @@
 /**
- * Pure renderToStaticMarkup fidelity tests for PublishFlow's non-dialog states
- * (RV-11b review round). The 'review' status renders PublishReviewDialog,
+ * Pure renderToStaticMarkup fidelity tests for PublishFlow's non-dialog states.
+ * The 'review' status renders PublishReviewDialog,
  * which wraps content in the project's real Dialog primitive — Radix mounts
  * Portal content on the client only, so it renders nothing in static server
  * markup (verified empirically). That content is covered directly by
@@ -102,7 +102,7 @@ describe('PublishFlow static markup (non-dialog states)', () => {
     expect(html).toContain('Try again');
   });
 
-  it('shows the published notice with the real version and title, never "Undo publish" (D26)', () => {
+  it('shows the published notice with the real version and title, never "Undo publish"', () => {
     const controller = makeStubController({
       ...BASE_STATE,
       status: 'published',

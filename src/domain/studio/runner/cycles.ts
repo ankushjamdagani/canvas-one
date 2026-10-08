@@ -50,7 +50,7 @@ function mapOutcome(category: 'root' | 'message', outcome: string): CycleOutcome
 }
 
 /**
- * D56: assembles cycles from the kernel's lifecycle facts. A cycle opens with its root request and
+ * Assembles cycles from the kernel's lifecycle facts. A cycle opens with its root request and
  * completes when the response has reached the source and every descendant message has settled.
  */
 export class CycleTracker {

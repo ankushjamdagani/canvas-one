@@ -1,11 +1,5 @@
 /**
- * Session layer types for System Studio (RV-12c1).
- *
- * Implements specifications from:
- * - specs/revamp/decisions.md (D37)
- * - specs/revamp/contracts/transactions.md §1–§3
- * - specs/revamp/contracts/commands.md §1–§4
- * - specs/revamp/contracts/storage.md §5 & session undo bullet
+ * Session layer types for System Studio.
  */
 
 import type { Document, Id } from '../../domain/studio/model';
@@ -27,7 +21,7 @@ export type SessionState = {
   readonly status: SessionStatus;
   readonly projectId: Id | null;
   readonly branchId: Id | null;
-  /** The project's main branch id, so callers (D40) can tell "on main" apart from a draft. */
+  /** The project's main branch id, so callers can tell "on main" apart from a draft. */
   readonly mainBranchId: Id | null;
   readonly projectRevision: number | null;
   readonly workingRevision: number | null;

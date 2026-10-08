@@ -1,11 +1,10 @@
 /**
- * Navigation guard (RV-05b).
+ * Navigation guard.
  *
- * Implements specs/revamp/contracts/commands.md §6 "Navigation guard":
- * "Selection, branch, project and inspector-close all pass through one guard.
- * Clean -> proceed. Dirty -> Apply / Discard / Stay: Apply proceeds only on success,
- * Discard cancels then proceeds, and Stay keeps focus and selection." and D25 /
- * transactions.md §3: "Run requires a clean draft... Apply or Cancel first."
+ * Selection, branch, project and inspector-close all pass through one guard. A clean draft
+ * proceeds. A dirty draft offers Apply / Discard / Stay: Apply proceeds only on success,
+ * Discard cancels then proceeds, and Stay keeps focus and selection. Run requires a clean
+ * draft: Apply or Cancel first.
  */
 
 import type { DraftHandle } from './types';

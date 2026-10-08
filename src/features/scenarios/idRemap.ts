@@ -1,9 +1,8 @@
 /**
- * Scenario copy ID remapping (RV-05c).
+ * Scenario copy ID remapping.
  *
- * specs/revamp/contracts/commands.md §4 Scenarios (D41): "A copy remaps every nested ID
- * (workloads, classes, inputs, faults, boundaries, assertions, assumptions) with fresh
- * UUIDs."
+ * A copy remaps every nested ID (workloads, classes, inputs, faults, boundaries,
+ * assertions, assumptions) to fresh UUIDs.
  *
  * Remapped (scenario-owned nested identities): scenario.id, workload.id, request
  * class.id, input.id, input.journeyId (and every payloadBindings[].source.journeyId
@@ -12,15 +11,15 @@
  * input).
  *
  * NOT remapped (references into the rest of the document, or scenario-local
- * classification tokens the contract says are not references):
+ * classification tokens, not references):
  * - scopeElementIds, entryPorts, refinementSelections[].refinementId,
  *   initialContexts[].{elementId,fixtureId}, inputs[].entry, inputs[].fixtureId,
  *   boundaries[].source, boundaries[].schemaId, boundaries[].responses[].responseFixtureId,
  *   assertions[].subject element/port ids -- all real document references, unchanged by
  *   a same-document copy.
- * - `ResourceMetadata.requestClassId` / `ResourceCallMetadata.requestClassId`: "a
- *   scenario-local classification token, not a required reference to a workload class"
- *   (model-and-runner.md §6) -- copied verbatim so requestClassId groupings that shared
+ * - `ResourceMetadata.requestClassId` / `ResourceCallMetadata.requestClassId`: a
+ *   scenario-local classification token, not a required reference to a workload class,
+ *   so it is copied verbatim so requestClassId groupings that shared
  *   a token before the copy still share it after.
  */
 

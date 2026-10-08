@@ -1,9 +1,9 @@
 /**
- * Recovery journey integration tests (RV-16b task prompt, item 6).
+ * Recovery journey integration tests.
  *
  * (a) saveRun at the 21st unpinned run fails typed -> prune one selected unpinned run ->
  *     the retry of the same save succeeds.
- * (b) a quota failure on model.apply-records (simulated the same way as RV-08b's own
+ * (b) a quota failure on model.apply-records (simulated the same way as the working-copies
  *     tests) -> the branch's stored working state is untouched -> exportProject still
  *     succeeds -> import into a fresh project -> loadHistory is equal modulo projectId,
  *     importSourceId, revision and run provenance/traceState.
@@ -24,7 +24,7 @@ import { LocalRepository } from './repository';
 import { mintRunStartToken } from './token';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type ProjectCreateCommand } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = { actorId: 'test-user', kind: 'local-human', displayName: 'Test User' };
@@ -74,7 +74,7 @@ async function runAndSaveScenario(repo: LocalRepository, projectId: Id, doc: Doc
   return prepared.runId;
 }
 
-describe('Recovery journeys (RV-16b)', () => {
+describe('Recovery journeys', () => {
   it('(a) 21st unpinned run fails typed limit; pruning one selected run lets the retry succeed', async () => {
     const dbName = `${DB_NAME}-recovery-a-${crypto.randomUUID()}`;
     const db = createStudioDatabase(dbName);
@@ -88,8 +88,8 @@ describe('Recovery journeys (RV-16b)', () => {
     }
     expect(runIds.length).toBe(20);
 
-    // The 21st unpinned run fails typed with 'limit' (storage.md §7: "Before storing a
-    // 21st, offer an explicit prune").
+    // The 21st unpinned run fails typed with 'limit' (before storing a
+    // 21st, an explicit prune is offered).
     const prepared21 = await prepareRunSave(projectId, s01Doc, scenarioId);
     const firstAttempt = await repo.saveRun(prepared21.token, prepared21.terminalResult, prepared21.chunks, {
       projectId,
@@ -133,8 +133,8 @@ describe('Recovery journeys (RV-16b)', () => {
 
     const branchBefore = (await repo.loadBranch(projectId, draftBranchId))!;
 
-    // Simulate a browser QuotaExceededError mid-transaction (same technique as RV-08b's
-    // own working-copies.test.ts "a quota failure during apply-records" case).
+    // Simulate a browser QuotaExceededError mid-transaction (same technique as the
+    // "a quota failure during apply-records" case in working-copies.test.ts).
     const originalAdd = db.snapshots.add;
     db.snapshots.add = (async () => {
       const err = new Error('QuotaExceededError');

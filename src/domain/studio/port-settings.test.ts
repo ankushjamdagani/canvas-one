@@ -7,7 +7,7 @@ import { buildManifest } from './manifest';
 import { DEFAULT_BUILD_VERSIONS } from '../../persistence/studio/types';
 import { connectionAdvisories, describeCalleeContract, describeCallerPolicy, callRetryOf, ackDelayOf, messageTtlOf, DEFAULT_ACK_DELAY_MS } from './port-settings';
 
-const S05 = JSON.parse(readFileSync(resolve(__dirname, '../../../specs/revamp/fixtures/s06.json'), 'utf8')) as Document; // S06: workloads, an unmodeled call target and default-TTL messages
+const S05 = JSON.parse(readFileSync(resolve(__dirname, '../../features/entry/examples/s06.json'), 'utf8')) as Document; // S06: workloads, an unmodeled call target and default-TTL messages
 
 function withPortSettings(doc: Document, pick: (e: Element, p: Port) => boolean, settings: Record<string, unknown>): Document {
   let done = false;
@@ -29,7 +29,7 @@ function withPortSettings(doc: Document, pick: (e: Element, p: Port) => boolean,
 const resourceCallIn = (e: Element, p: Port) => e.behavior.kind === 'resource' && p.direction === 'in' && p.channel === 'call';
 const unmodeledCallIn = (e: Element, p: Port) => e.behavior.kind === 'unmodeled' && p.direction === 'in' && p.channel === 'call';
 
-describe('port settings validation (D53)', () => {
+describe('port settings validation', () => {
   it('accepts declared and simulated settings on a simulated call in-port', () => {
     const doc = withPortSettings(S05, resourceCallIn, {
       expectedP95Ms: 80, availabilityPct: 99.9, idempotent: false, maxConcurrency: 50,
@@ -58,7 +58,7 @@ describe('port settings validation (D53)', () => {
   });
 });
 
-describe('port settings in the run manifest (D53)', () => {
+describe('port settings in the run manifest', () => {
   const fingerprint = async (doc: Document) => {
     const scenario = doc.scenarios.find((sc) => sc.workloads.length > 0)!;
     const result = await buildManifest(doc, scenario.id, DEFAULT_BUILD_VERSIONS);
@@ -114,7 +114,7 @@ describe('reading and describing port settings', () => {
   });
 });
 
-describe('caller policies, payload sizes and link impairments (D54)', () => {
+describe('caller policies, payload sizes and link impairments', () => {
   const callOut = (e: Element, p: Port) => e.behavior.kind === 'resource' && p.direction === 'out' && p.channel === 'call';
   const messageOut = (e: Element, p: Port) => p.direction === 'out' && p.channel === 'message';
   const messageIn = (e: Element, p: Port) => p.direction === 'in' && p.channel === 'message';
@@ -180,7 +180,7 @@ describe('caller policies, payload sizes and link impairments (D54)', () => {
   });
 });
 
-describe('the new simulated settings in the run manifest (D54)', () => {
+describe('caller policy and link settings in the run manifest', () => {
   const fingerprint = async (doc: Document) => {
     const scenario = doc.scenarios.find((sc) => sc.workloads.length > 0)!;
     const result = await buildManifest(doc, scenario.id, DEFAULT_BUILD_VERSIONS);

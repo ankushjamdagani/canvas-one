@@ -3,7 +3,6 @@
  *
  * Reference coverage is intentionally expressed through the model's closed unions;
  * literal payload values, labels, paths, and other user-authored strings are copied.
- * See parts-and-export.md "Reference-remap coverage".
  */
 
 import type {

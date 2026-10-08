@@ -1,10 +1,8 @@
 /**
- * Tests for entry-screen import error mapping (RV-10b).
- *
- * Implements the RV-10b task brief: "shows typed errors ... with no raw exception
- * text." `importProjectJson` (json-transfer.ts) already returns typed, non-raw
- * failure messages (D19's "made with the old app, not supported" for v7/v8, the
- * byte-cap message, validation issue text); this only verifies the presentation
+ * Tests for entry-screen import error mapping: typed errors, never raw exception text.
+ * `importProjectJson` (json-transfer.ts) already returns typed, non-raw failure messages
+ * (the "made with the old app, not supported" message for v7/v8, the byte-cap message,
+ * validation issue text); this only verifies the presentation
  * fallback picks the right text for each failure `kind`.
  */
 
@@ -13,7 +11,7 @@ import type { ImportProjectJsonFailure } from '../transfer';
 import { formatImportError } from './importError';
 
 describe('formatImportError', () => {
-  it('uses the D19 message for unsupported-version (old app v7/v8) failures', () => {
+  it('uses the old-app message for unsupported-version (old app v7/v8) failures', () => {
     const failure: ImportProjectJsonFailure = {
       ok: false,
       kind: 'unsupported-version',

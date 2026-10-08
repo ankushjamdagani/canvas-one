@@ -1,8 +1,7 @@
 /**
- * Pure eligibility predicates and evidence manifest builder (RV-08a).
+ * Pure eligibility predicates and evidence manifest builder.
  *
- * Implements specs/revamp/contracts/run-identity.md §5 (Eligibility):
- * - runQualifies: checks all §5 rules with stable reason codes
+ * - runQualifies: checks every qualification rule with stable reason codes
  * - evaluateCandidate: per-scenario evaluation and overall eligibility (≥1 scenario, all qualified)
  * - buildEvidenceManifest: compiles EvidenceManifest reusing evidenceEntryFromTerminal
  *
@@ -32,7 +31,7 @@ import type {
 
 /**
  * Extracts all non-null target element IDs from assertions defined in the manifest.
- * Used to verify: "all assertion subjects in compiled scope" (§5 & model-and-runner.md §6).
+ * Used to verify: "all assertion subjects in compiled scope".
  *
  * Subjects:
  * - final-state: elementId
@@ -98,11 +97,11 @@ function extractAssertionSubjectElementIds(manifest: unknown): readonly Id[] {
 }
 
 // ============================================================================
-// runQualifies (§5)
+// runQualifies
 // ============================================================================
 
 /**
- * Evaluates whether a given run qualifies a scenario per specs/revamp/contracts/run-identity.md §5:
+ * Evaluates whether a given run qualifies a scenario:
  *
  * All of the following must hold:
  * 1. status 'completed'
@@ -196,7 +195,7 @@ export function sortQualifyingRuns(runs: readonly RunCandidate[]): RunCandidate[
 }
 
 // ============================================================================
-// evaluateCandidate (§5)
+// evaluateCandidate
 // ============================================================================
 
 /**
@@ -212,7 +211,7 @@ function normalizeScopeElementIds(scope: CandidateScenario['scope']): readonly I
 }
 
 /**
- * Evaluates candidate scenarios against available runs per specs/revamp/contracts/run-identity.md §5:
+ * Evaluates candidate scenarios against available runs:
  * - per-scenario status: 'qualified' with runId | 'missing' | 'not-qualifying' with reasons | 'incomplete'
  * - overall eligible only if ≥1 scenario and every one qualifies (no subset, no bypass)
  * - evidence may come from any run with matching fingerprint (other branches allowed)
@@ -346,7 +345,7 @@ export function evaluateCandidate(
 }
 
 // ============================================================================
-// buildEvidenceManifest (§5)
+// buildEvidenceManifest
 // ============================================================================
 
 /**

@@ -7,7 +7,7 @@ import { LocalRepository } from './repository';
 import { projectDetails, projectExposures, type Actor, type ProjectUpdateDetailsCommand } from './types';
 import type { Document } from '../../domain/studio/model';
 
-const s01Doc = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8')) as Document;
+const s01Doc = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8')) as Document;
 const actor: Actor = { actorId: 'test-user', kind: 'local-human', displayName: 'Test User' };
 
 async function setup() {
@@ -39,7 +39,7 @@ async function setup() {
   return { db, repo, projectId, command };
 }
 
-describe('project.update-details (D52)', () => {
+describe('project.update-details', () => {
   it('stores trimmed details, advances the project revision and leaves branches and snapshots alone', async () => {
     const { db, repo, projectId, command } = await setup();
     const branchesBefore = await db.branches.where('projectId').equals(projectId).toArray();
@@ -56,7 +56,7 @@ describe('project.update-details (D52)', () => {
     db.close();
   });
 
-  it('stores exposed connection types (D53) and rejects unknown, repeated or misplaced ones', async () => {
+  it('stores exposed connection types and rejects unknown, repeated or misplaced ones', async () => {
     const { db, repo, projectId, command } = await setup();
     const exposures = [{ channel: 'call', protocol: 'grpc', path: '/orders' }, { channel: 'message', protocol: 'kafka', path: 'orders.created' }] as const;
     expect(await repo.execute(command({ payload: { description: '', team: '', exposures } }))).toMatchObject({ status: 'applied' });

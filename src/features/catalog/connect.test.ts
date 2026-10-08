@@ -112,7 +112,7 @@ describe('connect.ts', () => {
     expect(valRes.ok).toBe(true);
   });
 
-  describe('connection types (D53)', () => {
+  describe('connection types', () => {
     const exposure = (protocol: ProjectExposure['protocol'], path = ''): ProjectExposure => ({ channel: 'call', protocol, path });
 
     function setup() {
@@ -344,7 +344,7 @@ describe('connect.ts', () => {
 
     const connChange = plan.changes.find((c) => c.kind === 'insert' && c.value.recordKind === 'connection');
     expect((connChange as any).value.record.config).toEqual({
-      latencyMs: 2, // D49 default
+      latencyMs: 2, // default
       returnLatencyMs: 2,
       linkClass: 'same-az',
       jitterMs: 0,
@@ -359,7 +359,7 @@ describe('connect.ts', () => {
     expect(validateDocument(finalDoc).ok).toBe(true);
   });
 
-  it('an unsimulated caller (a client) connects with no request metadata: it cannot be configured (D54)', () => {
+  it('an unsimulated caller (a client) connects with no request metadata: it cannot be configured', () => {
     const mintId = createMintId();
     const { document: baseDoc, viewId } = makeBlankDocument(mintId);
 

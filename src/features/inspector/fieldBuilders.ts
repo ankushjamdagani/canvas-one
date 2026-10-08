@@ -1,5 +1,5 @@
 /**
- * Generic inspector field builders (RV-05b), shared by the element, port and connection fields.
+ * Generic inspector field builders, shared by the element, port and connection fields.
  */
 
 import type { FieldOption, FieldParseResult, FieldSpec } from './types';

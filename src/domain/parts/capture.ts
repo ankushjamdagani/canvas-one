@@ -1,4 +1,4 @@
-/** Pure capture planner for detached parts (parts-and-export.md "Capture and placement"). */
+/** Pure capture planner for detached parts. */
 
 import { canonicalJson } from '../studio/canonical';
 import type {

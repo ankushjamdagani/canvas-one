@@ -1,10 +1,5 @@
 /**
- * Standalone SVG Diagram Exporter (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("JSON, images and files")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
- * - specs/revamp/decisions.md (D35, D42: stripes, node captions)
+ * Standalone SVG Diagram Exporter.
  *
  * Rules:
  * - Standalone SVG string of the view

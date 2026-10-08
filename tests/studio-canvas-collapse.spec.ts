@@ -14,7 +14,7 @@ async function expectHeaderBelowTopBar(page: Page, name: string) {
     .toBeGreaterThanOrEqual(0);
 }
 
-test.describe('Studio canvas collapse and expand (RV-04g)', () => {
+test.describe('Studio canvas collapse and expand', () => {
   test('collapses a group, undoes, redoes and persists across reload', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();
@@ -33,7 +33,7 @@ test.describe('Studio canvas collapse and expand (RV-04g)', () => {
     const boundary = page.locator('.group-boundary', { hasText: 'Entry pair' });
     await expect(boundary).toBeVisible();
 
-    // Boundary header toggle collapses the group. RV-13a: the header must sit below the top bar
+    // Boundary header toggle collapses the group. The header must sit below the top bar
     // without any fit gesture first.
     await expectHeaderBelowTopBar(page, 'Collapse group Entry pair');
     await page.getByRole('button', { name: 'Collapse group Entry pair' }).click();

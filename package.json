@@ -1,6 +1,11 @@
 {
   "name": "canvasone",
   "private": true,
+  "license": "MIT",
+  "author": "Ankush Jamdagani",
+  "repository": { "type": "git", "url": "git+https://github.com/ankushjamdagani/canvas-one.git" },
+  "homepage": "https://github.com/ankushjamdagani/canvas-one#readme",
+  "bugs": "https://github.com/ankushjamdagani/canvas-one/issues",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

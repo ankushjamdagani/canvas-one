@@ -1,5 +1,5 @@
 /**
- * Reading port settings (D53). A connection no longer carries its caller policy or its receiver's
+ * Reading port settings. A connection no longer carries its caller policy or its receiver's
  * terms: the caller's retry, deadline and request live on the source out-port, and the receiver's
  * acknowledgement and TTL live on the target in-port. These helpers resolve them for a connection.
  */
@@ -41,13 +41,13 @@ export function ackDelayOf(document: Pick<Document, 'elements'>, connection: Con
   return targetSettings(document, connection).ackDelayMs ?? DEFAULT_ACK_DELAY_MS;
 }
 
-/** D56: null when the port sets no TTL, so a message never expires (unconsumed, it is reported stuck). */
+/** Null when the port sets no TTL, so a message never expires (unconsumed, it is reported stuck). */
 export function messageTtlOf(document: Pick<Document, 'elements'>, connection: Connection): number | null {
   return targetSettings(document, connection).messageTtlMs ?? null;
 }
 
 // ----------------------------------------------------------------------------
-// What a connection tells its two ends (D53)
+// What a connection tells its two ends
 // ----------------------------------------------------------------------------
 
 type Settings = Readonly<Record<string, unknown>>;

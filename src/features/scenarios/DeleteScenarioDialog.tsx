@@ -1,10 +1,8 @@
 /**
- * Delete scenario confirmation dialog (RV-05c).
+ * Delete scenario confirmation dialog.
  *
- * Implements specs/revamp/contracts/commands.md §4 scenario.delete: "Confirmation
- * first (screen scenario_delete_scenario): its saved runs stay; the commit gate then
- * covers the remaining scenarios. One model.apply-records remove; one undo." Screen:
- * scenario_delete_scenario.png.
+ * Confirmation comes first. Saved runs of the scenario stay; the commit gate then
+ * covers the remaining scenarios. Deleting is one record removal and one undo step.
  */
 
 import { Trash2 } from 'lucide-react';

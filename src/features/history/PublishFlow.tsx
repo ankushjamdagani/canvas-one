@@ -1,22 +1,15 @@
 /**
- * PublishFlow (RV-11b review round) — orchestrates the publish review dialog
- * (22C), the full-panel compare-and-resolve view (22F), and the published
- * confirmation (22D) off PublishController's state.
+ * PublishFlow orchestrates the publish review dialog, the full-panel compare-and-resolve
+ * view, and the published confirmation off PublishController's state.
  *
- * - specs/revamp/contracts/commands.md (history.prepare-publish, history.resolve-conflict, history.publish)
- * - specs/revamp/contracts/transactions.md §4 & §5
- * - specs/revamp/decisions.md D25 (sequence conflicts), D26 (no publish undo —
- *   irreversible, explicit confirm), D29 (source branch closes by default)
- * - specs/revamp/design-revalidation.md §2: excludes "Undo publish" (D26),
- *   "minor · fits the diff" version reasoning, p95/burst/"vs X" deltas, and
- *   single-letter shortcuts (commands.md §1 allows only Mod+Z, Mod+Shift+Z,
- *   Delete/Backspace, F2) — none of that appears anywhere in this flow.
+ * Publishing cannot be undone, so the flow offers no "Undo publish", shows no version
+ * reasoning text or performance deltas, and wires no bare-letter shortcuts.
  *
- * 22E (draft behind main) is a separate, standalone component
- * (DraftBehindMainBanner) the app shell mounts proactively; this flow only
- * shows a plain retry notice for the rare genuine `stale` prepare-publish
- * result (an optimistic-concurrency mismatch — different from "main has new
- * publications", which is the normal case DraftBehindMainBanner covers).
+ * The "draft behind main" banner is a separate, standalone component
+ * (DraftBehindMainBanner) the app shell mounts proactively; this flow only shows a plain
+ * retry notice for the rare genuine `stale` prepare-publish result (an optimistic-concurrency
+ * mismatch — different from "main has new publications", which is the normal case
+ * DraftBehindMainBanner covers).
  */
 
 import * as React from 'react';
@@ -45,12 +38,12 @@ export function PublishFlow({ controller, onClose, className }: PublishFlowProps
   const [isResolving, setIsResolving] = React.useState(false);
   const [runningScenarioId, setRunningScenarioId] = React.useState<string | null>(null);
 
-  // 22C "nothing chosen yet": no version bump is pre-selected.
+  // Nothing chosen yet: no version bump is pre-selected.
   const [selectedBump, setSelectedBump] = React.useState<VersionBumpKind | null>(null);
   const [title, setTitle] = React.useState('');
   const [rationale, setRationale] = React.useState('');
   const [ticketUrl, setTicketUrl] = React.useState('');
-  // Checkbox reads "Close this draft after publishing"; checked (the D29
+  // Checkbox reads "Close this draft after publishing"; checked (the
   // default) means keepSourceOpen=false when calling controller.publish.
   const [closeSourceAfterPublish, setCloseSourceAfterPublish] = React.useState(true);
   const [confirming, setConfirming] = React.useState(false);
@@ -191,7 +184,7 @@ export function PublishFlow({ controller, onClose, className }: PublishFlowProps
     );
   }
 
-  // Rare optimistic-concurrency mismatch (contracts.md's `stale`): the source
+  // Rare optimistic-concurrency mismatch (the `stale` result): the source
   // or main revision the UI expected changed underneath it. Distinct from the
   // normal "main published new versions" case, which DraftBehindMainBanner
   // covers using a real conflict count from a successful prepare().

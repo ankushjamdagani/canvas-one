@@ -1,7 +1,6 @@
 /**
- * Repository boot function for System Studio (RV-12c1).
+ * Repository boot function for System Studio.
  *
- * Implements RV-12c1 requirement:
  * openStudioRepository(): opens LocalRepository on Dexie `system-studio-local-v1`;
  * maps open failure (unavailable/quota) to a typed boot result, never throws raw.
  * Never touches the old `system-studio` DB.

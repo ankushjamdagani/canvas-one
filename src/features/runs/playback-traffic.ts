@@ -9,7 +9,7 @@ const copy = (s: State): State => ({ occupancy: new Map(s.occupancy), waits: new
 const outcomeKey = (r: FlowRecord) => `${r.elementId ? `n:${r.elementId}` : `e:${r.connectionId}`}\u0000${r.trafficOutcome}`;
 const kind = (outcome: FlowRecord['outcome']): TrafficOutcomeKind => outcome === 'succeeded' ? 'success' : outcome === 'rejected' ? 'rejected' : outcome === 'expired' ? 'expired' : 'error';
 
-/** A separate presentation cursor preserves the legacy packet/flash API. Forward frames consume
+/** A separate presentation cursor serves the packet/flash API. Forward frames consume
  * only new facts; seeks reconstruct from a retained boundary checkpoint, never kernel state. */
 export class TrafficIndex {
   private records: FlowRecord[] = [];

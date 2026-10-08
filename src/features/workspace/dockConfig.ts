@@ -1,4 +1,4 @@
-/** The closed dock inventory in commands.md §5. These IDs are never persisted with payloads. */
+/** The closed dock inventory. These IDs are never persisted with payloads. */
 export const DOCK_COMMAND_IDS = [
   'canvas.select-tool', 'canvas.pan-tool', 'library.open', 'canvas.add-note',
   'selection.group', 'edit.undo', 'edit.redo', 'canvas.zoom-out',

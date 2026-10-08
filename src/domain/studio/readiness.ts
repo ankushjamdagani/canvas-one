@@ -1,40 +1,26 @@
 /**
- * Runnable-level readiness checks (RV-02e).
+ * Runnable-level readiness checks.
  *
- * Implements the "Runnable" validation level described in:
- * - specs/revamp/contracts/model-and-runner.md §1 ("Two validation levels, one schema.
- *   Runnable: also requires complete scope, supported behavior, compatible ports,
- *   nonempty inputs. Readiness errors never block
- *   saving a structurally valid design.")
- * - specs/revamp/contracts/model-and-runner.md §2 (Synchronous call cycles are rejected)
- * - specs/revamp/contracts/model-and-runner.md §3 (Port compatibility)
- * - specs/revamp/contracts/model-and-runner.md §5 (Readiness rejects)
- * - specs/revamp/contracts/model-and-runner.md §6 (Scenario mode/completion/boundary rules)
- * - specs/revamp/contracts/run-identity.md §3 (Scope closure; unresolved crossings fail
- *   readiness before fingerprinting)
- * - specs/revamp/contracts/storage.md §6 (Time limits)
+ * A runnable scenario needs complete scope, supported behavior, compatible ports and
+ * non-empty arrivals. Readiness errors never block saving a structurally valid design.
  *
- * SCOPE: this module assumes `doc` already passed `validateDocument` (storable level).
- * It re-derives some rules that this codebase's `validate.ts` already enforces at the
- * storable level (e.g. call-port response schema, input atMs/mode, boundary delay/mode,
- * completion/mode, time-limit ranges) so that `checkReadiness` is self-sufficient and can
- * be exercised directly against a document that has not been (or no longer is) freshly
- * re-validated. This is intentional defense in depth, not a contract gap.
+ * Assumes `doc` already passed `validateDocument` (storable level). Some rules that
+ * `validate.ts` enforces at the storable level (call-port response schema, input atMs/mode,
+ * boundary delay/mode, completion/mode, time-limit ranges) are re-derived here as defense in
+ * depth, so `checkReadiness` can be exercised against a document that has not been freshly
+ * re-validated.
  *
- * CONTRACT GAPS / INTERPRETATIONS:
- * - "missing pipeline outputs" (specs/revamp/contracts/model-and-runner.md §5):
- *   Interpreted as meaning the pipeline's declared outputPortId or errorPortId does not
- *   resolve to a port on the same element (defensive check; the storable validator normally
- *   catches it). An unconnected output port is legal (as demonstrated by reference fixture S03,
- *   which passes with zero connections); connection/assertion coverage is not required.
+ * Interpretation notes:
+ * - "Missing pipeline outputs" means the pipeline's declared outputPortId or errorPortId
+ *   does not resolve to a port on the same element (the storable validator normally catches
+ *   it). An unconnected output port is legal; connection and assertion coverage is not required.
  *
- * NOT COVERED (explicitly out of scope for this task; see final report for citations):
- * - Path-dependent double settlement (runtime-only concern; model-and-runner.md §5:
- *   "Path-dependent double settlement and budget-exhausting message cycles fail or end
- *   incomplete at runtime").
+ * Not covered:
+ * - Path-dependent double settlement and budget-exhausting message cycles; these fail or end
+ *   incomplete at runtime.
  * - Value-dependent errors (optional/missing reads, nullable values, scalar unions),
  *   and response schemas of replies whose initiating frame is not locally knowable.
- * - The trace envelope (model-and-runner.md §8/§9 TraceEvent, RunUpdate, etc).
+ * - The trace envelope.
  */
 
 import type {
@@ -66,74 +52,68 @@ import { callRetryOf } from './port-settings';
 // ============================================================================
 
 /**
- * Readiness-only issue codes. Kept separate from `validate.ts`'s `ISSUE_CODES`
- * (storable-level) per this task's brief: "if you need a new issue code, define
- * readiness codes as a separate exported const array in readiness.ts". The `Issue`
- * shape itself (model-and-runner.md §8: `{code,path,entityId,severity,message}`)
- * is reused unchanged.
+ * Readiness-only issue codes, kept separate from the storable-level `ISSUE_CODES` in
+ * `validate.ts`. The `Issue` shape (`{code,path,entityId,severity,message}`) is reused unchanged.
  */
 const READINESS_ISSUE_CODES = [
-  /** §3: "Call ports need a non-null response schema; other channels need null." */
+  /** Call ports need a non-null response schema. */
   'call-port-missing-response-schema',
-  /** §3: "other channels need null" (the converse of the above). */
+  /** Ports on other channels must have a null response schema. */
   'non-call-port-has-response-schema',
-  /** §3: "Port compatibility = identical normalized shapes ...". */
+  /** Connected ports must have identical normalized shapes. */
   'incompatible-port-shapes',
-  /** §2: "Synchronous call cycles are rejected." */
+  /** Synchronous call cycles are rejected. */
   'sync-call-cycle',
-  /** §6 Inputs: "Logical mode: atMs is null ... Timed mode: atMs >= 0." */
+  /** Logical mode needs atMs null; timed mode needs atMs >= 0. */
   'invalid-input-timing',
-  /** §6 Inputs: "Logical scenarios that reach resources reject readiness." */
+  /** Logical scenarios that reach resources are not runnable. */
   'logical-reaches-resource',
-  /** §6 Workloads: "Pure logical scenarios need empty workloads and faults." */
+  /** Pure logical scenarios need empty workloads and faults. */
   'logical-scenario-not-empty',
-  /**
-   * §1/§6: Runnable requires "nonempty inputs"; "Timed scenarios need at least
-   * one finite input or enabled workload."
-   */
+  /** A runnable scenario needs inputs; a timed one needs at least one finite input or enabled workload. */
   'no-arrivals',
-  /** D56: only timed scenarios have workloads; a logical scenario is driven by its inputs. */
+  /** Only timed scenarios have workloads; a logical scenario is driven by its inputs. */
   'workload-in-logical',
-  /** D56: a bulk needs a whole number of requests and a positive spread; an enabled stream needs a rate above zero. */
+  /** A bulk needs a whole number of requests and a positive spread; an enabled stream needs a rate above zero. */
   'workload-emission-range',
-  /** §6 Boundaries: logical delayMs null; timed delayMs required, afterInputId null. */
+  /** Boundaries: logical needs delayMs null; timed needs delayMs and a null afterInputId. */
   'boundary-timing-mode-mismatch',
-  /** §6 Assertions: "A qualifying scenario needs >=1 assertion". */
+  /** A qualifying scenario needs at least one assertion. */
   'no-assertions',
-  /** §6 Assertions: "Assertion subjects must be in compiled scope." */
+  /** Assertion subjects must be in compiled scope. */
   'assertion-subject-out-of-scope',
-  /** §6 Workloads: "They can target only resource entry ports." */
+  /** Workloads can target only resource entry ports. */
   'workload-target-not-resource-entry',
-  /** D50: a broker's delivery route redelivers after a backoff; it has no attempt timeout. */
+  /** A broker's delivery route redelivers after a backoff; it has no attempt timeout. */
   'broker-route-attempt-timeout',
-  /** run-identity.md §3: compiler returned 'analysis-limit' instead of a closure. */
+  /** The compiler returned 'analysis-limit' instead of a closure. */
   'compiler-analysis-limit',
-  /** run-identity.md §3: compilation was cancelled before a closure could be computed. */
+  /** Compilation was cancelled before a closure could be computed. */
   'compiler-cancelled',
-  /** §4 Wiring: "maps each outbound call port to exactly one inbound event port on the same machine, with a compatible shape" / §5: "Readiness rejects: unbound call responses". */
+  /** Each outbound call port must map to exactly one inbound event port on the same machine, with a compatible shape. */
   'unbound-call-response',
-  /** §4 Behaviors / §5: "Readiness rejects: ... effect lists that could reply twice". */
+  /** Effect lists that could reply twice. */
   'reply-twice',
-  /** §4 Wiring / §5: "Readiness rejects: ... mismatched schemas". */
+  /** Mismatched schemas. */
   'mismatched-schema',
-  /** §5: "Readiness rejects: ... missing pipeline outputs". */
+  /** Missing pipeline outputs. */
   'missing-pipeline-output',
-  /** §4 Behaviors: "unmodeled: reachable in a runnable scenario only behind a boundary fixture". */
+  /** An unmodeled element is reachable in a runnable scenario only behind a boundary fixture. */
   'unmodeled-element',
-  /** §4: "A statically knowable type error rejects readiness". */
+  /** A statically knowable type error. */
   'expression-type-error',
-  /** §8 Bridge call frames: "a non-router resource with a bridge call continuation may have no other selectable call continuation". */
+  /** A non-router resource with a bridge call continuation may have no other selectable call continuation. */
   'bridge-continuation-conflict',
-  /** §8 Bridge call frames: a router's routes must reach resources. A router shares load by capacity, and a machine, pipeline or unmodeled element has none (RV-18 dropped, 2026-09-30). */
+  /** Bridge call frames: a router's routes must reach resources. A router shares load by capacity, and a machine, pipeline or unmodeled element has none. */
   'router-route-needs-resource',
-  /** §6 Refinement: duplicate/unknown selections and crossings without a compatible mapping are not runnable. */
+  /** Refinement: duplicate/unknown selections and crossings without a compatible mapping are not runnable. */
   'invalid-refinement-selection',
 ] as const;
 
 export type ReadinessIssueCode = (typeof READINESS_ISSUE_CODES)[number];
 
 /**
- * `Issue` (model-and-runner.md §8) with its `code` widened to also admit readiness-only
+ * `Issue` with its `code` widened to also admit readiness-only
  * codes and closure issue codes, mirroring the `ClosureIssue` pattern already used in
  * `closure.ts`.
  */
@@ -155,13 +135,12 @@ export type ReadinessResult =
   | { readonly ready: false; readonly issues: readonly ReadinessIssue[] };
 
 // ============================================================================
-// §3: normalizeShape / shapesCompatible
+// normalizeShape / shapesCompatible
 // ============================================================================
 
 /**
- * A shape normalized per model-and-runner.md §3: "identical normalized shapes
- * (ignore field IDs/labels, sort record fields by key)". Represented as plain JSON
- * so it can be compared via `canonicalJson` string equality.
+ * A shape with field IDs/labels ignored and record fields sorted by key. Represented as
+ * plain JSON so it can be compared via `canonicalJson` string equality.
  */
 type NormalizedShape =
   | { readonly type: 'string' | 'boolean' | 'number' | 'integer'; readonly nullable: boolean }
@@ -174,11 +153,10 @@ type NormalizedShape =
   | { readonly type: 'scalar-union'; readonly nullable: boolean; readonly types: readonly string[] };
 
 /**
- * Normalizes a Shape per model-and-runner.md §3, dropping field `id`/`label` and
- * sorting record fields by key. Implemented iteratively with an explicit stack and a
- * WeakMap memo (rather than direct recursion) per this task's requirement to avoid
- * recursing over untrusted depth, even though shape depth is already bounded to 8 by
- * the storable validator (storage.md §6).
+ * Normalizes a Shape, dropping field `id`/`label` and sorting record fields by key.
+ * Implemented iteratively with an explicit stack and a WeakMap memo (rather than direct
+ * recursion) to avoid recursing over untrusted depth, even though shape depth is already
+ * bounded to 8 by the storable validator.
  */
 export function normalizeShape(root: Shape): NormalizedShape {
   const memo = new WeakMap<object, NormalizedShape>();
@@ -228,8 +206,8 @@ export function normalizeShape(root: Shape): NormalizedShape {
 }
 
 /**
- * model-and-runner.md §3: "Port compatibility = identical normalized shapes (ignore
- * field IDs/labels, sort record fields by key)."
+ * Port compatibility: identical normalized shapes (field IDs/labels ignored, record
+ * fields sorted by key).
  */
 export function shapesCompatible(a: Shape, b: Shape): boolean {
   const na = canonicalJson(normalizeShape(a) as unknown as Json);
@@ -259,12 +237,12 @@ const NON_RESOURCE_NOUN: Readonly<Record<string, string>> = {
   unmodeled: 'not simulated',
 };
 
-/** Guidance for a router route that reaches a non-resource element (§8). */
+/** Guidance for a router route that reaches a non-resource element. */
 function routerRouteMessage(routerLabel: string, target: Element | undefined, targetId: Id): string {
   const targetLabel = target?.label ?? targetId;
   const noun = target ? NON_RESOURCE_NOUN[target.behavior.kind] : undefined;
   const what = noun ? ` (${noun})` : '';
-  return `Router '${routerLabel}' routes straight to '${targetLabel}'${what}, which has no capacity to share load. Put a component with capacity, such as a Service, between them: '${routerLabel}' → Service → '${targetLabel}' (specs/revamp/contracts/model-and-runner.md §8)`;
+  return `Router '${routerLabel}' routes straight to '${targetLabel}'${what}, which has no capacity to share load. Put a component with capacity, such as a Service, between them: '${routerLabel}' → Service → '${targetLabel}'`;
 }
 
 // Possible value types, not a new authored union grammar. Constructed list items
@@ -334,7 +312,7 @@ function writeStatic(root: StaticValue, path: Path, value: StaticValue): StaticV
 }
 
 // Only a disjoint type is a definite failure. Nullable and scalar-union reads can
-// produce valid values, and optional/missing assignments remain modeled errors (§4).
+// produce valid values, and optional/missing assignments remain modeled errors.
 function cannotMatch(value: StaticValue, shape: Shape): boolean {
   if (value.kind === 'unknown' || value.kind === 'missing') return false;
   if (value.kind === 'null') return !shape.nullable;
@@ -528,18 +506,17 @@ function checkExpressions(
 }
 
 /**
- * model-and-runner.md §1/§2/§3/§5/§6; run-identity.md §3.
+ * Checks whether a scenario is runnable.
  *
  * Assumes `doc` already passed `validateDocument` (storable level). Computes the
- * scenario's scope closure first (run-identity.md §3), then layers readiness-only
+ * scenario's scope closure first, then layers readiness-only
  * checks on top of it.
  */
 export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   const closureResult = computeClosure(doc, scenarioId);
 
   if (closureResult.status === 'analysis-limit') {
-    // run-identity.md §3: "returns analysis-limit or cancelled rather than freezing
-    // or accepting partial closure."
+    // Report analysis-limit or cancelled rather than freezing or accepting a partial closure.
     return {
       ready: false,
       issues: [
@@ -547,7 +524,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'compiler-analysis-limit',
           ['scenarios'],
           scenarioId,
-          'Scope closure exceeded compiler limits (storage.md §6: <=2,000 expanded entities, <=10,000 references)',
+          'Scope closure exceeded compiler limits (<=2,000 expanded entities, <=10,000 references)',
         ),
       ],
     };
@@ -559,8 +536,8 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
     };
   }
   if (closureResult.status === 'not-ready') {
-    // run-identity.md §3: "Unresolved crossings, missing targets and unsupported
-    // relation kinds fail readiness before fingerprinting." Propagate as-is.
+    // Unresolved crossings, missing targets and unsupported relation kinds fail readiness
+    // before fingerprinting. Propagate as-is.
     return { ready: false, issues: closureResult.issues };
   }
 
@@ -609,7 +586,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   const includedConnectionSet = new Set(closure.includedConnectionIds);
 
   // --------------------------------------------------------------------------
-  // §3: call ports need non-null responseSchemaId, others need null.
+  // Call ports need non-null responseSchemaId, others need null.
   // --------------------------------------------------------------------------
   for (const elId of closure.includedElementIds) {
     const el = elementsMap.get(elId);
@@ -630,7 +607,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §3: port compatibility across every included connection.
+  // Port compatibility across every included connection.
   // --------------------------------------------------------------------------
   const sortedIncludedConnections = doc.connections
     .map((c, idx) => ({ c, idx }))
@@ -669,7 +646,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §2: "Synchronous call cycles are rejected." Detect cycles among included
+  // Synchronous call cycles are rejected. Detect cycles among included
   // 'call'-kind connections restricted to the compiled scope.
   // --------------------------------------------------------------------------
   {
@@ -717,7 +694,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §6: pure logical scenarios need empty workloads and faults.
+  // Pure logical scenarios need empty workloads and faults.
   // --------------------------------------------------------------------------
   if (scenario.mode === 'logical' && (scenario.workloads.length > 0 || scenario.faults.length > 0)) {
     issues.push(
@@ -731,8 +708,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §6: input atMs must match mode; "Logical scenarios that reach resources
-  // reject readiness."
+  // Input atMs must match mode; logical scenarios that reach resources are not runnable.
   // --------------------------------------------------------------------------
   scenario.inputs.forEach((inp, i) => {
     if (scenario.mode === 'logical' && inp.atMs !== null) {
@@ -756,7 +732,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §1/§6: nonempty inputs; timed scenarios need >=1 finite input or enabled workload.
+  // Nonempty inputs; timed scenarios need >=1 finite input or enabled workload.
   // --------------------------------------------------------------------------
   const hasEnabledWorkload = scenario.workloads.some((w) => w.enabled);
   if (scenario.mode === 'logical' && scenario.inputs.length === 0) {
@@ -768,7 +744,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §6: workloads can target only resource entry ports.
+  // Workloads can target only resource entry ports.
   // --------------------------------------------------------------------------
   scenario.workloads.forEach((w, i) => {
     const at = [...scenarioPath, 'workloads', i];
@@ -825,7 +801,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   });
 
   // --------------------------------------------------------------------------
-  // §6 Boundaries: logical delayMs null; timed delayMs required, afterInputId null.
+  // Boundaries: logical delayMs null; timed delayMs required, afterInputId null.
   // --------------------------------------------------------------------------
   scenario.boundaries.forEach((b, bi) => {
     b.responses.forEach((r, ri) => {
@@ -851,7 +827,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   });
 
   // --------------------------------------------------------------------------
-  // §6 Assertions: >=1 assertion; every subject must be in compiled scope.
+  // Assertions: >=1 assertion; every subject must be in compiled scope.
   // --------------------------------------------------------------------------
   if (scenario.assertions.length === 0) {
     issues.push(issue('no-assertions', [...scenarioPath, 'assertions'], scenario.id, 'A qualifying scenario needs at least one assertion'));
@@ -880,7 +856,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   });
 
   // --------------------------------------------------------------------------
-  // §4 Behaviors: unmodeled elements reachable only behind boundary fixtures.
+  // Behaviors: unmodeled elements reachable only behind boundary fixtures.
   // "unmodeled: reachable in a runnable scenario only behind a boundary fixture"
   // "so reject any unmodeled element present in the closure's includedElementIds."
   // --------------------------------------------------------------------------
@@ -894,26 +870,20 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'unmodeled-element',
           ['elements', elIdx, 'behavior', 'kind'],
           el.id,
-          `Element '${el.id}' has unmodeled behavior; reachable in a runnable scenario only behind a boundary fixture (specs/revamp/contracts/model-and-runner.md §4)`,
+          `Element '${el.id}' has unmodeled behavior; reachable in a runnable scenario only behind a boundary fixture`,
         ),
       );
     }
   }
 
   // --------------------------------------------------------------------------
-  // §4 Wiring / §5: Machine checks
-  // 1. Unbound call responses:
-  //    §4 Wiring: "A machine response binding maps each outbound call port to exactly one
-  //    inbound event port on the same machine, with a compatible shape."
-  //    §5: "Readiness rejects: unbound call responses"
-  // 2. Effect lists that could reply twice:
-  //    §4 Behaviors: "{id,kind:'reply',value:Value,outcome:'succeeded'|'rejected'|'failed'|'expired'}
-  //    — settles the current initiating call frame exactly once"
-  //    §5: "Readiness rejects: ... effect lists that could reply twice ... Path-dependent
-  //    double settlement and budget-exhausting message cycles fail or end incomplete at runtime."
-  // 3. Machine transition eventPortId:
-  //    §4 Transitions and effects: "eventPortId may be any inbound event/call/message/data
-  //    port on the machine."
+  // Machine checks
+  // 1. Unbound call responses: a response binding maps each outbound call port to exactly
+  //    one inbound event port on the same machine, with a compatible shape.
+  // 2. Effect lists that could reply twice: a reply effect settles the current initiating
+  //    call frame exactly once. Path-dependent double settlement is only caught at runtime.
+  // 3. Machine transition eventPortId may be any inbound event/call/message/data port on
+  //    the machine.
   // --------------------------------------------------------------------------
   for (const elId of closure.includedElementIds) {
     const el = elementsMap.get(elId);
@@ -942,7 +912,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
                 'unbound-call-response',
                 ['elements', elIdx, 'ports', pIdx],
                 p.id,
-                `Outbound call port '${p.id}' on machine '${el.id}' is used but has no response binding (specs/revamp/contracts/model-and-runner.md §4, §5)`,
+                `Outbound call port '${p.id}' on machine '${el.id}' is used but has no response binding`,
               ),
             );
           } else if (matchingBindings.length > 1) {
@@ -951,7 +921,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
                 'unbound-call-response',
                 ['elements', elIdx, 'behavior', 'responseBindings'],
                 el.id,
-                `Outbound call port '${p.id}' on machine '${el.id}' has multiple response bindings; expected exactly one (specs/revamp/contracts/model-and-runner.md §4, §5)`,
+                `Outbound call port '${p.id}' on machine '${el.id}' has multiple response bindings; expected exactly one`,
               ),
             );
           } else {
@@ -964,7 +934,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
                   'unbound-call-response',
                   ['elements', elIdx, 'behavior', 'responseBindings', rbIdx, 'eventPortId'],
                   rb.id,
-                  `Response binding '${rb.id}' eventPortId '${rb.eventPortId}' must be an inbound event port on machine '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+                  `Response binding '${rb.id}' eventPortId '${rb.eventPortId}' must be an inbound event port on machine '${el.id}'`,
                 ),
               );
             } else if (p.responseSchemaId) {
@@ -976,7 +946,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
                     'unbound-call-response',
                     ['elements', elIdx, 'behavior', 'responseBindings', rbIdx, 'eventPortId'],
                     rb.id,
-                    `Response binding '${rb.id}' event port '${eventPort.id}' shape is incompatible with call port '${p.id}' response schema (specs/revamp/contracts/model-and-runner.md §4)`,
+                    `Response binding '${rb.id}' event port '${eventPort.id}' shape is incompatible with call port '${p.id}' response schema`,
                   ),
                 );
               }
@@ -1002,7 +972,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
               'reply-twice',
               ['elements', elIdx, 'behavior', 'transitions', tIdx, 'effects', replyEffects[i].effIdx],
               replyEffects[i].eff.id,
-              `Transition '${t.id}' has multiple reply effects; an effect list cannot reply twice (specs/revamp/contracts/model-and-runner.md §5)`,
+              `Transition '${t.id}' has multiple reply effects; an effect list cannot reply twice`,
             ),
           );
         }
@@ -1019,7 +989,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
             'mismatched-schema',
             ['elements', elIdx, 'behavior', 'transitions', tIdx, 'eventPortId'],
             t.eventPortId,
-            `Machine transition '${t.id}' eventPortId '${t.eventPortId}' must be an inbound port on machine '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+            `Machine transition '${t.id}' eventPortId '${t.eventPortId}' must be an inbound port on machine '${el.id}'`,
           ),
         );
       }
@@ -1027,10 +997,8 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
   }
 
   // --------------------------------------------------------------------------
-  // §4 Wiring / §5: Decision checks
-  // §4 Wiring: "A decision's inputPortId is an inbound data port matching inputSchemaId.
-  // Case/fallback ports are outbound data ports..."
-  // §5: "Readiness rejects: ... mismatched schemas"
+  // Decision checks: a decision's inputPortId is an inbound data port matching inputSchemaId.
+  // Case/fallback ports are outbound data ports. Mismatched schemas are rejected.
   // --------------------------------------------------------------------------
   for (const elId of closure.includedElementIds) {
     const el = elementsMap.get(elId);
@@ -1054,7 +1022,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'mismatched-schema',
           ['elements', elIdx, 'behavior', 'inputPortId'],
           db.inputPortId,
-          `Decision inputPortId '${db.inputPortId}' must be an inbound data port whose schema matches inputSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          `Decision inputPortId '${db.inputPortId}' must be an inbound data port whose schema matches inputSchemaId on element '${el.id}'`,
         ),
       );
     }
@@ -1067,7 +1035,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
             'mismatched-schema',
             ['elements', elIdx, 'behavior', 'cases', cIdx, 'outputPortId'],
             c.outputPortId,
-            `Decision case outputPortId '${c.outputPortId}' must be an outbound data port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+            `Decision case outputPortId '${c.outputPortId}' must be an outbound data port on element '${el.id}'`,
           ),
         );
       }
@@ -1080,16 +1048,14 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'mismatched-schema',
           ['elements', elIdx, 'behavior', 'fallback', 'outputPortId'],
           db.fallback.outputPortId,
-          `Decision fallback outputPortId '${db.fallback.outputPortId}' must be an outbound data port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          `Decision fallback outputPortId '${db.fallback.outputPortId}' must be an outbound data port on element '${el.id}'`,
         ),
       );
     }
   }
 
   // --------------------------------------------------------------------------
-  // §4 Wiring / §5: Resource checks
-  // §4 Wiring: "A resource entryPortId is an inbound call/message port."
-  // §5: "Readiness rejects: ... mismatched schemas"
+  // Resource checks: a resource entryPortId is an inbound call/message port.
   // --------------------------------------------------------------------------
   for (const elId of closure.includedElementIds) {
     const el = elementsMap.get(elId);
@@ -1104,14 +1070,14 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'mismatched-schema',
           ['elements', elIdx, 'behavior', 'entryPortId'],
           rb.entryPortId,
-          `Resource entryPortId '${rb.entryPortId}' must be an inbound call or message port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          `Resource entryPortId '${rb.entryPortId}' must be an inbound call or message port on element '${el.id}'`,
         ),
       );
     }
   }
 
   // --------------------------------------------------------------------------
-  // §8 Bridge call frames: a call continuation from a resource to a non-resource target.
+  // Bridge call frames: a call continuation from a resource to a non-resource target.
   // "A non-router resource with a bridge call continuation may have no other selectable
   // call continuation (routers select exactly one route)." A router's routes must reach
   // resources: it shares load by capacity, and a non-resource target has none, so the
@@ -1144,17 +1110,16 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'bridge-continuation-conflict',
           ['elements', elIdx, 'behavior'],
           el.id,
-          `Resource '${el.label}' calls non-resource '${elementsMap.get(bridges[0].target.elementId)?.label ?? bridges[0].target.elementId}' and has another call continuation; a resource with a bridge call may have no other call continuation (specs/revamp/contracts/model-and-runner.md §8)`,
+          `Resource '${el.label}' calls non-resource '${elementsMap.get(bridges[0].target.elementId)?.label ?? bridges[0].target.elementId}' and has another call continuation; a resource with a bridge call may have no other call continuation`,
         ),
       );
     }
   }
 
   // --------------------------------------------------------------------------
-  // §4 Wiring / §5: Pipeline checks
-  // §4 Wiring: "A pipeline's inputPortId, outputPortId and errorPortId must be data-channel
-  // ports whose shapes match its input, output and error schemas."
-  // §5: "Readiness rejects: ... mismatched schemas; missing pipeline outputs."
+  // Pipeline checks: inputPortId, outputPortId and errorPortId must be data-channel ports
+  // whose shapes match its input, output and error schemas. Mismatched schemas and missing
+  // pipeline outputs are rejected.
   // --------------------------------------------------------------------------
   for (const elId of closure.includedElementIds) {
     const el = elementsMap.get(elId);
@@ -1178,7 +1143,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'mismatched-schema',
           ['elements', elIdx, 'behavior', 'inputPortId'],
           pb.inputPortId,
-          `Pipeline inputPortId '${pb.inputPortId}' must be an inbound data port matching inputSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+          `Pipeline inputPortId '${pb.inputPortId}' must be an inbound data port matching inputSchemaId on element '${el.id}'`,
         ),
       );
     }
@@ -1199,7 +1164,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
             'mismatched-schema',
             ['elements', elIdx, 'behavior', 'outputPortId'],
             pb.outputPortId,
-            `Pipeline outputPortId '${pb.outputPortId}' must be an outbound data port matching outputSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+            `Pipeline outputPortId '${pb.outputPortId}' must be an outbound data port matching outputSchemaId on element '${el.id}'`,
           ),
         );
       }
@@ -1221,13 +1186,13 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
             'mismatched-schema',
             ['elements', elIdx, 'behavior', 'errorPortId'],
             pb.errorPortId,
-            `Pipeline errorPortId '${pb.errorPortId}' must be an outbound data port matching errorSchemaId on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §4)`,
+            `Pipeline errorPortId '${pb.errorPortId}' must be an outbound data port matching errorSchemaId on element '${el.id}'`,
           ),
         );
       }
     }
 
-    // Check 4: Missing pipeline outputs (§5)
+    // Check 4: Missing pipeline outputs
     // Fires only when outputPortId or errorPortId does not resolve to a port on the same
     // element (defensive check; the storable validator normally catches it).
     if (!outPort) {
@@ -1236,7 +1201,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'missing-pipeline-output',
           ['elements', elIdx, 'behavior', 'outputPortId'],
           pb.outputPortId,
-          `Pipeline '${el.id}' outputPortId '${pb.outputPortId}' does not resolve to a port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §5)`,
+          `Pipeline '${el.id}' outputPortId '${pb.outputPortId}' does not resolve to a port on element '${el.id}'`,
         ),
       );
     }
@@ -1246,7 +1211,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
           'missing-pipeline-output',
           ['elements', elIdx, 'behavior', 'errorPortId'],
           pb.errorPortId,
-          `Pipeline '${el.id}' errorPortId '${pb.errorPortId}' does not resolve to a port on element '${el.id}' (specs/revamp/contracts/model-and-runner.md §5)`,
+          `Pipeline '${el.id}' errorPortId '${pb.errorPortId}' does not resolve to a port on element '${el.id}'`,
         ),
       );
     }

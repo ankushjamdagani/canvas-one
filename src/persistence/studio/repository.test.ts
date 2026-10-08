@@ -15,7 +15,7 @@ import {
 import type { Document } from '../../domain/studio/model';
 
 const s01Doc = JSON.parse(
-  readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
 ) as Document;
 
 const testActor: Actor = {
@@ -200,7 +200,7 @@ describe('LocalRepository', () => {
       db.close();
     });
 
-    it('creates exactly the §2 rows for valid document, with snapshot ID equal to content hash', async () => {
+    it('creates exactly the expected rows for valid document, with snapshot ID equal to content hash', async () => {
       const db = createStudioDatabase(`test-create-valid-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
 
@@ -628,10 +628,10 @@ describe('LocalRepository', () => {
   });
 
   describe('Unsupported methods and commands', () => {
-    it('returns typed missing/stale results for transfer methods called with unknown data (RV-16b)', async () => {
+    it('returns typed missing/stale results for transfer methods called with unknown data', async () => {
       const db = createStudioDatabase(`test-unsupported-${crypto.randomUUID()}`);
       // A repository constructed WITH an injected mintId, so exportProject's 'missing'
-      // path (unknown project) is exercised independently of item 1's mintId gate below.
+      // path (unknown project) is exercised independently of the mintId gate below.
       const repo = new LocalRepository(db, { mintId: () => crypto.randomUUID() });
 
       // importProject: an unresolvable fileToken (never registered) is 'missing'.
@@ -657,12 +657,11 @@ describe('LocalRepository', () => {
 
       const prepPublishCmd = await repo.execute({ commandId: 'history.prepare-publish' } as any);
       expect(prepPublishCmd.status).toBe('unsupported');
-      expect((prepPublishCmd as any).task).toBe('RV-08');
 
       db.close();
     });
 
-    it('exportProject fails invalid naming mintId when constructed without one (review round 1, item 1)', async () => {
+    it('exportProject fails invalid naming mintId when constructed without one', async () => {
       const db = createStudioDatabase(`test-no-mintid-${crypto.randomUUID()}`);
       // No mintId injected -- there must be NO fallback of any kind (not even a
       // deterministic one): exportProject must refuse rather than invent a downloadId.

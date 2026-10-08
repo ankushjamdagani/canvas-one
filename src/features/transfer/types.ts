@@ -1,11 +1,5 @@
 /**
- * Transfer and Exporters Types (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("JSON, images and files", "CSV v1", "Mermaid v1")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
- * - specs/revamp/contracts/storage.md (§4 portable bundle, §5 repository API, §6 ceilings)
- * - specs/revamp/decisions.md (D12, D19, D37, D42)
+ * Types shared by the project JSON transfer and the SVG, PNG, Mermaid and CSV exporters.
  */
 
 import type { Document, Id } from '../../domain/studio/model';

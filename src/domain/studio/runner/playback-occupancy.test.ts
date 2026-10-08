@@ -8,7 +8,7 @@ import type { FlowRecord } from "./types";
 import { PlaybackStore } from "../../../features/runs/playback";
 
 const s06 = JSON.parse(
-  readFileSync(join(process.cwd(), "specs/revamp/fixtures/s06.json"), "utf8"),
+  readFileSync(join(process.cwd(), "src/features/entry/examples/s06.json"), "utf8"),
 ) as Document;
 
 describe("recorded occupancy through broker delivery", () => {

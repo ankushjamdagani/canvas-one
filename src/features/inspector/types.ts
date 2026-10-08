@@ -1,19 +1,14 @@
 /**
- * Inspector draft types (RV-05b).
+ * Inspector draft types: DraftTarget, field specs and DraftHandle.
  *
- * Implements specs/revamp/contracts/commands.md §5 (inspector.open/apply/cancel/close,
- * DraftTarget) and §6 (Draft lifecycle: DraftHandle, bridge methods, stale/missing,
- * navigation guard).
- *
- * SCOPE: only `DraftTarget.kind` values `'element'` and `'connection'` are built here
- * (RV-05b's assigned target kinds). `'scenario'` | `'workload'` | `'selection'` are
- * listed by the contract for other inspector tabs/tasks and are out of scope.
+ * SCOPE: only `DraftTarget.kind` values `'element'` and `'connection'` are supported here;
+ * scenario, workload and selection targets belong to other inspector tabs.
  */
 
 import type { Connection, Document, Element, Id, Json } from '../../domain/studio/model';
 
 // ============================================================================
-// DraftTarget (commands.md §5)
+// DraftTarget
 // ============================================================================
 
 export type InspectorTargetKind = 'element' | 'connection';
@@ -24,7 +19,7 @@ export type DraftTarget = {
 };
 
 // ============================================================================
-// Fields (schema-owned; commands.md §6 "Field IDs are schema-owned")
+// Fields (field IDs are schema-owned)
 // ============================================================================
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'select' | 'readonly';
@@ -47,7 +42,7 @@ export type FieldSpec<TRecord = Element | Connection> = {
   readonly id: string;
   readonly label: string;
   readonly kind: FieldKind;
-  /** D53: rows with the same group are shown under one sub-heading (port settings). */
+  /** Rows with the same group are shown under one sub-heading (port settings). */
   readonly group?: string;
   readonly unit?: string;
   readonly options?: readonly FieldOption[];
@@ -63,7 +58,7 @@ export type FieldSpec<TRecord = Element | Connection> = {
 };
 
 // ============================================================================
-// DraftHandle (commands.md §6)
+// DraftHandle
 // ============================================================================
 
 export type DraftStatus =
@@ -80,7 +75,7 @@ export type DraftHandle = {
   readonly baseWorkingRevision: number;
   /** Raw string per field id, captured when the draft was opened or last accepted. */
   readonly baseValues: Readonly<Record<string, string>>;
-  /** Empty for a multi-target draft (RV-05b: "n selected", no bulk editing yet). */
+  /** Empty for a multi-target draft ("n selected", no bulk editing yet). */
   readonly fields: readonly FieldSpec[];
   readonly values: Readonly<Record<string, string>>;
   readonly dirty: boolean;
@@ -104,7 +99,7 @@ export type ValidateDraftResult = {
 };
 
 /**
- * Minimal session shape applyDraft() depends on (transactions.md §3), narrowed so
+ * Minimal session shape applyDraft() depends on, narrowed so
  * draft.ts stays testable against a fake without importing SessionController.
  */
 export type DraftSession = {

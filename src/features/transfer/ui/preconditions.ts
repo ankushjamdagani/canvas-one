@@ -1,10 +1,8 @@
 /**
- * Export precondition checks for the transfer UI (RV-10b).
+ * Export precondition checks for the transfer UI.
  *
- * Implements specs/revamp/contracts/parts-and-export.md ("JSON, images and files",
- * "CSV v1", "Mermaid v1") and the RV-10b task brief: "Each item disabled with a
- * stated reason when its precondition fails (e.g. CSV needs a saved terminal run;
- * image exports need an authored view)."
+ * Each export item is disabled with a stated reason when its precondition fails
+ * (e.g. CSV needs a saved terminal run; image exports need an authored view).
  *
  * The SVG/PNG and Mermaid reason strings below are exactly the messages
  * `renderDiagramSvg` / `exportDiagramMermaid` themselves throw for an empty view

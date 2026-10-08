@@ -1,19 +1,16 @@
 /**
- * Scenario switcher (RV-05c).
+ * Scenario switcher.
  *
- * Implements specs/revamp/contracts/commands.md §4 "Switcher": "a segmented control
- * beside Run in the 22A top bar (D38) -- scenario name with status dot and mode icon,
- * then the green Run. Its list shows every scenario with status ..., 'Run all n', the
- * commit line ..., and New / Duplicate / Edit. Per-row menu: Rename, Duplicate,
- * Delete.... No scenario -> the control reads 'No scenario' and Run is disabled with
- * the reason 'Add a scenario to run'." Screens: scenario_switcher.png,
- * scenario_blank_project.png.
+ * A segmented control beside Run in the top bar: scenario name with status dot and
+ * mode icon, then Run. Its list shows every scenario with status, 'Run all n', the
+ * commit line, and New / Duplicate / Edit. The per-row menu offers Rename, Duplicate
+ * and Delete. With no scenario the control reads 'No scenario' and Run is disabled
+ * with the reason 'Add a scenario to run'.
  *
- * It replaced the RV-12c4 run control in the top bar (RV-12i), with New/Duplicate/Edit/
- * Rename/Delete wired to the scenario editor. "Rename" opens the same editor as "Edit",
- * focused on the header name field -- the screens show no separate rename-only surface.
+ * New/Duplicate/Edit/Rename/Delete are wired to the scenario editor. "Rename" opens
+ * the same editor as "Edit", focused on the header name field.
  *
- * "Run itself is passed in; no runner here" (brief) -- onRun/onRunAll/onPause/onResume/
+ * Running is the host's job: onRun/onRunAll/onPause/onResume/
  * onReset are opaque callbacks; this component owns no run state.
  */
 
@@ -76,7 +73,7 @@ export interface ScenarioSwitcherProps {
   readonly onPause?: () => void;
   readonly onResume?: () => void;
   readonly onReset?: () => void;
-  /** D55: stop a timed run gracefully, keeping its results; `isStopping` while it drains. */
+  /** Stop a timed run gracefully, keeping its results; `isStopping` while it drains. */
   readonly onStop?: () => void;
   readonly isStopping?: boolean;
   /** Unified simulation bar: transport owns pause/resume; the joined action drains. */

@@ -4,7 +4,7 @@ async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
 }
 
-test.describe('Studio selection duplicate (RV-09a)', () => {
+test.describe('Studio selection duplicate', () => {
   test('duplicates two connected S05 nodes with one undo step', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();

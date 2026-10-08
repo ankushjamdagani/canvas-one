@@ -1,5 +1,5 @@
 /**
- * The main thread's copy of a run's recording, and the playhead that plays it (D57).
+ * The main thread's copy of a run's recording, and the playhead that plays it.
  *
  * The worker computes ahead and posts flow records, finished cycles and summary checkpoints; this store
  * keeps them, owns the playhead clock, drops what has fallen out of the history window (streams only), and

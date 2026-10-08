@@ -10,7 +10,7 @@ import type { ProjectExposure } from '../../domain/studio/exposure';
 import { placeEntry } from './place';
 
 const FIXTURES_DIR = fileURLToPath(
-  new URL('../../../specs/revamp/fixtures', import.meta.url),
+  new URL('../../../src/features/entry/examples', import.meta.url),
 );
 
 function loadFixture(name: string): Document {
@@ -54,7 +54,7 @@ function makeBlankDocument(mintId: () => Id): { document: Document; viewId: Id }
   return { document, viewId };
 }
 
-// D52: the linked-project entry can only be placed with the project it links to.
+// The linked-project entry can only be placed with the project it links to.
 const LINKED_PROJECT_ID = '00000000-0000-4000-8000-0000000000aa';
 const LINKED_EXPOSURES: readonly ProjectExposure[] = [
   { channel: 'call', protocol: 'http', path: '' },
@@ -119,7 +119,7 @@ describe('place.ts', () => {
     });
   });
 
-  describe('linked-project placement (D52)', () => {
+  describe('linked-project placement', () => {
     it('places a linked node with the link, the project title as label and one in-port per exposed connection type', () => {
       const mintId = createMintId();
       const { document, viewId } = makeBlankDocument(mintId);
@@ -140,7 +140,7 @@ describe('place.ts', () => {
       expect(element.ports.map((p) => (p as { settings?: unknown }).settings)).toEqual([undefined, { expectedP95Ms: 80, idempotent: true }]);
     });
 
-    it('refuses to link a project that exposes no call connection type (D53)', () => {
+    it('refuses to link a project that exposes no call connection type', () => {
       const mintId = createMintId();
       const { document, viewId } = makeBlankDocument(mintId);
       const res = placeEntry({

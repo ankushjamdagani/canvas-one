@@ -1,5 +1,5 @@
 /**
- * Public API for System Studio Runs feature (RV-12c4).
+ * Public API for System Studio Runs feature.
  */
 
 export type * from './protocol';

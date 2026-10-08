@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures';
 
-test.describe('Studio scenario authoring (RV-05d)', () => {
+test.describe('Studio scenario authoring', () => {
   test('opens stored logical replies with guards, bindings, paths, and draggable steps', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s01').click();
@@ -63,7 +63,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await expect(page.locator('[data-testid^="node-traffic-entry-"]')).toHaveCount(0);
   });
 
-  test('D50: traffic can burst; the burst fields start empty and must be filled', async ({ page }) => {
+  test('traffic can burst; the burst fields start empty and must be filled', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s04').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
@@ -92,7 +92,7 @@ test.describe('Studio scenario authoring (RV-05d)', () => {
     await editor.getByRole('button', { name: 'Cancel' }).click();
   });
 
-  test('D51: a boundary reply can answer every matching request; the choice is saved', async ({ page }) => {
+  test('a boundary reply can answer every matching request; the choice is saved', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s01').click();
     await expect(page.getByTestId('save-status')).toContainText('Saved');

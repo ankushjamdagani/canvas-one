@@ -1,13 +1,10 @@
 /**
- * Inspector panel (2A workspace) -- RV-05b.
+ * Inspector panel: header (name + kind tag(s)), CONFIGURATION section, MEASURED · LAST RUN
+ * section and an Apply/Cancel footer.
+ * It never renders TIGHTEST LINK, HEADROOM, bottleneck/pressure labels, p99 or a queue-depth
+ * sparkline; only measured ElementMetric rows (measured.ts) are shown.
  *
- * Matches specs/revamp/screens/2A_workspace.png's right dock: header (name + kind
- * tag(s)), CONFIGURATION section, MEASURED · LAST RUN section, Apply/Cancel footer.
- * Per design-revalidation.md §2 and the lead default "Metrics", this never renders
- * TIGHTEST LINK, HEADROOM, bottleneck/pressure labels, p99 or a queue-depth
- * sparkline -- only measured ElementMetric rows (measured.ts) are shown.
- *
- * `variant='dock'` is the desktop 320px right dock (commands.md §7); `variant='sheet'`
+ * `variant='dock'` is the desktop 320px right dock; `variant='sheet'`
  * is the < 768px bottom sheet with identical content and the same navigation guard.
  */
 
@@ -117,12 +114,10 @@ export function InspectorPanel({
           data-testid="inspector-close"
           aria-label="Close inspector"
           onClick={onClose}
-          // RV-05b review round 1: the shadcn Button (ghost/icon) is used here
-          // instead of a bare <button> because it's the component every other
-          // icon-only control in the shell already renders through -- a bare
-          // <button> left the lucide <X> invisible (no guaranteed foreground
-          // colour / svg sizing without it). size="icon" gives a 32px hit area
-          // (44px on touch, via pointer-coarse) per the review's ask.
+          // The shadcn Button (ghost/icon) is used instead of a bare <button> because it is
+          // the component every other icon-only control in the shell renders through; a bare
+          // <button> left the lucide <X> invisible (no guaranteed foreground colour / svg
+          // sizing). size="icon" gives a 32px hit area (44px on touch, via pointer-coarse).
           className="shrink-0"
         >
           <X aria-hidden="true" />

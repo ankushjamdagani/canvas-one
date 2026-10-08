@@ -1,9 +1,9 @@
 /**
  * Deterministic ID generator and a small sample Document, for the preview harness and
- * unit tests (RV-05c). Not wired into any persistence path.
+ * unit tests. Not wired into any persistence path.
  *
- * model-and-runner.md §1: "Id is a lowercase canonical UUID." The brief bans
- * `crypto.randomUUID` in production code; a fixed, deterministic counter-based
+ * An Id is a lowercase canonical UUID. `crypto.randomUUID` is not used in production
+ * code; a fixed, deterministic counter-based
  * generator is used here (and nowhere near persistence) so preview/test output is
  * reproducible.
  */

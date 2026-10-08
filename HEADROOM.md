@@ -2,7 +2,7 @@
 
 **Usage**: Token-optimized context compression layer for AI coding agents and LLM tool outputs.
 
-Headroom complements [`RTK.md`](file:///Users/ankushjamdagani/personal/system-design-planner/RTK.md):
+Headroom complements [`RTK.md`](RTK.md):
 - **RTK** optimizes shell command execution output in the terminal (`rtk git status`, `rtk npm run build`).
 - **Headroom** optimizes LLM context windows (tool outputs, file contents, JSON responses, RAG chunks) before requests reach the model.
 
@@ -73,7 +73,7 @@ headroom inspect                # Show original vs. compressed content for recen
 ## Verification
 
 ```bash
-which headroom                  # /Users/ankushjamdagani/.local/bin/headroom
+which headroom                  # ~/.local/bin/headroom
 headroom --version              # Verify installed version
 headroom mcp status             # Verify MCP environment readiness
 ```

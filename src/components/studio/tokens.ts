@@ -1,9 +1,6 @@
 /**
  * Evergreen design tokens for System Studio.
  * Single source of truth for the Evergreen paper palette (light-only).
- *
- * Source: specs/revamp/design.md "Tokens (Evergreen paper, light only)"
- * Corrections: specs/revamp/design.md "Accessibility corrections"
  */
 
 export const evergreen = Object.freeze({
@@ -143,21 +140,18 @@ export type Evergreen = typeof evergreen;
 /**
  * Node-kind stripe colours.
  *
- * Source: specs/revamp/design.md "Canvas objects" ("A 176px card with a 3px type
- * stripe. The stripe colour is the node kind; the border carries state").
+ * A node card has a 3px type stripe; the stripe colour is the node kind and the border
+ * carries state.
  *
  * Keyed by the six system layers used by src/domain/componentCatalog.ts
  * (Clients, Edge, Compute, Data, Messaging, Operations), lowercased to match
  * ArchitectureCanvas's `category-${categorySlug}` class/slug convention — never by
- * node name (design.md "Design vs decisions": "Kind stripes use an explicit
- * node-kind color map, never colors chosen by node name").
+ * node name (kind stripes use an explicit node-kind colour map).
  *
- * Per user decision D35, these are a dedicated set of six stripe colours, distinct
- * from (and deliberately not derived from) the semantic primary/branch/risk roles —
- * replacing the earlier board-inferred mapping onto those roles. Each is verified
- * (tokens.test.ts) to reach >=3:1 contrast against both white and the panel surface,
- * matching the "meaningful control boundaries and state indicators" bar from
- * design.md's Accessibility corrections.
+ * These are a dedicated set of six stripe colours, distinct from (and deliberately not
+ * derived from) the semantic primary/branch/risk roles. Each is verified (tokens.test.ts)
+ * to reach >=3:1 contrast against both white and the panel surface, the bar for
+ * meaningful control boundaries and state indicators.
  */
 export const nodeKindColor = Object.freeze({
   clients: '#4F6D8F',

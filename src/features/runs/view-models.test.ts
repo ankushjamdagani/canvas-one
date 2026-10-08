@@ -31,7 +31,7 @@ describe('View-Model Formatters and Helpers', () => {
     expect(notRun.label).toBe('Not run yet');
   });
 
-  it('Item 6: formats not-ready status as "Can\'t run · n issues"', () => {
+  it('formats not-ready status as "Can\'t run · n issues"', () => {
     const oneIssue = getScenarioStatusColor({
       kind: 'not-ready',
       issues: [
@@ -50,7 +50,7 @@ describe('View-Model Formatters and Helpers', () => {
     expect(twoIssues.label).toBe("Can't run · 2 issues");
   });
 
-  it('Item 6: findRunAllDisabledReason surfaces the first not-ready scenario\'s first issue, or null when all can run', () => {
+  it('findRunAllDisabledReason surfaces the first not-ready scenario\'s first issue, or null when all can run', () => {
     expect(
       findRunAllDisabledReason([
         { status: { kind: 'not-run' } },
@@ -78,7 +78,7 @@ describe('View-Model Formatters and Helpers', () => {
     expect(formatScenarioMode('logical')).toBe('Step by step');
   });
 
-  it('formats commit requirement banner text per commands.md', () => {
+  it('formats the commit requirement banner text', () => {
     expect(formatCommitLineText(4, 1)).toBe('Commit needs all 4 passing · 1 of 4 passing now');
     expect(formatCommitLineText(4, 4)).toBe('All 4 scenarios passing · ready to commit');
     expect(formatCommitLineText(0, 0)).toBe('Commits need at least one scenario');

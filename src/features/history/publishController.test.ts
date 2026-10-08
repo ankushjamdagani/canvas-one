@@ -1,5 +1,5 @@
 /**
- * PublishController integration tests (RV-11b), against a real LocalRepository
+ * PublishController integration tests, against a real LocalRepository
  * (fake-indexeddb) and the real CandidateController — no mocked merge, eligibility
  * or persistence logic.
  *
@@ -33,7 +33,7 @@ import { SessionController } from '../session/controller';
 import { PublishController } from './publishController';
 import { setAtPath } from './CompareAndResolvePanel';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc: Document = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8'));
 const s02Doc: Document = JSON.parse(readFileSync(join(FIXTURES_DIR, 's02.json'), 'utf8'));
 
@@ -323,8 +323,8 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     expect(state.eligible).toBe(true);
     expect(state.scenarios.every((s) => s.status.kind === 'passed')).toBe(true);
 
-    // RV-11b review round: real commit-since-fork/components-touched/fork data
-    // for 22C's "What goes onto main" section, not fabricated.
+    // Real commit-since-fork/components-touched/fork data
+    // for the "What goes onto main" section, not fabricated.
     expect(state.commitsSinceFork.length).toBe(1);
     expect(state.commitsSinceFork[0].message).toBe('Initial checkout scenarios');
     // No element edits were made on top of the initial document in this
@@ -365,7 +365,7 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     expect(state.publication?.metadata.title).toBe('Initial release');
 
     const sourceAfter = await repo.loadBranch(projectId, draftBranchId);
-    expect(sourceAfter?.state).toBe('closed'); // D29: closes by default
+    expect(sourceAfter?.state).toBe('closed'); // closes by default
     expect(session.getState().branchId).toBe(mainBranchId);
 
     const mainAfter = await repo.loadBranch(projectId, mainBranchId);
@@ -481,7 +481,7 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
       (c) => c.recordKind === 'element' && c.recordId === workerElementId,
     );
     expect(capacityConflict).toBeDefined();
-    // D25: not a document-kind conflict, so 'edited' is contractually allowed here.
+    // Not a document-kind conflict, so 'edited' is allowed here.
     expect(capacityConflict!.recordKind).not.toBe('document');
 
     // Resolve with an explicit edit to a value neither prior side used (25), so the
@@ -504,9 +504,9 @@ describe('PublishController (real LocalRepository, real CandidateController)', (
     const state = controller.getState();
     expect(state.status).toBe('review');
     expect(state.conflicts.length).toBe(0);
-    expect(state.candidateId).not.toBe(preResolveCandidateId); // new candidate (D25/commands.md)
+    expect(state.candidateId).not.toBe(preResolveCandidateId); // new candidate
 
-    // RV-11b review round: the resolution is tracked for 22F's "resolved ·
+    // The resolution is tracked for the "resolved ·
     // field · side" display, with the real recordId/path/kind, not invented.
     expect(state.resolvedFields).toEqual([
       {

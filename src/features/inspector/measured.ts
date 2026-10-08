@@ -1,13 +1,12 @@
 /**
- * MEASURED · LAST RUN selection (RV-05b).
+ * MEASURED · LAST RUN selection.
  *
- * Implements the brief's inspector item 3 and model-and-runner.md §9 (ElementMetric).
  * Reads the latest saved run for the currently selected scenario -- already exposed by
  * `loadScenarioStatuses` (features/runs/scenarioStatus.ts) as `ScenarioWithStatus.latestRun`
  * -- and picks out the rows for one element: value + unit when available, "Unavailable ·
- * reason" otherwise, never an invented value. design-revalidation.md §2 rules out
- * TIGHTEST LINK / HEADROOM / bottleneck-pressure labels / p99 / a queue-depth sparkline
- * (no real per-run time series exists), so this only ever renders the closed
+ * reason" otherwise, never an invented value. There is no
+ * TIGHTEST LINK / HEADROOM / bottleneck-pressure label, p99 or queue-depth sparkline (no
+ * real per-run time series exists), so this only ever renders the closed
  * ElementMetric key catalog's labels and values.
  */
 

@@ -1,7 +1,6 @@
 /**
- * Persistence primitives for System Studio repository (RV-16a).
+ * Persistence primitives for System Studio repository.
  *
- * Implements specs/revamp/contracts/transactions.md §1 & §2:
  * - insertImmutable (insert-if-absent; equal content -> no-op; conflict -> invalid; never overwrite)
  * - snapshot content hashing outside transactions
  * - operation receipts (idempotency, retry before stale checks, operation-id-reused)
@@ -18,7 +17,7 @@ import type { Actor, AuthoredResult, FailedResult, InvalidResult } from './types
 
 /**
  * Canonical lowercase UUID format: 8-4-4-4-12 lowercase hex with version 1-5 and variant [89ab].
- * Conforms to model-and-runner.md §8 and validate.ts.
+ * Matches the UUID check in validate.ts.
  */
 export const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -74,7 +73,7 @@ export function validateRevision(
 }
 
 /**
- * Validates an Actor envelope per transactions.md §1.
+ * Validates an Actor envelope.
  * Only kind: 'local-human' is accepted; unknown kinds are rejected.
  */
 export function validateActor(actor: unknown): Issue[] | null {

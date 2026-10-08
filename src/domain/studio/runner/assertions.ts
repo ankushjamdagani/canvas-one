@@ -1,14 +1,12 @@
 /**
- * Assertion evaluator (RV-14b).
+ * Assertion evaluator.
  *
- * Implements specs/revamp/contracts/model-and-runner.md §6 ("Assertions and assumptions")
- * and §9 ("Results: CheckResult"):
  * - Evaluates Assertion subjects: final-state, context, output, count, trace-count against the run result.
  * - Canonical-JSON equality for 'equals'.
  * - Numeric operators ('at-most', 'at-least') apply strictly to numbers; wrong types return 'error'.
  * - Missing/unsupported subjects return status 'unevaluated' or 'error' with a reason, never zero.
  * - The 'metric' subject reads the element's metric from a timed run; logical runs and
- *   missing or unavailable metrics are 'unevaluated' (§6 & §9, D48).
+ *   missing or unavailable metrics are 'unevaluated'.
  * - Pure function without side effects.
  */
 
@@ -107,7 +105,7 @@ export function evaluateAssertion(
     }
 
     // Assertions that read trace rows must check `summary.trace?.truncatedBy`: after a
-    // trace cap the rows are partial while counts and metrics cover the whole run (D47).
+    // trace cap the rows are partial while counts and metrics cover the whole run.
     case 'trace-count': {
       const truncatedBy = summary.trace?.truncatedBy ?? null;
       if (truncatedBy !== null) {
@@ -134,13 +132,13 @@ export function evaluateAssertion(
           assertionId: assertion.id,
           status: 'unevaluated',
           actual: null,
-          reason: 'Logical runs have no timing, so metric checks are unavailable (§6)',
+          reason: 'Logical runs have no timing, so metric checks are unavailable',
         };
       }
       const metric = summary.elementMetrics.find(
         (m) => m.scope === 'element' && m.elementId === subject.elementId && m.key === subject.key,
       );
-      // §6: a missing or unavailable metric is an unevaluated failure, never zero.
+      // A missing or unavailable metric is an unevaluated failure, never zero.
       if (!metric) {
         return {
           assertionId: assertion.id,

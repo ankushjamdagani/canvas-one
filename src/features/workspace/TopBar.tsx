@@ -45,27 +45,26 @@ export interface TopBarProps {
   onDeleteProject: () => void;
   /** Saves the project's description and team; resolves to an error message, or null on success. */
   onUpdateProjectDetails: (details: ProjectDetails) => Promise<string | null>;
-  /** D53: inbound ports of this project and whether each is exposed to projects that link it. */
+  /** Inbound ports of this project and whether each is exposed to projects that link it. */
   endpointCandidates: readonly EndpointCandidate[];
   onToggleEndpointExposed: (candidate: EndpointCandidate, exposed: boolean) => Promise<string | null>;
   saveStatusText: string;
   isSaving: boolean;
   hasError: boolean;
   /**
-   * D38: Run and the scenario switcher live in the top bar, but that UI
-   * belongs to the runs lane (RV-04/RV-07), not this shell package. This slot
-   * is where it mounts; empty until that lane wires it in.
+   * Mount slot for Run and the scenario switcher, which live in the top bar
+   * but are owned by the run feature rather than this shell.
    */
   runControl?: React.ReactNode;
   /**
-   * RV-12h (D38, 22A): History is a top-bar command, never a dock item.
+   * History is a top-bar command, never a dock item.
    * Dispatches history.open (panel reducer OPEN 'history') in the caller.
    */
   onOpenHistory?: () => void;
   /** Highlights the History button while the History panel is open/focused. */
   historyActive?: boolean;
   /**
-   * RV-03q (14A): opens Quick options (registry commands.open). The visible
+   * Opens Quick options (registry commands.open). The visible
    * button covers the case where the OS captures F2.
    */
   onOpenQuickOptions?: () => void;
@@ -76,9 +75,7 @@ export interface TopBarProps {
 }
 
 /**
- * 22A "nav live" top bar.
- *
- * Implements specifications from Screen 22A / 13A / 13B:
+ * Top bar:
  * - Two targets quiet at rest: Project rename target and Branch switch target
  * - Warm neutral on hover, teal on press for project name
  * - Violet family with live down caret on hover and flipped up caret while menu open for branch
@@ -130,7 +127,7 @@ export function TopBar({
     if (!isRenaming) setTitleDraft(project.title);
   }, [project.title, isRenaming]);
 
-  // Global ⌘R / Ctrl+R shortcut to rename project (13A annotation)
+  // Global ⌘R / Ctrl+R shortcut to rename project
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
@@ -249,7 +246,7 @@ export function TopBar({
           aria-hidden="true"
         />
 
-        {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] (13A toggle sizing) */}
+        {/* Breadcrumb chip: Project / branch [DRAFT|MAIN] */}
         <RenamedNotice
           open={renamedNotice !== null && !isRenaming}
           title={renamedNotice?.to ?? ""}
@@ -342,7 +339,7 @@ export function TopBar({
               </ProjectMenu>
             )}
 
-            {/* RV-05b review round 1: dropped below sm so a 390px top bar has room
+            {/* Dropped below sm so a 390px top bar has room
                 for the project name and the branch toggle without clipping. */}
             <span
               className="hidden sm:inline text-text-disabled text-xs select-none shrink-0"
@@ -461,7 +458,7 @@ export function TopBar({
         </span>
       </div>
 
-      {/* D38: Run + scenario switcher slot, owned by the runs lane */}
+      {/* Run + scenario switcher slot, owned by the run feature */}
       <div
         data-slot="run-control"
         className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink min-[1000px]:pointer-events-auto"

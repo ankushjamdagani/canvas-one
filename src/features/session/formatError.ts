@@ -1,8 +1,7 @@
 /**
- * Structured error formatting for System Studio (RV-12c2).
+ * Structured error formatting for System Studio.
  *
- * Implements requirement: No raw exception text in the UI.
- * Shows messages derived strictly from typed result status/code
+ * No raw exception text reaches the UI. Shows messages derived strictly from typed result status/code
  * (missing, stale, invalid with issue messages, unavailable, quota).
  * Unexpected throws show a fixed generic message and are logged with console.error.
  */

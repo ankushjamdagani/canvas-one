@@ -10,7 +10,7 @@ import {
 
 const load = (family = "s03") =>
   JSON.parse(
-    readFileSync(`specs/revamp/fixtures/${family}.json`, "utf8"),
+    readFileSync(`src/features/entry/examples/${family}.json`, "utf8"),
   ) as Document;
 function content(family = "s03") {
   const document = load(family);

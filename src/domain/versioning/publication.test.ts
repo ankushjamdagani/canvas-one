@@ -11,7 +11,7 @@ import {
 } from './publication';
 import type { PublicationMetadata } from '../../persistence/studio/types';
 
-describe('Publication Metadata and Version Helpers (RV-08e)', () => {
+describe('Publication Metadata and Version Helpers', () => {
   const validMetadata: PublicationMetadata = {
     version: { major: 0, minor: 1, patch: 0 },
     title: 'Initial publication',

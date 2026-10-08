@@ -1,18 +1,18 @@
 /**
- * Composed Scenario Runner for Logical and Timed scenarios (RV-14d-3).
+ * Composed Scenario Runner for Logical and Timed scenarios.
  *
- * Implements specs/revamp/contracts/model-and-runner.md:
- * - §4 Behaviors: machine, pipeline, decision, resource, wiring.
- * - §5 Invocation semantics: frames, propagation, root accounting, control promotion,
- *   descendant data-edge reply settlement, message roots linked to parent.
- * - §6 Scenarios: logical (quiescent) and timed (horizon, drain), external inputs,
- *   completion policies, boundaries.
- * - §8 Runner interface: one global scheduler owning time and insertion sequence:
- *   order (atMs, phase, sequence); phase 1 retained kernel, phase 2 bridge dispatch /
- *   edge arrivals, phase 3 external input.
- * - §9 Results: RunSummary, Counts conserved separately for roots and messages,
- *   ElementMetrics, CheckResult.
- * - §11 Reference scenarios: S01 (checkout), S02 (order processing), S03 (records pipeline).
+ * Composes the machine, pipeline, decision and resource behaviors with wiring: call
+ * frames, propagation, root accounting, control promotion, descendant data-edge reply
+ * settlement, and message roots linked to their parent. Logical scenarios run to
+ * quiescence; timed scenarios run to a horizon and drain. Boundaries script external
+ * replies.
+ *
+ * One global scheduler owns time and insertion sequence, ordering events by
+ * (atMs, phase, sequence): phase 1 retained kernel, phase 2 bridge dispatch / edge
+ * arrivals, phase 3 external input.
+ *
+ * Results are a RunSummary with Counts conserved separately for roots and messages,
+ * ElementMetrics and CheckResults.
  */
 
 import { canonicalJson, sha256Hex } from '../canonical';
@@ -74,7 +74,7 @@ export type ScenarioRunResult = {
   readonly status: TerminalStatus;
   readonly events: readonly TraceEvent[];
   readonly summary: RunSummary;
-  /** D56: every cycle of the run, in the order its request arrived. */
+  /** Every cycle of the run, in the order its request arrived. */
   readonly cycles: readonly Cycle[];
   readonly checks: readonly CheckResult[];
   readonly reason: string | null;
@@ -83,13 +83,12 @@ export type ScenarioRunResult = {
 
 export type ScenarioRunnerOptions = {
   readonly stepSize?: number;
-  /** Checked at every scheduler batch boundary (each `step()` call, §12 "cancellation at
-   * compiler and runner batch boundaries"). An aborted signal ends the run 'cancelled'
+  /** Checked at every scheduler batch boundary (each `step()` call). An aborted signal ends the run 'cancelled'
    * with no terminal success, mirroring `prepareScenario`'s compile-time cancellation. */
   readonly signal?: AbortSignal;
-  /** D56: request Stop when the simulated clock reaches this time (the headless Stop button). */
+  /** Request Stop when the simulated clock reaches this time (the headless Stop button). */
   readonly stopAtMs?: number;
-  /** D57: finished cycles leave memory once `drainCycles()` hands them out (a streamed recording). */
+  /** Finished cycles leave memory once `drainCycles()` hands them out (a streamed recording). */
   readonly streamOutCycles?: boolean;
 };
 
@@ -136,7 +135,7 @@ export type SettlementResult =
   | { readonly ok: false; readonly status: 'failed'; readonly reason: string };
 
 /**
- * Handles unit settlement with explicit outcome check and exact linkage (§8).
+ * Handles unit settlement with explicit outcome check and exact linkage.
  * No success is inferred from aggregates: a settled event without an explicit outcome
  * fails the run with a sanitized diagnostic.
  */
@@ -237,7 +236,7 @@ type GlobalSchedulerEvent =
       readonly held: HeldBoundaryResponse;
     }
   | {
-      /** A boundary's scripted reply to a resource's bridge call (§6 Boundaries, §8 frames). */
+      /** A boundary's scripted reply to a resource's bridge call. */
       readonly kind: 'resource-boundary-response';
       readonly atMs: number;
       readonly phase: 2;
@@ -266,7 +265,7 @@ class ScenarioEventRecorder {
   public stopped = false;
   public stopReason: string | null = null;
   /**
-   * The first trace cap reached (storage.md §6, D47). From then on rows aren't recorded,
+   * The first trace cap reached. From then on rows aren't recorded,
    * but payloads still resolve and the run keeps running and counting.
    */
   public truncatedBy: 'trace-rows' | 'trace-bytes' | null = null;
@@ -377,7 +376,7 @@ class ScenarioEventRecorder {
 // ScenarioRunner Class
 // ============================================================================
 
-/** D55: how long a stopped run may keep draining, in simulated ms. */
+/** How long a stopped run may keep draining, in simulated ms. */
 const STOP_DRAIN_MS = 60000;
 
 /**
@@ -428,15 +427,15 @@ export class ScenarioRunner {
   private readonly activeUserRoots = new Map<string, { openFrameCount: number; outcomes: TransportOutcome[] }>();
   // Active message root IDs
   private readonly activeMessageRoots = new Set<string>();
-  // Exact mapping of delivered unit ID -> studio message root ID (§8)
+  // Exact mapping of delivered unit ID -> studio message root ID
   private readonly deliveredUnitToMessageRoot = new Map<string, string>();
-  // Bridge call frames (§8): a call-frame id handed to an external (non-resource)
+  // Bridge call frames: a call-frame id handed to an external (non-resource)
   // business flow via a resource's bridge continuation. Its eventual reply settles the
   // resource's own waiting op (ResourceAdapter.settleCall) instead of root accounting.
   private readonly kernelBridgeFrames = new Set<string>();
   // A machine call routed directly into a resource entry, keyed by the resource
-  // ResourceInput.rootId (the SAME id as the promoted user root, §5 "the bridge call and
-  // everything synchronous under it share that root"): carries what's needed to deliver
+  // ResourceInput.rootId (the SAME id as the promoted user root: the bridge call and
+  // everything synchronous under it share that root): carries what's needed to deliver
   // the eventual settlement back to the calling machine's response port, mirroring a
   // HeldBoundaryResponse.
   private readonly resourceCallPending = new Map<
@@ -453,7 +452,7 @@ export class ScenarioRunner {
   // Issues collected during runner initialization / runtime
   private issues: ScenarioIssue[] = [];
 
-  // Refinement selection (§6): elements excluded by the scenario's aggregate/refined
+  // Refinement selection: elements excluded by the scenario's aggregate/refined
   // choices, and the connection list with crossings routed through port mappings.
   private refinementExcludedElementIds: Set<Id> = new Set();
   private effectiveConnections: readonly Connection[] = [];
@@ -479,21 +478,21 @@ export class ScenarioRunner {
   private messageCounter = 0;
 
   private isFinished = false;
-  /** D55: set by requestStop(); applied at the next step boundary. */
+  /** Set by requestStop(); applied at the next step boundary. */
   private stopRequested = false;
-  /** D56: simulated ms at which a headless run requests Stop. */
+  /** Simulated ms at which a headless run requests Stop. */
   private readonly stopAtMs: number | undefined;
   private readonly streamOutCycles: boolean;
-  /** D56: an enabled stream (one no finite input replaces) keeps the run going until Stop. */
+  /** An enabled stream (one no finite input replaces) keeps the run going until Stop. */
   private hasStream = false;
-  /** D56: requests the enabled bulk sources send in all, for the "sent M of N" report on Stop. */
+  /** Requests the enabled bulk sources send in all, for the "sent M of N" report on Stop. */
   private bulkRequests = 0;
-  /** D55: when a stop took effect (simulated ms), and the latest the stopped run may keep draining. */
+  /** When a stop took effect (simulated ms), and the latest the stopped run may keep draining. */
   private stoppedAtMs: number | null = null;
   private stopDrainDeadlineMs: number | null = null;
   private terminalStatus: TerminalStatus = 'incomplete';
   private failureReason: string | null = null;
-  // First budget stop (storage.md §6, run-identity.md: an exhausted step/trace budget ends
+  // First budget stop (an exhausted step/trace budget ends
   // the run 'incomplete'). Errors that cascade from that stop must not turn it into 'failed'.
   private budgetStop: string | null = null;
   private readonly signal?: AbortSignal;
@@ -552,7 +551,7 @@ export class ScenarioRunner {
       maxTraceBytes: this.scenario.budgets.maxTraceBytes,
     });
 
-    // Validate faults and host placements (§6 & §8)
+    // Validate faults and host placements
     const validationIssues = validateFaultsAndPlacements(
       this.scenario.faults,
       this.document.relations,
@@ -566,11 +565,7 @@ export class ScenarioRunner {
       return;
     }
 
-    // Bridge call frames (resource -> non-resource call continuation) are supported as of
-    // RV-14f (§8 "Bridge call frames"); the former RV-14d 'unsupported-rv14d' guard for
-    // this case is removed.
-
-    // Refinement selection (§6): aggregate runs the owner and excludes members; refined
+    // Refinement selection: aggregate runs the owner and excludes members; refined
     // runs the members and excludes the owner, with crossing connections routed through
     // port mappings.
     const refinementRouting = resolveRefinementRouting(this.document, this.scenario);
@@ -627,8 +622,8 @@ export class ScenarioRunner {
       if (hasResourceElements) {
         // Built from the refinement-resolved elements/connections (not {document,
         // scenarioId}) so an aggregate/refined selection changes which resource
-        // configuration actually runs (§11 S05 "Aggregate and refined service
-        // configurations are exclusive per scenario").
+        // configuration actually runs (aggregate and refined service configurations
+        // are exclusive per scenario).
         const effectiveElements = this.refinementExcludedElementIds.size
           ? this.document.elements.filter((e) => !this.refinementExcludedElementIds.has(e.id))
           : this.document.elements;
@@ -669,13 +664,13 @@ export class ScenarioRunner {
       }
       this.sortTimedQueue();
     } else {
-      // Logical mode check: logical scenarios reaching resources reject readiness (§6)
+      // Logical mode check: logical scenarios reaching resources reject readiness
       const hasResourceElements = document.elements.some(
         (e) => e.behavior.kind === 'resource' && this.scenario.scopeElementIds.includes(e.id),
       );
       if (hasResourceElements) {
         this.terminalStatus = 'invalid';
-        this.failureReason = 'Logical scenario cannot reach resource elements (§6)';
+        this.failureReason = 'Logical scenario cannot reach resource elements';
         this.isFinished = true;
       }
     }
@@ -725,7 +720,7 @@ export class ScenarioRunner {
   }
 
   private async settleCallFrame(frameId: string, outcome: TransportOutcome, payloadRef?: string): Promise<boolean> {
-    // Bridge call frames (§8): this frame was handed to an external (non-resource)
+    // Bridge call frames: this frame was handed to an external (non-resource)
     // business flow by the resource adapter; settling it here resolves the resource's own
     // waiting op via ResourceAdapter.settleCall, rather than touching root accounting
     // directly (the resource's own eventual unit_settled — via routeSettlement — is what
@@ -755,7 +750,7 @@ export class ScenarioRunner {
       userRoot.openFrameCount--;
       if (userRoot.openFrameCount === 0) {
         this.activeUserRoots.delete(frameInfo.userRootId);
-        // Precedence: expired > failed > rejected > succeeded (§5)
+        // Precedence: expired > failed > rejected > succeeded
         let finalOutcome: TransportOutcome = 'succeeded';
         if (userRoot.outcomes.includes('expired')) finalOutcome = 'expired';
         else if (userRoot.outcomes.includes('failed')) finalOutcome = 'failed';
@@ -769,11 +764,11 @@ export class ScenarioRunner {
   }
 
   /**
-   * Picks a boundary's reply to one request (§6 Boundaries): the first matching response in
+   * Picks a boundary's reply to one request: the first matching response in
    * declared order, then its fixture with request bindings applied, checked against the
-   * boundary's response schema. `consume` follows the contract for finite requests (each
+   * boundary's response schema. `consume` applies to finite requests (each
    * response answers once; exhaustion is an error). Workload traffic is statistical, so
-   * its requests reuse the first matching response (D47).
+   * its requests reuse the first matching response.
    */
   private answerBoundary(
     boundary: Boundary,
@@ -791,9 +786,9 @@ export class ScenarioRunner {
       }
     }
     if (!matchedResponse) {
-      return { ok: false, error: `Boundary exhaustion or no matching response on port '${portId}' (§6)` };
+      return { ok: false, error: `Boundary exhaustion or no matching response on port '${portId}'` };
     }
-    // D51: a repeating response answers every matching request.
+    // A repeating response answers every matching request.
     if (consume && !matchedResponse.repeat) this.usedBoundaryResponseIds.add(matchedResponse.id);
 
     const fixtureVal = this.fixturesMap.get(matchedResponse.responseFixtureId);
@@ -832,7 +827,7 @@ export class ScenarioRunner {
 
   /**
    * Root counts for the whole run: finite-input and machine roots tracked here, plus the
-   * roots the kernel generated from workloads, which only the adapter sees (§5, §9).
+   * roots the kernel generated from workloads, which only the adapter sees.
    */
   private totalRootCounts(): Counts {
     const w = this.adapter?.workloadRoots();
@@ -848,7 +843,7 @@ export class ScenarioRunner {
   }
 
   /**
-   * Routes a settled TraceEvent to the right accounting path (§5, §8): a resource unit
+   * Routes a settled TraceEvent to the right accounting path: a resource unit
    * settling on behalf of a machine's direct call (resourceCallPending, keyed by the
    * SAME rootId as the promoted user root) is delivered back to the calling machine's
    * response port exactly like a boundary response, instead of being counted as a bare
@@ -863,7 +858,7 @@ export class ScenarioRunner {
       const pending = this.resourceCallPending.get(te.rootId);
       if (pending) {
         this.resourceCallPending.delete(te.rootId);
-        // §8 "No success is inferred": a settlement with no explicit outcome, or one whose
+        // No success is inferred: a settlement with no explicit outcome, or one whose
         // payload reference can't be resolved, fails the run — never a fabricated
         // 'succeeded' outcome or an empty payload standing in for the real one.
         if (!te.outcome) {
@@ -927,13 +922,13 @@ export class ScenarioRunner {
   }
 
   /**
-   * Checks the adapter for a pending journey/parent resolution failure (§5/§8: every
+   * Checks the adapter for a pending journey/parent resolution failure (every
    * TraceEvent carries its journey, and a message root links to its parent) after every
    * admit()/stepNext() call. Ends the run 'failed' with a sanitized diagnostic instead of
    * ever letting an unresolved journey surface as 'unknown'. Returns true when the run was
    * just ended so the caller can return immediately.
    */
-  /** A trace row/byte cap refused an append: stop the run 'incomplete' (storage.md §6). */
+  /** A trace row/byte cap refused an append: stop the run 'incomplete'. */
   private recorderCapHit(): { readonly ok: false; readonly error: string } {
     this.budgetStop ??= `Budget exhausted: ${this.recorder.stopReason ?? 'trace limit reached'}`;
     this.terminalStatus = 'incomplete';
@@ -967,7 +962,7 @@ export class ScenarioRunner {
 
     for (const conn of outgoing) {
       if (conn.kind === 'data') {
-        // Data edges forward context unchanged in zero modeled time (§4 & §5)
+        // Data edges forward context unchanged in zero modeled time
         const res = await this.dispatchToElement(conn.target, payload, context, atMs);
         if (!res.ok) return res;
       } else if (conn.kind === 'message') {
@@ -979,13 +974,13 @@ export class ScenarioRunner {
 
         let msgRootId: string;
         if (!isBroadcastBroker) {
-          // Message emission creates its own message root linked to its parent (§5)
+          // Message emission creates its own message root linked to its parent
           msgRootId = `msg_${++this.messageCounter}`;
           this.messageCounts.generated++;
           this.messageCounts.inFlight++;
           this.activeMessageRoots.add(msgRootId);
         } else {
-          // Through a broadcast broker (D36), delivered consumer copies become individual message roots
+          // Through a broadcast broker, delivered consumer copies become individual message roots
           msgRootId = `pub_${++this.messageCounter}`;
         }
 
@@ -1192,7 +1187,7 @@ export class ScenarioRunner {
       context: stepResult.context,
     });
 
-    // Control invocation root promotion on first call emission (§5)
+    // Control invocation root promotion on first call emission
     if (context.isExternalControlInput && stepResult.emissions.length > 0) {
       this.rootCounts.generated++;
       this.rootCounts.inFlight++;
@@ -1314,10 +1309,10 @@ export class ScenarioRunner {
           continue;
         }
 
-        // Direct call into a resource entry (§5 root accounting, §8 bridge call frames):
+        // Direct call into a resource entry (root accounting and bridge call frames):
         // no boundary mocks this call, so if its connection targets a resource element,
         // admit it into the retained kernel using the SAME rootId as the promoted user
-        // root ("the bridge call and everything synchronous under it share that root").
+        // root (the bridge call and everything synchronous under it share that root).
         // The frame created above is settled once the resource's own unit_settled fires
         // (directly, or via an internal bridge continuation resolved by settleCall) —
         // see routeSettlement()/resourceCallPending.
@@ -1327,7 +1322,7 @@ export class ScenarioRunner {
         const targetEl = targetConn ? this.elementsMap.get(targetConn.target.elementId) : undefined;
         if (targetConn && targetEl && targetEl.behavior.kind === 'resource') {
           if (this.scenario.mode !== 'timed') {
-            return { ok: false, error: 'Logical scenario cannot reach resource elements (§6)' };
+            return { ok: false, error: 'Logical scenario cannot reach resource elements' };
           }
           if (!this.adapter) {
             return { ok: false, error: 'Resource adapter not initialized for resource admission' };
@@ -1378,13 +1373,13 @@ export class ScenarioRunner {
     // Process replies
     for (const reply of stepResult.replies) {
       if (!context.frameId) {
-        return { ok: false, error: 'Reply without active frame fails the run (§4 & §5)' };
+        return { ok: false, error: 'Reply without active frame fails the run' };
       }
       const replyCanon = canonicalJson(reply.value);
       const replyPayloadRef = replyCanon.ok ? `sha256:${await sha256Hex(replyCanon.text)}` : undefined;
       const settledOk = await this.settleCallFrame(context.frameId, reply.outcome, replyPayloadRef);
       if (!settledOk) {
-        return { ok: false, error: `Double reply on frame '${context.frameId}' fails the run (§4 & §5)` };
+        return { ok: false, error: `Double reply on frame '${context.frameId}' fails the run` };
       }
 
       this.processedEvents++;
@@ -1466,7 +1461,7 @@ export class ScenarioRunner {
     return false;
   }
 
-  /** D56: "3 units never settled: 2 in Queue, 1 in Worker", by where each is held. */
+  /** "3 units never settled: 2 in Queue, 1 in Worker", by where each is held. */
   private describeStuck(stuck: readonly { holderNodeId: string }[]): string {
     const byHolder = new Map<string, number>();
     for (const u of stuck) byHolder.set(u.holderNodeId, (byHolder.get(u.holderNodeId) ?? 0) + 1);
@@ -1474,12 +1469,12 @@ export class ScenarioRunner {
     return `${stuck.length} ${stuck.length === 1 ? 'unit' : 'units'} never settled: ${where}`;
   }
 
-  /** D55: ask a timed run to stop arrivals and drain; it takes effect at the next step boundary. */
+  /** Ask a timed run to stop arrivals and drain; it takes effect at the next step boundary. */
   requestStop(): void {
     if (this.scenario.mode === 'timed' && !this.isFinished) this.stopRequested = true;
   }
 
-  /** D57: the run's cumulative summary at the current simulated time. */
+  /** The run's cumulative summary at the current simulated time. */
   checkpoint(): RunCheckpoint {
     return {
       atMs: this.currentTimeMs,
@@ -1533,12 +1528,12 @@ export class ScenarioRunner {
     return this.adapter?.drainFlow() ?? [];
   }
 
-  /** D55: the run's simulated clock, in ms. */
+  /** The run's simulated clock, in ms. */
   get simulatedMs(): number {
     return this.currentTimeMs;
   }
 
-  /** D55: when the next event is due in simulated ms, or null when none is pending; used to pace a run against the wall clock. */
+  /** When the next event is due in simulated ms, or null when none is pending; used to pace a run against the wall clock. */
   nextEventAtMs(): number | null {
     const kernel = this.adapter?.peekNext()?.atMs ?? null;
     const global = this.timedQueue[0]?.atMs ?? null;
@@ -1550,7 +1545,7 @@ export class ScenarioRunner {
   async step(): Promise<boolean> {
     if (this.isFinished) return false;
 
-    // Cancellation at a scheduler batch boundary (§12): ends the run 'cancelled' with no
+    // Cancellation at a scheduler batch boundary: ends the run 'cancelled' with no
     // terminal success, never mid-mutation (checked only between steps).
     if (this.signal?.aborted) {
       this.terminalStatus = 'cancelled';
@@ -1567,7 +1562,7 @@ export class ScenarioRunner {
       return false;
     }
 
-    // D57: a stream has no event budget (the worker's lookahead bounds how far it computes, and its trace
+    // A stream has no event budget (the worker's lookahead bounds how far it computes, and its trace
     // truncates at the trace cap); the kernel's own hard limits still end a run that gets that far.
     if (!this.hasStream && this.processedEvents >= this.scenario.budgets.maxEvents) {
       this.terminalStatus = 'incomplete';
@@ -1742,7 +1737,7 @@ export class ScenarioRunner {
     // TIMED MODE STEP (One global scheduler: atMs, phase, sequence)
     // ========================================================================
 
-    // D55: a requested stop takes effect at a step boundary: no workload or input arrives again, and
+    // A requested stop takes effect at a step boundary: no workload or input arrives again, and
     // what is in flight gets up to STOP_DRAIN_MS of simulated time to finish.
     if (this.stopRequested && this.stoppedAtMs === null) {
       this.stoppedAtMs = this.currentTimeMs;
@@ -1752,7 +1747,7 @@ export class ScenarioRunner {
       this.timedQueue.splice(0, this.timedQueue.length, ...kept);
     }
 
-    // D56: a headless run stops itself at `stopAtMs`.
+    // A headless run stops itself at `stopAtMs`.
     if (this.stopAtMs !== undefined && !this.stopRequested && this.currentTimeMs >= this.stopAtMs) this.stopRequested = true;
     if (this.stopRequested && this.stoppedAtMs === null) {
       this.stoppedAtMs = this.currentTimeMs;
@@ -1762,7 +1757,7 @@ export class ScenarioRunner {
       this.timedQueue.splice(0, this.timedQueue.length, ...kept);
     }
 
-    // D56: a run ends when every bulk has sent its requests, nothing is in flight and nothing can
+    // A run ends when every bulk has sent its requests, nothing is in flight and nothing can
     // still happen. A stream never ends by itself; Stop ends its emission and the rest drains.
     const arrivalsDone =
       this.stoppedAtMs !== null ||
@@ -1806,7 +1801,7 @@ export class ScenarioRunner {
       if (kernelNext.atMs < globalNext.atMs) {
         stepKernel = true;
       } else if (kernelNext.atMs === globalNext.atMs) {
-        // Phase 1 (kernel) has precedence over Phase 2 or 3 (§8)
+        // Phase 1 (kernel) has precedence over Phase 2 or 3
         stepKernel = kernelNext.phase <= globalNext.phase;
       } else {
         stepKernel = false;
@@ -1839,12 +1834,12 @@ export class ScenarioRunner {
           return false;
         }
 
-        // Exact linkage: record delivered unit IDs when adapter reports message creation (§8 & D36)
+        // Exact linkage: record delivered unit IDs when adapter reports message creation
         if (te.kind === 'dispatch' && te.code === 'message' && te.parentId) {
           if (this.activeMessageRoots.has(te.parentId)) {
             this.deliveredUnitToMessageRoot.set(te.rootId, te.parentId);
           } else {
-            // A message dispatch whose parent isn't already a known message root (D36
+            // A message dispatch whose parent isn't already a known message root (a
             // broadcast: the runner doesn't pre-register a root for a broadcast publish,
             // only for the ordinary single-delivery case) mints one now. The adapter's
             // clean, deterministic rootId (never a parsed/matched identity string) is
@@ -1866,7 +1861,7 @@ export class ScenarioRunner {
         }
       }
 
-      // Process adapter outputs. A non-null frameId (§8 bridge call frames) marks this as
+      // Process adapter outputs. A non-null frameId (a bridge call frame) marks this as
       // a bridge dispatch: the resource's call continuation reaches an external
       // (non-resource) target, carrying the real admitted payload (resolved from the
       // recorder's payload table, never the placeholder `{}`) and no transport outcome
@@ -1877,7 +1872,7 @@ export class ScenarioRunner {
         const payload =
           out.payloadRef === WORKLOAD_PAYLOAD_REF ? WORKLOAD_REQUEST_PAYLOAD : this.recorder.payloadTable.get(out.payloadRef);
         if (payload === undefined) {
-          // §8 "No success is inferred": never substitute a fabricated `{}` payload for
+          // No success is inferred: never substitute a fabricated `{}` payload for
           // one that can't be resolved.
           this.terminalStatus = 'failed';
           this.failureReason = `Bridge dispatch from '${out.source.elementId}' referenced an unresolvable payload '${out.payloadRef}'`;
@@ -1939,7 +1934,7 @@ export class ScenarioRunner {
               rootId: out.rootId,
               journeyId: out.journeyId,
               parentEventId: out.parentEventId,
-              // A bridge dispatch (§8) carries the application request ID embedded in the
+              // A bridge dispatch carries the application request ID embedded in the
               // forwarded payload (e.g. checkout's own `requestId` field), so a
               // `correlation:{kind:'current'}` emission on the far side of the bridge can
               // still reuse it (there is no authored reverse edge to derive it from).
@@ -1963,7 +1958,7 @@ export class ScenarioRunner {
     switch (evt.kind) {
       case 'external-input': {
         if (this.stoppedAtMs !== null && evt.atMs > this.stoppedAtMs) {
-          // No arrivals after a stop (D55)
+          // No arrivals after a stop
           return true;
         }
 
@@ -2070,7 +2065,7 @@ export class ScenarioRunner {
 
         let frameId: string | null = null;
         if (entryEl?.behavior.kind === 'machine' && entryPort?.channel === 'call') {
-          // Call entry creates one user root and a frame (§5 & BUILD)
+          // Call entry creates one user root and a frame
           frameId = `frame:${this.runId}:${++this.frameCounter}`;
           this.rootCounts.generated++;
           this.rootCounts.inFlight++;
@@ -2133,7 +2128,7 @@ export class ScenarioRunner {
             if (this.activeMessageRoots.has(te.parentId)) {
               this.deliveredUnitToMessageRoot.set(te.rootId, te.parentId);
             } else {
-              // D36 broadcast: no pre-registered root for a broadcast publish. Mint one
+              // Broadcast: no pre-registered root for a broadcast publish. Mint one
               // now, using the adapter's clean, deterministic rootId directly — never a
               // parsed/matched identity string.
               this.messageCounts.generated++;
@@ -2158,7 +2153,7 @@ export class ScenarioRunner {
       }
 
       case 'admit-resource-call': {
-        // A machine's call routed directly into a resource entry (§5, §8): admission is
+        // A machine's call routed directly into a resource entry: admission is
         // recorded via resourceCallPending (registered when the call was emitted), so
         // every settlement — including an immediate admission rejection, which the
         // kernel surfaces synchronously in adm.events — routes back to the calling
@@ -2355,7 +2350,7 @@ export class ScenarioRunner {
         includedElementIds: this.scenario.scopeElementIds.filter(
           (id) => !this.refinementExcludedElementIds.has(id),
         ),
-        // Refinement selection (§6): unselected elements (the excluded owner in refined
+        // Refinement selection: unselected elements (the excluded owner in refined
         // mode, or the excluded members in aggregate mode) stay uncovered here.
         excludedElementIds: this.scenario.scopeElementIds.filter((id) =>
           this.refinementExcludedElementIds.has(id),

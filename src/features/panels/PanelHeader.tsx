@@ -179,7 +179,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
         onDragStart?.(e);
       }}
     >
-      {/* Top grip indicator for floating panel matching 23C */}
+      {/* Top grip indicator for floating panel */}
       {showGrip && (
         <div
           data-slot="panel-grip-bar"
@@ -320,7 +320,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
         </Button>
       </div>
 
-      {/* Static / SSR Inline Menu for 23A Preview and Testing without Portal */}
+      {/* Static / SSR Inline Menu for Preview and Testing without Portal */}
       {menuOpen && renderMenuInline && (
         <div
           data-slot="panel-dropdown-menu"

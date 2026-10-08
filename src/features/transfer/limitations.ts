@@ -1,8 +1,7 @@
 /**
- * Export Limitations Text (RV-10a).
+ * Export Limitations Text.
  *
- * Implements R10 ("limitations are shown at the export action") and
- * specs/revamp/contracts/parts-and-export.md ("JSON, images and files", "CSV v1", "Mermaid v1").
+ * What each export format omits, shown to the user next to the export action.
  */
 
 import type { ExportFormat } from './types';

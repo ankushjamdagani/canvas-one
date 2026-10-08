@@ -26,7 +26,7 @@ export const DropTargets: React.FC<DropTargetsProps> = ({
         className
       )}
     >
-      {/* Left Dock Drop Target (23D) */}
+      {/* Left Dock Drop Target */}
       <div
         data-slot="drop-target-left"
         data-active={activeTarget === 'left'}
@@ -60,7 +60,7 @@ export const DropTargets: React.FC<DropTargetsProps> = ({
         </div>
       </div>
 
-      {/* Right Dock Drop Target (23D) */}
+      {/* Right Dock Drop Target */}
       <div
         data-slot="drop-target-right"
         data-active={activeTarget === 'right'}

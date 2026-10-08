@@ -8,7 +8,7 @@ export interface ArrivalSettings {
   traffic: number;
   duration: number;
   profile?: TrafficProfile;
-  /** D56: a ramp keeps its end rate after `duration` instead of ending the arrivals (an endless stream). */
+  /** A ramp keeps its end rate after `duration` instead of ending the arrivals (an endless stream). */
   holdFinalRate?: boolean;
 }
 

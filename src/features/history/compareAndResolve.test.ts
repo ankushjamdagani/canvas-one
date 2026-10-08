@@ -1,7 +1,6 @@
 /**
- * Pure logic tests for CompareAndResolvePanel's field-edit helper (RV-11b
- * review round). Covers "the edited-field resolution building the right
- * record" from a nested nested nested field path, matching how
+ * Pure logic tests for CompareAndResolvePanel's field-edit helper: building the edited-field resolution's
+ * record from a deeply nested field path, matching how
  * resolve.ts/applySideAtConflictPath addresses conflict paths elsewhere.
  */
 import { describe, expect, it } from 'vitest';

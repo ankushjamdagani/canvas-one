@@ -1,9 +1,5 @@
 /**
- * Mermaid v1 Flowchart Exporter (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("Mermaid v1")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
+ * Mermaid v1 Flowchart Exporter.
  *
  * Rules:
  * - Output plain text `flowchart LR` only

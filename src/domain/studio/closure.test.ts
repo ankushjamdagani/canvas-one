@@ -5,7 +5,7 @@ import type { Document, Element, Connection, Port, Refinement } from './model';
 import { computeClosure } from './closure';
 
 function loadFixture(filename: string): Document {
-  const filePath = path.resolve(__dirname, '../../../specs/revamp/fixtures', filename);
+  const filePath = path.resolve(__dirname, '../../../src/features/entry/examples', filename);
   const content = fs.readFileSync(filePath, 'utf8');
   return JSON.parse(content) as Document;
 }
@@ -364,7 +364,7 @@ describe('Scenario Scope Closure (computeClosure)', () => {
 
       // First call is the pre-flight check (before any expansion); return false there
       // so traversal proceeds, then flip true so cancellation must come from the
-      // batch-boundary check inside/after the work-queue loop (storage.md §6).
+      // batch-boundary check inside/after the work-queue loop.
       let callCount = 0;
       const resBatched = computeClosure(doc, scenarioId, {
         shouldCancel: () => {

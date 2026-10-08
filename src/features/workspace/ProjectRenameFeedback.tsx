@@ -1,5 +1,5 @@
 /**
- * 13A rename feedback: the "NAME TAKEN" popover shown under the inline rename
+ * Rename feedback: the "NAME TAKEN" popover shown under the inline rename
  * input and the "SAVED" notice shown after a successful rename.
  *
  * Both anchor to the breadcrumb chip through `PopoverAnchor` and never take

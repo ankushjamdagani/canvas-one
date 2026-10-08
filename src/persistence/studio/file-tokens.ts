@@ -1,25 +1,22 @@
 /**
- * FileToken registry for System Studio transfer (RV-16b).
+ * FileToken registry for System Studio transfer.
  *
- * Implements specs/revamp/contracts/commands.md §2 "File tokens":
- * "A FileToken is an opaque local UUID bound to user-selected bytes, their hash and size.
- *  It expires on reload and can't be imported or supplied remotely. Bytes are hashed and
- *  validated outside transactions. Retries reuse the same operation ID and destination ID."
+ * A FileToken is an opaque local handle bound to user-selected bytes, their hash and size.
+ * It expires on reload and cannot be imported or supplied remotely. Bytes are hashed and
+ * validated outside transactions.
  *
  * Controller-owned and in memory, same unforgeability pattern as token.ts and
  * publish-ticket.ts: the token handed back is a frozen object whose only durable identity
  * is its entry in a module-instance-private WeakMap. A plain object built from JSON (e.g.
  * `{ id: '...' }`) is never in the registry, so `resolveFile` returns null for it even if
  * its `id` field happens to look like a valid UUID -- this is the "forged/plain token"
- * rejection the task's TESTS section requires. A new `FileTokenRegistry` instance (e.g.
+ * rejection. A new `FileTokenRegistry` instance (e.g.
  * after a reload) has an empty WeakMap, so every previously minted token expires with it.
  *
- * CONTRACT GAP: the contract calls the FileToken itself "an opaque local UUID," but also
- * requires it "can't be built from plain data (WeakMap pattern)" (RV-16b task prompt). A
- * bare UUID string cannot be bound to a WeakMap key. Narrowest reading chosen: the public
- * `id` field IS the UUID commands.md describes (usable for display / `MissingResult.ids`),
- * but the value callers actually pass as `fileToken` is the frozen token object, whose
- * authenticity is checked by object identity in the registry -- exactly like
+ * A bare UUID string cannot be bound to a WeakMap key, so the public `id` field is the
+ * UUID (usable for display / `MissingResult.ids`), while the value callers pass as
+ * `fileToken` is the frozen token object, whose authenticity is checked by object identity
+ * in the registry -- exactly like
  * `RunStartToken` and `PublishTicket`, which are also called "tokens" despite being
  * objects, not primitive strings.
  */
@@ -60,7 +57,7 @@ export async function sha256HexOfBytes(bytes: Uint8Array): Promise<string> {
 /**
  * Controller-owned, in-memory registry of FileTokens. One instance's lifetime is the
  * "session" for transfer purposes: constructing a new registry (e.g. after a page reload)
- * discards every previously minted token, matching commands.md's "It expires on reload."
+ * discards every previously minted token.
  */
 export class FileTokenRegistry {
   private readonly registry = new WeakMap<object, FileTokenBinding>();
@@ -87,7 +84,7 @@ export class FileTokenRegistry {
   /**
    * Resolves a FileToken against this registry's private WeakMap. Returns null for an
    * unknown, expired (different registry instance) or forged/plain token -- never throws,
-   * so callers can uniformly treat it as storage.md's `missing`.
+   * so callers can uniformly treat it as a `missing` result.
    */
   resolveFile(token: unknown): FileTokenBinding | null {
     if (!token || typeof token !== 'object') return null;

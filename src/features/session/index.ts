@@ -1,5 +1,5 @@
 /**
- * Public exports for System Studio Session layer (RV-12c1).
+ * Public exports for System Studio Session layer.
  */
 
 export * from './types';

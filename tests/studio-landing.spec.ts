@@ -14,15 +14,8 @@ test("landing preserves supplied copy and opens projects with working history", 
     "Let agents draw the system.",
   );
   await expect(page.getByText("You & Claude", { exact: true })).toBeVisible();
-  await page
-    .getByRole("button", { name: "Copy npx canvas-one@preview" })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Command copied" }),
-  ).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-    "npx canvas-one@preview",
-  );
+  await expect(page.getByText("npx canvas-one@preview")).toBeVisible();
+  await expect(page.getByText("Coming soon")).toBeVisible();
   await page.getByRole("link", { name: "Try Beta" }).last().click();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByTestId("entry-screen-root")).toBeVisible();
@@ -151,24 +144,6 @@ test("demo connections follow pointer and keyboard movement and accepted queue s
   await page.clock.runFor(16000);
   await expect(gateway.locator("p")).toHaveText("Queue0 dropped");
   await expect(page.getByRole("figure")).toContainText("42 ms");
-});
-
-test("unavailable clipboard shows a usable fallback instead of throwing", async ({
-  page,
-}) => {
-  await page.addInitScript(() =>
-    Object.defineProperty(navigator, "clipboard", { value: undefined }),
-  );
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
-  await page
-    .getByRole("button", { name: "Copy npx canvas-one@preview" })
-    .click();
-  await expect(page.getByRole("alert")).toContainText(
-    "npx canvas-one@preview",
-  );
-  expect(errors).toEqual([]);
 });
 
 test("landing follows authored board geometry and timed collaboration sequence", async ({

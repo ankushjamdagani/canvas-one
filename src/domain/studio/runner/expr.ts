@@ -1,8 +1,5 @@
 /**
- * Value and Guard evaluator (RV-14b).
- *
- * Implements specs/revamp/contracts/model-and-runner.md §4 ("Values and guards")
- * and the Evaluator interface from runner/expr-api.ts:
+ * Value and Guard evaluator, implementing the Evaluator interface from runner/expr-api.ts:
  * - Path reads over input/context, returning `missingValue` for missing reads.
  * - Only `exists` can test `missingValue`; other operations produce a modeled EvalError.
  * - Record/list constructors with unique keys and no missing values.

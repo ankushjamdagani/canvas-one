@@ -1,12 +1,11 @@
 /**
- * "What happens during the run" section for timed scenarios: faults (RV-05c).
+ * "What happens during the run" section for timed scenarios: faults.
  *
- * commands.md §4 "Editor sections": "timed only: faults." model-and-runner.md §6:
- * `Fault={id,hostId,downAtMs,upAtMs,detectionDelayMs,recoveryDetectionDelayMs,
- * activePolicy:'fail',queuedPolicy:'reject',routeReset:'first-healthy'}` -- the last
+ * Faults exist for timed scenarios only. A `Fault` is
+ * `{id,hostId,downAtMs,upAtMs,detectionDelayMs,recoveryDetectionDelayMs,
+ * activePolicy:'fail',queuedPolicy:'reject',routeReset:'first-healthy'}`; the last
  * three are fixed literals (the only legal values), so the editor only exposes host,
- * timing and detection delays. Screen: scenario_traffic_editor.png ("Payment host goes
- * down ... down 5.0s -> up 12.0s ... noticed after 0.5s").
+ * timing and detection delays.
  */
 
 import * as React from 'react';

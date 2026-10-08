@@ -1,10 +1,6 @@
 /**
- * Component Placement Compiler (RV-06a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/catalog.md (§3 Placement rule, Approved resolutions 3, 4, 11)
- * - specs/revamp/contracts/commands.md (§4 model.apply-records, fresh IDs, one undo)
- * - specs/revamp/contracts/parts-and-export.md (fresh-ID rules)
+ * Component placement compiler: turns a catalog entry placement into record changes with
+ * fresh IDs, applied as one undoable command.
  */
 
 import type {
@@ -32,7 +28,7 @@ export type PlaceEntryParams = {
   readonly entryId: string;
   readonly anchor: { readonly x: number; readonly y: number };
   readonly mintId: () => Id;
-  /** D52: required for (and only valid with) the `linked-project` entry; `title` is the label until it is read live. */
+  /** Required for (and only valid with) the `linked-project` entry; `title` is the label until it is read live. */
   readonly link?: { readonly projectId: Id; readonly title: string; readonly exposures: readonly ProjectExposure[] };
 };
 
@@ -92,7 +88,7 @@ export function placeEntry(params: PlaceEntryParams): PlaceEntryResult {
     };
   }
 
-  // D53: a linked node gets one in-port per endpoint the project exposes, and needs a call port as its entry.
+  // A linked node gets one in-port per endpoint the project exposes, and needs a call port as its entry.
   const linkedExposures = link
     ? [...link.exposures].sort((a, b) => Number(b.channel === 'call') - Number(a.channel === 'call'))
     : [];

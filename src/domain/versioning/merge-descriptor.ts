@@ -1,9 +1,5 @@
 /**
- * Closed merge descriptor and key classification for System Studio documents (RV-08c).
- *
- * Implements:
- * - specs/revamp/contracts/transactions.md §5 (Merge: 3-way merge rules, conflict taxonomy, ordered vs set fields)
- * - specs/revamp/contracts/model-and-runner.md §7 (Projection inventory: which lists are ordered vs sets)
+ * Closed merge descriptor and key classification for System Studio documents.
  *
  * Classifies every field of every Document record, recursively, as one of:
  * - scalar: three-way value (primitives and Json values like fixture.value and literals compared by canonical JSON)
@@ -273,7 +269,7 @@ export const BEHAVIOR_DESCRIPTOR: UnionFieldDescriptor = {
         initialStateId: { type: 'scalar' },
         contextSchemaId: { type: 'scalar' },
         initialContextFixtureId: { type: 'scalar' },
-        transitions: { type: 'atomic' }, // §7: transitions are atomic
+        transitions: { type: 'atomic' }, // transitions are atomic
         responseBindings: { type: 'keyed', item: MACHINE_RESPONSE_BINDING_DESCRIPTOR },
       },
     },
@@ -288,7 +284,7 @@ export const BEHAVIOR_DESCRIPTOR: UnionFieldDescriptor = {
         inputPortId: { type: 'scalar' },
         outputPortId: { type: 'scalar' },
         errorPortId: { type: 'scalar' },
-        operations: { type: 'atomic' }, // §7: operations are atomic
+        operations: { type: 'atomic' }, // operations are atomic
       },
     },
     decision: {
@@ -487,7 +483,7 @@ export const SHAPE_DESCRIPTOR: UnionFieldDescriptor = {
       fields: {
         type: { type: 'scalar' },
         nullable: { type: 'scalar' },
-        types: { type: 'atomic' }, // §7: list values are atomic
+        types: { type: 'atomic' }, // list values are atomic
       },
     },
   },
@@ -539,7 +535,7 @@ export const WORKLOAD_DESCRIPTOR: ObjectFieldDescriptor = {
     startDelayMs: { type: 'scalar' },
     emission: { type: 'atomic' },
     timeoutMs: { type: 'scalar' },
-    classes: { type: 'atomic' }, // §7: workload classes are atomic
+    classes: { type: 'atomic' }, // workload classes are atomic
   },
 };
 
@@ -572,14 +568,14 @@ export const SCENARIO_DESCRIPTOR: ObjectFieldDescriptor = {
     label: { type: 'scalar' },
     revision: { type: 'scalar' }, // derived during merge
     mode: { type: 'scalar' },
-    scopeElementIds: { type: 'set' }, // §7: set
-    entryPorts: { type: 'atomic' }, // §7: atomic
-    inputs: { type: 'atomic' }, // §7: atomic
+    scopeElementIds: { type: 'set' }, // set
+    entryPorts: { type: 'atomic' }, // atomic
+    inputs: { type: 'atomic' }, // atomic
     workloads: { type: 'keyed', item: WORKLOAD_DESCRIPTOR },
-    faults: { type: 'atomic' }, // §7: atomic
-    boundaries: { type: 'atomic' }, // §7: atomic
-    refinementSelections: { type: 'atomic' }, // §7: atomic
-    initialContexts: { type: 'atomic' }, // §7: atomic
+    faults: { type: 'atomic' }, // atomic
+    boundaries: { type: 'atomic' }, // atomic
+    refinementSelections: { type: 'atomic' }, // atomic
+    initialContexts: { type: 'atomic' }, // atomic
     assertions: { type: 'keyed', item: ASSERTION_DESCRIPTOR },
     seed: { type: 'scalar' },
     budgets: {
@@ -613,7 +609,7 @@ export const GROUP_DESCRIPTOR: ObjectFieldDescriptor = {
   fields: {
     id: { type: 'scalar' },
     label: { type: 'scalar' },
-    elementIds: { type: 'set' }, // §7: set
+    elementIds: { type: 'set' }, // set
     collapsed: { type: 'scalar' },
   },
 };
@@ -627,7 +623,7 @@ export const NOTE_DESCRIPTOR: ObjectFieldDescriptor = {
     y: { type: 'scalar' },
     width: { type: 'scalar' },
     tone: { type: 'scalar' },
-    attachedElementIds: { type: 'set' }, // §7: set
+    attachedElementIds: { type: 'set' }, // set
   },
 };
 
@@ -637,8 +633,8 @@ export const VIEW_DESCRIPTOR: ObjectFieldDescriptor = {
     id: { type: 'scalar' },
     label: { type: 'scalar' },
     placements: { type: 'keyed', item: PLACEMENT_DESCRIPTOR },
-    connectionIds: { type: 'set' }, // §7: set
-    relationIds: { type: 'set' }, // §7: set
+    connectionIds: { type: 'set' }, // set
+    relationIds: { type: 'set' }, // set
     groups: { type: 'keyed', item: GROUP_DESCRIPTOR },
     notes: { type: 'keyed', item: NOTE_DESCRIPTOR },
   },

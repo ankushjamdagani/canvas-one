@@ -71,7 +71,7 @@ async function configurePlaybackLink(page: Page) {
   return edge.getAttribute('data-id');
 }
 
-test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
+test.describe('Bulk and stream runs, Stop and pace', () => {
   test('a stream goes on until Stop, then drains and keeps its results', async ({ page }) => {
     await openS06(page);
     await setTraffic(page, { mode: 'stream', rate: 100 });
@@ -92,7 +92,7 @@ test.describe('Bulk and stream runs, Stop and pace (D55, D56)', () => {
   test('a stream is not cut off by the event budget, and Stop still completes it', async ({ page }) => {
     await openS06(page);
     await setTraffic(page, { mode: 'stream', rate: 100 });
-    // The approved 4× playback rate keeps this stream advancing beyond the initial recording window.
+    // The 4× playback rate keeps this stream advancing beyond the initial recording window.
     await setSpeed(page, '4');
     await runScenario(page);
     await page.waitForTimeout(8000);

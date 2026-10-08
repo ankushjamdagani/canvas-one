@@ -1,9 +1,5 @@
 /**
- * Tests for Exporter Limitations Texts (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/requirements.md (R10: "limitations are shown at the export action")
- * - specs/revamp/contracts/parts-and-export.md
+ * Tests for the exporter limitations texts.
  */
 
 import { describe, expect, it } from 'vitest';

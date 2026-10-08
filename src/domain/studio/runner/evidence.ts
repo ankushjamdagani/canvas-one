@@ -1,16 +1,15 @@
 /**
- * Evidence interface (RV-14a): the shapes storage.md §2's `EvidenceRef` row and
- * run-identity.md §5's evidence manifest need, plus a pure constructor from a terminal
- * RunUpdate.
+ * Evidence interface: the shapes of an `EvidenceRef` and an evidence manifest, plus a
+ * pure constructor from a terminal RunUpdate.
  *
- * SCOPE: interface only. Eligibility predicates (run-identity.md §5: "A run qualifies a
- * scenario only if ...") belong to RV-08a and are NOT implemented here.
+ * SCOPE: interface only. Eligibility predicates (whether a run qualifies a scenario)
+ * are NOT implemented here.
  */
 
 import type { Id } from '../model';
 import type { CheckResult, RunUpdate, TerminalStatus } from './types';
 
-/** storage.md §2: `EvidenceRef={scenarioId, fingerprint, runId}`. */
+/** `EvidenceRef={scenarioId, fingerprint, runId}`. */
 export type EvidenceRef = {
   readonly scenarioId: Id;
   readonly fingerprint: string;
@@ -18,9 +17,8 @@ export type EvidenceRef = {
 };
 
 /**
- * One scenario's evidence in a commit/publish manifest (run-identity.md §5: "Store an
- * evidence manifest: full scenario inventory, fingerprint, run ID, completion, check
- * outcomes and tested scope").
+ * One scenario's evidence in a commit/publish manifest: fingerprint, run ID, completion,
+ * check outcomes and tested scope.
  */
 export type EvidenceEntry = {
   readonly scenarioId: Id;
@@ -35,9 +33,7 @@ export type EvidenceEntry = {
 };
 
 /**
- * run-identity.md §5: "Enumerate every scenario in the immutable candidate ... Store an
- * evidence manifest: full scenario inventory, fingerprint, run ID, completion, check
- * outcomes and tested scope." `scenarioIds` is the full inventory (every scenario in the
+ * Evidence manifest for an immutable candidate. `scenarioIds` is the full inventory (every scenario in the
  * candidate, whether or not it has evidence yet); `entries` holds the evidence gathered
  * so far.
  */
@@ -49,8 +45,8 @@ export type EvidenceManifest = {
 /**
  * Builds one `EvidenceEntry` from a run's terminal `RunUpdate`. This is a pure copy: it
  * never edits, reorders or reinterprets `checks` or `scope` outcomes (eligibility — e.g.
- * "every configured check was evaluated and passed" — is RV-08a's job, not this
- * constructor's), and it never mutates its `terminalUpdate` argument.
+ * "every configured check was evaluated and passed" — is not this
+ * constructor's job), and it never mutates its `terminalUpdate` argument.
  */
 export function evidenceEntryFromTerminal(
   scenarioId: Id,

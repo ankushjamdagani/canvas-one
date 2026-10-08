@@ -1,24 +1,17 @@
 /**
- * Scenario compile front end (RV-14a).
- *
- * Implements the `compileScenario` half of model-and-runner.md §8's runner interface,
- * under the name `prepareScenario` (see below for why it isn't `compileScenario` yet).
+ * Scenario compile front end, exported as `prepareScenario`.
  * Pipeline: storable validation (./validate.ts's `validateDocument`) → execution
  * manifest + fingerprint (./manifest.ts's `buildManifest`, which itself runs
  * `checkReadiness`/scope closure).
  *
  * SCOPE: this module deliberately does NOT implement plan handles, a worker session, or
- * `startRun` (model-and-runner.md §8's `plan:{workerSessionId,planId}` and `RunHandle`
- * machinery). Delivery order §12 puts "characterize the retained resource runner" and
- * the worker/adapter wiring after this step; RV-14a is scoped to "no UI and no worker
- * yet" per its task brief. Hence this export is named `prepareScenario` rather than the
- * contract's `compileScenario`: the contract's `compileScenario` returns a `plan` field
- * on success that nothing here can honestly produce yet. A later step should rename/wrap
- * this into the full `compileScenario` once a worker session exists.
+ * `startRun`. It is named `prepareScenario` rather than `compileScenario` because a
+ * full `compileScenario` would return a `plan` field on success that nothing here can
+ * produce without a worker session.
  *
  * Cancellation: the signal is checked before validation, again before handing off to
  * `buildManifest`, and again after it resolves — `buildManifest` takes no AbortSignal
- * (see CONTRACT GAPS in the task report), so cancellation between its internal awaits
+ * so cancellation between its internal awaits
  * can't be observed mid-call; this is the narrowest boundary-only workaround available
  * without editing manifest.ts.
  */
@@ -35,7 +28,7 @@ import type { AuthoredSnapshot } from './types';
  * codes). `prepareScenario` surfaces whichever issue shape produced the failure rather
  * than lossily narrowing readiness codes back down to `Issue`'s closed catalog.
  *
- * `IdentityUnavailableIssue` is the CONTRACT GAPS sentinel described below: neither
+ * `IdentityUnavailableIssue` is a sentinel for hashing failures: neither
  * `Issue` nor `ReadinessIssue` declares an `'identity-unavailable'` code (it names a
  * hashing failure, not a document/readiness defect), so it's added as its own arm here
  * rather than smuggled into either closed catalog.
@@ -64,16 +57,15 @@ function cancelled(): PrepareScenarioResult {
 /**
  * `prepareScenario(snapshot, scenarioId, signal, versions)`.
  *
- * Status mapping from `buildManifest` (run-identity.md §3 / model-and-runner.md §9):
+ * Status mapping from `buildManifest`:
  * - `ok` → `ready` (manifest + fingerprint passed through unchanged).
  * - `not-ready` → `invalid`, keeping its issues verbatim.
- * - `analysis-limit` / `cancelled` → pass through unchanged (contract has these exact
+ * - `analysis-limit` / `cancelled` → pass through unchanged (the result type has these exact
  *   statuses already).
- * - `identity-unavailable` has no corresponding contract status for this front end
- *   (run-identity.md §3 only says hash-unavailable "blocks qualifying runs, commit and
- *   publish" — it doesn't name a `compileScenario` status). Narrowest reading: treat it
- *   as `invalid` with a single sentinel issue carrying code `'identity-unavailable'`,
- *   since it is not a modeled document/readiness defect. See CONTRACT GAPS.
+ * - `identity-unavailable` has no corresponding status here (an unavailable hash blocks
+ *   qualifying runs, commit and publish). It is reported as `invalid` with a single
+ *   sentinel issue carrying code `'identity-unavailable'`, since it is not a modeled
+ *   document/readiness defect.
  */
 export async function prepareScenario(
   snapshot: AuthoredSnapshot,

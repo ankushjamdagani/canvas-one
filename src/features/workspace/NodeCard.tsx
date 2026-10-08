@@ -17,13 +17,13 @@ export function NodeCard({ data, selected }: NodeProps) {
   if (nodeData.kind !== 'element') return null;
 
   const { element, layer, stripeColor, placement, connectable, trafficEntry } = nodeData;
-  // placement.width stays authoritative (2A workspace: ~184px nominal card,
+  // placement.width stays authoritative (nominal card is about 184px;
   // wider placements render as authored rather than truncating fields).
   const Icon = getNodeIcon(element.visualKind);
   const caption = getNodeCaption(element);
   const portSummary = ['in', 'out']
     .map((direction) => {
-      // D53: connectable ports read as their protocol and path (HTTP / REST /orders); event ports keep their label.
+      // Connectable ports read as their protocol and path (HTTP / REST /orders); event ports keep their label.
       const labels = element.ports
         .filter((p) => p.direction === direction)
         .map((p) => {
@@ -65,7 +65,7 @@ export function NodeCard({ data, selected }: NodeProps) {
           Traffic enters here
         </span>
       ) : null}
-      {/* Node kind stripe by catalog layer (D35, extended by D42: state-machine,
+      {/* Node kind stripe by catalog layer (state-machine,
           data-pipeline and host each get their own stripe group; custom gets
           none — getCatalogLayer/CATALOG_LAYER_COLORS in projection.ts). */}
       {stripeColor ? (
@@ -164,8 +164,8 @@ export function NodeCard({ data, selected }: NodeProps) {
         ) : null}
 
         <div className="flex items-center gap-1.5">
-          {/* No truncate: D42's caption values ("processor · 2 000 /s cap")
-              can run longer than the old bare visualKind text, so this wraps
+          {/* No truncate: caption values ("processor · 2 000 /s cap")
+              can run long, so this wraps
               rather than clipping (the card has no fixed height). */}
           <span
             className="text-micro font-mono text-secondary-text leading-snug break-words"
@@ -175,9 +175,8 @@ export function NodeCard({ data, selected }: NodeProps) {
           </span>
         </div>
 
-        {/* RV-04g: Placement.expanded adds a port summary under the caption.
-            Fresh placements are expanded:false (catalog.md resolution 4), so
-            the default card is unchanged. */}
+        {/* Placement.expanded adds a port summary under the caption.
+            Fresh placements are expanded:false, so the default card is unchanged. */}
         {placement.expanded ? (
           <div
             data-testid={`node-ports-${element.id}`}

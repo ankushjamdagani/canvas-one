@@ -1,5 +1,5 @@
 /**
- * Pure planner for commands.md §4 selection.wrap-in-boundary.
+ * Pure planner for selection.wrap-in-boundary.
  *
  * The resulting RecordChange[] is one model.apply-records batch: the new
  * aggregate owner, its refinement, every crossing connection, affected

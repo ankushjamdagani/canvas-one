@@ -1,9 +1,9 @@
 /**
- * Typed import-error formatting for the entry screen (RV-10b).
+ * Typed import-error formatting for the entry screen.
  *
- * `importProjectJson` (RV-10a, src/features/transfer/json-transfer.ts) never throws
+ * `importProjectJson` (src/features/transfer/json-transfer.ts) never throws
  * for an expected failure -- it returns a typed `ImportProjectJsonFailure` whose
- * `message` is already a non-raw, user-facing string (D19's "made with the old app,
+ * `message` is already a non-raw, user-facing string (e.g. "made with the old app,
  * not supported" for unsupported v7/v8, the byte-cap message, validation issue
  * text, ...). This just picks the right field for each failure `kind`, joining
  * issue messages when `message` is absent. A failure with neither is a contract

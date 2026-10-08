@@ -1,13 +1,12 @@
 /**
- * In-memory Candidate Controller for System Studio (RV-08d).
+ * In-memory Candidate Controller for System Studio.
  *
- * Implements:
- * - specs/revamp/contracts/commands.md (Candidates, history.prepare-publish, history.resolve-conflict, run.start)
- * - specs/revamp/contracts/transactions.md §4 & §5 (Prepare publish, 3-way merge, candidate isolation)
- * - specs/revamp/contracts/run-identity.md §5 (Eligibility across branches)
+ * Covers prepare-publish, 3-way merge conflict resolution, candidate-scoped runs and
+ * eligibility across branches.
  *
- * Controller-owned and in-memory only (never written to the DB; a new controller instance = reload, so candidates are gone).
- * Inject mintId for candidate IDs (it is an ephemeral controller handle, not a stored record; say so in a comment).
+ * Controller-owned and in-memory only (never written to the DB; a new controller instance
+ * means candidates are gone). The injected mintId produces candidate IDs, which are
+ * ephemeral controller handles, not stored records.
  */
 
 import type { Id } from '../../domain/studio/model';
@@ -784,7 +783,7 @@ export class CandidateController {
   }
 
   /**
-   * Publishes an eligible candidate to main (RV-08e).
+   * Publishes an eligible candidate to main.
    *
    * Candidates are controller-owned and can't come from portable input, so publish
    * goes through CandidateController.publish(ctx, command): it looks up the candidate

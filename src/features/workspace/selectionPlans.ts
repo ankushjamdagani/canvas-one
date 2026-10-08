@@ -1,5 +1,5 @@
 /**
- * Pure presentation planners for commands.md §4 selection.group,
+ * Pure presentation planners for selection.group,
  * selection.ungroup, selection.align, selection.distribute and
  * canvas.add-note. Every successful plan replaces only the active View, so
  * one model.apply-records command creates one undo entry without touching the
@@ -22,7 +22,7 @@ export const GROUP_LABEL_MAX_LENGTH = 80;
 export const NOTE_TEXT_MAX_LENGTH = 4000;
 export const VIEW_GROUP_LIMIT = 50;
 export const VIEW_NOTE_LIMIT = 50;
-/** No authored note-width default existed before RV-04e; 220px matches the existing note fixture/card size. */
+/** Default note width in px. */
 export const DEFAULT_NOTE_WIDTH = 220;
 
 const MIN_CANVAS_COORDINATE = -1_000_000;

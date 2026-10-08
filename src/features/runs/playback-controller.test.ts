@@ -1,5 +1,5 @@
 /**
- * D57: RunController plays the worker's recording: a playhead clock, with flow, trace events and the final
+ * RunController plays the worker's recording: a playhead clock, with flow, trace events and the final
  * result released as the playhead passes them.
  */
 import { describe, expect, it } from 'vitest';
@@ -11,7 +11,7 @@ import { InProcessTransport } from './inProcessTransport';
 import { RunController, type PlaybackClock } from './RunController';
 import { WorkerProtocolHandler, type HostMessage } from './protocol';
 
-const s06 = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+const s06 = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s06.json'), 'utf8')) as Document;
 
 function docWith(emission: Emission): Document {
   return {
@@ -85,7 +85,7 @@ function setup(emission: Emission, speed: number) {
   return { controller, params, advance, until, saved, repository };
 }
 
-describe('playback pacing (D57)', () => {
+describe('playback pacing', () => {
   it('Stop preserves live bulk range review through drain and an explicit Save persists it', async () => {
     const { controller, params, until, advance, saved } = setup({ mode: 'bulk', requests: 100, arrival: { spreadMs: 80000 } }, 1);
     void controller.run(params);

@@ -1,4 +1,4 @@
-/** How a bulk of N requests spreads over time (D56). */
+/** How a bulk of N requests spreads over time. */
 export type BulkArrival =
   | 'instant'
   | { readonly spreadMs: number }

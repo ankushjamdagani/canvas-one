@@ -1,5 +1,5 @@
 /**
- * selection.replace-part (commands.md "Selection-scoped actions", board 16D): pick a
+ * selection.replace-part: pick a
  * catalog entry, review what moves and what is removed, then confirm. The replacement is
  * one model change (one undo); nothing is written until Confirm.
  */

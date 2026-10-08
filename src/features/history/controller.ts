@@ -1,15 +1,8 @@
 import { filterHistorySteps } from './historyFilter';
 /**
- * HistoryController implementation for System Studio (RV-11a).
- *
- * Implements specifications from:
- * - specs/revamp/decisions.md (D11, D20, D26, D27, D28, D29, D37, D40, D41)
- * - specs/revamp/design-revalidation.md (§2 exclusions & §3 item 10)
- * - specs/revamp/requirements.md (R08)
- * - specs/revamp/contracts/transactions.md §4
- * - specs/revamp/contracts/commands.md §3 & "Scenarios (D41)"
- * - specs/revamp/contracts/storage.md §2–§5
- * - specs/revamp/contracts/run-identity.md §5
+ * HistoryController implementation for System Studio: loads the branch's history ladder
+ * (commits, checkpoints, publications), and runs checkpoint, restore and commit actions
+ * against the repository, keeping the session in sync.
  */
 
 import type { Document, Id } from '../../domain/studio/model';
@@ -265,7 +258,7 @@ export class HistoryController {
       const branch = history.branches.find((b) => b.id === activeBranchId) ?? null;
       const isMain = activeBranchId === history.project.mainBranchId;
 
-      // Commits reachable from the branch's head in DAG order, newest first (storage.md §9)
+      // Commits reachable from the branch's head in DAG order, newest first
       const branchCommits =
         history.branchHistories.find((bh) => bh.branchId === activeBranchId)?.commits ??
         Object.freeze([]);
@@ -321,7 +314,7 @@ export class HistoryController {
     if (typeof label !== 'string') {
       throw new TypeError('saveCheckpoint requires a string label');
     }
-    // Checkpoint label bound per contracts/storage.md §5 ("labels/title 1-80 code points"),
+    // Checkpoint label bound to 1-80 code points,
     // matching the repository's own history.checkpoint validation (repository.ts).
     const trimmed = label.trim();
     if (trimmed.length < 1 || trimmed.length > 80) {
@@ -382,9 +375,9 @@ export class HistoryController {
     if (typeof label !== 'string') {
       throw new TypeError('restore requires a string label for the pre-restore checkpoint');
     }
-    // Pre-restore checkpoint label bound identically to saveCheckpoint (contracts/storage.md
-    // §5 "labels/title 1-80 code points"); never invented — the caller must supply it
-    // (commands.md history.restore payload {snapshotId, checkpointId, label}).
+    // Pre-restore checkpoint label bound identically to saveCheckpoint
+    // (1-80 code points); never invented — the caller must supply it
+    // (history.restore payload {snapshotId, checkpointId, label}).
     const trimmedLabel = label.trim();
     if (trimmedLabel.length < 1 || trimmedLabel.length > 80) {
       return {
@@ -411,7 +404,7 @@ export class HistoryController {
       };
     }
 
-    // Direct restore on main is rejected (transactions.md §4)
+    // Direct restore on main is rejected
     if (this.state.isMain) {
       return {
         status: 'invalid',
@@ -437,7 +430,7 @@ export class HistoryController {
       }
     }
 
-    // Contract: Checkpoints current work first, then replaces it in the same transaction
+    // Checkpoints current work first, then replaces it in the same transaction
     const checkpointId = this.mintId();
 
     const command: HistoryRestoreCommand = {
@@ -475,14 +468,14 @@ export class HistoryController {
       };
     }
 
-    // D40: Main never holds unpublished edits
+    // Main never holds unpublished edits
     if (this.state.isMain) {
       return {
         status: 'invalid',
         issues: [
           createIssue(
             'structural-rule',
-            'Direct commit on main branch is rejected; main never holds edits (D40)',
+            'Direct commit on main branch is rejected; main never holds edits',
             ['branchId'],
           ),
         ],
@@ -492,8 +485,8 @@ export class HistoryController {
     if (typeof message !== 'string') {
       throw new TypeError('commit requires a string message');
     }
-    // Commit message bound per contracts/storage.md §5 (rationale/message 0-4000 code
-    // points) with a required minimum of 1, matching the repository's own
+    // Commit message bound to 0-4000 code
+    // points with a required minimum of 1, matching the repository's own
     // history.commit validation (repository.ts).
     const trimmedMsg = message.trim();
     if (trimmedMsg.length < 1 || trimmedMsg.length > 4000) {
@@ -826,7 +819,7 @@ export class HistoryController {
 /**
  * The public surface HistoryLadder and CommitPanel depend on. A `Pick` of the
  * controller's own members so the workspace can hand them a facade whose
- * actions execute the registry's history commands (RV-03s).
+ * actions execute the registry's history commands.
  */
 export type HistoryControllerLike = Pick<
   HistoryController,

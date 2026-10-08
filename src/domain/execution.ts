@@ -15,18 +15,18 @@ export interface ResourceConfig {
   maxRetries: number;
   retryDelayMs: number;
   /**
-   * D49 (audit H1): how long one attempt takes. 'fixed' is exactly 1/capacity per slot
+   * How long one attempt takes. 'fixed' is exactly 1/capacity per slot
    * (M/D/c); 'exponential' draws a seeded exponential time with that mean (M/M/c).
-   * Absent means 'fixed', the behaviour of graphs built before D49. 'lognormal' (D50)
+   * Absent means 'fixed'. 'lognormal'
    * has a heavy tail: mean 1/capacity and coefficient of variation `serviceTimeCv`.
    */
   serviceTime?: 'fixed' | 'exponential' | 'lognormal';
-  /** D50: coefficient of variation (stdev / mean) for 'lognormal', 0.1..10; required for it. */
+  /** Coefficient of variation (stdev / mean) for 'lognormal', 0.1..10; required for it. */
   serviceTimeCv?: number;
 }
 
 /**
- * D49 (audit H13): the caller retries a call that is rejected, fails or times out.
+ * The caller retries a call that is rejected, fails or times out.
  * Attempt n waits min(maxBackoffMs, backoffMs * multiplier^(n-1)) before retrying, scaled
  * by a seeded uniform draw when `jitter` is on ("full jitter"). `attemptTimeoutMs` bounds
  * each attempt; null leaves only the request's own deadline.
@@ -63,7 +63,7 @@ export interface RequestClass {
 }
 
 /**
- * D53: what one endpoint (an in-port) of a node overrides for the calls that enter through it.
+ * What one endpoint (an in-port) of a node overrides for the calls that enter through it.
  * Absent fields fall back to the node's own behavior. `key` identifies the endpoint's rate limiter.
  */
 export interface EndpointBehavior {
@@ -80,7 +80,7 @@ export interface EndpointBehavior {
   responseBytes?: number;
 }
 
-/** D54: the caller's out-port policies for one downstream endpoint; `key` identifies the out-port. */
+/** The caller's out-port policies for one downstream endpoint; `key` identifies the out-port. */
 export interface CallerPolicy {
   key: string;
   /** Consecutive failures that open the breaker, how long it stays open, and the probes allowed when half-open. */
@@ -96,7 +96,7 @@ export interface CallerPolicy {
   batch?: { size: number; windowMs: number };
 }
 
-/** D54: what can go wrong on the wire of an edge. */
+/** What can go wrong on the wire of an edge. */
 export interface EdgeLink {
   jitterMs: number;
   lossRate: number;
@@ -104,7 +104,7 @@ export interface EdgeLink {
 }
 
 /**
- * D56: how a studio source emits. A bulk sends `requests` arrivals at deterministic times; a stream
+ * How a studio source emits. A bulk sends `requests` arrivals at deterministic times; a stream
  * keeps arriving (Poisson, shaped by `profile`) until arrivals are stopped. Absent = the engine-level
  * `rate`/`intervalMs` behaviour the kernel tests drive directly.
  */
@@ -122,7 +122,7 @@ export interface WorkloadDefinition {
   intervalMs?: number;
   schedule?: WorkloadSchedule;
   classes: RequestClass[];
-  /** D53: the entry endpoint's overrides. */
+  /** The entry endpoint's overrides. */
   endpoint?: EndpointBehavior;
 }
 
@@ -134,7 +134,7 @@ export interface ExecutionEdge {
   latencyMs: number;
   returnLatencyMs: number;
   ackDelayMs: number;
-  /** D56: null = the message never expires. */
+  /** Null = the message never expires. */
   messageTtlMs: number | null;
   weight: number;
   condition?: {
@@ -145,11 +145,11 @@ export interface ExecutionEdge {
   needsReview?: boolean;
   /** Call edges only; absent or null means the caller never retries. */
   retry?: CallRetryPolicy | null;
-  /** D53: the target endpoint's overrides. */
+  /** The target endpoint's overrides. */
   endpoint?: EndpointBehavior;
-  /** D54: the source out-port's policies. */
+  /** The source out-port's policies. */
   caller?: CallerPolicy;
-  /** D54: jitter, loss and bandwidth of the link. */
+  /** Jitter, loss and bandwidth of the link. */
   link?: EdgeLink;
 }
 
@@ -378,7 +378,7 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
       const edgeId = isStr(e.id) ? e.id : undefined;
       if (!isObj(r)) err(issues, 'INVALID_EDGE_RETRY', 'retry must be an object or null', undefined, edgeId);
       else {
-        // D50: a broker route's retry is redelivery (no attempt timeout); other message
+        // A broker route's retry is redelivery (no attempt timeout); other message
         // edges have no caller to retry.
         const fromBroker = brokerIds.has(src);
         if (e.transport !== 'call' && !fromBroker) err(issues, 'INVALID_EDGE_RETRY', 'retry applies to call edges and broker routes only', undefined, edgeId);
@@ -402,7 +402,7 @@ export function compileExecution(raw: unknown, requireRunnable = true): { plan?:
 
     if (!isStr(w.entryNodeId) || !nodeIds.has(w.entryNodeId)) err(issues, 'INVALID_ENTRY_NODE', `entryNodeId does not exist: ${String(w.entryNodeId)}`);
     if (typeof w.enabled !== 'boolean') err(issues, 'INVALID_WORKLOAD_ENABLED', 'enabled must be boolean');
-    // D56: a bulk's arrivals come from its schedule, so its rate is unused.
+    // A bulk's arrivals come from its schedule, so its rate is unused.
     if ((w.schedule as { kind?: unknown } | undefined)?.kind !== 'bulk' && !isNum(w.rate, 1, 10000)) err(issues, 'INVALID_WORKLOAD_RATE', 'rate must be 1..10000');
     if (!isNum(w.timeoutMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_TIMEOUT', 'timeoutMs must be 1..3600000');
     if (w.intervalMs !== undefined && !isNum(w.intervalMs, 1, 3600000)) err(issues, 'INVALID_WORKLOAD_INTERVAL', 'intervalMs must be 1..3600000');

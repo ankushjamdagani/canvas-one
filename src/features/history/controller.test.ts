@@ -12,7 +12,7 @@ import { RunController } from '../runs/RunController';
 import { HistoryController } from './controller';
 
 const s01Doc = JSON.parse(
-  readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
 ) as Document;
 
 const testActor: Actor = {
@@ -31,7 +31,7 @@ function createMintId(): () => Id {
 }
 
 /** Runs every scenario in the document to completion via the real runner, seeding
- * saved runs so the current fingerprint has a qualifying run per scenario (D27/D28). */
+ * saved runs so the current fingerprint has a qualifying run per scenario. */
 async function runAllScenarios(
   repo: LocalRepository,
   mintId: () => Id,
@@ -86,7 +86,7 @@ async function setup() {
 }
 
 describe('HistoryController (real LocalRepository, S01)', () => {
-  // RV-12h review round: getState/subscribe must work when extracted as bare
+  // getState/subscribe must work when extracted as bare
   // references (the exact shape HistoryLadder/CommitPanel's `controller` prop
   // passes into React.useSyncExternalStore, and any other library that
   // destructures a store's API off the instance) -- not only when called as
@@ -149,7 +149,7 @@ describe('HistoryController (real LocalRepository, S01)', () => {
     expect(res.status).toBe('applied');
 
     // Evidence: one ref per scenario, each pointing at a saved run for that scenario's
-    // current fingerprint (run-identity.md §5 eligibility; commands.md history.commit).
+    // current fingerprint (commit eligibility).
     const commits = history.commits;
     expect(commits.length).toBeGreaterThan(0);
     const head = commits[0];
@@ -219,7 +219,7 @@ describe('HistoryController (real LocalRepository, S01)', () => {
     db.close();
   });
 
-  it('rejects commit and restore directly on main (D40)', async () => {
+  it('rejects commit and restore directly on main', async () => {
     const { db, session, history, projectId } = await setup();
     const mainBranchId = session.getState().mainBranchId;
     if (!mainBranchId) throw new Error('no main branch');

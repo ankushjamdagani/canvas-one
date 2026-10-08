@@ -1,10 +1,8 @@
 /**
- * LibraryPanel Component (RV-06b / Screens 12A, 12B, 12C).
- *
- * Implements the standard component catalog library panel:
- * - 12A: List view with kind icon, label, libraryCaption, and "Not simulated" tags.
- * - 12B: 2-column Grid view with cards, previews, and group headers with counts.
- * - 12C: Hover/focus detail popover strictly adhering to exclusions in design-revalidation.md §2.
+ * LibraryPanel: the standard component catalog library panel.
+ * - List view with kind icon, label, libraryCaption, and "Not simulated" tags.
+ * - 2-column Grid view with cards, previews, and group headers with counts.
+ * - Hover/focus detail popover (see EntryDetailCard for the rows it omits).
  * - Footer bar with "<label> · DEFAULTS · ..." and "Place on canvas" primary action.
  * - Drag-and-drop: sets 'application/x-studio-catalog-entry' MIME type.
  * - Keyboard navigation (arrow keys, Enter, Escape) & touch (tap to select, second tap or footer button to place).
@@ -29,7 +27,7 @@ import { CatalogEntryCard } from './CatalogEntryCard';
 import { useCatalogSelection } from './useCatalogSelection';
 import { cn } from '../../lib/utils';
 
-// D52: the linked-project entry is instantiated from a project (Projects tab), not placed from the catalog.
+// The linked-project entry is instantiated from a project (Projects tab), not placed from the catalog.
 const STANDARD_ENTRIES = CATALOG_ENTRIES.filter((entry) => entry.visualKind !== 'linked-project');
 
 export function LibraryPanel({
@@ -128,7 +126,7 @@ export function LibraryPanel({
       data-testid="library-panel"
     >
       <div className="shrink-0 bg-background border-b border-border">
-      {/* 2. Search Field (12A/12B) */}
+      {/* 2. Search Field */}
       <div className="px-4 pt-1 pb-3">
         <div className="relative flex items-center">
           <Search className="absolute left-2.5 w-4 h-4 text-secondary-text pointer-events-none" />
@@ -171,7 +169,7 @@ export function LibraryPanel({
         </div>
       </div>
 
-      {/* 3. Filter Bar & List/Grid Toggle (12A/12B) */}
+      {/* 3. Filter Bar & List/Grid Toggle */}
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 px-4 pb-0 text-xs">
         <div role="tablist" aria-label="Library source" className="flex w-max max-w-full shrink-0 items-end gap-3 -mb-px overflow-x-auto">
           {(['standard', ...(renderSavedParts ? ['ours'] : []), ...(renderLinkedProjects ? ['projects'] : [])] as LibraryTab[]).map((id) => {
@@ -311,7 +309,7 @@ export function LibraryPanel({
         )}
       </div>
 
-      {/* Floating Hover/Focus Detail Popover (Screen 12C) */}
+      {/* Floating Hover/Focus Detail Popover */}
       </div>
       {activeDetailEntry &&
         popoverPosition &&
@@ -326,7 +324,7 @@ export function LibraryPanel({
           document.body,
         )}
 
-      {/* 5. Sticky Footer Bar (12A/12B/12C) */}
+      {/* 5. Sticky Footer Bar */}
       <div className="px-4 py-3 border-t border-border bg-background flex items-center justify-between gap-3">
         {selectedEntry ? (
           <>

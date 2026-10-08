@@ -1,12 +1,9 @@
 /**
- * Decision behavior interpreter (RV-14d-3).
+ * Decision behavior interpreter.
  *
- * Implements specs/revamp/contracts/model-and-runner.md:
- * - §4 Behaviors: decision behavior, cases and fallback, values and guards, wiring.
- * - §5 Invocation semantics: "A decision picks one output."
- * - BUILD requirement 1: "evaluate cases in order with the Evaluator; the first
- *   matching case emits its value on its output port; else fallback. Exactly one output;
- *   each value is validated against its port schema (a mismatch is a modeled error)."
+ * Evaluates cases in order with the Evaluator; the first matching case emits its value
+ * on its output port, otherwise the fallback applies. Exactly one output is picked, and
+ * each value is validated against its port schema (a mismatch is a modeled error).
  */
 
 import type {
@@ -100,7 +97,7 @@ export function runDecision(
   let targetOutputPortId: Id | null = null;
   let rawValue: Json | null = null;
 
-  // Evaluate cases in authored order; first match wins (§4)
+  // Evaluate cases in authored order; first match wins
   for (const c of behavior.cases) {
     const guardRes = evaluator.evalGuard(c.guard, scope);
     if (!guardRes.ok) {
@@ -137,7 +134,7 @@ export function runDecision(
     }
   }
 
-  // If no case matched, evaluate fallback (§4)
+  // If no case matched, evaluate fallback
   if (targetOutputPortId === null) {
     targetOutputPortId = behavior.fallback.outputPortId;
     const valRes = evaluator.evalValue(behavior.fallback.value, scope);
@@ -171,7 +168,7 @@ export function runDecision(
     };
   }
 
-  // Validate the value against the output port's schema (§4: "each value is validated against its port schema")
+  // Validate the value against the output port's schema
   let shape: Shape | undefined;
   if (options.schemas) {
     if (options.schemas instanceof Map) {

@@ -1,11 +1,9 @@
 /**
- * Bridges Dexie rows to the pure `computePinClosure` input (RV-08f).
+ * Bridges Dexie rows to the pure `computePinClosure` input.
  *
  * Single shared helper so retention (limits.ts), reference integrity and history reads
- * (repository.ts) all agree on exactly one definition of "pinned" -- per
- * specs/revamp/contracts/storage.md §7: "A run is pinned when a retained commit
- * references it," derived from the same pin closure as everything else, never a
- * second, independently-maintained notion of pinning.
+ * (repository.ts) all agree on one definition of "pinned": a run is pinned when a
+ * retained commit references it, derived from the same pin closure as everything else.
  *
  * Reads only; callers decide the transaction scope. When called from inside an open
  * Dexie transaction (e.g. `db.transaction('rw', ..., async () => { ... })`), these table

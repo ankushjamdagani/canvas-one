@@ -1,29 +1,23 @@
 /**
- * Pin closure (RV-08f).
- *
- * Implements specs/revamp/contracts/storage.md §7 (Retention), the "Pin closure" bullet
- * verbatim:
- *
- *   "Pin closure: the creation snapshot, all branch head and working snapshots, commit
- *    ancestry and evidence, publications, checkpoints, and snapshots referenced by any
- *    retained run. A snapshot is released only after all references are rechecked inside
- *    an explicit prune transaction."
+ * Pin closure: the snapshots, commits and runs that retention must keep. Pinned are the
+ * creation snapshot, all branch head and working snapshots, commit ancestry and evidence,
+ * publications, checkpoints, and snapshots referenced by any retained run. A snapshot is
+ * released only after all references are rechecked inside an explicit prune transaction.
  *
  * Pure and deterministic: no I/O, no Date.now(), no randomness. Given a plain project
  * state (project + branches + commits + publications + checkpoints + runs), returns the
  * sets of pinned snapshot/commit/run IDs plus any dangling references discovered while
  * walking the graph. A dangling reference (a parent, head, publication or evidence run
  * that points at something absent from the given state) is always reported, never
- * silently dropped or fabricated (storage.md §5 `missing`, transactions.md §4 "Missing or
- * corrupt content returns `missing` with IDs; restore content is never fabricated").
+ * silently dropped or fabricated.
  *
- * CONTRACT GAP: this function only has the entity lists the caller passes in (no
+ * Limitation: this function only has the entity lists the caller passes in (no
  * snapshots table). It can therefore detect dangling commit parents/heads/publication
  * commits/evidence runs (all cross-checked against the given arrays), but it cannot by
  * itself detect a checkpoint or run pointing at a snapshot ID absent from the `snapshots`
  * table -- that requires the actual snapshot rows, which is exactly what
- * `verifyReferenceIntegrity` (repository.ts) additionally checks against storage. Narrowest
- * reading chosen: computePinClosure reports dangling only for references it can resolve
+ * `verifyReferenceIntegrity` (repository.ts) additionally checks against storage.
+ * computePinClosure reports dangling only for references it can resolve
  * against its own input; verifyReferenceIntegrity is the authority for snapshot existence
  * and content-hash corruption.
  */
@@ -104,7 +98,7 @@ function danglingSortKey(d: PinClosureDangling): string {
 }
 
 /**
- * Computes the pin closure for a project's history per storage.md §7.
+ * Computes the pin closure for a project's history.
  */
 export function computePinClosure(state: PinClosureState): PinClosureResult {
   const commitById = new Map<string, PinClosureCommit>();
@@ -170,7 +164,7 @@ export function computePinClosure(state: PinClosureState): PinClosureResult {
     }
   }
 
-  // Creation snapshot: always pinned, per storage.md §2 "Creation snapshot".
+  // Creation snapshot: always pinned.
   pinnedSnapshotIds.add(state.project.initialSnapshotId);
 
   // Every branch's head and working snapshots, plus commit ancestry of every branch head.
@@ -180,7 +174,7 @@ export function computePinClosure(state: PinClosureState): PinClosureResult {
   }
 
   // Publications' commits (defensive: normally already reachable via main's ancestry,
-  // but publications are pinned in their own right per storage.md §7).
+  // but publications are pinned in their own right).
   for (const publication of state.publications) {
     walkAncestry(publication.commitId, { kind: 'publication', id: publication.id });
   }
@@ -191,7 +185,7 @@ export function computePinClosure(state: PinClosureState): PinClosureResult {
   }
 
   // Snapshots referenced by any retained run (a run pinned via commit evidence above).
-  // storage.md §7: "snapshots referenced by any retained run" — every stored run is
+  // Snapshots referenced by any retained run: every stored run is
   // retained until an explicit prune removes it, pinned or not.
   for (const run of state.runs) {
     pinnedSnapshotIds.add(run.snapshotId);

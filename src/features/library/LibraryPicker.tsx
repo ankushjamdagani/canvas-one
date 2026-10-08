@@ -1,17 +1,16 @@
 /**
- * LibraryPicker Component (RV-06b / Screen 16E).
+ * LibraryPicker: the compact catalog component picker opened from the dock.
  *
- * Implements the compact catalog component picker opened from the dock:
  * - Search field filtering across label, tags, group, and models.
  * - Horizontal filter chips for catalog groups (All, Compute, Data, Messaging, Edge, Clients, Operations, ...).
- *   Plus a leading Recent chip (parts you placed, by click or drag). Platform team, team chips and
- *   Ours/patterns stay excluded per design-revalidation.md §2; Recent was added by the Project Canvas design.
+ *   Plus a leading Recent chip (parts you placed, by click or drag). There are no team chips or
+ *   Ours/patterns filters.
  * - 4-column card grid with visual previews, kind icons, labels, library captions, and "Not simulated" tags.
  * - Drag-and-drop support setting 'application/x-studio-catalog-entry' MIME type.
  * - Footer hints: "↵ place at centre · drag to position" and "Browse full library" button.
  * - Keyboard navigation (arrow keys across 4 columns, Enter to place, Escape to close).
  *
- * Single-instance coordination (D30 / R07) is the caller's / dock's job.
+ * Single-instance coordination with the full Library panel is the caller's / dock's job.
  */
 
 import * as React from 'react';
@@ -157,7 +156,7 @@ export function LibraryPicker({
         </div>
       </div>
 
-      {/* 4-Column Card Grid (16E) */}
+      {/* 4-Column Card Grid */}
       <div
         ref={gridContainerRef}
         role="listbox"
@@ -198,13 +197,13 @@ export function LibraryPicker({
         )}
       </div>
 
-      {/* Footer (16E) */}
+      {/* Footer */}
       <div className="px-3.5 py-2.5 bg-panel border-t border-hairline flex items-center justify-between text-xs shrink-0">
         <div className="text-[11px] font-mono text-secondary-text pointer-coarse:hidden">
           {actionLabel === 'Place' ? '↵ place at centre · drag to position' : `↵ ${actionLabel.toLowerCase()} selected`}
         </div>
         {/* Touch has no Enter key or reliable double-tap, so coarse pointers get an
-            explicit Place action for the selected entry (D14). */}
+            explicit Place action for the selected entry. */}
         {selectedEntry && (
           <button
             type="button"

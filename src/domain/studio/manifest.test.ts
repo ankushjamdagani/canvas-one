@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { buildManifest, type BuildManifestVersions } from './manifest';
 import type { Document } from './model';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 // Loaded as `any` (mirroring validate.test.ts / readiness.test.ts / closure.test.ts
 // conventions) so mutation tests below can freely edit nested fields without fighting
@@ -63,7 +63,7 @@ describe('buildManifest reference fixtures', () => {
   }
 });
 
-describe('buildManifest golden vectors: equal fingerprint (run-identity.md §2)', () => {
+describe('buildManifest golden vectors: equal fingerprint', () => {
   it('is unaffected by reordered object keys throughout the document', async () => {
     const doc = loadFixture('s01.json');
     const scenarioId = doc.scenarios[0].id;
@@ -184,7 +184,7 @@ describe('buildManifest golden vectors: equal fingerprint (run-identity.md §2)'
   });
 });
 
-describe('buildManifest golden vectors: different fingerprint (run-identity.md §2)', () => {
+describe('buildManifest golden vectors: different fingerprint', () => {
   it('differs when scenario inputs are reordered', async () => {
     const doc = loadFixture('s01.json');
     const scenario = doc.scenarios.find((s: any) => s.inputs.length >= 2)!;
@@ -321,7 +321,7 @@ describe('buildManifest golden vectors: different fingerprint (run-identity.md �
   });
 });
 
-describe('buildManifest: hash unavailable (run-identity.md §3)', () => {
+describe('buildManifest: hash unavailable', () => {
   it("returns 'identity-unavailable' when crypto.subtle.digest is stubbed to throw, with no weaker fallback hash", async () => {
     const doc = loadFixture('s01.json');
     const scenarioId = doc.scenarios[0].id;
@@ -345,7 +345,7 @@ describe('buildManifest: readiness propagation', () => {
     const scenarioId = doc.scenarios[0].id;
     const broken = structuredClone(doc);
     // Break a call port's response schema requirement to force a readiness rejection
-    // (model-and-runner.md §3) rather than a closure/compiler failure.
+    // rather than a closure/compiler failure.
     const boundary = broken.scenarios.find((s: any) => s.id === scenarioId)!.boundaries[0];
     const srcEl = broken.elements.find((e: any) => e.id === boundary.source.elementId)!;
     const srcPort = srcEl.ports.find((p: any) => p.id === boundary.source.portId);
@@ -361,16 +361,16 @@ describe('buildManifest: readiness propagation', () => {
   });
 });
 
-describe('buildManifest: coverage test (model-and-runner.md §7 closed schema descriptors)', () => {
+describe('buildManifest: coverage test (closed key sets)', () => {
   afterEach(() => {
     // no shared mutable state between these tests beyond fresh clones; kept for symmetry.
   });
 
-  it('throws when an element carries an unclassified field not in the §7 projection inventory', async () => {
+  it('throws when an element carries an unclassified field not in the projection inventory', async () => {
     const doc = loadFixture('s01.json');
     const scenarioId = doc.scenarios[0].id;
     const mutated = structuredClone(doc) as unknown as { elements: Record<string, unknown>[] };
-    mutated.elements[0].syntheticUnclassifiedField = 'not in §7 yet';
+    mutated.elements[0].syntheticUnclassifiedField = 'not in the inventory yet';
 
     await expect(buildManifest(mutated as unknown as Document, scenarioId, VERSIONS)).rejects.toThrow(/unclassified field/);
   });

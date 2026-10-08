@@ -29,7 +29,7 @@ async function setup() {
     actor,
   });
   const document = JSON.parse(
-    readFileSync("specs/revamp/fixtures/s03.json", "utf8"),
+    readFileSync("src/features/entry/examples/s03.json", "utf8"),
   ) as Document;
   await session.createProject({ title: "Parts", initialDocument: document });
   const current = session.getState();

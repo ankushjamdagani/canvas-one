@@ -1,8 +1,6 @@
 /**
- * Machine interpreter (RV-14b).
+ * Machine interpreter.
  *
- * Implements specs/revamp/contracts/model-and-runner.md §4 ("Transitions and effects")
- * and §5 ("Invocation semantics"):
  * - One machine invocation = one event on an inbound port.
  * - Ordered transitions from current state; first match (fromStateId + eventPortId + guard) wins.
  * - Effects apply in order to a COPIED context:
@@ -37,7 +35,7 @@ export function deepCloneJson<T extends Json>(value: T): T {
 }
 
 /**
- * Validates a payload against a PayloadSchema Shape per §3.
+ * Validates a payload against a PayloadSchema Shape per the payload-schema rules.
  * Unknown record fields, non-finite numbers, and invalid nullability are rejected.
  */
 export function validatePayloadShape(payload: unknown, shape: Shape): { ok: true } | { ok: false; reason: string } {
@@ -282,7 +280,7 @@ export function stepMachine(options: MachineStepOptions): MachineStepResult {
     break;
   }
 
-  // No match -> no change (§4 & §5)
+  // No match -> no change
   if (!matchedTransition) {
     return {
       ok: true,
@@ -426,7 +424,7 @@ export function stepMachine(options: MachineStepOptions): MachineStepResult {
           return {
             ok: false,
             errorCode: 'double-reply',
-            errorMessage: 'Double reply in transition effects fails the run (§4 & §5)',
+            errorMessage: 'Double reply in transition effects fails the run',
             stateId: currentStateId,
             context: currentContext,
           };
@@ -486,7 +484,7 @@ export function stepMachine(options: MachineStepOptions): MachineStepResult {
             context: currentContext,
           };
         }
-        // Logical mode records 'timer-awaits-explicit-input' (§4)
+        // Logical mode records 'timer-awaits-explicit-input'
         traces.push('timer-awaits-explicit-input');
         break;
       }
@@ -507,7 +505,7 @@ export function stepMachine(options: MachineStepOptions): MachineStepResult {
     }
   }
 
-  // Atomic validation of final context and all emissions before state or context changes (§4)
+  // Atomic validation of final context and all emissions before state or context changes
   if (contextSchema) {
     const cRes = validatePayloadShape(workingContext, contextSchema);
     if (!cRes.ok) {

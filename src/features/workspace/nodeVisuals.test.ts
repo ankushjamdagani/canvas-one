@@ -26,7 +26,7 @@ describe('nodeVisuals: icon mapping', () => {
     expect(icon).toBeDefined();
   });
 
-  it('covers state-machine, data-pipeline and host (D35/D42 stripe-gap kinds still get an icon)', () => {
+  it('covers state-machine, data-pipeline and host (kinds without a stripe still get an icon)', () => {
     expect(getNodeIcon('state-machine')).toBeDefined();
     expect(getNodeIcon('data-pipeline')).toBeDefined();
     expect(getNodeIcon('host')).toBeDefined();
@@ -51,7 +51,7 @@ describe('nodeVisuals: formatThousands (thin-space grouping)', () => {
   });
 });
 
-describe('nodeVisuals: caption mapping (D42 catalog.md item 10)', () => {
+describe('nodeVisuals: caption mapping', () => {
   it('unmodeled elements always show exactly "Not simulated" (items 7 & 12), regardless of visualKind', () => {
     for (const visualKind of ['email', 'monitoring', 'analytics', 'secrets', 'thirdparty', 'custom', 'traffic', 'client'] as const) {
       const el = makeElement({

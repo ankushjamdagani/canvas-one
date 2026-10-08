@@ -10,7 +10,7 @@ import {
   type Document,
 } from './model';
 
-const FIXTURE_DIR = fileURLToPath(new URL('../../../specs/revamp/fixtures', import.meta.url));
+const FIXTURE_DIR = fileURLToPath(new URL('../../../src/features/entry/examples', import.meta.url));
 const FIXTURE_FILES = ['s01.json', 's02.json', 's03.json', 's04.json', 's05.json'] as const;
 
 describe('studio-model/1 type contracts and fixtures', () => {

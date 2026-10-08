@@ -100,9 +100,9 @@ type ResourceFormState = {
   readonly x: number;
   readonly y: number;
   readonly error: string | null;
-  /** D53: the endpoint path or name being typed; the draft is re-planned with it on confirm. */
+  /** The endpoint path or name being typed; the draft is re-planned with it on confirm. */
   readonly path: string;
-  /** D53: what the planner needs to re-plan when the connection type changes. */
+  /** What the planner needs to re-plan when the connection type changes. */
   readonly plan: {
     readonly sourceElementId: Id;
     readonly sourcePortId: Id;
@@ -130,18 +130,18 @@ export interface CanvasViewProps {
   activeViewId: Id | null;
   onSelectView: (viewId: Id) => void;
   isSaving: boolean;
-  /** Elements a workload of the scenario being edited enters at (board scenario_traffic_editor). */
+  /** Elements a workload of the scenario being edited enters at. */
   trafficEntryElementIds?: ReadonlySet<Id>;
   /** Recording read at the controller's playhead for transit and node occupancy. */
   playbackSource?: PlaybackSource | null;
   simulationHighlight?: SimulationHighlight | null;
-  /** D52: details of the projects linked-project nodes point at (absent id = unavailable). */
-  /** D53: reads what a project exposes right now (for linking and for connecting to a linked node). */
+  /** Details of the projects linked-project nodes point at (absent id = unavailable). */
+  /** Reads what a project exposes right now (for linking and for connecting to a linked node). */
   loadLinkedExposures?: (projectId: string) => Promise<readonly ProjectExposure[]>;
   linkedProjects?: ReadonlyMap<string, { readonly title: string; readonly team: string; readonly description: string }> | null;
-  /** D52: opens a linked project (guarded navigation owned by the workspace). */
+  /** Opens a linked project (guarded navigation owned by the workspace). */
   onOpenLinkedProject?: (projectId: string) => void;
-  /** A dirty scenario draft blocks Run; the canvas says so (board scenario_traffic_editor). */
+  /** A dirty scenario draft blocks Run; the canvas says so. */
   runWaitsForScenarioDraft?: boolean;
   onMoveNodes: (
     movedNodes: Array<{ id: string; position: { x: number; y: number } }>,
@@ -156,12 +156,12 @@ export interface CanvasViewProps {
   onRequestSelection?: (request: CanvasSelectionRequest) => void;
   /** Empty canvas was clicked -- clears selection through the guard. */
   onRequestClearSelection?: () => void;
-  /** RV-12e: mints ids for placeEntry / planConnection RecordChange batches. */
+  /** Mints ids for placeEntry / planConnection RecordChange batches. */
   mintId: () => Id;
   /**
-   * RV-12e: applies one model.apply-records batch (one gesture == one undo).
+   * Applies one model.apply-records batch (one gesture == one undo).
    * Returns false on busy/failed/rejected so callers can leave nothing
-   * destructive on screen and let the user retry (commands.md "busy").
+   * destructive on screen and let the user retry.
    */
   onApplyChanges: (changes: readonly RecordChange[], label: string) => Promise<boolean>;
   /** Registry context and executor supplied by Workspace; toolbar/dock never mutate locally. */
@@ -170,7 +170,7 @@ export interface CanvasViewProps {
   /**
    * Canvas-scoped shortcuts (Delete/Backspace) live in the registry: Workspace
    * matches the event and returns true only when an enabled command ran, so
-   * `preventDefault` fires after a real match (commands.md §1).
+   * `preventDefault` fires after a real match.
    */
   onCanvasShortcut: (event: ShortcutEvent) => boolean;
   dockConfig: DockConfig;
@@ -279,7 +279,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   // ReactFlow's own click-selection: 'select' changes are dropped here and the
   // `selected` flag is instead derived below from selectedElementIds /
   // selectedConnectionIds, which only change once the guard has approved the
-  // navigation (commands.md §6: "the guard runs before any change").
+  // navigation (the guard runs before any change).
   // When dragging a marquee selection box across the pane, we capture the selected
   // node IDs and dispatch batch selection onSelectionEnd.
   const onNodesChange = React.useCallback(
@@ -314,7 +314,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     setEdges(projection.edges as unknown as Edge[]);
   }, [projection, setNodes, setEdges]);
 
-  // Handles are connectable while in Select mode (commands.md §4). ReactFlow only starts a
+  // Handles are connectable while in Select mode. ReactFlow only starts a
   // connection gesture from a pointerdown on the handle itself, so marking
   // handles connectable in both modes is what makes "drag from a handle while
   // in Select mode" possible without hijacking ordinary node dragging/panning.
@@ -740,8 +740,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     [projection, isSaving, onMoveNodes, setNodes, document, measuredHeights, onApplyChanges],
   );
 
-  // Zoom controls per specs/revamp/contracts/commands.md §4:
-  // factor 1.2, clamped 0.1–2, fit padding exactly 32 px
+  // Zoom controls: factor 1.2, clamped 0.1–2, fit padding exactly 32 px
   const handleZoomIn = React.useCallback(() => {
     const current = reactFlow.getZoom();
     const next = Math.min(2.0, current * 1.2);
@@ -767,16 +766,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   // Fit the view (32 px padding, zoom clamp 0.1–2) when a document/view is first shown
   // and when switching views; never re-fit after a drag or undo/redo.
   //
-  // Review round 1: the automatic open/view-switch fit must never zoom IN past
-  // 100% for a small diagram (screens show 100%, not 161%) — so this one caps
-  // at maxZoom 1, a narrower clamp than the contract's general 0.1–2 (lead
-  // reading: the contract clamp bounds what a user-driven zoom gesture may
-  // reach, not what the camera should assume on a passive open). The Fit
-  // *button* (handleFitView above) is a deliberate user gesture and keeps the
-  // full 0.1–2 contract clamp.
+  // The automatic open/view-switch fit must never zoom IN past 100% for a
+  // small diagram, so it caps at maxZoom 1, a narrower clamp than the general
+  // 0.1–2 range. That range bounds user-driven zoom gestures, not what the
+  // camera should assume on a passive open. The Fit *button* (handleFitView
+  // above) is a deliberate user gesture and keeps the full 0.1–2 clamp.
   const lastFittedKeyRef = React.useRef<string | null>(null);
 
-  // RV-13a: the fit must wait until the view's nodes are measured. A fixed 50 ms
+  // The fit must wait until the view's nodes are measured. A fixed 50 ms
   // timer could fire before ReactFlow had the nodes (after a reload), leaving the
   // default viewport so content -- notably a group header above its members --
   // sat outside the canvas.
@@ -802,7 +799,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     });
   }, [document?.id, projection.activeView?.id, projection.nodes.length, nodesInitialized, nodes.length, reactFlow]);
 
-  // RV-13a: creating a group draws its boundary GROUP_PADDING_Y_TOP above the
+  // Creating a group draws its boundary GROUP_PADDING_Y_TOP above the
   // members, which can leave the header (and its collapse chevron) outside the
   // visible canvas -- under the top bar -- because the open-time fit only knew
   // about the members. When a group appears in the active view, pan (never
@@ -850,7 +847,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const applyPlacement = React.useCallback(
     async (entryId: string, anchor: { x: number; y: number }, link?: { projectId: string; title: string }) => {
       if (!document || !projection.activeView || isSaving) return;
-      // D53: a linked node gets its ports from what the project exposes right now.
+      // A linked node gets its ports from what the project exposes right now.
       const exposures = link ? ((await loadLinkedExposures?.(link.projectId)) ?? []) : [];
       const result = placeEntry({
         document,
@@ -1019,7 +1016,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         return;
       }
 
-      // D53: a linked project is connected with the types it exposes right now.
+      // A linked project is connected with the types it exposes right now.
       const linkedExposures = targetElement.linkedProjectId
         ? await loadLinkedExposures?.(targetElement.linkedProjectId)
         : undefined;
@@ -1054,7 +1051,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     [document, projection.activeView, isSaving, nodes, mintId, onApplyChanges, loadLinkedExposures],
   );
 
-  // D53: changing the connection type re-plans, because it decides which ports the connection uses.
+  // Changing the connection type re-plans, because it decides which ports the connection uses.
   const changeConnectionType = React.useCallback(
     (protocol: Protocol) => {
       if (!resourceForm || !document || !projection.activeView) return;
@@ -1083,7 +1080,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
   const confirmResourceForm = React.useCallback(async () => {
     if (!resourceForm) return;
-    // D53: the path decides which ports the connection uses, so plan again with it before completing.
+    // The path decides which ports the connection uses, so plan again with it before completing.
     let draft = resourceForm.draft;
     if (document && projection.activeView && draft.protocol) {
       const { plan } = resourceForm;
@@ -1116,7 +1113,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   }, [resourceForm, onApplyChanges, mintId, document, projection.activeView]);
 
   // ==========================================================================
-  // RV-12e: Delete -- Delete/Backspace on canvas focus, or the 16D toolbar
+  // Delete -- Delete/Backspace on canvas focus, or the selection toolbar
   // ==========================================================================
 
   const [deleteConfirm, setDeleteConfirm] = React.useState<DeletePlan | null>(null);
@@ -1301,7 +1298,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         </div>
       )}
 
-      {/* 16D selection-scoped actions. */}
+      {/* Selection-scoped actions. */}
       {hasPartSelection && (
         <SelectionToolbar
           context={commandContext}
@@ -1470,7 +1467,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         </div>
       )}
 
-      {/* 16A Canvas Dock */}
+      {/* Canvas dock */}
       <FloatingDock
         dragMode={dragMode}
         zoom={zoom}

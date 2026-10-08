@@ -4,8 +4,7 @@ import { canonicalJson, sha256Hex } from './canonical';
 
 /**
  * Note: Manifest-level vectors (layout-only change, entity storage reorder,
- * omitted vs materialized default, reordered input events) wait for the manifest builder
- * as specified in run-identity.md §2 and §3.
+ * omitted vs materialized default, reordered input events) belong with the manifest builder tests.
  */
 
 describe('canonical-json-v1 golden vectors and encoding', () => {

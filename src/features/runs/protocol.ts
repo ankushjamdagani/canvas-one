@@ -1,7 +1,7 @@
 /**
- * Plain serializable worker protocol and in-process handler (RV-12c4).
+ * Plain serializable worker protocol and in-process handler.
  *
- * Implements specs/revamp/contracts/model-and-runner.md §8:
+ * Messages:
  * - compile: prepares scenario, returns manifest, fingerprint and single-use plan handle.
  * - start: verifies handle (session, planId, snapshotId, unused), steps ScenarioRunner
  *   in bounded batches posting state, batch and exactly one terminal.
@@ -94,15 +94,15 @@ export type ProtocolTerminalUpdate = {
 /** Live canvas view: the packet steps since the last report; not part of the run's trace. */
 export type ProtocolFlowUpdate = { readonly kind: 'flow'; readonly runId: string; readonly records: readonly FlowRecord[] };
 
-/** D57: cycles that completed since the last report (a stream's cycles leave the worker once sent). */
+/** Cycles that completed since the last report (a stream's cycles leave the worker once sent). */
 export type ProtocolCyclesUpdate = { readonly kind: 'cycles'; readonly runId: string; readonly cycles: readonly Cycle[] };
 
-/** D57: the run's cumulative summary at one simulated time, about every `CHECKPOINT_MS`. */
+/** The run's cumulative summary at one simulated time, about every `CHECKPOINT_MS`. */
 export type ProtocolCheckpointUpdate = { readonly kind: 'checkpoint'; readonly runId: string; readonly checkpoint: RunCheckpoint };
 export type ProtocolResultsUpdate = { readonly kind: 'results'; readonly runId: string; readonly records: readonly ResultDelta[] };
 
 /**
- * D57: what the worker is doing. `computing`: stepping; `idle`: waiting for the playhead because it is
+ * What the worker is doing. `computing`: stepping; `idle`: waiting for the playhead because it is
  * `LOOKAHEAD_MS` ahead; `draining`: Stop was pressed and the limit is lifted.
  */
 export type ProtocolBufferUpdate = {
@@ -127,7 +127,7 @@ export type RunUpdateMessage = {
 };
 
 /**
- * D57: where the main thread's playhead is, in simulated ms (Infinity = no limit). The worker computes up to
+ * Where the main thread's playhead is, in simulated ms (Infinity = no limit). The worker computes up to
  * `LOOKAHEAD_MS` beyond it and then waits; a larger value wakes it.
  */
 export type PlayheadMessage = {
@@ -160,9 +160,9 @@ type StoredPlan = {
   used: boolean;
 };
 
-/** D57: how far ahead of the playhead the worker computes, in simulated ms. */
+/** How far ahead of the playhead the worker computes, in simulated ms. */
 export const LOOKAHEAD_MS = 30_000;
-/** D57: how often (simulated ms) the worker posts a cumulative summary. */
+/** How often (simulated ms) the worker posts a cumulative summary. */
 export const CHECKPOINT_MS = 5_000;
 
 type ActiveRun = {
@@ -174,11 +174,11 @@ type ActiveRun = {
   status: 'running' | 'paused' | 'cancelled';
   lastReportedEventCount: number;
   steppingPromise: Promise<void> | null;
-  /** D57: the main thread's playhead (simulated ms); the worker computes up to `LOOKAHEAD_MS` beyond it. */
+  /** The main thread's playhead (simulated ms); the worker computes up to `LOOKAHEAD_MS` beyond it. */
   playheadMs: number;
-  /** D55: Stop was pressed; the lookahead limit is lifted so the run can drain. */
+  /** Stop was pressed; the lookahead limit is lifted so the run can drain. */
   stopping: boolean;
-  /** D57: stepping has paused at the lookahead limit and waits for the playhead (or Stop). */
+  /** Stepping has paused at the lookahead limit and waits for the playhead (or Stop). */
   idle: boolean;
   lastCheckpointMs: number;
   readonly interactive: boolean;
@@ -493,7 +493,7 @@ export class WorkerProtocolHandler {
     this.scheduleStepping(runId);
   }
 
-  /** D57: the playhead moved; a worker waiting at the lookahead limit may have room to compute again. */
+  /** The playhead moved; a worker waiting at the lookahead limit may have room to compute again. */
   private handlePlayhead(msg: PlayheadMessage): void {
     const active = this.activeRuns.get(msg.runId);
     if (!active || !Number.isFinite(msg.simulatedMs) || msg.simulatedMs < 0 || msg.simulatedMs === active.playheadMs) return;
@@ -501,7 +501,7 @@ export class WorkerProtocolHandler {
     this.wakeIfRoom(active);
   }
 
-  /** D57: the furthest simulated ms the worker may compute to right now. */
+  /** The furthest simulated ms the worker may compute to right now. */
   private computeLimitMs(active: ActiveRun): number {
     return active.stopping || !active.interactive ? Infinity : active.playheadMs + LOOKAHEAD_MS;
   }
@@ -551,7 +551,7 @@ export class WorkerProtocolHandler {
         this.scheduleStepping(runId);
       }
     } else if (kind === 'stop') {
-      // D55: stop arrivals and drain; a paused run resumes to do so. D57: Stop lifts the lookahead limit.
+      // Stop arrivals and drain; a paused run resumes to do so. Stop lifts the lookahead limit.
       active.runner.requestStop();
       active.stopping = true;
       this.postMessageCallback({ type: 'update', message: { kind: 'buffer', runId, state: 'draining', computedMs: active.runner.simulatedMs } });
@@ -594,7 +594,7 @@ export class WorkerProtocolHandler {
       const resultDeltas: ResultDelta[] = [];
 
       while (stepsInBatch < this.stepBatchSize && active.status === 'running') {
-        // D57: the worker computes only up to LOOKAHEAD_MS ahead of the playhead; Stop lifts the limit.
+        // The worker computes only up to LOOKAHEAD_MS ahead of the playhead; Stop lifts the limit.
         const next = active.runner.nextEventAtMs();
         if (next !== null && next > this.computeLimitMs(active)) {
           reachedLimit = true;
@@ -689,7 +689,7 @@ export class WorkerProtocolHandler {
         return;
       }
 
-      // D57: at the lookahead limit, report it once and wait for the playhead (or Stop) to wake the loop.
+      // At the lookahead limit, report it once and wait for the playhead (or Stop) to wake the loop.
       if (reachedLimit) {
         active.idle = true;
         this.postMessageCallback({

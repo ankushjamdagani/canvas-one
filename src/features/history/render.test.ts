@@ -1,8 +1,6 @@
 /**
- * Pure renderToStaticMarkup fidelity tests for HistoryLadder and CommitPanel (RV-11a).
- *
- * Implements specs/revamp/design-revalidation.md §2 (excluded texts) and §3 item 10,
- * and specs/revamp/screens/22A_history_ladder.png, scenario_commit_gate.png.
+ * Pure renderToStaticMarkup fidelity tests for HistoryLadder and CommitPanel, including the
+ * texts that must never appear.
  */
 import { describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
@@ -13,13 +11,12 @@ import { DraftBehindMainBanner } from './DraftBehindMainBanner';
 import { PublishedNotice } from './PublishedNotice';
 import { readFileSync } from 'node:fs';
 import type { Document } from '../../domain/studio/model';
-const fixture: Document = JSON.parse(readFileSync('specs/revamp/fixtures/s02.json', 'utf8'));
+const fixture: Document = JSON.parse(readFileSync('src/features/entry/examples/s02.json', 'utf8'));
 import type { CommitRecord, PublicationRecord } from '../../persistence/studio';
 import type { ScenarioWithStatus } from '../runs/scenarioStatus';
 import type { RecordChangeItem } from './types';
 
-// design-revalidation.md §2 / lead defaults: text that must never appear as visible
-// content in these panels. Excludes "overflow", which only ever appears here as a
+// Text that must never appear as visible content in these panels. Excludes "overflow", which only ever appears here as a
 // Tailwind utility class (overflow-y-auto / overflow-hidden), not visible copy.
 const EXCLUDED_TEXTS = ['no run', 'suggested from your edits', 'p95', 'p99', 'burst', 'bottleneck'];
 
@@ -58,7 +55,7 @@ const publications: readonly PublicationRecord[] = [
   },
 ];
 
-describe('HistoryLadder static markup (22A)', () => {
+describe('HistoryLadder static markup', () => {
   it('omits its own header and outer chrome when hosted by PanelHost', () => {
     const html = renderToStaticMarkup(
       React.createElement(HistoryLadder, {
@@ -72,7 +69,7 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(html).toContain('border-0');
   });
 
-  it('shows the published main ladder with current release and draft actions (22D)', () => {
+  it('shows the published main ladder with current release and draft actions', () => {
     const html = renderToStaticMarkup(React.createElement(HistoryLadder, { isMain: true, branchName: 'main', publications, onStartDraft: vi.fn(), onEditMain: vi.fn() }));
     expect(html).toContain('Current');
     expect(html).toContain('Start a new draft from 2.2.1');
@@ -81,7 +78,7 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(html).not.toContain('open-publish-button');
   });
 
-  it('renders the standalone behind-main banner with supplied counts and actions (22E)', () => {
+  it('renders the standalone behind-main banner with supplied counts and actions', () => {
     const html = renderToStaticMarkup(React.createElement(DraftBehindMainBanner, { conflictCount: 3, versionsPublishedSinceFork: 2, forkVersionKey: '2.2.1', onLater: vi.fn(), onReviewAndResolve: vi.fn() }));
     expect(html).toContain('Main has moved on · 3 conflicts with your edits');
     expect(html).toContain('forked at 2.2.1');
@@ -138,7 +135,7 @@ describe('HistoryLadder static markup (22A)', () => {
     }
   });
 
-  it('disables Commit and restore with a stated reason on main (D40)', () => {
+  it('disables Commit and restore with a stated reason on main', () => {
     const html = renderToStaticMarkup(
       React.createElement(HistoryLadder, {
         branchName: 'main',
@@ -173,7 +170,7 @@ describe('HistoryLadder static markup (22A)', () => {
     expect(publishButtonMatch![0]).toContain('disabled=""');
   });
 
-  it('shows the real behind-main callout and "Review and resolve N conflicts" primary action (22E)', () => {
+  it('shows the real behind-main callout and "Review and resolve N conflicts" primary action', () => {
     const html = renderToStaticMarkup(
       React.createElement(HistoryLadder, {
         branchName: 'async-fulfilment',
@@ -247,7 +244,7 @@ const changes: readonly RecordChangeItem[] = [
   { recordKind: 'connection', id: 'conn-1', change: 'added', label: 'Queue → payment provider', detail: 'new connection' },
 ];
 
-describe('CommitPanel static markup (scenario_commit_gate.png)', () => {
+describe('CommitPanel static markup', () => {
   it('omits its own header and outer chrome when hosted by PanelHost', () => {
     const html = renderToStaticMarkup(
       React.createElement(CommitPanel, {

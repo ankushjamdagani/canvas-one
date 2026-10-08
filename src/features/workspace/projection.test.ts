@@ -295,7 +295,7 @@ describe('projectDocumentToCanvas', () => {
     expect(res.issues.some((i) => i.code === 'missing-connection' && i.entityId === 'c_missing_404')).toBe(true);
   });
 
-  it('maps visualKind to correct catalog layers per D35, and per D42: state-machine/data-pipeline/host get their own stripe groups, thirdparty -> edge, custom -> no stripe', () => {
+  it('maps visualKind to correct catalog layers: state-machine/data-pipeline/host get their own stripe groups, thirdparty -> edge, custom -> no stripe', () => {
     // 29 catalog kinds have layers
     expect(getCatalogLayer('traffic')).toBe('clients');
     expect(getCatalogLayer('client')).toBe('clients');
@@ -305,17 +305,17 @@ describe('projectDocumentToCanvas', () => {
     expect(getCatalogLayer('queue')).toBe('messaging');
     expect(getCatalogLayer('monitoring')).toBe('operations');
 
-    // D42 item 1: three new dedicated stripe groups
+    // three new dedicated stripe groups
     expect(getCatalogLayer('state-machine')).toBe('state-machine');
     expect(getCatalogLayer('data-pipeline')).toBe('data-pipeline');
     expect(getCatalogLayer('host')).toBe('host');
 
-    // D42 item 2: thirdparty -> Edge; custom -> no stripe at all
+    // thirdparty -> Edge; custom -> no stripe at all
     expect(getCatalogLayer('thirdparty')).toBe('edge');
     expect(getCatalogLayer('custom')).toBeNull();
   });
 
-  it('D42: new stripe colors for state-machine (indigo), data-pipeline (umber), host (charcoal)', () => {
+  it('new stripe colors for state-machine (indigo), data-pipeline (umber), host (charcoal)', () => {
     expect(CATALOG_LAYER_COLORS['state-machine']).toBe('#5A5B8C');
     expect(CATALOG_LAYER_COLORS['data-pipeline']).toBe('#7A5C3E');
     expect(CATALOG_LAYER_COLORS.host).toBe('#3A3F3C');
@@ -371,7 +371,7 @@ describe('buildMoveChange', () => {
   });
 });
 
-describe('refinement boundary frames (D46)', () => {
+describe('refinement boundary frames', () => {
   function boundaryDocument(expanded: boolean): Document {
     const doc = makeTestDocument();
     const owner: Element = {
@@ -435,7 +435,7 @@ describe('refinement boundary frames (D46)', () => {
   });
 });
 
-describe('collapsed groups (RV-04g)', () => {
+describe('collapsed groups', () => {
   function collapsedDoc(): Document {
     const doc = makeTestDocument();
     const view = doc.views[0];

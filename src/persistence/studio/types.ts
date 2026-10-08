@@ -1,11 +1,6 @@
 /**
- * Storage and Repository types for System Studio (RV-16a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/storage.md (§1 versions, §2 tables, §3 publication metadata,
- *   §5 repository API, §6 limits)
- * - specs/revamp/contracts/transactions.md (§1 Actor & Idempotency, §2 Revisions & CAS)
- * - specs/revamp/contracts/commands.md (Envelopes, results, project.create, project.rename, branch.create)
+ * Storage and Repository types for System Studio: table records, command values and
+ * results, the error model, the repository port and the portable bundle format.
  */
 
 import type {
@@ -27,7 +22,7 @@ import type { Issue } from '../../domain/studio/validate';
 import type { BuildManifestVersions } from '../../domain/studio/manifest';
 
 // ============================================================================
-// storage.md §1: Versions
+// Versions
 // ============================================================================
 
 export const DB_NAME = 'system-studio-local-v1';
@@ -40,7 +35,7 @@ export const DEFAULT_BUILD_VERSIONS: BuildManifestVersions = Object.freeze({
 });
 
 // ============================================================================
-// storage.md §6: Ceilings and Limits
+// Ceilings and Limits
 // ============================================================================
 
 export const STORAGE_LIMITS = {
@@ -63,11 +58,11 @@ export const STORAGE_LIMITS = {
 } as const;
 
 // ============================================================================
-// transactions.md §1 & storage.md §2: Actor
+// Actor
 // ============================================================================
 
 /**
- * Actor per transactions.md §1:
+ * Actor envelope:
  * { actorId, kind: 'local-human', displayName }
  * Unknown kinds are rejected.
  */
@@ -78,7 +73,7 @@ export type Actor = {
 };
 
 // ============================================================================
-// storage.md §3: Publication Metadata
+// Publication Metadata
 // ============================================================================
 
 export type SemanticVersion = {
@@ -95,7 +90,7 @@ export type PublicationMetadata = {
 };
 
 // ============================================================================
-// storage.md §2: Table Record Types
+// Table Record Types
 // ============================================================================
 
 /**
@@ -110,10 +105,10 @@ export type ProjectRecord = {
   readonly mainBranchId: Id;
   readonly initialSnapshotId: string; // Hash
   readonly importSourceId: Id | null;
-  /** Free-text details other projects show when they link here (D52). Absent on older rows. */
+  /** Free-text details other projects show when they link here. Absent on older rows. */
   readonly description?: string;
   readonly team?: string;
-  /** D53: connection types other projects can connect to when they link here. Absent means none. */
+  /** connection types other projects can connect to when they link here. Absent means none. */
   readonly exposures?: readonly ProjectExposure[];
   readonly createdAt: number;
   readonly updatedAt: number;
@@ -122,7 +117,7 @@ export type ProjectRecord = {
 export const PROJECT_DESCRIPTION_MAX_LENGTH = 500;
 export const PROJECT_TEAM_MAX_LENGTH = 60;
 
-/** Details with absent fields read as empty (rows written before D52 have none). */
+/** Details with absent fields read as empty (rows written before this field existed have none). */
 export function projectDetails(project: Pick<ProjectRecord, 'description' | 'team'>): {
   readonly description: string;
   readonly team: string;
@@ -130,7 +125,7 @@ export function projectDetails(project: Pick<ProjectRecord, 'description' | 'tea
   return { description: project.description ?? '', team: project.team ?? '' };
 }
 
-/** D53: a project's exposed connection types; absent reads as none. */
+/** a project's exposed connection types; absent reads as none. */
 export function projectExposures(project: Pick<ProjectRecord, 'exposures'>): readonly ProjectExposure[] {
   return project.exposures ?? [];
 }
@@ -288,13 +283,13 @@ export type PreferenceRecord = {
 };
 
 // ============================================================================
-// storage.md §5: Error Model
+// Error Model
 // ============================================================================
 
 /**
- * Exactly the 9 error codes specified in storage.md §5:
- * "Errors: not-found | invalid | stale | referenced-artifact | quota | unavailable |
- *  unsupported-version | operation-id-reused | limit, with structured issue paths and IDs"
+ * Exactly the 9 error codes:
+ * "not-found | invalid | stale | referenced-artifact | quota | unavailable |
+ *  unsupported-version | operation-id-reused | limit", with structured issue paths and IDs.
  */
 const STORAGE_ERROR_CODES = [
   'not-found',
@@ -311,7 +306,7 @@ const STORAGE_ERROR_CODES = [
 export type StorageErrorCode = (typeof STORAGE_ERROR_CODES)[number];
 
 // ============================================================================
-// commands.md §2: Command Values and Results
+// Command Values and Results
 // ============================================================================
 
 export type ExpectedHead = Id | null;
@@ -382,7 +377,6 @@ export type FailedResult = {
 
 export type UnsupportedResult = {
   readonly status: 'unsupported';
-  readonly task: string;
   readonly message: string;
 };
 
@@ -410,11 +404,11 @@ export type SaveRunResult =
   | FailedResult;
 
 // ============================================================================
-// storage.md §7 / §9: History reads and reference integrity (RV-08f)
+// History reads and reference integrity
 // ============================================================================
 
 /**
- * One branch's history per storage.md §9 "round-trip reload": the commits reachable
+ * One branch's history for round-trip reload: the commits reachable
  * from that branch's head, newest first by DAG order from the head (never by timestamp).
  */
 export type BranchHistoryEntry = {
@@ -425,7 +419,7 @@ export type BranchHistoryEntry = {
 /**
  * `loadHistory(projectId)` result: project, branches, commits, publications (by ordinal)
  * and checkpoints, plus per-branch history, all read in one consistent read-only
- * transaction (storage.md §5).
+ * transaction.
  */
 export type HistoryLoadResult = {
   readonly project: Readonly<ProjectRecord>;
@@ -438,8 +432,8 @@ export type HistoryLoadResult = {
 
 /**
  * A single broken or corrupt reference found by `verifyReferenceIntegrity`. Never
- * repaired or fabricated -- transactions.md §4: "Missing or corrupt content returns
- * `missing` with IDs; restore content is never fabricated."
+ * repaired or fabricated: missing or corrupt content returns
+ * `missing` with IDs, and restore content is never fabricated.
  */
 export type ReferenceIntegrityIssue = {
   readonly kind:
@@ -459,7 +453,7 @@ export type ReferenceIntegrityIssue = {
 };
 
 /**
- * `verifyReferenceIntegrity(projectId)` result per storage.md §5/§9: {ok:true} when every
+ * `verifyReferenceIntegrity(projectId)` result: {ok:true} when every
  * reference resolves and every snapshot re-hashes to its own ID; otherwise {ok:false,
  * missing:[{kind,id,referencedBy}]}.
  */
@@ -468,7 +462,7 @@ export type ReferenceIntegrityResult =
   | { readonly ok: false; readonly missing: readonly ReferenceIntegrityIssue[] };
 
 // ============================================================================
-// commands.md §2 & §3: Supported Authored Commands (RV-16a scope)
+// Supported Authored Commands
 // ============================================================================
 
 export type ProjectCreateCommand = {
@@ -498,7 +492,7 @@ export type ProjectRenameCommand = {
   };
 };
 
-/** D52: edits the project record's description, team and (D53) exposed connection types only; no snapshot or branch changes. */
+/** edits the project record's description, team and exposed connection types only; no snapshot or branch changes. */
 export type ProjectUpdateDetailsCommand = {
   readonly commandId: 'project.update-details';
   readonly operationId: Id;
@@ -508,7 +502,7 @@ export type ProjectUpdateDetailsCommand = {
   readonly payload: {
     readonly description: string;
     readonly team: string;
-    /** D53: when present, replaces the project's exposed connection types. */
+    /** when present, replaces the project's exposed connection types. */
     readonly exposures?: readonly ProjectExposure[];
   };
 };
@@ -667,7 +661,7 @@ export type AuthoredCommand =
   | GenericCommand;
 
 // ============================================================================
-// Controller commands & Branch Switch (RV-08b)
+// Controller commands & Branch Switch
 // ============================================================================
 
 export type DraftResolution = 'clean' | 'applied' | 'discarded' | 'stay';
@@ -707,7 +701,7 @@ export type SwitchBranchOptions = {
 };
 
 // ============================================================================
-// Save Failure & Recovery (RV-08b)
+// Save Failure & Recovery
 // ============================================================================
 
 export type SaveFailureRecoveryAction = 'retry' | 'reload' | 'export';
@@ -727,12 +721,12 @@ export type SaveFailureRecoveryInfo = {
 };
 
 // ============================================================================
-// storage.md §5: Repository API
+// Repository API
 // ============================================================================
 
 /**
- * storage.md §5 Repository Port interface.
- * All nine methods specified in the contract.
+ * Repository port interface.
+ * All nine methods of the repository contract.
  */
 export interface StudioRepository {
   /** Detached parts belong only to this project's Library. */
@@ -767,7 +761,7 @@ export interface StudioRepository {
   deleteProject(projectId: Id, expectedMainHead: ExpectedHead): Promise<DeleteProjectResult>;
 
   /**
-   * Commits the terminal summary, manifest, checks and retained chunks atomically (RV-08a).
+   * Commits the terminal summary, manifest, checks and retained chunks atomically.
    * Verified by unforgeable RunStartToken; snapshot insert-if-absent from document;
    * provenance 'local' set ONLY by repository; traceState 'complete' when chunks saved.
    */
@@ -788,7 +782,7 @@ export interface StudioRepository {
   runsByFingerprint(projectId: Id, fingerprint: string): Promise<readonly Readonly<RunRecord>[]>;
 
   /**
-   * Publishes a candidate to main atomically (RV-08e).
+   * Publishes a candidate to main atomically.
    * Verified by unforgeable PublishTicket from CandidateController;
    * source and main CAS, runs rechecked, version strictly greater, source closed by default.
    */
@@ -804,36 +798,36 @@ export interface StudioRepository {
   listPublications(projectId: Id): Promise<readonly Readonly<PublicationRecord>[]>;
 
   /**
-   * project.import (RV-16b): validates the bundle bound to `fileToken` outside any
+   * project.import: validates the bundle bound to `fileToken` outside any
    * transaction, then creates a fresh project namespace in one transaction. Unknown or
    * expired token -> missing; invalid bundle -> invalid; reused newProjectId -> failed/conflict.
    */
   importProject(command: ProjectImportCommand): Promise<AuthoredResult>;
 
   /**
-   * project.export-json (RV-16b): one consistent read-only transaction; canonical-json-v1
+   * project.export-json: one consistent read-only transaction; canonical-json-v1
    * envelope bytes of `{format:'system-studio',version:9,project:ProjectBundle}`, capped
-   * at 64 MiB (storage.md §5 "Export always fits").
+   * at 64 MiB (export always fits).
    */
   exportProject(params: ExportProjectParams): Promise<ExportProjectResult>;
 
   /**
-   * pruneUnreferenced (RV-16b): explicit-only trace/run/snapshot pruning in one
-   * transaction, recomputing the pin closure from current rows (storage.md §7).
+   * pruneUnreferenced: explicit-only trace/run/snapshot pruning in one
+   * transaction, recomputing the pin closure from current rows.
    */
   pruneUnreferenced(params: PruneUnreferencedParams): Promise<PruneUnreferencedResult>;
 
   /**
    * Loads project, branches, commits, publications (by ordinal), checkpoints and
-   * per-branch history in one consistent read-only transaction (RV-08f, storage.md §9
-   * "round-trip reload"). Throws a `RepositoryError` (code `not-found`) if the project
+   * per-branch history in one consistent read-only transaction
+   * (round-trip reload). Throws a `RepositoryError` (code `not-found`) if the project
    * does not exist.
    */
   loadHistory(projectId: Id): Promise<HistoryLoadResult>;
 
   /**
-   * Verifies every stored reference resolves and every snapshot re-hashes to its own ID
-   * (RV-08f, storage.md §5/§9, transactions.md §4). Never repairs or fabricates content.
+   * Verifies every stored reference resolves and every snapshot re-hashes to its own ID.
+   * Never repairs or fabricates content.
    * Throws a `RepositoryError` (code `not-found`) if the project does not exist.
    */
   verifyReferenceIntegrity(projectId: Id): Promise<ReferenceIntegrityResult>;
@@ -844,14 +838,14 @@ export type { MintPublishTicketParams, PublishTicket, PublishTicketBinding } fro
 export type { FileToken, FileTokenBinding } from './file-tokens';
 
 // ============================================================================
-// storage.md §1 & §4: Portable bundle (RV-16b)
+// Portable bundle
 // ============================================================================
 
-/** storage.md §1: the portable file's fixed format discriminator and version. */
+/** The portable file's fixed format discriminator and version. */
 export const PORTABLE_FORMAT = 'system-studio' as const;
 export const PORTABLE_VERSION = 9 as const;
 
-/** Bundle rows are the table rows with `projectId` omitted (storage.md §4). */
+/** Bundle rows are the table rows with `projectId` omitted. */
 export type BundleBranchRecord = Omit<BranchRecord, 'projectId'>;
 export type BundleSnapshotRecord = Omit<SnapshotRecord, 'projectId'>;
 export type BundleCommitRecord = Omit<CommitRecord, 'projectId'>;
@@ -861,7 +855,7 @@ export type BundleRunRecord = Omit<RunRecord, 'projectId'>;
 export type BundlePartRecord = Omit<PartRecord, 'projectId'>;
 
 /**
- * storage.md §4 "Portable bundle" fields exactly:
+ * Portable bundle fields exactly:
  * `ProjectBundle={id,title,createdAt,updatedAt,mainBranchId,initialSnapshotId,branches,
  * snapshots,commits,publications,checkpoints,runs,parts}`. Arrays omit `projectId`.
  * Excludes operation receipts, preferences, trace chunks, device-local actors/credentials,
@@ -883,7 +877,7 @@ export type ProjectBundle = {
   readonly parts: readonly BundlePartRecord[];
 };
 
-/** storage.md §1: `{format:'system-studio',version:9,project:ProjectBundle}`. */
+/** `{format:'system-studio',version:9,project:ProjectBundle}`. */
 export type PortableFile = {
   readonly format: typeof PORTABLE_FORMAT;
   readonly version: typeof PORTABLE_VERSION;
@@ -891,10 +885,10 @@ export type PortableFile = {
 };
 
 // ============================================================================
-// commands.md §3 / storage.md §4-§6: Transfer, import, export, prune (RV-16b)
+// Transfer, import, export, prune
 // ============================================================================
 
-/** commands.md "File tokens": `{fileToken, newProjectId, operationId}` (Bootstrap envelope). */
+/** `{fileToken, newProjectId, operationId}` (Bootstrap envelope). */
 export type ProjectImportCommand = {
   readonly commandId: 'project.import';
   readonly operationId: Id;
@@ -925,7 +919,7 @@ export type ExportProjectResult =
 
 /**
  * `pruneUnreferenced({projectId, expectedProjectRevision, selection})`. Explicit only
- * (storage.md §7: "No auto-pruning anywhere").
+ * ("No auto-pruning anywhere").
  */
 export type PruneSelection = {
   readonly runIds: readonly Id[];

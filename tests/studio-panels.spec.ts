@@ -1,8 +1,8 @@
 import { test, expect, type Page } from './fixtures';
 
 /**
- * RV-12h: History and Library panels wired into the running workspace
- * through the panel system (PanelHost / panels.ts, RV-03a).
+ * History and Library panels wired into the running workspace
+ * through the panel system (PanelHost / panels.ts).
  *
  * Helpers mirror tests/studio-authoring.spec.ts (waitForIdle on the
  * save-status data-state, blank projects for authoring gestures, S05 for a
@@ -99,7 +99,7 @@ async function waitForPanelPreferenceSave(page: Page, minimumRevision = 1) {
     .toBeGreaterThanOrEqual(minimumRevision);
 }
 
-test.describe('RV-12h: History and Library panels', () => {
+test.describe('History and Library panels', () => {
   test('opens History from the top bar and the ladder renders for an S05 project', async ({ page }) => {
     await openS05Project(page);
 
@@ -114,7 +114,7 @@ test.describe('RV-12h: History and Library panels', () => {
   });
 
   test('opens the singleton Library from the dock and places a component', async ({ page }) => {
-    await openBlankProject(page, `RV-12h library ${Date.now()}`);
+    await openBlankProject(page, `library ${Date.now()}`);
 
     await expect(page.locator('[data-panel-id="library"]')).toHaveCount(0);
 
@@ -126,7 +126,7 @@ test.describe('RV-12h: History and Library panels', () => {
     const panel = page.getByTestId('library-panel');
     await expect(panel).toBeVisible();
 
-    // RV-12h debt: the two-column cards must stay inside the hosted panel's
+    // The two-column cards must stay inside the hosted panel's
     // narrower dock instead of retaining the standalone panel's minimum width.
     await panel.getByRole('button', { name: 'Grid view' }).click();
     const panelBox = await panel.boundingBox();

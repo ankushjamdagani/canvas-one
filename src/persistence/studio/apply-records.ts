@@ -1,7 +1,7 @@
 /**
- * Pure reducer and validator for applying RecordChange[] to a Document (RV-08b).
+ * Pure reducer and validator for applying RecordChange[] to a Document.
  *
- * Implements specs/revamp/contracts/commands.md §4:
+ * Rules:
  * - Reject whole command on missing target (dangling-reference)
  * - Reject whole command on duplicate targets within changes or existing document (duplicate-id)
  * - Reject unknown IDs or fields (invalid-id, invalid-literal, unknown-property via validateDocument)

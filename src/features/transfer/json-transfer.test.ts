@@ -1,10 +1,5 @@
 /**
- * Tests for JSON Export and Import flows (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("JSON, images and files")
- * - specs/revamp/contracts/storage.md (§4 portable v9 bundle, §5 repository API)
- * - specs/revamp/decisions.md (D19)
+ * Tests for JSON Export and Import flows.
  *
  * Verification:
  * - JSON export -> import round trip on S01-S05 fixture projects (fake-indexeddb)
@@ -187,7 +182,7 @@ describe('JSON Transfer (exportProjectJson & importProjectJson)', () => {
     db.close();
   });
 
-  it('rejects unsupported v7 and v8 files with a clear "made with the old app, not supported" message (D19)', async () => {
+  it('rejects unsupported v7 and v8 files with a clear "made with the old app, not supported" message', async () => {
     const { repo, db } = createTestRepo();
 
     const v7Payload = JSON.stringify({

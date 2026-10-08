@@ -1,13 +1,8 @@
 /**
- * Entry Detail Card (RV-06b / Screen 12C).
+ * Entry Detail Card: the hover / focus / detail popover content for a catalog entry.
  *
- * Implements the hover / focus / detail popover content matching 12C.
- *
- * Specification & Revalidation rules:
- * - specs/revamp/screens/12C_Library_hover_detail.png
- * - specs/revamp/contracts/catalog.md (§5 Library display mapping)
- * - specs/revamp/design-revalidation.md (§2: OUT: Owner, Used in, Platform team / team chips,
- *   "Failures go to", Open docs)
+ * It shows only catalog-derived rows; it has no Owner, Used in, team chips, "Failures go to" or
+ * Open docs rows.
  */
 
 import type { CatalogEntry } from '../catalog/catalog';

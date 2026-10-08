@@ -1,7 +1,6 @@
 /**
  * Detached part content and capture preview types.
  *
- * Implements specs/revamp/contracts/parts-and-export.md "Capture and placement".
  * Part content deliberately excludes documents, scenarios, runs, and history.
  */
 

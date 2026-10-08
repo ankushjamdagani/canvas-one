@@ -1,9 +1,5 @@
 /**
- * Tests for SVG Diagram Exporter (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("JSON, images and files")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
+ * Tests for SVG Diagram Exporter.
  *
  * Verification:
  * - SVG determinism

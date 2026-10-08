@@ -10,7 +10,7 @@ import { PlaybackStore } from './playback';
 import { ResourceAdapter } from '../../domain/studio/runner/resource-adapter';
 
 const range = { startMs: 100, endMs: 300 };
-const s06 = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+const s06 = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s06.json'), 'utf8')) as Document;
 const cycle = (id: string, startedAtMs: number, responseAtMs: number | null, completedAtMs: number | null, outcome: Cycle['outcome'] = null): Cycle => ({
   id, workloadId: 'w', startedAtMs, responseAtMs, completedAtMs, outcome,
   counts: { ok: 0, expired: 0, rejected: 0, 'timed-out': 0, failed: 0, lost: 0, stuck: 0 },

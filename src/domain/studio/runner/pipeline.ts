@@ -1,13 +1,10 @@
 /**
- * Pipeline behavior interpreter and data operations (RV-14c).
+ * Pipeline behavior interpreter and data operations (validate, trim, map, filter,
+ * deduplicate, group-sum).
  *
- * Implements specs/revamp/contracts/model-and-runner.md:
- * - §4 Behaviors: pipeline behavior, Operations (validate, trim, map, filter,
- *   deduplicate, group-sum), Wiring.
- * - §5 Invocation semantics: "A pipeline emits ordered success/error arrays,
- *   only when nonempty; an empty branch emits nothing, and row outcomes stay available."
- * - §9 Results: row provenance ({inputEventId, index}), rowOutcomes, errorCode union.
- * - §11 Reference scenarios: S03 records pipeline.
+ * A pipeline emits ordered success/error arrays only when nonempty; an empty branch
+ * emits nothing, and row outcomes stay available. Row provenance is
+ * `{inputEventId, index}`.
  */
 
 import { canonicalJson } from '../canonical';

@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 
-test.describe('Studio Shell E2E (RV-03s)', () => {
+test.describe('Studio Shell E2E', () => {
   test('entry two columns, create S05, breadcrumb, project menu rename persists, branch popover switches, drag on main auto-drafts, dock zoom, no rail, mobile no scroll', async ({
     page,
   }) => {
@@ -76,7 +76,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
 
-    // 5. Drag a node while on main -> D40 auto-drafts a new branch; main unchanged
+    // 5. Drag a node while on main -> auto-drafts a new branch; main unchanged
     const node = page.locator('.component-node').first();
     await expect(node).toBeVisible();
     const initialBox = await node.boundingBox();
@@ -134,7 +134,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await page.getByTestId('dock-zoom-out-btn').click();
     await page.waitForTimeout(250);
 
-    // 7. Create blank project via "Open an empty canvas" -> D43(a): opens
+    // 7. Create blank project via "Open an empty canvas" -> opens
     //    straight onto its seeded "Main" view (canvas + dock, zero nodes),
     //    not the (now unreachable from this flow) empty-views-state.
     await page.getByTestId('breadcrumb-project-btn').click();
@@ -251,7 +251,7 @@ test.describe('Studio Shell E2E (RV-03s)', () => {
     await expect(page.getByTestId('canvas-floating-dock')).toBeVisible();
   });
 
-  test('RV-12d review round 1: edge labels that would cover a node caption are hidden by default and reveal on hover', async ({
+  test('edge labels that would cover a node caption are hidden by default and reveal on hover', async ({
     page,
   }) => {
     await page.goto('/projects');

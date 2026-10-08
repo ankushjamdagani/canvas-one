@@ -1,5 +1,5 @@
 /**
- * D57: the worker computes ahead of the playhead the main thread reports, up to LOOKAHEAD_MS, and then waits.
+ * The worker computes ahead of the playhead the main thread reports, up to LOOKAHEAD_MS, and then waits.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import type { Document, Emission } from '../../domain/studio/model';
 import { DEFAULT_BUILD_VERSIONS } from '../../persistence/studio/types';
 import { CHECKPOINT_MS, LOOKAHEAD_MS, WorkerProtocolHandler, type HostMessage } from './protocol';
 
-const s06 = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+const s06 = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s06.json'), 'utf8')) as Document;
 const withEmission = (emission: Emission): Document => ({
   ...s06,
   scenarios: s06.scenarios.map((s, i) => (i === 0 ? { ...s, workloads: s.workloads.map((w) => ({ ...w, emission })) } : s)),
@@ -36,7 +36,7 @@ async function start(doc: Document) {
   return { handler, updates, waitFor, idle, terminal };
 }
 
-describe('lookahead (D57)', () => {
+describe('lookahead', () => {
   it('a stream computes only about LOOKAHEAD_MS ahead of the playhead, then goes idle', async () => {
     const run = await start(withEmission(STREAM));
     await run.waitFor(run.idle);

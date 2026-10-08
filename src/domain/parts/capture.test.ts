@@ -6,7 +6,7 @@ import { validateDocument } from '../studio/validate';
 import { captureSelection } from './capture';
 
 function fixture(name: string): Document {
-  return JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures', `${name}.json`), 'utf8')) as Document;
+  return JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples', `${name}.json`), 'utf8')) as Document;
 }
 
 describe('captureSelection', () => {

@@ -1,10 +1,6 @@
 /**
- * Connection Planning Compiler (RV-06a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/catalog.md (§4 Connection defaults per kind, Approved resolutions 5, 8, 11)
- * - specs/revamp/contracts/model-and-runner.md (§2 Records, §3 Payload schemas, §4 Behaviors)
- * - specs/revamp/decisions.md (D36, D42)
+ * Connection planning compiler: turns a connect gesture into the connection, port and schema
+ * record changes (or a typed rejection).
  */
 
 import { LINK_CLASS_LATENCY_MS } from '../../domain/studio/model';
@@ -43,7 +39,7 @@ import { createIssue } from '../../domain/studio/issue';
 /** Port, schema and connection labels are limited to 80 characters; a long path must not break validation. */
 const clip = (text: string): string => Array.from(text).slice(0, 80).join('');
 
-/** A new connection starts as a same-AZ hop (assumption, catalog.md D49); the inspector changes the link class. */
+/** A new connection starts as a same-AZ hop (an assumption); the inspector changes the link class. */
 const DEFAULT_CALL_CONFIG: CallConnectionConfig = {
   latencyMs: LINK_CLASS_LATENCY_MS['same-az'],
   returnLatencyMs: LINK_CLASS_LATENCY_MS['same-az'],
@@ -51,7 +47,7 @@ const DEFAULT_CALL_CONFIG: CallConnectionConfig = {
   jitterMs: 0,
   lossRate: 0,
   bandwidthKbps: null,
-  weight: 1, // assumption (catalog.md)
+  weight: 1, // assumption
   condition: null,
   fallback: false,
 };
@@ -61,7 +57,7 @@ const DEFAULT_MESSAGE_CONFIG: MessageConnectionConfig = {
   jitterMs: 0,
   lossRate: 0,
   bandwidthKbps: null,
-  weight: 1, // assumption (catalog.md)
+  weight: 1, // assumption
   condition: null,
   fallback: false,
 };
@@ -74,11 +70,11 @@ export type PlanConnectionParams = {
   readonly source: Endpoint;
   readonly target: Endpoint | { readonly elementId: Id };
   readonly mintId: () => Id;
-  /** D53: the connection type chosen in the connect form; defaults to the target's entry protocol. */
+  /** The connection type chosen in the connect form; defaults to the target's entry protocol. */
   readonly protocol?: Protocol;
-  /** D53: the endpoint path or name; defaults to the target's own path for the chosen type. */
+  /** The endpoint path or name; defaults to the target's own path for the chosen type. */
   readonly path?: string;
-  /** D53: the connection types the project a linked-project target points at exposes right now. */
+  /** The connection types the project a linked-project target points at exposes right now. */
   readonly linkedExposures?: readonly ProjectExposure[];
 };
 
@@ -90,13 +86,13 @@ export type ConnectionDraft = {
   readonly target: Endpoint;
   readonly kind: 'call' | 'message';
   readonly sourceElementReplacement?: Element;
-  /** D53: the connection type this draft was planned with, and the types the form may offer. */
+  /** The connection type this draft was planned with, and the types the form may offer. */
   readonly protocol: Protocol | null;
   readonly protocolOptions: readonly Protocol[];
-  /** D53: the endpoint path or name this draft was planned with, and the paths the target already has for the type. */
+  /** The endpoint path or name this draft was planned with, and the paths the target already has for the type. */
   readonly path: string;
   readonly pathOptions: readonly string[];
-  /** D53: schema inserts and element replacements for ports added by this connection. */
+  /** Schema inserts and element replacements for ports added by this connection. */
   readonly portChanges: readonly RecordChange[];
 };
 
@@ -130,7 +126,7 @@ export type CompleteConnectionResult =
 
 /**
  * Checks whether adding a directed 'call' edge from sourceElementId to targetElementId
- * would close a synchronous call cycle (model-and-runner.md §2).
+ * would close a synchronous call cycle .
  */
 function wouldCreateSyncCallCycle(
   connections: readonly Connection[],
@@ -248,7 +244,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
 
   const resolvedTargetPort: Port = targetPort;
 
-  // Contract §4: Event ports are never connectable
+  // Event ports are never connectable
   if (sourcePort.channel === 'event') {
     return {
       kind: 'rejected',
@@ -290,9 +286,9 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
   let sourceElementReplacement: Element | undefined = undefined;
   const newSourcePortChanges: RecordChange[] = [];
 
-  // Messaging between resources (D47, closes audit G1). A service-like resource publishes
+  // Messaging between resources: a service-like resource publishes
   // to a broker through its own out:message port, and a broker delivers to a consumer's
-  // in:call entry through an out:call route port (the S02/S05 consumer shape). Both ports
+  // in:call entry through an out:call route port (the consumer shape). Both ports
   // are added by the connect gesture, like a router's route ports.
   const resourceType = (el: Element) => (el.behavior.kind === 'resource' ? (el.behavior.config as { type: string }).type : null);
   const publishesToBroker =
@@ -355,7 +351,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     effectiveSourcePort = newPort;
   }
 
-  // D53: connection types. A node is connected through a port per (direction, channel, protocol); a
+  // Connection types. A node is connected through a port per (direction, channel, protocol); a
   // connection of type P reuses the source and target port of that type or adds the missing one, and a
   // new port shares the schemas of the port on the other side (a fresh pair if both are new).
   const portChanges: RecordChange[] = [];
@@ -624,7 +620,7 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     };
   }
 
-  // Synchronous call cycle rejection (§2)
+  // Synchronous call cycle rejection
   if (connectionKind === 'call') {
     if (wouldCreateSyncCallCycle(document.connections, source.elementId, targetElement.id)) {
       return {

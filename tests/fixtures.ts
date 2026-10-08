@@ -2,7 +2,7 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 export const speedTrigger = (page: Page) => page.locator('[data-testid="playback-panel"]:has([role="slider"][aria-disabled="false"]) [data-testid="playback-speed"]');
 
-/** Move playback to the source design's fastest public setting. */
+/** Moves playback to its fastest public setting (4×). */
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addLocatorHandler(

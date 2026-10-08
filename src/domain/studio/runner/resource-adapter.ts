@@ -1,16 +1,11 @@
 /**
- * Retained resource adapter (RV-14d-2).
+ * Retained resource adapter.
  *
- * Implements the retained adapter over the simulation kernel for studio `resource`
- * elements and their call/message connections, per:
- * - specs/revamp/contracts/model-and-runner.md §4 (ResourceConfig, call/message connection config)
- * - specs/revamp/contracts/model-and-runner.md §6 (Workloads, completion horizon/drain, service time)
- * - specs/revamp/contracts/model-and-runner.md §8 ("Retained adapter", TraceEvent, "Transport-only settlement", "One global scheduler")
- * - specs/revamp/contracts/model-and-runner.md §9 (Counts, ElementMetric, ResourceSummary)
- * - specs/revamp/contracts/model-and-runner.md §10 (Reuse vs new work)
- *
- * Note: interruptHost (faults) belongs to RV-14e and settleCall (bridge frames) to RV-14f:
- * they are intentionally not implemented here per RV-14d-2 specification.
+ * Runs studio `resource` elements and their call/message connections over the
+ * simulation kernel: ResourceConfig and connection config, workloads (completion
+ * horizon/drain, service time), transport-only settlement, one global scheduler, and
+ * the Counts / ElementMetric / ResourceSummary results. Also handles host interruption
+ * (faults) and bridge call frames (`settleCall`).
  */
 
 import type {
@@ -189,7 +184,7 @@ export function validateFaultsAndPlacements(
 
 export interface ResourceAdapterOptions {
   runId?: string;
-  /** D57: cycles leave the tracker once handed out (a streamed recording); the summary still counts them. */
+  /** Cycles leave the tracker once handed out (a streamed recording); the summary still counts them. */
   streamOutCycles?: boolean;
   elements: readonly Element[];
   connections: readonly Connection[];
@@ -201,7 +196,7 @@ export interface ResourceAdapterOptions {
   disabledWorkloadIds?: Iterable<string>;
 }
 
-/** D56: how far a run's clock may go (24 simulated hours), far past any practical session. */
+/** How far a run's clock may go (24 simulated hours), far past any practical session. */
 export const RUN_CEILING_MS = 86_400_000;
 
 export type ResourceAdapterInit =
@@ -216,7 +211,7 @@ export type ResourceAdapterInit =
 
 /**
  * Builds an ExecutionGraph from studio-model/1 records.
- * ResourceConfig fields and connection latencies are copied 1:1 per §4.
+ * ResourceConfig fields and connection latencies are copied 1:1.
  * The ms<->s conversion lives only at this boundary.
  * Outgoing edge order is stable edge-ID order.
  */
@@ -236,8 +231,8 @@ function buildExecutionGraph(opts: {
   const nodes: ExecutionNode[] = [];
   const allElementsById = new Map<Id, Element>();
   const portLookup = { elements: opts.elements };
-  // D53: the simulated settings of the in-port a call enters through override the node's behavior for it.
-  // D54: the caller's circuit breaker, in-flight limit, hedging, payload size, confirm and batching.
+  // The simulated settings of the in-port a call enters through override the node's behavior for it.
+  // The caller's circuit breaker, in-flight limit, hedging, payload size, confirm and batching.
   const callerOf = (endpoint: Endpoint): CallerPolicy | undefined => {
     const settings = findPort(portLookup, endpoint)?.port.settings as
       | { circuitBreaker?: CallerPolicy['breaker']; maxInFlight?: number; hedge?: { afterMs: number }; requestBytes?: number; confirm?: boolean; batch?: CallerPolicy['batch'] }
@@ -297,7 +292,7 @@ function buildExecutionGraph(opts: {
   const bridgeConnByNode = new Map<Id, Connection>();
 
   for (const conn of opts.connections) {
-    // Bridge call frames (§8): a call from a resource's continuation to a non-resource
+    // Bridge call frames: a call from a resource's continuation to a non-resource
     // target. Deliberately excluded from the compiled ExecutionGraph (its target isn't a
     // kernel node), and tracked separately so the kernel can be told, via
     // KernelBridgeConfig, which resource nodes have one (dispatchDownstream then waits on
@@ -342,7 +337,7 @@ function buildExecutionGraph(opts: {
           ? { field: callConn.config.condition.field, value: String(callConn.config.condition.value) }
           : undefined,
         fallback: callConn.config.fallback,
-        // D49/D50: a caller's retries, or a broker route's redelivery policy.
+        // A caller's retries, or a broker route's redelivery policy.
         ...(callRetryOf(portLookup, conn) ? { retry: callRetryOf(portLookup, conn)! } : {}),
         ...(endpointOf(conn.target) ? { endpoint: endpointOf(conn.target)! } : {}),
         ...(callerOf(conn.source) ? { caller: callerOf(conn.source)! } : {}),
@@ -372,14 +367,14 @@ function buildExecutionGraph(opts: {
     }
   }
 
-  // Stable edge-ID order (§4 & §8)
+  // Stable edge-ID order
   edges.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   const workloads: WorkloadDefinition[] = (opts.workloads ?? []).map((w) => ({
     id: w.id,
     entryNodeId: w.entry.elementId,
     enabled: w.enabled,
-    // D56: a stream's base rate and profile; a bulk's arrivals come from its schedule.
+    // A stream's base rate and profile; a bulk's arrivals come from its schedule.
     rate: w.emission.mode === 'stream' ? w.emission.ratePerSecond : 0,
     timeoutMs: w.timeoutMs,
     ...(endpointOf(w.entry) ? { endpoint: endpointOf(w.entry)! } : {}),
@@ -391,7 +386,7 @@ function buildExecutionGraph(opts: {
             startDelayMs: w.startDelayMs,
             ...(w.emission.profile.kind === 'ramp' ? { rampSeconds: w.emission.profile.rampMs / 1000 } : {}),
           },
-    // D50: the ms<->s conversion lives only at this boundary.
+    // The ms<->s conversion lives only at this boundary.
     profile:
       w.emission.mode === 'stream' && w.emission.profile.kind === 'burst'
         ? { kind: 'burst', peakRate: w.emission.profile.peakRate, start: w.emission.profile.startMs / 1000, end: w.emission.profile.endMs / 1000 }
@@ -450,17 +445,17 @@ export class ResourceAdapter {
   private traceSequence = 0;
   private stepFacts: SimLifecycleFact[] = [];
   /** Live canvas view: connection of each packet announced by a `sent` fact, and the steps not yet drained. */
-  /** D56: cycles assembled from the kernel's lifecycle facts. */
+  /** Cycles assembled from the kernel's lifecycle facts. */
   readonly cycleTracker: CycleTracker;
   private readonly flowConnections = new Map<string, string>();
   private flowRecords: FlowRecord[] = [];
 
   // Delivered-copy ordinal, keyed by the delivering (kernel) parent unit identity, so
-  // every message delivery (single or D36 broadcast fan-out) gets a stable, deterministic
+  // every message delivery (single or broadcast fan-out) gets a stable, deterministic
   // runner-level root id (`${parentRootId}:${ordinal}`) instead of exposing the kernel's
   // own internal delivery-path identity (e.g. `msg_1:<path>:__entry:<id>:`) in TraceEvents.
   private readonly deliveryOrdinalByParent = new Map<string, number>();
-  // Set when a kernel fact's journey/parent linkage can't be resolved (§5/§8: every
+  // Set when a kernel fact's journey/parent linkage can't be resolved (every
   // TraceEvent carries its journey; a message root links to its parent). Checked by the
   // caller after every admit()/stepNext()/interruptHost() call so the run fails with a
   // sanitized diagnostic instead of ever emitting an 'unknown' journeyId.
@@ -477,7 +472,7 @@ export class ResourceAdapter {
 
   /**
    * Roots the kernel generated from workloads (never admitted through `admit()`). The
-   * runner only sees finite inputs, so it adds these to its own root counts (§5 counts
+   * runner only sees finite inputs, so it adds these to its own root counts (counts
    * conserve every root, whatever its source).
    */
   private readonly workloadRootCounts: MutableCounts = {
@@ -583,7 +578,7 @@ export class ResourceAdapter {
     const kernelBridges: KernelBridgeConfig[] = [];
     for (const [nodeId, conn] of bridgeConnByNode.entries()) {
       const returnLatencyMs = conn.kind === 'call' ? (conn as CallConnection).config.returnLatencyMs : 0;
-      // D50: a resource's retries on a call that leaves the kernel (e.g. to a boundary).
+      // A resource's retries on a call that leaves the kernel (e.g. to a boundary).
       const retry = callRetryOf({ elements }, conn);
       kernelBridges.push({ nodeId, returnLatencyMs, retry, connectionId: conn.id });
     }
@@ -690,22 +685,22 @@ export class ResourceAdapter {
     if (phase === 'released' && fact.operationReleased) this.flowConnections.delete(key);
   }
 
-  /** D55: nothing is live in the kernel and no arrival is pending. */
+  /** Nothing is live in the kernel and no arrival is pending. */
   isIdle(): boolean {
     return this.sim.isIdle();
   }
 
-  /** D56: an event that could still change an outcome is scheduled (periodic samples do not count). */
+  /** An event that could still change an outcome is scheduled (periodic samples do not count). */
   hasPendingWork(): boolean {
     return this.sim.hasPendingWork();
   }
 
-  /** D56: arrivals still to come (a live stream always has one). */
+  /** Arrivals still to come (a live stream always has one). */
   pendingArrivalCount(): number {
     return this.sim.pendingArrivalCount();
   }
 
-  /** D56: units that have not settled, with where each is held. */
+  /** Units that have not settled, with where each is held. */
   unsettled(): ReturnType<OpenSimulation['unsettled']> {
     return this.sim.unsettled();
   }
@@ -720,7 +715,7 @@ export class ResourceAdapter {
     }
   }
 
-  /** D55: no workload arrives again; work in flight carries on. */
+  /** No workload arrives again; work in flight carries on. */
   stopArrivals(): void {
     this.sim.stopArrivals();
   }
@@ -734,7 +729,7 @@ export class ResourceAdapter {
   }
 
   /**
-   * Returns and clears a pending journey/parent resolution failure (§5/§8). Callers check
+   * Returns and clears a pending journey/parent resolution failure. Callers check
    * this after every admit()/stepNext()/interruptHost() call and turn a non-null result
    * into a controlled run failure — never a silent 'unknown' journeyId.
    */
@@ -750,13 +745,12 @@ export class ResourceAdapter {
   }
 
   /**
-   * Per-fact bookkeeping shared by admit(), stepNext() and interruptHost() (§5, §8): root
+   * Per-fact bookkeeping shared by admit(), stepNext() and interruptHost(): root
    * and message Counts, and unitContexts registration for every kernel-derived unit
-   * (delivered message copies, D36 broadcast fan-out copies) so journeyId, parent
+   * (delivered message copies, broadcast fan-out copies) so journeyId, parent
    * linkage, and payloadRef always propagate from the admitted parent — regardless of
-   * which entry point produced the fact (a broker's synchronous delivery inside admit()
-   * previously skipped this, which is exactly what left journeyId 'unknown' on delivered
-   * units admitted via a message; see RV-14f review).
+   * which entry point produced the fact (including a broker's synchronous delivery inside
+   * admit()).
    *
    * Every delivered copy is exposed under a deterministic `${parentRootId}:${ordinal}`
    * root id, never the kernel's own internal delivery-path identity.
@@ -767,9 +761,9 @@ export class ResourceAdapter {
       return;
     }
 
-    // §8 "No success is inferred": root-vs-message is likewise never inferred from the
-    // shape of unitIdentity — the kernel now carries the unit's actual category on every
-    // 'admitted'/'rejected'/'unit_settled' fact (RV-14f review). A fact of one of these
+    // Root-vs-message is never inferred from the shape of unitIdentity: the kernel
+    // carries the unit's actual category on every
+    // 'admitted'/'rejected'/'unit_settled' fact. A fact of one of these
     // kinds with no category is an adapter/kernel bookkeeping failure, not a silent
     // "assume root" default.
     if (fact.kind === 'admitted' || fact.kind === 'rejected' || fact.kind === 'unit_settled') {
@@ -817,7 +811,7 @@ export class ResourceAdapter {
       });
     } else if (fact.kind === 'unit_settled') {
       if (!fact.outcome) {
-        // §8 "No success is inferred": a unit_settled fact without an explicit outcome
+        // No success is inferred: a unit_settled fact without an explicit outcome
         // must fail the run, never default to 'succeeded'.
         this.journeyFailure ??= `unit_settled fact for unit '${fact.unitIdentity}' carried no outcome`;
         return;
@@ -838,7 +832,7 @@ export class ResourceAdapter {
   }
 
   /**
-   * Registers a delivered message unit's context (§5, §8), inheriting journeyId,
+   * Registers a delivered message unit's context, inheriting journeyId,
    * payloadRef and a clean, deterministic root id from its parent. Split out from
    * consumeFact and called unconditionally (including from admit(), where a broker's
    * synchronous delivery can fire this fact before any per-fact root/message counting
@@ -851,7 +845,7 @@ export class ResourceAdapter {
 
     const parentCtx = fact.parentIdentity ? this.unitContexts.get(fact.parentIdentity) : undefined;
     if (!parentCtx) {
-      // §5/§8: every message root links to its parent, and every TraceEvent carries its
+      // Every message root links to its parent, and every TraceEvent carries its
       // journey — a delivered unit whose parent can't be resolved must fail the run
       // rather than fabricate a placeholder journey.
       this.journeyFailure = `Cannot resolve journey for delivered message unit '${fact.unitIdentity}': parent unit '${fact.parentIdentity ?? '(none)'}' has no registered context`;
@@ -989,7 +983,7 @@ export class ResourceAdapter {
 
   /**
    * Peeks the next event in the kernel heap.
-   * Phase is 0 for fault/detection events and 1 for retained kernel events per §8 global scheduler rules.
+   * Phase is 0 for fault/detection events and 1 for retained kernel events (the one global scheduler's ordering).
    */
   peekNext(): { atMs: number; phase: 0 | 1; sequence: number } | null {
     const nextEvt = this.sim.peekNextEvent();
@@ -1002,7 +996,7 @@ export class ResourceAdapter {
   }
 
   /**
-   * Interrupts a host at the given simulation time (§8).
+   * Interrupts a host at the given simulation time.
    * Host outage fails active work once and rejects queued work once on that host.
    */
   interruptHost(hostId: Id, atMs: number): KernelDelta {
@@ -1047,7 +1041,7 @@ export class ResourceAdapter {
         // A route target that is itself a resource element stays inside this kernel's own
         // subgraph: the kernel continues processing it internally (admission/queue/completion),
         // so it must not also surface as a bridge PortEmission for external dispatch. Only a
-        // route crossing out to a non-resource element is a bridge continuation (§8).
+        // route crossing out to a non-resource element is a bridge continuation.
         if (conn && !this.resourceElements.has(conn.target.elementId)) {
           const latencyMs = conn.kind === 'call' || conn.kind === 'message' ? conn.config.latencyMs : 0;
           outputs.push({
@@ -1062,9 +1056,9 @@ export class ResourceAdapter {
           });
         }
       } else if (fact.kind === 'bridge_dispatch' && fact.frameId) {
-        // Bridge call frames (§8): the resource has no further in-kernel route and
+        // Bridge call frames: the resource has no further in-kernel route and
         // dispatches its call continuation externally, carrying the system frameId the
-        // caller must eventually resolve via settleCall(). §8 phase 2 "bridge dispatch".
+        // caller must eventually resolve via settleCall().
         const conn = this.bridgeConnByNode.get(fact.nodeId);
         const unitCtx = this.unitContexts.get(fact.unitIdentity);
         if (!unitCtx) {
@@ -1098,19 +1092,19 @@ export class ResourceAdapter {
   }
 
   /**
-   * Bridge call frames (RV-14f, §8): settles a frame dispatched externally via a
+   * Bridge call frames: settles a frame dispatched externally via a
    * 'bridge_dispatch' PortEmission. A second settlement of the same frame fails the run
    * (the kernel throws); if the parent was already settled by an outage or deadline
-   * expiry while the frame was open, this is a no-op that still frees the frame (§8: "the
-   * later settleCall is ignored ... but still counts toward root settlement and drain").
+   * expiry while the frame was open, this is a no-op that still frees the frame (the
+   * late reply is ignored but still counts toward root settlement and drain).
    * The resulting completion (with the adopted outcome/payload) surfaces later, at
    * `atMs + returnLatencyMs`, through the normal `peekNext()`/`stepNext()` scheduler loop
-   * — matching how a retained child's response delay already surfaces (§8 "the kernel
-   * applies returnLatencyMs and its existing child-response handling").
+   * — matching how a retained child's response delay already surfaces (the kernel
+   * applies returnLatencyMs and its existing child-response handling).
    */
   settleCall(input: { frameId: string; outcome: TraceEvent['outcome']; payloadRef: string; atMs: number }): KernelDelta {
     if (input.outcome === null) {
-      // §8: no success is inferred. A bridge settlement must carry an explicit outcome.
+      // No success is inferred: a bridge settlement must carry an explicit outcome.
       this.journeyFailure ??= `settleCall for frame '${input.frameId}' carried no outcome`;
       return { events: [], outputs: [] };
     }
@@ -1240,7 +1234,7 @@ export class ResourceAdapter {
         };
       case 'unit_settled': {
         if (!fact.outcome) {
-          // §8 "No success is inferred": never default a bare settlement to 'succeeded'.
+          // No success is inferred: never default a bare settlement to 'succeeded'.
           this.journeyFailure ??= `unit_settled fact for unit '${fact.unitIdentity}' carried no outcome`;
           return null;
         }
@@ -1254,9 +1248,9 @@ export class ResourceAdapter {
           portId: unitCtx.entryPortId,
           kind: 'settled',
           code: fact.outcome,
-          // Bridge call frames (§8): a bridge-adopted settlement carries the child's own
+          // Bridge call frames: a bridge-adopted settlement carries the child's own
           // payload ref (fact.payloadRef); every other settlement keeps the original
-          // admitted payload (transport-only settlement, §8).
+          // admitted payload (transport-only settlement).
           payloadRef: fact.payloadRef ?? unitCtx.payloadRef,
           atMs,
           outcome: fact.outcome,
@@ -1293,7 +1287,7 @@ export class ResourceAdapter {
           outcome: null,
         };
       case 'call_retry': {
-        // D49/D50: the caller sends another attempt along this call connection after a
+        // The caller sends another attempt along this call connection after a
         // backoff (a kernel edge, a bridge connection, or a broker route's redelivery).
         if (!fact.edgeId) return null;
         const conn = this.edgeMap.get(fact.edgeId) ?? [...this.bridgeConnByNode.values()].find((c) => c.id === fact.edgeId);
@@ -1505,7 +1499,7 @@ export class ResourceAdapter {
           scope: 'element',
           key: 'utilization',
           // Share of slot-time occupied, including slots held while waiting on a downstream
-          // call or acknowledgement (model-and-runner.md §9). The kernel's processing-only
+          // call or acknowledgement. The kernel's processing-only
           // `utilization` makes a blocked element look idle.
           value: nm.occupancy,
           unit: 'ratio',
@@ -1528,7 +1522,7 @@ export class ResourceAdapter {
       );
 
       // Response time at this element: arrival to success, including queueing, retries
-      // and downstream waits (model-and-runner.md §9, D48).
+      // and downstream waits.
       const latency = this.sim.nodeLatency(nodeId);
       for (const [key, value] of [['meanLatencyMs', latency.mean], ['p95LatencyMs', latency.p95]] as const) {
         metrics.push({

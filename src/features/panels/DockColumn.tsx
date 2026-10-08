@@ -203,7 +203,7 @@ export const DockColumn: React.FC<DockColumnProps> = ({
         </div>
       )}
 
-      {/* Render Stacked Panels with Dividers (23E): two or more panels share the column */}
+      {/* Render Stacked Panels with Dividers: two or more panels share the column */}
       {isStacked && (
         <div className="flex flex-col h-full min-h-0">
           {sortedPanels.map((panel, index) => (

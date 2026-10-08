@@ -10,7 +10,7 @@ describe('StudioDatabase schema introspection', () => {
     db.close();
   });
 
-  it('matches specs/revamp/contracts/storage.md §2 table names and indexes exactly', async () => {
+  it('matches the expected table names and indexes exactly', async () => {
     const db = createStudioDatabase(`test-schema-${crypto.randomUUID()}`);
     await db.open();
 

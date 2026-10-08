@@ -1,5 +1,5 @@
 /**
- * D54: the caller's circuit breaker, in-flight limit and hedging, link jitter, loss and bandwidth,
+ * The caller's circuit breaker, in-flight limit and hedging, link jitter, loss and bandwidth,
  * a callee's concurrency cap, and message confirm and batching, all through the real planners and
  * the scenario runner.
  */
@@ -128,7 +128,7 @@ async function run(o: Parameters<typeof build>[0]) {
   };
 }
 
-describe('callee concurrency cap (D54)', () => {
+describe('callee concurrency cap', () => {
   it('rejects calls beyond the endpoint\'s slots, while an uncapped endpoint absorbs them', async () => {
     const slow = { serviceTimeMs: 1000 };
     const open = await run({ calleeIn: slow });
@@ -141,7 +141,7 @@ describe('callee concurrency cap (D54)', () => {
   });
 });
 
-describe('caller circuit breaker (D54)', () => {
+describe('caller circuit breaker', () => {
   // A failing callee that takes 100 ms per call: the load it carries shows in its utilization.
   const failing = { failureRate: 100, serviceTimeMs: 100 };
   it('stops sending to a callee that keeps failing, and probes again after it has been open a while', async () => {
@@ -163,7 +163,7 @@ describe('caller circuit breaker (D54)', () => {
   });
 });
 
-describe('caller in-flight limit (D54)', () => {
+describe('caller in-flight limit', () => {
   it('fails calls fast once that many are outstanding', async () => {
     const slow = { serviceTimeMs: 400 };
     const open = await run({ calleeIn: slow });
@@ -175,7 +175,7 @@ describe('caller in-flight limit (D54)', () => {
   });
 });
 
-describe('hedged calls (D54)', () => {
+describe('hedged calls', () => {
   it('send a second copy of a slow call, which adds load but cuts the tail', async () => {
     // Half the time the callee is slow: a 20% failure rate cannot be hedged around, but latency can.
     const base = { calleeConfig: { serviceTime: 'lognormal', serviceTimeCv: 3 } };
@@ -187,7 +187,7 @@ describe('hedged calls (D54)', () => {
   });
 });
 
-describe('link impairments (D54)', () => {
+describe('link impairments', () => {
   it('loss: a lost request or response never reaches the caller, so only a timeout or the deadline ends the call', async () => {
     const lossy = await run({ link: { lossRate: 30 }, callerOut: { retry: { maxAttempts: 1, backoffMs: 0, backoffMultiplier: 1, maxBackoffMs: 0, jitter: false, attemptTimeoutMs: null } } });
     // About half the calls lose a leg (30% each way) and expire at the 30 s deadline.
@@ -214,7 +214,7 @@ describe('link impairments (D54)', () => {
   });
 });
 
-describe('message publishing (D54)', () => {
+describe('message publishing', () => {
   const ack = { ackDelayMs: 200 };
   it('confirm waits for the acknowledgement; fire and forget does not', async () => {
     const confirmed = await run({ kind: 'publish', calleeIn: ack });

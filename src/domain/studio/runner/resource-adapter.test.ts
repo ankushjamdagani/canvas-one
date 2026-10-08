@@ -84,7 +84,7 @@ function makeResourceInput(overrides: Partial<ResourceInput> = {}): ResourceInpu
   };
 }
 
-describe('Retained Resource Adapter (RV-14d-2)', () => {
+describe('Retained Resource Adapter', () => {
   it('1. a finite input admitted to a processor settles succeeded with the exact latency 1000/capacity ms plus edge latencies', () => {
     // p1: capacity 10 req/s -> service time = 1000/10 = 100 ms
     const p1 = makeResourceElement('p1', {

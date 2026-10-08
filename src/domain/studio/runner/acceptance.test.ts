@@ -1,9 +1,8 @@
 /**
- * RV-14 acceptance (model-and-runner.md §12 "Delivery order and acceptance"):
- * "success, failure and boundary cases for S01-S05 ... chunk-independent scheduling ...
- * cancellation at compiler and runner batch boundaries." Runs the five reference
- * scenario families together via `runScenario`, plus determinism, chunked-vs-one-shot
- * equivalence, and cancellation.
+ * Acceptance: success, failure and boundary cases for the five reference scenario
+ * families (S01-S05), chunk-independent scheduling, and cancellation at compiler and
+ * runner batch boundaries. Runs the families together via `runScenario`, plus
+ * determinism, chunked-vs-one-shot equivalence, and cancellation.
  *
  * Per-family exhaustive edge cases (fulfillment failure regression, transport retry,
  * payment timeout, per-arrival routing/outage accounting) already live in
@@ -20,7 +19,7 @@ import { canonicalJson } from '../canonical';
 import type { AuthoredSnapshot, TraceEvent } from './types';
 import type { Document, Scenario } from '../model';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
 }
@@ -32,11 +31,11 @@ function expectAllChecksPassed(checks: readonly { status: string; reason: string
 }
 
 /**
- * Runner-level trace invariant (RV-14f review): no TraceEvent carries journeyId
+ * Runner-level trace invariant: no TraceEvent carries journeyId
  * 'unknown' (fault-kind events are host-level and carry no journey at all, so they're
- * exempt), and every TraceEvent.rootId is either an input/workload-derived root (§8:
- * "Input/root IDs come from the input or workload ID + ordinal") or a runner-minted
- * message root (`msg_N`, its `msg_N:ordinal` delivered/D36-broadcast copies, or a
+ * exempt), and every TraceEvent.rootId is either an input/workload-derived root (input
+ * or workload ID plus ordinal) or a runner-minted
+ * message root (`msg_N`, its `msg_N:ordinal` delivered/broadcast copies, or a
  * `pub_N` broadcast top-level admission and its own `:ordinal` copies) — never a raw
  * kernel-internal delivery-path identity (e.g. `msg_1:<path>:__entry:<id>:`).
  */
@@ -49,7 +48,7 @@ export function expectCleanJourneysAndRootIds(events: readonly TraceEvent[], sce
   const isMessageRoot = (root: string) => /^(msg_|pub_)\d+(:\d+)?$/.test(root);
 
   for (const e of events) {
-    if (e.kind === 'fault') continue; // host-level; no journey applies (§8 host_down/up)
+    if (e.kind === 'fault') continue; // host-level; no journey applies (host_down/up)
     expect(e.journeyId, `event ${e.id} (${e.kind}/${e.code}) has journeyId 'unknown'`).not.toBe('unknown');
     expect(
       isInputRoot(e.rootId) || isWorkloadRoot(e.rootId) || isMessageRoot(e.rootId),
@@ -58,7 +57,7 @@ export function expectCleanJourneysAndRootIds(events: readonly TraceEvent[], sce
   }
 }
 
-describe('RV-14 acceptance: S01-S05 pass together (§12)', () => {
+describe('acceptance: S01-S05 pass together', () => {
   it('S01 checkout machine: all three scenarios complete with every assertion passing', async () => {
     const doc = loadFixture('s01.json');
     for (const scenario of doc.scenarios) {
@@ -87,8 +86,8 @@ describe('RV-14 acceptance: S01-S05 pass together (§12)', () => {
     expectAllChecksPassed(result.checks);
     expectCleanJourneysAndRootIds(result.events, scenario);
 
-    // §11 S03: "errors=[r4]; duplicate=[r2] ... retained=[r1,r3,r5] ... Accounting: 5 = 1
-    // invalid + 1 duplicate + 3 retained. Every aggregate lists its source rows" — the
+    // S03 accounting: errors=[r4]; duplicate=[r2]; retained=[r1,r3,r5], so 5 rows = 1
+    // invalid + 1 duplicate + 3 retained, and every aggregate lists its source rows. The
     // group-sum step emits one row per group (EU, US), each carrying the ordered union of
     // its contributing source rows, so "3 retained" shows up as inputRows across the 2
     // emitted (group-sum) rows, not as 3 separate 'emitted' outcomes.
@@ -141,7 +140,7 @@ describe('RV-14 acceptance: S01-S05 pass together (§12)', () => {
 
     // Distinct request IDs under the shared journey: both inputs share journeyId (fixed by
     // the fixture) and the checkout machine's own "create order" call payload carries a
-    // fresh requestId each time (§4 request-id effect).
+    // fresh requestId each time.
     expect(new Set(outage.inputs.map((i) => i.journeyId)).size).toBe(1);
     const createOrderOutputs = outageResult.summary.outputs.find(
       (o) => o.port.elementId === 'b5582eea-b31f-5df1-b50c-bf73046f2726',
@@ -151,7 +150,7 @@ describe('RV-14 acceptance: S01-S05 pass together (§12)', () => {
     expect(requestIds).toHaveLength(2);
     expect(new Set(requestIds).size).toBe(2);
 
-    // Trace-level (§11): the two user roots (external submits) are distinct, and every event
+    // Trace-level: the two user roots (external submits) are distinct, and every event
     // in the run (both user roots and the linked fulfillment message root) carries the same
     // journey.
     const userRoots = outageResult.events
@@ -165,7 +164,7 @@ describe('RV-14 acceptance: S01-S05 pass together (§12)', () => {
   });
 });
 
-describe('RV-14 acceptance: determinism, chunking and cancellation (§12)', () => {
+describe('acceptance: determinism, chunking and cancellation', () => {
   it('determinism: two runs of the same scenario produce byte-identical canonical output', async () => {
     const doc = loadFixture('s05.json');
     const scenario = doc.scenarios.find((s) => s.label === 'Accepted and fulfilled')!;
@@ -182,7 +181,7 @@ describe('RV-14 acceptance: determinism, chunking and cancellation (§12)', () =
     }
   });
 
-  it('chunked vs one-shot stepping give identical results (§8 "chunked and one-shot stepping must give identical results")', async () => {
+  it('chunked vs one-shot stepping give identical results (chunked and one-shot stepping give identical results)', async () => {
     const doc = loadFixture('s05.json');
     const scenario = doc.scenarios.find((s) => s.label === 'Outage then explicit retry')!;
     const runId = '00000000-0000-0000-0000-0000000000f2';
@@ -229,7 +228,7 @@ describe('RV-14 acceptance: determinism, chunking and cancellation (§12)', () =
     expect(result.summary.rootCounts.succeeded).toBe(0);
   });
 
-  it('a resource-call settlement with no outcome, or an unresolvable payload, fails the run instead of inferring success or an empty payload (§8 "No success is inferred", RV-14f review round 3)', async () => {
+  it('a resource-call settlement with no outcome, or an unresolvable payload, fails the run instead of inferring success or an empty payload (no success is inferred)', async () => {
     const doc = loadFixture('s05.json');
     const scenario = doc.scenarios.find((s) => s.label === 'Accepted and fulfilled')!;
     const runner: any = new ScenarioRunner(doc, scenario.id, '00000000-0000-0000-0000-0000000000f4');

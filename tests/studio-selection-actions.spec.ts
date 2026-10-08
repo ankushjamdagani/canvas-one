@@ -12,7 +12,7 @@ async function openNotes(page: Page) {
   }
 }
 
-test.describe('Studio selection actions and note dock (RV-04e)', () => {
+test.describe('Studio selection actions and note dock', () => {
   test('aligns, groups, undoes, and adds a note through registry commands', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();

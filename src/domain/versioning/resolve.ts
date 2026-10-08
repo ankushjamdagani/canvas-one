@@ -1,9 +1,6 @@
 /**
- * Conflict resolution and post-resolution re-validation for System Studio (RV-08c).
+ * Conflict resolution and post-resolution re-validation for System Studio.
  *
- * Implements:
- * - specs/revamp/contracts/commands.md history.resolve-conflict
- * - specs/revamp/contracts/transactions.md §5
  * - Resolution kinds: 'ours', 'theirs', or 'edited' (record or null).
  * - ours/theirs sets the value at the conflict path (for delete-edit / add-add at a keyed position this means present or absent).
  * - edited replaces the whole owning record (null = explicit deletion) and clears every conflict owned by that record.
@@ -159,7 +156,7 @@ function applySideAtConflictPath(
 
   const collection = (doc[collectionKey] as unknown as (Record<string, unknown> & { id: string })[]);
 
-  // Reference conflict: resolved at the owning record level (commands.md: "Edits the whole owning typed record")
+  // Reference conflict: resolved at the owning record level (an edit replaces the whole owning typed record):
   // its base/ours/theirs sides are the WHOLE owning record looked up BY ID in base/ours/theirs
   // and ours/theirs resolution replaces the owning record with that side (absent -> remove)
   if (conflict.kind === 'reference') {

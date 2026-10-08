@@ -1,6 +1,6 @@
 /**
- * One 14A Quick options row (RV-03q): a registry command with its bound
- * payload. Disabled rows stay visible with their reason (commands.md §1).
+ * One Quick options row: a registry command with its bound payload.
+ * Disabled rows stay visible with their reason.
  */
 
 import {
@@ -115,7 +115,7 @@ export function QuickOptionRow({
   const reason = option.availability.enabled ? null : option.availability.reason;
   const isBranch = option.id === 'branch.switch';
   const isCurrent = option.badge === 'current';
-  // The current branch reads as a "you are here" row (14A), not a greyed-out
+  // The current branch reads as a "you are here" row, not a greyed-out
   // one; selecting it is a no-op because availability says so.
   const showsReason = reason !== null && !isCurrent;
   return (

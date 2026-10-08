@@ -1,13 +1,11 @@
 /**
- * Scenario editor: inspector-dock content (RV-05c).
+ * Scenario editor: inspector-dock content.
  *
- * Implements specs/revamp/contracts/commands.md §4 "Editor sections" (inspector dock,
- * Apply/Cancel per §6): header (name, mode shown, not editable after creation); What
- * goes in; What happens during the run; What should be true; Run settings. Screens:
- * scenario_traffic_editor.png (timed), scenario_steps_editor.png (logical).
+ * Sections: header (name, mode shown, not editable after creation); What goes in;
+ * What happens during the run; What should be true; Run settings. Changes are
+ * committed with Apply or discarded with Cancel.
  *
- * "Run itself is passed in; no runner here" (brief) -- this component has no Run
- * button; it only edits the draft and calls onApply/onCancel.
+ * Running is the host's job: this component has no Run button; it only edits the draft and calls onApply/onCancel.
  */
 
 import * as React from 'react';

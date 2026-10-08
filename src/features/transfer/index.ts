@@ -1,11 +1,5 @@
 /**
- * Transfer module for System Studio (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("JSON, images and files", "CSV v1", "Mermaid v1")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
- * - specs/revamp/contracts/storage.md (§4 portable v9 bundle, §5 repository API)
- * - specs/revamp/decisions.md (D12, D19, D37, D42)
+ * Transfer module: project JSON export/import and diagram/run exporters.
  */
 
 export * from './types';

@@ -40,9 +40,7 @@ function branchLabel(project: ProjectRecord, branch: BranchRecord): string {
 }
 
 /**
- * 13B "Branch popover".
- *
- * Implements specifications and aesthetics from Screen 13B (Branch switch):
+ * Branch popover:
  * - 392px width popover with subtle border and elevation shadow
  * - Top search bar with "Find or create a branch" and ⌘B hint
  * - "CURRENT BRANCH" section with current branch, status badge, last edited timestamp, and checkmark

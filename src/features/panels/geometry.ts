@@ -1,6 +1,5 @@
 /**
  * Pure geometry and drop target calculations for workspace panels.
- * Governed by specs/revamp/contracts/commands.md §7 "Panels and geometry".
  */
 
 import {

@@ -1,8 +1,5 @@
 /**
- * Tests for computePinClosure (RV-08f).
- *
- * Implements specs/revamp/contracts/storage.md §7 (Retention "Pin closure" bullet).
- * Hand-built plain project states; no I/O.
+ * Tests for computePinClosure. Hand-built plain project states; no I/O.
  */
 
 import { describe, expect, it } from 'vitest';

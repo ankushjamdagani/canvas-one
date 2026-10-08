@@ -1,9 +1,8 @@
 /**
- * Apply / Discard / Stay navigation guard dialog (RV-05b).
+ * Apply / Discard / Stay navigation guard dialog.
  *
- * commands.md §6: "Dirty -> Apply / Discard / Stay: Apply proceeds only on success,
- * Discard cancels then proceeds, and Stay keeps focus and selection." Uses shadcn
- * Dialog (focus trap, title, description, focus return) per commands.md §7.
+ * Apply proceeds only on success, Discard cancels then proceeds, and Stay keeps focus and
+ * selection. Uses the shadcn Dialog for focus trap, title, description and focus return.
  */
 
 import {

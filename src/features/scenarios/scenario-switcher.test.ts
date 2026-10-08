@@ -71,7 +71,7 @@ describe('ScenarioSwitcher: not-ready status (ported from the retired ScenarioRu
   });
 });
 
-describe('ScenarioSwitcher: Stop (D55)', () => {
+describe('ScenarioSwitcher: Stop', () => {
   const timed = (): ScenarioSwitcherEntry => ({
     id: 'scn-1', label: 'Timed', mode: 'timed', status: { kind: 'not-run' },
   });

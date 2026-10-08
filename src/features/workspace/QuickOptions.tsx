@@ -1,17 +1,11 @@
 /**
- * 14A Quick options (RV-03q).
+ * Quick options dialog over the command registry: every row is a registry
+ * command with its bound payload, disabled rows show their reason, and
+ * selecting a row goes through the caller's `onRun` (the workspace's
+ * `executeCommand`).
  *
- * Matches specs/revamp/screens/14A_Quick_options_open.png and
- * 14A_Rename_inside_quick_options.png over the command registry
- * (commands.md §1): every row is a registry command with its bound payload,
- * disabled rows show their reason, and selecting a row goes through the
- * caller's `onRun` (the workspace's `executeCommand`).
- *
- * Left out per design-revalidation.md §2 and commands.md §1: ⌘K and the other
- * ⌘-letter hints (Quick options opens with F2 or the top-bar button), Duplicate
- * project, Project settings, New branch from here, "Tab stay open", parts in
- * search, team availability copy and branch ahead/behind/author metadata (no
- * contracted source for it).
+ * Quick options opens with F2 or the top-bar button; there are no ⌘-letter
+ * hints, and no team availability copy or branch ahead/behind/author metadata.
  */
 
 import * as React from 'react';

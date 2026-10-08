@@ -1,9 +1,8 @@
 /**
- * Run start token for System Studio runner and persistence (RV-08a).
+ * Run start token for System Studio runner and persistence.
  *
- * Implements specs/revamp/contracts/storage.md §5:
- * "The run start token is minted by the local runner controller and bound to the manifest,
- *  snapshot and run ID. Portable data can't mint one."
+ * The run start token is minted by the local runner controller and bound to the manifest,
+ * snapshot and run ID. Portable data cannot mint one.
  *
  * It is not constructible from portable data: validated via an unforgeable in-memory
  * module-private registry (WeakMap of issued tokens), never a string format.

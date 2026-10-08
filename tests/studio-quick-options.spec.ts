@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 
-// RV-03q: 14A Quick options over the command registry (commands.md §1).
-test.describe('Studio Quick options (RV-03q)', () => {
+// Quick options over the command registry.
+test.describe('Studio Quick options', () => {
   test('button and F2 open it; search, nested rename, branch switch and registry undo', async ({ page }) => {
     await page.goto('/projects');
     await page.getByTestId('create-example-s05').click();

@@ -1,13 +1,11 @@
 /**
- * Storable-level studio-model/1 document validator (RV-02b).
+ * Storable-level studio-model/1 document validator.
  *
- * Enforces §1 ground rules, §2 records, §3 payload schemas, §4 behaviors, §6 scenarios,
- * and storage.md §6 limits checkable without canonical bytes.
+ * Enforces the ground rules, records, payload schemas, behaviors and scenarios, plus the
+ * size limits checkable without canonical bytes.
  *
- * SCOPE: STORABLE validation only (§1: "types, bounds, IDs and references are correct").
- *
- * Runnable readiness (model-and-runner.md §1–§3, §5, §6) is readiness.ts; the trace envelope
- * (§8) is runner/trace.ts.
+ * Scope: storable validation only (types, bounds, IDs and references are correct).
+ * Runnable readiness is readiness.ts; the trace envelope is runner/trace.ts.
  */
 
 import { canonicalJson } from './canonical';
@@ -85,7 +83,7 @@ export const ISSUE_CODES = [
 export type IssueCode = (typeof ISSUE_CODES)[number];
 
 /**
- * Validation issue matching model-and-runner.md §8 exactly.
+ * A validation issue.
  */
 export type Issue = {
   readonly code: IssueCode;
@@ -108,7 +106,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 
 /**
  * Checks raw container depth iteratively using an explicit stack.
- * storage.md §6: raw document depth 32. Root container is depth 1.
+ * Raw document depth is limited to 32. The root container is depth 1.
  */
 function checkRawDepth(input: unknown, issues: Issue[], maxDepth = 32): void {
   if (input === null || typeof input !== 'object') return;
@@ -164,7 +162,6 @@ function checkRawDepth(input: unknown, issues: Issue[], maxDepth = 32): void {
 
 /**
  * Iteratively checks that string values inside fixture values do not exceed 16 KiB (UTF-8 bytes).
- * storage.md §6: string fixture values <= 16 KiB.
  */
 function checkFixtureStrings(
   root: unknown,
@@ -1116,7 +1113,7 @@ export function validateDocument(
     };
   }
 
-  // Step 2: Byte size limits (storage.md §6) before other inventory walks
+  // Step 2: Byte size limits before other inventory walks
   // Whole document <= 2 MiB (2*1048576 bytes).
   const docByteResult = canonicalJson(input, 2 * 1048576);
   if (!docByteResult.ok) {
@@ -1129,7 +1126,7 @@ export function validateDocument(
 
   const doc = input as Record<string, unknown>;
 
-  // Fixtures byte limits (storage.md §6) before other inventory walks:
+  // Fixtures byte limits before other inventory walks:
   // aggregate of all fixture values <= 1 MiB; each fixture value <= 256 KiB;
   // string values inside fixture values <= 16 KiB (UTF-8 bytes).
   if (Array.isArray(doc.fixtures)) {
@@ -1231,7 +1228,7 @@ export function validateDocument(
   const pendingFixtureRefs: PendingFixtureRef[] = [];
 
   // ==========================================================================
-  // Section A: Schemas (§3)
+  // Section A: Schemas
   // ==========================================================================
   if (validateArray(doc.schemas, 100, ['schemas'], docId, issues, 'Document schemas')) {
     const schemas = doc.schemas as unknown[];
@@ -1252,7 +1249,7 @@ export function validateDocument(
   }
 
   // ==========================================================================
-  // Section B: Elements and Ports (§2 & §4)
+  // Section B: Elements and Ports
   // ==========================================================================
   if (validateArray(doc.elements, 100, ['elements'], docId, issues, 'Document elements')) {
     const elements = doc.elements as unknown[];
@@ -1281,7 +1278,7 @@ export function validateDocument(
           );
         }
 
-        // D52: a linked-project node names the project it stands for; no other element may.
+        // A linked-project node names the project it stands for; no other element may.
         const hasLink = el.linkedProjectId !== undefined;
         if (hasLink) validateId(el.linkedProjectId, [...elPath, 'linkedProjectId'], elId, issues);
         if (hasLink && el.visualKind !== 'linked-project') {
@@ -1337,7 +1334,7 @@ export function validateDocument(
                 );
               }
 
-              // D53: every connectable port has a protocol of its channel; event ports have none.
+              // Every connectable port has a protocol of its channel; event ports have none.
               if (p.channel === 'event' ? p.protocol !== null : !isProtocolOf(p.channel as (typeof PORT_CHANNELS)[number], p.protocol)) {
                 issues.push(
                   errorIssue(
@@ -1390,14 +1387,14 @@ export function validateDocument(
           }
         }
 
-        // Behavior (§4)
+        // Behavior
         validateBehavior(el.behavior, [...elPath, 'behavior'], elId, portsMap, allIds, pendingSchemaRefs, pendingFixtureRefs, issues);
       }
     }
   }
 
   // ==========================================================================
-  // Section C: Fixtures (§2)
+  // Section C: Fixtures
   // ==========================================================================
   if (validateArray(doc.fixtures, Number.MAX_SAFE_INTEGER, ['fixtures'], docId, issues, 'Document fixtures')) {
     const fixtures = doc.fixtures as unknown[];
@@ -1418,7 +1415,7 @@ export function validateDocument(
   }
 
   // ==========================================================================
-  // Section D: Connections (§2 & §4)
+  // Section D: Connections
   // ==========================================================================
   if (validateArray(doc.connections, 200, ['connections'], docId, issues, 'Document connections')) {
     const connections = doc.connections as unknown[];
@@ -1459,7 +1456,7 @@ export function validateDocument(
   }
 
   // ==========================================================================
-  // Section E: Relations (§2)
+  // Section E: Relations
   // ==========================================================================
   if (validateArray(doc.relations, 200, ['relations'], docId, issues, 'Document relations')) {
     const relations = doc.relations as unknown[];
@@ -1504,7 +1501,7 @@ export function validateDocument(
   }
 
   // ==========================================================================
-  // Section F: Refinements (§6)
+  // Section F: Refinements
   // ==========================================================================
   if (validateArray(doc.refinements, Number.MAX_SAFE_INTEGER, ['refinements'], docId, issues, 'Document refinements')) {
     const refinements = doc.refinements as unknown[];
@@ -1549,7 +1546,7 @@ export function validateDocument(
   }
 
   // ==========================================================================
-  // Section G: Views (§2)
+  // Section G: Views
   // ==========================================================================
   const viewElementsPlaced = new Map<Id, Set<Id>>();
   if (validateArray(doc.views, 10, ['views'], docId, issues, 'Document views')) {
@@ -1702,7 +1699,7 @@ export function validateDocument(
   }
 
   // ==========================================================================
-  // Section H: Scenarios (§6)
+  // Section H: Scenarios
   // ==========================================================================
   if (validateArray(doc.scenarios, 20, ['scenarios'], docId, issues, 'Document scenarios')) {
     const scenarios = doc.scenarios as unknown[];
@@ -2189,7 +2186,7 @@ export function validateDocument(
     }
   }
 
-  // 7b. D33: Recursive refinement ownership is a storable structural error, like a
+  // 7b. Recursive refinement ownership is a storable structural error, like a
   // `contains` cycle: reject a refinement whose owner is, transitively, a member of a
   // refinement it owns (self-membership included). Checked iteratively (explicit stack,
   // no recursion) over the ownerElementId -> memberElementIds graph.
@@ -2661,7 +2658,7 @@ function validateRouteCondition(
 
 
 
-/** D50/D56: steady, burst ({peakRate, startMs < endMs}) or ramp ({endRate, rampMs}). */
+/** Steady, burst ({peakRate, startMs < endMs}) or ramp ({endRate, rampMs}). */
 function validateWorkloadProfile(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
   const kind = (value as { kind?: unknown } | null)?.kind;
   const keys = kind === 'burst' ? ['kind', 'peakRate', 'startMs', 'endMs'] : kind === 'ramp' ? ['kind', 'endRate', 'rampMs'] : ['kind'];
@@ -2682,7 +2679,7 @@ function validateWorkloadProfile(value: unknown, path: (string | number)[], enti
   }
 }
 
-/** D49: caller retry policy on a call connection; absent or null means no retries. */
+/** Caller retry policy on a call connection; absent or null means no retries. */
 function validateCallRetryPolicy(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
   if (value === undefined || value === null) return;
   const keys = ['maxAttempts', 'backoffMs', 'backoffMultiplier', 'maxBackoffMs', 'jitter', 'attemptTimeoutMs'];
@@ -2702,7 +2699,7 @@ function validateCallRetryPolicy(value: unknown, path: (string | number)[], enti
 const SIMULATED_CALL_IN_KEYS = ['rateLimit', 'failureRate', 'serviceTimeMs', 'maxConcurrency', 'responseBytes'] as const;
 
 /**
- * D53: a port's settings, by direction and channel. Empty settings are not stored; the simulated
+ * A port's settings, by direction and channel. Empty settings are not stored; the simulated
  * in-port settings (rate limit, failure rate, service time) are allowed on resource nodes only.
  */
 function validatePortSettings(
@@ -2843,7 +2840,7 @@ function validateMachineBehavior(
   pendingSchemaRefs.push({ schemaId: rec.contextSchemaId, path: [...path, 'contextSchemaId'], entityId: elementId });
   pendingFixtureRefs.push({ fixtureId: rec.initialContextFixtureId, path: [...path, 'initialContextFixtureId'], entityId: elementId });
 
-  // Transitions (storage.md §6: 100 transitions/machine)
+  // Transitions (limit 100 per machine)
   if (validateArray(rec.transitions, 100, [...path, 'transitions'], elementId, issues, 'Machine transitions')) {
     const transitions = rec.transitions as unknown[];
     for (let tIdx = 0; tIdx < transitions.length; tIdx++) {
@@ -3109,7 +3106,7 @@ function validatePipelineBehavior(
     }
   }
 
-  // Operations (storage.md §6: 100 operations/pipeline)
+  // Operations (limit 100 per pipeline)
   if (validateArray(rec.operations, 100, [...path, 'operations'], elementId, issues, 'Pipeline operations')) {
     const ops = rec.operations as unknown[];
     for (let opIdx = 0; opIdx < ops.length; opIdx++) {
@@ -3368,7 +3365,7 @@ function validateScenario(
   // Inputs collector for afterInputId resolution within this scenario
   const scenarioInputIds = new Set<Id>();
 
-  // Inputs (storage.md §6: 1,000 inputs)
+  // Inputs (limit 1,000)
   if (validateArray(rec.inputs, 1000, [...sPath, 'inputs'], sId, issues, 'Scenario inputs')) {
     const inputs = rec.inputs as unknown[];
     for (let iIdx = 0; iIdx < inputs.length; iIdx++) {
@@ -3389,7 +3386,7 @@ function validateScenario(
         pendingFixtureRefs.push({ fixtureId: inp.fixtureId, path: [...iPath, 'fixtureId'], entityId: inpId ?? sId });
         validateId(inp.journeyId, [...iPath, 'journeyId'], inpId ?? sId, issues);
 
-        // D32: mode coherence (atMs null vs number by scenario mode) is a readiness rule
+        // Mode coherence (atMs null vs number by scenario mode) is a readiness rule
         // (readiness.ts), not storable. The storable check is per-field only: atMs is
         // either null or a finite number >= 0.
         if (inp.atMs !== null) {
@@ -3422,7 +3419,7 @@ function validateScenario(
     }
   }
 
-  // Workloads (storage.md §6: 20 workloads)
+  // Workloads (limit 20)
   if (validateArray(rec.workloads, 20, [...sPath, 'workloads'], sId, issues, 'Scenario workloads')) {
     const workloads = rec.workloads as unknown[];
     for (let wIdx = 0; wIdx < workloads.length; wIdx++) {
@@ -3430,7 +3427,7 @@ function validateScenario(
     }
   }
 
-  // Faults (storage.md §6: 100 faults)
+  // Faults (limit 100)
   if (validateArray(rec.faults, 100, [...sPath, 'faults'], sId, issues, 'Scenario faults')) {
     const faults = rec.faults as unknown[];
     const hostIntervals = new Map<Id, { down: number; up: number; fIdx: number }[]>();
@@ -3516,7 +3513,7 @@ function validateScenario(
     }
   }
 
-  // Boundaries (storage.md §6: 100 boundaries)
+  // Boundaries (limit 100)
   if (validateArray(rec.boundaries, 100, [...sPath, 'boundaries'], sId, issues, 'Scenario boundaries')) {
     const boundaries = rec.boundaries as unknown[];
     for (let bIdx = 0; bIdx < boundaries.length; bIdx++) {
@@ -3565,7 +3562,7 @@ function validateScenario(
                 }
               }
 
-              // D32: mode coherence (delayMs/afterInputId vs scenario mode) is a readiness
+              // Mode coherence (delayMs/afterInputId vs scenario mode) is a readiness
               // rule (readiness.ts), not storable. The storable checks are per-field only:
               // delayMs is null or 0-600000ms; afterInputId, if present, must reference an
               // input in this scenario.
@@ -3639,7 +3636,7 @@ function validateScenario(
     }
   }
 
-  // Assertions (storage.md §6: 100 assertions)
+  // Assertions (limit 100)
   if (validateArray(rec.assertions, 100, [...sPath, 'assertions'], sId, issues, 'Scenario assertions')) {
     const assertions = rec.assertions as unknown[];
     for (let aIdx = 0; aIdx < assertions.length; aIdx++) {
@@ -3668,7 +3665,7 @@ function validateScenario(
     }
   }
 
-  // Budgets (storage.md §6: events 1M, trace rows 100k, trace bytes 16 MiB, scheduled events 100k, live roots 10k)
+  // Budgets (limits: events 1M, trace rows 100k, trace bytes 16 MiB, scheduled events 100k, live roots 10k)
   validateScenarioBudgets(rec.budgets, [...sPath, 'budgets'], sId, issues);
 
   // Assumptions
@@ -3770,7 +3767,7 @@ function validateResourceMetadata(
   }
 }
 
-/** D56: a workload emits a bulk of N requests or an endless stream. */
+/** A workload emits a bulk of N requests or an endless stream. */
 function validateEmission(value: unknown, path: (string | number)[], entityId: Id | null, issues: Issue[]): void {
   const mode = (value as { mode?: unknown } | null)?.mode;
   if (mode === 'bulk') {
@@ -3834,7 +3831,7 @@ function validateWorkload(
 
   validateNumber(rec.timeoutMs, 1, 3600000, [...path, 'timeoutMs'], wId ?? scenarioId, issues, 'Workload timeoutMs');
 
-  // Classes (storage.md §6: 20 classes per workload)
+  // Classes (limit 20 per workload)
   if (validateArray(rec.classes, 20, [...path, 'classes'], wId ?? scenarioId, issues, 'Workload classes')) {
     const classes = rec.classes as unknown[];
     for (let cIdx = 0; cIdx < classes.length; cIdx++) {

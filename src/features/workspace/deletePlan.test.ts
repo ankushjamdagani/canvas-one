@@ -4,7 +4,7 @@ import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import type { RecordChange } from '../../persistence/studio/types';
 import { placeEntry } from '../catalog/place';
 import { planConnection } from '../catalog/connect';
-import s05 from '../../../specs/revamp/fixtures/s05.json';
+import s05 from '../entry/examples/s05.json';
 import { planDelete } from './deletePlan';
 
 function createMintId(): () => Id {
@@ -247,7 +247,7 @@ describe('planDelete', () => {
     expect(plan.removedConnectionIds).toEqual([plan1.connectionId]);
   });
 
-  it('RV-13a: every S05 element is deletable; scenario references are repaired in one valid batch', () => {
+  it('every element is deletable; scenario references are repaired in one valid batch', () => {
     const doc = s05 as unknown as Document;
     const view = doc.views[0];
     for (const element of doc.elements) {
@@ -262,7 +262,7 @@ describe('planDelete', () => {
     }
   });
 
-  it('RV-13a: previews scenario repairs and requires confirmation for a scenario-referenced node', () => {
+  it('previews scenario repairs and requires confirmation for a scenario-referenced node', () => {
     const doc = s05 as unknown as Document;
     const checkout = doc.elements.find((e) => e.label === 'Checkout')!;
     const plan = planDelete(doc, doc.views[0].id, { elementIds: [checkout.id], connectionIds: [] });
@@ -271,7 +271,7 @@ describe('planDelete', () => {
     expect(plan.scenarioRepairSummaries[0]).toMatch(/Accepted and fulfilled: .*input/);
   });
 
-  it('RV-13a: blocks (does not offer a doomed confirm) when repairs cannot validate', () => {
+  it('blocks (does not offer a doomed confirm) when repairs cannot validate', () => {
     const doc = s05 as unknown as Document;
     // A fixture-referencing schema cannot be repaired by this plan: corrupt the doc so validation fails regardless.
     const broken: Document = { ...doc, views: doc.views.map((v) => ({ ...v, connectionIds: [...v.connectionIds, 'ghost'] })) };

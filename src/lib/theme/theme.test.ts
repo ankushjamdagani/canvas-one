@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import {
   PALETTES,
@@ -28,9 +28,12 @@ const REQUIRED_TOKEN_KEYS: (keyof ThemeTokens)[] = [
   'sh', 'isDark',
 ];
 
+// The supplied design export is kept local (artifacts/ is not published); skip the comparison without it.
+const THEMES_SOURCE = 'artifacts/design/System Studio Themes v2.html';
+
 describe('palettes', () => {
-  it('matches every authored role in all 28 supplied variants', () => {
-    const bundled = readFileSync('artifacts/design/System Studio Themes v2.html', 'utf8');
+  it.skipIf(!existsSync(THEMES_SOURCE))('matches every authored role in all 28 supplied variants', () => {
+    const bundled = readFileSync(THEMES_SOURCE, 'utf8');
     const encoded = bundled.match(/<script type="__bundler\/template">([\s\S]*?)<\/script>/)?.[1];
     expect(encoded).toBeDefined();
     const source: string = JSON.parse(encoded!);

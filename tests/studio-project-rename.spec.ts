@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 
-test('13A rename: blank projects default to Untitled, taken names are flagged, success offers Undo', async ({ page }) => {
+test('rename: blank projects default to Untitled, taken names are flagged, success offers Undo', async ({ page }) => {
   const suffix = Date.now();
   const taken = `Taken ${suffix}`;
 
@@ -48,7 +48,7 @@ test('13A rename: blank projects default to Untitled, taken names are flagged, s
   await expect(page.getByTestId('breadcrumb-project-btn')).toContainText('Untitled');
 });
 
-test('14A quick options search matches whole words', async ({ page }) => {
+test('quick options search matches whole words', async ({ page }) => {
   await page.goto('/projects');
   await page.getByTestId('blank-project-name-input').fill(`Search ${Date.now()}`);
   await page.getByTestId('create-blank-project-btn').click();

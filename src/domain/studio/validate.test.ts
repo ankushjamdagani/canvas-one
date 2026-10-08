@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateDocument, ISSUE_CODES } from './validate';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): unknown {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
@@ -24,7 +24,7 @@ describe('validateDocument reference fixtures', () => {
       const doc = loadFixture(file);
       const result = validateDocument(doc);
       if (!result.ok) {
-        // If a fixture fails, print the issue list as required by spec
+        // If a fixture fails, print the issue list
         console.error(`Fixture ${file} failed validation with issues:`, result.issues);
       }
       expect(result.ok).toBe(true);
@@ -432,9 +432,9 @@ describe('validateDocument mutation tests', () => {
     }
   });
 
-  // D32: mode coherence (input atMs, completion kind, boundary delayMs/afterInputId vs
+  // Mode coherence (input atMs, completion kind, boundary delayMs/afterInputId vs
   // scenario mode) moved to readiness.ts; the storable validator only checks per-field
-  // types/bounds now, so these previously-rejected mode-mismatch shapes are storable-valid.
+  // types/bounds, so mode-mismatch shapes are storable-valid.
   it('accepts a timed-mode scenario with logical-shaped fields (mode coherence is a readiness rule, not storable)', () => {
     const doc = structuredClone(s01);
     // Flip mode to 'timed' but leave every mode-coupled field in its logical shape:
@@ -494,7 +494,7 @@ describe('validateDocument mutation tests', () => {
     }
   });
 
-  // D33: recursive refinement ownership is a storable structural error.
+  // Recursive refinement ownership is a storable structural error.
   it('detects self-membership refinement ownership as structural-rule', () => {
     const doc = structuredClone(s01);
     const idA = doc.elements[0].id;
@@ -569,7 +569,7 @@ describe('validateDocument mutation tests', () => {
   });
 });
 
-describe('workload emission (D56)', () => {
+describe('workload emission', () => {
   const withWorkload = (patch: Record<string, unknown>) => {
     const doc = loadFixture('s06.json') as any;
     Object.assign(doc.scenarios[0].workloads[0], patch);

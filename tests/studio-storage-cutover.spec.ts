@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 
 /**
- * RV-13 storage cutover (D19, verification.md "Storage cutover: old DB untouched").
+ * Storage cutover: the old database is left untouched.
  * The retired app stored projects in the Dexie database `system-studio`
  * (`db.version(1)`, native IndexedDB version 10, one `projects` store). The new app
  * boots on `system-studio-local-v1` and must neither read, list, migrate, upgrade nor
@@ -69,7 +69,7 @@ test('the retired app database stays untouched while the new app creates and sav
 
   await page.reload();
   await expect(page.getByTestId('entry-screen-root')).toBeVisible();
-  // Old projects are never listed or migrated (D19).
+  // Old projects are never listed or migrated.
   await expect(page.getByTestId('no-projects-notice')).toBeVisible();
   await expect(page.getByText(LEGACY_RECORD.name)).toHaveCount(0);
 

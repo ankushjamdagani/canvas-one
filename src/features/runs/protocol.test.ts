@@ -11,14 +11,14 @@ import {
 
 const loadS01 = (): Document =>
   JSON.parse(
-    readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+    readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
   ) as Document;
 
 const s01Doc = loadS01();
 
 describe('Worker Protocol and Handler (protocol.ts)', () => {
   it('records exact timed measurements and checkpoints the measured final summary', async () => {
-    const document = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s06.json'), 'utf8')) as Document;
+    const document = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s06.json'), 'utf8')) as Document;
     const source = document.scenarios[0];
     const snapshot = { id: 'measured', document: { ...document, scenarios: [{ ...source,
       workloads: source.workloads.map(w => ({ ...w, startDelayMs: 5000, emission: { mode: 'bulk' as const, requests: 2, arrival: 'instant' as const } })),

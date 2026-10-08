@@ -17,7 +17,7 @@ import type {
 } from './types';
 
 const s01Doc = JSON.parse(
-  readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
 ) as Document;
 
 const testActor: Actor = {
@@ -61,7 +61,7 @@ async function createTestProject(repo: LocalRepository) {
   };
 }
 
-describe('RV-08b: Branch Working Copies, Autosave, Checkpoints, Restore, Reopen, Switch', () => {
+describe('Branch Working Copies, Autosave, Checkpoints, Restore, Reopen, Switch', () => {
   describe('model.apply-records', () => {
     it('happy path: revision++, project revision++, snapshot id = content hash, receipt retry returns original', async () => {
       const db = createStudioDatabase(`test-apply-happy-${crypto.randomUUID()}`);

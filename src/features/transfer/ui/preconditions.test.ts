@@ -1,9 +1,8 @@
 /**
- * Tests for export menu precondition checks (RV-10b).
+ * Tests for export menu precondition checks.
  *
- * Implements specs/revamp/contracts/parts-and-export.md and the RV-10b task brief:
- * "Each item disabled with a stated reason when its precondition fails (e.g. CSV
- * needs a saved terminal run; image exports need an authored view)."
+ * Each export item is disabled with a stated reason when its precondition fails
+ * (e.g. CSV needs a saved terminal run; image exports need an authored view).
  */
 
 import { describe, expect, it } from 'vitest';

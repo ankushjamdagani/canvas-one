@@ -1,11 +1,6 @@
 /**
- * SessionController implementation for System Studio (RV-12c1).
- *
- * Implements specifications from:
- * - specs/revamp/decisions.md (D37)
- * - specs/revamp/contracts/transactions.md §1–§3
- * - specs/revamp/contracts/commands.md §1–§4
- * - specs/revamp/contracts/storage.md §5 & session undo bullet
+ * SessionController implementation for System Studio: the in-memory editing session
+ * (open project and branch, working document, undo/redo) over the repository commands.
  */
 
 import type { Document, Id, View } from '../../domain/studio/model';
@@ -283,9 +278,9 @@ export class SessionController {
     const draftBranchId = this.mintId();
     const operationId = this.mintId();
 
-    // D43(a): a blank project (no views yet) is created with one empty view
+    // A blank project (no views yet) is created with one empty view
     // labelled "Main" so components can be placed immediately -- a caller
-    // that starts from a template (S01-S05) already supplies its own views
+    // that starts from a template already supplies its own views
     // and is left untouched. The id comes from this session's own mintId,
     // never a client-invented default.
     const initialDocument: Document =
@@ -626,7 +621,7 @@ export class SessionController {
     return this.runSaving(() => this.executeAndAdopt(command));
   }
 
-  /** D52: description and team live on the project record, so no snapshot, undo entry or reload is involved. */
+  /** Description and team live on the project record, so no snapshot, undo entry or reload is involved. */
   async updateProjectDetails(details: {
     readonly description: string;
     readonly team: string;
@@ -683,15 +678,14 @@ export class SessionController {
   }
 
   /**
-   * D40: the first authored edit on main creates a draft branch from main's
+   * The first authored edit on main creates a draft branch from main's
    * working content (branch.create, source:'working') and switches the
    * session to it, before the edit itself is applied. Branch creation is not
    * undoable (like other branch history) — only the edit gets an undo entry.
    *
-   * CONTRACT GAP: decisions.md D40 names the label "Draft from main" but is
-   * silent on collisions with an existing branch label. Narrowest reading:
-   * append " 2", " 3", … (first free suffix), checked against every branch
-   * on the project (open and closed) via loadHistory.
+   * The branch is labelled "Draft from main"; on a collision with an existing
+   * branch label, " 2", " 3", … is appended (first free suffix), checked against
+   * every branch on the project (open and closed) via loadHistory.
    */
   private async autoDraftFromMainIfNeeded(): Promise<
     { readonly ok: true } | { readonly ok: false; readonly error: SessionApplyResult }
@@ -794,7 +788,7 @@ export class SessionController {
    * On applied: adopts returned revision and new Document, pushes one undo entry, clears redo.
    * On invalid/stale/failed: state unchanged, typed result returned.
    *
-   * D40: if the active branch is main, this first creates and switches to a
+   * If the active branch is main, this first creates and switches to a
    * draft branch (see `autoDraftFromMainIfNeeded`) before applying the edit,
    * so main never ends up holding unpublished edits.
    */

@@ -1,11 +1,11 @@
 /**
- * S06 "Checkout under a traffic spike" (D51): the example that shows the D47-D50 model -
+ * S06 "Checkout under a traffic spike" example:
  * a gateway in front of replicas with caller retries, a third party with retries and an
  * attempt timeout, a queue absorbing a burst, and latency/throughput checks.
  *
  * The fixture is built with the app's own planners (placeEntry, planConnection,
  * completeConnection), so it carries the catalog's real defaults. `UPDATE_S06=1` rewrites
- * specs/revamp/fixtures/s06.json; otherwise this test checks the file still matches the
+ * src/features/entry/examples/s06.json; otherwise this test checks the file still matches the
  * builder and that every scenario completes with every check passing.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -20,7 +20,7 @@ import { placeEntry } from '../catalog/place';
 import { completeConnection, planConnection } from '../catalog/connect';
 import { DEFAULT_SCENARIO_BUDGETS } from '../scenarios/budgets';
 
-const FIXTURE = join(process.cwd(), 'specs/revamp/fixtures/s06.json');
+const FIXTURE = join(process.cwd(), 'src/features/entry/examples/s06.json');
 
 function buildS06(): Document {
   let n = 0;
@@ -64,7 +64,7 @@ function buildS06(): Document {
       apply(c.changes);
       id = c.connectionId;
     }
-    // D53: a caller's retries live on the out-port it calls through.
+    // A caller's retries live on the out-port it calls through.
     const conn = doc.connections.find((x) => x.id === id)!;
     if (patch.retry) {
       const from = el(conn.source.elementId);

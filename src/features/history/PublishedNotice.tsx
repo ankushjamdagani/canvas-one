@@ -1,10 +1,7 @@
 /**
- * PublishedNotice (22D published) — RV-11b review round.
- *
- * specs/revamp/screens/22D_published.png shows a canvas banner: version + "you are
- * now on main", a line about the source branch closing, and an "Undo publish" link.
- * design-revalidation.md §2 explicitly overrides "Undo publish" (D26: publications
- * can't be undone, no undo command exists) — it is never rendered here.
+ * PublishedNotice: a canvas banner showing the version, "you are now on main", and a line
+ * about the source branch closing. Publications cannot be undone, so no "Undo publish"
+ * control is rendered.
  */
 
 import * as React from 'react';
@@ -15,7 +12,7 @@ import type { PublicationRecord } from '../../persistence/studio';
 export interface PublishedNoticeProps {
   readonly publication: Readonly<PublicationRecord>;
   readonly sourceBranchLabel: string | null;
-  /** Whether the source branch closed as part of this publish (D29 default: closes). */
+  /** Whether the source branch closed as part of this publish (closes by default). */
   readonly sourceBranchClosed: boolean;
   readonly className?: string;
 }

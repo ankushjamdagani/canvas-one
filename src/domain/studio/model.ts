@@ -1,23 +1,16 @@
 /**
- * Shared studio-model/1 TypeScript domain types.
- *
- * Ground rules and specifications from specs/revamp/contracts/model-and-runner.md:
- * - §1 Ground rules
- * - §2 Records
- * - §3 Payload schemas
- * - §4 Behaviors
- * - §6 Scenarios
+ * Shared studio-model/1 TypeScript domain types: the document, its records,
+ * payload schemas, behaviors and scenarios.
  */
 
 import type { BulkArrival } from '../bulk-arrivals';
 import { VALID_KINDS } from '../execution';
 
 // ============================================================================
-// §1 Ground rules
+// Ground rules
 // ============================================================================
 
 /**
- * Contract §1:
  * - Id is a lowercase canonical UUID string. Constructors generate it; import preserves it.
  * - Ref always names an ID of a specified kind.
  *
@@ -29,7 +22,6 @@ export type Id = string;
 export type Ref<_Kind extends string = string> = string;
 
 /**
- * Contract §1:
  * - JSON values are finite, plain, bounded and surrogate-valid (as in canonical-json-v1).
  */
 export type JsonPrimitive = string | number | boolean | null;
@@ -39,12 +31,10 @@ export type Json =
   | { readonly [key: string]: Json };
 
 // ============================================================================
-// §2 Records
+// Records
 // ============================================================================
 
-/**
- * Contract §2: Document field list.
- */
+/** Top-level document fields, in canonical order. */
 export const DOCUMENT_FIELDS = [
   'schema',
   'id',
@@ -60,9 +50,8 @@ export const DOCUMENT_FIELDS = [
 ] as const;
 
 /**
- * Contract §2: visualKind catalog.
- * Exactly the 29-kind catalog in src/domain/execution.ts:VALID_KINDS plus
- * 'state-machine', 'data-pipeline', 'host', and (D52) 'linked-project'.
+ * The visual kind catalog: the kinds in `VALID_KINDS` (src/domain/execution.ts) plus
+ * 'state-machine', 'data-pipeline', 'host', and 'linked-project'.
  */
 export const VISUAL_KINDS = [
   ...VALID_KINDS,
@@ -81,7 +70,7 @@ export const PORT_CHANNELS = ['call', 'message', 'data', 'event'] as const;
 export type PortChannel = (typeof PORT_CHANNELS)[number];
 
 // ----------------------------------------------------------------------------
-// Port settings (D53)
+// Port settings
 // ----------------------------------------------------------------------------
 
 export const DELIVERY_GUARANTEES = ['at-most-once', 'at-least-once', 'exactly-once'] as const;
@@ -143,7 +132,7 @@ export type CallOutSettings = {
   readonly requestBytes?: number;
 };
 
-/** The caller's circuit breaker (D54). */
+/** The caller's circuit breaker. */
 export type CircuitBreakerPolicy = {
   readonly failureThreshold: number;
   readonly openMs: number;
@@ -168,10 +157,6 @@ export type PortSettings =
   | CallOutSettings
   | MessageOutSettings;
 
-/**
- * Contract §2: Port
- * id, label, direction:'in'|'out', channel:'call'|'message'|'data'|'event', schemaId, responseSchemaId:Id|null
- */
 export type Port = {
   readonly id: Id;
   readonly label: string;
@@ -179,27 +164,19 @@ export type Port = {
   readonly channel: PortChannel;
   readonly schemaId: Id;
   readonly responseSchemaId: Id | null;
-  /** D53: how this port is spoken to; null only on `event` ports, which can't be connected. */
+  /** How this port is spoken to; null only on `event` ports, which can't be connected. */
   readonly protocol: import('./protocols').Protocol | null;
-  /** D53: expectations and behavior of this endpoint (see PortSettings); absent when none are set. */
+  /** Expectations and behavior of this endpoint (see PortSettings); absent when none are set. */
   readonly settings?: PortSettings;
-  /** D53: the endpoint path or name within the protocol (`/orders`, a topic, a procedure). Absent means none. */
+  /** The endpoint path or name within the protocol (`/orders`, a topic, a procedure). Absent means none. */
   readonly path?: string;
 };
 
-/**
- * Contract §2: Endpoint
- * elementId, portId
- */
 export type Endpoint = {
   readonly elementId: Id;
   readonly portId: Id;
 };
 
-/**
- * Contract §2: Element
- * id, label, description, visualKind, ports:Port[], behavior:Behavior, linkedProjectId? (D52)
- */
 export type Element = {
   readonly id: Id;
   readonly label: string;
@@ -208,7 +185,7 @@ export type Element = {
   readonly ports: readonly Port[];
   readonly behavior: Behavior;
   /**
-   * D52: the project this node stands for, on `linked-project` elements only. A reference by id
+   * The project this node stands for, on `linked-project` elements only. A reference by id
    * (never a copy), omitted otherwise so older snapshot hashes are unchanged, and never part of
    * the run manifest.
    */
@@ -216,22 +193,18 @@ export type Element = {
 };
 
 // ----------------------------------------------------------------------------
-// Connections and Connection Config (§2 & §4)
+// Connections and Connection Config
 // ----------------------------------------------------------------------------
 
 export const ROUTE_CONDITION_FIELDS = ['class', 'operation', 'tag'] as const;
 export type RouteConditionField = (typeof ROUTE_CONDITION_FIELDS)[number];
 
-/**
- * Contract §4: RouteCondition
- * field:'class'|'operation'|'tag', value
- */
 export type RouteCondition = {
   readonly field: RouteConditionField;
   readonly value: string;
 };
 
-/** D49: caller retry policy (model-and-runner.md §4). */
+/** Caller retry policy. */
 export type CallRetryPolicy = {
   readonly maxAttempts: number;
   readonly backoffMs: number;
@@ -242,7 +215,7 @@ export type CallRetryPolicy = {
 };
 
 // ----------------------------------------------------------------------------
-// Link classes (D53): where the two ends of a connection sit relative to each other.
+// Link classes: where the two ends of a connection sit relative to each other.
 // ----------------------------------------------------------------------------
 
 export const LINK_CLASSES = ['same-host', 'same-az', 'cross-az', 'cross-region', 'internet'] as const;
@@ -258,15 +231,13 @@ export const LINK_CLASS_LATENCY_MS: Readonly<Record<LinkClass, number>> = {
 };
 
 /**
- * Contract §4: Connection config for data channel.
- * data: {}
+ * Connection config for the data channel (no settings).
  */
 export type DataConnectionConfig = {
-  // §4: data: {}
 };
 
 /**
- * D53: a call connection is the link and the route: wire delay both ways, and how a node with several
+ * A call connection is the link and the route: wire delay both ways, and how a node with several
  * routes picks one. What the caller sends and how it retries live on its out-port; what the callee
  * promises lives on its in-port. `linkClass` is the preset the latencies came from (null = custom).
  */
@@ -285,7 +256,7 @@ export type CallConnectionConfig = {
   readonly fallback: boolean;
 };
 
-/** D53: a message connection is the link and the route; acknowledgement and TTL live on the receiving in-port. */
+/** A message connection is the link and the route; acknowledgement and TTL live on the receiving in-port. */
 export type MessageConnectionConfig = {
   readonly latencyMs: number;
   readonly linkClass: LinkClass | null;
@@ -329,14 +300,10 @@ export type DataConnection = {
   readonly config: DataConnectionConfig;
 };
 
-/**
- * Contract §2: Connection (discriminated union per §4)
- * id, label, kind:'call'|'message'|'data', source:Endpoint, target:Endpoint, config (§4)
- */
 export type Connection = CallConnection | MessageConnection | DataConnection;
 
 // ----------------------------------------------------------------------------
-// Relations (§2)
+// Relations
 // ----------------------------------------------------------------------------
 
 export const RELATION_KINDS = ['contains', 'deployed-on', 'descriptive'] as const;
@@ -366,26 +333,15 @@ export type DescriptiveRelation = {
   readonly targetId: Id;
 };
 
-/**
- * Contract §2: Relation (discriminated union)
- * id, label plus one of:
- * - {kind:'contains',parentId,childId}
- * - {kind:'deployed-on',elementId,hostId}
- * - {kind:'descriptive',sourceId,targetId}
- */
 export type Relation =
   | ContainsRelation
   | DeployedOnRelation
   | DescriptiveRelation;
 
 // ----------------------------------------------------------------------------
-// Fixtures (§2)
+// Fixtures
 // ----------------------------------------------------------------------------
 
-/**
- * Contract §2: Fixture
- * id, schemaId, value:Json
- */
 export type Fixture = {
   readonly id: Id;
   readonly schemaId: Id;
@@ -393,13 +349,9 @@ export type Fixture = {
 };
 
 // ----------------------------------------------------------------------------
-// Views, Placements, Groups, Notes (§2)
+// Views, Placements, Groups, Notes
 // ----------------------------------------------------------------------------
 
-/**
- * Contract §2: Placement
- * id, elementId, x, y, width, expanded:boolean
- */
 export type Placement = {
   readonly id: Id;
   readonly elementId: Id;
@@ -409,10 +361,6 @@ export type Placement = {
   readonly expanded: boolean;
 };
 
-/**
- * Contract §2: Group
- * id, label, elementIds:Id[], collapsed:boolean
- */
 export type Group = {
   readonly id: Id;
   readonly label: string;
@@ -424,10 +372,6 @@ export type Group = {
 export const NOTE_TONES = ['paper', 'neutral', 'sky', 'mint', 'rose', 'lilac'] as const;
 export type NoteTone = (typeof NOTE_TONES)[number];
 
-/**
- * Contract §2: Note
- * id, text, x, y, width, tone:NoteTone, attachedElementIds:Id[]
- */
 export type Note = {
   readonly id: Id;
   readonly text: string;
@@ -438,10 +382,6 @@ export type Note = {
   readonly attachedElementIds: readonly Id[];
 };
 
-/**
- * Contract §2: View
- * id, label, placements:Placement[], connectionIds:Id[], relationIds:Id[], groups:Group[], notes:Note[]
- */
 export type View = {
   readonly id: Id;
   readonly label: string;
@@ -453,15 +393,9 @@ export type View = {
 };
 
 // ----------------------------------------------------------------------------
-// Document (§2)
+// Document
 // ----------------------------------------------------------------------------
 
-/**
- * Contract §2: Document
- * schema:'studio-model/1', id, title, elements:Element[], connections:Connection[],
- * relations:Relation[], schemas:PayloadSchema[], fixtures:Fixture[],
- * refinements:Refinement[], scenarios:Scenario[], views:View[]
- */
 export type Document = {
   readonly schema: 'studio-model/1';
   readonly id: Id;
@@ -477,7 +411,7 @@ export type Document = {
 };
 
 // ============================================================================
-// §3 Payload schemas
+// Payload schemas
 // ============================================================================
 
 export const SCALAR_TYPES = ['string', 'boolean', 'number', 'integer'] as const;
@@ -503,20 +437,12 @@ export type IntegerScalarShape = {
   readonly nullable: boolean;
 };
 
-/**
- * Contract §3: Scalar shape (nullable is required)
- * {type:'string'|'boolean'|'number'|'integer',nullable:boolean}
- */
 export type ScalarShape =
   | StringScalarShape
   | BooleanScalarShape
   | NumberScalarShape
   | IntegerScalarShape;
 
-/**
- * Contract §3: Record field
- * {id,key,optional:boolean,shape}
- */
 export type RecordField = {
   readonly id: Id;
   readonly key: string;
@@ -524,20 +450,12 @@ export type RecordField = {
   readonly shape: Shape;
 };
 
-/**
- * Contract §3: Record shape (nullable is required)
- * {type:'record',nullable,fields:[{id,key,optional:boolean,shape}]}
- */
 export type RecordShape = {
   readonly type: 'record';
   readonly nullable: boolean;
   readonly fields: readonly RecordField[];
 };
 
-/**
- * Contract §3: List shape (nullable is required)
- * {type:'list',nullable,items:shape,maxItems}
- */
 export type ListShape = {
   readonly type: 'list';
   readonly nullable: boolean;
@@ -545,29 +463,18 @@ export type ListShape = {
   readonly maxItems: number;
 };
 
-/**
- * Contract §3: Scalar-union shape (nullable is required)
- * {type:'scalar-union',nullable,types:('string'|'boolean'|'number'|'integer')[]}
- */
 export type ScalarUnionShape = {
   readonly type: 'scalar-union';
   readonly nullable: boolean;
   readonly types: readonly ScalarType[];
 };
 
-/**
- * Contract §3: Shape union
- */
 export type Shape =
   | ScalarShape
   | RecordShape
   | ListShape
   | ScalarUnionShape;
 
-/**
- * Contract §3: PayloadSchema
- * PayloadSchema={id,label,shape}
- */
 export type PayloadSchema = {
   readonly id: Id;
   readonly label: string;
@@ -575,7 +482,7 @@ export type PayloadSchema = {
 };
 
 // ============================================================================
-// §4 Behaviors
+// Behaviors
 // ============================================================================
 
 export const BEHAVIOR_KINDS = [
@@ -590,7 +497,7 @@ export const BEHAVIOR_KINDS = [
 export type BehaviorKind = (typeof BEHAVIOR_KINDS)[number];
 
 // ----------------------------------------------------------------------------
-// ResourceConfig (§4)
+// ResourceConfig
 // ----------------------------------------------------------------------------
 
 export type ResourceConfigBase = {
@@ -601,11 +508,11 @@ export type ResourceConfigBase = {
   readonly maxRetries: number;
   readonly retryDelayMs: number;
   /**
-   * D49: 'fixed' takes exactly 1/capacity per slot; 'exponential' draws a seeded
-   * exponential time with that mean. Absent means 'fixed' (configs created before D49).
+   * 'fixed' takes exactly 1/capacity per slot; 'exponential' draws a seeded
+   * exponential time with that mean. Absent means 'fixed'.
    */
   readonly serviceTime?: 'fixed' | 'exponential' | 'lognormal';
-  /** D50: stdev / mean for 'lognormal' (heavy tail), 0.1..10; present only for it. */
+  /** Stdev / mean for 'lognormal' (heavy tail), 0.1..10; present only for it. */
   readonly serviceTimeCv?: number;
 };
 
@@ -636,16 +543,6 @@ export type BrokerResourceConfig = ResourceConfigBase & {
   readonly delivery: 'competing' | 'broadcast';
 };
 
-/**
- * Contract §4: ResourceConfig (copied, versioned contract)
- * Common fields: capacity, concurrency, queueLimit, failureRate, maxRetries, retryDelayMs.
- * Variants:
- * - type:'source'|'processor'
- * - type:'storage',writeCapacity
- * - type:'router',strategy:'round-robin'|'weighted'|'conditional'
- * - type:'cache',mode:'fixed'|'lru',hitRate,entries,ttlMs
- * - type:'broker',delivery:'competing'|'broadcast'
- */
 export type ResourceConfig =
   | SourceOrProcessorResourceConfig
   | StorageResourceConfig
@@ -654,11 +551,10 @@ export type ResourceConfig =
   | BrokerResourceConfig;
 
 // ----------------------------------------------------------------------------
-// Values and Guards (§4)
+// Values and Guards
 // ----------------------------------------------------------------------------
 
 /**
- * Contract §4: Path
  * Path is an array of literal keys or non-negative list indices, never a dotted string.
  */
 export type Path = readonly (string | number)[];
@@ -696,12 +592,6 @@ export type OutcomeValue = {
   readonly kind: 'outcome';
 };
 
-/**
- * Contract §4: Value
- * {kind:'literal',value:Json} | {kind:'read',source:'input'|'context',path:Path}
- * | {kind:'record',fields:[{key:string,value:Value}]} | {kind:'list',items:Value[]}
- * | {kind:'outcome'}
- */
 export type Value =
   | LiteralValue
   | ReadValue
@@ -753,15 +643,6 @@ export type EveryGuard = {
   readonly itemGuard: Guard;
 };
 
-/**
- * Contract §4: Guard
- * - {op:'equals'|'notEquals',left:Value,right:Value}
- * - {op:'exists',value:Value}
- * - {op:'all'|'any',guards:Guard[]} (nonempty)
- * - {op:'positiveInteger',value:Value}
- * - {op:'nonEmpty',value:Value}
- * - {op:'every',value:Value,itemGuard:Guard}
- */
 export type Guard =
   | EqualsGuard
   | ExistsGuard
@@ -771,7 +652,7 @@ export type Guard =
   | EveryGuard;
 
 // ----------------------------------------------------------------------------
-// Transitions and Effects (§4)
+// Transitions and Effects
 // ----------------------------------------------------------------------------
 
 export const TRANSPORT_OUTCOMES = ['succeeded', 'rejected', 'failed', 'expired'] as const;
@@ -789,9 +670,8 @@ export type AssignEffect = {
 };
 
 /**
- * Contract §4: {id,kind:'request-id',path:Path}
- * ID derived from the run-local root ID plus a monotonic counter (no clock or RNG).
- * The runner derives it in runner/machine.ts (run-identity.md §1/§2).
+ * Writes a request ID at `path`. The ID is derived from the run-local root ID plus a monotonic counter (no clock or RNG).
+ * The runner derives it in runner/machine.ts.
  */
 export type RequestIdEffect = {
   readonly id: Id;
@@ -841,10 +721,6 @@ export type MachineState = {
   readonly label: string;
 };
 
-/**
- * Contract §4: Transition
- * Transition={id,fromStateId,eventPortId,guard:Guard|null,toStateId,effects:Effect[]}
- */
 export type Transition = {
   readonly id: Id;
   readonly fromStateId: Id;
@@ -861,7 +737,7 @@ export type MachineResponseBinding = {
 };
 
 // ----------------------------------------------------------------------------
-// Operations (§4)
+// Operations
 // ----------------------------------------------------------------------------
 
 export const OPERATION_KINDS = [
@@ -928,7 +804,7 @@ export type Operation =
   | GroupSumOperation;
 
 // ----------------------------------------------------------------------------
-// Decision Cases (§4)
+// Decision Cases
 // ----------------------------------------------------------------------------
 
 export type DecisionCase = {
@@ -944,23 +820,15 @@ export type DecisionFallback = {
 };
 
 // ----------------------------------------------------------------------------
-// Behavior Variants (§4)
+// Behavior Variants
 // ----------------------------------------------------------------------------
 
-/**
- * Contract §4: unmodeled
- * {kind:'unmodeled',version:1,reason}
- */
 export type UnmodeledBehavior = {
   readonly kind: 'unmodeled';
   readonly version: 1;
   readonly reason: string;
 };
 
-/**
- * Contract §4: resource
- * {kind:'resource',version:1,config:ResourceConfig,entryPortId}
- */
 export type ResourceBehavior = {
   readonly kind: 'resource';
   readonly version: 1;
@@ -968,10 +836,6 @@ export type ResourceBehavior = {
   readonly entryPortId: Id;
 };
 
-/**
- * Contract §4: machine
- * {kind:'machine',version:1,states:[{id,label}],initialStateId,contextSchemaId,initialContextFixtureId,transitions:Transition[],responseBindings:[{id,callPortId,eventPortId}]}
- */
 export type MachineBehavior = {
   readonly kind: 'machine';
   readonly version: 1;
@@ -983,10 +847,6 @@ export type MachineBehavior = {
   readonly responseBindings: readonly MachineResponseBinding[];
 };
 
-/**
- * Contract §4: pipeline
- * {kind:'pipeline',version:1,inputSchemaId,outputSchemaId,errorSchemaId,inputPortId,outputPortId,errorPortId,operations:Operation[]}
- */
 export type PipelineBehavior = {
   readonly kind: 'pipeline';
   readonly version: 1;
@@ -999,10 +859,6 @@ export type PipelineBehavior = {
   readonly operations: readonly Operation[];
 };
 
-/**
- * Contract §4: decision
- * {kind:'decision',version:1,inputSchemaId,inputPortId,cases:[{id,guard,outputPortId,value:Value}],fallback:{outputPortId,value:Value}}
- */
 export type DecisionBehavior = {
   readonly kind: 'decision';
   readonly version: 1;
@@ -1012,18 +868,11 @@ export type DecisionBehavior = {
   readonly fallback: DecisionFallback;
 };
 
-/**
- * Contract §4: host
- * {kind:'host',version:1}
- */
 export type HostBehavior = {
   readonly kind: 'host';
   readonly version: 1;
 };
 
-/**
- * Contract §4: Behavior discriminated union
- */
 export type Behavior =
   | UnmodeledBehavior
   | ResourceBehavior
@@ -1033,15 +882,15 @@ export type Behavior =
   | HostBehavior;
 
 // ============================================================================
-// §6 Scenarios
+// Scenarios
 // ============================================================================
 
 export type ScenarioMode = 'logical' | 'timed';
 
 /**
- * Contract §6: Scenario Budgets
+ * Scenario budgets.
  * budgets={maxEvents,maxTraceRows,maxTraceBytes,maxScheduledEvents,maxLiveRoots}
- * storage.md §6 bounds are enforced by validate.ts; runner defaults are in runner/types.ts.
+ * Bounds are enforced by validate.ts; runner defaults are in runner/types.ts.
  */
 export type ScenarioBudgets = {
   readonly maxEvents: number;
@@ -1053,7 +902,7 @@ export type ScenarioBudgets = {
 export type Budgets = ScenarioBudgets;
 
 // ----------------------------------------------------------------------------
-// Inputs (§6)
+// Inputs
 // ----------------------------------------------------------------------------
 
 export type InputBindingSource = {
@@ -1063,19 +912,11 @@ export type InputBindingSource = {
   readonly path: Path;
 };
 
-/**
- * Contract §6: InputBinding
- * InputBinding={targetPath:Path,source:{port:Endpoint,journeyId:Id,occurrence:number,path:Path}}
- */
 export type InputBinding = {
   readonly targetPath: Path;
   readonly source: InputBindingSource;
 };
 
-/**
- * Contract §6: ResourceMetadata
- * ResourceMetadata={requestClassId:Id,operation:'read'|'write',key:string|null,tags:string[],deadlineMs:number}
- */
 export type ResourceMetadata = {
   readonly requestClassId: Id;
   readonly operation: 'read' | 'write';
@@ -1084,10 +925,6 @@ export type ResourceMetadata = {
   readonly deadlineMs: number;
 };
 
-/**
- * Contract §6: Input
- * Input={id,entry:Endpoint,fixtureId,journeyId:Id,atMs:number|null,payloadBindings:InputBinding[],resource:ResourceMetadata|null}
- */
 export type Input = {
   readonly id: Id;
   readonly entry: Endpoint;
@@ -1100,7 +937,7 @@ export type Input = {
 export type ScenarioInput = Input;
 
 // ----------------------------------------------------------------------------
-// Workloads (§6)
+// Workloads
 // ----------------------------------------------------------------------------
 
 export type KeyDistribution = {
@@ -1120,7 +957,7 @@ export type RequestClass = {
 };
 
 /**
- * D50/D56: the arrival rate of a stream over time. `burst` runs at `peakRate` between `startMs`
+ * The arrival rate of a stream over time. `burst` runs at `peakRate` between `startMs`
  * and `endMs` (from the run start) and at the base rate otherwise; `ramp` moves linearly from the
  * base rate to `endRate` over `rampMs` and then holds `endRate`.
  */
@@ -1129,14 +966,14 @@ export type WorkloadProfile =
   | { readonly kind: 'burst'; readonly peakRate: number; readonly startMs: number; readonly endMs: number }
   | { readonly kind: 'ramp'; readonly endRate: number; readonly rampMs: number };
 
-/** D56: a bulk of N requests; the run's cycle for this source completes when all N have settled. */
+/** A bulk of N requests; the run's cycle for this source completes when all N have settled. */
 export type BulkEmission = {
   readonly mode: 'bulk';
   readonly requests: number;
   readonly arrival: BulkArrival;
 };
 
-/** D56: requests at a rate with no end; the run goes on until the user presses Stop. */
+/** Requests at a rate with no end; the run goes on until the user presses Stop. */
 export type StreamEmission = {
   readonly mode: 'stream';
   readonly ratePerSecond: number;
@@ -1146,7 +983,6 @@ export type StreamEmission = {
 export type Emission = BulkEmission | StreamEmission;
 
 /**
- * Contract §6: Workload (D56)
  * A source: where requests enter, when it starts (`startDelayMs` from the run start), and what it
  * emits (a bulk of N or an endless stream). Keeps the RequestClass fields; entry is an Endpoint,
  * IDs are UUIDs.
@@ -1162,13 +998,9 @@ export type Workload = {
 };
 
 // ----------------------------------------------------------------------------
-// Faults (§6)
+// Faults
 // ----------------------------------------------------------------------------
 
-/**
- * Contract §6: Fault
- * Fault={id,hostId,downAtMs,upAtMs,detectionDelayMs,recoveryDetectionDelayMs,activePolicy:'fail',queuedPolicy:'reject',routeReset:'first-healthy'}
- */
 export type Fault = {
   readonly id: Id;
   readonly hostId: Id;
@@ -1182,7 +1014,7 @@ export type Fault = {
 };
 
 // ----------------------------------------------------------------------------
-// Boundaries (§6)
+// Boundaries
 // ----------------------------------------------------------------------------
 
 export type BoundaryPayloadBinding = {
@@ -1198,17 +1030,13 @@ export type BoundaryResponse = {
   readonly delayMs: number | null;
   readonly afterInputId: Id | null;
   /**
-   * D51: true = this response answers every matching request instead of being used once
-   * (§6: "the first unused matching response is consumed"). Absent means once.
+   * True = this response answers every matching request instead of being used once
+   * Otherwise the first unused matching response is consumed. Absent means once.
    */
   readonly repeat?: boolean;
   readonly outcome: TransportOutcome;
 };
 
-/**
- * Contract §6: Boundary
- * Boundary={id,source:Endpoint,schemaId,responses:[{id,match:Guard,responseFixtureId,payloadBindings:[{targetPath:Path,requestPath:Path}],delayMs:number|null,afterInputId:Id|null,outcome:'succeeded'|'rejected'|'failed'|'expired'}]}
- */
 export type Boundary = {
   readonly id: Id;
   readonly source: Endpoint;
@@ -1217,7 +1045,7 @@ export type Boundary = {
 };
 
 // ----------------------------------------------------------------------------
-// Refinement and Selection (§6)
+// Refinement and Selection
 // ----------------------------------------------------------------------------
 
 export type PortMapping = {
@@ -1227,10 +1055,6 @@ export type PortMapping = {
 };
 export type RefinementPortMapping = PortMapping;
 
-/**
- * Contract §6: Refinement
- * Refinement={id,ownerElementId,memberElementIds:Id[],portMappings:[{id,outer:Endpoint,inner:Endpoint}]}
- */
 export type Refinement = {
   readonly id: Id;
   readonly ownerElementId: Id;
@@ -1238,10 +1062,6 @@ export type Refinement = {
   readonly portMappings: readonly PortMapping[];
 };
 
-/**
- * Contract §6: Selection
- * Selection={refinementId,mode:'aggregate'|'refined'}
- */
 export type Selection = {
   readonly refinementId: Id;
   readonly mode: 'aggregate' | 'refined';
@@ -1249,7 +1069,7 @@ export type Selection = {
 export type RefinementSelection = Selection;
 
 // ----------------------------------------------------------------------------
-// Initial Contexts (§6)
+// Initial Contexts
 // ----------------------------------------------------------------------------
 
 export type InitialContext = {
@@ -1259,7 +1079,7 @@ export type InitialContext = {
 export type ScenarioInitialContext = InitialContext;
 
 // ----------------------------------------------------------------------------
-// Assertions (§6)
+// Assertions
 // ----------------------------------------------------------------------------
 
 export const ASSERTION_SUBJECT_KINDS = [
@@ -1329,15 +1149,6 @@ export type MetricSubject = {
   readonly key: MetricSubjectKey;
 };
 
-/**
- * Contract §6: Assertion Subject
- * - {kind:'final-state',elementId}
- * - {kind:'context',elementId,path:Path}
- * - {kind:'output',port:Endpoint,path:Path}
- * - {kind:'count',scope:'root'|'message'|'element',elementId:Id|null,outcome:'generated'|'succeeded'|'rejected'|'failed'|'expired'|'inFlight'}
- * - {kind:'trace-count',elementId,code:string}
- * - {kind:'metric',elementId:Id,key:'throughput'|'meanLatencyMs'|'p95LatencyMs'|'utilization'}
- */
 export type AssertionSubject =
   | FinalStateSubject
   | ContextSubject
@@ -1349,10 +1160,6 @@ export type AssertionSubject =
 export const ASSERTION_OPERATORS = ['equals', 'at-most', 'at-least'] as const;
 export type AssertionOperator = (typeof ASSERTION_OPERATORS)[number];
 
-/**
- * Contract §6: Assertion
- * Assertion={id,label,subject,operator:'equals'|'at-most'|'at-least',expected:Json}
- */
 export type Assertion = {
   readonly id: Id;
   readonly label: string;
@@ -1362,16 +1169,12 @@ export type Assertion = {
 };
 
 // ----------------------------------------------------------------------------
-// Assumptions (§6)
+// Assumptions
 // ----------------------------------------------------------------------------
 
 export const ASSUMPTION_SOURCES = ['author', 'template', 'measured'] as const;
 export type AssumptionSource = (typeof ASSUMPTION_SOURCES)[number];
 
-/**
- * Contract §6: Assumption
- * Assumption={id,key,value:Json,source:'author'|'template'|'measured',description}
- */
 export type Assumption = {
   readonly id: Id;
   readonly key: string;
@@ -1381,17 +1184,9 @@ export type Assumption = {
 };
 
 // ----------------------------------------------------------------------------
-// Scenario (§6)
+// Scenario
 // ----------------------------------------------------------------------------
 
-/**
- * Contract §6: Scenario
- * Scenario={id,label,revision,mode:'logical'|'timed',scopeElementIds:Id[],
- * entryPorts:Endpoint[],inputs:Input[],workloads:Workload[],faults:Fault[],
- * boundaries:Boundary[],refinementSelections:Selection[],
- * initialContexts:[{elementId,fixtureId}],assertions:Assertion[],seed,
- * budgets,assumptions:Assumption[]}
- */
 export type Scenario = {
   readonly id: Id;
   readonly label: string;

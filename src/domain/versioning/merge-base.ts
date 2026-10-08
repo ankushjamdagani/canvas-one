@@ -1,9 +1,6 @@
 /**
- * Merge base detection in commit DAG (RV-08c).
+ * Merge base detection in the commit DAG.
  *
- * Implements:
- * - specs/revamp/contracts/storage.md §2 (Ancestry and Creation snapshot bullets)
- * - specs/revamp/contracts/transactions.md §4 & §5
  * - DAG ancestry only (parentIds).
  * - If either head is null (unborn), the base is the creation snapshot.
  * - Otherwise the best common ancestors (Lowest Common Ancestors in DAG).
@@ -126,7 +123,7 @@ export async function findMergeBase(
   if (commonAncestors.size === 0) {
     // Both heads are born and their commit ancestries share no common commit.
     // The creation snapshot is the implicit common root that every 0-parent commit descends from
-    // (storage.md: it is the merge base for unborn branches, and every branch forks from it).
+    // (it is also the merge base for unborn branches, and every branch forks from it).
     return {
       status: 'ok',
       commitId: null,

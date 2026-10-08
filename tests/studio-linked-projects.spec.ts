@@ -11,7 +11,7 @@ async function openLibrary(page: Page) {
   await expect(page.getByTestId('library-panel')).toBeVisible();
 }
 
-/** A blank project with one service whose HTTP type is exposed (D53: a project must expose a call connection type to be linked). */
+/** A blank project with one service whose HTTP type is exposed (a project must expose a call connection type to be linked). */
 async function createExposingProject(page: Page, name: string) {
   await page.goto('/projects');
   await page.getByRole('textbox', { name: 'Blank project name' }).fill(name);

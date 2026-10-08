@@ -1,5 +1,5 @@
 /**
- * Pure presentation planner for commands.md §4 canvas.expand / canvas.collapse.
+ * Pure presentation planner for canvas.expand / canvas.collapse.
  * Flips Placement.expanded or Group.collapsed on the owning View record only,
  * so one model.apply-records command is one undo entry and no runner input
  * (elements, connections, scenarios) changes.

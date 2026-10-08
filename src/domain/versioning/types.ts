@@ -1,16 +1,12 @@
 /**
- * Eligibility and Versioning types (RV-08a).
- *
- * Implements specs/revamp/contracts/run-identity.md §5 (Eligibility),
- * specs/revamp/contracts/storage.md §2 (EvidenceRef), and
- * specs/revamp/contracts/model-and-runner.md §6 & §9.
+ * Eligibility and versioning types.
  */
 
 import type { Id } from '../studio/model';
 import type { CheckResult, RunSummary, TerminalStatus } from '../studio/runner/types';
 
 // ============================================================================
-// Reason codes for run qualification (§5)
+// Reason codes for run qualification
 // ============================================================================
 
 const QUALIFICATION_REASON_CODES = [

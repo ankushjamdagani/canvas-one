@@ -1,14 +1,10 @@
 /**
- * DraftBehindMainBanner (22E draft behind main) — RV-11b review round.
+ * DraftBehindMainBanner: a canvas-top banner — "Main has moved on · N conflicts with your
+ * edits" / "M versions published since you forked at <version>" with Later / Review and
+ * resolve actions.
  *
- * specs/revamp/screens/22E_draft_behind_main.png: a canvas-top banner —
- * "Main has moved on · N conflicts with your edits" / "M versions published
- * since you forked at <version>" with Later / Review and resolve actions.
- *
- * This is a standalone, presentational component: the app shell decides when to
- * mount it (typically after calling PublishController.prepare() to learn the
- * real conflict count) and is not wired here — wiring PublishController into a
- * canvas/shell region is out of this task's scope.
+ * A standalone, presentational component: the app shell decides when to mount it
+ * (typically after calling PublishController.prepare() to learn the real conflict count).
  */
 
 import * as React from 'react';

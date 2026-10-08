@@ -12,24 +12,14 @@ import type { Document } from '../src/domain/studio/model';
 import { exportProjectJson } from '../src/features/transfer/json-transfer';
 
 /**
- * Studio Transfer E2E (RV-10b).
+ * Studio Transfer E2E: choosing an exported JSON bundle on the entry screen imports it, and the
+ * project appears in "Your projects" and can be opened.
  *
- * Verifies project.import on the entry screen (2A): choosing an exported v9 JSON
- * bundle registers it with the repository's FileToken registry, imports it, and the
- * project appears in "Your projects" and can be opened -- the round trip the task
- * brief asks for ("import of an exported S05 bundle round trip via the entry
- * screen").
- *
- * The export half is produced in Node, through the real repository/exportProjectJson
- * code (not hand-authored JSON), against an isolated fake-indexeddb instance
- * entirely separate from the browser's own IndexedDB -- matching the task's "export
- * can be produced ... by fixture" option, using the actual S05 fixture document
- * (specs/revamp/fixtures/s05.json, the same file src/features/entry/fixtures.ts
- * loads) as its source. The fixture is read directly with `fs.readFileSync` here
- * (rather than importing entry/fixtures.ts) because Playwright's own Node-ESM test
- * runner -- unlike Vite, which the app itself builds with -- requires an explicit
- * `type: "json"` import attribute for a bare `.json` import, which that module
- * doesn't have.
+ * The export is produced in Node through the real repository/exportProjectJson code, against an
+ * isolated fake-indexeddb instance separate from the browser's IndexedDB, using the S05 fixture
+ * (src/features/entry/examples/s05.json). The fixture is read with `fs.readFileSync` rather than
+ * importing entry/fixtures.ts because Playwright's Node-ESM runner requires an explicit
+ * `type: "json"` import attribute for a bare `.json` import, which that module lacks.
  */
 
 const testActor: Actor = {
@@ -41,7 +31,7 @@ const testActor: Actor = {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadS05Fixture(): Document {
-  const path = join(__dirname, '..', 'specs', 'revamp', 'fixtures', 's05.json');
+  const path = join(__dirname, '..', 'src', 'features', 'entry', 'examples', 's05.json');
   return JSON.parse(readFileSync(path, 'utf-8')) as Document;
 }
 
@@ -90,7 +80,7 @@ async function buildExportedS05BundleFile(s05: Document): Promise<string> {
   return filePath;
 }
 
-test.describe('Studio Transfer E2E (RV-10b)', () => {
+test.describe('Studio Transfer E2E', () => {
   test('mounts Export under the project menu and enables CSV only for the displayed saved run', async ({
     page,
   }) => {

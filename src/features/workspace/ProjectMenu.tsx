@@ -34,9 +34,7 @@ export interface ProjectMenuProps {
 }
 
 /**
- * 13A "Project menu open" & 18B "Export submenu".
- *
- * Implements specs and aesthetics from Screens 13A & 18B:
+ * Project menu with an Export submenu:
  * - 268px width menu with subtle border and elevation shadow
  * - Standardized faded gray top header with mono category and metadata subtitle
  * - Pure white body section with standardized 14px icon sizing and consistent row spacing
@@ -130,7 +128,7 @@ export function ProjectMenu({
           <span>Project settings</span>
         </DropdownMenuItem>
 
-        {/* Exposed endpoints (D53) */}
+        {/* Exposed endpoints */}
         <DropdownMenuItem
           data-testid="project-menu-exposed-endpoints"
           onSelect={() => {

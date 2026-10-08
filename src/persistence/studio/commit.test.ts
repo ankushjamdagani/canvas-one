@@ -11,7 +11,7 @@ import { prepareScenario } from '../../domain/studio/runner/compile';
 import { runScenario } from '../../domain/studio/runner/scenario-runner';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type HistoryCommitCommand } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -115,7 +115,7 @@ async function runAndSaveScenario(
   };
 }
 
-describe('history.commit (RV-08d)', () => {
+describe('history.commit', () => {
   it('happy path: advances head, records parentIds ([] for unborn, [head] for next), stores pins and evidence manifest, supports receipt retry', async () => {
     const db = createStudioDatabase(`test-commit-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
@@ -506,10 +506,10 @@ describe('history.commit (RV-08d)', () => {
   });
 
   // ========================================================================
-  // Review Round 1 Tests
+  // Edge cases
   // ========================================================================
 
-  it('item 1: a run saved with a different compilerVersion does not qualify', async () => {
+  it('a run saved with a different compilerVersion does not qualify', async () => {
     const db = createStudioDatabase(`test-diff-compiler-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, draftBranchId } = await createTestProject(repo);
@@ -593,7 +593,7 @@ describe('history.commit (RV-08d)', () => {
     db.close();
   });
 
-  it('item 2: evidence refs invalid shape -> invalid at payload.evidence[i]', async () => {
+  it('evidence refs with invalid shape -> invalid at payload.evidence[i]', async () => {
     const db = createStudioDatabase(`test-evidence-shape-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, draftBranchId } = await createTestProject(repo);
@@ -626,7 +626,7 @@ describe('history.commit (RV-08d)', () => {
     db.close();
   });
 
-  it('item 2: duplicate ref for scenarioId or ref for scenario not in document -> invalid', async () => {
+  it('duplicate ref for scenarioId or ref for scenario not in document -> invalid', async () => {
     const db = createStudioDatabase(`test-evidence-dup-unknown-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, draftBranchId } = await createTestProject(repo);
@@ -678,7 +678,7 @@ describe('history.commit (RV-08d)', () => {
     db.close();
   });
 
-  it('item 2: ref whose run is missing -> failed/ineligible naming the run; scenarioId or fingerprint mismatch -> failed/ineligible', async () => {
+  it('ref whose run is missing -> failed/ineligible naming the run; scenarioId or fingerprint mismatch -> failed/ineligible', async () => {
     const db = createStudioDatabase(`test-evidence-mismatch-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, draftBranchId } = await createTestProject(repo);
@@ -762,7 +762,7 @@ describe('history.commit (RV-08d)', () => {
     db.close();
   });
 
-  it('item 2: every scenario in document must have exactly one ref, and THAT ref run must qualify (no stand-ins)', async () => {
+  it('every scenario in document must have exactly one ref, and THAT ref run must qualify (no stand-ins)', async () => {
     const db = createStudioDatabase(`test-evidence-no-standin-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, draftBranchId } = await createTestProject(repo);
@@ -794,7 +794,7 @@ describe('history.commit (RV-08d)', () => {
     db.close();
   });
 
-  it('item 3: history.commit on a closed branch -> invalid', async () => {
+  it('history.commit on a closed branch -> invalid', async () => {
     const db = createStudioDatabase(`test-commit-closed-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const { projectId, draftBranchId } = await createTestProject(repo);

@@ -1,7 +1,6 @@
 /**
- * RV-03q: 14A Quick options render fidelity (renderToStaticMarkup, no portal).
- * Screens 14A_Quick_options_open.png / 14A_Rename_inside_quick_options.png;
- * exclusions from design-revalidation.md §2.
+ * Quick options rendering (renderToStaticMarkup, no portal), including the
+ * elements deliberately left out.
  */
 import { describe, expect, it } from 'vitest';
 import * as React from 'react';
@@ -66,7 +65,7 @@ function render(mode: 'list' | 'rename' | 'group' | 'note' | 'commit'): string {
   );
 }
 
-describe('QuickOptionsContent (14A)', () => {
+describe('QuickOptionsContent', () => {
   it('shows the search field, project/branch chip, groups and footer', () => {
     const html = render('list');
     expect(html).toContain('Search actions and branches…');
@@ -90,7 +89,7 @@ describe('QuickOptionsContent (14A)', () => {
     expect(html).toContain('Nothing to undo');
   });
 
-  it('leaves out the excluded 14A elements', () => {
+  it('leaves out the excluded elements', () => {
     const html = render('list');
     for (const excluded of [
       '⌘K',

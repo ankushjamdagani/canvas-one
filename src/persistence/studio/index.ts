@@ -1,5 +1,5 @@
 /**
- * Public exports for System Studio persistence layer (RV-16a).
+ * Public exports for System Studio persistence layer.
  */
 
 export * from './types';

@@ -21,7 +21,7 @@ import {
   type PublicationMetadata,
 } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -165,7 +165,7 @@ async function runAllCandidateScenarios(
   return evidence;
 }
 
-describe('Publish and Publication Lifecycle (RV-08e)', () => {
+describe('Publish and Publication Lifecycle', () => {
   it('happy path end to end with real history: project -> branch -> edit -> commit -> prepare -> candidate runs -> publish', async () => {
     const db = createStudioDatabase(`test-pub-happy-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
@@ -1622,8 +1622,8 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
     db.close();
   });
 
-  describe('RV-08e review round 1 fixes', () => {
-    it('Item 1: CandidateController.publish strictly validates envelope and payload without fallbacks', async () => {
+  describe('Publish validation and ticket handling', () => {
+    it('CandidateController.publish strictly validates envelope and payload without fallbacks', async () => {
       const db = createStudioDatabase(`test-pub-strict-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
@@ -1729,7 +1729,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
       db.close();
     });
 
-    it('Item 1: CandidateController.publish rejects context mismatch without falling back', async () => {
+    it('CandidateController.publish rejects context mismatch without falling back', async () => {
       const db = createStudioDatabase(`test-pub-mismatch-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
@@ -1810,7 +1810,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
       db.close();
     });
 
-    it('Item 1: repo.publish checks command.expectedWorkingRevision against ticket expectedSourceRevision', async () => {
+    it('repo.publish checks command.expectedWorkingRevision against ticket expectedSourceRevision', async () => {
       const db = createStudioDatabase(`test-repo-check-rev-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
@@ -1876,7 +1876,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
       db.close();
     });
 
-    it('Item 2: successful publish does NOT mark candidate superseded; retry with same opId succeeds; new opId fails on moved tokens', async () => {
+    it('successful publish does NOT mark candidate superseded; retry with same opId succeeds; new opId fails on moved tokens', async () => {
       const db = createStudioDatabase(`test-pub-no-superseded-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const controller = createCandidateController({ mintId: () => crypto.randomUUID() });
@@ -1953,7 +1953,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
       db.close();
     });
 
-    it('Item 3: repo.execute() without registered ticket returns failed/ineligible', async () => {
+    it('repo.execute() without registered ticket returns failed/ineligible', async () => {
       const db = createStudioDatabase(`test-execute-no-ticket-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const { projectId, draftBranchId } = await createTestProject(repo);
@@ -1989,7 +1989,7 @@ describe('Publish and Publication Lifecycle (RV-08e)', () => {
       db.close();
     });
 
-    it('Item 4: ticket is single-use for one operationId and rejects different operationId', async () => {
+    it('ticket is single-use for one operationId and rejects different operationId', async () => {
       const db = createStudioDatabase(`test-ticket-single-use-${crypto.randomUUID()}`);
       const repo = new LocalRepository(db);
       const controller = createCandidateController({ mintId: () => crypto.randomUUID() });

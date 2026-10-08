@@ -1,33 +1,17 @@
 /**
- * Execution manifest v1 builder and run fingerprint (RV-02g).
+ * Execution manifest v1 builder and run fingerprint.
  *
- * Implements:
- * - specs/revamp/decisions.md D31 (manifest shape), D34 (compiler 'reference' reading,
- *   used only indirectly via closure.ts/readiness.ts).
- * - specs/revamp/contracts/run-identity.md §3 (Execution manifest v1: shape, scope
- *   closure, hash-unavailable handling, coverage test).
- * - specs/revamp/contracts/model-and-runner.md §7 (Projection inventory: normative A/E
- *   field split, closed schema descriptors, "adding an unclassified field fails the
- *   contract test").
- * - specs/revamp/contracts/storage.md §6 (Scenario budgets are always required/materialized
- *   on the Scenario type; no omission path exists to fill in).
+ * Assumes `doc` already passed `validateDocument` (storable level); `buildManifest`
+ * calls `checkReadiness` itself, which computes the scope closure.
  *
- * SCOPE: this module assumes `doc` already passed `validateDocument` (storable level);
- * `buildManifest` calls `checkReadiness` itself, which computes the scope closure.
- *
- * PROJECTION APPROACH (how fields are classified, per model-and-runner.md §7):
- * Every manifest record below is built by *allow-listing* the E (execution) fields from
- * the authored record and simply not copying the A (presentation) fields — this is the
- * normal, silent part of the projection for known record shapes. Because TypeScript's
- * structural types don't stop an `as any`-widened record from carrying a genuinely new,
- * not-yet-classified field, each record kind that has at least one A field to drop (i.e.
- * where an unclassified field could be silently mis-projected either way) is additionally
- * checked at runtime against a *closed* key set (`assertClosedKeys`) covering every field
- * name the contract's §7 table currently classifies (A or E) for that record. An
- * unrecognized key throws instead of silently landing on either side of the projection.
- * Record kinds whose contract row has no A fields at all (Fixture, Refinement, Behavior:
- * "all fields recursively") are copied through whole and are not given a closed-key check,
- * since there is nothing to classify — every field is already E by contract.
+ * Projection approach: every manifest record is built by allow-listing the E (execution)
+ * fields of the authored record and not copying the A (presentation) fields. Because
+ * TypeScript's structural types don't stop an `as any`-widened record from carrying a
+ * new, unclassified field, each record kind that has at least one A field to drop is also
+ * checked at runtime against a closed key set (`assertClosedKeys`) listing every field
+ * known to be A or E for that record. An unrecognized key throws instead of silently
+ * landing on either side of the projection. Fixture, Refinement and Behavior have no A
+ * fields (every field is E), so they are copied whole with no closed-key check.
  */
 
 import type {
@@ -72,7 +56,7 @@ import { checkReadiness, type ReadinessIssue } from './readiness';
 import { canonicalJson, sha256Hex } from './canonical';
 
 // ============================================================================
-// Execution manifest v1 shape (run-identity.md §3, "Manifest shape (D31)")
+// Execution manifest v1 shape
 // ============================================================================
 
 export type ManifestRunnerVersion = {
@@ -86,7 +70,7 @@ export type ManifestPort = {
   readonly channel: PortChannel;
   readonly schemaId: Id;
   readonly responseSchemaId: Id | null;
-  /** D53: only the settings that change what a run does (see `manifestSettings`). */
+  /** Only the settings that change what a run does (see `manifestSettings`). */
   readonly settings?: Record<string, unknown>;
 };
 
@@ -217,14 +201,13 @@ export type BuildManifestResult =
   | { readonly status: 'cancelled' };
 
 // ----------------------------------------------------------------------------
-// Closed key-set classification guard (model-and-runner.md §7: "closed schema
-// descriptors, and adding an unclassified field fails the contract test").
+// Closed key-set classification guard: adding an unclassified field fails loudly.
 // ----------------------------------------------------------------------------
 
 /**
  * Throws if `obj` carries any key not in `knownKeys`. Every key here — whether it ends
  * up on the A (dropped) or E (kept) side of the projection — must be listed; an
- * unrecognized key means the §7 projection inventory hasn't classified it yet, so the
+ * unrecognized key means the projection hasn't classified it yet, so the
  * manifest builder refuses to guess and fails loudly instead.
  */
 function assertClosedKeys(obj: Record<string, unknown>, knownKeys: readonly string[], recordLabel: string, entityId: string | number | null): void {
@@ -234,18 +217,18 @@ function assertClosedKeys(obj: Record<string, unknown>, knownKeys: readonly stri
       throw new Error(
         `buildManifest: unclassified field '${key}' on ${recordLabel} record` +
           (entityId !== null ? ` '${entityId}'` : '') +
-          ` — classify it as A (drop) or E (keep) in model-and-runner.md §7 and this builder before compiling`,
+          ` — classify it as A (drop) or E (keep) in the projection inventory and this builder before compiling`,
       );
     }
   }
 }
 
-// model-and-runner.md §7: "Element / Port | label, description, visualKind / label | everything else"
-// D52: `linkedProjectId` is a drop-class key too, so a link never changes a run's identity.
+// Element / Port: label, description and visualKind are A on Element; label is A on Port; the rest is E.
+// `linkedProjectId` is a drop-class key too, so a link never changes a run's identity.
 const ELEMENT_KEYS = ['id', 'label', 'description', 'visualKind', 'ports', 'behavior', 'linkedProjectId'] as const;
 const PORT_KEYS = ['id', 'label', 'direction', 'channel', 'schemaId', 'responseSchemaId', 'protocol', 'path', 'settings'] as const;
 
-// D53: port settings. E (kept in the manifest) changes what a run does; A (dropped) is a declared
+// Port settings. E (kept in the manifest) changes what a run does; A (dropped) is a declared
 // expectation or presentation. Anything not listed here throws, like every other record.
 const SETTINGS_KEPT: Readonly<Record<string, readonly string[]>> = {
   'in:call': ['rateLimit', 'failureRate', 'serviceTimeMs', 'maxConcurrency', 'responseBytes'],
@@ -275,20 +258,20 @@ function manifestSettings(port: Port): Record<string, unknown> | undefined {
   }
   return Object.keys(result).length > 0 ? result : undefined;
 }
-// §7: "PayloadSchema / fields | label | everything else, including IDs"
+// PayloadSchema: label is A; everything else, including IDs, is E.
 const PAYLOAD_SCHEMA_KEYS = ['id', 'label', 'shape'] as const;
-// §7: "Connection / Relation | label; descriptive relations entirely | executable fields; ..."
+// Connection / Relation: label is A, and descriptive relations are dropped entirely; executable fields are E.
 const CONNECTION_KEYS = ['id', 'kind', 'source', 'target', 'config'] as const;
 const CONTAINS_RELATION_KEYS = ['id', 'label', 'kind', 'parentId', 'childId'] as const;
 const DEPLOYED_ON_RELATION_KEYS = ['id', 'label', 'kind', 'elementId', 'hostId'] as const;
-// §7: "Assertion / Assumption | label / description | everything else"
+// Assertion / Assumption: label / description are A; everything else is E.
 const ASSERTION_KEYS = ['id', 'label', 'subject', 'operator', 'expected'] as const;
 const ASSUMPTION_KEYS = ['id', 'key', 'value', 'source', 'description'] as const;
-// §7: "Workload / RequestClass | class name | everything else, including enablement, tags and class order"
+// Workload / RequestClass: class name is A; everything else is E, including enablement, tags and class order.
 const WORKLOAD_KEYS = ['id', 'entry', 'enabled', 'startDelayMs', 'emission', 'timeoutMs', 'classes'] as const;
 const REQUEST_CLASS_KEYS = ['id', 'name', 'weight', 'operation', 'tags', 'keyDistribution'] as const;
-// §7: "Scenario | label | everything else. Scope lists are sorted as sets; inputs, faults,
-// operations and transitions stay ordered."
+// Scenario: label is A; everything else is E. Scope lists are sorted as sets; inputs, faults,
+// operations and transitions stay ordered.
 const SCENARIO_KEYS = [
   'id', 'label', 'revision', 'mode', 'scopeElementIds', 'entryPorts', 'inputs', 'workloads',
   'faults', 'boundaries', 'refinementSelections', 'initialContexts', 'assertions', 'seed',
@@ -301,11 +284,11 @@ function byId(a: { readonly id: Id }, b: { readonly id: Id }): number {
 
 /**
  * Builds the execution manifest v1 for one scenario of an (already storable-valid)
- * document, and computes its fingerprint (run-identity.md §1: `ss-run-v1:` + lowercase
+ * document, and computes its fingerprint (`ss-run-v1:` + lowercase
  * hex SHA-256 of canonical-json-v1(manifest)).
  *
- * Readiness (run-identity.md §3: "Unresolved crossings, missing targets and unsupported
- * relation kinds fail readiness before fingerprinting") is checked first via
+ * Readiness (unresolved crossings, missing targets and unsupported
+ * relation kinds fail before fingerprinting) is checked first via
  * `checkReadiness`, which also computes the scope closure this manifest is built from.
  */
 export async function buildManifest(
@@ -316,7 +299,7 @@ export async function buildManifest(
   const readiness = checkReadiness(doc, scenarioId);
 
   if (!readiness.ready) {
-    // run-identity.md §3: computeClosure surfaces 'analysis-limit'/'cancelled' through
+    // computeClosure surfaces 'analysis-limit'/'cancelled' through
     // checkReadiness as single-issue not-ready results with these specific codes; widen
     // them back out to their own top-level statuses per this function's contract.
     if (readiness.issues.length === 1 && readiness.issues[0].code === 'compiler-analysis-limit') {
@@ -412,7 +395,7 @@ export async function buildManifest(
 
   // --------------------------------------------------------------------------
   // refinements: one aggregate/refined choice per selected element (Refinement has no A
-  // fields per §7 "Fixture / Refinement / Behavior | -- | all fields recursively", so
+  // fields, so
   // ownerElementId/memberElementIds/portMappings are copied through whole).
   // --------------------------------------------------------------------------
   const refinementsById = new Map<Id, Refinement>(doc.refinements.map((r) => [r.id, r]));
@@ -457,9 +440,8 @@ export async function buildManifest(
   fixtures.sort(byId);
 
   // --------------------------------------------------------------------------
-  // scenario projection (model-and-runner.md §7 "Scenario | label | everything else.
-  // Scope lists are sorted as sets; inputs, faults, operations and transitions stay
-  // ordered."). scopeElementIds and entryPorts are sorted as sets; inputs,
+  // scenario projection. Scope lists are sorted as sets; inputs, faults, operations and
+  // transitions stay ordered. scopeElementIds and entryPorts are sorted as sets; inputs,
   // workloads, faults, boundaries, refinementSelections, initialContexts stay in
   // authored order.
   // --------------------------------------------------------------------------
@@ -525,7 +507,7 @@ export async function buildManifest(
     initialContexts: scenario.initialContexts,
     assertions,
     seed: scenario.seed,
-    // storage.md §6 / Scenario.budgets is a required, always-materialized field on the
+    // Scenario.budgets is a required, always-materialized field on the
     // authored type (no omission path exists), so it is copied through as-is rather than
     // defaulted.
     budgets: scenario.budgets,
@@ -568,8 +550,8 @@ export async function buildManifest(
   try {
     fingerprint = `ss-run-v1:${await sha256Hex(canonManifest.text)}`;
   } catch {
-    // run-identity.md §3: "Hash unavailable. If Web Crypto is unavailable or fails,
-    // return identity-unavailable... There is no weaker fallback hash."
+    // Hash unavailable: if Web Crypto is unavailable or fails, report
+    // identity-unavailable. There is deliberately no weaker fallback hash.
     return { status: 'identity-unavailable' };
   }
 

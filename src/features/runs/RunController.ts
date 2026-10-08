@@ -1,7 +1,7 @@
 /**
- * Main-thread Run Controller (RV-12c4).
+ * Main-thread Run Controller.
  *
- * Implements specs/revamp/contracts/model-and-runner.md §8 & storage.md §5:
+ * Behaviour:
  * - constructor takes { repository, mintId, transport, projectId-agnostic }.
  * - run({ projectId, branchId, snapshotId, document, scenarioId }) and runAll.
  * - Mints unforgeable start token (mintRunStartToken bound to
@@ -13,9 +13,8 @@
  * - Stale run IDs ignored.
  * - Reactive state via subscribe / getState.
  *
- * CONTRACT INVARIANT D25:
- * The caller guarantees that configuration drafts are clean before calling run() or runAll().
- * Run is disabled while a configuration draft is dirty per D25 / commands.md §6.
+ * Invariant: the caller guarantees that configuration drafts are clean before calling run() or runAll();
+ * Run is disabled while a configuration draft is dirty.
  * RunController itself does not inspect or validate editor draft state.
  */
 
@@ -81,14 +80,13 @@ export type RunControllerState = {
   readonly current: CurrentRunState | null;
   readonly issues: readonly PrepareIssue[];
   /**
-   * RV-12d review round 1: the bounded trace-event buffer the controller
-   * already keeps internally (buffered within trace caps, per storage.md §6),
-   * now surfaced read-only for the results UI's event log. Cleared when a new
+   * The bounded trace-event buffer the controller keeps (buffered within the
+   * trace caps), surfaced read-only for the results UI's event log. Cleared when a new
    * run starts and on reset(); never mutated in place (each update replaces
    * the array so consumers can rely on reference identity for change checks).
    */
   readonly events: readonly TraceEvent[];
-  /** D55: Stop was pressed and the run is draining (stops arrivals, lets work in flight finish). */
+  /** Stop was pressed and the run is draining (stops arrivals, lets work in flight finish). */
   readonly stopping: boolean;
 };
 
@@ -108,7 +106,7 @@ export type RunAllParams = {
   readonly scenarioIds: readonly Id[];
 };
 
-/** D57: the timer the playhead runs on; tests inject a manual one. */
+/** The timer the playhead runs on; tests inject a manual one. */
 export type PlaybackClock = {
   readonly now: () => number;
   readonly schedule: (run: () => void, ms: number) => unknown;
@@ -121,9 +119,9 @@ const REAL_CLOCK: PlaybackClock = {
   cancel: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 };
 
-/** D57: the worker is told where the playhead is when it has moved this far (simulated ms). */
+/** The worker is told where the playhead is when it has moved this far (simulated ms). */
 const PLAYHEAD_REPORT_MS = 250;
-/** D57: how often the playhead moves (real ms). */
+/** How often the playhead moves (real ms). */
 const TICK_MS = 16;
 
 export interface RunControllerOptions {
@@ -244,7 +242,7 @@ export class RunController {
 
   /**
    * Runs a single scenario.
-   * D25: Caller guarantees the draft is clean before calling run().
+   * Caller guarantees the draft is clean before calling run().
    */
   async run(params: RunParams): Promise<TerminalResult | null> {
     this.runAllQueue = [];
@@ -256,7 +254,7 @@ export class RunController {
   /**
    * Runs multiple scenarios in document order.
    * A failing scenario doesn't stop the rest; pause/reset act on the whole sequence.
-   * D25: Caller guarantees the draft is clean before calling runAll().
+   * Caller guarantees the draft is clean before calling runAll().
    */
   async runAll(params: RunAllParams): Promise<void> {
     const { document, scenarioIds } = params;
@@ -292,7 +290,7 @@ export class RunController {
   }
 
   /**
-   * D57: how fast the playhead moves for the runs this controller starts, in simulated seconds per real second
+   * How fast the playhead moves for the runs this controller starts, in simulated seconds per real second
    * (1 = real time). Only the seven supported finite speeds are accepted.
    */
   setPlaybackSpeed(speed: number): void {
@@ -342,7 +340,7 @@ export class RunController {
     this.setState({});
   }
 
-  /** D57: the current run's recording and playhead (timed runs), or null. */
+  /** The current run's recording and playhead (timed runs), or null. */
   getPlayback(): PlaybackStore | null {
     return this.playback;
   }
@@ -677,7 +675,7 @@ export class RunController {
   }
 
   private handleRunUpdate(update: RunUpdateMessage['message']): void {
-    // Stale run IDs ignored (§8)
+    // Updates for stale run IDs are ignored
     if (!this.activeRunId || update.runId !== this.activeRunId) {
       return;
     }
@@ -693,10 +691,10 @@ export class RunController {
       }
 
       case 'batch': {
-        // Buffer batches within trace caps (storage.md §6)
+        // Buffer batches within the trace caps
         const cap = RUN_BUDGET_LIMITS.maxTraceRows.max;
         if (this.playback) {
-          // D57: the worker is ahead of the playhead, so events wait until the playhead reaches them.
+          // The worker is ahead of the playhead, so events wait until the playhead reaches them.
           const room = Math.max(0, cap - this.bufferedEvents.length - (this.heldEvents.length - this.heldEventIndex));
           this.heldEvents.push(...update.events.slice(0, room));
           for (const e of update.events) if (e.atMs !== null) this.playback.setComputedEdge(e.atMs);
@@ -745,7 +743,7 @@ export class RunController {
       case 'terminal': {
         if (this.state.current?.terminal || this.pendingTerminal) break;
         if (this.playback && update.measured) {
-          // D57: the run has finished computing, but the playhead may be far behind. Keep the result until it arrives.
+          // The run has finished computing, but the playhead may be far behind. Keep the result until it arrives.
           this.playback.setEnded(Math.max(this.playback.computedMs, update.summary.elapsedMs ?? 0));
           if (!this.playback.following) this.playback.playing = false;
           this.pendingTerminal = update;
@@ -764,7 +762,7 @@ export class RunController {
   }
 
   // ==========================================================================
-  // Playback (D57)
+  // Playback
   // ==========================================================================
 
   private beginPlayback(document: Document, workloads: Scenario['workloads']): void {

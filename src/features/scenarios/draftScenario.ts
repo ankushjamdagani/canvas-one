@@ -1,10 +1,8 @@
 /**
- * DraftScenario: the in-progress, possibly-incomplete editing shape (review round,
- * RV-05c).
+ * DraftScenario: the in-progress, possibly-incomplete editing shape.
  *
- * commands.md §4 "Empty drafts invent nothing": "the only prefilled values are the
- * contracted budget defaults (storage.md §6) and a seed drawn at random when the draft
- * opens." Every other value the stored `Scenario` record requires must be entered by
+ * Empty drafts invent nothing: the only prefilled values are the default budgets and a
+ * seed drawn at random when the draft opens. Every other value the stored `Scenario` record requires must be entered by
  * the user before Apply.
  *
  * Three stored fields can't hold "not yet chosen" while still typing as their stored
@@ -12,12 +10,10 @@
  * state -- never the stored `Scenario` type (draft.ts converts back with
  * `toStorableScenario`, which returns null while anything is unset, and Apply is
  * blocked whenever it does):
- * - each workload's `emission` (D56: bulk or stream, with the values that mode needs).
- * - each workload request class's `keyDistribution` (model-and-runner.md §6 Workloads:
- *   `RequestClass.keyDistribution` is a required, always-present object regardless of
+ * - each workload's `emission` (bulk or stream, with the values that mode needs).
+ * - each workload request class's `keyDistribution`: `RequestClass.keyDistribution` is a required, always-present object regardless of
  *   `kind`, per `src/domain/studio/validate.ts`'s `validateRequestClass`).
- * - each `output`/`context` assertion subject's `path` (model-and-runner.md §6
- *   Assertions: `output`/`context` subjects carry a required `Path`; `[]` -- "the whole
+ * - each `output`/`context` assertion subject's `path`: `output`/`context` subjects carry a required `Path`; `[]` -- "the whole
  *   value" -- is a legitimate value, but only once the user has explicitly picked it).
  *
  * Every other DraftScenario field is identical to `Scenario` and is never partially
@@ -74,8 +70,8 @@ export type DraftRequestClass = Omit<RequestClass, 'keyDistribution'> & {
 };
 
 /**
- * D50: burst and ramp fields start unset when the author picks the shape; Apply is blocked
- * until they're typed (commands.md §4 "Empty drafts invent nothing").
+ * Burst and ramp fields start unset when the author picks the shape; Apply is blocked
+ * until they're typed.
  */
 export type DraftWorkloadProfile =
   | { readonly kind: 'steady' }
@@ -91,14 +87,14 @@ function draftProfileToStorable(p: DraftWorkloadProfile): WorkloadProfile | null
   return { kind: 'steady' };
 }
 
-/** D56: how a bulk's requests spread; each value stays individually nullable until typed. */
+/** How a bulk's requests spread; each value stays individually nullable until typed. */
 export type DraftBulkArrival =
   | 'instant'
   | { readonly spreadMs: number | null }
   | { readonly ramp: { readonly spreadMs: number | null } };
 
 /**
- * D56: `mode: null` = nothing chosen yet. Once bulk or stream is picked, its own values stay
+ * `mode: null` = nothing chosen yet. Once bulk or stream is picked, its own values stay
  * individually nullable so partial entry isn't lost on every keystroke elsewhere in the form.
  */
 export type DraftEmission =

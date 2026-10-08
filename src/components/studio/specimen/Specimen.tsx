@@ -294,10 +294,10 @@ export function Specimen() {
           </div>
         </div>
 
-        {/* Node Kinds (D35 Decision) */}
+        {/* Node Kinds */}
         <div className="space-y-3">
           <h3 className="font-mono text-[10px] tracking-wider text-muted-foreground">
-            Node Kinds · D35 Decision Stripes
+            Node kinds · decision stripes
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
             {Object.entries(nodeKindColor).map(([layer, hex]) => (

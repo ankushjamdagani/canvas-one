@@ -1,8 +1,6 @@
 /**
- * Pure projection and change builder for System Studio canvas (RV-12c2).
- *
- * Implements specs/revamp/contracts/model-and-runner.md §2 (Document, View, Placement, Group, Note)
- * and specs/revamp/contracts/commands.md §4 (model.apply-records).
+ * Pure projection and change builder for the studio canvas: maps a Document's active View (placements, groups,
+ * notes) to canvas nodes and edges, and builds model.apply-records changes.
  */
 
 import type {
@@ -33,11 +31,9 @@ export type CatalogLayer =
 /**
  * Maps a visualKind to its system catalog layer.
  *
- * D35 covers the original six layers; D42 (catalog.md "Approved resolutions"
- * 1-2) extends it: state-machine, data-pipeline and host each get their own
- * dedicated stripe group; thirdparty moves to Edge; custom gets no stripe at
- * all (falls through to null, catalog.md "custom has no stripe, library group
- * 'Other'").
+ * State-machine, data-pipeline and host each get their own stripe group;
+ * thirdparty belongs to Edge; custom gets no stripe at all (falls through to
+ * null).
  */
 export function getCatalogLayer(visualKind: string): CatalogLayer | null {
   switch (visualKind) {
@@ -51,7 +47,7 @@ export function getCatalogLayer(visualKind: string): CatalogLayer | null {
     case 'firewall':
     case 'gateway':
     case 'balancer':
-    case 'thirdparty': // D42 item 2: thirdparty -> Edge
+    case 'thirdparty': // thirdparty -> Edge
       return 'edge';
     case 'service':
     case 'function':
@@ -75,13 +71,13 @@ export function getCatalogLayer(visualKind: string): CatalogLayer | null {
     case 'analytics':
     case 'secrets':
       return 'operations';
-    case 'state-machine': // D42 item 1: own indigo stripe group
+    case 'state-machine': // own indigo stripe group
       return 'state-machine';
-    case 'data-pipeline': // D42 item 1: own umber stripe group
+    case 'data-pipeline': // own umber stripe group
       return 'data-pipeline';
-    case 'host': // D42 item 1: own charcoal stripe group
+    case 'host': // own charcoal stripe group
       return 'host';
-    case 'custom': // D42 item 2: no stripe
+    case 'custom': // no stripe
     default:
       return null;
   }
@@ -123,19 +119,18 @@ export type ProjectedNodeData =
       readonly layer: CatalogLayer | null;
       readonly stripeColor: string | null;
       /**
-       * RV-12e: ports render as connectable handles only while the Connect
-       * tool/gesture is active (commands.md §4, "Handles become interactive
-       * only in Connect mode/drag"). Not part of the pure projection itself --
+       * Ports render as connectable handles only while the Connect
+       * tool/gesture is active. Not part of the pure projection itself --
        * CanvasView sets this per current dragMode, so projectDocumentToCanvas
        * stays a pure function of Document + activeViewId.
        */
       readonly connectable?: boolean;
-      /** While a scenario is being edited: a workload enters here (board "TRAFFIC ENTERS HERE"). Set by CanvasView. */
+      /** While a scenario is being edited: a workload enters here ("TRAFFIC ENTERS HERE" tag). Set by CanvasView. */
       readonly trafficEntry?: boolean;
       /** Directly toggles port summary expansion on the node card itself. */
       readonly onToggleExpanded?: () => void;
       /**
-       * D52, set by CanvasView on linked-project elements: the linked project's live details, or
+       * Set by CanvasView on linked-project elements: the linked project's live details, or
        * `unavailable` when it no longer exists. Not part of the projection.
        */
       readonly linked?: LinkedProjectView;
@@ -147,7 +142,7 @@ export type ProjectedNodeData =
       readonly label: string;
       readonly width: number;
       readonly height: number;
-      /** RV-04g: collapsed groups render as one compact node (Group.collapsed). */
+      /** Collapsed groups render as one compact node (Group.collapsed). */
       readonly collapsed: boolean;
       readonly memberCount: number;
       /**
@@ -205,7 +200,7 @@ export type ProjectedEdge = {
     readonly connection: Connection;
     readonly kind: 'call' | 'message' | 'data';
     /**
-     * RV-04g: a visual-only edge standing in for connections whose endpoint is
+     * A visual-only edge standing in for connections whose endpoint is
      * a collapsed group's hidden member. `connection` is the first one; the
      * edge is not a selectable/editable connection.
      */
@@ -231,7 +226,7 @@ export type ProjectionResult = {
 
 /**
  * Placements persist their width but not their height. Group bounds and the
- * selection geometry planners (commands.md §4 bounding-box alignment) use the
+ * selection geometry planners (bounding-box alignment) use the
  * canvas's measured card heights when available, and this rendered-card
  * estimate for cards that haven't been measured yet.
  */
@@ -244,7 +239,7 @@ export function placementHeight(placement: Placement, heights?: MeasuredHeights)
   return heights?.get(placement.id) ?? ESTIMATED_ELEMENT_NODE_HEIGHT;
 }
 const GROUP_PADDING = 24;
-/** Compact boundary node a collapsed group renders as (RV-04g). */
+/** Compact boundary node a collapsed group renders as. */
 const COLLAPSED_GROUP_WIDTH = 184;
 const COLLAPSED_GROUP_HEIGHT = 44;
 const BOUNDARY_FRAME_PADDING = 24;
@@ -338,7 +333,7 @@ export function projectDocumentToCanvas(
   }
 
   // Members of collapsed groups are hidden and their edges reroute to the
-  // group node (RV-04g, presentation only).
+  // group node (presentation only).
   const collapsedGroupByElementId = new Map<Id, Group>();
   for (const group of activeView.groups) {
     if (!group.collapsed) continue;

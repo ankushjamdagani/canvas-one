@@ -247,7 +247,7 @@ describe('kernel fault support', () => {
     // (1000ms service time, failureRate 100%) and schedules a retry for t=1+1.5=2.5s.
     // Outage covers [2.0, 3.0]s, so the retry's re-admission at t=2.5s lands mid-outage:
     // it must NOT be proactively failed at outage time (t=2.0), and must be rejected as
-    // unavailable (not failed) when its timer actually fires (§6 Faults).
+    // unavailable (not failed) when its timer actually fires.
     const facts: SimLifecycleFact[] = [];
     const graph = makeRetryableGraph();
     const sim = new OpenSimulation(graph, {

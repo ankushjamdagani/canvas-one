@@ -1,9 +1,5 @@
 /**
- * CSV v1 Run Metrics Exporter (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("CSV v1")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
+ * CSV v1 Run Metrics Exporter.
  *
  * Rules:
  * - Export one explicitly selected immutable saved run, not mutable editor state
@@ -193,7 +189,7 @@ export function exportRunCsv(options: CsvExportOptions): CsvExportResult {
 
   const summary = run.summary;
 
-  // Resolve scenario_id via real ExecutionManifest shape (run-identity.md §3)
+  // Resolve scenario_id via real ExecutionManifest shape
   if (!hasManifestScenarioId(run.manifest)) {
     throw new MalformedRunError(
       'Malformed run: manifest is missing required scenario.id',

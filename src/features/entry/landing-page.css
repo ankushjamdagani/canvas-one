@@ -202,8 +202,10 @@
   gap: 12px;
 }
 .lp-command {
+  display: inline-flex;
+  align-items: center;
   height: 44px;
-  padding: 0 16px;
+  padding: 0 10px 0 16px;
   background: var(--background);
   border-color: var(--hairline);
   border-radius: 7px;
@@ -215,10 +217,16 @@
 .lp-command > span {
   color: var(--text-placeholder);
 }
-.lp-command svg {
-  width: 14px;
-  height: 14px;
-  color: var(--landing-muted);
+.lp-command code {
+  font: inherit;
+  user-select: text;
+}
+.lp-soon {
+  margin-left: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .lp-actions [role="alert"] {
   width: 100%;

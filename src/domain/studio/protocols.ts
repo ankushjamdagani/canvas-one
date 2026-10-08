@@ -1,5 +1,5 @@
 /**
- * Connection protocols (D53, specs/revamp/connection-protocols.md).
+ * Connection protocols.
  *
  * A protocol is a label on a port; the runner ignores it. Every connectable port carries one
  * (`Port.protocol`; null on `event` ports); `defaultProtocol` only seeds new ports.

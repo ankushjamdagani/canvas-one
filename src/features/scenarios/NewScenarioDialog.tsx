@@ -1,11 +1,10 @@
 /**
- * New scenario dialog (RV-05c).
+ * New scenario dialog.
  *
- * Implements specs/revamp/contracts/commands.md §4 scenario.new payload
+ * Produces the scenario.new payload
  * `{mode:'timed'|'logical', from:{kind:'empty'}|{kind:'copy',scenarioId}, label}`.
- * Screen: scenario_new_scenario.png.
  *
- * commands.md §4: "mode must equal the copied scenario's mode" -- when a copy source is
+ * The mode must equal the copied scenario's mode, so when a copy source is
  * selected the mode radios lock to that source's mode (Duplicate uses this dialog's copy
  * path with a preselected, undismissable source -- see ScenarioSwitcher.tsx).
  */

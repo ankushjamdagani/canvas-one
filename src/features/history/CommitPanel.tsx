@@ -1,13 +1,7 @@
 /**
- * CommitPanel React component (RV-11a).
- *
- * Implements specifications from:
- * - specs/revamp/screens/scenario_commit_gate.png (approved D41 version)
- * - specs/revamp/screens/22B_save_checkpoint.png (structure reference)
- * - specs/revamp/decisions.md (D20, D27, D28, D40, D41)
- * - specs/revamp/design-revalidation.md (§2 exclusions: NO "no run" commits, NO "suggested from your edits" text)
- * - specs/revamp/contracts/commands.md ("Scenarios (D41)" Status + Commit panel)
- * - specs/revamp/contracts/run-identity.md §5
+ * CommitPanel: the commit gate for a draft branch. Lists the changes since the last commit,
+ * the scenario evidence that qualifies it, and takes the commit message. Committing is gated
+ * on every scenario passing on this version.
  */
 
 import * as React from 'react';
@@ -161,7 +155,7 @@ export function CommitPanel({
   };
 
   const commitDisabledReason = React.useMemo(() => {
-    if (isMain) return 'Main never holds edits (D40): edit main directly to create a draft';
+    if (isMain) return 'Main never holds edits: edit main directly to create a draft';
     if (totalScenarios === 0) return 'Add a scenario to run before committing';
     if (!allScenariosPass) return `Commit unlocks when all ${totalScenarios} scenarios pass.`;
     if (!isMessageValid) return 'Commit message is required (1-4000 characters).';

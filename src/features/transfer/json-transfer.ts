@@ -1,11 +1,6 @@
 /**
- * Portable JSON Export and Import flows (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("JSON, images and files")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
- * - specs/revamp/contracts/storage.md (§4 portable bundle, §5 repository API, §6 ceilings)
- * - specs/revamp/decisions.md (D19: old format-7/8 dropped with clear message)
+ * Portable JSON export and import flows. Export is deterministic (byte-identical for the same project);
+ * import checks the file size before reading it and rejects unsupported or corrupted bundles.
  */
 
 import { TRANSFER_LIMITS, validatePortableBundle } from '../../persistence/studio/bundle-validate';
@@ -157,7 +152,7 @@ export async function importProjectJson(
     };
   }
 
-  // 1. Byte cap check BEFORE reading into memory (storage.md §6 / Transfer 64 MiB cap)
+  // 1. Byte cap check BEFORE reading into memory (64 MiB transfer cap)
   if (file && typeof (file as Blob).size === 'number') {
     const size = (file as Blob).size;
     if (size > TRANSFER_LIMITS.maxFileBytes) {
@@ -221,7 +216,7 @@ export async function importProjectJson(
   const validation = await validatePortableBundle(bytes);
   if (!validation.ok) {
     if (validation.kind === 'unsupported-version') {
-      // D19: formats 7/8 say clearly "made with the old app, not supported"
+      // Formats 7/8 say clearly "made with the old app, not supported"
       let isOldApp = false;
       try {
         const preview = new TextDecoder('utf-8').decode(bytes.slice(0, 512));

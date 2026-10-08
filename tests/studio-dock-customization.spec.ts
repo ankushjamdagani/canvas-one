@@ -65,12 +65,12 @@ test('narrow dock keeps primary tools and puts the rest in touch sized overflow'
   await expect(page.locator('.note-card', { hasText: 'Mobile note' })).toBeVisible();
 });
 
-test('16B more popover lists all non-sticky options with pin buttons and toggleable actions', async ({ page }) => {
+test('more popover lists all non-sticky options with pin buttons and toggleable actions', async ({ page }) => {
   await page.goto('/projects');
   await page.getByTestId('create-example-s05').click();
   const dock = page.getByTestId('canvas-floating-dock');
 
-  // Open 16B more popover
+  // Open the more popover
   await dock.getByTestId('dock-more-btn').click();
   const popover = page.getByTestId('dock-more-popover');
   await expect(popover).toBeVisible();

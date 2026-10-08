@@ -25,7 +25,7 @@ test('S01 source popover selects scenarios; Run and existing Run all save real r
   expect(await savedRunCount(page)).toBe(4);
 });
 
-test('S04 existing Run all saves every scenario without restoring legacy results UI', async ({ page }) => {
+test('S04 existing Run all saves every scenario without restoring the old results UI', async ({ page }) => {
   await page.goto('/projects');
   await page.getByTestId('create-example-s04').click();
   await runAll(page);

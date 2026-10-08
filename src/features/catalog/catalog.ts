@@ -1,10 +1,6 @@
 /**
- * Standard Component Catalog (RV-06a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/catalog.md (All sections, approved resolutions 1–12)
- * - specs/revamp/decisions.md (D35, D42)
- * - specs/revamp/contracts/model-and-runner.md (§1–§5)
+ * Standard component catalog: the entries the Library offers, their ports, stripe colours,
+ * default behaviour configs and display copy.
  */
 
 import type { BehaviorKind, VisualKind } from '../../domain/studio/model';
@@ -37,7 +33,7 @@ export type CatalogEntry = {
   readonly entryId: string;
   readonly label: string;
   readonly group: CatalogGroup;
-  readonly category: CatalogGroup; // alias for group per catalog.md §1
+  readonly category: CatalogGroup; // alias for group
   readonly visualKind: VisualKind;
   readonly behaviorKind: BehaviorKind | 'none';
   readonly ports: readonly CatalogPort[];
@@ -52,7 +48,7 @@ export type CatalogEntry = {
 };
 
 // ============================================================================
-// D35 + D42 Stripe Colors
+// Stripe Colors
 // ============================================================================
 
 export const GROUP_STRIPE_COLORS: Record<CatalogGroup, string | null> = {
@@ -90,17 +86,17 @@ export function groupOf(entry: CatalogEntry): CatalogGroup {
 // Shared Default Configurations
 // ============================================================================
 
-// D49 (realism audit): exponential service time by default; slot pools sized like real
+// Exponential service time by default; slot pools sized like real
 // thread and connection pools; brokers retain 10,000 messages; caches use LRU so hot keys
 // matter; storage writes cost more than reads.
 const BASE_RESOURCE_DEFAULTS = {
-  capacity: 2000, // assumption (catalog.md)
-  concurrency: 64, // assumption (catalog.md, D49): a typical request thread/worker pool
-  queueLimit: 500, // assumption (catalog.md)
-  failureRate: 0, // assumption (catalog.md)
-  maxRetries: 0, // assumption (catalog.md)
-  retryDelayMs: 100, // assumption (catalog.md)
-  serviceTime: 'exponential' as const, // assumption (catalog.md, D49)
+  capacity: 2000, // assumption
+  concurrency: 64, // assumption: a typical request thread/worker pool
+  queueLimit: 500, // assumption
+  failureRate: 0, // assumption
+  maxRetries: 0, // assumption
+  retryDelayMs: 100, // assumption
+  serviceTime: 'exponential' as const, // assumption
 } as const;
 
 const PROCESSOR_CONFIG = {
@@ -108,19 +104,19 @@ const PROCESSOR_CONFIG = {
   type: 'processor' as const,
 };
 
-/** D52: fixed black-box behavior for linked-project nodes; read-only in the inspector. */
+/** Fixed black-box behavior for linked-project nodes; read-only in the inspector. */
 export const LINKED_PROJECT_CONFIG = {
   ...PROCESSOR_CONFIG,
 } as const;
 
 const CACHE_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
-  capacity: 5000, // assumption (catalog.md)
+  capacity: 5000, // assumption
   type: 'cache' as const,
-  mode: 'lru' as const, // assumption (catalog.md, D49)
-  hitRate: 80, // assumption (catalog.md); used in fixed mode
-  entries: 1000, // assumption (catalog.md, D49)
-  ttlMs: 60000, // assumption (catalog.md, D49)
+  mode: 'lru' as const, // assumption
+  hitRate: 80, // assumption; used in fixed mode
+  entries: 1000, // assumption
+  ttlMs: 60000, // assumption
 };
 
 const ROUTER_CONFIG = {
@@ -131,39 +127,39 @@ const ROUTER_CONFIG = {
 
 const STORAGE_DATABASE_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
-  capacity: 500, // assumption (catalog.md): 2 ms per read
-  concurrency: 10, // assumption (catalog.md, D49): connection pool
+  capacity: 500, // assumption: 2 ms per read
+  concurrency: 10, // assumption: connection pool
   type: 'storage' as const,
-  writeCapacity: 200, // assumption (catalog.md, D49): 5 ms per write
+  writeCapacity: 200, // assumption: 5 ms per write
 };
 
 const STORAGE_DEFAULT_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
-  concurrency: 16, // assumption (catalog.md, D49)
+  concurrency: 16, // assumption
   type: 'storage' as const,
-  writeCapacity: 1000, // assumption (catalog.md, D49)
+  writeCapacity: 1000, // assumption
 };
 
 const STORAGE_SEARCH_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
-  capacity: 1000, // assumption (catalog.md, D49): 1 ms per query
-  concurrency: 8, // assumption (catalog.md, D49)
+  capacity: 1000, // assumption: 1 ms per query
+  concurrency: 8, // assumption
   type: 'storage' as const,
-  writeCapacity: 100, // assumption (catalog.md, D49): indexing costs 10 ms
+  writeCapacity: 100, // assumption: indexing costs 10 ms
 };
 
 const STORAGE_WAREHOUSE_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
-  capacity: 2, // assumption (catalog.md, D49): 500 ms analytical query
-  concurrency: 4, // assumption (catalog.md, D49)
-  queueLimit: 100, // assumption (catalog.md, D49)
+  capacity: 2, // assumption: 500 ms analytical query
+  concurrency: 4, // assumption
+  queueLimit: 100, // assumption
   type: 'storage' as const,
-  writeCapacity: 1, // assumption (catalog.md, D49): 1 s load batch
+  writeCapacity: 1, // assumption: 1 s load batch
 };
 
 const BROKER_BASE = {
   ...BASE_RESOURCE_DEFAULTS,
-  queueLimit: 10000, // assumption (catalog.md, D49): retained messages
+  queueLimit: 10000, // assumption: retained messages
 };
 
 const BROKER_COMPETING_CONFIG = {
@@ -180,10 +176,10 @@ const BROKER_BROADCAST_CONFIG = {
 
 const WORKER_CONFIG = {
   ...BASE_RESOURCE_DEFAULTS,
-  capacity: 100, // assumption (catalog.md)
-  concurrency: 2, // assumption (catalog.md)
-  queueLimit: 0, // assumption (catalog.md)
-  maxRetries: 2, // assumption (catalog.md)
+  capacity: 100, // assumption
+  concurrency: 2, // assumption
+  queueLimit: 0, // assumption
+  maxRetries: 2, // assumption
   type: 'processor' as const,
 };
 
@@ -271,7 +267,7 @@ const DATA_IN_PORT: readonly CatalogPort[] = [
 
 export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
   // --------------------------------------------------------------------------
-  // Clients (D42 resolution 12: diagram labels only — unmodeled, "Not simulated")
+  // Clients (diagram labels only: unmodeled, "Not simulated")
   // --------------------------------------------------------------------------
   {
     entryId: 'traffic',
@@ -342,7 +338,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     behaviorKind: 'unmodeled',
     ports: CALL_IN_PORT,
     defaultConfig: null,
-    models: 'A name-resolution service, shown for completeness. Clients cache lookups, so DNS is not on the per-request path (D49)',
+    models: 'A name-resolution service, shown for completeness. Clients cache lookups, so DNS is not on the per-request path',
     doesNotModel: 'Resolution time, propagation, anycast, record types',
     tags: ['not simulated'],
     caption: { line1: 'DNS', line2template: 'Not simulated' },
@@ -404,7 +400,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     caption: { line1: 'Load Balancer', line2template: 'router · round-robin' },
   },
   {
-    // D42 resolution 2: thirdparty -> Edge (teal stripe)
+    // thirdparty -> Edge (teal stripe)
     entryId: 'thirdparty',
     label: 'Third-Party Service',
     group: 'Edge',
@@ -471,7 +467,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     category: 'Compute',
     visualKind: 'worker',
     behaviorKind: 'resource',
-    ports: CALL_IN_PORT, // terminal, no out port by default (§2/§4)
+    ports: CALL_IN_PORT, // terminal, no out port by default
     defaultConfig: WORKER_CONFIG,
     models: 'A background/queue-consuming processor that returns its response via bridge settlement rather than an outbound edge',
     doesNotModel: 'Job frameworks, real concurrency primitives',
@@ -479,7 +475,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     caption: { line1: 'Worker', line2template: 'processor · 100 /s cap' },
   },
   {
-    // D42 resolution 12: scheduler diagram label only — unmodeled, "Not simulated"
+    // scheduler diagram label only — unmodeled, "Not simulated"
     entryId: 'scheduler',
     label: 'Scheduler',
     group: 'Compute',
@@ -608,7 +604,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     behaviorKind: 'resource',
     ports: MESSAGE_BROKER_PORTS,
     defaultConfig: BROKER_BROADCAST_CONFIG,
-    models: 'A stream/log: every consumer route gets every event, like one consumer group per route (D49)',
+    models: 'A stream/log: every consumer route gets every event, like one consumer group per route',
     doesNotModel: 'Partitioning, offsets, replay, competing consumers within a group, ordering guarantees beyond FIFO',
     tags: ['broker', 'broadcast'],
     caption: { line1: 'Event Stream', line2template: 'broker · broadcast' },
@@ -622,13 +618,13 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     behaviorKind: 'resource',
     ports: MESSAGE_BROKER_PORTS,
     defaultConfig: BROKER_BROADCAST_CONFIG,
-    models: 'A fan-out broker: every consumer route gets its own message root (D36)',
+    models: 'A fan-out broker: every consumer route gets its own message root',
     doesNotModel: 'Real pub/sub protocol guarantees, subscription filters',
     tags: ['broker', 'broadcast'],
     caption: { line1: 'Pub/Sub Topic', line2template: 'broker · broadcast' },
   },
   {
-    // D42 resolution 7: email unmodeled "Not simulated"
+    // email unmodeled "Not simulated"
     entryId: 'email',
     label: 'Email Delivery',
     group: 'Messaging',
@@ -647,7 +643,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
   // Operations
   // --------------------------------------------------------------------------
   {
-    // D42 resolution 7: monitoring unmodeled "Not simulated"
+    // monitoring unmodeled "Not simulated"
     entryId: 'monitoring',
     label: 'Monitoring Sink',
     group: 'Operations',
@@ -657,12 +653,12 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     ports: DATA_IN_PORT,
     defaultConfig: null,
     models: 'A labelled observability sink for diagramming',
-    doesNotModel: 'Metrics collection, alerting, dashboards (D16: no engine change for a visual)',
+    doesNotModel: 'Metrics collection, alerting, dashboards (a visual only; the engine is unchanged)',
     tags: ['not simulated'],
     caption: { line1: 'Monitoring Sink', line2template: 'Not simulated' },
   },
   {
-    // D42 resolution 7: analytics unmodeled "Not simulated"
+    // analytics unmodeled "Not simulated"
     entryId: 'analytics',
     label: 'Analytics Ingestion',
     group: 'Operations',
@@ -677,7 +673,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     caption: { line1: 'Analytics Ingestion', line2template: 'Not simulated' },
   },
   {
-    // D42 resolution 7: secrets unmodeled "Not simulated"
+    // secrets unmodeled "Not simulated"
     entryId: 'secrets',
     label: 'Secrets Manager',
     group: 'Operations',
@@ -693,10 +689,10 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
   },
 
   // --------------------------------------------------------------------------
-  // Dedicated D42 Groups: State Machine, Data Pipeline, Host
+  // Dedicated groups: State Machine, Data Pipeline, Host
   // --------------------------------------------------------------------------
   {
-    // D42 resolution 1: own indigo stripe group
+    // own indigo stripe group
     entryId: 'state-machine',
     label: 'State Machine',
     group: 'State Machine',
@@ -719,7 +715,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     caption: { line1: 'State Machine', line2template: 'state machine · 0 states' },
   },
   {
-    // D42 resolution 1: own umber stripe group
+    // own umber stripe group
     entryId: 'data-pipeline',
     label: 'Data Pipeline',
     group: 'Data Pipeline',
@@ -756,7 +752,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     caption: { line1: 'Data Pipeline', line2template: 'data pipeline · 0 steps' },
   },
   {
-    // D42 resolution 1: own charcoal stripe group
+    // own charcoal stripe group
     entryId: 'host',
     label: 'Host Infrastructure',
     group: 'Host',
@@ -772,7 +768,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
   },
 
   // --------------------------------------------------------------------------
-  // Other (D42 resolution 2: custom -> no stripe, library group "Other")
+  // Other (custom -> no stripe, library group "Other")
   // --------------------------------------------------------------------------
   {
     entryId: 'custom',
@@ -788,7 +784,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     tags: ['custom'],
     caption: { line1: 'Custom Node', line2template: 'Not simulated' },
   },
-  // D52: instantiated from a project (see linked.ts), so the Library lists projects, not this entry.
+  // Instantiated from a project (see linked.ts), so the Library lists projects, not this entry.
   {
     entryId: 'linked-project',
     label: 'Linked project',
@@ -796,7 +792,7 @@ export const CATALOG_ENTRIES: readonly CatalogEntry[] = Object.freeze([
     category: 'Other',
     visualKind: 'linked-project',
     behaviorKind: 'resource',
-    ports: [], // D53: in-ports come from the linked project's exposed endpoints (see place.ts)
+    ports: [], // In-ports come from the linked project's exposed endpoints (see place.ts)
     defaultConfig: LINKED_PROJECT_CONFIG,
     models: 'Another project as a black box: a fixed service that answers calls',
     doesNotModel: "The other project's real behavior, latency or failures; its configuration cannot be changed from here",

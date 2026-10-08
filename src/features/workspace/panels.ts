@@ -1,10 +1,6 @@
 /**
  * Workspace panel reducer and geometry calculations.
  *
- * Implements System Studio revamp task RV-03a.
- * Governed by specs/revamp/contracts/commands.md §7 "Panels and geometry"
- * and specs/revamp/architecture.md §3.
- *
  * Domain logic is pure TypeScript: no React, no DOM, no Dexie/storage access.
  */
 
@@ -38,8 +34,8 @@ export interface FloatRect {
 }
 
 /**
- * Exact panel preference shape from specs/revamp/contracts/commands.md §7.
- * PanelPreference={open, placement:'left'|'right'|'floating', collapsed, floatRect:{x,y,width,height}, stackOrder}.
+ * Persisted per-panel preference: open, placement ('left' | 'right' | 'floating'),
+ * collapsed, floatRect and stackOrder.
  */
 export interface PanelPreference {
   open: boolean;
@@ -50,7 +46,7 @@ export interface PanelPreference {
 }
 
 /**
- * Shared side widths for left and right docking areas (§7).
+ * Shared side widths for left and right docking areas.
  */
 export interface SideWidths {
   left: number;
@@ -58,7 +54,7 @@ export interface SideWidths {
 }
 
 /**
- * Panels and sideWidths parts of studio-preferences/1 (§7).
+ * Panel and side-width parts of the persisted studio preferences.
  */
 export interface WorkspacePanelPreferences {
   panels: Record<PanelId, PanelPreference>;
@@ -92,7 +88,7 @@ export interface WorkspacePanelState {
   panels: Record<PanelId, PanelPreference>;
   sideWidths: SideWidths;
 
-  // Runtime-only state (§7)
+  // Runtime-only state
   focusedPanel: PanelId | null;
   lastFocusedSequence: Record<PanelId, number>;
   activeOverlay: PanelOverlayId | null;
@@ -104,7 +100,7 @@ export interface WorkspacePanelState {
 
 /**
  * Effect descriptors returned by the pure reducer.
- * §7: "The reducer is pure: it returns state plus effect descriptors (save, announce, focus), with no DOM or DB access."
+ * The reducer is pure: it returns state plus effect descriptors (save, announce, focus), with no DOM or storage access.
  */
 export type PanelEffect =
   | { type: 'save' }
@@ -135,7 +131,7 @@ export interface EffectiveLayout {
 }
 
 /**
- * Reducer events exactly as listed in specs/revamp/contracts/commands.md §7:
+ * Reducer events:
  * OPEN(panel), CLOSE(panel), FOCUS(panel), PLACE(panel,placement,index),
  * COLLAPSE(panel), EXPAND(panel), RESIZE_SIDE(side,width), RESET_SIDE(side),
  * RESIZE_FLOAT(panel,rect), VIEWPORT_CHANGED(width,height),
@@ -165,73 +161,73 @@ export type WorkspacePanelAction =
 export type WorkspacePanelEvent = WorkspacePanelAction;
 
 // ============================================================================
-// Exported Named Constants (specs/revamp/contracts/commands.md §7)
+// Exported Named Constants
 // ============================================================================
 
-/** §7 Breakpoints: Mobile tier < 768 px */
+/** Mobile tier < 768 px */
 export const BREAKPOINT_MOBILE = 768;
 
-/** §7 Breakpoints: Desktop tier >= 1200 px (Tablet is 768–1199 px) */
+/** Desktop tier >= 1200 px (Tablet is 768–1199 px) */
 export const BREAKPOINT_DESKTOP = 1200;
 
-/** §7 Side widths: default 320 px */
+/** default 320 px */
 export const DEFAULT_SIDE_WIDTH = 320;
 
-/** §7 Side widths: clamped 280–440 px minimum */
+/** clamped 280–440 px minimum */
 export const MIN_SIDE_WIDTH = 280;
 
-/** §7 Side widths: clamped 280–440 px maximum */
+/** clamped 280–440 px maximum */
 export const MAX_SIDE_WIDTH = 440;
 
-/** §7 Inspector fixed contextual region width: 320 px */
+/** 320 px */
 export const INSPECTOR_WIDTH = 320;
 
-/** §7 Canvas minimum width on desktop (>= 1200 px): 480 px */
+/** Canvas minimum width on desktop (>= 1200 px): 480 px */
 export const CANVAS_MIN_WIDTH_DESKTOP = 480;
 
-/** §7 Canvas minimum width on tablet (768–1199 px): 360 px */
+/** Canvas minimum width on tablet (768–1199 px): 360 px */
 export const CANVAS_MIN_WIDTH_TABLET = 360;
 
-/** §7 Activity rail width: 44 px */
+/** 44 px */
 export const RAIL_WIDTH = 44;
 
-/** §7 Collapsed rail width: 44 px */
+/** 44 px */
 export const COLLAPSED_RAIL_WIDTH = 44;
 
-/** §7 Gutters: 16 px */
+/** 16 px */
 export const GUTTER_WIDTH = 16;
 
-/** §7 Floating panel default width: 360 px */
+/** 360 px */
 export const DEFAULT_FLOAT_WIDTH = 360;
 
-/** §7 Floating panel default height: 480 px */
+/** 480 px */
 export const DEFAULT_FLOAT_HEIGHT = 480;
 
-/** §7 Floating panel minimum width: 280 px */
+/** 280 px */
 export const MIN_FLOAT_WIDTH = 280;
 
-/** §7 Floating panel minimum height: 240 px */
+/** 240 px */
 export const MIN_FLOAT_HEIGHT = 240;
 
-/** §7 Floating panel viewport margin: 16 px */
+/** 16 px */
 export const FLOAT_MARGIN = 16;
 
-/** §7 Topbar reservation on desktop: 54 px */
+/** 54 px */
 export const TOPBAR_HEIGHT_DESKTOP = 54;
 
-/** §7 Stacked panels: minimum expanded content: 160 px */
+/** minimum expanded content: 160 px */
 export const STACK_MIN_CONTENT_HEIGHT = 160;
 
-/** §7 Stacked panels: header height: 40 px */
+/** header height: 40 px */
 export const STACK_HEADER_HEIGHT = 40;
 
-/** §7 Stacked panels: total minimum expanded height (160 px content + 40 px header = 200 px) */
+/** total minimum expanded height (160 px content + 40 px header = 200 px) */
 export const STACK_MIN_EXPANDED_HEIGHT = STACK_MIN_CONTENT_HEIGHT + STACK_HEADER_HEIGHT;
 
-/** §7 Keyboard resize step: 10 px */
+/** 10 px */
 export const KEYBOARD_RESIZE_STEP = 10;
 
-/** §7 Keyboard resize fine step (Shift): 1 px */
+/** Keyboard resize fine step (Shift): 1 px */
 export const KEYBOARD_RESIZE_STEP_FINE = 1;
 
 // ============================================================================
@@ -255,7 +251,7 @@ export function clampSideWidth(width: number): number {
 /**
  * Computes effective side width in a given viewport, clamped between MIN_SIDE_WIDTH (280)
  * and MAX_SIDE_WIDTH (440), but also constrained to what fits in the viewport without
- * violating minimum canvas, rail, gutter, and inspector reservations (§7).
+ * violating minimum canvas, rail, gutter, and inspector reservations .
  */
 export function computeEffectiveSideWidth(
   side: 'left' | 'right',
@@ -292,7 +288,7 @@ export function computeEffectiveSideWidth(
 }
 
 /**
- * Clamps floating panel rect so header and close button stay inside bounds (§7).
+ * Clamps floating panel rect so header and close button stay inside bounds .
  */
 export function clampFloatRect(rect: FloatRect, viewport: Viewport): FloatRect {
   const maxW = Math.max(0, viewport.width - 2 * FLOAT_MARGIN);
@@ -313,7 +309,7 @@ export function clampFloatRect(rect: FloatRect, viewport: Viewport): FloatRect {
 }
 
 /**
- * Creates default float rectangle centered in viewport (§5, §7).
+ * Creates default float rectangle centered in viewport .
  */
 export function defaultFloatRect(viewport: Viewport): FloatRect {
   const w = DEFAULT_FLOAT_WIDTH;
@@ -407,20 +403,20 @@ export function createInitialPanelState(
 }
 
 // ============================================================================
-// Effective Layout Computation (§7)
+// Effective Layout Computation
 // ============================================================================
 
 /**
  * Pure function computing effective panel layout without mutating preferences.
- * Responsive overrides never overwrite desktop preferences (§7).
+ * Responsive overrides never overwrite desktop preferences .
  */
 export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
   const { viewport, panels, activeOverlay, focusedPanel, lastFocusedSequence } = state;
 
   // --------------------------------------------------------------------------
   // Tier 1: Mobile (< 768 px)
-  // §7: "One modal overlay at a time: a full-width sheet under the topbar,
-  // max remaining height. Inspector, Library, History and results replace one another"
+  // One modal overlay at a time: a full-width sheet under the topbar,
+  // max remaining height. Inspector, Library, History and results replace one another
   // --------------------------------------------------------------------------
   if (viewport.width < BREAKPOINT_MOBILE) {
     const inspector: InspectorMode = 'overlay';
@@ -462,9 +458,9 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
 
   // --------------------------------------------------------------------------
   // Tier 2: Tablet (768–1199 px)
-  // §7: "Auxiliary panels are single overlays. The inspector may take 320 px only
+  // Auxiliary panels are single overlays. The inspector may take 320 px only
   // if the canvas keeps ≥360 px (after the 44 px rail and 16 px gutters); otherwise
-  // it becomes an overlay too."
+  // it becomes an overlay too.
   // --------------------------------------------------------------------------
   if (viewport.width < BREAKPOINT_DESKTOP) {
     const remainingForCanvas = viewport.width - INSPECTOR_WIDTH - RAIL_WIDTH - GUTTER_WIDTH;
@@ -509,11 +505,11 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
 
   // --------------------------------------------------------------------------
   // Tier 3: Desktop (>= 1200 px)
-  // §7: "Docking and floating. Side widths default 320, clamped 280–440; inspector 320;
+  // Docking and floating. Side widths default 320, clamped 280–440; inspector 320;
   // canvas min 480; rail 44; gutters 16. If occupancy exceeds width, collapse the
   // least-recently-focused auxiliary panel (ties by panel ID) and repeat. The inspector
   // is kept; if it alone doesn't fit, it becomes an overlay. When width returns,
-  // restore the preferred state without stealing focus."
+  // restore the preferred state without stealing focus.
   // --------------------------------------------------------------------------
   const resultPanels = hiddenPanelModes();
 
@@ -601,11 +597,11 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
     resultPanels[toCollapse] = 'collapsed';
   }
 
-  // 4. Stacks vertical height check (§7):
-  // "Stacks: Library and History can stack on one side, sharing its width with an
+  // 4. Stacks vertical height check :
+  // Stacks: Library and History can stack on one side, sharing its width with an
   // equal initial split and accessible separators. The minimum expanded content is
   // 160 px plus a 40 px header; if both don't fit, show one expanded panel and the
-  // other as a collapsed header."
+  // other as a collapsed header.
   const checkSideStack = (side: 'left' | 'right') => {
     const sidePanels = activeDocked.filter((id) => panels[id].placement === side);
     const availableHeight = viewport.height - TOPBAR_HEIGHT_DESKTOP;
@@ -646,7 +642,7 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
 }
 
 // ============================================================================
-// Pure Reducer Implementation (§7)
+// Pure Reducer Implementation
 // ============================================================================
 
 function getNextSequence(seqs: Record<PanelId, number>): number {
@@ -724,8 +720,8 @@ export function panelReducer(
   switch (action.type) {
     // ------------------------------------------------------------------------
     // OPEN(panel)
-    // §5: "Open on an already-expanded, focused panel is a no-op; otherwise it
-    // expands and focuses the panel and never toggles it closed."
+    // Open on an already-expanded, focused panel is a no-op; otherwise it
+    // expands and focuses the panel and never toggles it closed.
     // ------------------------------------------------------------------------
     case 'OPEN':
       return expandAndFocus(state, action.panel, true);
@@ -801,8 +797,8 @@ export function panelReducer(
 
     // ------------------------------------------------------------------------
     // PLACE(panel, placement, index)
-    // §5: "Floating reuses a valid floatRect, otherwise 360×480 centered, then clamped;
-    // index is ignored when floating"
+    // Floating reuses a valid floatRect, otherwise 360×480 centered, then clamped;
+    // index is ignored when floating
     // ------------------------------------------------------------------------
     case 'PLACE': {
       const { panel, placement, index } = action;
@@ -912,7 +908,7 @@ export function panelReducer(
 
     // ------------------------------------------------------------------------
     // RESET_SIDE(side)
-    // §5: "Reset affects the shared side width when docked"
+    // Reset affects the shared side width when docked
     // ------------------------------------------------------------------------
     case 'RESET_SIDE': {
       const side = action.side;
@@ -969,10 +965,10 @@ export function panelReducer(
 
     // ------------------------------------------------------------------------
     // VIEWPORT_CHANGED(width, height)
-    // §7: "responsive overrides never overwrite desktop preferences"
-    // "When width returns, restore the preferred state without stealing focus."
-    // "auto-collapse emits an announce effect naming the panel and reason;
-    // restoring width does not emit a focus effect."
+    // responsive overrides never overwrite desktop preferences
+    // When width returns, restore the preferred state without stealing focus.
+    // auto-collapse emits an announce effect naming the panel and reason;
+    // restoring width does not emit a focus effect.
     // ------------------------------------------------------------------------
     case 'VIEWPORT_CHANGED': {
       const { width, height } = action;
@@ -1053,7 +1049,7 @@ export function panelReducer(
 
     // ------------------------------------------------------------------------
     // COMMIT_GESTURE
-    // Only COMMIT persists (§7).
+    // Only COMMIT persists .
     // ------------------------------------------------------------------------
     case 'COMMIT_GESTURE': {
       if (state.gesture === null) {
@@ -1080,7 +1076,7 @@ export function panelReducer(
 
     // ------------------------------------------------------------------------
     // CANCEL_GESTURE
-    // §7: "Escape and pointercancel restore the original state."
+    // Escape and pointercancel restore the original state.
     // Cancel restores exactly, with no save effect.
     // ------------------------------------------------------------------------
     case 'CANCEL_GESTURE': {
@@ -1112,7 +1108,7 @@ export function panelReducer(
 
 /**
  * Detects if any auxiliary panel transitioned into an auto-collapsed state
- * because available width or height was exceeded (§7).
+ * because available width or height was exceeded .
  */
 function detectAutoCollapseAnnounce(
   prevState: WorkspacePanelState,

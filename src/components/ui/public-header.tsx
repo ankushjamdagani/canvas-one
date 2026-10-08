@@ -22,7 +22,7 @@ export function PublicHeader({ page, collaborators, owner, className }: {
     <Reveal as="nav" kind="chrome" index={2} aria-label="Main navigation">
       {collaborators}
       <Button asChild variant="ghost" className="public-brand-link"><a href="/brand" aria-current={page === 'brand' ? 'page' : undefined}>Brand</a></Button>
-      {page !== 'projects' && <Button variant="ghost" className="public-github" disabled title="Repository link is not configured">GitHub</Button>}
+      {page !== 'projects' && <Button asChild variant="ghost" className="public-github"><a href="https://github.com/ankushjamdagani/canvas-one" target="_blank" rel="noreferrer">GitHub</a></Button>}
       {page !== 'projects' && <Button asChild variant="outline" className="public-header-action"><a href="/projects">Try Beta <ArrowRight /></a></Button>}
       {page === 'projects' && owner}
       <ThemePopover />

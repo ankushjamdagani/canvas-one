@@ -1,15 +1,10 @@
 /**
- * Export/import round trip and rejection tests (RV-16b).
+ * Export/import round trip and rejection tests.
  *
- * Implements specs/revamp/contracts/storage.md §9 Acceptance, Export/import row:
- * "record-key and reference inventory; immutable publications; retries of create/import
- *  keep their identity; project/branch compare-and-set races."
- *
- * Builds a real RV-08-style history (branches, commits with evidence, a publication,
+ * Builds a real repository-driven history (branches, commits with evidence, a publication,
  * checkpoints, runs) using the same repository-driven helpers as reload.test.ts, exports
- * it, mutates the bytes to exercise every rejection path listed in the task's TESTS
- * section, and re-imports the untouched bytes to assert a lossless round trip modulo the
- * fields storage.md §4 explicitly excludes.
+ * it, mutates the bytes to exercise every rejection path, and re-imports the untouched bytes to assert a lossless round trip modulo the
+ * fields the bundle format excludes.
  */
 
 import 'fake-indexeddb/auto';
@@ -34,7 +29,7 @@ import {
   type ProjectCreateCommand,
 } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = { actorId: 'test-user', kind: 'local-human', displayName: 'Test User' };
@@ -144,7 +139,7 @@ async function publishBranch(
   expect(publishRes.status).toBe('applied');
 }
 
-/** Builds a real RV-08-style history: branch, commit with evidence, checkpoint, publication. */
+/** Builds a real repository-driven history: branch, commit with evidence, checkpoint, publication. */
 async function buildHistory(): Promise<{ repo: LocalRepository; db: ReturnType<typeof createStudioDatabase>; projectId: Id }> {
   const dbName = `${DB_NAME}-export-${crypto.randomUUID()}`;
   const db = createStudioDatabase(dbName);
@@ -188,7 +183,7 @@ async function buildHistory(): Promise<{ repo: LocalRepository; db: ReturnType<t
   return { repo, db, projectId };
 }
 
-describe('Export/import round trip and rejections (RV-16b, storage.md §4/§9)', () => {
+describe('Export/import round trip and rejections', () => {
   it('exports a real history and round-trips it into a fresh project, lossless modulo the excluded fields', async () => {
     const { repo, db, projectId } = await buildHistory();
     const integrity = await repo.verifyReferenceIntegrity(projectId);
@@ -492,7 +487,7 @@ describe('Export/import round trip and rejections (RV-16b, storage.md §4/§9)',
       expect(projectCount).toBe(0);
     });
 
-    it('enforces §6 byte limits on import (review round 1, item 4): over-cap -> failed/limit, nothing written', async () => {
+    it('enforces byte limits on import: over-cap -> failed/limit, nothing written', async () => {
       // Same technique as limits.test.ts's own byte-cap tests: STORAGE_LIMITS is a plain
       // object (not frozen), so the ceiling can be lowered under the bundle's real
       // accounted size for this one assertion, then restored.

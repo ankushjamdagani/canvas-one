@@ -17,7 +17,7 @@ export interface ProjectDetailsDialogProps {
   readonly onClose: () => void;
 }
 
-/** Project settings: the description and team other projects show when they link here (D52). */
+/** Project settings: the description and team other projects show when they link here. */
 export function ProjectDetailsDialog({ open, projectTitle, initial, onSave, onClose }: ProjectDetailsDialogProps) {
   const [description, setDescription] = React.useState(initial.description);
   const [team, setTeam] = React.useState(initial.team);

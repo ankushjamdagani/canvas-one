@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures';
 
-// specs/revamp/fixtures/s04.json element ids (stable UUIDs in the fixture).
+// src/features/entry/examples/s04.json element ids (stable UUIDs in the fixture).
 const ROUTER_ELEMENT_ID = '816fe039-76dd-5b7b-a787-4d7666ff8d62';
 const PROCESSOR_A_ELEMENT_ID = 'ec155572-83d4-5ad5-b77a-e26a2eaabdfb';
 
-test.describe('Studio Inspector E2E (RV-05b)', () => {
+test.describe('Studio Inspector E2E', () => {
   test('S04: router capacity draft -- invalid, valid Apply + Undo, dirty Run guard, navigation guard, measured metrics', async ({
     page,
   }) => {

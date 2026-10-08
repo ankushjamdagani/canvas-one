@@ -1,4 +1,4 @@
-/** Panel states for screens 23A–23G, as fixtures for PanelHost tests. */
+/** Panel layout states (docked, floating, collapsed, dragging), as fixtures for PanelHost tests. */
 import {
   createInitialPanelState,
   type WorkspacePanelState,

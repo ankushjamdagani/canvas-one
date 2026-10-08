@@ -1,5 +1,5 @@
 /**
- * History and Publish controller facades (RV-03s).
+ * History and Publish controller facades.
  *
  * HistoryLadder, CommitPanel and PublishFlow keep calling their controller's
  * action methods; the workspace hands them these facades so every one of those
@@ -9,7 +9,7 @@
  * which the components already render as their inline error.
  *
  * Not routed: read-only state and previews, `reopenConflict` and the candidate
- * scenario runs (not §3 history commands), and the background behind-main
+ * scenario runs (not history commands), and the background behind-main
  * probe, which is not a user command.
  */
 

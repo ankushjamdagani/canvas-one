@@ -126,7 +126,7 @@ describe('buildEmptyScenario', () => {
     expect(scenario.initialContexts).toEqual([]);
     expect(scenario.scopeElementIds).toEqual(document.elements.map((e) => e.id));
     expect(scenario.budgets).toEqual(DEFAULT_SCENARIO_BUDGETS);
-    // Exhaustive: nothing beyond the contract's three allowed prefills (budgets, seed,
+    // Exhaustive: nothing beyond the three allowed prefills (budgets, seed,
     // scope) plus the caller-supplied id/label/mode/revision is present with a
     // non-empty/non-default value.
     const allowedNonEmptyKeys = new Set(['id', 'label', 'mode', 'revision', 'scopeElementIds', 'budgets', 'seed']);
@@ -155,7 +155,7 @@ describe('buildEmptyScenario', () => {
     expect(scenario.assertions).toEqual([]);
   });
 
-  it('draws the seed from the injected random source, within the contracted uint32 range', () => {
+  it('draws the seed from the injected random source, within the uint32 range', () => {
     const document = buildMockDocument();
     const mintId = makeCounterMintId(3);
     const scenario = buildEmptyScenario({
@@ -337,8 +337,8 @@ describe('openScenarioDraft', () => {
     expect(handle.status).toBe('clean');
     expect(handle.dirty).toBe(false);
     expect(handle.scenario?.label).toBe('Traffic test');
-    // An empty timed scenario is storable but not runnable yet (model-and-runner.md §1:
-    // readiness errors never block saving a structurally valid design) -- readiness
+    // An empty timed scenario is storable but not runnable yet (readiness
+    // errors never block saving a structurally valid design) -- readiness
     // issues are still surfaced and linked, ready for the editor to show, but they are
     // not a storable ("invalid") problem.
     expect(handle.allIssues.length).toBeGreaterThan(0);
@@ -347,7 +347,7 @@ describe('openScenarioDraft', () => {
     expect(handle.allIssues.some((i) => i.message.includes('finite input or enabled workload'))).toBe(true);
   });
 
-  it('kind:"new"/"copy" throws if the mode does not match the copy source (contract violation)', () => {
+  it('kind:"new"/"copy" throws if the mode does not match the copy source (caller error)', () => {
     const document = buildMockDocument();
     const mintId = makeCounterMintId(101);
     const source = logicalSourceScenario(document, mintId, 'Original');
@@ -484,7 +484,7 @@ describe('changeScenarioDraft / computeScenarioIssues', () => {
       ],
     }));
 
-    // Runnable per model-and-runner.md §6: "A qualifying scenario needs >=1 assertion" --
+    // A qualifying scenario needs at least one assertion --
     // storable is clean (a workload alone is valid), so readiness now reports the
     // missing-assertion issue, linked to the 'assertions' section.
     const result = computeScenarioIssues(document, handle.scenario!, null);
@@ -493,7 +493,7 @@ describe('changeScenarioDraft / computeScenarioIssues', () => {
 });
 
 // ============================================================================
-// Review round item 7: each "invents nothing" field blocks Apply until supplied.
+// Each "invents nothing" field blocks Apply until supplied.
 // ============================================================================
 
 describe('Apply is blocked until the user supplies each draft-only field (no invented defaults)', () => {

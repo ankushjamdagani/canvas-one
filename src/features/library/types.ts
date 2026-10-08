@@ -1,14 +1,5 @@
 /**
- * Library Feature Types (RV-06b).
- *
- * Implements specifications from:
- * - specs/revamp/screens/12A_Library_list_view.png
- * - specs/revamp/screens/12B_Library_grid_view.png
- * - specs/revamp/screens/12C_Library_hover_detail.png
- * - specs/revamp/screens/16E_Library_picker_from_dock.png
- * - specs/revamp/contracts/catalog.md (§5 Library display mapping)
- * - specs/revamp/decisions.md (D30, D35, D42)
- * - specs/revamp/requirements.md (R07)
+ * Library feature types: props, view modes, drag MIME types and linked-project summaries.
  */
 
 import type { CatalogEntry, CatalogGroup } from '../catalog/catalog';
@@ -25,13 +16,13 @@ export const LINKED_PROJECT_MIME_TYPE = 'application/x-studio-linked-project';
 
 export type LibraryTab = 'standard' | 'ours' | 'projects';
 
-/** D52: what the Library shows about a project it can link to. */
+/** What the Library shows about a project it can link to. */
 export interface LinkedProjectSummary {
   readonly id: string;
   readonly title: string;
   readonly team: string;
   readonly description: string;
-  /** D53: the connection types the project exposes; it can be linked only if one of them is a call type. */
+  /** The connection types the project exposes; it can be linked only if one of them is a call type. */
   readonly exposures: readonly ProjectExposure[];
 }
 
@@ -48,7 +39,7 @@ export interface SavedPartsRenderContext {
   readonly onCountChange: (count: number) => void;
 }
 
-/** Props for the full LibraryPanel (12A/12B/12C) */
+/** Props for the full LibraryPanel */
 export interface LibraryPanelProps {
   /** Called when the user confirms placing a catalog entry */
   onPlace: (entryId: string) => void;
@@ -78,9 +69,9 @@ export interface LibraryPanelProps {
 }
 
 /**
- * Props for the compact LibraryPicker from the dock (16E).
+ * Props for the compact LibraryPicker opened from the dock.
  *
- * Note on D30: Library entry points focus/expand the single existing Library instance.
+ * Library entry points focus/expand the single existing Library instance.
  * Single-instance coordination is the caller's / dock's responsibility.
  */
 export interface LibraryPickerProps {

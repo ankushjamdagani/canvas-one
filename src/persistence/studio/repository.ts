@@ -1,9 +1,9 @@
 /**
- * Local Repository implementation for System Studio (RV-16a).
+ * Local Repository implementation for System Studio.
  *
- * Implements specs/revamp/contracts/storage.md §5 (Repository API),
- * specs/revamp/contracts/transactions.md §1 & §2 (Idempotency, CAS, immutability),
- * and specs/revamp/contracts/commands.md (§2 Envelopes & Results, §3 Commands).
+ * Implements the repository API over Dexie: idempotent operation receipts, compare-and-swap
+ * revision checks and immutable content-addressed rows, with each command in one atomic
+ * transaction.
  */
 
 import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
@@ -151,7 +151,7 @@ function getProjectTables(db: StudioDatabase) {
 
 export type LocalRepositoryOptions = {
   readonly buildVersions?: BuildManifestVersions;
-  /** Injected downloadId/newProjectId-adjacent ID minting for transfer (RV-16b). */
+  /** Injected ID minting for transfer (download IDs). */
   readonly mintId?: () => Id;
   /** Injected FileToken registry; defaults to a private instance owned by this repository. */
   readonly fileTokens?: FileTokenRegistry;
@@ -161,9 +161,8 @@ export class LocalRepository implements StudioRepository {
   private readonly db: StudioDatabase;
   private readonly buildVersions: BuildManifestVersions;
   /**
-   * Injected downloadId minting (RV-16b review round 1, item 1). storage.md §5:
-   * "downloadId comes from an injected mintId, never randomUUID by default" -- there is
-   * no fallback generator of any kind (not even a deterministic one): a repository built
+   * Injected downloadId minting. There is no fallback generator of any kind (not even a
+   * deterministic one): a repository built
    * without one simply cannot mint a downloadId, and `exportProject` reports that as a
    * typed `invalid` naming `mintId` rather than inventing an ID.
    */
@@ -432,12 +431,12 @@ export class LocalRepository implements StudioRepository {
 
   /**
    * Executes an authored command within a single atomic read-write transaction.
-   * In RV-16a, implements exactly:
+   * Implements exactly:
    * - project.create
    * - project.rename
    * - branch.create
    *
-   * All other commands return typed UnsupportedResult naming the owning task.
+   * All other commands return typed UnsupportedResult naming the unsupported command.
    */
   async execute(command: AuthoredCommand): Promise<AuthoredResult | UnsupportedResult> {
     switch (command.commandId) {
@@ -478,13 +477,11 @@ export class LocalRepository implements StudioRepository {
       case 'history.resolve-conflict':
         return {
           status: 'unsupported',
-          task: 'RV-08',
-          message: `Command ${command.commandId} is not yet implemented (owned by RV-08)`,
+          message: `Command ${command.commandId} is not yet implemented`,
         };
       default:
         return {
           status: 'unsupported',
-          task: 'RV-08',
           message: `Command ${command.commandId} is not supported in this repository version`,
         };
     }
@@ -930,7 +927,7 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
-   * project.update-details (D52):
+   * project.update-details:
    * Sets the project record's description and team. Advances the project revision only;
    * snapshots, branches and undo history are untouched.
    */
@@ -2152,7 +2149,7 @@ export class LocalRepository implements StudioRepository {
 
   /**
    * history.commit:
-   * Non-main branch; passing evidence for every scenario (run-identity.md §5).
+   * Non-main branch; passing evidence for every scenario.
    * Commit with parent = branch head (or [] when unborn); advance head; revision++.
    * 1,000-commit limit. Retried commitId with same request returns original result.
    */
@@ -2447,9 +2444,7 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
-   * Publishes an eligible candidate to main atomically (RV-08e).
-   *
-   * storage.md §2 & §3, commands.md (history.publish), transactions.md §4:
+   * Publishes an eligible candidate to main atomically (history.publish):
    * - Validated by unforgeable PublishTicket from CandidateController
    * - OUTSIDE: metadata validation, manifest build with current build versions, evidence qualification
    * - INSIDE: receipt check, project CAS, source & main CAS, main clean, recheck runs,
@@ -2591,7 +2586,7 @@ export class LocalRepository implements StudioRepository {
       };
     }
 
-    // 5. Validate metadata per storage.md §3
+    // 5. Validate publication metadata
     const metadataIssues = validatePublicationMetadata(command.payload.metadata);
     if (metadataIssues.length > 0) {
       return { status: 'invalid', issues: metadataIssues };
@@ -3019,7 +3014,7 @@ export class LocalRepository implements StudioRepository {
   }
 
   // ==========================================================================
-  // storage.md §5: Run persistence and reads (RV-08a)
+  // Run persistence and reads
   // ==========================================================================
 
   async saveRun(
@@ -3423,12 +3418,11 @@ export class LocalRepository implements StudioRepository {
 
   /**
    * Loads project, branches, commits, publications (by ordinal), checkpoints and
-   * per-branch history in one consistent read-only transaction (RV-08f).
+   * per-branch history in one consistent read-only transaction.
    *
    * Per-branch history is the commits reachable from that branch's head, newest first by
-   * DAG order from the head, never by timestamp (storage.md §9 "round-trip reload").
-   * CONTRACT GAP: the contract specifies "newest first by DAG order," not an exact
-   * algorithm; narrowest reading chosen is breadth-first from the head following
+   * DAG order from the head, never by timestamp.
+   * Order is breadth-first from the head following
    * `parentIds` in array order (head first, then its parents, then their parents, ...),
    * deduplicating shared merge ancestors on first visit. A dangling parent is skipped
    * here (never fabricated) -- `verifyReferenceIntegrity` is the authority that reports it.
@@ -3495,9 +3489,9 @@ export class LocalRepository implements StudioRepository {
 
   /**
    * Verifies every stored reference resolves and every snapshot re-hashes to its own ID
-   * (RV-08f). Checks: commit parents and snapshots, branch head/working snapshots,
+   * Checks: commit parents and snapshots, branch head/working snapshots,
    * publication commits, checkpoint snapshots, evidence runs, and run snapshots. Never
-   * repairs or fabricates content (transactions.md §4).
+   * repairs or fabricates content.
    */
   async verifyReferenceIntegrity(projectId: Id): Promise<ReferenceIntegrityResult> {
     let readResult: { missing: ReferenceIntegrityIssue[]; snapshots: readonly SnapshotRecord[] };
@@ -3664,10 +3658,10 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
-   * project.export-json (RV-16b, storage.md §4 & §5). One consistent read-only
+   * project.export-json. One consistent read-only
    * transaction; the canonical-json-v1 envelope is built and hashed OUTSIDE the
-   * transaction (async Web Crypto is never awaited inside a Dexie transaction --
-   * transactions.md §2). Excluded per storage.md §4: operation receipts, preferences,
+   * transaction (async Web Crypto is never awaited inside a Dexie transaction).
+   * Excluded: operation receipts, preferences,
    * trace chunks, device-local actors/credentials, project revision, importSourceId.
    * Every exported run gets `traceState:'not-saved'`; checks/status/summary/manifest are
    * unchanged.
@@ -3676,7 +3670,7 @@ export class LocalRepository implements StudioRepository {
     const { projectId, expectedProjectRevision } = params;
 
     // No `mintId` was injected at construction -- fail fast, before doing any work, rather
-    // than inventing a downloadId (review round 1, item 1).
+    // than inventing a downloadId.
     if (!this.mintId) {
       return {
         status: 'invalid',
@@ -3824,14 +3818,13 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
-   * project.import (RV-16b, commands.md §2/§3, storage.md §4). Validates the bundle bound
+   * project.import. Validates the bundle bound
    * to `fileToken` OUTSIDE any transaction (bundle-validate.ts is pure), then creates a
    * fresh project namespace in one transaction: receipt first, then the newProjectId
    * collision check, then the write. Every imported run becomes `imported-unverified`
-   * with `traceState:'not-saved'` regardless of its exported traceState (storage.md §4:
-   * "the bundle is lossless for authored content, history and check summaries, not for
-   * traces" -- an imported project never carries trusted-local trace evidence in from
-   * outside).
+   * with `traceState:'not-saved'` regardless of its exported traceState (the bundle is lossless
+   * for authored content, history and check summaries, not for traces; an imported project
+   * never carries trusted-local trace evidence in from outside).
    */
   async importProject(command: ProjectImportCommand): Promise<AuthoredResult> {
     const actorIssues = validateActor(command.actor);
@@ -3902,8 +3895,8 @@ export class LocalRepository implements StudioRepository {
       ...cp,
       projectId: newProjectId,
     }));
-    // storage.md §5: "Only the local repository sets provenance; portable input can't
-    // claim trusted-local" (run-identity.md §5/§6). Every imported run is
+    // Only the local repository sets provenance; portable input cannot claim
+    // trusted-local. Every imported run is
     // 'imported-unverified' with traceState 'not-saved', regardless of the exported value.
     const runRows: RunRecord[] = bundle.runs.map((r) => ({
       ...r,
@@ -3912,7 +3905,7 @@ export class LocalRepository implements StudioRepository {
       traceState: 'not-saved' as const,
     }));
     // Parts remain in the backup for fidelity, but enter another Library only
-    // through a standalone part import with a fresh identity (storage.md §4).
+    // through a standalone part import with a fresh identity.
     const partRows: PartRecord[] = [];
 
     const changedIds: Id[] = [
@@ -3932,7 +3925,7 @@ export class LocalRepository implements StudioRepository {
       value: { kind: 'project', projectId: newProjectId, branchId: bundle.mainBranchId },
     };
 
-    // Review round 1, item 4: import must also enforce §6 byte limits, per-record
+    // Import must also enforce byte limits, per-record
     // canonical sizes exactly as every other authored write does (see handleProjectCreate).
     // localBytes accounts every row this import will write, INCLUDING the operation
     // receipt (operations are local-only, per limits.ts's getProjectAccountedBytes);
@@ -3983,7 +3976,7 @@ export class LocalRepository implements StudioRepository {
           } as const;
         }
 
-        // 3. Project limits on the new namespace (§6, before writing anything): counts
+        // 3. Project limits on the new namespace (before writing anything): counts
         // AND accounted bytes (128 MiB local / 64 MiB export), exactly as every other
         // authored write enforces them.
         const limitError = await enforceProjectLimits(this.db, {
@@ -4025,7 +4018,7 @@ export class LocalRepository implements StudioRepository {
   }
 
   /**
-   * pruneUnreferenced (RV-16b, storage.md §7). Explicit only; recomputes the pin closure
+   * pruneUnreferenced. Explicit only; recomputes the pin closure
    * from CURRENT rows inside the transaction (never a stale, pre-computed closure). A
    * selected pinned run in `runIds` (full row deletion) or a selected pinned snapshot
    * fails the whole call with `referenced-artifact` and deletes nothing. `traceRunIds`
@@ -4071,7 +4064,7 @@ export class LocalRepository implements StudioRepository {
           // Pin closure treats every stored run as pinning its own snapshot "pinned or
           // not" (pin-closure.ts: "every stored run is retained until an explicit prune
           // removes it"). For deciding whether a SELECTED snapshot may be released by
-          // THIS prune call, storage.md §7's "any retained run" therefore means any run
+          // THIS prune call, "any retained run" therefore means any run
           // that will still exist after this call -- so the gate and the later deletion
           // both use a closure computed with `selection.runIds` (full deletions, not
           // trace-only prunes) already removed, never the raw pre-mutation closure. This
@@ -4087,8 +4080,8 @@ export class LocalRepository implements StudioRepository {
 
           // Any selected pinned run (full row deletion) or pinned snapshot -> referenced-
           // artifact; nothing deleted. A pinned run in `traceRunIds` is NOT rejected here
-          // (review round 1, item 3): storage.md §7 says "Pruning trace chunks changes
-          // only traceState, never checks or status," and pinning protects the evidence
+          // : pruning trace chunks changes only traceState,
+          // never checks or status, and pinning protects the evidence
           // run ROW (its fingerprint, checks, status, summary), not its trace bytes.
           // Trace-only pruning never removes the row a commit's evidence points at, so it
           // cannot break `referenced-artifact` integrity even when the run is pinned.

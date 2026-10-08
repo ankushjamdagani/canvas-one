@@ -7,7 +7,7 @@ import type { Document, ResourceBehavior } from '../model';
 import type { TraceEvent } from './types';
 import { canonicalJson } from '../canonical';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
@@ -110,7 +110,7 @@ describe('scenario runner: S02 reference fixture', () => {
   });
 });
 
-describe('scenario runner: S02 regression variants (§11)', () => {
+describe('scenario runner: S02 regression variants', () => {
   const s02Doc = loadFixture('s02.json');
   const allowScenarioId = '5bf95962-e1aa-5df7-8dd2-5784bbad14c8';
   const workerElementId = 'b870e6ff-5835-5cdc-80b9-9f9e159c8a55';
@@ -258,7 +258,7 @@ describe('scenario runner: S03 reference fixture through runScenario', () => {
       expect(check.status).toBe('passed');
     }
 
-    // Pure data run: 0 transport roots generated (§5)
+    // Pure data run: 0 transport roots generated
     expect(result.summary.rootCounts.generated).toBe(0);
     expect(result.summary.consumedInputs).toBe(1);
 
@@ -321,7 +321,7 @@ describe('scenario runner: determinism and chunked stepping', () => {
   });
 });
 
-describe('review fix 1: no inferred success on settlement without outcome (§8)', () => {
+describe('review fix 1: no inferred success on settlement without outcome', () => {
   it('fails with sanitized diagnostic naming the event when a settled message unit has outcome null', () => {
     const state: SettlementState = {
       activeMessageRoots: new Set(['msg_1']),
@@ -457,7 +457,7 @@ describe('review fix 2: exact linkage, no string prefix collisions', () => {
   });
 });
 
-describe('D36: broadcast message roots supersede the RV-14d broadcast guard', () => {
+describe('broadcast message roots', () => {
   const s02Doc = loadFixture('s02.json');
   const allowScenarioId = '5bf95962-e1aa-5df7-8dd2-5784bbad14c8';
   const queueElementId = 'cbf95fcf-bc61-5c89-9c0c-d506c152f7f8';
@@ -486,7 +486,7 @@ describe('D36: broadcast message roots supersede the RV-14d broadcast guard', ()
     const runId = '00000000-0000-0000-0000-000000000099';
     const result = await runScenario(broadcastDoc, allowScenarioId, runId);
 
-    // D36 supersedes the RV-14d 'unsupported-rv14d' guard: this now runs and completes.
+    // A broadcast broker runs to completion.
     expect(result.status).toBe('completed');
     expect(result.reason).toBeNull();
 

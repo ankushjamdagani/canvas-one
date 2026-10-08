@@ -1,13 +1,12 @@
 import { test, expect, type Page } from './fixtures';
 
 /**
- * RV-13b: Library panel journeys (screens 12A list, 12B grid, 12C hover/focus
- * detail; specs/revamp/contracts/catalog.md section 5).
+ * Library panel journeys: list view, grid view and hover/focus detail.
  *
- * The dock Component button opens the compact 16E picker while the Library
- * panel is closed (D30 as amended 2026-09-29); these panel journeys reach the
- * panel through the picker's "Browse full library" link. The picker itself is
- * covered by the "16E compact picker" block below.
+ * The dock Component button opens the compact picker while the Library
+ * panel is closed; these panel journeys reach the panel through the picker's
+ * "Browse full library" link. The picker itself is covered by the
+ * "compact picker" block below.
  */
 
 async function waitForIdle(page: Page) {
@@ -39,9 +38,9 @@ async function elementIds(page: Page): Promise<string[]> {
     }));
 }
 
-test.describe('RV-13b: Library panel', () => {
+test.describe('Library panel', () => {
   test('search filters the catalog, shows an empty state, and clears', async ({ page }) => {
-    await openBlankProject(page, `RV-13b library search ${Date.now()}`);
+    await openBlankProject(page, `library search ${Date.now()}`);
     const panel = await openLibrary(page);
     const options = panel.getByRole('option');
 
@@ -66,7 +65,7 @@ test.describe('RV-13b: Library panel', () => {
   });
 
   test('list and grid toggle keeps the catalog and reports the pressed view', async ({ page }) => {
-    await openBlankProject(page, `RV-13b library views ${Date.now()}`);
+    await openBlankProject(page, `library views ${Date.now()}`);
     const panel = await openLibrary(page);
     const options = panel.getByRole('option');
     const total = await options.count();
@@ -86,7 +85,7 @@ test.describe('RV-13b: Library panel', () => {
   });
 
   test('hover and focus detail shows human-readable defaults, not raw config keys', async ({ page }) => {
-    await openBlankProject(page, `RV-13b library detail ${Date.now()}`);
+    await openBlankProject(page, `library detail ${Date.now()}`);
     const panel = await openLibrary(page);
     const queue = panel.locator('[data-entry-id="queue"]');
 
@@ -115,7 +114,7 @@ test.describe('RV-13b: Library panel', () => {
   });
 
   test('places a component from the Library by clicking Place on canvas', async ({ page }) => {
-    await openBlankProject(page, `RV-13b library click ${Date.now()}`);
+    await openBlankProject(page, `library click ${Date.now()}`);
     const panel = await openLibrary(page);
     expect(await elementIds(page)).toHaveLength(0);
 
@@ -126,7 +125,7 @@ test.describe('RV-13b: Library panel', () => {
   });
 
   test('places a component from the Library with the keyboard (arrows then Enter)', async ({ page }) => {
-    await openBlankProject(page, `RV-13b library keyboard ${Date.now()}`);
+    await openBlankProject(page, `library keyboard ${Date.now()}`);
     const panel = await openLibrary(page);
 
     const listbox = panel.getByRole('listbox', { name: 'Component catalog entries' });
@@ -143,7 +142,7 @@ test.describe('RV-13b: Library panel', () => {
 
   test('390x844: Library search and placement work without horizontal scroll', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await openBlankProject(page, `RV-13b library mobile ${Date.now()}`);
+    await openBlankProject(page, `library mobile ${Date.now()}`);
     const panel = await openLibrary(page);
 
     await panel.getByRole('searchbox', { name: 'Search components' }).fill('service');
@@ -158,9 +157,9 @@ test.describe('RV-13b: Library panel', () => {
   });
 });
 
-test.describe('16E compact picker (D30 amended 2026-09-29, R07)', () => {
+test.describe('compact picker', () => {
   test('the dock opens the picker, Enter places the selected entry with one undo, and the picker closes', async ({ page }) => {
-    await openBlankProject(page, `16E picker place ${Date.now()}`);
+    await openBlankProject(page, `picker place ${Date.now()}`);
     const dockButton = page.getByTestId('dock-component-btn');
     await dockButton.click();
     const picker = page.getByTestId('library-picker');
@@ -180,7 +179,7 @@ test.describe('16E compact picker (D30 amended 2026-09-29, R07)', () => {
   });
 
   test('never opens alongside the Library panel: with the panel open the dock focuses the panel', async ({ page }) => {
-    await openBlankProject(page, `16E picker singleton ${Date.now()}`);
+    await openBlankProject(page, `picker singleton ${Date.now()}`);
     await page.getByTestId('dock-component-btn').click();
     await page.getByTestId('library-picker-full-library-btn').click();
     await expect(page.getByTestId('library-panel')).toBeVisible();
@@ -193,7 +192,7 @@ test.describe('16E compact picker (D30 amended 2026-09-29, R07)', () => {
   });
 
   test('Escape closes the picker without placing anything', async ({ page }) => {
-    await openBlankProject(page, `16E picker escape ${Date.now()}`);
+    await openBlankProject(page, `picker escape ${Date.now()}`);
     await page.getByTestId('dock-component-btn').click();
     await expect(page.getByTestId('library-picker')).toBeVisible();
     await page.keyboard.press('Escape');

@@ -14,7 +14,7 @@ function mintFactory(start = 1): () => Id {
 
 describe('planPlacement', () => {
   it('returns one valid RecordChange batch with anchor-offset presentation', () => {
-    const source = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s03.json'), 'utf8')) as Document;
+    const source = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s03.json'), 'utf8')) as Document;
     const capture = captureSelection(source, source.views[0].id, { elementIds: [source.elements[0].id], noteIds: [] });
     expect(capture.ok).toBe(true);
     if (!capture.ok) return;
@@ -32,7 +32,7 @@ describe('planPlacement', () => {
   });
 
   it('rejects placement near the destination element/view limits before returning changes', () => {
-    const source = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s03.json'), 'utf8')) as Document;
+    const source = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s03.json'), 'utf8')) as Document;
     const capture = captureSelection(source, source.views[0].id, { elementIds: [source.elements[0].id], noteIds: [] });
     expect(capture.ok).toBe(true);
     if (!capture.ok) return;

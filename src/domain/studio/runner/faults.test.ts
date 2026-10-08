@@ -6,7 +6,7 @@ import { runScenario, ScenarioRunner } from './scenario-runner';
 import { canonicalJson } from '../canonical';
 import { expectCleanJourneysAndRootIds } from './acceptance.test';
 
-const FIXTURES_DIR = path.join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = path.join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): Document {
   const content = fs.readFileSync(path.join(FIXTURES_DIR, name), 'utf8');
@@ -16,8 +16,8 @@ function loadFixture(name: string): Document {
 type ResultEvent = Awaited<ReturnType<typeof runScenario>>['events'][number];
 
 // Exactly one 'settled' event per root/unit carries the unit-level outcome; per-attempt
-// resource settlements always use the distinct 'attempt-settled:<attempt>' code (§8 &
-// coordinator review), so excluding that prefix isolates the single canonical unit-level
+// resource settlements always use the distinct 'attempt-settled:<attempt>' code, so
+// excluding that prefix isolates the single canonical unit-level
 // settlement regardless of how many attempts ran or which subsystem (resource admission,
 // machine reply) produced it.
 function unitSettlements(events: readonly ResultEvent[], rootId: string): ResultEvent[] {
@@ -26,8 +26,8 @@ function unitSettlements(events: readonly ResultEvent[], rootId: string): Result
   );
 }
 
-// The element a router selected for this root (§11: "which service element each root
-// reached"), surfaced via the 'route-selected' dispatch fact rather than admission facts,
+// The element a router selected for this root (which service element each root
+// reached), surfaced via the 'route-selected' dispatch fact rather than admission facts,
 // since a rejected admission never reaches 'started'/'admitted' at the target.
 function routedTarget(events: readonly ResultEvent[], rootId: string): string | undefined {
   return events.find((e) => e.rootId === rootId && e.kind === 'dispatch' && e.code === 'route-selected')
@@ -58,7 +58,7 @@ describe('S04 host failover and fault scheduler', () => {
       expect(check.status).toBe('passed');
     }
 
-    // Trace-level facts: verify per-arrival route selections and outcomes (§11)
+    // Trace-level facts: verify per-arrival route selections and outcomes
     const routerId = '816fe039-76dd-5b7b-a787-4d7666ff8d62';
     const routeSelectedEvents = result.events.filter(
       (e) => e.kind === 'dispatch' && e.code === 'admitted' && e.elementId === routerId,
@@ -74,7 +74,7 @@ describe('S04 host failover and fault scheduler', () => {
     const arrivalAt = (ms: number) =>
       result.events.find((e) => e.kind === 'input' && e.atMs === ms)!.rootId;
 
-    // All six arrivals per §11: t0->A ok, t1->B ok, t2->A rejected (host down, router not
+    // All six arrivals: t0->A ok, t1->B ok, t2->A rejected (host down, router not
     // yet updated), t3->B ok, t4->B ok, t5->A ok (cursor reset at recovery detection).
     // For each root: exactly one unit-level settlement, with the expected outcome, and the
     // route-selected fact shows which service element it actually targeted.
@@ -172,7 +172,7 @@ describe('S04 host failover and fault scheduler', () => {
     const arrivalAt = (ms: number) => result.events.find((e) => e.kind === 'input' && e.atMs === ms)!.rootId;
 
     // x arrived at t=0 and was due to complete at exactly t=1000ms, the same instant the
-    // outage fires: the outage phase comes first (§6), so x fails exactly once, not succeeds.
+    // outage fires: the outage phase comes first, so x fails exactly once, not succeeds.
     const xRootId = arrivalAt(0);
     const xSettlements = unitSettlements(result.events, xRootId);
     expect(xSettlements.length).toBe(1);
@@ -348,7 +348,7 @@ describe('S04 fault and placement validation', () => {
   });
 });
 
-describe('Decision D36: broadcast message roots', () => {
+describe('broadcast message roots', () => {
   const s02Doc = loadFixture('s02.json');
   const allowScenarioId = '5bf95962-e1aa-5df7-8dd2-5784bbad14c8';
   const queueElementId = 'cbf95fcf-bc61-5c89-9c0c-d506c152f7f8';
@@ -440,7 +440,7 @@ describe('Decision D36: broadcast message roots', () => {
     expect(res.summary.messageCounts.failed).toBe(0);
     expect(res.summary.messageCounts.inFlight).toBe(0);
 
-    // RV-14f review: no delivered/broadcast-copy unit is left with journeyId 'unknown',
+    // No delivered/broadcast-copy unit is left with journeyId 'unknown',
     // and both broadcast copies expose a clean runner-minted root id, never a raw kernel
     // delivery-path identity.
     const scenario = docWith2Consumers.scenarios.find((s) => s.id === allowScenarioId)!;

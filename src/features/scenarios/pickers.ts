@@ -1,7 +1,7 @@
 /**
- * Element/port picker helpers (RV-05c).
+ * Element/port picker helpers.
  *
- * Brief: "element/port pickers by label" -- every editor control that names a document
+ * Every editor control that names a document
  * element or port picks it from real document content, by its own label, never a raw
  * ID typed or shown in the UI.
  */
@@ -76,7 +76,7 @@ export type HostOption = {
   readonly label: string;
 };
 
-/** model-and-runner.md §4: "host: No fields. Availability comes from the scenario fault schedule." */
+/** Host elements have no fields of their own; their availability comes from the scenario fault schedule. */
 export function hostElementOptions(document: Document): readonly HostOption[] {
   return document.elements
     .filter((e): e is Element & { readonly behavior: { readonly kind: 'host' } } => e.behavior.kind === 'host')

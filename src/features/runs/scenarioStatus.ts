@@ -1,14 +1,14 @@
 /**
- * Pure scenario status derivation and async loader (RV-12c4).
+ * Pure scenario status derivation and async loader.
  *
- * Implements specs/revamp/contracts/commands.md ("Scenarios (D41)" / "Status"):
- * - Passed = a saved qualifying run exists for the scenario's current fingerprint (run-identity.md §5);
+ * Status rules:
+ * - Passed = a saved qualifying run exists for the scenario's current fingerprint;
  * - Needs a rerun = the latest saved run's fingerprint differs from the current one;
  * - Failed = the latest saved run for the current fingerprint didn't qualify;
  * - Not run yet = no saved run;
  * - Can't run · n issues (not-ready) = the scenario's current manifest can't be built
  *   (validation or readiness issues) — Run is disabled for it with the first issue as the
- *   reason, and Run all is disabled while any scenario is not-ready (lead reading, 2026-09-25).
+ *   reason, and Run all is disabled while any scenario is not-ready.
  *
  * Computes the commit line data: { total, passing }.
  * Uses DEFAULT_BUILD_VERSIONS matching the LocalRepository.
@@ -32,7 +32,7 @@ import {
 } from '../../persistence/studio/types';
 
 // ============================================================================
-// RunRecord -> RunCandidate mapping (item 7: explicit, not a cast)
+// RunRecord -> RunCandidate mapping (explicit mapping, not a cast)
 // ============================================================================
 
 /**
@@ -104,7 +104,7 @@ export type ScenariosStatusResult = {
 // ============================================================================
 
 /**
- * Pure function deriving scenario status strictly per commands.md:
+ * Pure function deriving scenario status:
  * - not-ready: the scenario's current manifest can't be built (readiness/validation
  *   issues) — takes priority over run-derived statuses, since there is no reliable
  *   current fingerprint to compare saved runs against.

@@ -1,13 +1,10 @@
 /**
- * Scenario scope closure computation (RV-02d).
+ * Scenario scope closure computation: the set of elements, connections, relations and
+ * schemas a scenario reaches from its declared scope, entry ports, inputs, boundaries,
+ * refinement selections and faults.
  *
- * Implements the scenario scope closure as specified in:
- * - specs/revamp/contracts/run-identity.md §3 (Execution manifest v1: Scope closure, Record separation)
- * - specs/revamp/contracts/model-and-runner.md §2 (Records), §4 (Behaviors, Wiring),
- *   §5 (Invocation semantics), §6 (Scenarios, Inputs, Boundaries, Refinement, Faults),
- *   §7 (Projection inventory)
- * - specs/revamp/contracts/storage.md §6 (Compiler limits: <=2,000 expanded entities,
- *   <=10,000 references, batches <=100, cancellation checked after every batch)
+ * Limits: at most 2,000 expanded entities and 10,000 references; the work queue is
+ * processed in batches of at most 100, checking for cancellation after every batch.
  */
 
 import type {
@@ -28,7 +25,7 @@ import { resolveRefinementRouting } from './refinementRouting';
 
 /**
  * Documented issue codes specific to scenario scope closure and readiness.
- * (run-identity.md §3, model-and-runner.md §6, §9)
+ *
  */
 const CLOSURE_ISSUE_CODES = [
   'unresolved-crossing',
@@ -95,9 +92,8 @@ type WorkItem =
 // ============================================================================
 
 /**
- * Specs: model-and-runner.md §6, run-identity.md §3:
- * "Each member has at most one owner, and recursive ownership is rejected."
- * "Reject recursive ownership before expansion ('recursive-refinement')."
+ * Each member has at most one owner, and recursive ownership is rejected before
+ * expansion ('recursive-refinement').
  *
  * Checks the refinement ownership graph for directed cycles.
  */
@@ -183,7 +179,7 @@ export function computeClosure(
   const scenario = doc.scenarios[scenarioIndex];
 
   // --------------------------------------------------------------------------
-  // Step 1: Pre-expansion Refinement Check (run-identity.md §3, model-and-runner.md §6)
+  // Step 1: Pre-expansion Refinement Check
   // "Reject recursive ownership before expansion ('recursive-refinement')."
   // --------------------------------------------------------------------------
   const recursiveRef = findRecursiveRefinement(doc.refinements);
@@ -203,7 +199,7 @@ export function computeClosure(
   }
 
   // --------------------------------------------------------------------------
-  // Step 2: Index Lookups and Refinement Routing (model-and-runner.md §6)
+  // Step 2: Index Lookups and Refinement Routing
   // --------------------------------------------------------------------------
   const elementsMap = new Map<Id, (typeof doc.elements)[number]>();
   for (const el of doc.elements) elementsMap.set(el.id, el);
@@ -218,7 +214,7 @@ export function computeClosure(
   for (const rel of doc.relations) relationsMap.set(rel.id, rel);
 
   // Process scenario refinement selections through the shared runtime/compiler routing model.
-  // model-and-runner.md §6: mappings are transitive in both directions; a nested
+  // Mappings are transitive in both directions; a nested
   // selection below an aggregate outer refinement is inert.
   const refinementMap = new Map<Id, Refinement>();
   for (const ref of doc.refinements) refinementMap.set(ref.id, ref);
@@ -226,7 +222,7 @@ export function computeClosure(
   const refinementExcludedElementIds = new Set(refinementRouting.excludedElementIds);
 
   // --------------------------------------------------------------------------
-  // Step 3: Work Queue and Visited Sets Setup (storage.md §6 Compiler limits)
+  // Step 3: Work Queue and Visited Sets Setup
   // "<=2,000 expanded entities, <=10,000 references; batches <=100 items; cancellation checked after every batch"
   // --------------------------------------------------------------------------
   let expandedEntitiesCount = 0;
@@ -271,7 +267,7 @@ export function computeClosure(
   }
 
   // --------------------------------------------------------------------------
-  // Step 4: Seed from Scenario Entry Points (model-and-runner.md §6)
+  // Step 4: Seed from Scenario Entry Points
   // "Start from the scenario entry points: entryPorts, every input.entry, every workload.entry."
   // --------------------------------------------------------------------------
   for (const ep of scenario.entryPorts) {
@@ -320,7 +316,7 @@ export function computeClosure(
 
   // --------------------------------------------------------------------------
   // Step 5: Iterative Fixed-Point Work Queue Traversal
-  // (storage.md §6: batches <=100, cancellation checked after every batch)
+  // (batches <=100, cancellation checked after every batch)
   // --------------------------------------------------------------------------
   let batchCount = 0;
 
@@ -336,13 +332,12 @@ export function computeClosure(
       const el = elementsMap.get(item.id);
       if (el) {
         // Schemas from included ports (schemaId, responseSchemaId)
-        // model-and-runner.md §2, §7
         for (const p of el.ports) {
           enqueueSchema(p.schemaId);
           enqueueSchema(p.responseSchemaId);
         }
 
-        // Behavior schemas and fixtures (model-and-runner.md §4, §7)
+        // Behavior schemas and fixtures
         const b = el.behavior;
         if (b.kind === 'machine') {
           const mb = b as MachineBehavior;
@@ -362,7 +357,7 @@ export function computeClosure(
           const db = b as DecisionBehavior;
           enqueueSchema(db.inputSchemaId);
         } else if (b.kind === 'resource') {
-          // Deployed-on relations for included resources (model-and-runner.md §2, §7)
+          // Deployed-on relations for included resources
           // "Structural: included resources with a deployed-on relation include that relation and its host"
           for (const rel of doc.relations) {
             if (rel.kind === 'deployed-on' && rel.elementId === el.id) {
@@ -375,7 +370,7 @@ export function computeClosure(
           }
         }
 
-        // Determine reachable declared outputs (model-and-runner.md §4, §5)
+        // Determine reachable declared outputs
         // - machine -> ports used by emit effects in any transition and callPortIds of responseBindings
         // - pipeline -> outputPortId and errorPortId
         // - decision -> every case outputPortId and fallback outputPortId
@@ -504,7 +499,7 @@ export function computeClosure(
       return { status: 'analysis-limit' };
     }
 
-    // Check cancellation after each batch of <=100 items (storage.md §6)
+    // Check cancellation after each batch of <=100 items
     batchCount++;
     if (batchCount >= 100) {
       batchCount = 0;
@@ -522,7 +517,7 @@ export function computeClosure(
   }
 
   // --------------------------------------------------------------------------
-  // Step 6: Post-traversal Fault Host Validation (model-and-runner.md §6)
+  // Step 6: Post-traversal Fault Host Validation
   // "faults' hostIds must be included hosts."
   // --------------------------------------------------------------------------
   for (let fIdx = 0; fIdx < scenario.faults.length; fIdx++) {
@@ -539,7 +534,7 @@ export function computeClosure(
     }
   }
 
-  // If any readiness issues were encountered, fail readiness (run-identity.md §3)
+  // If any readiness issues were encountered, fail readiness
   if (issues.length > 0) {
     return {
       status: 'not-ready',

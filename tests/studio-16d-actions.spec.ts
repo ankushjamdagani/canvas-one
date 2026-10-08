@@ -1,7 +1,7 @@
 import { expect, test, type Page } from './fixtures';
 
 /**
- * Board 16D overflow menu (commands.md "Selection-scoped actions", D46): Save as
+ * Selection overflow menu: Save as
  * component, Replace part…, Add flow probe, Changes on this part, Export selection.
  */
 
@@ -14,7 +14,7 @@ async function openExample(page: Page, id: 's04' | 's05') {
 
 const node = (page: Page, label: string) => page.locator('.component-node', { hasText: new RegExp(`^${label}`) }).first();
 
-test.describe('16D selection overflow menu', () => {
+test.describe('selection overflow menu', () => {
   test('lists the board actions and shows why one is unavailable', async ({ page }) => {
     await openExample(page, 's04');
     await node(page, 'A').click();

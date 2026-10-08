@@ -1,4 +1,4 @@
-/** 16D selection-scoped actions, routed through the command registry. */
+/** Selection-scoped actions, routed through the command registry. */
 
 import * as React from 'react';
 import { useStore } from '@xyflow/react';
@@ -97,7 +97,7 @@ type OverflowCommandId =
   | 'history.show-changes'
   | 'selection.export';
 
-/** Board 16D overflow menu, in board order (Wrap in boundary lives on the toolbar). */
+/** Overflow menu entries, in display order (Wrap in boundary lives on the toolbar). */
 const OVERFLOW_PRIMARY: readonly { readonly id: OverflowCommandId; readonly label: string }[] = [
   { id: 'selection.save-as-component', label: 'Save as component' },
   { id: 'selection.replace-part', label: 'Replace part…' },

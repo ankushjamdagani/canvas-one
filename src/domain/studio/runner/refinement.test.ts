@@ -1,24 +1,22 @@
 /**
- * Refinement selection (RV-14f, model-and-runner.md §6 "Refinement").
+ * Refinement selection.
  *
- * "Aggregate runs the owner and excludes members; refined runs the members and excludes
- * the owner (port mappings route crossings). Nesting within budgets. Unselected elements
- * stay uncovered in RunSummary.coverage. Running both paths, or mismatched mappings, is
- * invalid. View expand/collapse never changes the trace or the fingerprint."
+ * Aggregate runs the owner and excludes members; refined runs the members and excludes
+ * the owner (port mappings route crossings). Unselected elements stay uncovered in
+ * RunSummary.coverage. Running both paths, or mismatched mappings, is invalid.
  *
- * Test-local document variants (§11: "The fixture has NO refinements: cover refinement
- * with test-local document variants") — a small logical document with a "Caller" decision
+ * The reference fixture has no refinements, so these tests use test-local document
+ * variants: a small logical document with a "Caller" decision
  * driving a refined subsystem (an "Owner" decision, aggregate-selected, or a "Member"
  * decision reached through a port mapping, refined-selected), so aggregate vs refined
  * coverage/outcome is observable directly from which element's output port received the
  * value.
  *
- * CONTRACT GAP (narrowed reading): the runner's port-remap (scenario-runner.ts
+ * Limitation: the runner's port-remap (scenario-runner.ts
  * `resolveRefinements`) resolves one level of outer -> inner mapping; a doubly-nested
  * refinement (a member that is itself an owner of a further refinement) is not
  * chain-resolved here. Full nested resolution belongs to `computeClosure`'s reachability
- * walk (closure.ts, off limits for this task); S05 carries no refinements to exercise
- * nesting against, so this narrower single-level resolution is what's tested.
+ * walk (closure.ts), so only single-level resolution is tested.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -31,7 +29,7 @@ import { computeClosure } from '../closure';
 import type { AuthoredSnapshot } from './types';
 import type { Document, Element, Connection, Scenario, Refinement, Selection } from '../model';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
 }
@@ -208,7 +206,7 @@ function nestedDocument(selections: Selection[], includeThirdLevel = false): Doc
   };
 }
 
-describe('Refinement selection (RV-14f, §6)', () => {
+describe('Refinement selection', () => {
   it('aggregate mode runs the owner and excludes the member: coverage and outputs reflect the owner only', async () => {
     const { document, scenario } = docWith([{ refinementId: 'refinement-1', mode: 'aggregate' }]);
     const result = await runScenario(document, scenario.id, 'run-aggregate');

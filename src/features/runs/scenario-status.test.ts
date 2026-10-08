@@ -12,7 +12,7 @@ import { DEFAULT_BUILD_VERSIONS, type Actor, type ProjectCreateCommand } from '.
 import { deriveScenarioStatus, loadScenarioStatuses } from './scenarioStatus';
 
 const s01Doc = JSON.parse(
-  readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s01.json'), 'utf8'),
+  readFileSync(join(process.cwd(), 'src/features/entry/examples/s01.json'), 'utf8'),
 ) as Document;
 
 const testActor: Actor = {
@@ -118,7 +118,7 @@ describe('scenarioStatus derivation and loader', () => {
     }
   });
 
-  it('a runner version bump alone makes a saved passing run need a rerun (D47-D50)', async () => {
+  it('a runner version bump alone makes a saved passing run need a rerun', async () => {
     const scenario = s01Doc.scenarios[0];
     const older = { ...DEFAULT_BUILD_VERSIONS, runnerVersions: [{ runnerId: 'studio-runner', version: 'studio-runner/4' }] };
     const before = await buildManifest(s01Doc, scenario.id, older);
@@ -142,7 +142,7 @@ describe('scenarioStatus derivation and loader', () => {
     expect(deriveScenarioStatus(scenario.id, now.fingerprint, [runUnderOldRunner], scope).kind).toBe('needs-rerun');
   });
 
-  it('Item 6: deriveScenarioStatus returns not-ready when the manifest cannot be built, taking priority over run-derived status', () => {
+  it('deriveScenarioStatus returns not-ready when the manifest cannot be built, taking priority over run-derived status', () => {
     const scenarioId = s01Doc.scenarios[0].id;
     const compiledScope = s01Doc.scenarios[0].scopeElementIds;
     const issues = [

@@ -1,8 +1,8 @@
 /**
- * Value/Guard evaluation interface (model-and-runner.md §4 "Values and guards").
+ * Value/Guard evaluation interface.
  *
- * Shared seam between the S01 machine interpreter (RV-14b), which implements it in
- * `runner/expr.ts`, and the S03 pipeline operations (RV-14c), whose `map`/`filter`
+ * Shared seam between the machine interpreter, which implements it in
+ * `runner/expr.ts`, and the pipeline operations, whose `map`/`filter`
  * operations take an evaluator through this interface instead of re-implementing one.
  */
 
@@ -10,7 +10,7 @@ import type { Guard, Json, Path, Value } from '../model';
 import type { TransportOutcome } from './types';
 
 /**
- * A read that found nothing. Only a guard's `exists` can test it (§4). Branded with a
+ * A read that found nothing. Only a guard's `exists` can test it. Branded with a
  * module-private symbol so no JSON payload can ever be mistaken for it.
  */
 const MISSING: unique symbol = Symbol('studio.missing');
@@ -28,7 +28,7 @@ export function isMissing(value: EvalResult): value is MissingValue {
 
 /**
  * Evaluation scope. `input` is the triggering payload (or the current row/item);
- * `context` is the machine context (empty object for pipeline rows, §4 `map`);
+ * `context` is the machine context (empty object for pipeline rows);
  * `outcome` is the current invocation's transport outcome, or null before settlement.
  */
 export type EvalScope = {

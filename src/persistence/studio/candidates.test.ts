@@ -20,7 +20,7 @@ import {
   type CommitRecord,
 } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -140,7 +140,7 @@ async function commitBranch(
   return { commitId, evidence };
 }
 
-describe('CandidateController (RV-08d)', () => {
+describe('CandidateController', () => {
   it('prepare preconditions: source not main, stale revisions, moved heads, unborn source, uncommitted edits', async () => {
     const db = createStudioDatabase(`test-cand-pre-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
@@ -569,10 +569,10 @@ describe('CandidateController (RV-08d)', () => {
   });
 
   // ========================================================================
-  // Review Round 1 Tests
+  // Edge cases
   // ========================================================================
 
-  it('item 3: prepare with closed source branch -> invalid', async () => {
+  it('prepare with closed source branch -> invalid', async () => {
     const db = createStudioDatabase(`test-cand-closed-source-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = new CandidateController({ mintId: () => crypto.randomUUID() });
@@ -600,13 +600,13 @@ describe('CandidateController (RV-08d)', () => {
     db.close();
   });
 
-  it('item 4: mintId must be required in CandidateControllerOptions', () => {
+  it('mintId must be required in CandidateControllerOptions', () => {
     // Calling constructor without options or without mintId must throw
     expect(() => new (CandidateController as any)()).toThrow(/mintId/);
     expect(() => new CandidateController({} as any)).toThrow(/mintId/);
   });
 
-  it('item 5: startCandidateRun handles cancelled signal explicitly', async () => {
+  it('startCandidateRun handles cancelled signal explicitly', async () => {
     const db = createStudioDatabase(`test-cand-run-cancel-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = new CandidateController({ mintId: () => crypto.randomUUID() });
@@ -642,7 +642,7 @@ describe('CandidateController (RV-08d)', () => {
     db.close();
   });
 
-  it('item 5: if candidate is superseded after run finishes, still saves run and returns superseded: true', async () => {
+  it('if candidate is superseded after run finishes, still saves run and returns superseded: true', async () => {
     const db = createStudioDatabase(`test-cand-run-superseded-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
     const controller = new CandidateController({ mintId: () => crypto.randomUUID() });

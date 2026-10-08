@@ -1,18 +1,13 @@
 /**
- * Export action controller for the transfer UI (RV-10b).
+ * Export action controller for the transfer UI.
  *
- * Wires the pure RV-10a exporters (json-transfer, svg-export, png-export,
+ * Wires the pure exporters (json-transfer, svg-export, png-export,
  * mermaid-export, csv-export) to a caller-supplied session snapshot, repository and
  * download sink. `createTransferActions` is a plain, synchronous-to-construct
  * factory with no React and no global side effects of its own (the only DOM/global
  * touch -- Blob + object URL + anchor click -- lives entirely in the injected
  * `DownloadSink`, see `download-sink.ts`); `useTransferActions` is a thin React hook
  * that memoizes it.
- *
- * Implements specs/revamp/contracts/commands.md §5 ("export.svg / png / mermaid",
- * "export.csv") and parts-and-export.md ("JSON, images and files", "CSV v1",
- * "Mermaid v1"). Task RV-10b: "A hook/controller useTransferActions ... taking the
- * repository, session state, mintId and a download sink."
  */
 
 import * as React from 'react';
@@ -41,7 +36,7 @@ import {
 /**
  * The slice of session state the transfer actions need. Deliberately narrower than
  * `SessionState` (features/session/types.ts) so this module has no dependency on the
- * session controller -- the caller (the lane that owns Workspace.tsx/TopBar.tsx)
+ * session controller -- the caller (Workspace.tsx/TopBar.tsx)
  * projects its own session/results state into this shape when mounting `ExportMenu`.
  */
 export type TransferSessionState = {
@@ -50,7 +45,7 @@ export type TransferSessionState = {
   readonly document: Document | null;
   /** The pinned authored view to export; null selects the document's first view. */
   readonly viewId: Id | null;
-  /** The saved terminal run selected for CSV export (owned by the results lane); null = none selected. */
+  /** The saved terminal run selected for CSV export (owned by the results UI); null = none selected. */
   readonly selectedRunId: Id | null;
 };
 

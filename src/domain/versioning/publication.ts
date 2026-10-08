@@ -1,7 +1,5 @@
 /**
- * Pure Publication Metadata and Version helpers for System Studio (RV-08e).
- *
- * Implements specs/revamp/contracts/storage.md §3:
+ * Pure Publication Metadata and Version helpers for System Studio:
  * - PublicationMetadata validation (version parts safe integers 0–999999;
  *   title trimmed 1–80 code points; rationale 0–4000 code points;
  *   ticketUrl null or absolute http(s) <= 2048 chars with no credentials;
@@ -83,7 +81,7 @@ export function compareSemanticVersions(a: SemanticVersion, b: SemanticVersion):
 }
 
 /**
- * Validates PublicationMetadata exactly per storage.md §3:
+ * Validates PublicationMetadata:
  * - version parts: safe integers 0–999999
  * - title: trimmed 1–80 code points
  * - rationale: 0–4000 code points
@@ -252,7 +250,7 @@ export function validatePublicationMetadata(metadata: unknown): Issue[] {
 }
 
 /**
- * Computes version suggestions per storage.md §3:
+ * Computes version suggestions:
  * - The first publication proposes 0.1.0.
  * - Later ones offer major/minor/patch bumps with resets:
  *   - Major bump resets minor and patch to 0.

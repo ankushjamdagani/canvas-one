@@ -5,7 +5,7 @@ import { mergeDocuments } from './merge';
 import { resolveConflict, ConflictResolutionError } from './resolve';
 import type { Element, Connection } from '../studio/model';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): any {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));

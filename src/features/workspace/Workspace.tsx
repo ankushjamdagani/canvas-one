@@ -174,7 +174,7 @@ const IS_MAC =
   typeof navigator !== "undefined" &&
   /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
-/** RV-03q: the nested Quick options rename reports the session's own reason. */
+/** The nested Quick options rename reports the session's own reason. */
 function renameOutcome(result: SessionRenameResult): RenameOutcome {
   switch (result.status) {
     case "applied":
@@ -276,16 +276,16 @@ export interface WorkspaceProps {
   session: SessionController;
   repository: StudioRepository;
   onBackToProjects: () => void;
-  /** RV-12d: mints ids for the workspace's RunController runs (the app's mintId). */
+  /** Mints ids for the workspace's RunController runs (the app's mintId). */
   mintId: () => string;
   /**
-   * RV-12h review round: the one session actor App.tsx already holds in its
+   * The one session actor App.tsx already holds in its
    * bootState and threads to EntryScreen -- Workspace's HistoryController
    * and PublishController act as this same local-human actor rather than
    * minting or reading a second identity of their own.
    */
   actor: Actor;
-  /** D38 run-control slot; owned by the runs lane, empty until wired in. */
+  /** Run-control slot, owned by the run feature; empty until supplied. */
   runControl?: React.ReactNode;
 }
 
@@ -321,9 +321,9 @@ export function Workspace({
     session.getState,
   );
 
-  // Project record + branch list for the 22A breadcrumb / 13A project menu /
-  // 13B branch popover. Project.title and the branch list are navigation
-  // metadata (transactions.md §4), separate from the per-branch Document, so
+  // Project record + branch list for the breadcrumb, project menu and branch
+  // popover. Project.title and the branch list are navigation
+  // metadata, separate from the per-branch Document, so
   // they're loaded from the repository rather than read off the session's
   // Document.
   const [projectRecord, setProjectRecord] =
@@ -380,7 +380,7 @@ export function Workspace({
   }, [document, activeViewId]);
 
   // ==========================================================================
-  // RV-05b: inspector (2A workspace) draft + navigation guard
+  // Inspector draft + navigation guard
   // ==========================================================================
 
   const viewportWidth = useViewportWidth();
@@ -448,7 +448,7 @@ export function Workspace({
   );
 
   /**
-   * commands.md §6 "Navigation guard": clean -> proceed; dirty -> Apply / Discard /
+   * Navigation guard: clean -> proceed; dirty -> Apply / Discard /
    * Stay. Every selection change, empty-canvas click, branch/project switch and
    * inspector close routes through this before touching anything.
    */
@@ -473,7 +473,7 @@ export function Workspace({
 
   const openInspectorFor = React.useCallback(
     (target: DraftTarget) => {
-      // RV-12e: read the session's live state, not the `document`/`sessionState`
+      // Read the session's live state, not the `document`/`sessionState`
       // render closure. A caller can request selection of a just-applied
       // record synchronously after `await session.apply(...)` resolves --
       // `session.apply` updates its internal state before that promise
@@ -680,7 +680,7 @@ export function Workspace({
       action?.run();
     } else {
       // Apply failed: stay on the inspector with the error surfaced, per
-      // commands.md §6 ("Apply proceeds only on success").
+      // Apply proceeds only on success.
       setGuardOpen(false);
       setDraft(result.handle);
       setFocusFieldId(result.firstInvalidFieldId);
@@ -736,7 +736,7 @@ export function Workspace({
   }, [document, selectedElementIds]);
 
   // ==========================================================================
-  // RV-12d: run lane wiring
+  // Run wiring
   // ==========================================================================
 
   // One RunController per session, backed by a real Web Worker transport.
@@ -826,7 +826,7 @@ export function Workspace({
   });
 
   // loadScenarioStatuses for the current document; recomputed after every
-  // document change and after every saved run (commands.md "Scenarios (D41)").
+  // document change and after every saved run.
   const [scenarioStatusResult, setScenarioStatusResult] =
     React.useState<ScenariosStatusResult | null>(null);
   const [statusRefreshToken, setStatusRefreshToken] = React.useState(0);
@@ -868,7 +868,7 @@ export function Workspace({
 
   const scenariosWithStatus = scenarioStatusResult?.scenarios ?? [];
 
-  // D41 scenario.select: per-browser preference keyed by project + branch;
+  // scenario.select: per-browser preference keyed by project + branch;
   // missing/deleted selection falls back to the first scenario in document
   // order; none -> no selection. Never an authored change.
   const [selectedScenarioId, setSelectedScenarioId] = React.useState<Id | null>(
@@ -907,7 +907,7 @@ export function Workspace({
   // Tracks the working snapshot a run was started against, so the results
   // strip can tell the user "Ran on an earlier version" once the session's
   // working snapshot has moved on (a canvas layout edit is presentation-only
-  // per run-identity.md and doesn't change the scenario fingerprint, but the
+  // and doesn't change the scenario fingerprint, but the
   // run result is still from an earlier snapshot).
   const [lastRunSnapshotId, setLastRunSnapshotId] = React.useState<
     string | null
@@ -1132,7 +1132,7 @@ export function Workspace({
     [scenariosWithStatus],
   );
 
-  // D25 / commands.md §6: Run is disabled while a configuration draft is dirty,
+  // Run is disabled while a configuration draft is dirty,
   // with this exact reason -- checked ahead of the session's own busy reasons.
   const sessionRunDisabledReason =
     draft?.dirty || scenarioDraft?.dirty || scenarioDraft?.isNew
@@ -1164,7 +1164,7 @@ export function Workspace({
     );
   }, [runControllerState, selectedScenarioId, scenariosWithStatus, recordedDocument]);
 
-  // RV-05b MEASURED · LAST RUN: only for an element target, from the latest saved
+  // MEASURED · LAST RUN: only for an element target, from the latest saved
   // run of the currently selected scenario (already exposed by loadScenarioStatuses
   // as ScenarioWithStatus.latestRun -- no separate runs-lane lookup needed).
   const measuredSection = React.useMemo(() => {
@@ -1200,7 +1200,7 @@ export function Workspace({
     return new Map(latestRun.checks.map((check) => [check.assertionId, check]));
   }, [scenarioDraft, scenariosWithStatus]);
 
-  // RV-12d review round 1: every check's assertion label, looked up from the
+  // Every check's assertion label, looked up from the
   // scenario that ran (never the raw assertionId) so ResultsRegion can show
   // "Cart total matches" instead of "Assertion <uuid>".
   const assertionLabels = React.useMemo(() => {
@@ -1318,7 +1318,7 @@ export function Workspace({
     return "";
   }, [isSaving, sessionState.lastError, sessionState.status]);
 
-  // Other projects, so renaming can refuse a name another project already uses (13A "name taken").
+  // Other projects, so renaming can refuse a name another project already uses ("name taken").
   const [projectsLoaded, setProjectsLoaded] = React.useState(false);
   const [otherProjects, setOtherProjects] = React.useState<
     readonly {
@@ -1386,7 +1386,7 @@ export function Workspace({
     [session],
   );
 
-  // D52: details for linked-project nodes, read live from the project records (this project included).
+  // Details for linked-project nodes, read live from the project records (this project included).
   const linkedProjects = React.useMemo(() => {
     if (!projectsLoaded) return null;
     const map = new Map<
@@ -1428,11 +1428,11 @@ export function Workspace({
     await session.redo();
   }, [session, sessionState.canRedo, isSaving]);
 
-  // RV-12e: generic apply for place/connect/delete -- each caller builds its
+  // Generic apply for place/connect/delete -- each caller builds its
   // own model.apply-records batch (placeEntry / planConnection / planDelete)
   // and this just runs it through the session (one gesture == one undo). A
   // busy/failed/unsupported result returns false so the caller leaves nothing
-  // destructive on screen and the user can retry (commands.md "busy").
+  // destructive on screen and the user can retry.
   const handleApplyChanges = React.useCallback(
     async (
       changes: Parameters<SessionController["apply"]>[0],
@@ -1445,7 +1445,7 @@ export function Workspace({
     [document, isSaving, session],
   );
 
-  // D53: the connection types this project accepts (from its nodes' in-ports) and which are exposed.
+  // The connection types this project accepts (from its nodes' in-ports) and which are exposed.
   const exposedTypes = React.useMemo(
     () => (projectRecord ? projectExposures(projectRecord) : []),
     [projectRecord],
@@ -1549,7 +1549,7 @@ export function Workspace({
   );
 
   // ==========================================================================
-  // RV-12h: History and Library panels
+  // History and Library panels
   // ==========================================================================
 
   // One HistoryController / CandidateController / PublishController per
@@ -1569,7 +1569,7 @@ export function Workspace({
         candidateController,
         mintId,
         actor,
-        // Reuses CandidateController's own already-tested runner (RV-11b) --
+        // Reuses CandidateController's own already-tested runner --
         // never a bespoke one, matching the exact pattern in
         // publishController.test.ts.
         runScenario: (params) =>
@@ -1602,7 +1602,7 @@ export function Workspace({
     [publishController, runCommand],
   );
 
-  // Panel placement/collapse/width preferences (commands.md §7) use their own
+  // Panel placement/collapse/width preferences use their own
   // repository revision, outside project content and workingRevision.
   const [panelState, setPanelState] = React.useState<WorkspacePanelState>(() =>
     createInitialPanelState(
@@ -1779,7 +1779,7 @@ export function Workspace({
       if (effects.some((effect) => effect.type === "save")) {
         persistPanelState(next);
       }
-      // commands.md: opening a panel "expands and focuses" it. Only OPEN/EXPAND move focus,
+      // Opening a panel expands and focuses it. Only OPEN/EXPAND move focus,
       // and never away from something already inside that panel (clicks there emit FOCUS too).
       if (action.type === "OPEN" || action.type === "EXPAND") {
         for (const effect of effects) {
@@ -1882,8 +1882,7 @@ export function Workspace({
     return () => window.removeEventListener("resize", syncViewport);
   }, [panelDispatch]);
 
-  // History panel's own view: the ladder (22A), or the commit gate (scenario
-  // "commit_gate" screen) swapped in when the ladder's Commit action fires.
+  // History panel's own view: the ladder, or the commit gate swapped in when the ladder's Commit action fires.
   const [historyView, setHistoryView] = React.useState<"ladder" | "commit">(
     "ladder",
   );
@@ -1910,7 +1909,7 @@ export function Workspace({
   const [behindMainBannerDismissed, setBehindMainBannerDismissed] =
     React.useState(false);
 
-  // 22E "draft behind main": proactively prepares a real publish candidate
+  // "Draft behind main": proactively prepares a real publish candidate
   // against main so the real conflict count is known before the user opens
   // Publish (matching DraftBehindMainBanner's own doc comment: "the app
   // shell mounts [it] typically after calling PublishController.prepare()").
@@ -1948,7 +1947,7 @@ export function Workspace({
       // session onto main -- reaching this branch. Nothing to prepare while
       // sitting on main itself.
       //
-      // 22D: this session's own publish reloads the session onto main while the
+      // This session's own publish reloads the session onto main while the
       // controller is still 'publishing' (it turns 'published' right after);
       // keep the controller and overlay so PublishedNotice shows until the user
       // dismisses it or navigates to another branch.
@@ -2023,11 +2022,11 @@ export function Workspace({
   }, [runGuarded, onBackToProjects]);
 
   // ==========================================================================
-  // RV-03q: command registry + 14A Quick options (commands.md §1)
+  // Command registry + Quick options
   // ==========================================================================
 
   const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
-  // 16D overflow state: a Library capture review request, History's part filter, the
+  // Selection overflow state: a Library capture review request, History's part filter, the
   // part being replaced, and the flow-probe check to open expanded.
   const [captureRequested, setCaptureRequested] = React.useState<number>(0);
   const [historyFilter, setHistoryFilter] = React.useState<readonly Id[]>([]);
@@ -2045,7 +2044,7 @@ export function Workspace({
     refreshBehindMainCheck();
   }, [panelDispatch, refreshBehindMainCheck]);
 
-  // Board scenario_traffic_editor: while a scenario is edited, its enabled workloads'
+  // While a scenario is edited, its enabled workloads'
   // entry elements carry a "Traffic enters here" tag on the canvas.
   const trafficEntryElementIds = React.useMemo(():
     ReadonlySet<Id> | undefined => {
@@ -2056,7 +2055,7 @@ export function Workspace({
     );
   }, [scenarioDraft]);
 
-  // Open inspector / scenario draft as the registry sees it (commands.md §1).
+  // Open inspector / scenario draft as the registry sees it.
   const draftContext = React.useMemo((): {
     readonly id: Id | null;
     readonly state: CommandDraftState;
@@ -2088,7 +2087,7 @@ export function Workspace({
     return { id: null, state: "clean" };
   }, [draft, scenarioDraft]);
 
-  // 16D overflow availability inputs: the single selected element and the scenario a
+  // Selection overflow availability inputs: the single selected element and the scenario a
   // flow probe would be added to (the switcher's selection, else the first scenario).
   const singleSelectedElement = React.useMemo(() => {
     if (!document || selectedElementIds.size !== 1) return null;
@@ -2542,7 +2541,7 @@ export function Workspace({
               ),
             )
           : { ok: false, message: "No canvas view is open" },
-      // 16D overflow (commands.md "Selection-scoped actions", D46).
+      // Selection overflow commands.
       "selection.save-as-component": () => {
         openLibraryPanel();
         setCaptureRequested((n) => n + 1);
@@ -2827,7 +2826,7 @@ export function Workspace({
   );
 
   const [historyNotice, setHistoryNotice] = React.useState<string | null>(null);
-  // D40: main never holds edits. "Start a new draft" / "Edit main directly" on
+  // Main never holds edits. "Start a new draft" / "Edit main directly" on
   // published main both create a draft through branch.create (the same guarded
   // path as the branch popover) and switch to it. Main's working content is its
   // head, so 'head' and 'working' copy the same document; "Edit main directly"
@@ -3141,7 +3140,7 @@ export function Workspace({
 
   // Global shortcuts (Mod+Z, Mod+Shift+Z, F2) come from the registry; ignored
   // during IME composition, in editable fields and nested dialogs, and
-  // preventDefault fires only after an enabled match (commands.md §1).
+  // preventDefault fires only after an enabled match.
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null;
@@ -3192,7 +3191,7 @@ export function Workspace({
       (branch) => branch.id === commandContext.branchId,
     )?.label ?? "";
 
-  // Escape closes an overlay first, never a dirty draft directly (commands.md §6).
+  // Escape closes an overlay first, never a dirty draft directly.
   // The guard dialog is itself a shadcn Dialog and handles its own Escape (-> Stay).
   // With no overlay open, Escape on a clean inspector closes it; a dirty draft is
   // left untouched (Apply/Discard/Stay only).
@@ -3233,7 +3232,7 @@ export function Workspace({
           className="pointer-events-none absolute inset-[22px] hidden min-[1000px]:block border border-[var(--drafting-frame-edge,#c9c2b5)] shadow-[inset_0_0_0_4px_var(--shell),inset_0_0_0_5px_var(--drafting-inner-edge)]"
         />
       )}
-      {/* Top Bar (22A nav live) */}
+      {/* Top bar */}
       {projectRecord ? (
         <TopBar
           project={projectRecord}
@@ -3282,15 +3281,13 @@ export function Workspace({
         />
       )}
 
-      {/* Canvas fills the workspace; the permanent left activity rail is
-          removed per D-observed shell structure — a rail only exists for
-          collapsed panels (23F/23G), not built here. */}
+      {/* Canvas fills the workspace; there is no permanent left activity rail. */}
       <div className="flex flex-1 w-full max-w-full min-h-0 overflow-hidden relative">
         <main ref={simulationViewportRef} className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
           {/* Canvas shrinks to make room for the results strip below it. The
               History and Library panels dock/float/collapse around the
-              canvas through PanelHost (RV-03a); the inspector stays its own
-              contextual region below (commands.md §5) and is never a panel. */}
+              canvas through PanelHost; the inspector stays its own
+              contextual region below and is never a panel. */}
           <ResizablePanelGroup
             orientation="vertical"
             className="min-h-0 flex-1"
@@ -3366,7 +3363,7 @@ export function Workspace({
                     )}
                   />
 
-                  {/* 22E draft behind main: a real conflict count from
+                  {/* Draft behind main: a real conflict count from
                       PublishController.prepare(), never invented. */}
                   {behindMainInfo && !behindMainBannerDismissed && (
                     <div className="absolute top-[calc(0.75rem+var(--topbar-inset,0px))] left-3 right-3 z-dock">
@@ -3397,12 +3394,12 @@ export function Workspace({
           </ResizablePanel>
           <ResizablePanel id="simulation" panelRef={simulationPanelRef} minSize={simulationMobileLayout ? 152 : 52} className="min-h-0 overflow-hidden">
 
-          {/* 22C/22F publish review + compare-and-resolve, driven by the same
-              proactively-prepared PublishController used for the 22E banner. */}
+          {/* Publish review + compare-and-resolve, driven by the same
+              proactively-prepared PublishController used for the banner. */}
           {publishOpen && (
             <div
               data-testid="publish-flow-overlay"
-              // 22D published is a non-modal notice (the canvas and History stay
+              // Published is a non-modal notice (the canvas and History stay
               // usable); every other publish state is the modal review.
               className={
                 publishControllerState.status === "published"
@@ -3485,10 +3482,10 @@ export function Workspace({
           </ResizablePanelGroup>
         </main>
 
-        {/* RV-05b inspector: 320px right dock >= 768px (commands.md §7); a full-width
+        {/* Inspector: 320px right dock >= 768px; a full-width
             bottom sheet below 768px, same content and guard. */}
         {/* A multi-selection keeps its draft (it is the selection) but shows no
-            inspector: board 16D has only the selection toolbar (D44 O2). */}
+            inspector: only the selection toolbar applies. */}
         {draft && !draft.multi && !isMobileInspector && !inspectorHosted ? (
           <InspectorPanel
             draft={draft}
@@ -3532,7 +3529,7 @@ export function Workspace({
       panelState.activeOverlay !== "history" ? (
         <div
           data-testid="inspector-sheet-overlay"
-          // RV-05b review round 1: an explicit h-[70vh] (not just max-h) gives the
+          // An explicit h-[70vh] (not just max-h) gives the
           // flex column below a definite height to resolve its own h-full against,
           // and overflow-hidden makes sure the sheet itself never grows past that --
           // the canvas stays visible above it, and InspectorPanel's own scroll

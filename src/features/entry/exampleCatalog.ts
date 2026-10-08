@@ -18,15 +18,15 @@ const asDocument = (module: { default: unknown }) => module.default as Document;
 
 export const EXAMPLE_CATALOG: readonly ExampleCatalogEntry[] = Object.freeze([
   { id: 's01', key: 'S01', title: 'S01 Checkout', componentCount: 2, scenarioCount: 3,
-    load: () => import('../../../specs/revamp/fixtures/s01.json').then(asDocument) },
+    load: () => import('./examples/s01.json').then(asDocument) },
   { id: 's02', key: 'S02', title: 'S02 Order processing', componentCount: 6, scenarioCount: 2,
-    load: () => import('../../../specs/revamp/fixtures/s02.json').then(asDocument) },
+    load: () => import('./examples/s02.json').then(asDocument) },
   { id: 's03', key: 'S03', title: 'S03 Records pipeline', componentCount: 1, scenarioCount: 1,
-    load: () => import('../../../specs/revamp/fixtures/s03.json').then(asDocument) },
+    load: () => import('./examples/s03.json').then(asDocument) },
   { id: 's04', key: 'S04', title: 'S04 Infrastructure', componentCount: 7, scenarioCount: 3,
-    load: () => import('../../../specs/revamp/fixtures/s04.json').then(asDocument) },
+    load: () => import('./examples/s04.json').then(asDocument) },
   { id: 's05', key: 'S05', title: 'S05 Fullstack', componentCount: 9, scenarioCount: 2,
-    load: () => import('../../../specs/revamp/fixtures/s05.json').then(asDocument) },
+    load: () => import('./examples/s05.json').then(asDocument) },
   { id: 's06', key: 'S06', title: 'S06 Checkout under a traffic spike', componentCount: 8, scenarioCount: 2,
-    load: () => import('../../../specs/revamp/fixtures/s06.json').then(asDocument) },
+    load: () => import('./examples/s06.json').then(asDocument) },
 ] as const);

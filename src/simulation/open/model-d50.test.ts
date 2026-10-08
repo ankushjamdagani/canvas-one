@@ -12,9 +12,9 @@ import { compileExecution } from '../../domain/execution';
 import { OpenSimulation } from './kernel';
 
 /**
- * D50 (the D49 limits): heavy-tailed lognormal service time, routers retrying on another
+ * Heavy-tailed lognormal service time, routers retrying on another
  * route, and broker redelivery. Bridge (boundary) retries run through the studio runner
- * and are tested in reference-architectures.test.ts (A12).
+ * and are tested in reference-architectures.test.ts.
  */
 
 const SEEDS = [11, 29, 47, 71, 101, 149] as const;
@@ -43,7 +43,7 @@ const retry = (o: Partial<CallRetryPolicy> = {}): CallRetryPolicy => ({
   maxAttempts: 3, backoffMs: 0, backoffMultiplier: 2, maxBackoffMs: 10_000, jitter: false, attemptTimeoutMs: null, ...o,
 });
 
-describe('D50 lognormal service time', () => {
+describe('lognormal service time', () => {
   // cv 3: sigma^2 = ln 10; p95 = exp(-sigma^2/2 + 1.645 sigma) = 3.83 x mean (exponential: 3.0 x).
   const runLognormal = (seed: number) =>
     new OpenSimulation(graph([node('svc', 'service', processor({ capacity: 20, concurrency: 1024, serviceTime: 'lognormal', serviceTimeCv: 3 }))], [], workload('svc', 50), seed, 300)).advance(300);
@@ -65,7 +65,7 @@ describe('D50 lognormal service time', () => {
   });
 });
 
-describe('D50 a router retries on another route', () => {
+describe('a router retries on another route', () => {
   it('a request that fails on a broken backend succeeds on the healthy one', () => {
     const policy = retry({ maxAttempts: 2 });
     const m = new OpenSimulation(graph(
@@ -113,7 +113,7 @@ describe('D50 a router retries on another route', () => {
   });
 });
 
-describe('D50 broker redelivery', () => {
+describe('broker redelivery', () => {
   const queueGraph = (policy: CallRetryPolicy | null, seed: number) =>
     graph(
       [

@@ -1,16 +1,11 @@
 /**
- * PublishReviewDialog (22C publish review) — RV-11b review round.
+ * PublishReviewDialog: a modal with five numbered sections — (1) What goes onto main,
+ * (2) Run evidence for exactly this state (REQUIRED), (3) Conflicts with main (blocks
+ * publishing), (4) Version number (major/minor/patch radio cards), (5) title/rationale/ticket
+ * URL — and a footer with "Close this draft after publishing", Cancel and "Publish X.Y.Z".
  *
- * specs/revamp/screens/22C_publish_review.png: a modal with five numbered
- * sections — (1) What goes onto main, (2) Run evidence for exactly this state
- * (REQUIRED), (3) Conflicts with main (blocks publishing), (4) Version number
- * (major/minor/patch radio cards), (5) title/rationale/ticket URL — and a
- * footer with "Close this draft after publishing", Cancel and "Publish X.Y.Z".
- *
- * design-revalidation.md §2 overrides, deliberately absent here:
- * - "minor · fits the diff" (or any) reasoning text on a version card — the
- *   cards show only the computed number and the word major/minor/patch.
- * - p95/burst/"vs 2.2.1" deltas anywhere in the evidence or commit list.
+ * Deliberately absent: reasoning text on a version card (cards show only the computed number
+ * and the word major/minor/patch) and performance deltas in the evidence or commit list.
  *
  * `PublishReviewBody` is the pure, presentational content — exported
  * separately so it can be rendered and asserted on directly with
@@ -608,8 +603,8 @@ export interface PublishReviewDialogProps extends PublishReviewBodyProps {
 }
 
 /** The real composition to mount: PublishReviewBody inside the project's actual
- * Dialog primitive (focus trap, title, description, focus return per
- * commands.md §7). Not exercised by renderToStaticMarkup tests — see the file
+ * Dialog primitive (focus trap, title, description, focus return).
+ * Not exercised by renderToStaticMarkup tests — see the file
  * header — those target PublishReviewBody directly. */
 export function PublishReviewDialog({
   open,

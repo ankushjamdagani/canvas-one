@@ -1,5 +1,5 @@
 /**
- * D53: the simulated settings of an in-port (rate limit, failure rate, service time) override the
+ * The simulated settings of an in-port (rate limit, failure rate, service time) override the
  * node's behavior for calls entering through it. Built with the app's own planners.
  */
 import { describe, expect, it } from 'vitest';
@@ -63,7 +63,7 @@ async function roots(settings: Record<string, unknown> | null) {
   return { ...(r.summary.rootCounts as { generated: number; succeeded: number; failed: number; rejected: number }), meanMs };
 }
 
-describe('endpoint behavior overrides (D53)', () => {
+describe('endpoint behavior overrides', () => {
   it('without settings nothing is rejected or failed', async () => {
     const c = await roots(null);
     expect(c.succeeded).toBe(c.generated);

@@ -1,5 +1,5 @@
 /**
- * Exposed endpoints (D53): the connection types a project offers to projects that link to it.
+ * Exposed endpoints: the connection types a project offers to projects that link to it.
  * Project-level data (like description and team), not part of any document or branch.
  */
 

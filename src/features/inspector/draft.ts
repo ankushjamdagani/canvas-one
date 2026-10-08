@@ -1,8 +1,6 @@
 /**
- * Draft lifecycle (RV-05b).
+ * Draft lifecycle for the inspector.
  *
- * Implements specs/revamp/contracts/commands.md §6 "Draft lifecycle" and
- * specs/revamp/contracts/transactions.md §3 "Inspector Apply":
  * - openDraft/changeField/validateDraft/applyDraft/cancelDraft are the only bridge
  *   methods; field IDs are schema-owned (fields.ts); raw strings (including
  *   incomplete ones) never enter the Document until a successful Apply.
@@ -76,7 +74,7 @@ function buildFieldsAndLabel(
 
 /**
  * Opens a draft for `target` against `document` (the session's current working
- * Document at `baseWorkingRevision`). commands.md §5: "An empty target is rejected" —
+ * Document at `baseWorkingRevision`). An empty target is rejected:
  * callers must not pass `target.ids.length === 0`.
  */
 export function openDraft(
@@ -169,8 +167,8 @@ function computeDirty(baseValues: Readonly<Record<string, string>>, values: Read
 }
 
 /**
- * commands.md §6: "The only bridge methods are changeField(fieldId, rawValue) ...
- * Raw strings (including incomplete ones) never enter the Document."
+ * Records a raw string for one field. Raw strings (including incomplete ones) never enter the
+ * Document until a successful Apply.
  */
 export function changeField(handle: DraftHandle, fieldId: string, rawValue: string): DraftHandle {
   if (handle.missing || handle.multi) return handle;
@@ -217,7 +215,7 @@ export function validateDraft(handle: DraftHandle): ValidateDraftResult {
 }
 
 /**
- * commands.md §6 Cancel: "discards the draft and reloads accepted values."
+ * Discards the draft and reloads accepted values.
  */
 export function cancelDraft(handle: DraftHandle): DraftHandle {
   return Object.freeze({
@@ -234,7 +232,7 @@ function buildChangedRecord(handle: DraftHandle, currentRecord: Element | Connec
   for (const field of handle.fields) {
     if (field.kind === 'readonly') continue;
     const raw = handle.values[field.id] ?? '';
-    if (raw === handle.baseValues[field.id]) continue; // only changed fields (transactions.md §3)
+    if (raw === handle.baseValues[field.id]) continue; // only changed fields
     const parsed = field.parse(raw);
     if (!parsed.ok) continue; // validateDraft() gates this before we get here
     record = field.apply(record as never, parsed.value) as Element | Connection;
@@ -243,10 +241,9 @@ function buildChangedRecord(handle: DraftHandle, currentRecord: Element | Connec
 }
 
 /**
- * transactions.md §3: "Opening a draft captures {..., baseWorkingRevision, baseValues}.
- * Apply parses the whole draft, checks target existence, cross-references and revision,
- * then submits one compound command = one undo entry." Multi-target drafts have no
- * fields yet (RV-05b: no bulk editing), so applyDraft is a no-op for them.
+ * Parses the whole draft, checks target existence, cross-references and revision, then
+ * submits one compound command (one undo entry). Multi-target drafts have no fields yet
+ * (no bulk editing), so applyDraft is a no-op for them.
  */
 export async function applyDraft(handle: DraftHandle, session: DraftSession): Promise<ApplyDraftResult> {
   if (handle.multi) {
@@ -265,8 +262,8 @@ export async function applyDraft(handle: DraftHandle, session: DraftSession): Pr
 
   const sessionState = session.getState();
 
-  // Stale: the working revision moved under the draft (commands.md §6: "never
-  // silently rebases" — Reload/Keep editing/Cancel navigation is the caller's UI).
+  // Stale: the working revision moved under the draft ; a stale draft is never
+  // silently rebased. Reload/Keep editing/Cancel navigation is the caller's UI).
   if (sessionState.workingRevision === null || sessionState.workingRevision !== handle.baseWorkingRevision) {
     return {
       handle: Object.freeze({ ...validated.handle, status: 'stale' }),
@@ -285,7 +282,7 @@ export async function applyDraft(handle: DraftHandle, session: DraftSession): Pr
       : findConnection(document, handle.target.ids[0]);
 
   if (!currentRecord) {
-    // Target deleted elsewhere: stale/missing, text kept (commands.md §6).
+    // Target deleted elsewhere: stale/missing, text kept.
     return {
       handle: Object.freeze({ ...validated.handle, status: 'stale', missing: true }),
       firstInvalidFieldId: null,
@@ -317,7 +314,7 @@ export async function applyDraft(handle: DraftHandle, session: DraftSession): Pr
       );
     }
     // Some fields depend on the record (e.g. retry details appear once a call has a retry
-    // policy, D49), so the field list is rebuilt from the applied record. Accepted values
+    // policy), so the field list is rebuilt from the applied record. Accepted values
     // stay as typed; fields that just appeared take the record's value.
     const refreshedFields =
       handle.target.kind === 'element'

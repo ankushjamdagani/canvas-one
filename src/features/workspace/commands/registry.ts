@@ -1,9 +1,5 @@
 /**
- * Workspace command registry (RV-03q, completed in RV-03s).
- *
- * Implements specs/revamp/contracts/commands.md §1 ("Registry", "Shortcuts") for
- * the commands the new app already wires, and the 14A Quick options list
- * (specs/revamp/screens/14A_Quick_options_open.png) built from it.
+ * Workspace command registry, and the Quick options list built from it.
  *
  * - Every entry is `{id, label, keywords, group, iconKey, shortcut, availability}`
  *   and the definition table is exhaustive over `CommandId` (a mapped type), as
@@ -42,7 +38,7 @@
  * - Saved parts: part.capture/place/export/import, executed by the Library's
  *   SavedParts. Their payloads wrap the bound branch/project command, so a retry
  *   reuses one operation id. They are not in Quick options (parts stay out of
- *   14A search).
+ *   Quick options search).
  *
  * Not here: project.create and project.import (reachable only from the entry
  * screen, before any workspace exists), inspector.open, panel.resize,
@@ -136,13 +132,13 @@ export type CommandId = (typeof COMMAND_IDS)[number];
 
 type Empty = Record<string, never>;
 
-/** Presentation only (commands.md §4): flips Placement.expanded / Group.collapsed. */
+/** Presentation only: flips Placement.expanded / Group.collapsed. */
 export interface CanvasExpansionPayload {
   readonly viewId: Id;
   readonly target: { readonly kind: 'placement' | 'group'; readonly id: Id };
 }
 
-/** Closed payload per command (commands.md §2: never JSON patches). */
+/** Closed payload per command (never JSON patches). */
 export interface CommandPayloads {
   'commands.open': Empty;
   'project.rename': { readonly title: string };
@@ -209,14 +205,14 @@ export interface CommandPayloads {
   };
   'selection.distribute': { readonly axis: 'x' | 'y' };
   'canvas.add-note': { readonly text: string };
-  /** The bound branch envelope keeps the operation id, so a retry stays idempotent (§2). */
+  /** The bound branch envelope keeps the operation id, so a retry stays idempotent. */
   'part.capture': { readonly command: PartCaptureCommand };
   'part.place': { readonly content: PartContent; readonly label: string };
   'part.export': { readonly partId: Id; readonly revision: number; readonly label: string };
   'part.import': { readonly command: PartImportCommand };
   'canvas.expand': CanvasExpansionPayload;
   'canvas.collapse': CanvasExpansionPayload;
-  // 16D overflow (commands.md "Selection-scoped actions"): invoked for the current canvas
+  // Selection-scoped overflow commands: invoked for the current canvas
   // selection like selection.duplicate/delete; handlers read the selection from context.
   /** Opens the replace dialog; the replacement applies as one model change on confirm. */
   /** Opens the Library's capture review for the selection, which then runs part.capture. */
@@ -325,7 +321,7 @@ export type AvailabilityCode =
 
 export type CommandRunPhase = 'idle' | 'compiling' | 'running' | 'paused' | 'saving' | 'done';
 
-/** Open configuration draft state (commands.md §1 `draftState`). */
+/** Open configuration draft state. */
 export type CommandDraftState = 'clean' | 'dirty' | 'validating' | 'saving' | 'invalid' | 'stale';
 
 export interface CommandPanelState {
@@ -366,7 +362,7 @@ export interface CommandContext {
   /** The open inspector/scenario draft, or `clean`/null when none is dirty or open. */
   readonly draftState: CommandDraftState;
   readonly draftId: Id | null;
-  /** Library/History preference state (commands.md §7). */
+  /** Library/History preference state. */
   /** The inspector entry is optional: it only exists on desktop, where it is a hosted panel. */
   readonly panels: Readonly<Record<'library' | 'history', CommandPanelState>> &
     Readonly<Partial<Record<'inspector', CommandPanelState>>>;
@@ -384,7 +380,7 @@ export interface CommandContext {
   /** Exact presentation groups represented by the current element selection. */
   readonly selectedGroupIds: readonly Id[];
   readonly selectionWhollyUngrouped: boolean;
-  /** True when any selected element already has a refinement owner (D33). */
+  /** True when any selected element already has a refinement owner. */
   readonly selectionHasRefinementMember: boolean;
   readonly activeViewGroupCount: number;
   readonly activeViewNoteCount: number;
@@ -485,7 +481,7 @@ function requireOpenBranch(ctx: CommandContext, action: string): Availability | 
     : null;
 }
 
-const MAIN_COMMIT_REASON = 'Main never holds edits (D40): edit main directly to create a draft';
+const MAIN_COMMIT_REASON = 'Main never holds edits: edit main directly to create a draft';
 const MAIN_RESTORE_REASON = 'Direct restore on main branch is rejected; main is changed only by publication';
 
 function requireDraftBranch(ctx: CommandContext, reason: string): Availability | null {
@@ -990,7 +986,7 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     keywords: ['delete', 'remove', 'selection', 'parts'],
     group: 'selection',
     iconKey: 'delete',
-    // Canvas focus only (commands.md §1): matched by the canvas key handler.
+    // Canvas focus only: matched by the canvas key handler.
     shortcut: { key: 'Delete', aliases: ['Backspace'], modifiers: [], scope: 'canvas' },
     availability: (ctx) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
@@ -1397,7 +1393,7 @@ function runShortcutCommand(
 /**
  * Keyboard entry point: matches the event, checks availability synchronously
  * and starts execution. Returns the command id when an *enabled* command
- * matched -- only then may the caller `preventDefault` (commands.md §1).
+ * matched -- only then may the caller `preventDefault`.
  */
 export function runGlobalShortcut(
   event: ShortcutEvent,
@@ -1438,7 +1434,7 @@ export function formatShortcut(shortcut: Shortcut, isMac: boolean): string {
 }
 
 // ============================================================================
-// Quick options (14A)
+// Quick options
 // ============================================================================
 
 /** One selectable row: a command with its bound payload. */
@@ -1490,7 +1486,7 @@ function option<K extends CommandId>(
 }
 
 /**
- * The 14A list plus contracted canvas actions. The current
+ * The Quick options list plus canvas actions. The current
  * branch comes first in its group, then main, then the rest by label. Run pause/
  * resume/reset appear only while they apply, so the list isn't padded with
  * rows that are nearly always disabled.

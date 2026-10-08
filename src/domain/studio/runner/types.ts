@@ -1,25 +1,20 @@
 /**
- * Runner-start types (RV-14a).
+ * Runner record shapes: RunUpdate, TraceEvent, retained adapter types, CheckResult,
+ * RunSummary, Counts, the closed ElementMetric key catalog, MetricSample,
+ * ResourceSummary, AuthoredSnapshot and row provenance, plus the run budget limits.
  *
- * Implements the exact record shapes required by:
- * - specs/revamp/contracts/model-and-runner.md §8 (Runner interface: RunUpdate,
- *   TraceEvent, retained adapter types) and §9 (Results: Issue-adjacent records,
- *   CheckResult, RunSummary, Counts, ElementMetric closed key catalog, MetricSample,
- *   ResourceSummary, AuthoredSnapshot, row provenance).
- * - specs/revamp/contracts/storage.md §6 (run defaults/maxima table).
+ * SCOPE: pure type declarations and numeric constants only. No worker, no `startRun`,
+ * no plan handles (see compile.ts's module comment).
  *
- * SCOPE: pure type declarations and the storage.md numeric constants only. No worker,
- * no `startRun`, no plan handles — see compile.ts's module comment for why.
- *
- * `Issue` (model-and-runner.md §9's validation-issue record) already exists at
- * ./validate.ts and is intentionally NOT redeclared here; runner modules import it.
+ * `Issue` (the validation-issue record) lives in ./validate.ts and is intentionally NOT
+ * redeclared here; runner modules import it.
  */
 
 import type { Document, Endpoint, Id, Json } from '../model';
 import type { Issue } from '../validate';
 
 // ============================================================================
-// Run lifecycle (run-identity.md §4, model-and-runner.md §8)
+// Run lifecycle
 // ============================================================================
 
 /** Non-terminal run states carried by `{kind:'state'}` RunUpdates. */
@@ -30,7 +25,7 @@ export type RunState = (typeof RUN_STATES)[number];
 export const TERMINAL_STATUSES = ['completed', 'invalid', 'failed', 'cancelled', 'incomplete'] as const;
 export type TerminalStatus = (typeof TERMINAL_STATUSES)[number];
 
-/** `stop` (D55): stop new arrivals and let work in flight finish, then complete (unlike `cancel`, which discards). */
+/** `stop`: stop new arrivals and let work in flight finish, then complete (unlike `cancel`, which discards). */
 export type RunControl = { readonly kind: 'pause' | 'resume' | 'cancel' | 'stop' };
 
 export interface RunHandle {
@@ -39,7 +34,7 @@ export interface RunHandle {
 }
 
 // ============================================================================
-// TraceEvent (§8)
+// TraceEvent
 // ============================================================================
 
 const TRACE_EVENT_KINDS = [
@@ -75,7 +70,7 @@ export type TraceEvent = {
 };
 
 // ============================================================================
-// RunUpdate (§8)
+// RunUpdate
 // ============================================================================
 
 export type CheckResult = {
@@ -95,10 +90,10 @@ export type Counts = {
 };
 
 /**
- * Closed ElementMetric key catalog (§9: "the six counts, `acknowledged`, `throughput`,
+ * Closed ElementMetric key catalog (the six counts, `acknowledged`, `throughput`,
  * `meanLatencyMs`, `p95LatencyMs`, `utilization`, `queued`, `active`,
- * `cacheHits/Misses/Entries/Evictions/Expirations`"). Each key needs its own regression
- * fixture per the contract; this array is the single source of truth for the catalog.
+ * `cacheHits/Misses/Entries/Evictions/Expirations`). Each key needs its own regression
+ * fixture; this array is the single source of truth for the catalog.
  */
 export const ELEMENT_METRIC_KEYS = [
   'generated',
@@ -142,7 +137,7 @@ export type MetricSample = {
   readonly metrics: readonly ElementMetric[];
 };
 
-/** §9 row provenance: `{inputEventId,index}` identifies one source row. */
+/** Row provenance: `{inputEventId,index}` identifies one source row. */
 export type RowRef = { readonly inputEventId: string; readonly index: number };
 
 export type RowOutcome = {
@@ -154,11 +149,11 @@ export type RowOutcome = {
   readonly errorCode: 'schema-mismatch' | 'wrong-type' | 'missing-path' | 'integer-overflow' | null;
 };
 
-/** D56: how one cycle ended, worst first when its units differ. `lost` is reserved for a lost leg. */
+/** How one cycle ended, worst first when its units differ. `lost` is reserved for a lost leg. */
 export type CycleOutcome = 'ok' | 'expired' | 'rejected' | 'timed-out' | 'failed' | 'lost' | 'stuck';
 
 /**
- * D56: one request from a source and everything it caused. The response reaches the source at
+ * One request from a source and everything it caused. The response reaches the source at
  * `responseAtMs`; the cycle is complete at `completedAtMs`, when its last descendant has settled.
  */
 export type Cycle = {
@@ -184,7 +179,7 @@ export type CycleSummary = {
 };
 
 /**
- * D57: the run's cumulative summary at one simulated time, posted about every 5 s of simulated time so a
+ * The run's cumulative summary at one simulated time, posted about every 5 s of simulated time so a
  * playhead can show "results as of now" without replaying the whole run.
  */
 export type RunCheckpoint = {
@@ -221,9 +216,9 @@ export type RunSummary = {
   readonly rowOutcomes: readonly RowOutcome[];
   /**
    * The trace covers the whole run unless `truncatedBy` names the cap it reached
-   * (storage.md §6, D47). Counts, metrics and checks always cover the whole run; checks
-   * that read trace rows are unevaluated when the trace is truncated. Absent on runs saved
-   * before D47: those stopped at the cap as `incomplete`, so their traces were never truncated.
+   * Counts, metrics and checks always cover the whole run; checks
+   * that read trace rows are unevaluated when the trace is truncated. Absent on older saved
+   * runs, which stopped at the cap as `incomplete`, so their traces were never truncated.
    */
   readonly trace?: { readonly recordedRows: number; readonly truncatedBy: 'trace-rows' | 'trace-bytes' | null };
 };
@@ -276,7 +271,7 @@ export type RunUpdate =
     };
 
 /**
- * The request a workload-generated root carries (model-and-runner.md §6 Workloads):
+ * The request a workload-generated root carries:
  * the empty record, the only value the catalog's generic request schema accepts.
  * A workload request that crosses to a boundary must satisfy that call's request schema.
  */
@@ -285,7 +280,7 @@ export const WORKLOAD_REQUEST_PAYLOAD: Json = Object.freeze({}) as Json;
 export const WORKLOAD_PAYLOAD_REF = 'payload-workload';
 
 // ============================================================================
-// Retained adapter types (§8 "Retained adapter")
+// Retained adapter types
 // ============================================================================
 
 export type ResourceInput = {
@@ -334,22 +329,22 @@ export type ResourceSummary = {
 };
 
 // ============================================================================
-// AuthoredSnapshot (§9)
+// AuthoredSnapshot
 // ============================================================================
 
 export type AuthoredSnapshot = { readonly id: string; readonly document: Document };
 
 // ============================================================================
-// storage.md §6 run defaults/maxima
+// Run budget defaults and maxima
 // ============================================================================
 
 export const RUN_BUDGET_LIMITS = {
   maxEvents: { default: 100_000, max: 1_000_000 },
   maxTraceRows: { default: 10_000, max: 100_000 },
   maxTraceBytes: { default: 4 * 1024 * 1024, max: 16 * 1024 * 1024 },
-  /** Single ceiling per storage.md §6; no separate "default" is stated. */
+  /** Single ceiling; there is no separate default. */
   maxScheduledEvents: 100_000,
-  /** Single ceiling per storage.md §6; no separate "default" is stated. */
+  /** Single ceiling; there is no separate default. */
   maxLiveRoots: 10_000,
 } as const;
 

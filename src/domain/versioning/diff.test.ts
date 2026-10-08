@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { diffDocuments } from './diff';
 import type { Element } from '../studio/model';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): any {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));

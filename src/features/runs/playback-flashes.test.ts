@@ -82,7 +82,7 @@ describe('recorded lifecycle flashes', () => {
   });
 
   it('shows real adapter descendant arrivals even though they have no received fact', async () => {
-    const fixture = JSON.parse(readFileSync('specs/revamp/fixtures/s06.json', 'utf8')) as Document;
+    const fixture = JSON.parse(readFileSync('src/features/entry/examples/s06.json', 'utf8')) as Document;
     const document: Document = { ...fixture, scenarios: fixture.scenarios.map(s => ({ ...s,
       workloads: s.workloads.map(w => ({ ...w, emission: { mode: 'bulk', requests: 1, arrival: 'instant' } })),
     })) };

@@ -58,7 +58,7 @@ export interface FloatingDockProps {
   readonly onRestoreDefaults: () => void;
   readonly onAddNote: (text: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
   readonly onGroup: (label: string) => Promise<{ readonly ok: true } | { readonly ok: false; readonly message: string }>;
-  /** 16E: places a catalog entry at the visible canvas centre from the compact picker. */
+  /** Places a catalog entry at the visible canvas centre from the compact picker. */
   readonly onPlaceEntry: (entryId: string) => void;
   readonly snapToGrid?: boolean;
   readonly onToggleSnapToGrid?: (snap: boolean) => void;
@@ -109,9 +109,9 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   const [textAction, setTextAction] = React.useState<'selection.group' | null>(null);
   const [textValue, setTextValue] = React.useState('');
   const [textError, setTextError] = React.useState<string | null>(null);
-  // 16E compact picker (D30 as amended 2026-09-29): the dock's Component button opens it
-  // only while the Library panel is closed; with the panel open it focuses the panel, so
-  // the picker and the panel are never open together (R07).
+  // Compact picker: the dock's Component button opens it only while the
+  // Library panel is closed; with the panel open it focuses the panel, so the
+  // picker and the panel are never open together.
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const libraryPanelOpen = context.panels.library.open;
   React.useEffect(() => {
@@ -150,7 +150,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
   // On narrow screens (mobile): keep library.open in center if present
   const mobileCenterVisible = centerCommandIds.filter((id) => id === 'library.open');
 
-  // All tools outside left-fixed (Select, Pan) for the 16B more popover
+  // All tools outside left-fixed (Select, Pan) for the more popover
   const allNonStickyOrdered = config.orderedCommandIds.filter((id) => !FIXED_SET.has(id));
   const allNonStickyHidden = config.hiddenCommandIds.filter((id) => !FIXED_SET.has(id));
   const allNonSticky = [...allNonStickyOrdered, ...allNonStickyHidden];
@@ -306,7 +306,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
       onDrop={(event) => acceptDrop(event)}>
 
       {customizing ? (
-        /* 16C-4 Expanded dock: Grows a header and shelf in-place, shrinks back when done */
+        /* Expanded dock: grows a header and shelf in-place, shrinks back when done */
         <div data-testid="dock-customize-tray" className="flex flex-col w-full">
           {/* Header row */}
           <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-sunken border-b border-hairline">
@@ -701,7 +701,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                 onCloseAutoFocus={(event) => { if (textAction) event.preventDefault(); }}
               >
                 <div data-testid="dock-more-popover" className="flex flex-col">
-                  {/* 16B Header */}
+                  {/* Header */}
                   <div className="flex items-center justify-between px-2.5 py-1.5 font-mono text-micro tracking-[0.12em] text-secondary-text select-none shrink-0">
                     <span>More tools</span>
                     <span>Pin to dock</span>
@@ -778,10 +778,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                     })}
                   </div>
 
-                  {/* 16B Divider */}
+                  {/* Divider */}
                   <div className="h-px bg-hairline my-1 shrink-0" />
 
-                  {/* 16B Toggleable actions */}
+                  {/* Toggleable actions */}
                   <div className="flex flex-col gap-0.5 px-0.5 shrink-0">
                     <div className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-control text-ui hover:bg-sunken transition-colors">
                       <div className="flex items-center gap-2.5">
@@ -835,10 +835,10 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
                     </div>
                   </div>
 
-                  {/* 16B Divider */}
+                  {/* Divider */}
                   <div className="h-px bg-hairline my-1 shrink-0" />
 
-                  {/* 16B Footer actions */}
+                  {/* Footer actions */}
                   <div className="flex flex-col gap-0.5 px-0.5 shrink-0">
                     <button
                       type="button"

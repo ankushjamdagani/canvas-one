@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { describeEndpoint } from '../../domain/studio/protocols';
 import { LINKED_PROJECT_MIME_TYPE, type LinkedProjectSummary } from './types';
 
-/** D52: other projects the user can place as read-only linked nodes. Stays mounted while hidden. */
+/** Other projects the user can place as read-only linked nodes. Stays mounted while hidden. */
 export function LinkedProjects({
   projects,
   searchQuery,

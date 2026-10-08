@@ -389,7 +389,7 @@ describe('expr: evalGuard', () => {
     if (!numRes.ok) expect(numRes.error.code).toBe('wrong-type');
   });
 
-  it('every on an empty list is true (§4)', () => {
+  it('every on an empty list is true', () => {
     const guard: Guard = {
       op: 'every',
       value: { kind: 'literal', value: [] },

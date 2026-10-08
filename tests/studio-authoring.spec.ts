@@ -37,7 +37,7 @@ async function openS05Project(page: Page) {
 }
 
 /**
- * Creates a brand-new blank project. D43(a): it opens on one empty view
+ * Creates a brand-new blank project. It opens on one empty view
  * labelled "Main", so the dock and Component/Connect/Delete work at once.
  * Authoring gestures run here rather than on S05, whose edge labels and
  * dense layout can cover the handles a drag targets.
@@ -79,8 +79,8 @@ async function newElementId(page: Page, before: string[]): Promise<string> {
 async function openLibrary(page: Page) {
   await waitForIdle(page);
   await page.getByTestId('dock-component-btn').click();
-  // With the panel already open the dock focuses it; otherwise it opens the 16E
-  // picker, whose "Browse full library" link opens the panel (D30 amended).
+  // With the panel already open the dock focuses it; otherwise it opens the compact
+  // picker, whose "Browse full library" link opens the panel.
   const alreadyOpen = await page.getByTestId('library-panel').isVisible();
   if (!alreadyOpen) await page.getByTestId('library-picker-full-library-btn').click();
   await expect(page.getByTestId('library-panel')).toBeVisible();
@@ -165,11 +165,11 @@ async function dragConnect(page: Page, sourceElementId: string, targetElementId:
   throw new Error(`connect gesture from ${sourceElementId} to ${targetElementId} had no effect after 3 attempts`);
 }
 
-test.describe('Studio Authoring E2E (RV-12e)', () => {
+test.describe('Studio Authoring E2E', () => {
   test('delete preview lists the scenarios that reference the node', async ({ page }) => {
     await openS05Project(page);
     // "Checkout" is referenced by S05's scenarios, so Delete asks first
-    // (planDelete requiresConfirmation, commands.md §4). Cancelled here.
+    // (planDelete requiresConfirmation). Cancelled here.
     await page.locator('.component-node', { hasText: 'Checkout' }).click();
     await page.getByTestId('selection-delete-btn').click();
     await expect(page.getByTestId('delete-confirm-dialog')).toBeVisible();
@@ -188,7 +188,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.locator('.component-node', { hasText: 'Checkout' })).toBeVisible();
   });
 
-  test('RV-13a: confirming the delete preview removes a scenario-referenced node; undo restores it', async ({ page }) => {
+  test('confirming the delete preview removes a scenario-referenced node; undo restores it', async ({ page }) => {
     await openS05Project(page);
     const checkout = page.locator('.component-node', { hasText: 'Checkout' });
     await checkout.click();
@@ -225,10 +225,10 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
 
   test('connect: ready pair adds an edge; incompatible channels are rejected', async ({ page }) => {
     await openBlankProject(page, 'Connect ready and rejected');
-    // Handle-to-handle dragging works in Select mode (commands.md §4).
+    // Handle-to-handle dragging works in Select mode.
     await expect(page.getByTestId('dock-select-btn')).toHaveAttribute('aria-pressed', 'true');
     // Email is unmodeled, so a queue -> email message connects without the
-    // resource form (catalog.md resolution 8 applies to resource targets only).
+    // resource form (only resource targets open it).
     const queueId = await placeAtFraction(page, 'queue', 0.1, 0.15);
     const emailId = await placeAtFraction(page, 'email', 0.4, 0.15);
     expect(await dragConnect(page, queueId, emailId)).toBe('edge');
@@ -243,7 +243,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
   });
 
-  test('connect into a resource: the form asks for the connection type and path only, and Enter confirms (D54)', async ({ page }) => {
+  test('connect into a resource: the form asks for the connection type and path only, and Enter confirms', async ({ page }) => {
     await openBlankProject(page, 'Resource form');
     // An unsimulated caller has nothing to configure: no request class, operation or deadline.
     const clientId = await placeAtFraction(page, 'client', 0.1, 0.3);
@@ -284,7 +284,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await expect(page.getByTestId('connect-rejected-message')).toHaveCount(0);
   });
 
-  test('D47: a service publishes to a queue and the queue feeds a worker', async ({ page }) => {
+  test('a service publishes to a queue and the queue feeds a worker', async ({ page }) => {
     await openBlankProject(page, 'Messaging');
     const serviceId = await placeAtFraction(page, 'service', 0.1, 0.15);
     const queueId = await placeAtFraction(page, 'queue', 0.4, 0.15);
@@ -302,7 +302,7 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await page.screenshot({ path: test.info().outputPath('d47-messaging.png') });
   });
 
-  test('D49: a service shows its service time, and a call can be given caller retries', async ({ page }) => {
+  test('a service shows its service time, and a call can be given caller retries', async ({ page }) => {
     await openBlankProject(page, 'Retries');
     const serviceId = await placeAtFraction(page, 'service', 0.1, 0.3);
     const databaseId = await placeAtFraction(page, 'database', 0.4, 0.3);
@@ -381,8 +381,8 @@ test.describe('Studio Authoring E2E (RV-12e)', () => {
     await newElementId(page, before);
   });
 
-  test('D43(a): a brand-new blank project opens on "Main" and Component works immediately', async ({ page }) => {
-    await openBlankProject(page, 'RV-12e Blank Project');
+  test('a brand-new blank project opens on "Main" and Component works immediately', async ({ page }) => {
+    await openBlankProject(page, 'Blank Project');
     await expect(page.getByTestId('dock-component-btn')).toBeVisible();
     expect(await elementIds(page)).toHaveLength(0);
     const elementId = await placeAtCentre(page, 'service');

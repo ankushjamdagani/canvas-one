@@ -1,24 +1,14 @@
 /**
- * Delete dependency preview (RV-12e).
+ * Delete dependency preview.
  *
- * Implements specifications from:
- * - specs/revamp/contracts/commands.md §4 "Dependency preview" and `selection.delete`
- *   ("removing an element also removes its placements, its connections and their
- *   view connectionIds; if a scenario references the element or its ports, show
- *   the list and require confirmation")
- * - specs/revamp/screens/16D_Selection_scoped_actions.png (delete action only)
+ * Removing an element also removes its placements, its connections and their
+ * view connectionIds. If a scenario references the element or its ports, the
+ * plan lists them and requires confirmation. This is a pure computation of the
+ * removals for a canvas selection before one model.apply-records command; it
+ * does not use the session's preview-dependencies call.
  *
- * This is a local, pure implementation of the "dependency preview" idea scoped to
- * what RV-12e needs (compute removals for a canvas selection before one
- * model.apply-records command). It does not implement the full
- * `previewDependencies` RPC shape (dependencyPreviewId / boundRevision / stale /
- * missing / invalid) from commands.md §4 -- that lives with the session/command
- * boundary, which is out of scope for this task's allowed files. See CONTRACT
- * GAPS in the task summary.
- *
- * Repairs (commands.md §4 "repairs:RecordChange[]"): every record that would
- * dangle after the delete is repaired in the same batch, so the compound
- * command validates. Scenario members (entry ports, inputs, workloads, faults,
+ * Repairs: every record that would dangle after the delete is repaired in the
+ * same batch, so the compound command validates. Scenario members (entry ports, inputs, workloads, faults,
  * boundaries, initial contexts, assertions) that reference a removed element,
  * port or connection are dropped, scope lists are pruned, deployment/containment
  * relations and refinements that involve a removed element are removed or

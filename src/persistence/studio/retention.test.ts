@@ -1,10 +1,8 @@
 /**
- * Retention and pinning tests (RV-08f).
+ * Retention and pinning tests.
  *
- * Implements specs/revamp/contracts/storage.md §7:
- *   "Keep the 20 latest unpinned runs by (completedAt,id)."
- *   "A run is pinned when a retained commit references it."
- * saveRun never auto-prunes: before storing a 21st unpinned run it returns a typed
+ * The 20 latest unpinned runs are kept by (completedAt,id); a run is pinned when a retained
+ * commit references it. saveRun never auto-prunes: before storing a 21st unpinned run it returns a typed
  * failure (status 'failed', code 'limit') asking for an explicit prune, and nothing is
  * written.
  */
@@ -24,7 +22,7 @@ import { mintRunStartToken } from './token';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type ProjectCreateCommand } from './types';
 import { emptyCycleSummary } from '../../domain/studio/runner/cycles';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -128,7 +126,7 @@ async function runAndSaveAllScenarios(repo: LocalRepository, projectId: Id, doc:
   return evidence;
 }
 
-describe('Retention and pinning (RV-08f)', () => {
+describe('Retention and pinning', () => {
   it('pinned runs (referenced by a retained commit) do not count toward the 20-unpinned limit', async () => {
     const db = createStudioDatabase(`test-retention-pinned-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);

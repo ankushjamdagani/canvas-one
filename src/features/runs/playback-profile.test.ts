@@ -15,7 +15,7 @@ describe.skipIf(process.env.PROFILE_PLAYBACK !== "1")(
   () => {
     it("measures 600 requests/s over 120 seconds of recorded history", async () => {
       const fixture = JSON.parse(
-        readFileSync("specs/revamp/fixtures/s06.json", "utf8"),
+        readFileSync("src/features/entry/examples/s06.json", "utf8"),
       ) as Document;
       const source = fixture.scenarios[0];
       const document: Document = {

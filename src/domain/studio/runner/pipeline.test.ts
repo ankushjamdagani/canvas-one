@@ -21,7 +21,7 @@ import type {
 } from './expr-api';
 import { missingValue } from './expr-api';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadS03Document(): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, 's03.json'), 'utf8')) as Document;
@@ -183,7 +183,7 @@ describe('runPipeline', () => {
       [{ inputEventId, index: 2 }],
     ]);
 
-    // 5. rowOutcomes exact §9 shape
+    // 5. rowOutcomes exact shape
     const behavior = pipelineElement.behavior as PipelineBehavior;
     const validateOpId = behavior.operations[0].id;
     const dedupOpId = behavior.operations[2].id;

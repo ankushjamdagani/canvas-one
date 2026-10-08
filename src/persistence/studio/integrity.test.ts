@@ -1,9 +1,8 @@
 /**
- * loadHistory and verifyReferenceIntegrity tests (RV-08f).
+ * loadHistory and verifyReferenceIntegrity tests.
  *
- * Implements specs/revamp/contracts/storage.md §5 ("missing") & §9 ("round-trip reload")
- * and transactions.md §4 ("Missing or corrupt content returns `missing` with IDs; restore
- * content is never fabricated"). Corruption is injected by writing directly to the
+ * Missing or corrupt content is reported with IDs and restore content is never fabricated.
+ * Corruption is injected by writing directly to the
  * fake-indexeddb tables; the repository must report it, never repair it.
  */
 
@@ -16,7 +15,7 @@ import { createStudioDatabase } from './db';
 import { LocalRepository } from './repository';
 import type { Actor, ProjectCreateCommand } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -46,7 +45,7 @@ async function createTestProject(repo: LocalRepository, doc: Document = s01Doc) 
   return { projectId, mainBranchId, draftBranchId };
 }
 
-describe('loadHistory (RV-08f)', () => {
+describe('loadHistory', () => {
   it('loads project, branches, commits, publications and per-branch history in one transaction', async () => {
     const db = createStudioDatabase(`test-history-load-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
@@ -74,7 +73,7 @@ describe('loadHistory (RV-08f)', () => {
     // Commits without evidence require an empty scenario document to satisfy eligibility,
     // or evidence: [] with a document that has no scenarios; s01Doc has scenarios, so
     // history.commit with empty evidence against a non-empty scenario set is expected to
-    // be rejected per run-identity.md §5. Skip straight to verifying via direct DB rows
+    // be rejected (eligibility needs evidence for every scenario). Skip straight to verifying via direct DB rows
     // that ancestry order follows parentIds, independent of createdAt.
     const c1 = { projectId, id: 'c1', snapshotId: 'snap-1', parentIds: [] as Id[], evidence: [], actor: testActor, createdAt: 3000, message: 'first' };
     const c2 = { projectId, id: 'c2', snapshotId: 'snap-2', parentIds: ['c1'], evidence: [], actor: testActor, createdAt: 1000, message: 'second' };
@@ -91,7 +90,7 @@ describe('loadHistory (RV-08f)', () => {
   });
 });
 
-describe('verifyReferenceIntegrity (RV-08f)', () => {
+describe('verifyReferenceIntegrity', () => {
   it('reports ok:true for a freshly created project', async () => {
     const db = createStudioDatabase(`test-integrity-ok-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);

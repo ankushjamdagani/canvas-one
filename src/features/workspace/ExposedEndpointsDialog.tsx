@@ -26,7 +26,7 @@ export interface ExposedEndpointsDialogProps {
   readonly onClose: () => void;
 }
 
-/** D53: choose which inbound ports of this project other projects may connect to when they link it. */
+/** Choose which inbound ports of this project other projects may connect to when they link it. */
 export function ExposedEndpointsDialog({ open, projectTitle, candidates, onToggle, onClose }: ExposedEndpointsDialogProps) {
   const [error, setError] = React.useState<string | null>(null);
   React.useEffect(() => {

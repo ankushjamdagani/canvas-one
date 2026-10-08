@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { assertDocumentKeysClassified, canonicalEqual } from './merge-descriptor';
 import type { Document } from '../studio/model';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8')) as Document;

@@ -1,8 +1,6 @@
 /**
- * Typed three-way document merge and reference conflict detection (RV-08c).
+ * Typed three-way document merge and reference conflict detection.
  *
- * Implements:
- * - specs/revamp/contracts/transactions.md §5 (Merge: 3-way merge rules, conflict taxonomy, ordered vs set fields)
  * - Identical changes coalesce; one-sided changes apply.
  * - Conflicts for competing scalars, delete vs edit (at any keyed level), add/add with same ID and different content,
  *   incompatible kinds (union kind changed and other side changed anything inside), atomic fields changed differently,
@@ -769,8 +767,7 @@ export async function mergeDocuments(
 
   // Scenario revision derivation rule:
   // Scenario `revision` is derived, not merged: equal to ours content → ours.revision,
-  // equal to theirs content → theirs.revision, otherwise max(base, ours, theirs) versions that exist + 1;
-  // say so in a comment.
+  // equal to theirs content → theirs.revision, otherwise max(base, ours, theirs) versions that exist + 1.
   const mapBaseScenarios = new Map(base.scenarios.map((s) => [s.id, s]));
   const mapOursScenarios = new Map(ours.scenarios.map((s) => [s.id, s]));
   const mapTheirsScenarios = new Map(theirs.scenarios.map((s) => [s.id, s]));
@@ -858,7 +855,7 @@ export async function mergeDocuments(
       const relativePath = issue.path.slice(2);
       const relativeIdPath = convertIssuePathToIdPath(rec, recordKind, relativePath);
 
-      // A reference conflict is resolved at the owning record level (commands.md: "Edits the whole owning typed record"):
+      // A reference conflict is resolved at the owning record level (an edit replaces the whole owning typed record):
       // its base/ours/theirs sides are the WHOLE owning record looked up BY ID in base/ours/theirs documents (present=false when absent)
       const baseRec = lookupRecordById(base, collectionKey, recordId);
       const oursRec = lookupRecordById(ours, collectionKey, recordId);

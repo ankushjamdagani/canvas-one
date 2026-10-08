@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { runDecision } from './decision';
 import type { Element, PayloadSchema } from '../model';
 
-describe('decision interpreter (RV-14d-3)', () => {
+describe('decision interpreter', () => {
   const schemas: PayloadSchema[] = [
     {
       id: 'schema-str',

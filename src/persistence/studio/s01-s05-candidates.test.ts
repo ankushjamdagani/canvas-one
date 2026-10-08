@@ -13,7 +13,7 @@ import { buildManifest } from '../../domain/studio/manifest';
 import { CandidateController } from './candidates';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type HistoryCommitCommand } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(family: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, `${family}.json`), 'utf8')) as Document;

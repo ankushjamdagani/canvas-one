@@ -28,7 +28,7 @@ const Workspace = lazyComponent<React.ComponentProps<typeof import('./features/w
 import { Button } from '@/components/ui/button';
 
 // Exported so the workspace can mint the same kind of id for its RunController
-// (RV-12d: "the app's mintId") instead of defining its own.
+// (the app's mintId) instead of defining its own.
 const MINT_ID = () => crypto.randomUUID();
 
 function getOrCreateActorId(): string {

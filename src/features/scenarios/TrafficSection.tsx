@@ -1,11 +1,10 @@
 /**
- * "What goes in" section for timed scenarios: workloads (RV-05c).
+ * "What goes in" section for timed scenarios: workloads.
  *
- * commands.md §4 "Editor sections": "timed: workloads with entry, rate and request
- * mix." Screen: scenario_traffic_editor.png.
+ * Each workload has an entry, a rate and a request mix.
  *
- * Review round: a new request class's `keyDistribution` starts fully unset (no
- * uniform/catalogSize-1 default) -- model-and-runner.md §6 Workloads: `keyDistribution`
+ * A new request class's `keyDistribution` starts fully unset (no
+ * uniform/catalogSize-1 default). `keyDistribution`
  * is a required, always-present object on every `RequestClass` regardless of `kind`
  * (`src/domain/studio/validate.ts`'s `validateRequestClass` checks all four fields
  * unconditionally). Apply is blocked (draft.ts's `draftCompletenessIssues`) until the
@@ -247,7 +246,7 @@ const numberOrNull = (raw: string): number | null => {
   return Number.isFinite(v) ? v : null;
 };
 
-/** D56: a source sends a bulk of N requests, or an endless stream at a rate. */
+/** A source sends a bulk of N requests, or an endless stream at a rate. */
 function EmissionFields({
   emission,
   onChange,
@@ -389,7 +388,7 @@ function StreamFields({
   );
 }
 
-/** D50/D56: steady, burst (peak rate between two times) or ramp (to an end rate over a time, then held). */
+/** Steady, burst (peak rate between two times) or ramp (to an end rate over a time, then held). */
 function ProfileFields({
   profile,
   onChange,

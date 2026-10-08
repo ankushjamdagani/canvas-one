@@ -22,8 +22,8 @@ const meta: Meta<typeof HistoryLadder> = {
 };
 export default meta;
 
-export const Ladder22A: StoryObj<typeof HistoryLadder> = {
-  name: '22A ladder',
+export const Default: StoryObj<typeof HistoryLadder> = {
+  name: 'Ladder',
   args: {
     hosted: true,
     branchName: 'async-fulfilment',

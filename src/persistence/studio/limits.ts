@@ -1,7 +1,6 @@
 /**
- * Limits enforcement and byte accounting for System Studio repository (RV-16a).
+ * Limits enforcement and byte accounting for System Studio repository.
  *
- * Implements specs/revamp/contracts/storage.md §5 ("Export always fits") and §6 (Limits):
  * - accounted project bytes = per-record canonical UTF-8 sizes
  * - total accounted local bytes <= 128 MiB
  * - complete canonical export envelope <= 64 MiB
@@ -317,7 +316,7 @@ export async function enforceProjectLimits(
 }
 
 /**
- * Enforces run retention limits and run summary caps per storage.md §6 & §7:
+ * Enforces run retention limits and run summary caps:
  * - 200 run summaries cap per project
  * - 20 latest unpinned runs retention rule ("Before storing a 21st, offer an explicit prune")
  * Returns a FailedResult with code 'limit' if any limit would be exceeded, or null if all pass.
@@ -333,7 +332,7 @@ export async function enforceRunRetentionLimits(
     return null;
   }
 
-  // 1. Enforce 200 run-summaries cap (storage.md §6)
+  // 1. Enforce 200 run-summaries cap
   const totalRuns = await db.runs.where('projectId').equals(projectId).count();
   if (totalRuns >= STORAGE_LIMITS.maxRunSummariesPerProject) {
     return {
@@ -350,9 +349,8 @@ export async function enforceRunRetentionLimits(
     };
   }
 
-  // 2. Enforce 20 unpinned runs retention rule (storage.md §7:
-  // "Keep the 20 latest unpinned runs by (completedAt,id). Before storing a 21st, offer an
-  // explicit prune") using the single shared pin closure (pin-state.ts / domain/versioning/
+  // 2. Enforce 20 unpinned runs retention rule (keep the 20 latest unpinned
+  // runs by (completedAt,id); before storing a 21st, offer an explicit prune) using the single shared pin closure (pin-state.ts / domain/versioning/
   // pin-closure.ts) so this agrees exactly with verifyReferenceIntegrity and loadHistory's
   // notion of "pinned" -- never a second, independently-maintained definition.
   const closure = await computeProjectPinClosure(db, projectId);

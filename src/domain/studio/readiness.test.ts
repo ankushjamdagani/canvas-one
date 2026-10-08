@@ -22,7 +22,7 @@ import type {
 import { checkReadiness, normalizeShape, shapesCompatible } from './readiness';
 import { validateDocument } from './validate';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8')) as Document;
@@ -665,7 +665,7 @@ describe('checkReadiness mutation tests', () => {
 });
 
 // ============================================================================
-// RV-02f runnable-readiness rejects
+// Runnable-readiness rejects
 // ============================================================================
 
 function pipelineElement(
@@ -947,9 +947,9 @@ function unmodeledElement(id: string, ports: Port[] = []): Element {
   };
 }
 
-describe('RV-02f runnable-readiness rejects', () => {
+describe('runnable-readiness rejects', () => {
   // --------------------------------------------------------------------------
-  // Check 1: Unbound call responses (§4 Wiring, §5)
+  // Check 1: Unbound call responses
   // --------------------------------------------------------------------------
   describe('unbound-call-response', () => {
     it('rejects an outbound call port used by an emit effect when response binding is missing', () => {
@@ -1069,7 +1069,7 @@ describe('RV-02f runnable-readiness rejects', () => {
   });
 
   // --------------------------------------------------------------------------
-  // Check 2: Effect lists that could reply twice (§5)
+  // Check 2: Effect lists that could reply twice
   // --------------------------------------------------------------------------
   describe('reply-twice', () => {
     it('rejects a transition effect list with more than one reply effect', () => {
@@ -1173,7 +1173,7 @@ describe('RV-02f runnable-readiness rejects', () => {
   });
 
   // --------------------------------------------------------------------------
-  // Check 3: Mismatched schemas (§4 Wiring)
+  // Check 3: Mismatched schemas
   // --------------------------------------------------------------------------
   describe('mismatched-schema', () => {
     it('rejects a decision whose inputPort schema does not match inputSchemaId', () => {
@@ -1303,7 +1303,7 @@ describe('RV-02f runnable-readiness rejects', () => {
   });
 
   // --------------------------------------------------------------------------
-  // Check 4: Missing pipeline outputs (§5)
+  // Check 4: Missing pipeline outputs
   // --------------------------------------------------------------------------
   describe('missing-pipeline-output', () => {
     it('allows a pipeline with an unconnected output (unconnected output is legal per S03)', () => {
@@ -1416,7 +1416,7 @@ describe('RV-02f runnable-readiness rejects', () => {
   });
 
   // --------------------------------------------------------------------------
-  // Check 5: Unmodeled element in closure (§4)
+  // Check 5: Unmodeled element in closure
   // --------------------------------------------------------------------------
   describe('unmodeled-element', () => {
     it('rejects an unmodeled element present in the scenario closure', () => {
@@ -1467,7 +1467,7 @@ describe('RV-02f runnable-readiness rejects', () => {
   });
 });
 
-describe('bridge call continuations (model-and-runner.md §8 Readiness)', () => {
+describe('bridge call continuations', () => {
   function bridgeDoc(sourceType: 'router' | 'processor', targets: ('resource' | 'machine')[]): Document {
     const doc = timedHappyDoc();
     const r1 = doc.elements[0] as Element & { behavior: ResourceBehavior };

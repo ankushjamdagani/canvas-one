@@ -87,7 +87,7 @@ describe('openDraft', () => {
     expect(handle.baseValues.label).toBe('Checkout service');
   });
 
-  it('throws on an empty target (commands.md §5: rejected)', () => {
+  it('throws on an empty target (rejected)', () => {
     const doc = makeDocument([]);
     expect(() => openDraft('draft-1', { kind: 'element', ids: [] }, 1, doc)).toThrow();
   });

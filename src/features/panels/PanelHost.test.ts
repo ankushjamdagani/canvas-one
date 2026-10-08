@@ -14,16 +14,16 @@ import {
 } from './panelStates.fixtures';
 import type { PanelId } from '@/features/workspace/panels';
 
-describe('PanelHost and Panels System Components (RV-03p)', () => {
+describe('PanelHost and Panels System Components', () => {
   const dummyCanvas = React.createElement('div', { id: 'test-canvas-content' }, 'CANVAS_VIEWPORT_XYFLOW');
   const renderDummyPanel = (id: PanelId) =>
     React.createElement('div', { id: `panel-content-${id}` }, `CONTENT_${id.toUpperCase()}`);
 
   // ==========================================================================
-  // 1. Static Markup Rendering of 23A–23G Screen States
+  // 1. Static markup rendering of panel layout states
   // ==========================================================================
-  describe('Screens 23A–23G pure renderToStaticMarkup fidelity', () => {
-    it('23A: renders History docked right, with no rails or floating panel', () => {
+  describe('panel layout states render to static markup', () => {
+    it('renders History docked right, with no rails or floating panel', () => {
       const state = createState23A();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -52,7 +52,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(html).not.toContain('data-slot="floating-panel"');
     });
 
-    it('23B: renders Library docked left, with no right dock or floating panel', () => {
+    it('renders Library docked left, with no right dock or floating panel', () => {
       const state = createState23B();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -74,7 +74,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(html).not.toContain('data-slot="floating-panel"');
     });
 
-    it('23C: renders History floating with grip bar, header, and corner resize', () => {
+    it('renders History floating with grip bar, header, and corner resize', () => {
       const state = createState23C();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -118,7 +118,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(state.panels.history.floatRect).toEqual(savedRect);
     });
 
-    it('23D: renders dragging to dock state with drop targets on both edges and ghost panel', () => {
+    it('renders dragging to dock state with drop targets on both edges and ghost panel', () => {
       const state = createState23D();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -142,7 +142,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(html).toContain('data-slot="panel-canvas-slot"');
     });
 
-    it('23E: renders stacked docks on right with splitter divider', () => {
+    it('renders stacked docks on right with splitter divider', () => {
       const state = createState23E();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -165,7 +165,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(html).toContain('CONTENT_LIBRARY');
     });
 
-    it('23F: renders collapsed left rail with unseen dot and peek flyout, plus right docked Library', () => {
+    it('renders collapsed left rail with unseen dot and peek flyout, plus right docked Library', () => {
       const state = createState23F();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -198,7 +198,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
       expect(html).toContain('CONTENT_LIBRARY');
     });
 
-    it('23G: renders both History and Library collapsed into left rail with expand-all toggle', () => {
+    it('renders both History and Library collapsed into left rail with expand-all toggle', () => {
       const state = createState23G();
       const html = renderToStaticMarkup(
         React.createElement(PanelHost, {
@@ -226,9 +226,9 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
   });
 
   // ==========================================================================
-  // 2. Canvas Slot Stability Across Layouts (R04 requirement)
+  // 2. Canvas Slot Stability Across Layouts
   // ==========================================================================
-  describe('Canvas slot stability (R04)', () => {
+  describe('Canvas slot stability', () => {
     it('preserves stable canvas slot container and key across all screen states', () => {
       const states = [
         createState23A(),
@@ -464,7 +464,7 @@ describe('PanelHost and Panels System Components (RV-03p)', () => {
   // ==========================================================================
   // 5. Mobile & Tablet Responsive Overlays (< 768px / 768–1199px)
   // ==========================================================================
-  describe('Responsive rules from §7', () => {
+  describe('responsive rules', () => {
     it('renders overlay sheet on mobile (< 768px)', () => {
       const mobileState = {
         ...createState23A(),

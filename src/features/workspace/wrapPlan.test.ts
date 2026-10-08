@@ -10,7 +10,7 @@ import { LocalRepository, StudioDatabase, type Actor } from '../../persistence/s
 import { SessionController } from '../session';
 import { planWrapInBoundary, wrapBoundaryCrossingEndpoints, type WrapBoundaryIds } from './wrapPlan';
 
-const S05_PATH = join(process.cwd(), 'specs/revamp/fixtures/s05.json');
+const S05_PATH = join(process.cwd(), 'src/features/entry/examples/s05.json');
 const QUEUE_ID = '3f495542-b8ea-5d92-90a0-3c8ec53b12d8';
 const WORKER_ID = '7453e0ab-17a6-579d-909c-0586d9144ad3';
 const TEST_ACTOR: Actor = { actorId: 'wrap-test', kind: 'local-human', displayName: 'Wrap test' };
@@ -48,7 +48,7 @@ function executedElements(result: Awaited<ReturnType<typeof runScenario>>): read
 }
 
 describe('planWrapInBoundary', () => {
-  it('wraps part of S05 without changing executed elements, outcomes or assertions, and stays ready', async () => {
+  it('wraps part of a graph without changing executed elements, outcomes or assertions, and stays ready', async () => {
     const before = loadS05();
     const viewId = before.views[0].id;
     const members = [QUEUE_ID, WORKER_ID];

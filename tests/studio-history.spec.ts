@@ -2,8 +2,7 @@ import { test, expect, type Page } from './fixtures';
 import { runAll, savedRunCount } from './simulation-support';
 
 /**
- * RV-13b: History panel journeys (screens 22A-F; contracts/commands.md section 3,
- * contracts/transactions.md; decisions D20/D26/D27/D28/D40).
+ * History panel journeys: ladder, publish review, published state and conflict resolution.
  *
  * S04 is the fixture used wherever a commit/publish is needed: it ships three
  * scenarios that all pass on "Run all" (see studio-runs.spec.ts) and its Router
@@ -12,7 +11,7 @@ import { runAll, savedRunCount } from './simulation-support';
  */
 
 const ROUTER_ELEMENT_ID = '816fe039-76dd-5b7b-a787-4d7666ff8d62';
-const MAIN_COMMIT_REASON = 'Main never holds edits (D40): edit main directly to create a draft';
+const MAIN_COMMIT_REASON = 'Main never holds edits: edit main directly to create a draft';
 
 async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
@@ -73,8 +72,8 @@ async function publishMajor(page: Page, title: string) {
   await expect(page.getByTestId('breadcrumb-branch-state')).toHaveText('Main');
 }
 
-test.describe('RV-13b: History panel', () => {
-  test('22A: an empty draft ladder shows no commits and no checkpoint form', async ({ page }) => {
+test.describe('History panel', () => {
+  test('an empty draft ladder shows no commits and no checkpoint form', async ({ page }) => {
     await openS04(page);
     const ladder = await openHistory(page);
     await expect(ladder.getByText('No commits on this branch yet')).toBeVisible();
@@ -142,7 +141,7 @@ test.describe('RV-13b: History panel', () => {
     await expect(panel.getByTestId('passing-scenarios-summary')).toHaveText('3 of 3 passing', { timeout: 30000 });
   });
 
-  test('22C/22D: publish review, publish, and the published state has no undo (D26)', async ({ page }) => {
+  test('publish review, publish, and the published state has no undo', async ({ page }) => {
     test.setTimeout(120000);
     await openS04(page);
     await editRouterCapacity(page, '77');
@@ -190,12 +189,12 @@ test.describe('RV-13b: History panel', () => {
     await expect(start).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Edit main directly' })).toBeEnabled();
     await start.click();
-    // D40: main never holds edits; the action creates and opens a draft.
+    // Main never holds edits; the action creates and opens a draft.
     await expect(page.getByTestId('breadcrumb-branch-btn')).toContainText('Draft from main');
     await expect(page.getByTestId('breadcrumb-branch-state')).not.toHaveText('Main');
   });
 
-  test('22D: the published notice names the version after publishing', async ({ page }) => {
+  test('the published notice names the version after publishing', async ({ page }) => {
     await openS04(page);
     await openHistory(page);
     await runAllScenarios(page);
@@ -204,7 +203,7 @@ test.describe('RV-13b: History panel', () => {
     await expect(page.getByTestId('publish-published')).toContainText('1.0.0 published');
   });
 
-  test('22E/22F: a draft behind main shows the conflict, and keyboard resolution unblocks publishing', async ({ page }) => {
+  test('a draft behind main shows the conflict, and keyboard resolution unblocks publishing', async ({ page }) => {
     test.setTimeout(180000);
     await openS04(page);
     await openHistory(page);
@@ -237,7 +236,7 @@ test.describe('RV-13b: History panel', () => {
     await expect(dialog.getByTestId('publish-blocking-reason')).toHaveText('resolve 1 conflict first');
     await expect(dialog.getByTestId('publish-review-button')).toBeDisabled();
 
-    // 22F, keyboard only: tab to "use theirs" (main's value) and press Enter.
+    // Keyboard only: tab to "use theirs" (main's value) and press Enter.
     await dialog.getByRole('button', { name: 'Open diff view' }).click();
     const compare = page.getByTestId('compare-and-resolve-panel');
     await expect(compare).toBeVisible();

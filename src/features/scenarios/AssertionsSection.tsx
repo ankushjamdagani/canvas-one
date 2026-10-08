@@ -1,12 +1,10 @@
 /**
- * "What should be true" section: assertions (RV-05c).
+ * "What should be true" section: assertions.
  *
- * commands.md §4 "Editor sections": "assertions; last-run pass/fail marks per check."
- * model-and-runner.md §6: Assertion subjects (final-state, context, output, count,
- * trace-count, metric), operators (equals/at-most/at-least), and `expected:Json`.
+ * Shows last-run pass/fail marks per check. Assertion subjects are final-state, context,
+ * output, count, trace-count and metric; operators are equals/at-most/at-least; `expected` is Json.
  *
- * `expected` is Json in the contract, but the brief requires "typed controls, never raw
- * JSON": a small kind selector (number / text / true / false) plus the matching typed
+ * Instead of a raw JSON box, `expected` uses typed controls: a small kind selector (number / text / true / false) plus the matching typed
  * input produces the Json value, instead of a free-text JSON box.
  *
  * A new `output`/`context` subject's `path` starts unset (`null`), not a silent `[]`.
@@ -42,9 +40,9 @@ export interface AssertionsSectionProps {
   readonly scenario: DraftScenario;
   readonly onChange: (patch: (s: DraftScenario) => DraftScenario) => void;
   readonly mintId: MintId;
-  /** commands.md §4: "last-run pass/fail marks per check." */
+  /** Last-run pass/fail mark per check. */
   readonly lastRunChecks?: ReadonlyMap<string, CheckResult> | null;
-  /** Opens this check expanded on mount (a flow probe added from the canvas, board 16D). */
+  /** Opens this check expanded on mount (a flow probe added from the canvas). */
   readonly focusAssertionId?: string | null;
 }
 
@@ -250,7 +248,7 @@ export function AssertionsSection({ document, scenario, onChange, mintId, lastRu
 
         {scenario.assertions.length === 0 && (
           <p className="text-[11px] text-secondary-text">
-            No checks. commands.md: a scenario with no checks is "Completed · no checks" and never passes.
+            No checks. A scenario with no checks is "Completed · no checks" and never passes.
           </p>
         )}
       </div>

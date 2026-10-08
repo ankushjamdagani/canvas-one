@@ -1,5 +1,5 @@
 /**
- * Library Tests (RV-06b).
+ * Library tests.
  *
  * Covers:
  * 1. Pure view-model functions:
@@ -10,7 +10,7 @@
  * 2. Static render checks with react-dom/server `renderToStaticMarkup`:
  *    - LibraryPanel (list view & grid view)
  *    - LibraryPicker (compact dock picker)
- *    - EntryDetailCard (12C detail view)
+ *    - EntryDetailCard (detail view)
  *    - Empty search results state ("Clear search" way out)
  *    - Strict assertions that excluded fields (Owner, Used in, Platform team, Failures go to, Open docs) NEVER appear.
  */
@@ -38,7 +38,7 @@ import { LibraryPicker } from './LibraryPicker';
 import { EntryDetailCard } from './EntryDetailCard';
 import { CATALOG_ENTRY_MIME_TYPE } from './types';
 
-describe('Library Feature (RV-06b)', () => {
+describe('Library feature', () => {
   // ==========================================================================
   // 1. Pure View-Model Functions
   // ==========================================================================
@@ -149,7 +149,7 @@ describe('Library Feature (RV-06b)', () => {
     });
   });
 
-  describe('getFormattedEntryDetail & exclusions (design-revalidation.md §2)', () => {
+  describe('getFormattedEntryDetail and excluded rows', () => {
     it('formats structured details with required fields and excludes forbidden ones', () => {
       for (const entry of CATALOG_ENTRIES) {
         const detail = getFormattedEntryDetail(entry);
@@ -254,7 +254,7 @@ describe('Library Feature (RV-06b)', () => {
   // ==========================================================================
 
   describe('Static HTML Rendering', () => {
-    it('renders LibraryPanel in list view (12A) with group headers, captions, and footer', () => {
+    it('renders LibraryPanel in list view with group headers, captions, and footer', () => {
       const html = renderToStaticMarkup(
         React.createElement(LibraryPanel, {
           onPlace: () => {},
@@ -292,7 +292,7 @@ describe('Library Feature (RV-06b)', () => {
       // Drag MIME type constant presence
       expect(CATALOG_ENTRY_MIME_TYPE).toBe('application/x-studio-catalog-entry');
 
-      // Strictly assert absence of excluded design elements per §2
+      // Excluded rows must never appear
       expect(html).not.toMatch(/owner/i);
       expect(html).not.toMatch(/used in/i);
       expect(html).not.toMatch(/failures go to/i);
@@ -300,7 +300,7 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).not.toMatch(/platform team/i);
     });
 
-    it('renders LibraryPanel in grid view (12B)', () => {
+    it('renders LibraryPanel in grid view', () => {
       const html = renderToStaticMarkup(
         React.createElement(LibraryPanel, {
           onPlace: () => {},
@@ -340,7 +340,7 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).not.toContain('min-w-[320px]');
     });
 
-    it('renders LibraryPicker (16E) with group filter chips, 4-col grid, and footer hints', () => {
+    it('renders LibraryPicker with group filter chips, 4-col grid, and footer hints', () => {
       const html = renderToStaticMarkup(
         React.createElement(LibraryPicker, {
           onPlace: () => {},
@@ -373,7 +373,7 @@ describe('Library Feature (RV-06b)', () => {
       expect(html).not.toMatch(/platform team/i);
     });
 
-    it('renders EntryDetailCard (12C) with models, DEFAULTS, and DOES NOT MODEL rows', () => {
+    it('renders EntryDetailCard with models, DEFAULTS, and DOES NOT MODEL rows', () => {
       const queueEntry = getEntry('queue')!;
       const html = renderToStaticMarkup(
         React.createElement(EntryDetailCard, {

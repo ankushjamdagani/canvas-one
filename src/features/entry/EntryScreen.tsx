@@ -183,14 +183,11 @@ function ProjectPreview({
 }
 
 /**
- * 2A "new system" entry screen: two columns.
+ * "New system" entry screen: two columns.
  *
- * D12/design-revalidation.md §2: no prompt box ("Describe the system…"), no
- * question chips, no team/shared items. The old 2A screen's "Bring in what
- * exists" drop zone is not reproduced (no plausible-defaults auto-build to drop
- * onto); RV-10b instead adds a plain "Import a project" action that runs the
- * contracted project.import flow (JSON v9 bundle only) and surfaces its typed
- * errors, same one the Export submenu's "System as JSON" writes.
+ * There is no prompt box, question chips or team/shared items. A plain "Import a project"
+ * action runs the project.import flow (JSON v9 bundle only) and surfaces its typed errors;
+ * it reads the same format the Export submenu's "System as JSON" writes.
  */
 export function EntryScreen({
   session,
@@ -424,7 +421,7 @@ export function EntryScreen({
     }
   };
 
-  // Import a portable v9 project JSON bundle (RV-10b): register the file's bytes
+  // Import a portable v9 project JSON bundle: register the file's bytes
   // with the repository's FileToken registry, run project.import, and surface any
   // typed failure (unsupported version, byte cap, validation) without raw exception
   // text. On success, just refresh the project list -- the imported project is not

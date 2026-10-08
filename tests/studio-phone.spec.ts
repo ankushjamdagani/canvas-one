@@ -2,8 +2,7 @@ import { test, expect, devices } from './fixtures';
 import { tab } from './simulation-support';
 
 /**
- * RV-13 phone acceptance (D14 full phone editing; design.md "Touch targets";
- * requirements.md viewports). A 390×844 touch phone must keep every top-bar control
+ * Phone acceptance: full editing on a phone. A 390×844 touch phone must keep every top-bar control
  * on screen — including the project menu — with coarse-pointer targets of at least
  * 44 px, and the simulation inspection sheet must leave a usable canvas on short screens.
  */
@@ -66,9 +65,9 @@ test('short viewport: source inline simulation inspection leaves a usable canvas
   expect(canvasHeight).toBeGreaterThanOrEqual(40);
 });
 
-test('390×844 touch: the 16E picker fits and places the selected entry with its Place button', async ({ page }) => {
+test('390×844 touch: the compact picker fits and places the selected entry with its Place button', async ({ page }) => {
   await page.goto('/projects');
-  await page.getByTestId('blank-project-name-input').fill(`16E phone ${Date.now()}`);
+  await page.getByTestId('blank-project-name-input').fill(`phone ${Date.now()}`);
   await page.getByTestId('create-blank-project-btn').tap();
   await expect(page.getByTestId('workspace-root')).toBeVisible();
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');

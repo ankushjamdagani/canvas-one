@@ -1,19 +1,18 @@
 /**
- * Scenario draft lifecycle: pure logic (RV-05c).
+ * Scenario draft lifecycle: pure logic.
  *
- * Implements specs/revamp/contracts/commands.md "Scenarios (D41)":
- * - scenario.new / scenario.duplicate: "Opens the scenario editor on an unsaved draft;
- *   nothing is stored until Apply, which inserts the scenario as one model.apply-records
- *   command and one undo. Cancel stores nothing."
- * - "Empty drafts invent nothing": no workloads/inputs/faults/boundaries/assertions;
+ * - scenario.new / scenario.duplicate open the editor on an unsaved draft; nothing is
+ *   stored until Apply, which inserts the scenario as one record change and one undo
+ *   step. Cancel stores nothing.
+ * - Empty drafts invent nothing: no workloads/inputs/faults/boundaries/assertions;
  *   scope = every element in the document at draft time; the only prefilled values are
- *   the contracted budget defaults and a seed drawn at random when the draft opens
- *   (shown and editable).
- * - scenario.delete: "One model.apply-records remove; one undo."
- * - §6 Draft lifecycle: open/change/validate/apply/cancel; "Apply parses, validates the
+ *   the default budgets and a seed drawn at random when the draft opens (shown and
+ *   editable).
+ * - scenario.delete is one record removal and one undo step.
+ * - Lifecycle: open/change/validate/apply/cancel. Apply parses and validates the
  *   candidate and revision, persists one compound command, clears dirty state and adds
- *   one undo entry"; "Stale ... never silently rebases"; "If the target is deleted
- *   elsewhere, the draft is marked stale/missing."
+ *   one undo entry; a stale draft never silently rebases; if the target is deleted
+ *   elsewhere, the draft is marked stale/missing.
  *
  * See types.ts for why this uses a typed-patch bridge instead of the inspector's
  * raw-string FieldSpec bridge.
@@ -51,16 +50,16 @@ function scopeElementIdsAtDraftOpen(document: Document): readonly Id[] {
 }
 
 /**
- * commands.md §4/"Empty drafts invent nothing": builds a brand-new, unsaved
+ * Builds a brand-new, unsaved
  * DraftScenario with no workloads/inputs/faults/boundaries/assertions, scope = every
- * element in the document right now, contracted budget defaults, a freshly drawn
+ * element in the document right now, default budgets, a freshly drawn
  * seed. A workload added later has no emission until the user picks bulk or stream and
  * fills its values; see draftScenario.ts's DraftEmission and draftCompletenessIssues below.
  * `revision: 0` -- a never-yet-persisted record; see idRemap.ts's
  * remapScenarioForCopy for the same choice on a copy.
  *
  * `entryPorts: []` and stays that way: closure.ts seeds scope from `entryPorts`,
- * every `input.entry` and every `workload.entry` combined (model-and-runner.md §6 /
+ * every `input.entry` and every `workload.entry` combined (see
  * closure.ts "Start from the scenario entry points"), so inputs/workloads alone
  * already make the scenario's entry points reachable. No readiness rule requires
  * `entryPorts` itself to be non-empty, so it is never something the user is forced to
@@ -143,7 +142,7 @@ function draftIssue(entityId: Id, field: string, message: string): ScenarioIssue
 }
 
 /**
- * commands.md §4 "Empty drafts invent nothing": everything the record requires but the
+ * Everything the record requires but the
  * user hasn't chosen yet blocks Apply. Reports exactly the three draft-only "unset"
  * states (see draftScenario.ts): each workload's emission, each workload class's key
  * distribution, each output/context assertion's path.
@@ -189,9 +188,8 @@ function draftCompletenessIssues(draft: DraftScenario): ScenarioIssue[] {
  * shape via `toValidationScenario` -- see that function's doc comment on why this is
  * safe) inserted (new) or replacing the scenario `sourceScenarioId` (edit) at the same
  * index, runs the storable validator over the whole document, and -- only when
- * storable is clean -- runs readiness for this scenario (model-and-runner.md §1:
- * "Readiness errors never block saving a structurally valid design", so readiness only
- * needs checking once storable already passes). Storable issues are filtered to this
+ * storable is clean -- runs readiness for this scenario (readiness errors never block saving
+ * a structurally valid design, so readiness only needs checking once storable already passes). Storable issues are filtered to this
  * scenario's own subtree (`path[0] === 'scenarios' && path[1] === candidateIndex`);
  * readiness issues are already scoped to one scenario by `checkReadiness(doc,
  * scenarioId)`. `draftCompletenessIssues` issues are always included regardless.
@@ -246,8 +244,8 @@ export function computeScenarioIssues(
 // ============================================================================
 
 /**
- * commands.md §5: "scenario.new ... Opens the scenario editor on an unsaved draft" /
- * "scenario.edit = inspector.open with DraftTarget{kind:'scenario', ...}". This module's
+ * Opens a draft for scenario.new (an unsaved draft) or scenario.edit (the inspector
+ * opened on a scenario). This module's
  * own `ScenarioDraftTarget` covers both scenario.new/duplicate (`kind:'new'`) and
  * scenario.edit (`kind:'edit'`).
  *
@@ -312,7 +310,7 @@ export function openScenarioDraft(params: {
       );
     }
     if (source.mode !== target.mode) {
-      // commands.md §4: "mode must equal the copied scenario's mode." The caller (the
+      // The mode must equal the copied scenario's mode. The caller (the
       // New scenario dialog) must not let mode diverge from the chosen copy source.
       throw new Error(
         `scenario.new: mode '${target.mode}' must equal the copied scenario's mode '${source.mode}'`,
@@ -337,8 +335,7 @@ export function openScenarioDraft(params: {
 }
 
 /**
- * commands.md §6: "The only bridge methods are changeField(...), validateDraft(),
- * applyDraft() and cancelDraft()." This module's equivalent of changeField+validateDraft
+ * The equivalent of changeField+validateDraft
  * combined: applies a typed patch to the candidate and immediately re-links
  * validator/readiness issues, so the editor's per-section errors stay live.
  */
@@ -362,15 +359,14 @@ export function changeScenarioDraft(
 }
 
 /**
- * commands.md §6 Apply: "parses, validates the candidate and revision, persists one
- * compound command, clears dirty state and adds one undo entry." "While pending,
- * duplicate submits and navigation are blocked" is the caller's (ScenarioEditor's)
+ * Parses and validates the candidate and revision, persists one compound command,
+ * clears dirty state and adds one undo entry. Blocking duplicate submits and navigation
+ * while pending is the caller's (ScenarioEditor's)
  * responsibility via `status === 'saving'`.
  *
  * Validation failures (storable or readiness) keep the draft and report the linked
- * per-section field errors already computed by changeScenarioDraft/openScenarioDraft --
- * this is the brief's "apply blocked with linked field errors while the
- * validator/readiness reports issues."
+ * per-section field errors already computed by changeScenarioDraft/openScenarioDraft,
+ * so Apply stays blocked while the validator/readiness reports issues.
  */
 export async function applyScenarioDraft(
   handle: ScenarioDraftHandle,
@@ -422,11 +418,11 @@ export async function applyScenarioDraft(
   } else {
     const currentRecord = document.scenarios.find((s) => s.id === handle.sourceScenarioId) ?? null;
     if (!currentRecord) {
-      // Target deleted elsewhere: stale/missing, candidate text is kept (commands.md §6).
+      // Target deleted elsewhere: stale/missing, candidate text is kept.
       return Object.freeze({ ...withIssues, status: 'stale' });
     }
-    // model-and-runner.md §6: "revision ... increments on any edit, including a label
-    // change." The draft's own `scenario.revision` reflects the value it was opened
+    // A scenario's revision increments on any edit, including a label
+    // change. The draft's own `scenario.revision` reflects the value it was opened
     // from (or 0 for a copy); the outgoing record bumps from the *current session*
     // record's revision so a concurrently-applied unrelated edit (already ruled out
     // above by the working-revision stale check) is never silently skipped.
@@ -490,12 +486,12 @@ export async function applyScenarioDraft(
 }
 
 // ============================================================================
-// Delete (commands.md §4 scenario.delete)
+// Delete
 // ============================================================================
 
 /**
- * commands.md §4 scenario.delete: "Confirmation first ... One model.apply-records
- * remove; one undo." Confirmation itself is the DeleteScenarioDialog component; this is
+ * Removing a scenario needs confirmation first and is one record removal and one undo
+ * step. Confirmation itself is the DeleteScenarioDialog component; this is
  * the compound command it submits once confirmed.
  */
 function buildDeleteScenarioChange(scenarioId: Id): RecordChange {

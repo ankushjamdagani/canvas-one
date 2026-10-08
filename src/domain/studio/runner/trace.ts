@@ -1,11 +1,10 @@
 /**
- * Trace envelope (RV-14a): event/root ID derivation, the content-addressed payload
+ * Trace envelope: event/root ID derivation, the content-addressed payload
  * table, the trace recorder (row/byte budget enforcement + batch RunUpdates), and a
  * pure RunUpdate stream validity checker.
  *
- * Implements model-and-runner.md §8 (TraceEvent, RunUpdate `batch`) and storage.md §6
- * ("The row and byte caps are independent ... stops incomplete at the first cap hit ...
- * no sampling or hidden truncation").
+ * The row and byte caps are independent; the run stops incomplete at the first cap hit,
+ * with no sampling or hidden truncation.
  */
 
 import { canonicalJson, sha256Hex } from '../canonical';
@@ -19,7 +18,7 @@ import { deepFreeze } from '../freeze';
 // ============================================================================
 
 /**
- * `TraceEvent.id` derivation (§8: "IDs derive from runId + sequence"). Format:
+ * `TraceEvent.id` derivation (derived from runId + sequence). Format:
  * `${runId}:${sequence}` — colon-joined, since `sequence` is a non-negative integer and
  * `runId` is a UUID (never contains `:`), so the join is unambiguous and reversible by
  * splitting on the last `:`.
@@ -29,8 +28,8 @@ export function traceEventId(runId: string, sequence: number): string {
 }
 
 /**
- * Root ID derivation (§8: "Input/root IDs come from the input or workload ID +
- * ordinal"). Format: `${sourceId}#${ordinal}` — a distinct separator from
+ * Root ID derivation (from the input or workload ID +
+ * ordinal). Format: `${sourceId}#${ordinal}` — a distinct separator from
  * `traceEventId`'s `:` so the two ID families are visually distinguishable even though
  * they occupy separate namespaces (root IDs vs. trace event IDs) and are never compared
  * to each other.
@@ -63,16 +62,15 @@ async function computePayloadRef(
 }
 
 /**
- * Immutable, content-addressed payload store for one run (§8: "`payloadRef` points into
- * an immutable per-run content-addressed payload table"). `put` derives the ref from the
+ * Immutable, content-addressed payload store for one run (`payloadRef` points into
+ * it). `put` derives the ref from the
  * SHA-256 of the payload's `canonical-json-v1` text, so two payloads that differ only in
  * key order (or other canonicalization-invisible differences) dedupe to the same ref.
  * Stored values are deep-frozen copies parsed from that canonical text — never the
  * caller's own object reference — so mutating the argument after `put` (or mutating a
  * `get`/`snapshot` result) can never change what the table holds.
  *
- * `put` is async because it goes through Web Crypto (`sha256Hex`), matching
- * run-identity.md §2's "SHA-256 via Web Crypto behind an async boundary".
+ * `put` is async because it goes through Web Crypto (`sha256Hex`).
  */
 export class PayloadTable {
   private readonly byRef = new Map<PayloadRef, Json>();
@@ -153,8 +151,8 @@ export type TraceAppendResult =
 
 /**
  * Appends `TraceEvent`s for one run, assigning monotonic sequences starting at 0, and
- * enforcing `maxTraceRows` and `maxTraceBytes` independently (storage.md §6: "The row
- * and byte caps are independent ... 100k synthetic rows exceed 16 MiB"). Byte accounting
+ * enforcing `maxTraceRows` and `maxTraceBytes` independently (either cap alone can stop the run; 100k synthetic rows
+ * exceed 16 MiB). Byte accounting
  * is conservative: UTF-8 bytes of the canonical JSON of each event, plus — only the
  * first time a given payload ref is newly stored by this recorder — the canonical JSON
  * bytes of that payload.
@@ -306,9 +304,9 @@ export type GuardOutcome =
   | { readonly kind: 'violation'; readonly reason: string };
 
 /**
- * A pure checker over a sequence of `RunUpdate`s for one run (§8: "Exactly one terminal
- * message, with monotonic sequences ... Terminal statuses arrive only through that
- * message; `state` updates never carry them. The UI ignores stale run IDs").
+ * A pure checker over a sequence of `RunUpdate`s for one run (exactly one terminal
+ * message, with monotonic sequences; terminal statuses arrive only through that
+ * message and `state` updates never carry them).
  *
  * Stateful across calls (it must be, to track sequence continuity and terminal
  * exclusivity), but every check is a pure function of the accumulated update history —

@@ -53,7 +53,7 @@ function descendantsOf(refinement: Refinement, refinementsByOwner: ReadonlyMap<I
 }
 
 /**
- * Resolves the executable refinement topology for one scenario (§6 Refinement).
+ * Resolves the executable refinement topology for one scenario.
  *
  * The result is pure and deterministic. Active refined mappings are followed transitively
  * outer-to-inner and inner-to-outer. A nested selection below an active aggregate selection

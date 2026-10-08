@@ -1,13 +1,7 @@
 /**
- * HistoryLadder React component (RV-11a).
- *
- * Implements specifications from:
- * - specs/revamp/screens/22A_history_ladder.png
- * - specs/revamp/screens/23C_floating_panel.png
- * - specs/revamp/decisions.md (D11, D20, D26, D27, D28, D40, D41)
- * - specs/revamp/design-revalidation.md (§2 exclusions: NO p95, NO burst, NO suggested text, NO unverified claims)
- * - specs/revamp/contracts/transactions.md §4
- * - specs/revamp/contracts/commands.md §3
+ * HistoryLadder: the history panel for the open branch — branch header, commits newest
+ * first, checkpoints, publications, and the commit/restore/publish affordances. It shows
+ * only recorded facts (no performance statistics or suggested text).
  */
 
 import * as React from 'react';
@@ -46,7 +40,7 @@ export interface HistoryLadderProps {
   readonly commitBlockedReason?: string | null;
   readonly publishBlockedReason?: string | null;
   /** Set once a real prepare-publish has run and found the draft behind main
-   * (22E) — never invented; omitted/null shows the plain Publish affordance. */
+   * — never invented; omitted/null shows the plain Publish affordance. */
   readonly behindMain?: { readonly conflictCount: number; readonly versionsPublishedSinceFork: number } | null;
   readonly onReviewAndResolve?: () => void;
   readonly onStartDraft?: (publication: Readonly<PublicationRecord>) => void;
@@ -172,8 +166,8 @@ export function HistoryLadder({
     };
   }, [controller, commits, propCommitDiffSummaries]);
 
-  // Restore requires its own pre-restore checkpoint label (commands.md
-  // history.restore payload {snapshotId, checkpointId, label}) — never invented,
+  // Restore requires its own pre-restore checkpoint label (history.restore payload
+  // {snapshotId, checkpointId, label}) — never invented,
   // always collected from the person via the inline field below.
   const beginRestore = (id: string) => {
     if (isMain) return;
@@ -218,7 +212,7 @@ export function HistoryLadder({
   const visibleCommits = showAllCommits ? displayCommits : displayCommits.slice(0, 3);
 
   const mainCommitDisabledReason =
-    'Main never holds edits (D40): edit main directly to create a draft';
+    'Main never holds edits: edit main directly to create a draft';
   const mainRestoreDisabledReason =
     'Direct restore on main branch is rejected; main is changed only by publication';
 
@@ -299,7 +293,7 @@ export function HistoryLadder({
         </div>
       )}
 
-      {/* 2. Branch selector row (22A: sits in the white header block) — omitted
+      {/* 2. Branch selector row (sits in the white header block) — omitted
        * entirely when no real branch name is known */}
       {branchName && (
         <div className="shrink-0 border-b border-border bg-background px-4 pb-3 pt-1">
@@ -326,7 +320,7 @@ export function HistoryLadder({
 
       {/* Scrollable Content Body */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 space-y-5">
-        {/* 2b. "This draft is behind main" callout (22E) — shown only once a real
+        {/* 2b. "This draft is behind main" callout — shown only once a real
          * prepare-publish has found the draft behind main (never inferred). */}
         {behindMain && (
           <div
@@ -348,7 +342,7 @@ export function HistoryLadder({
           </div>
         )}
 
-        {/* 3. NOW · NOT COMMITTED block (22A) */}
+        {/* 3. NOW · NOT COMMITTED block */}
         {!publishedMain && (!behindMain || workingEdits.length > 0) && (
           <section aria-labelledby="now-not-committed-header" className="space-y-2">
             <div className="flex items-center justify-between font-mono text-[9.5px] font-medium tracking-[0.12em] text-secondary-text">
@@ -580,10 +574,10 @@ export function HistoryLadder({
           {workingEdits.length > 0 ? ` · ${workingEdits.length} edit${workingEdits.length === 1 ? '' : 's'}` : ''}
         </Button>}
 
-        {/* Publish affordance: opens PublishFlow (RV-11b). Disabled on main (D40)
+        {/* Publish affordance: opens PublishFlow. Disabled on main
          * and while the branch has no committed head yet (prepare-publish
-         * requires a committed source head per transactions.md §4). When the
-         * draft is known behind main (22E), the primary action becomes
+         * requires a committed source head). When the
+         * draft is known behind main, the primary action becomes
          * reviewing the real conflict count instead. */}
         {behindMain ? (
           <>

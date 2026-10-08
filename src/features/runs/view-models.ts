@@ -1,7 +1,7 @@
 /**
- * Pure view-model functions and formatters for Run UI (RV-12c4).
+ * Pure view-model functions and formatters for Run UI.
  *
- * Implements Evergreen tokens and design-revalidation.md §2:
+ * Contents:
  * - Status dot and text mappings.
  * - Formats checks, elapsed time, root counts, and metrics without invented values.
  * - Progress bar calculation for timed simulations.
@@ -68,7 +68,7 @@ export function formatScenarioMode(mode: 'logical' | 'timed'): string {
 }
 
 /**
- * Item 6 (commands.md "Status"): Run all is disabled while any scenario is not-ready.
+ * Run all is disabled while any scenario is not-ready.
  * Returns the first not-ready scenario's first issue message as the reason, or null when
  * every scenario can be run.
  */
@@ -83,7 +83,7 @@ export function findRunAllDisabledReason(
 }
 
 /**
- * Formats the commit requirement line banner text per commands.md.
+ * Formats the commit requirement line banner text.
  */
 export function formatCommitLineText(total: number, passing: number): string {
   if (total === 0) {
@@ -212,7 +212,7 @@ export function formatElapsed(
  * Formats root counts summary string without invented metrics.
  * Missing counts return '—' for both rootsLabel and failuresCount.
  *
- * RV-12d review round 1: `rootsLabel` is the bare count, not "n roots" -- the
+ * `rootsLabel` is the bare count, not "n roots" -- the
  * caller (ResultsRegion's "ROOTS" column) already carries the unit as its
  * heading, so appending it again read as "ROOTS 2 roots".
  */
@@ -233,7 +233,7 @@ export function formatRootCountsSummary(rootCounts?: Counts | null): {
 
 /**
  * Formats an ElementMetric value with unit, or returns "Unavailable" with reason.
- * Strict per model-and-runner.md §9 and design-revalidation.md §2 (no invented values).
+ * Never invents a value.
  */
 export function formatMetricDisplay(metric: ElementMetric): {
   readonly valueText: string;

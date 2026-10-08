@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * RV-13b: Entry screen (2A new system) journeys.
+ * Entry screen journeys.
  *
  * Complements studio-transfer.spec.ts, which already covers the exported-S05
  * round trip and the unsupported-version (old app) rejection, so this spec
@@ -36,7 +36,7 @@ function writeImportFile(name: string, content: string): string {
   return path;
 }
 
-test.describe('RV-13b: Entry screen', () => {
+test.describe('Entry screen', () => {
   test('lists every template and offers Untitled for a blank project', async ({ page }) => {
     await openEntry(page);
     await expect(page.getByTestId('no-projects-notice')).toBeVisible();
@@ -55,7 +55,7 @@ test.describe('RV-13b: Entry screen', () => {
 
   test('a blank project opens editable and reappears under Your projects after reload', async ({ page }) => {
     await openEntry(page);
-    await page.getByRole('textbox', { name: 'Blank project name' }).fill('RV-13b blank');
+    await page.getByRole('textbox', { name: 'Blank project name' }).fill('blank');
     await page.getByTestId('create-blank-project-btn').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);
@@ -74,7 +74,7 @@ test.describe('RV-13b: Entry screen', () => {
     await page.goto('/projects');
     await expect(page.getByTestId('entry-screen-root')).toBeVisible();
     const list = page.getByTestId('existing-projects-list');
-    await expect(list).toContainText('RV-13b blank');
+    await expect(list).toContainText('blank');
     // A new project opens on its draft branch, which holds the placed node.
     await list.locator('[data-testid^="open-project-"]').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
@@ -169,7 +169,7 @@ test.describe('RV-13b: Entry screen', () => {
     );
     expect(overflows).toBe(false);
     await expect(page.getByTestId('templates-list')).toBeVisible();
-    await page.getByRole('textbox', { name: 'Blank project name' }).fill('RV-13b mobile');
+    await page.getByRole('textbox', { name: 'Blank project name' }).fill('mobile');
     await page.getByTestId('create-blank-project-btn').click();
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await waitForIdle(page);

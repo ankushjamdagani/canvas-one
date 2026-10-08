@@ -1,8 +1,6 @@
 /**
- * Save failure recovery options helper (RV-08b).
+ * Save failure recovery options helper.
  *
- * Implements specs/revamp/contracts/transactions.md §2, storage.md §5,
- * and commands.md §2:
  * Exposes a helper describing recovery options (retry / reload / export) as data, with no UI.
  */
 

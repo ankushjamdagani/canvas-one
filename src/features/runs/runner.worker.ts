@@ -1,5 +1,5 @@
 /**
- * Web Worker entry point for scenario execution (RV-12c4).
+ * Web Worker entry point for scenario execution.
  *
  * Runs compilation and scenario stepping in an isolated worker thread.
  * Delegates message handling entirely to pure WorkerProtocolHandler.

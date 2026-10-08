@@ -1,6 +1,5 @@
 /**
- * Pure renderToStaticMarkup fidelity tests for CompareAndResolvePanel (22F,
- * RV-11b review round). Field-level conflict rendering with real record
+ * Pure renderToStaticMarkup fidelity tests for CompareAndResolvePanel Field-level conflict rendering with real record
  * labels (never a raw ID), plus a genuinely one-sided auto-merged field
  * rendered on the same selected record.
  */
@@ -13,7 +12,7 @@ import { CompareAndResolvePanel } from './CompareAndResolvePanel';
 import type { Document } from '../../domain/studio/model';
 import type { MergeConflict } from '../../domain/versioning/merge';
 
-const s02Doc: Document = JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures/s02.json'), 'utf8'));
+const s02Doc: Document = JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples/s02.json'), 'utf8'));
 const WORKER_ID = 'b870e6ff-5835-5cdc-80b9-9f9e159c8a55'; // "Fulfillment worker"
 
 function withWorkerConfig(doc: Document, config: { capacity: number; concurrency: number }): Document {
@@ -63,7 +62,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof CompareAndRe
   );
 }
 
-describe('CompareAndResolvePanel static markup (22F)', () => {
+describe('CompareAndResolvePanel static markup', () => {
   it('counts fields, including resolved fields on the same record, rather than records', () => {
     const html = renderPanel({ resolvedFields: [{ recordKind: 'element', recordId: WORKER_ID, path: ['label'], resolution: 'ours' }] });
     expect(html).toContain('1 of 2 resolved');

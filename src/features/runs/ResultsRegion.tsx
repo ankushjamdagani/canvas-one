@@ -1,13 +1,10 @@
 /**
- * Results region bottom strip and expandable inspection drawer (RV-12c4).
+ * Results region bottom strip and expandable inspection drawer.
  *
- * Implements specs/revamp/contracts/model-and-runner.md §8 & §9,
- * and matches screens:
- * - specs/revamp/screens/7A_branching_history.png (compact resting footer strip)
- * - specs/revamp/screens/21B_running_simulation_expanded.png (expanded General + event log)
- * - specs/revamp/screens/21D_running_expanded_component_first.png (expanded Components)
+ * The compact strip is the resting state; the drawer expands to a General view with the
+ * event log and a Components view.
  *
- * Design constraints (design-revalidation.md §2):
+ * Constraints:
  * - Excludes Stop run, p99, bottleneck/pressure/headroom labels, "vs run" deltas,
  *   predictions, Save result button.
  * - Shows measured values only; unavailable telemetry displays "Unavailable" + reason.
@@ -59,8 +56,8 @@ export interface ResultsRegionProps {
   /** Required: every element referenced by a metric or event must resolve to a label. Raw ids are never shown. */
   readonly elementLabels: Record<Id, string>;
   /**
-   * RV-12d review round 1: every check's assertion label, looked up by the
-   * caller from the scenario that ran (assertionId -> Assertion.label).
+   * Every check's assertion label, looked up by the caller from the scenario
+   * that ran (assertionId -> Assertion.label).
    * Required alongside elementLabels for the same reason: a check's raw
    * assertionId is never shown, only "Unlabelled check" when a label is
    * missing (e.g. the assertion was deleted after the run that references it).
@@ -68,11 +65,11 @@ export interface ResultsRegionProps {
   readonly assertionLabels: Record<Id, string>;
   readonly measured?: boolean;
   /**
-   * RV-12d: true when the session's working snapshot has moved on since this run
+   * True when the session's working snapshot has moved on since this run
    * started (e.g. a canvas layout edit after the run completed). Shown as "Ran on
    * an earlier version" next to the status; the caller decides staleness (view
-   * layout edits are presentation-only per run-identity.md and don't change the
-   * scenario fingerprint, but the run was still against an earlier snapshot).
+   * layout edits are presentation-only and don't change the scenario
+   * fingerprint, but the run was still against an earlier snapshot).
    */
   readonly staleRun?: boolean;
 }
@@ -137,7 +134,7 @@ export function ResultsRegion({
       aria-label="Simulation results and telemetry"
     >
       {/* ================================================================== */}
-      {/* Compact Resting Footer Strip (7A screen look)                      */}
+      {/* Compact Resting Footer Strip                                     */}
       {/* ================================================================== */}
       <div className="h-12 px-4 flex items-center justify-between text-xs gap-4">
         {/* Left Side: Status Dot + Run Badge. Only this side scrolls on narrow screens,
@@ -238,7 +235,7 @@ export function ResultsRegion({
       )}
 
       {/* ================================================================== */}
-      {/* Expanded Details Section (21B & 21D screens)                       */}
+      {/* Expanded Details Section                                         */}
       {/* ================================================================== */}
       {isExpanded && (
         <div
@@ -418,7 +415,7 @@ export function ResultsRegion({
                       </div>
                     </div>
 
-                    {/* Right Column: Event Log (21B look) */}
+                    {/* Right Column: Event Log */}
                     <div className="p-3 rounded-control border border-control-border bg-background flex flex-col h-full max-h-72">
                       <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold mb-2">
                         Event log ({events.length}) · {playbackAtEnd ? 'Whole run' : `Through ${formatElapsed(mode, null, summaryAtMs)}`}
@@ -472,7 +469,7 @@ export function ResultsRegion({
                     </div>
                   </>
                 ) : (
-                  /* Components Tab View (21D screen look) */
+                  /* Components Tab View */
                   <div className="col-span-1 md:col-span-2 space-y-2">
                     <span className="font-mono text-[10px] tracking-wider text-secondary-text font-semibold">
                       Element metrics

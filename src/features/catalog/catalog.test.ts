@@ -34,7 +34,7 @@ describe('catalog.ts', () => {
     });
   });
 
-  describe('groups and colours per D35 + D42', () => {
+  describe('groups and colours', () => {
     it('defines colors for all 10 catalog groups with custom having no stripe', () => {
       expect(GROUP_STRIPE_COLORS.Clients).toBe('#4F6D8F');
       expect(GROUP_STRIPE_COLORS.Edge).toBe('#2B7A83');
@@ -68,7 +68,7 @@ describe('catalog.ts', () => {
       expect(GROUP_STRIPE_COLORS[groupOf(custom)]).toBeNull();
     });
 
-    it('maps state-machine, data-pipeline, and host to their own D42 groups', () => {
+    it('maps state-machine, data-pipeline, and host to their own groups', () => {
       const sm = getEntry('state-machine')!;
       expect(sm.group).toBe('State Machine');
       expect(GROUP_STRIPE_COLORS[sm.group]).toBe('#5A5B8C');
@@ -99,7 +99,7 @@ describe('catalog.ts', () => {
       }
     });
 
-    it('unmodeled entries have "not simulated" tag per resolutions 7 & 12', () => {
+    it('unmodeled entries have "not simulated" tag', () => {
       const unmodeledNotSimulated = [
         'traffic',
         'client',

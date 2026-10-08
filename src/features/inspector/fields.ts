@@ -1,16 +1,14 @@
 /**
- * Field mapping per inspector target (RV-05b).
+ * Field mapping per inspector target.
  *
- * Builds the CONFIGURATION section's FieldSpec[] for a single Element or Connection,
- * per specs/revamp/contracts/model-and-runner.md §2 (Element, Port, Connection) and
- * §4 (Behaviors, ResourceConfig, connection configs). Numeric bounds are copied
- * verbatim from src/domain/studio/validate.ts's storable validator (the "schema-owned
- * parser" the brief requires) rather than re-derived, so a draft can never Apply a
+ * Builds the CONFIGURATION section's FieldSpec[] for a single Element or Connection.
+ * Numeric bounds are copied verbatim from src/domain/studio/validate.ts's storable
+ * validator (the schema-owned parser) rather than re-derived, so a draft can never Apply a
  * value the storable validator would then reject.
  *
  * Only `resource` behaviors get editable configuration fields; `machine` / `pipeline`
- * / `decision` / `host` show a read-only summary ("Editing arrives later" — their
- * editors are separate tasks per the brief) and `unmodeled` shows a "Not simulated"
+ * / `decision` / `host` show a read-only summary ("Editing arrives later"; they
+ * have no editors yet) and `unmodeled` shows a "Not simulated"
  * note plus an editable reason. Connection `data` config is `{}` — no fields besides
  * label.
  */
@@ -135,12 +133,12 @@ function resourceConfigFields(element: Element): readonly FieldSpec<Element>[] {
         { value: 'lognormal', label: RESOURCE_CONFIG_COPY.serviceTime.options.lognormal },
         { value: 'fixed', label: RESOURCE_CONFIG_COPY.serviceTime.options.fixed },
       ],
-      // Absent means 'fixed': configs created before D49 keep their behaviour.
+      // Absent means 'fixed': configs created without a service time keep their behaviour.
       get: (el) => (el.behavior.kind === 'resource' ? (el.behavior.config.serviceTime ?? 'fixed') : 'fixed'),
       set: (el, value) =>
         withConfig(el, (c) => {
           const { serviceTimeCv, ...rest } = c;
-          // D50: lognormal needs a variability; choosing it sets 2, shown and editable.
+          // Lognormal needs a variability; choosing it sets 2, shown and editable.
           return value === 'lognormal'
             ? { ...rest, serviceTime: 'lognormal', serviceTimeCv: serviceTimeCv ?? LOGNORMAL_CV_WHEN_CHOSEN }
             : { ...rest, serviceTime: value as 'fixed' | 'exponential' };
@@ -305,7 +303,7 @@ function behaviorFields(element: Element): readonly FieldSpec<Element>[] {
   }
 }
 
-/** D52: a linked-project node is a fixed black box; nothing about it is editable here. */
+/** A linked-project node is a fixed black box; nothing about it is editable here. */
 function linkedProjectFields(element: Element): readonly FieldSpec<Element>[] {
   return [
     readonlyField<Element>('linked.project', 'Linked project', element.label, 'Title, team and description are read from the linked project'),
@@ -349,7 +347,7 @@ export function kindTagForElement(element: Element): { readonly tag: string; rea
 // Connection fields
 // ============================================================================
 
-/** D50: the variability a resource gets when its author chooses lognormal (an assumption, shown). */
+/** The variability a resource gets when its author chooses lognormal (an assumption, shown). */
 const LOGNORMAL_CV_WHEN_CHOSEN = 2;
 
 const LINK_CLASS_LABELS: Readonly<Record<LinkClass, string>> = {
@@ -484,7 +482,7 @@ function routingReadonlyFields(): FieldSpec<Connection>[] {
   ];
 }
 
-/** D53: what the two ends of the connection say about it, read-only here and edited on the nodes. */
+/** What the two ends of the connection say about it, read-only here and edited on the nodes. */
 function endsFields(connection: Connection, document: Pick<Document, 'elements'> | undefined): FieldSpec<Connection>[] {
   if (!document || connection.kind === 'data') return [];
   const source = findPort(document, connection.source);

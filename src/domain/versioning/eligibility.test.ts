@@ -76,7 +76,7 @@ function createMockRun(overrides: Partial<RunCandidate> = {}): RunCandidate {
   };
 }
 
-describe('runQualifies (§5 eligibility rules)', () => {
+describe('runQualifies (eligibility rules)', () => {
   const defaultExpected: RunQualifiesExpected = {
     scenarioId: 'scen-1',
     fingerprint: 'ss-run-v1:abc1234',
@@ -264,7 +264,7 @@ describe('runQualifies (§5 eligibility rules)', () => {
   });
 });
 
-describe('evaluateCandidate (§5 commit/publish eligibility)', () => {
+describe('evaluateCandidate (commit/publish eligibility)', () => {
   const scenarioA: CandidateScenario = {
     scenarioId: 'scen-A',
     fingerprint: 'ss-run-v1:fp-a',

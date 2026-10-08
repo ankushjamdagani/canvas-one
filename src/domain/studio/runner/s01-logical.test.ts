@@ -5,16 +5,15 @@ import { runScenario } from './scenario-runner';
 import type { Document } from '../model';
 import { canonicalJson } from '../canonical';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): Document {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
 }
 
 /**
- * S01 logical-mode facts through the production runner (runScenario). Migrated from the
- * RV-14b logical interpreter's tests when that interpreter was retired: authored
- * assertions, §11 trace facts, determinism and budget exhaustion.
+ * S01 logical-mode facts through the production runner (runScenario). Covers authored
+ * assertions, trace facts, determinism and budget exhaustion.
  */
 describe('logical mode: S01 reference fixture through runScenario', () => {
   const s01Doc = loadFixture('s01.json');
@@ -45,7 +44,7 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     expect(result.summary.consumedInputs).toBe(1);
   });
 
-  it('runs scenario 2 (Duplicate submit): passes all authored assertions & §11 facts', async () => {
+  it('runs scenario 2 (Duplicate submit): passes all authored assertions and trace facts', async () => {
     const scenarioId = '425ec755-23cd-56f9-ab2f-1b1ae8ab18d6';
     const runId = '00000000-0000-0000-0000-000000000002';
 
@@ -64,7 +63,7 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     );
     expect(machineState?.stateId).toBe('47d8e10f-7c32-5ca4-b0e3-6493394efe86'); // succeeded
 
-    // §11 trace-level facts: duplicate submit -> 1 command, 1 request ID
+    // Trace-level facts: duplicate submit -> 1 command, 1 request ID
     const commandEvents = result.events.filter((e) => e.code === 'order-command');
     expect(commandEvents.length).toBe(1);
 
@@ -80,7 +79,7 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     expect(result.summary.consumedInputs).toBe(2);
   });
 
-  it('runs scenario 3 (Timeout retry stale response): passes all authored assertions & §11 facts', async () => {
+  it('runs scenario 3 (Timeout retry stale response): passes all authored assertions and trace facts', async () => {
     const scenarioId = 'c90abfe5-387e-556c-85cc-a246dd3aeec4';
     const runId = '00000000-0000-0000-0000-000000000003';
 
@@ -99,7 +98,7 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     );
     expect(machineState?.stateId).toBe('47d8e10f-7c32-5ca4-b0e3-6493394efe86'); // succeeded
 
-    // §11 trace-level facts: timeout case -> 2 distinct request IDs and the late first response traced as stale
+    // Trace-level facts: timeout case -> 2 distinct request IDs and the late first response traced as stale
     const orderCommands = result.events.filter((e) => e.code === 'order-command');
     expect(orderCommands.length).toBe(2);
 
@@ -166,7 +165,7 @@ describe('logical mode: S01 reference fixture through runScenario', () => {
     expect(res.reason).toContain('Budget exhausted');
   });
 
-  it('stops recording at maxTraceRows but finishes the run; trace-count checks are unevaluated (D47)', async () => {
+  it('stops recording at maxTraceRows but finishes the run; trace-count checks are unevaluated', async () => {
     const budgetDoc: Document = {
       ...s01Doc,
       scenarios: [

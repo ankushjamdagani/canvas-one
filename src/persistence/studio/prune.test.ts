@@ -1,5 +1,5 @@
 /**
- * pruneUnreferenced tests (RV-16b, storage.md §7).
+ * pruneUnreferenced tests.
  *
  * "Any selected pinned run or snapshot -> failed/referenced-artifact with IDs, and
  *  nothing deleted." / "traceRunIds deletes those runs' trace chunks and sets traceState
@@ -7,11 +7,9 @@
  *  if unpinned after the recheck." / "Already-absent IDs on retry -> a missing/already-
  *  absent result, not an error."
  *
- * CONTRACT GAP: the task's TESTS section lists "a pinned run -> referenced-artifact"
- * without distinguishing `runIds` (full delete) from `traceRunIds` (trace-only). Narrowest
- * reading chosen: a pinned run is rejected from EITHER selection list, since storage.md
- * §7's evidence-pinning guarantee is about the run record as a whole, not specifically
- * about its trace bytes -- see the longer comment in repository.ts's `pruneUnreferenced`.
+ * A pinned run is rejected from `runIds` (full delete); `traceRunIds` (trace-only) may include
+ * pinned runs because pinning protects the run record, not its trace bytes -- see the longer
+ * comment in repository.ts's `pruneUnreferenced`.
  */
 
 import 'fake-indexeddb/auto';
@@ -27,7 +25,7 @@ import { LocalRepository } from './repository';
 import { mintRunStartToken } from './token';
 import { DEFAULT_BUILD_VERSIONS, type Actor, type ProjectCreateCommand } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = { actorId: 'test-user', kind: 'local-human', displayName: 'Test User' };
@@ -73,8 +71,7 @@ async function setup() {
   };
   expect((await repo.execute(createCmd)).status).toBe('applied');
 
-  // Eligibility requires evidence for EVERY scenario in the document (run-identity.md §5:
-  // "no required subset"), so all 3 s01 scenarios are run and committed as pinned evidence.
+  // Eligibility requires evidence for EVERY scenario in the document (no required subset), so all 3 s01 scenarios are run and committed as pinned evidence.
   const pinnedEvidence = [];
   for (const scenario of s01Doc.scenarios) {
     pinnedEvidence.push(await runAndSaveScenario(repo, projectId, s01Doc, scenario.id));
@@ -113,7 +110,7 @@ async function setup() {
   };
 }
 
-describe('pruneUnreferenced (RV-16b, storage.md §7)', () => {
+describe('pruneUnreferenced', () => {
   it('rejects selecting a pinned run for deletion, deleting nothing', async () => {
     const { db, repo, projectId, pinnedRunId } = await setup();
     const project = (await repo.loadProject(projectId))!;
@@ -134,7 +131,7 @@ describe('pruneUnreferenced (RV-16b, storage.md §7)', () => {
     db.close();
   });
 
-  it('allows trace-only pruning of a PINNED run: chunks go, row/checks/status/summary stay (review round 1, item 3)', async () => {
+  it('allows trace-only pruning of a PINNED run: chunks go, row/checks/status/summary stay', async () => {
     const { db, repo, projectId, pinnedRunId } = await setup();
     const before = (await repo.loadRun(projectId, pinnedRunId))!;
     const project = (await repo.loadProject(projectId))!;
@@ -143,8 +140,8 @@ describe('pruneUnreferenced (RV-16b, storage.md §7)', () => {
       expectedProjectRevision: project.revision,
       selection: { runIds: [], traceRunIds: [pinnedRunId], snapshotIds: [] },
     });
-    // storage.md §7: "Pruning trace chunks changes only traceState, never checks or
-    // status" -- pinning protects the run ROW, not its trace bytes, so trace-only pruning
+    // Pruning trace chunks changes only traceState, never checks or
+    // status -- pinning protects the run ROW, not its trace bytes, so trace-only pruning
     // of a pinned run is allowed, never referenced-artifact.
     expect(res.status).toBe('applied');
     if (res.status === 'applied') {

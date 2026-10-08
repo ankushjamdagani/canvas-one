@@ -162,7 +162,7 @@ export const PanelRail: React.FC<PanelRailProps> = ({
         })}
       </div>
 
-      {/* Bottom expand toggle button (as in 23G) */}
+      {/* Bottom expand toggle button */}
       <div className="flex flex-col items-center pb-2">
         <button
           type="button"

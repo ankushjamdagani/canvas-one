@@ -1,8 +1,8 @@
 /**
- * Pure renderToStaticMarkup fidelity tests for PublishReviewBody (22C publish
- * review, RV-11b review round).
+ * Pure renderToStaticMarkup fidelity tests for PublishReviewBody (the publish
+ * review dialog's content).
  *
- * design-revalidation.md §2 overrides, checked explicitly here:
+ * Deliberately excluded content, checked explicitly here:
  * - no "minor · fits the diff" (or any) reasoning text on a version card
  * - no p95/burst/"vs 2.2.1" deltas anywhere
  * - no single-letter keyboard shortcuts
@@ -16,7 +16,7 @@ import type { VersionSuggestions } from '../../domain/versioning/publication';
 import type { ScenarioWithStatus } from '../runs/scenarioStatus';
 import type { Document } from '../../domain/studio/model';
 import { readFileSync } from 'node:fs';
-const fixture: Document = JSON.parse(readFileSync('specs/revamp/fixtures/s02.json', 'utf8'));
+const fixture: Document = JSON.parse(readFileSync('src/features/entry/examples/s02.json', 'utf8'));
 
 const EXCLUDED_TEXTS = ['p95', 'p99', 'burst', 'fits the diff', 'vs 2.2.1', 'no run'];
 
@@ -81,8 +81,8 @@ function render(overrides: Partial<PublishReviewBodyProps> = {}) {
   return renderToStaticMarkup(React.createElement(PublishReviewBody, defaultProps(overrides)));
 }
 
-describe('PublishReviewBody static markup (22C)', () => {
-  it('never renders excluded design elements (D26 undo, reasoning text, p95/burst/deltas)', () => {
+describe('PublishReviewBody static markup', () => {
+  it('never renders excluded design elements (undo, reasoning text, p95/burst/deltas)', () => {
     const html = render();
     for (const text of EXCLUDED_TEXTS) {
       expect(html.toLowerCase()).not.toContain(text.toLowerCase());

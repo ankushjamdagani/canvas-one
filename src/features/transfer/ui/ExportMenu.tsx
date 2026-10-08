@@ -1,20 +1,12 @@
 /**
- * Export submenu (screen 18B) for System Studio (RV-10b).
+ * Export submenu content: Diagram as PNG, Diagram as SVG, System as JSON, Run
+ * results as CSV, then (below a divider) Diagram as Mermaid.
  *
- * Implements specs/revamp/contracts/commands.md §5 ("export.svg / png / mermaid",
- * "export.csv") and parts-and-export.md ("JSON, images and files", "CSV v1",
- * "Mermaid v1"), matching specs/revamp/screens/18B_Export_submenu.png: Diagram as
- * PNG, Diagram as SVG, System as JSON, Run results as CSV, then (below a divider)
- * the Mermaid item.
+ * This component renders the submenu items only; the host mounts it under its
+ * "Export..." row (see the "Mounting" doc block below for the props it needs).
  *
- * Out of scope (RV-10b task / design-revalidation.md §2): this component is the
- * 18B submenu content only. Mounting it under 18A's header "Export..." row, inside
- * Workspace.tsx/TopBar.tsx, belongs to another lane -- see the "Mounting" doc block
- * below for the props it needs.
- *
- * 18B labels the Mermaid item "Copy as Mermaid", but the contracted Mermaid export
- * (commands.md export.mermaid, parts-and-export.md) is a file download (.mmd), so
- * the item says what it does: "Diagram as Mermaid".
+ * The Mermaid export is a file download (.mmd), not a clipboard copy, so the item
+ * is labelled "Diagram as Mermaid".
  */
 
 import * as React from 'react';
@@ -33,7 +25,7 @@ import type { TransferActionResult, TransferActions } from './useTransferActions
 import type { TransferExportKind } from './preconditions';
 
 // ============================================================================
-// Mounting (for the lane that owns Workspace.tsx / TopBar.tsx)
+// Mounting (from Workspace.tsx / TopBar.tsx)
 // ============================================================================
 //
 // 1. Build a `TransferSessionState` from the workspace/results session state
@@ -41,13 +33,13 @@ import type { TransferExportKind } from './preconditions';
 // 2. `const actions = useTransferActions({ repository, session, mintId, downloadSink: createBrowserDownloadSink() })`
 //    (repository/mintId already flow into Workspace.tsx; `createBrowserDownloadSink`
 //    and `useTransferActions` are exported from `src/features/transfer`.)
-// 3. `<ExportMenu actions={actions} trigger={<YourExportRow />} />` -- pass 18A's
+// 3. `<ExportMenu actions={actions} trigger={<YourExportRow />} />` -- pass the
 //    existing "Export..." row as `trigger` (with `asChild` semantics: it becomes the
 //    dropdown's trigger element), or omit `trigger` to use the built-in default.
 
 export interface ExportMenuProps {
   readonly actions: TransferActions;
-  /** Trigger element (e.g. 18A's "Export..." row); defaults to a standalone "Export..." button. */
+  /** Trigger element (e.g. an "Export..." menu row); defaults to a standalone "Export..." button. */
   readonly trigger?: React.ReactElement;
   readonly align?: 'start' | 'end';
   readonly side?: 'top' | 'right' | 'bottom' | 'left';

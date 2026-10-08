@@ -1,8 +1,7 @@
 /**
- * Schema value validator (RV-14c).
+ * Schema value validator.
  *
- * Validates a runtime Json value against a document PayloadSchema shape per
- * specs/revamp/contracts/model-and-runner.md §3 "Payload schemas":
+ * Validates a runtime Json value against a document PayloadSchema shape:
  * - Scalar shapes ('string' | 'boolean' | 'number' | 'integer', nullable)
  * - Record shape (nullable, closed records: unknown payload fields rejected,
  *   prototype keys rejected, optional fields may be omitted, missing != null)

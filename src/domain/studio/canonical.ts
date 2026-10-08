@@ -1,14 +1,13 @@
 /**
- * canonical-json-v1 encoder and cryptographic utilities (RV-02c).
+ * canonical-json-v1 encoder and cryptographic utilities.
  *
- * Implements specs/revamp/contracts/run-identity.md §2 rules 1–3:
+ * Rules:
  * 1. Object keys sorted by UTF-16 code units (plain < / > comparison, NOT localeCompare), no whitespace.
  * 2. Strings use JSON.stringify escaping. Unpaired surrogates are rejected; valid Unicode is preserved exactly.
  * 3. Numbers must be finite, serialized with JSON.stringify, with -0 -> 0.
  *    Rejects NaN, Infinity, BigInt, undefined, functions, symbols, sparse arrays, and non-plain objects.
  *
- * Manifest entity-set sorting and default materialization (run-identity.md §2.4–§2.5, §3)
- * live in manifest.ts.
+ * Manifest entity-set sorting and default materialization live in manifest.ts.
  */
 
 import type { Issue } from './validate';

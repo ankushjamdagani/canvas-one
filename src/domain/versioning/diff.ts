@@ -1,10 +1,9 @@
 /**
- * Deterministic document diffing for System Studio (RV-08c).
+ * Deterministic document diffing.
  *
- * Implements:
- * - Deterministic per-record changes { recordKind, id, change: 'added' | 'removed' | 'modified', fieldPaths }
- *   for all eight RecordKinds plus document title.
- * - Uses the closed merge descriptor (merge-descriptor.ts) to identify modified fields.
+ * Produces per-record changes { recordKind, id, change: 'added' | 'removed' | 'modified', fieldPaths }
+ * for all eight RecordKinds plus the document title. Uses the closed merge descriptor
+ * (merge-descriptor.ts) to identify modified fields.
  */
 
 import type { Document, Id } from '../studio/model';

@@ -5,7 +5,7 @@ import { prepareScenario } from './compile';
 import { buildManifest, type BuildManifestVersions } from '../manifest';
 import type { AuthoredSnapshot } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 
 function loadFixture(name: string): any {
   return JSON.parse(readFileSync(join(FIXTURES_DIR, name), 'utf8'));
@@ -51,8 +51,8 @@ describe('prepareScenario: invalid storable document', () => {
   it('returns invalid with issues when the document fails storable validation', async () => {
     const doc = loadFixture('s01.json');
     const broken = structuredClone(doc);
-    // Unknown property on the document root fails storable validation (§1: "closed
-    // records ... unknown properties ... are rejected").
+    // Unknown property on the document root fails storable validation
+    // (closed records reject unknown properties).
     broken.notARealField = true;
 
     const controller = new AbortController();

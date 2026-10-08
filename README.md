@@ -1,175 +1,84 @@
-# Canvas One
+<p align="center">
+  <img src="public/favicon.svg" alt="Canvas One logo" width="96" height="96" />
+</p>
 
-### Authored architecture revisions
+<h1 align="center">Canvas One</h1>
 
-Open the project selector, then **Architecture revisions**. Save a draft with a name, author, reason for change, explanation and optional http/https issue URL. Each immutable snapshot includes the configured graph, canvas notes, subsystems and expanded component views. Compare any saved revision with the current canvas or another revision; changes include field values, connections, notes, subsystem layout and workload settings.
+<p align="center">
+  An infinite drafting sheet for system design. Sketch an architecture, give each part real behaviour, and run it to see where queues build up and requests fail.
+</p>
 
-**Finalize this draft** creates a final copy of the saved draft, retaining its author and linking back to its source. It does not capture subsequent canvas edits. **Restore to canvas** restores the snapshot in one Undo/Redo step, retaining project identity, checkpoints and saved results. The camera stays where it is. Current version-7 JSON backups preserve revisions and source links.
+<p align="center">
+  <a href="LICENSE">MIT license</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="DESIGN.md">Design notes</a>
+</p>
 
-There are up to 20 snapshots per project, including final copies. Names are self-reported and final status records a local decision; this is browser-local history, with no authenticated authors, team approval or cloud sync.
+> **Status: preview (`v0.1.0`).** The app runs locally from this repository. The `npx canvas-one@preview` command shown on the landing page is **coming soon** and is not published yet. Expect rough edges and breaking changes before 1.0.
 
-An interactive architecture-learning workspace on one unified canvas. Start blank or load optional examples/tutorials, configure all 29 catalog component kinds and workloads, inspect internals, group subsystems, run seeded performance models, and compare saved results.
+## What it does
 
-## Unified canvas
+- **Model on a canvas.** Place components from a catalog of 29 kinds (clients, edge, compute, data, messaging, operations), connect them, group them into subsystems and annotate them with notes.
+- **Give parts behaviour.** Configure capacity, queueing, concurrency, failures, retries, caches, brokers and workloads. Scenarios describe the traffic to apply.
+- **Simulate.** A seeded, deterministic discrete-event simulation runs in a Web Worker. Replay it, scrub the timeline, and inspect individual requests and cycles. Nothing is reported as passed or measured unless it ran.
+- **Keep history.** Projects have branches, commits and three-way merges. Publishing to `main` requires passing runs for every scenario.
+- **Stay local.** Projects live in your browser's IndexedDB. There is no account, no server and no network traffic for your designs. Export a project as a portable JSON bundle to back it up or move it.
 
-Compose a system from 29 searchable building blocks across clients, edge, compute, data, messaging and operations. Every component can be configured with explicit capacity, queueing, concurrency, failure, retry, cache, broker, and workload behavior. Use **Custom component** when needed, then edit its type label, instance name and notes. Connect up to 100 components freely. The simulator models performance behavior and does not execute application code or reproduce a cloud provider.
+The simulator models performance behaviour. It does not execute your application code or reproduce a specific cloud provider, so treat results as a learning aid rather than a capacity plan.
 
-Select a connection to name the relationship, record its protocol, and classify it as synchronous, asynchronous, or data flow. Those choices appear as solid, dashed, or dotted paths and persist with checkpoints and exports.
+> The landing page shows an illustrative collaboration with an AI assistant. The app does not call any AI service today.
 
-Choose **Add canvas note** to place design context beside the architecture. Notes have five types—**Decision**, **Assumption**, **Future scope**, **Question**, and **General note**—and support an 80-character title, 1,000-character body, collapse/expand, and an optional link to a component, connection, or subsystem. Select a note to edit it in the inspector, then choose **Apply note** or **Cancel**. Moving, collapsing, deleting, and restoring notes are undoable; linked notes stay where they were placed, including when their target is temporarily unavailable.
+## Quick start
 
-Open **Architecture templates** for three editable starters: **Real-time chat**, **Ecommerce checkout**, and **Event processing**. Choose a template to read its purpose, then use **Load template**. Loading replaces the current diagram as one edit, so Undo restores the exact prior graph. Template nodes, notes, and labeled connections behave like anything drawn manually and persist through checkpoints and JSON export/import. These starters illustrate flows; they are not executable simulations or production recommendations.
-
-Organize a diagram by Shift-clicking cards, or choose **Select components** to use the keyboard- and touch-accessible checklist. Two or more selected components can align by any edge; three or more can distribute with equal horizontal or vertical gaps when the available span is large enough. Dragging one selected card moves the whole selection. Each alignment, distribution, or group drag is one Undo/Redo step and changes positions only. Collapsed subsystem members stay out of the selection list.
-
-Use **Download SVG** or **Download PNG** below the diagram to export the entire architecture independently of the current pan, zoom, or selection. Exports preserve the current subsystem collapse state, connection flow styles, and canvas notes. SVG stays editable and searchable; PNG renders on white at up to 2× scale within safe browser image limits. Exports use compact standard cards and system fonts; long visible text is shortened, with full component and note content retained in SVG titles. PNG is capped at 8192 pixels per side and 16 million pixels total. These image downloads complement the existing JSON project backup.
-
-## Run locally
-
-Requires Node.js 22.12+ (verified with Node 24.5).
+Requires Node.js 22.12 or newer (developed on Node 24).
 
 ```sh
+git clone https://github.com/ankushjamdagani/canvas-one.git
+cd canvas-one
 npm ci
 npm run dev
 ```
 
-Open http://localhost:5173. Production build: `npm run build`.
+Open <http://localhost:5173>. Pick **Try Beta** to reach your projects, then create a blank project or open one of the bundled examples.
 
-## Examples & tutorials
+## Scripts
 
-Open **Examples & tutorials** for optional starters and guided exercises:
+| Command                              | What it does                                                    |
+| ------------------------------------ | --------------------------------------------------------------- |
+| `npm run dev`                        | Start the Vite dev server                                       |
+| `npm run build`                      | Type-check and build to `dist/`                                 |
+| `npm test`                           | Run the unit tests (Vitest)                                     |
+| `npm run test:e2e`                   | Run the browser tests (Playwright) against the dev server       |
+| `TEST_PRODUCTION=1 npm run test:e2e` | Run the browser tests against `vite preview` of a built `dist/` |
+| `npm run storybook`                  | Browse the design system in Storybook on port 6006              |
+| `npm run build-storybook`            | Build a static Storybook                                        |
 
-- **Relieve database pressure:** compare overloaded URL lookups before and after adding cache.
-- **Scale a worker pool:** compare one worker with four at unchanged per-worker speed.
-- **Absorb a job burst:** inspect waiting and expiry, then scale consumers.
-- **Understand retry cost:** compare zero retries with two, measuring extra attempts and permanent failures.
-- **Scale service instances:** compare round-robin service instances while observing the shared downstream bottleneck.
-- **Warm a finite cache:** compare cache sizes under the same seeded hot-link workload.
+Install the browser once with `npx playwright install chromium`. To test a production build, run `npm run build` first and start the preview server on port 5174 (`npx vite preview --port 5174`).
 
-Each loads a real editable starter model. The inspector provides a question, suggested steps and observations calculated from the current run. Use **Guide** in the toolbar to return after selecting a component. The selected guide follows the model through Undo, checkpoints and export. **Explore freely** hides the guide without resetting a running experiment. Loading a different guide or path replaces the model with an undoable edit; saved results remain intact.
+## Project layout
 
-## First experiment
-
-1. Run the initial 100 requests/s model for 30 simulated seconds (4× playback).
-2. Select **700 req/s**, then **Run**. Inspect the database: its 500 lookups/s capacity cannot keep up; its bounded queue fills and new requests are rejected.
-3. Select **Add cache**. This connects a cache with an 80% hit rate and stores **Before cache** and **After cache** checkpoints.
-4. Run again. Expand **Live metrics** to compare completed runs. The same seed and traffic preserve the exact arrival sequence. Expected database demand is now 700 × (1 − 0.8) = 140 lookups/s; observed demand varies with sampled hits.
-
-Pause/resume preserves simulation state; Reset starts from the seed. Changing model parameters starts a fresh run. Moving/renaming nodes does not change the simulation model.
-
-## Try changing traffic over time
-
-Select empty canvas space (or configure the traffic source), then choose **Steady**, **Burst**, or **Ramp** under Traffic pattern.
-
-- **Steady** keeps a fixed average request rate.
-- **Burst** uses the baseline rate, switches to a configured burst rate between its start/end times, then returns to baseline. Defaults: 100 → 700 → 100 requests/s, from 10–20 seconds in a 30-second run.
-- **Ramp** changes the arrival rate linearly from starting to ending traffic over the complete run. Increasing and decreasing ramps are supported.
-
-The inspector previews the configured workload. Expand Live metrics to see the configured traffic and observed queue on aligned time axes. A queue may be empty at the end even though cumulative latency still includes earlier waits. Compare a burst before/after adding cache using the same seed, full profile, duration and timeout.
-
-Profiles save with local projects and checkpoints. JSON exports use **version 7** and include lookup, load-balanced lookup, background jobs, worker counts, service instances, canvas-note metadata and saved results. Canvas notes are retained in checkpoints and excluded from the executable worker model. Imports accept the current format only; existing browser-local projects are not deleted. The 100 req/s and 700 req/s shortcut buttons reset the profile to Steady.
-
-## Save and compare experiments
-
-After a run finishes, choose **Save result**, name it, and save. Open **Saved runs** in the library to revisit up to 20 completed experiments per project. Results retain the exact starting model, workload and measured history, even as you continue editing. Saving is explicit; reaching the limit never removes older results automatically.
-
-Choose a baseline and comparison in the bottom results panel. The table and shared-scale queue chart compare the saved measurements. Deltas appear only when model version, complete workload and generated arrival counts match; differences are explained otherwise. Model changes are listed alongside the measurements.
-
-Rename a result in the panel, **Restore model** to edit or replay its setup, or delete it. Model restoration supports regular Undo; deletion offers **Undo delete** while the panel remains open. Local autosave and JSON exports retain saved results. Imported results are labeled as imported and have not been rerun: validation checks structure and accounting, not authenticity.
-
-## Reveal the model
-
-Use a node's chevron, or **Show internals on canvas** in the inspector, to expand it. The same canvas reveals:
-
-- Traffic: the seeded Poisson generator and observed arrival count.
-- Service: one bounded shared FIFO queue, 1–16 processing workers, per-worker processing time, sampled worker occupancy and processed/rejected counts.
-- Database: bounded FIFO queue, one processing slot and observed counters.
-- Cache: the same queue and processing details plus configured hit/miss routing and observed hits.
-
-Expanding, collapsing and moving components do not restart or replace the simulation. Expanded views are saved with the project and included in JSON exports. Queue bars summarize occupancy; they are not individual queued requests. Worker occupancy is a sampled aggregate count, not a trace of individual worker identities. Utilization is cumulative occupied processor time divided by worker count × elapsed time.
-
-Expanded **service** nodes also include per-worker capacity, worker-count and queue-limit inputs. Type the values, then choose **Apply changes** (or press Enter). Applying makes one undoable model edit and resets the current run; drafting, canceling and expanding do not. Escape cancels a draft. Inspector edits, Undo/Redo and restored models synchronize the canvas fields. Capacity accepts 1–100,000 req/s per worker; worker count accepts whole numbers from 1–16; queue limits accept 0–10,000 whole waiting slots. Saved results keep their original models. Database and cache internals remain read-only on canvas and configurable in the inspector.
-
-Traffic dots run continuously on the browser's animation clock, pause/resume without losing their phase, and are disabled for reduced-motion preferences. Dots show direction, not request count or measured speed.
-
-## Scale service workers
-
-Try a service at 200 req/s per worker with 700 req/s incoming traffic. Run with one worker, save the result, then change Workers to four, Apply and replay. The service now has 800 req/s total capacity, while each request still needs 5 ms of service processing. The database can become the next bottleneck.
-
-Workers take requests from one shared FIFO queue. New arrivals use the first free worker; otherwise they wait or are rejected if the queue is full. Completing workers take the oldest nonexpired waiting request. Equal-time events use stable insertion order. Expired active work occupies its worker until processing completes. Workers are ideal independent processing slots: no contention, scheduling overhead, connection pools or machine-level scaling are modeled.
-
-Missing worker count defaults to one. Portable exports/imports use the current version-7 format; old-format import shims are not maintained. Existing browser-local records are not deleted. Re-export a local project with the current app; very old saved result models may need a fresh run before portable import. Keep the original export as an archive if it contains unsupported historical results.
-
-## Load-balanced service instances
-
-The optional load-balanced example uses an instantaneous round-robin balancer. Each instance has its own worker pool and bounded FIFO queue; a full queue rejects that arrival and never reroutes it. Add up to eight instances from the expanded Load balancer panel; a new instance copies the first instance’s capacity, worker count and queue limit. Instances share the optional cache and database, so horizontal scaling can move the bottleneck downstream. The routing panel reports expected equal share before a run and routed, waiting, rejected and busy values after it.
-
-## URL popularity and finite caches
-
-Traffic can use a uniform catalog or a hot-link distribution. Both use the same bounded catalog size; hot mode sends a configured share to a smaller hot subset and the rest to cold keys. URL keys are seeded by request ordinal, so changing cache or topology preserves the arrival stream. Background jobs do not use URL popularity settings.
-
-The default **Fixed probability** cache is a deliberately simple configured assumption: it starts with no state and applies its hit probability independently, with no eviction or warm-up. **Finite LRU + TTL** starts empty, admits entries only after successful live database completion, refreshes recency on hits without refreshing TTL, expires keys at their deadline, and evicts the oldest live key at capacity. Misses are not coalesced; there are no writes or invalidations. Live metrics separate observed hits, misses, hit rate, current entries, evictions and expirations from configured settings.
-
-## Background jobs
-
-The optional background-job example uses a producer → bounded job queue → worker pool. Expand the queue or worker to edit settings atomically. Failure probability is sampled independently for each seeded job attempt; retries use a fixed delay and join the FIFO tail, up to the configured limit.
-
-Producer acknowledgment follows successful queue admission after 8 ms. It is separate from job completion and may occur even if the job subsequently fails or expires. The deadline starts at original submission and includes waiting, attempts and retry backoff. Backoff does not occupy a worker; already-processing expired work does. A full queue rejects initial admission; full retry re-entry or exhausted retries permanently fail the job. No crash recovery, duplicate delivery or real durable broker is modeled.
-
-Job accounting satisfies **generated = completed + admission rejected + expired + permanently failed + in flight**. Accepted = generated − admission rejected. Producer acknowledgements are a separate counter; the observation window may end before an acknowledgement arrives. Successful-job latency includes waiting and retries. Queue-to-worker edges show observed attempt rate after starting, and configured capacity before starting.
-
-## Subsystems on the same canvas
-
-Open **Subsystems → Create subsystem**, name the group and choose at least two components. Groups are non-overlapping and one level deep. Collapse an executable subsystem to see combined waiting/active counts and boundary connections; collapsed diagram subsystems instead identify an architecture boundary without implying simulated work. Expand to edit the actual components and connections. Drag its header to move members together. Ungroup keeps every component.
-
-Grouping and collapse are view changes, so a running experiment continues with the same graph and exact results. Groups persist with local projects and portable exports. A group whose components are absent after loading another scenario stays dormant and can reappear when that model edit is undone. This is visual composition around executable nodes, not a replacement simulation model.
-
-## Editing and persistence
-
-- Add components from the library, drag nodes, connect source and target handles, select a connection and press Delete, or delete a component from its inspector. Undo/redo preserves recent edits. Unsupported graphs remain editable and explain why Run is disabled.
-- Select a component → Configuration for capacity, queue size, and cache hit rate. Select empty canvas for traffic, seed, duration and timeout.
-- Projects autosave to IndexedDB in this browser. The project menu renames, reopens, creates, imports and exports projects. JSON exports are versioned; import creates a new copy.
-- Checkpoints store the graph and workload settings. Project storage also includes canvas viewport. Running simulation state is intentionally not saved; completed measurements persist only after Save result.
-- On narrow screens, the readable canvas can be panned, the inspector follows below it, and Checkpoints is a disclosure above the workspace.
-
-No cloud synchronization or remote account is involved. Export JSON to preserve a portable backup; browser site-data deletion removes local projects.
-
-## Model assumptions
-
-This is a learning model, not a hardware benchmark or architecture sizing tool.
-
-- Supported paths: traffic → service → optional cache → database; traffic → round-robin load balancer → service instances → shared optional cache/database; and producer → job queue → worker pool.
-- Poisson arrivals from a deterministic seed, following the configured steady, burst or linear-ramp rate. Integrated arrival intensity is inverted analytically; unused exponential hazard is carried across burst boundaries, without fixed time-step approximations. Cache outcomes use a separate per-request deterministic draw, so adding the cache does not perturb arrivals.
-- Service defaults to one worker at 2,000 requests/s per worker. Total service capacity is `workers × capacity`; processing time for each request is `1 / capacity`. Database and cache each retain one serial processor at 500 and 5,000 requests/s respectively.
-- FIFO waiting queues default to 500 slots. Queue limits exclude all active workers. New arrivals are rejected when every worker is busy and the waiting queue is full.
-- A global deadline defaults to 2,000 ms and includes a fixed 8 ms response overhead. An expired queued request is skipped. Already-processing expired work still consumes capacity until it completes, but never becomes a successful response.
-- Fixed-probability caches sample the configured hit rate independently. Optional finite LRU + TTL caches model cold starts, capacity, eviction and expiration against seeded URL popularity. Neither mode models writes or consistency.
-- Runs stop at the selected observation window. Outstanding requests are counted as in flight rather than silently marked successful. Generated = succeeded + rejected + timed out + in flight.
-- Throughput and utilization are cumulative averages. p95 and mean latency include successful requests only. The chart samples queue length each simulated second.
-- URL lookups do not retry. Job retries follow the explicit policy above. Replication, worker crashes, duplicate delivery, frontend execution, network contention and branched execution are not modeled. Subsystems are one level of visual grouping around the same executable components.
-
-## Structure
-
-- `src/domain`: framework-independent project/graph types, metrics, immutable saved results and validation.
-- `src/simulation`: deterministic event heap, request lifecycle, worker and React adapter; run IDs associate worker output with its starting model.
-- `src/persistence`: Dexie project repository and versioned import/export.
-- `src/state`: Zustand graph editing, history and checkpoints.
-- `src/components`: React Flow canvas, inspector and observed metrics.
-- `src/App.tsx`: workspace composition and project persistence orchestration.
-
-## Verification
-
-```sh
-npm test
-npm run build
-npx playwright install chromium
-npm run test:e2e
-# Verify built assets with a separate local preview:
-TEST_PRODUCTION=1 npm run test:e2e
+```
+src/
+  domain/        Pure model, readiness checks, versioning, scenario runner
+  simulation/    Discrete-event kernel and Web Worker protocol
+  persistence/   IndexedDB repository, import/export, integrity checks
+  features/      Screens and workflows: workspace, runs, history, library, transfer…
+  components/    Shared UI primitives, design tokens, canvas traffic visuals
+  stories/       Storybook stories for the design system
+tests/           Playwright browser tests
 ```
 
-Simulation tests cover baseline, overload, exact accounting, timeout cancellation, deterministic replay, chunk equivalence, cache demand reduction, zero queue slots and unsupported graphs. Browser journeys cover full experiments, pause/reset, local reopen, checkpoint restoration, import/export, invalid-graph repair, viewport persistence, connections and narrow-screen access.
+`DESIGN.md` describes the architecture and design system in depth, and `PRODUCT.md` records the product intent.
 
-Exact stable package versions are pinned in `package.json` and `package-lock.json`. `HANDOFF.md` records milestone commits, measured verification and concrete continuation steps. No remote push or deployment has been performed.
+## Built with
 
-Metrics updates retain exact latency statistics using incremental sorted merges. Saved-results UI code loads when opened. Measured performance and the memory tradeoff are documented in `artifacts/VERIFICATION.md`; no real-device frame-rate claim is made.
+React 19, TypeScript, Vite, [React Flow](https://reactflow.dev/), Dexie, Radix UI, Tailwind CSS, Motion, Vitest, Playwright and Storybook.
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and note our [Code of Conduct](CODE_OF_CONDUCT.md). To report a security issue, see [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Ankush Jamdagani

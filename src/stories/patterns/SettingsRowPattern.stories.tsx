@@ -57,8 +57,8 @@ export const InspectorSettingsRecipe: StoryObj = {
               </p>
             </div>
             <NativeSelect id="select-runner" defaultValue="studio-runner-5" className="w-36 text-xs">
-              <option value="studio-runner-5">Runner / 5 (D50)</option>
-              <option value="studio-runner-4">Runner / 4 (D49)</option>
+              <option value="studio-runner-5">Runner / 5</option>
+              <option value="studio-runner-4">Runner / 4</option>
               <option value="studio-runner-2">Runner / 2</option>
             </NativeSelect>
           </div>

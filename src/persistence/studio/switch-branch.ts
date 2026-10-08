@@ -1,7 +1,6 @@
 /**
- * branch.switch Controller function (RV-08b).
+ * branch.switch Controller function.
  *
- * Implements specs/revamp/contracts/transactions.md §3 & §4, and commands.md §2 & §3:
  * A controller function `switchBranch(ctx, {projectId, targetBranchId}, {flushPendingSave, resolveDraft})`
  * that awaits flushPendingSave (the source branch's pending autosave),
  * then resolveDraft (the injected navigation guard: 'clean' | 'applied' | 'discarded' | 'stay'),

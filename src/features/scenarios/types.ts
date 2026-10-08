@@ -1,12 +1,10 @@
 /**
- * Scenario module types (RV-05c).
+ * Scenario module types.
  *
- * Implements specs/revamp/contracts/commands.md "Scenarios (D41)" and "Draft lifecycle"
- * (§6): scenario.new / scenario.duplicate / scenario.delete / scenario.edit, and the
- * open/change/validate/apply/cancel draft pattern -- built self-contained here because
- * this module is not wired into the shell and `DraftTarget` in
- * src/features/inspector/types.ts is explicitly scoped to 'element' | 'connection' only
- * (out of scope for that task). `ScenarioDraftTarget` below is this module's own
+ * Covers scenario.new / scenario.duplicate / scenario.delete / scenario.edit and the
+ * open/change/validate/apply/cancel draft pattern. It is self-contained because
+ * `DraftTarget` in src/features/inspector/types.ts is scoped to 'element' | 'connection'
+ * only; `ScenarioDraftTarget` below is this module's own
  * `DraftTarget{kind:'scenario'}` equivalent.
  *
  * Unlike the inspector's single-scalar-field FieldSpec bridge (changeField(fieldId,
@@ -34,9 +32,8 @@ import type { DraftScenario } from './draftScenario';
 export type ScenarioIssue = Issue | ReadinessIssue;
 
 // ============================================================================
-// Injected sources (commands.md §6: "the only bridge methods"; brief: "seed drawn
-// at random via an injected random source", IDs "come from the injected/session
-// mintId")
+// Injected sources (the seed is drawn at random via an injected random source, and
+// IDs come from the injected/session mintId)
 // ============================================================================
 
 /** Returns a float in [0, 1), like `Math.random()`. Injected so tests are deterministic. */
@@ -45,7 +42,7 @@ export type RandomSource = () => number;
 export type MintId = () => Id;
 
 // ============================================================================
-// DraftTarget (this module's own, scenario-only, equivalent of commands.md §5)
+// DraftTarget (this module's own, scenario-only, equivalent of the inspector's DraftTarget)
 // ============================================================================
 
 export type ScenarioDraftTarget =
@@ -59,7 +56,7 @@ export type ScenarioNewFrom = { readonly kind: 'empty' } | { readonly kind: 'cop
 // ============================================================================
 
 /**
- * commands.md §6 "Editor sections": header; What goes in (traffic = workloads /
+ * Editor sections: header; What goes in (traffic = workloads /
  * steps = inputs); What happens during the run (faults / boundaries); What should be
  * true (assertions); Run settings (completion, seed, budgets). `general` covers
  * scenario-level fields with no dedicated section (scope, entryPorts,
@@ -109,7 +106,7 @@ export type ScenarioDraftHandle = {
 };
 
 // ============================================================================
-// Session bridge (transactions.md §3 / commands.md §6, narrowed like
+// Session bridge (narrowed like
 // inspector/types.ts's DraftSession so draft.ts stays testable against a fake)
 // ============================================================================
 

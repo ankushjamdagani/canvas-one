@@ -2,8 +2,6 @@ import * as React from "react";
 import {
   ArrowRight,
   ArrowUp,
-  Check,
-  Copy,
   Hand,
   MousePointer2,
   Pause,
@@ -12,6 +10,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from '@/components/ui/public-header';
 import { CanvasOneFace, type FaceExpression } from '@/components/ui/canvas-one-face';
@@ -37,8 +36,6 @@ export function LandingPage() {
   const [override, setOverride] = React.useState<
     "accepted" | "dismissed" | null
   >(null);
-  const [copied, setCopied] = React.useState(false),
-    [copyError, setCopyError] = React.useState(false);
   const [nodes, setNodes] = React.useState(initialNodes),
     [hero, setHero] = React.useState({ x: 104, y: 168, w: 800, h: 176 });
   const drag = React.useRef<{
@@ -58,11 +55,6 @@ export function LandingPage() {
     const timer = setInterval(() => setTime((value) => value + 100), 100);
     return () => clearInterval(timer);
   }, [paused, reduced]);
-  React.useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
   const t = reduced
     ? 9000
     : override === "accepted"
@@ -350,33 +342,13 @@ export function LandingPage() {
                   Try Beta <ArrowRight />
                 </a>
               </Button>
-              <Button
-                variant="outline"
-                className="lp-command"
-                aria-label={
-                  copied ? "Command copied" : "Copy npx canvas-one@preview"
-                }
-                onClick={() => {
-                  setCopyError(false);
-                  if (!navigator.clipboard) {
-                    setCopyError(true);
-                    return;
-                  }
-                  void navigator.clipboard
-                    .writeText("npx canvas-one@preview")
-                    .then(() => setCopied(true))
-                    .catch(() => setCopyError(true));
-                }}
-              >
-                <span>$</span>npx canvas-one@preview
-                {copied ? <Check /> : <Copy />}
-              </Button>
-              {copyError && (
-                <p role="alert">
-                  Could not copy. Copy this command manually:{" "}
-                  <code>npx canvas-one@preview</code>
-                </p>
-              )}
+              <div className="lp-command">
+                <span aria-hidden="true">$</span>
+                <code>npx canvas-one@preview</code>
+                <Badge variant="neutral" className="lp-soon">
+                  Coming soon
+                </Badge>
+              </div>
             </Reveal>
             <Reveal
               as="figure"

@@ -31,7 +31,7 @@ function installFakeLocalStorage(): void {
   } as Storage;
 }
 
-describe('resolveSelectedScenarioId (D41 selection fallback)', () => {
+describe('resolveSelectedScenarioId (selection fallback)', () => {
   it('keeps the stored id when it is still present', () => {
     expect(resolveSelectedScenarioId('b', ['a', 'b', 'c'])).toBe('b');
   });

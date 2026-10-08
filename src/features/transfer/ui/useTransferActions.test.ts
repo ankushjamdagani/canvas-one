@@ -1,9 +1,8 @@
 /**
- * Tests for the transfer UI action controller (RV-10b).
+ * Tests for the transfer UI action controller.
  *
- * Implements the RV-10b task brief: "each action calls the right transfer function
- * with the right inputs and the download sink with the right filename/mime."
- * Uses `createTransferActions` (the pure controller `useTransferActions` memoizes)
+ * Each action must call the right transfer function with the right inputs and the
+ * download sink with the right filename and MIME type. Uses `createTransferActions` (the pure controller `useTransferActions` memoizes)
  * with a mocked `StudioRepository` and a recording `DownloadSink` stub, matching
  * this codebase's existing test convention of typed `Partial<...>` repository
  * mocks cast via `as unknown as StudioRepository` (see EntryScreen.test.ts).

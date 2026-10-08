@@ -1,5 +1,5 @@
 /**
- * RV-03s: the history/publish facades execute registry commands and surface a
+ * The history/publish facades execute registry commands and surface a
  * disabled command's reason as an `invalid` result the components already render.
  */
 import { describe, expect, it, vi } from 'vitest';

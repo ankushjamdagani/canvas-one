@@ -1,5 +1,5 @@
 /**
- * Transport layer connecting RunController to the worker protocol (RV-12c4).
+ * Transport layer connecting RunController to the worker protocol.
  *
  * Provides:
  * - RunTransport interface for message exchange.

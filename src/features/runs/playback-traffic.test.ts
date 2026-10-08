@@ -19,7 +19,7 @@ const record = (phase: FlowRecord['phase'], atMs: number, extra: Partial<FlowRec
 
 describe('Cells and lanes playback traffic', () => {
   it('records real local retry backoff and root deadlines at their owners', async () => {
-    const source = JSON.parse(readFileSync('specs/revamp/fixtures/s06.json', 'utf8')) as Document;
+    const source = JSON.parse(readFileSync('src/features/entry/examples/s06.json', 'utf8')) as Document;
     const service = source.elements.find(e => e.label === 'Checkout API A')!;
     if (service.behavior.kind !== 'resource') throw new Error('Missing S06 resource');
     const entryPortId = service.behavior.entryPortId;
@@ -49,7 +49,7 @@ describe('Cells and lanes playback traffic', () => {
     }
   });
   it('maps real S06 fanout, bridge replies and broker delivery without changing run behavior', async () => {
-    const source = JSON.parse(readFileSync('specs/revamp/fixtures/s06.json', 'utf8')) as Document;
+    const source = JSON.parse(readFileSync('src/features/entry/examples/s06.json', 'utf8')) as Document;
     const doc: Document = { ...source, scenarios: source.scenarios.slice(0, 1).map(s => ({ ...s,
       workloads: s.workloads.map(w => ({ ...w, emission: { mode: 'bulk' as const, requests: 100, arrival: 'instant' as const } })) })) };
     expect(checkReadiness(doc, doc.scenarios[0].id).ready).toBe(true);

@@ -60,16 +60,16 @@ export interface SimLifecycleFact {
   arriveAt?: number;
   /** `occupancy_released`: false for broker dequeue, true for final operation cleanup. */
   operationReleased?: boolean;
-  /** Bridge call frames (RV-14f, model-and-runner.md §8): the system frame ID a
+  /** Bridge call frames: the system frame ID a
    * 'bridge_dispatch' fact carries, correlating it to the eventual settleCall(). */
   frameId?: string;
   /** Set only when a 'unit_settled' fact resolves through a bridge child's adopted
-   * outcome/payload (§8 "the parent adopts the child's outcome and returns the child's
-   * payload"). Absent for ordinary (non-bridge) settlement, where the original admitted
+   * outcome/payload (the parent adopts the child's outcome and returns the child's
+   * payload). Absent for ordinary (non-bridge) settlement, where the original admitted
    * payload still applies. */
   payloadRef?: string;
-  /** The emitting unit's actual category (RV-14f review, §8: "No success is inferred" —
-   * extended to "no root/message distinction is inferred either"). Set on 'admitted',
+  /** The emitting unit's actual category (no success is inferred, and neither is a
+   * root/message distinction). Set on 'admitted',
    * 'rejected' and 'unit_settled' facts so a consumer never has to guess root-vs-message
    * from the shape of `unitIdentity`. */
   category?: 'root' | 'message';
@@ -90,7 +90,7 @@ export interface KernelFaultConfig {
 }
 
 /**
- * Bridge call frames (RV-14f, model-and-runner.md §8): declares that `nodeId` (a
+ * Bridge call frames: declares that `nodeId` (a
  * resource with no other selectable call continuation, per readiness) dispatches its
  * call continuation to an external, non-resource target. The kernel keeps the parent op
  * waiting (as in a retained call chain) instead of completing it locally, and applies
@@ -100,9 +100,9 @@ export interface KernelFaultConfig {
 export interface KernelBridgeConfig {
   nodeId: string;
   returnLatencyMs: number;
-  /** D50: the call's caller retry policy; each attempt opens a new bridge frame. */
+  /** The call's caller retry policy; each attempt opens a new bridge frame. */
   retry?: CallRetryPolicy | null;
-  /** D50: the connection ID, reported on 'call_retry' facts. */
+  /** The connection ID, reported on 'call_retry' facts. */
   connectionId?: string;
 }
 
@@ -116,10 +116,10 @@ export interface OpenSimulationOptions {
   /**
    * Seconds after which workloads schedule no more arrivals. Defaults to the run
    * duration. A drain run stops arrivals at its arrival horizon and keeps running to its
-   * deadline (model-and-runner.md §6 completion).
+   * deadline.
    */
   arrivalHorizonSeconds?: number;
-  /** D55: at most this many root arrivals are scheduled in total (a 'count' run); absent = no cap. */
+  /** At most this many root arrivals are scheduled in total (a 'count' run); absent = no cap. */
   maxRootArrivals?: number;
 }
 
@@ -209,9 +209,9 @@ export interface SimEvent {
   priority: number;
   seq: number;
   run: () => void;
-  /** Periodic bookkeeping that cannot change an outcome (D56). */
+  /** Periodic bookkeeping that cannot change an outcome. */
   housekeeping?: boolean;
-  /** This is the expiry timer of `unit`: once the unit has settled it is a no-op (D56). */
+  /** This is the expiry timer of `unit`: once the unit has settled it is a no-op. */
   unit?: Unit;
 }
 
@@ -316,7 +316,7 @@ export interface Unit {
   done: boolean;
   rootOp?: Op;
   ops: Set<Op>;
-  /** Its expiry timer is scheduled and has not run (D56: it stops counting as pending work once the unit settles). */
+  /** Its expiry timer is scheduled and has not run (it stops counting as pending work once the unit settles). */
   expiryPending?: boolean;
 }
 
@@ -340,13 +340,13 @@ export interface Op {
   subscription?: string;
   publicationOnly?: boolean;
   cancelled?: boolean;
-  /** Bridge call frames (RV-14f): set while this op waits on an external settleCall. */
+  /** Bridge call frames: set while this op waits on an external settleCall. */
   bridgeFrameId?: string;
-  /** D50: deliveries of this broker op so far (redelivery counts). */
+  /** Deliveries of this broker op so far (redelivery counts). */
   deliveries?: number;
-  /** D53: the endpoint this op entered through; its overrides apply at this node. */
+  /** The endpoint this op entered through; its overrides apply at this node. */
   endpoint?: EndpointBehavior;
-  /** D54: the endpoint whose concurrency slot this op holds until it is released. */
+  /** The endpoint whose concurrency slot this op holds until it is released. */
   slotKey?: string;
 }
 
@@ -411,7 +411,7 @@ export class OpenSimulation {
   protected plan: CompiledPlan;
   protected routeSelector = new RouteSelector();
   protected events = new SimpleEventHeap();
-  /** Units created and not yet settled (D56: reported as stuck when nothing more can happen). */
+  /** Units created and not yet settled (reported as stuck when nothing more can happen). */
   protected liveUnits = new Set<Unit>();
   /** Scheduled events other than housekeeping (samples); see hasPendingWork(). */
   protected workEvents = 0;
@@ -419,12 +419,12 @@ export class OpenSimulation {
   protected currentTime = 0;
   protected duration: number;
   protected arrivalHorizon: number;
-  /** D55: a 'count' run's cap on root arrivals, and how many have been scheduled so far. */
+  /** A 'count' run's cap on root arrivals, and how many have been scheduled so far. */
   protected maxRootArrivals: number | undefined;
   protected scheduledArrivals = 0;
-  /** D55: arrivals scheduled and not yet fired. */
+  /** Arrivals scheduled and not yet fired. */
   protected pendingArrivals = 0;
-  /** D55: set by stopArrivals(); no workload arrives after it. */
+  /** Set by stopArrivals(); no workload arrives after it. */
   protected arrivalsStopped = false;
   protected seed: number;
   protected finished = false;
@@ -447,7 +447,7 @@ export class OpenSimulation {
    * so the characterization goldens are unchanged; read through `nodeLatency()`.
    */
   protected nodeLatencies = new Map<string, LatencyCollector>();
-  /** Caller retries per call edge (D49), outside `snapshot()` like `nodeLatencies`. */
+  /** Caller retries per call edge, outside `snapshot()` like `nodeLatencies`. */
   protected callRetries = new Map<string, number>();
 
   protected messagesGenerated = 0;
@@ -483,11 +483,11 @@ export class OpenSimulation {
   protected faults: KernelFaultConfig[] = [];
   protected pendingCompletionCancels = new Map<Op, () => void>();
 
-  // Bridge call frames (RV-14f, §8): nodes with an external (non-resource) call
+  // Bridge call frames: nodes with an external (non-resource) call
   // continuation, and the ops currently waiting on an external settleCall.
   protected bridgeByNode = new Map<string, KernelBridgeConfig>();
   protected bridgePendingOps = new Map<string, Op>();
-  /** D50 bridge retries: attempt number per frame, frames already resolved, frames abandoned by a timeout. */
+  /** Bridge retries: attempt number per frame, frames already resolved, frames abandoned by a timeout. */
   protected bridgeAttempts = new Map<string, number>();
   protected resolvedBridgeFrames = new Set<string>();
   protected abandonedBridgeFrames = new Set<string>();
@@ -648,7 +648,7 @@ export class OpenSimulation {
       if (!nr) continue;
 
       // 1. Active work on this host fails once. A router's forwarded requests wait without
-      // a slot (D49) but still die with the proxy.
+      // a slot but still die with the proxy.
       const isRouterNode = this.plan.nodes.get(nodeId)?.behavior.type === 'router';
       const activeOps = [...nr.active, ...(isRouterNode ? nr.waitingSources : [])];
       nr.active.clear();
@@ -703,7 +703,7 @@ export class OpenSimulation {
       }
 
       // Retrying work is left alone: activePolicy/queuedPolicy apply only to active and
-      // queued work present when the outage fires (§6 Faults). When a pending retry's timer
+      // queued work present when the outage fires. When a pending retry's timer
       // later re-admits it, normal admission applies: rejected as unavailable if the host is
       // still down, admitted normally if it has recovered.
     }
@@ -783,7 +783,7 @@ export class OpenSimulation {
     this.workEvents--;
   }
 
-  /** D56: true while an event that could still change an outcome is scheduled (periodic samples do not count). */
+  /** True while an event that could still change an outcome is scheduled (periodic samples do not count). */
   hasPendingWork(): boolean {
     return this.workEvents > 0;
   }
@@ -868,7 +868,7 @@ export class OpenSimulation {
   }
 
   /**
-   * D55: true when no operation is live and no workload arrival is pending, so nothing the run
+   * True when no operation is live and no workload arrival is pending, so nothing the run
    * produced can still change an outcome. Housekeeping events (samples, expiry timers of settled
    * units) do not count; that is why a stopped or counted run can end the moment its work is done.
    */
@@ -876,7 +876,7 @@ export class OpenSimulation {
     return this.liveOpsCount === 0 && this.pendingArrivals === 0;
   }
 
-  /** D56: units that have not settled, with where each one is held. */
+  /** Units that have not settled, with where each one is held. */
   unsettled(): readonly { identity: string; category: 'root' | 'message'; holderNodeId: string; path?: string; phase: OpPhase }[] {
     return [...this.liveUnits].map((u) => ({
       identity: u.identity,
@@ -887,12 +887,12 @@ export class OpenSimulation {
     }));
   }
 
-  /** D56: arrivals still to come: a bulk's remaining requests, or one for each live stream. */
+  /** Arrivals still to come: a bulk's remaining requests, or one for each live stream. */
   pendingArrivalCount(): number {
     return this.pendingArrivals;
   }
 
-  /** D55: stop every workload from arriving again; what is in flight carries on. */
+  /** Stop every workload from arriving again; what is in flight carries on. */
   stopArrivals(): void {
     this.arrivalsStopped = true;
   }
@@ -1167,19 +1167,19 @@ export class OpenSimulation {
   }
 
   private readonly endpointBuckets = new Map<string, { tokens: number; at: number }>();
-  /** D54: ops currently holding a slot of an endpoint with a concurrency cap. */
+  /** Ops currently holding a slot of an endpoint with a concurrency cap. */
   private readonly endpointSlots = new Map<string, number>();
-  /** D54: the caller side's breaker and in-flight state, keyed by out-port. */
+  /** The caller side's breaker and in-flight state, keyed by out-port. */
   private readonly callerStates = new Map<
     string,
     { failures: number; state: 'closed' | 'open' | 'half-open'; openUntil: number; probes: number; live: Set<Op> }
   >();
-  /** D54: publishes waiting to travel together, keyed by out-port and edge. */
+  /** Publishes waiting to travel together, keyed by out-port and edge. */
   private readonly batchBuffers = new Map<string, { entries: Array<(departure: number, leg: number | null) => void>; bytes: number; epoch: number }>();
   private batchSequence = 0;
 
   /**
-   * D54: seconds one leg of `edge` takes (latency, jitter, transfer time at the link's bandwidth),
+   * Seconds one leg of `edge` takes (latency, jitter, transfer time at the link's bandwidth),
    * or null when the leg is lost. Seeded per leg, so chunked and one-shot runs draw alike.
    */
   protected legSeconds(edge: ExecutionEdge, baseMs: number, bytes: number, id: string, lossy = true): number | null {
@@ -1203,7 +1203,7 @@ export class OpenSimulation {
     return state;
   }
 
-  /** D54: whether the caller may send now: its in-flight limit and circuit breaker (a half-open breaker lets probes through). */
+  /** Whether the caller may send now: its in-flight limit and circuit breaker (a half-open breaker lets probes through). */
   protected callerGate(caller: CallerPolicy): 'ok' | 'probe' | 'reject' {
     const st = this.callerState(caller.key);
     if (caller.maxInFlight !== undefined) {
@@ -1226,7 +1226,7 @@ export class OpenSimulation {
     return 'ok';
   }
 
-  /** D54: what an answered attempt tells the breaker. Fast-failed attempts never reach it. */
+  /** What an answered attempt tells the breaker. Fast-failed attempts never reach it. */
   protected callerOutcome(caller: CallerPolicy, outcome: Outcome, wasProbe: boolean): void {
     const breaker = caller.breaker;
     if (!breaker) return;
@@ -1245,7 +1245,7 @@ export class OpenSimulation {
     }
   }
 
-  /** D53: one token per admitted call; refills at `rps` up to `burst`, full at the start. */
+  /** One token per admitted call; refills at `rps` up to `burst`, full at the start. */
   private takeEndpointToken(endpoint: EndpointBehavior): boolean {
     const limit = endpoint.rateLimit!;
     const bucket = this.endpointBuckets.get(endpoint.key) ?? { tokens: limit.burst, at: this.currentTime };
@@ -1263,16 +1263,16 @@ export class OpenSimulation {
 
     const hostId = this.hostPlacement.get(op.nodeId);
     const hostDown = hostId !== undefined && this.hostState.get(hostId) === false;
-    // D53: an endpoint's rate limit rejects calls beyond its token bucket; a retry already got in once.
+    // An endpoint's rate limit rejects calls beyond its token bucket; a retry already got in once.
     const overRateLimit = !hostDown && !isRetry && op.endpoint?.rateLimit !== undefined && !this.takeEndpointToken(op.endpoint);
-    // D54: an endpoint's concurrency cap rejects calls beyond the slots in use.
+    // An endpoint's concurrency cap rejects calls beyond the slots in use.
     const overCapacity =
       !hostDown && !overRateLimit && !isRetry && op.endpoint?.maxConcurrency !== undefined &&
       (this.endpointSlots.get(op.endpoint.key) ?? 0) >= op.endpoint.maxConcurrency;
     if (hostDown || overRateLimit || overCapacity) {
       // Admission to a host that is actually down is rejected immediately as unavailable,
       // whatever the router knows and regardless of whether this is a first attempt or a
-      // retry landing during the outage (§6 Faults).
+      // retry landing during the outage.
       nr.counters.rejected++;
       op.phase = 'settled';
       op.done = true;
@@ -1512,7 +1512,7 @@ export class OpenSimulation {
       procTime = 1 / node.behavior.capacity;
     }
     if (node.behavior.serviceTime === 'exponential' || node.behavior.serviceTime === 'lognormal') {
-      // D49/D50: seeded per unit, path and attempt, so chunked and one-shot runs draw alike.
+      // Seeded per unit, path and attempt, so chunked and one-shot runs draw alike.
       const draw = makeRng((this.seed ^ hashString(`${op.unit.identity}:${op.path}:${op.attempt}:service`)) >>> 0);
       const u = Math.min(1 - 1e-12, Math.max(1e-12, draw()));
       if (node.behavior.serviceTime === 'exponential') {
@@ -1683,7 +1683,7 @@ export class OpenSimulation {
       });
 
       if (eligible.length === 0) {
-        // Advance round robin cursor even on rejected selection per S04
+        // Advance round robin cursor even on rejected selection
         if (node.behavior.strategy === 'round-robin') {
           const cursor = this.roundRobinCursors.get(node.id) ?? 0;
           this.roundRobinCursors.set(node.id, cursor + 1);
@@ -1752,12 +1752,12 @@ export class OpenSimulation {
   protected dispatchDownstream(op: Op): void {
     const allOutgoing = this.plan.outgoing.get(op.nodeId) || [];
     if (allOutgoing.length === 0) {
-      // Bridge call frames (RV-14f, §8): a non-router resource with no in-kernel
+      // Bridge call frames: a non-router resource with no in-kernel
       // outgoing edge but a declared bridge continuation waits, exactly like a retained
       // call chain, for an external settleCall() instead of completing locally. Routers
       // always select exactly one route themselves (never reach this branch with zero
       // real edges when a bridge is configured), so bridging is narrowed here to
-      // non-router resources per the readiness note in §8.
+      // non-router resources.
       const node = this.plan.nodes.get(op.nodeId)!;
       const bridge = node.behavior.type !== 'router' ? this.bridgeByNode.get(op.nodeId) : undefined;
       if (bridge) {
@@ -1806,7 +1806,7 @@ export class OpenSimulation {
     op.pendingChildren = selectedOutgoing.length;
     op.failedChild = false;
 
-    // D49 (audit H11): a router is an event-driven proxy. Once it has forwarded a request
+    // a router is an event-driven proxy. Once it has forwarded a request
     // its slot is free for the next one; the forwarded request waits without a slot.
     const dispatchingNode = this.plan.nodes.get(op.nodeId)!;
     if (dispatchingNode.behavior.type === 'router') {
@@ -1838,8 +1838,7 @@ export class OpenSimulation {
   }
 
   /**
-   * One attempt of a call from `op` along `edge`. With a retry policy on the edge (D49,
-   * audit H13), a rejected, failed or timed-out attempt is retried by the caller after a
+   * One attempt of a call from `op` along `edge`. With a retry policy on the edge, a rejected, failed or timed-out attempt is retried by the caller after a
    * backoff; the caller keeps waiting (and a non-router caller keeps its slot) meanwhile.
    * Only the final outcome reaches handleChildResponse.
    */
@@ -1853,7 +1852,7 @@ export class OpenSimulation {
     const caller = edge.caller;
 
     const childPath = attemptNo === 1 ? `${op.path}>${edge.id}` : `${op.path}>${edge.id}~${attemptNo}`;
-    // D54: the caller's in-flight limit and circuit breaker can turn the attempt away before it is sent.
+    // The caller's in-flight limit and circuit breaker can turn the attempt away before it is sent.
     const gate = caller ? this.callerGate(caller) : 'ok';
     // Resolved when the caller learns the attempt's outcome: its response arrives, or the
     // attempt timeout fires first (a response still on its way back is then ignored).
@@ -1868,7 +1867,7 @@ export class OpenSimulation {
       hedgePending = false;
       em.responses++;
       if (caller && gate !== 'reject') this.callerOutcome(caller, childOutcome, gate === 'probe');
-      // D54: a hedged copy that lost the race is abandoned like a timed-out attempt.
+      // A hedged copy that lost the race is abandoned like a timed-out attempt.
       const abandoned = new Set<string>();
       for (const copy of copies) {
         if (!copy.done) {
@@ -1995,7 +1994,7 @@ export class OpenSimulation {
     }
   }
 
-  /** Waits the backoff for `attemptNo`, then sends the next attempt (D49). */
+  /** Waits the backoff for `attemptNo`, then sends the next attempt. */
   protected scheduleCallRetry(op: Op, edge: ExecutionEdge, attemptNo: number, retry: NonNullable<ExecutionEdge['retry']>, logicalEdgeId = edge.id): void {
     let delayMs = Math.min(retry.maxBackoffMs, retry.backoffMs * Math.pow(retry.backoffMultiplier, attemptNo - 1));
     if (retry.jitter) {
@@ -2021,7 +2020,7 @@ export class OpenSimulation {
   }
 
   /**
-   * D50: a router retries on another route when one qualifies: the next healthy route for
+   * A router retries on another route when one qualifies: the next healthy route for
    * round robin, a fresh weighted draw among the others; a conditional router keeps the
    * route its conditions chose. Otherwise the retry stays on the same route.
    */
@@ -2087,7 +2086,7 @@ export class OpenSimulation {
     const parentUnit = parentOp.unit;
     const hops = parentUnit.hops + 1;
     const born = this.currentTime;
-    // D56: no TTL means the message never expires; unconsumed, it is reported stuck at quiescence.
+    // No TTL means the message never expires; unconsumed, it is reported stuck at quiescence.
     const edgeDeadline = edge.messageTtlMs === null ? Infinity : born + edge.messageTtlMs / 1000;
     const deadline = Math.min(edgeDeadline, parentUnit.lineageDeadline);
     const lineageDeadline = deadline;
@@ -2122,7 +2121,7 @@ export class OpenSimulation {
 
     let ackScheduled = false;
     const caller = isSynthetic ? undefined : edge.caller;
-    // D54: fire and forget. The publisher moves on at once and never hears of the delivery's fate.
+    // Fire and forget. The publisher moves on at once and never hears of the delivery's fate.
     if (caller?.confirm === false) {
       ackScheduled = true;
       this.scheduleEvent(this.currentTime, 1, () => {
@@ -2231,7 +2230,7 @@ export class OpenSimulation {
       return;
     }
 
-    // D54: hold the publish until `size` have gathered or `windowMs` has passed, then send them over one hop.
+    // Hold the publish until `size` have gathered or `windowMs` has passed, then send them over one hop.
     const bufferKey = `${caller!.key}>${edge.id}`;
     let buffer = this.batchBuffers.get(bufferKey);
     if (!buffer) {
@@ -2360,18 +2359,17 @@ export class OpenSimulation {
   }
 
   /**
-   * Bridge call frames (RV-14f, §8): completes the resource op that was waiting on an
+   * Bridge call frames: completes the resource op that was waiting on an
    * external settleCall(), adopting the bridge child's exact outcome (not collapsed to
    * 'failed' the way a retained in-kernel child's non-succeeded outcome is) and its
-   * payload. This is deliberately a separate path from handleChildResponse: §8 requires
-   * "the parent adopts the child's outcome and returns the child's payload" for bridge
-   * frames specifically, whereas handleChildResponse's generic non-router rule collapses
+   * payload. This is deliberately a separate path from handleChildResponse: the parent adopts the child's
+   * outcome and returns the child's payload for bridge frames specifically, whereas handleChildResponse's generic non-router rule collapses
    * every non-succeeded child outcome to 'failed'. Resource -> resource -> bridge chains
    * are unaffected: the outer resource's own childOp still resolves via the retained
-   * handleChildResponse path (per §8 "the outer resource keeps retained handling").
+   * handleChildResponse path (the outer resource keeps retained handling).
    */
   /**
-   * Opens one bridge attempt (RV-14f frames; D50 retries). With a retry policy, a
+   * Opens one bridge attempt (frames and retries). With a retry policy, a
    * rejected, failed or timed-out attempt opens a new frame after the backoff; a reply to
    * an abandoned frame is ignored.
    */
@@ -2458,7 +2456,7 @@ export class OpenSimulation {
   }
 
   /**
-   * Bridge call frames (RV-14f, §8): settles a still-open bridge frame from outside the
+   * Bridge call frames: settles a still-open bridge frame from outside the
    * kernel. `returnLatencyMs` (declared for this node via `OpenSimulationOptions.bridges`)
    * is applied before the parent op resolves, matching a retained child's response delay.
    *
@@ -2480,7 +2478,7 @@ export class OpenSimulation {
         this.emitFact({ kind: 'traffic', trafficPhase: 'outcome', trafficOutcome: 'late', time: (input.atMs ?? this.currentTime * 1000) / 1000,
           nodeId: observed.nodeId, unitIdentity: observed.unit.identity, attempt: observed.attempt, path: observed.path, edgeId: bridge?.connectionId });
       }
-      // D50: the caller gave up on this attempt; its reply is the frame's last event.
+      // The caller gave up on this attempt; its reply is the frame's last event.
       this.resolvedBridgeFrames.delete(input.frameId);
       return;
     }
@@ -2523,7 +2521,7 @@ export class OpenSimulation {
     return this.abandonedBridgeFrames.has(frameId) || this.bridgePendingOps.get(frameId)?.done === true;
   }
 
-  /** Caller retries sent along one call edge (D49). */
+  /** Caller retries sent along one call edge. */
   edgeRetries(edgeId: string): number {
     return this.callRetries.get(edgeId) ?? 0;
   }
@@ -2743,10 +2741,10 @@ export class OpenSimulation {
     consumerNr.counters.arrived++;
     consumerNr.counters.admitted++;
 
-    // Each delivery (D50 redelivery) is its own path, so its seeded draws are independent.
+    // Each delivery (a redelivery) is its own path, so its seeded draws are independent.
     const delivery = brokerOp.deliveries ?? 1;
     const childPath = delivery === 1 ? `${brokerOp.path}>${edge.id}` : `${brokerOp.path}>${edge.id}#${delivery}`;
-    // D54: the hop to the consumer has jitter and transfer time like any link, but is never lost (the broker would wait forever).
+    // The hop to the consumer has jitter and transfer time like any link, but is never lost (the broker would wait forever).
     const hopSeconds = this.legSeconds(edge, edge.latencyMs, 0, `${brokerOp.unit.identity}:${childPath}:hop`, false) ?? edge.latencyMs / 1000;
     const childOp: Op = {
       unit: brokerOp.unit,
@@ -2795,7 +2793,7 @@ export class OpenSimulation {
   }
 
   /**
-   * D50: a broker route with a retry policy redelivers a message whose consumer failed,
+   * A broker route with a retry policy redelivers a message whose consumer failed,
    * after the backoff (like a visibility timeout), by putting it back on the broker's
    * queue for any consumer. Returns false when no delivery is left.
    */

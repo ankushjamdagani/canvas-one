@@ -1,7 +1,6 @@
 /**
  * Views that open on demand (History ladder, Commit, Publish flow, scenario editor) load
- * as separate chunks so the workspace renders without them (architecture.md: lazy-load
- * history, merge and results). The workspace preloads them once the browser is idle, so
+ * as separate chunks so the workspace renders without them. The workspace preloads them once the browser is idle, so
  * opening one normally renders immediately. Each wrapper keeps the original props.
  */
 import * as React from 'react';

@@ -37,7 +37,7 @@ export interface PanelHostProps {
   unseenChanges?: Partial<Record<PanelId, boolean>>;
   viewport?: Viewport;
   className?: string;
-  // Dragging override for preview harness / tests (23D)
+  // Dragging override for preview harness / tests
   isDraggingPreview?: boolean;
   draggingPanelIdPreview?: PanelId | null;
   activeDropTargetPreview?: 'left' | 'right' | null;
@@ -193,7 +193,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
         className
       )}
     >
-      {/* 1. Left Collapsed Rail (23F, 23G) */}
+      {/* 1. Left Collapsed Rail */}
       {leftCollapsedItems.length > 0 && (
         <PanelRail
           side="left"
@@ -204,7 +204,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
         />
       )}
 
-      {/* 2. Left Dock Column (23B) */}
+      {/* 2. Left Dock */}
       {dockedLeftItems.length > 0 && (
         <DockColumn
           side="left"
@@ -228,7 +228,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
       >
         {canvas}
 
-        {/* Drag Drop Targets Overlay (23D) */}
+        {/* Drag Drop Targets Overlay */}
         {isDragging && (
           <DropTargets
             activeTarget={currentDropTarget}
@@ -237,7 +237,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
         )}
       </div>
 
-      {/* 4. Right Dock Column (23A, 23E) */}
+      {/* 4. Right Dock */}
       {dockedRightItems.length > 0 && (
         <DockColumn
           side="right"
@@ -264,7 +264,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
         />
       )}
 
-      {/* 6. Floating Panels Layer (23C) */}
+      {/* 6. Floating Panels */}
       {floatingPanelIds.map((id) => {
         const pref = state.panels[id];
         return (
@@ -285,7 +285,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
 
       {/* 7. Modal Overlay Panels for Mobile / Narrow screens (< 768px / 768-1199px) */}
       {/* A modal dialog: focus is trapped inside, Escape and a press on the backdrop close
-          it, and focus returns to the control that opens the panel (design.md overlays). */}
+          it, and focus returns to the control that opens the panel (standard modal behaviour). */}
       {overlayPanelIds.map((id) => (
         <DialogPrimitive.Root
           key={`overlay-${id}`}
@@ -335,7 +335,7 @@ export const PanelHost: React.FC<PanelHostProps> = ({
         </DialogPrimitive.Root>
       ))}
 
-      {/* 8. Dragging Ghost Preview (23D) */}
+      {/* 8. Dragging Ghost Preview */}
       {isDragging && currentDraggingPanel && dragPointer && (
         <div
           data-slot="dragging-ghost-panel"

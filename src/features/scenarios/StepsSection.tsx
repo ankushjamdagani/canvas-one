@@ -1,15 +1,13 @@
 /**
  * "What goes in" section for logical scenarios: ordered steps = inputs, with initial
- * states (RV-05c).
+ * states.
  *
- * commands.md §4 "Editor sections": "logical: ordered steps = inputs, with initial
- * states." Screen: scenario_steps_editor.png. model-and-runner.md §6: "Array order is
- * semantic" for `inputs`; "Logical mode: atMs is null."
+ * Array order of `inputs` is semantic, and in logical mode `atMs` is null.
  *
  * Each step needs an entry endpoint and a fixture whose schema matches that port's
  * `schemaId` -- picked from real document fixtures/schemas, never typed as JSON. A step
  * can only be added once at least one inbound port has a matching fixture in the
- * document (brief: "Empty drafts invent nothing" -- no fixture is fabricated here).
+ * document (an empty draft invents nothing -- no fixture is fabricated here).
  */
 
 import * as React from 'react';

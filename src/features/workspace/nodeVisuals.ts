@@ -1,19 +1,17 @@
 /**
- * Node card visuals for System Studio canvas (RV-03s).
+ * Node card visuals for the studio canvas.
  *
- * Screen: specs/revamp/screens/2A_workspace.png.
  * Icon: lucide, by visualKind, one fixed map with a neutral fallback for kinds
- * without one (D13: keep Lucide icons).
- * Caption (D42 catalog.md "Approved resolutions" item 10, extended by items
- * 7/12): before any run, `kind · key setting` phrased as a configured value —
+ * without one.
+ * Caption: before any run, `kind · key setting` phrased as a configured value —
  * the kind word is the behavior's own type word for a resource element (e.g.
  * "processor", "router"), not the visualKind; `unmodeled` elements (including
- * the D42-item-12 diagram-only traffic/client/mobile/device/scheduler
- * placeholders and the item-7 email/monitoring/analytics/secrets sinks) show
+ * the diagram-only traffic/client/mobile/device/scheduler
+ * placeholders and the email/monitoring/analytics/secrets sinks) show
  * exactly "Not simulated" with no kind word attached. Never p99/pressure/
- * measured-run values here (Lead default "Metrics"; D15) — after a run of the
+ * measured-run values here — after a run of the
  * selected scenario this line switches to that run's measurements, which is
- * the runs lane's responsibility, not this shell's.
+ * the responsibility of the run feature, not this module.
  */
 
 import {
@@ -55,7 +53,7 @@ import {
 import type { Element, ResourceConfig } from '../../domain/studio/model';
 
 /**
- * One fixed visualKind -> icon map (D13: keep Lucide icons).
+ * One fixed visualKind -> icon map.
  * Kinds not listed fall through to NEUTRAL_FALLBACK_ICON below rather than
  * inventing a mapping.
  */
@@ -96,10 +94,8 @@ const VISUAL_KIND_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * CONTRACT GAP: VISUAL_KIND_ICONS above already covers every VISUAL_KINDS entry
- * (29-kind catalog + state-machine/data-pipeline/host, model.ts). This fallback
- * exists only for a future visualKind added to the catalog without an icon
- * decision yet; it renders a neutral generic shape rather than guessing.
+ * VISUAL_KIND_ICONS above already covers every VISUAL_KINDS entry. This fallback
+ * exists only for a future visualKind added to the catalog without an icon; it renders a neutral generic shape rather than guessing.
  */
 const NEUTRAL_FALLBACK_ICON: LucideIcon = Component;
 
@@ -108,15 +104,15 @@ export function getNodeIcon(visualKind: string): LucideIcon {
 }
 
 /**
- * Builds the mono caption line, D42 item 10's "kind · key setting" shape.
+ * Builds the mono caption line, in the "kind · key setting" shape.
  */
 export function getNodeCaption(element: Element): string {
   const behavior = element.behavior;
-  // D52: a linked project is a fixed black box, so its caption doesn't quote editable-looking settings.
+  // A linked project is a fixed black box, so its caption doesn't quote editable-looking settings.
   if (element.visualKind === 'linked-project') return 'black box · fixed';
   switch (behavior.kind) {
     case 'unmodeled':
-      // D42 items 7 & 12: the whole label is exactly this — no kind word,
+      // The whole label is exactly this — no kind word,
       // no config value, whether it's a scenario-boundary external
       // dependency or a diagram-only placeholder.
       return 'Not simulated';
@@ -127,12 +123,10 @@ export function getNodeCaption(element: Element): string {
     case 'pipeline':
       return `data pipeline · ${formatCount(behavior.operations.length, 'step')}`;
     case 'decision':
-      // CONTRACT GAP: D42 item 10 gives worked examples for resource/
-      // unmodeled/machine/pipeline/host but not decision. Narrowest reading:
-      // follow the same "kind word · count" shape as machine/pipeline.
+      // Follows the same "kind word · count" shape as machine/pipeline.
       return `decision · ${formatCount(behavior.cases.length, 'case')}`;
     case 'host':
-      // catalog.md §2 "host": "host has no fields" — no key setting to show.
+      // A host has no fields, so there is no key setting to show.
       return 'host';
     default:
       return element.visualKind;
@@ -167,8 +161,8 @@ function formatCount(n: number, noun: string): string {
 }
 
 /**
- * Formats an integer with a thin space (U+2009) as the thousands separator,
- * matching the screens (e.g. 2000 -> "2 000"). Values under 1000 are
+ * Formats an integer with a thin space (U+2009) as the thousands separator
+ * (e.g. 2000 -> "2 000"). Values under 1000 are
  * unaffected.
  */
 export function formatThousands(n: number): string {

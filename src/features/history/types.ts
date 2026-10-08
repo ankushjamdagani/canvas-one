@@ -1,14 +1,5 @@
 /**
- * History panel and controller types for System Studio (RV-11a).
- *
- * Implements specifications from:
- * - specs/revamp/decisions.md (D11, D20, D26, D27, D28, D29, D37, D40, D41)
- * - specs/revamp/design-revalidation.md (§2 exclusions & §3 item 10)
- * - specs/revamp/requirements.md (R08)
- * - specs/revamp/contracts/transactions.md §4
- * - specs/revamp/contracts/commands.md §3 & "Scenarios (D41)"
- * - specs/revamp/contracts/storage.md §2–§5
- * - specs/revamp/contracts/run-identity.md §5
+ * History panel and controller types for System Studio.
  */
 
 import type { Document, Id } from '../../domain/studio/model';
@@ -56,7 +47,7 @@ export type HistoryControllerState = {
   readonly isMain: boolean;
   /** Working edit labels from the current session's undo stack (this session only). */
   readonly workingEdits: readonly string[];
-  /** Explicit contract notice: working edits are tracked for this session only. */
+  /** Explicit notice: working edits are tracked for this session only. */
   readonly workingEditsNotice: string;
   readonly checkpoints: readonly Readonly<CheckpointRecord>[];
   readonly commits: readonly Readonly<CommitRecord>[];
@@ -110,7 +101,7 @@ export type RecordChangeItem = {
 };
 
 /**
- * Everything CommitPanel needs to render (§: CommitPanel never reads the
+ * Everything CommitPanel needs to render (CommitPanel never reads the
  * controller's private session or repository directly — this is the one
  * public, typed surface it consumes for the CHANGES list and scenario gate).
  */

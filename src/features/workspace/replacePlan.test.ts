@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Document, Id } from '../../domain/studio/model';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
-import s04 from '../../../specs/revamp/fixtures/s04.json';
+import s04 from '../entry/examples/s04.json';
 import { planReplacePart } from './replacePlan';
 
 function createMintId(): () => Id {
@@ -15,7 +15,7 @@ const elementA = fixture.elements.find((e) => e.label === 'A')!;
 const touchesA = (doc: Document) =>
   doc.connections.filter((c) => c.source.elementId === elementA.id || c.target.elementId === elementA.id).map((c) => c.id);
 
-describe('planReplacePart (selection.replace-part, commands.md "Selection-scoped actions")', () => {
+describe('planReplacePart (selection.replace-part)', () => {
   it('swaps in the catalog entry at the same position, keeps the label and accounts for every connection', () => {
     const result = planReplacePart(fixture, viewId, elementA.id, 'service', createMintId());
     expect(result.ok).toBe(true);

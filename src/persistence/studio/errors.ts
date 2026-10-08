@@ -1,8 +1,7 @@
 /**
- * Error model and exception mappers for System Studio repository (RV-16a).
+ * Error model and exception mappers for the System Studio repository.
  *
- * Implements storage.md §5 & prompt error model:
- * exactly `not-found | invalid | stale | referenced-artifact | quota | unavailable |
+ * The error codes are exactly `not-found | invalid | stale | referenced-artifact | quota | unavailable |
  * unsupported-version | operation-id-reused | limit`, with structured issue paths and IDs,
  * never raw browser exception text alone.
  */

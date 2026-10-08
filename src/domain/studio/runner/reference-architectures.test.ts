@@ -1,14 +1,11 @@
 /**
- * Realism audit phase 3: reference architectures (specs/revamp/realism-audit.md,
- * "Phase 3"). Each architecture is built the way a user builds it — `placeEntry` and
+ * Reference architectures. Each architecture is built the way a user builds it — `placeEntry` and
  * `planConnection` from the catalog, so the element and connection defaults are the app's
  * own — then run through readiness and `runScenario`.
  *
- * These tests characterise what the app does today. The real-world expectation for each
- * architecture was written in the audit before the first run. Where today's behaviour
- * differs, the test is tagged with the audit ID ([gap Hn], [default]) and asserts the
- * current behaviour, so the change that fixes it has to rewrite the test to the
- * real-world expectation. Tests tagged [fixed Bn]/[fixed G1] assert a defect's fix (D47).
+ * These tests characterise what the app does today against a real-world expectation for
+ * each architecture. Where today's behaviour differs from that expectation, the test
+ * asserts the current behaviour, so a change that closes the gap has to rewrite the test.
  *
  * `REF_REPORT=1` prints one line per run.
  */
@@ -79,7 +76,7 @@ class Arch {
   }
 
   /**
-   * Patches what the inspector would edit for a connection (D53): the link and route stay on the
+   * Patches what the inspector would edit for a connection: the link and route stay on the
    * connection; a caller's retry goes on its out-port, a receiver's ack delay and TTL on its in-port.
    */
   setConn(id: Id, patch: Record<string, unknown>): void {
@@ -140,10 +137,10 @@ const uniformKeys = { kind: 'uniform' as const, catalogSize: 1000, hotSubset: 1,
 /**
  * Timed scenario with one workload, workload timeout 30 s (TrafficSection's default).
  * The workload is a stream, stopped after `seconds` of simulated time; arrivals end there and
- * what is in flight drains. Budgets are the contracted maxima
- * (storage.md §6) so the traces the tests read stay complete.
+ * what is in flight drains. Budgets are the maximum
+ * run budget limits so the traces the tests read stay complete.
  */
-/** Simulated ms at which `run` presses Stop for a scenario built by `scenario` (D56: a stream never ends by itself). */
+/** Simulated ms at which `run` presses Stop for a scenario built by `scenario` (a stream never ends by itself). */
 const stopAfterMs = new Map<Id, number>();
 
 function scenario(
@@ -226,7 +223,7 @@ function chain(title: string, kinds: readonly string[], configs: readonly Record
   return { a, ids };
 }
 
-const fixture = (name: string): Document => JSON.parse(readFileSync(join(process.cwd(), 'specs/revamp/fixtures', name), 'utf8'));
+const fixture = (name: string): Document => JSON.parse(readFileSync(join(process.cwd(), 'src/features/entry/examples', name), 'utf8'));
 
 // ============================================================================
 // A1-A12
@@ -277,7 +274,7 @@ describe('A2 queue absorbs a burst', () => {
     return { a, api };
   }
 
-  it('the canvas connects a service to a queue and a queue to a worker [fixed G1]', () => {
+  it('the canvas connects a service to a queue and a queue to a worker', () => {
     const a = new Arch();
     const api = a.place('service');
     const q = a.place('queue');
@@ -359,7 +356,7 @@ describe('A4 balancer failover', () => {
         e.behavior.kind === 'resource' ? { ...e, behavior: { ...e.behavior, config: defaults(e.visualKind === 'balancer' ? 'balancer' : 'service') } } : e,
       ) as Element[];
       const router = elements.find((e) => e.label === 'Router')!;
-      const base = d.scenarios[0]; // H1 (route A) down 2-4 s, detection and recovery detection 1 s
+      const base = d.scenarios[0]; // route A down 2-4 s, detection and recovery detection 1 s
       const workload: Workload = {
         id: '00000000-0000-4000-8000-0000000000aa', entry: { elementId: router.id, portId: (router.behavior as { entryPortId: Id }).entryPortId },
         enabled: true, startDelayMs: 0, emission: { mode: 'stream', ratePerSecond: 100, profile: { kind: 'steady' } }, timeoutMs: 30000,
@@ -404,7 +401,7 @@ describe('A5 fan-out', () => {
     expect(Math.abs((await fanOut('pubsub')) - 3)).toBeLessThan(0.03);
   });
 
-  it('a stream gives each consumer every event [fixed H14]', async () => {
+  it('a stream gives each consumer every event', async () => {
     expect(Math.abs((await fanOut('stream')) - 3)).toBeLessThan(0.03);
   });
 });
@@ -562,18 +559,18 @@ describe('A12 service calling a third party', () => {
     return { r, o: outcomes(r) };
   }
 
-  it('a slow third party shows up as caller latency [fixed B8]', async () => {
+  it('a slow third party shows up as caller latency', async () => {
     const fast = await callThirdParty(10, 'succeeded');
     const slow = await callThirdParty(200, 'succeeded');
     expect(fast.o.succeeded).toBeGreaterThan(30);
     expect(slow.o.failed + slow.o.rejected).toBe(0);
-    // One response answers every traffic request (D47); latency = service time + 2 x 2 ms
+    // One response answers every traffic request; latency = service time + 2 x 2 ms
     // default link latency + the boundary's delay.
     expect(fast.o.meanMs).toBeCloseTo(14.5, 0);
     expect(slow.o.meanMs).toBeCloseTo(204.5, 0);
   });
 
-  it('a failing third party fails the caller [fixed B8]', async () => {
+  it('a failing third party fails the caller', async () => {
     const { o } = await callThirdParty(50, 'failed');
     expect(o.generated).toBeGreaterThan(30);
     expect(o.succeeded).toBe(0);
@@ -582,10 +579,10 @@ describe('A12 service calling a third party', () => {
 });
 
 // ============================================================================
-// D50: the D49 limits
+// Traffic shapes, retries and heavy tails
 // ============================================================================
 
-describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
+describe('traffic shapes, retries everywhere, heavy tails', () => {
   const retryPolicy = (o: Record<string, unknown> = {}) => ({ maxAttempts: 3, backoffMs: 0, backoffMultiplier: 2, maxBackoffMs: 1000, jitter: false, attemptTimeoutMs: null, ...o });
   const withProfile = (a: Arch, id: Id, profile: WorkloadProfile) => {
     a.doc = { ...a.doc, scenarios: a.doc.scenarios.map((x) => (x.id === id ? { ...x, workloads: x.workloads.map((w) => ({ ...w, emission: w.emission.mode === 'stream' ? { ...w.emission, profile } : w.emission })) } : x)) };
@@ -593,7 +590,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
 
   it('A2 with a real burst: 5x traffic for 5 s is absorbed by the queue and drained; nothing is lost', async () => {
     const a = new Arch();
-    a.doc = { ...a.doc, title: 'D50 burst' };
+    a.doc = { ...a.doc, title: 'burst' };
     const api = a.place('service', 'API');
     const q = a.place('queue', 'Queue');
     a.connect(api, q);
@@ -610,7 +607,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   });
 
   it('a ramp from 10/s to 100/s over 10 s sends the average of the two rates', async () => {
-    const { a, ids } = chain('D50 ramp', ['service']);
+    const { a, ids } = chain('ramp', ['service']);
     const id = scenario(a, ids[0], { rate: 10, seconds: 10 });
     withProfile(a, id, { kind: 'ramp', endRate: 100, rampMs: 10000 });
     const r = await run(a, id);
@@ -645,7 +642,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   }
 
   it('a service retries a failing third party: every attempt asks the boundary again', async () => {
-    const r = await thirdParty('D50 third party fails', 10, 'failed', retryPolicy({ maxAttempts: 3, backoffMs: 20 }));
+    const r = await thirdParty('third party fails', 10, 'failed', retryPolicy({ maxAttempts: 3, backoffMs: 20 }));
     const o = outcomes(r);
     const settledRoots = o.generated - o.inFlight;
     expect(o.failed).toBe(settledRoots);
@@ -655,7 +652,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   });
 
   it('an attempt timeout on a slow third party gives up and retries; late replies are ignored', async () => {
-    const r = await thirdParty('D50 third party slow', 200, 'succeeded', retryPolicy({ maxAttempts: 2, attemptTimeoutMs: 50 }));
+    const r = await thirdParty('third party slow', 200, 'succeeded', retryPolicy({ maxAttempts: 2, attemptTimeoutMs: 50 }));
     const o = outcomes(r);
     expect(o.succeeded).toBe(0);
     expect(o.expired).toBe(o.generated - o.inFlight);
@@ -665,7 +662,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   it('a queue redelivers failed messages: final failures fall from p to p^3', async () => {
     const lost = async (retry: ReturnType<typeof retryPolicy> | null) => {
       const a = new Arch();
-      a.doc = { ...a.doc, title: `D50 redelivery ${retry ? 'on' : 'off'}` };
+      a.doc = { ...a.doc, title: `redelivery ${retry ? 'on' : 'off'}` };
       const api = a.place('service', 'API');
       const q = a.place('queue', 'Queue');
       const wk = a.place('worker', 'Worker');
@@ -696,7 +693,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
 
   it('a gateway retries on the healthy replica when one replica fails', async () => {
     const a = new Arch();
-    a.doc = { ...a.doc, title: 'D50 gateway retry' };
+    a.doc = { ...a.doc, title: 'gateway retry' };
     const g = a.place('gateway', 'Gateway');
     const bad = a.place('service', 'Broken replica');
     a.set(bad, { failureRate: 100 });
@@ -710,7 +707,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
 
   it('a heavy-tailed (lognormal) service has a much longer p95 than an exponential one with the same mean', async () => {
     const p95 = async (serviceTime: Record<string, unknown>) => {
-      const { a, ids } = chain(`D50 ${JSON.stringify(serviceTime)}`, ['service'], [{ capacity: 50, ...serviceTime }]);
+      const { a, ids } = chain(`${JSON.stringify(serviceTime)}`, ['service'], [{ capacity: 50, ...serviceTime }]);
       const r = await run(a, scenario(a, ids[0], { rate: 100, seconds: 20 }));
       return { mean: metric(r, 'meanLatencyMs', ids[0]), p95: metric(r, 'p95LatencyMs', ids[0]) };
     };
@@ -722,7 +719,7 @@ describe('D50 traffic shapes, retries everywhere, heavy tails', () => {
   });
 });
 
-describe('D51 repeating boundary responses', () => {
+describe('repeating boundary responses', () => {
   it('a response used once runs out; marked repeat, it answers every matching request', async () => {
     const d = fixture('s01.json');
     const base = d.scenarios.find((x) => x.label === 'Timeout retry stale response')!;
@@ -746,11 +743,11 @@ describe('D51 repeating boundary responses', () => {
 });
 
 // ============================================================================
-// Runner and metric defects found while building the architectures
+// Timed workload runs
 // ============================================================================
 
-describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the fix)', () => {
-  it('a workload entering a queue runs; its messages reach the consumer [fixed B1]', async () => {
+describe('timed workload runs', () => {
+  it('a workload entering a queue runs; its messages reach the consumer', async () => {
     const a = new Arch();
     const q = a.place('queue');
     a.connect(q, a.place('worker'));
@@ -763,7 +760,7 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(messages.succeeded).toBeGreaterThanOrEqual(roots.succeeded - 1);
   });
 
-  it('Stop ends arrivals at the stop time and the run drains what is in flight [fixed B2]', async () => {
+  it('Stop ends arrivals at the stop time and the run drains what is in flight', async () => {
     const a = new Arch();
     const svc = a.place('service');
     const r = await run(a, scenario(a, svc, { rate: 50, seconds: 10 }));
@@ -774,7 +771,7 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(r.summary.rootCounts.inFlight).toBe(0);
   });
 
-  it('summary.rootCounts includes workload roots, so root-count assertions see them [fixed B3]', async () => {
+  it('summary.rootCounts includes workload roots, so root-count assertions see them', async () => {
     const a = new Arch();
     const svc = a.place('service');
     a.set(svc, { capacity: 10, concurrency: 1, queueLimit: 0 });
@@ -793,7 +790,7 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(r.checks[0]).toMatchObject({ status: 'failed', actual: rejected });
   });
 
-  it('a root rejected at admission is counted once, and root counts conserve [fixed B4]', async () => {
+  it('a root rejected at admission is counted once, and root counts conserve', async () => {
     const a = new Arch();
     const svc = a.place('service');
     a.set(svc, { capacity: 10, concurrency: 1, queueLimit: 0 });
@@ -804,7 +801,7 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(o.succeeded + o.rejected + o.failed + o.expired + o.inFlight).toBe(o.generated);
   });
 
-  it('metric checks evaluate element throughput and latency in timed runs [fixed B9]', async () => {
+  it('metric checks evaluate element throughput and latency in timed runs', async () => {
     const c16 = { concurrency: 16 };
     const { a, ids } = chain('B9 metrics', ['service', 'service', 'service', 'service'], [c16, c16, c16, c16], 5);
     const id = scenario(a, ids[0], { rate: 100, seconds: 5 });
@@ -827,7 +824,7 @@ describe('Runner defects in timed workload runs (B1-B4 fixed; tests assert the f
     expect(r.checks.map((c) => c.status)).toEqual(['passed', 'failed', 'passed']);
   });
 
-  it('default budgets stop recording the trace, not the run: a 50/s, 30 s run completes [fixed B7]', async () => {
+  it('default budgets stop recording the trace, not the run: a 50/s, 30 s run completes', async () => {
     const a = new Arch();
     const svc = a.place('service');
     a.connect(svc, a.place('database'));

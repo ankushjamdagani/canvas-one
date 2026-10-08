@@ -1,8 +1,8 @@
 /**
- * Pure geometry helpers for the edge label overlap fix (RV-12d review round 1).
+ * Pure geometry helpers for the edge label overlap fix.
  *
  * TrafficEdge's label chip sits at the smoothstep path's midpoint. On tightly
- * spaced layouts (S01) that midpoint can land on top of a node rectangle even
+ * spaced layouts that midpoint can land on top of a node rectangle even
  * after lifting the chip above the line, covering the node's caption. These
  * helpers let TrafficEdge decide, in flow (not screen) coordinates, whether the
  * chip would intersect any node and should therefore be suppressed from the

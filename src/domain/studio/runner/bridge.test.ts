@@ -1,18 +1,18 @@
 /**
- * Bridge call frames (RV-14f, model-and-runner.md §8 "Bridge call frames").
+ * Bridge call frames.
  *
  * Exercises ResourceAdapter/OpenSimulation directly (not through the composed
  * ScenarioRunner): a resource with a call continuation to a non-resource target waits
  * exactly like a retained call chain, and the adapter's `settleCall` resolves it.
  *
- * §8: "The emission carries a system frameId, and the parent waits as in retained call
+ * The emission carries a system frameId, and the parent waits as in retained call
  * chains. The bridge settles the frame once via settleCall; the kernel applies
  * returnLatencyMs and its existing child-response handling. For bridge frames only, the
- * parent adopts the child's outcome and returns the child's payload... A second
+ * parent adopts the child's outcome and returns the child's payload. A second
  * settlement of a frame fails the run. If an outage or expiry settles the parent while
  * its bridge frame is open, the frame stays open until its descendants settle; the later
  * settleCall is ignored, isn't a second settlement, and still counts toward root
- * settlement and drain."
+ * settlement and drain.
  */
 import { describe, it, expect } from 'vitest';
 import type { Element, CallConnection, ResourceConfig, Relation } from '../model';
@@ -42,7 +42,7 @@ function makeNonResourceElement(id: string): Element {
     description: '',
     visualKind: 'service',
     ports: [{ id: `${id}-in`, label: 'in', direction: 'in', channel: 'call', protocol: 'http', schemaId: 'schema-1', responseSchemaId: 'schema-1' }],
-    behavior: { kind: 'unmodeled', version: 1, reason: 'bridge target stub for RV-14f tests' },
+    behavior: { kind: 'unmodeled', version: 1, reason: 'bridge target stub' },
   };
 }
 
@@ -112,7 +112,7 @@ const isSettled = (events: readonly TraceEvent[]) =>
 
 
 
-describe('Bridge call frames (RV-14f, §8)', () => {
+describe('Bridge call frames', () => {
   it('a resource with only a bridge continuation waits, dispatches exactly once, and settleCall completes it with returnLatencyMs applied and the adopted outcome/payload', () => {
     const p1 = makeResourceElement('p1', processorConfig);
     const m1 = makeNonResourceElement('m1');
@@ -145,7 +145,7 @@ describe('Bridge call frames (RV-14f, §8)', () => {
     expect(settled!.outcome).toBe('succeeded');
     // returnLatencyMs (20ms) applied on top of the settleCall time (100ms).
     expect(settled!.atMs).toBe(120);
-    // The parent returns the child's payload (§8), not the originally admitted payload.
+    // The parent returns the child's payload, not the originally admitted payload.
     expect(settled!.payloadRef).toBe('sha256:child-payload');
 
     const summary = adapter.snapshot();
@@ -249,7 +249,7 @@ describe('Bridge call frames (RV-14f, §8)', () => {
   });
 });
 
-describe('No invented outcomes/categories (RV-14f review round 3, §8 "No success is inferred")', () => {
+describe('No invented outcomes/categories (no success is inferred)', () => {
   it('a unit_settled fact with no outcome sets a journey failure and is never counted as succeeded', () => {
     const p1 = makeResourceElement('p1', processorConfig);
     const adapter = new ResourceAdapter({ runId: 'no-outcome-run', elements: [p1], connections: [], seed: 1, durationMs: 5000 });

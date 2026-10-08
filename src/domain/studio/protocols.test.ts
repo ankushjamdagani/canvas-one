@@ -9,9 +9,9 @@ import { DEFAULT_BUILD_VERSIONS } from '../../persistence/studio/types';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const S01 = JSON.parse(readFileSync(resolve(__dirname, '../../../specs/revamp/fixtures/s01.json'), 'utf8')) as Document;
+const S01 = JSON.parse(readFileSync(resolve(__dirname, '../../features/entry/examples/s01.json'), 'utf8')) as Document;
 
-describe('protocols (D53)', () => {
+describe('protocols', () => {
   it('has a label for every protocol and none is listed under two channels', () => {
     const all = Object.values(PROTOCOLS).flat();
     expect(new Set(all).size).toBe(all.length);

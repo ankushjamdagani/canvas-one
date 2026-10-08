@@ -1,9 +1,5 @@
 /**
- * Tests for CSV v1 Run Metrics Exporter (RV-10a).
- *
- * Implements specifications from:
- * - specs/revamp/contracts/parts-and-export.md ("CSV v1")
- * - specs/revamp/requirements.md (R10: Entry and transfer)
+ * Tests for CSV v1 Run Metrics Exporter.
  *
  * Verification:
  * - CSV formula-injection defense (=, +, -, @, tab, CR prefixes, fullwidth U+FF1D/U+FF0B/U+FF0D/U+FF20)
@@ -294,7 +290,7 @@ describe('CSV v1 Export (exportRunCsv)', () => {
     });
   });
 
-  describe('Item 2: Scenario ID from manifest shape', () => {
+  describe('Scenario ID from manifest shape', () => {
     it('throws MalformedRunError when manifest is missing or null', () => {
       const run = makeRunRecord({ manifest: null });
       expect(() => exportRunCsv({ run, snapshotDocument: makeSnapshotDocument() })).toThrow(
@@ -330,7 +326,7 @@ describe('CSV v1 Export (exportRunCsv)', () => {
     });
   });
 
-  describe('Item 3: Element labels strictly from run snapshot document', () => {
+  describe('Element labels strictly from run snapshot document', () => {
     it('throws MalformedRunError naming the elementId when element-scoped metric is missing from snapshot document', () => {
       const run = makeRunRecord({
         summary: {
@@ -382,7 +378,7 @@ describe('CSV v1 Export (exportRunCsv)', () => {
     });
   });
 
-  describe('Item 4: Summary count rows for every run', () => {
+  describe('Summary count rows for every run', () => {
     it('emits root and message count rows for EVERY run even when elementMetrics is non-empty', () => {
       const run = makeRunRecord(); // 1 element metric + 6 rootCounts + 6 messageCounts
       const snapshot = makeSnapshotDocument([{ id: 'el-1', label: 'Processor' }]);

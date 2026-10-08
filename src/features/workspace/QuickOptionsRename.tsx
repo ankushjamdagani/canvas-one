@@ -1,9 +1,6 @@
 /**
- * 14A "Rename inside quick options" (RV-03q): the nested project.rename step.
- *
- * Team availability copy from the screen ("Name is available in Platform
- * team") is left out (design-revalidation.md §2: no teams); the lines say what
- * rename really checks and changes (commands.md §3 project.rename).
+ * The nested project.rename step inside Quick options. The hint lines say what
+ * rename really checks and changes; there is no team availability copy.
  */
 
 import * as React from 'react';

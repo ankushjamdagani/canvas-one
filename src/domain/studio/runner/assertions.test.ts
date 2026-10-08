@@ -218,11 +218,11 @@ describe('assertions: evaluateAssertion', () => {
       assertionId: 'a-metric',
       status: 'unevaluated',
       actual: null,
-      reason: 'Logical runs have no timing, so metric checks are unavailable (§6)',
+      reason: 'Logical runs have no timing, so metric checks are unavailable',
     });
   });
 
-  it('evaluates a timed metric subject from the element metrics (D48)', () => {
+  it('evaluates a timed metric subject from the element metrics', () => {
     const metric = (key: 'p95LatencyMs' | 'throughput', value: number | null, available = true) => ({
       elementId: 'el-1', scope: 'element' as const, key, value, unit: 'ms' as const, available,
       reason: available ? null : 'No successful operations at this element', windowStartMs: 0, windowEndMs: 1000,

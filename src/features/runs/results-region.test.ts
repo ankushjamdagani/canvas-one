@@ -38,7 +38,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(html).not.toContain('654');
     expect(html).not.toContain('1 of 1 passed');
   });
-  it('Item 3: unmeasured terminal (measured: false) shows NO counts, elapsed, checks totals or metrics — only status and reason', () => {
+  it('unmeasured terminal (measured: false) shows NO counts, elapsed, checks totals or metrics — only status and reason', () => {
     const unmeasuredTerminal: TerminalResult = {
       status: 'invalid',
       checks: [],
@@ -77,7 +77,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(metricTimeBasis('meanLatencyMs', false)).toBe('Successful cohort through playhead');
   });
 
-  it('Item 4: missing values show "—", never 0 before terminal or with measured:false', () => {
+  it('missing values show "—", never 0 before terminal or with measured:false', () => {
     // Before terminal (running)
     const runningHtml = renderToStaticMarkup(
       React.createElement(ResultsRegion, {
@@ -97,7 +97,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(runningHtml).toContain('—');
   });
 
-  it('Item 5: Components table uses elementLabels and excludes null elementId (which appears under General)', () => {
+  it('Components table uses elementLabels and excludes null elementId (which appears under General)', () => {
     const measuredTerminal: TerminalResult = {
       status: 'completed',
       checks: [{ assertionId: 'a1', status: 'passed', actual: true, reason: null }],
@@ -159,7 +159,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(generalHtml).not.toContain('Global');
   });
 
-  it('RV-12d review round 1: checks list shows the assertion label, never the raw assertionId', () => {
+  it('checks list shows the assertion label, never the raw assertionId', () => {
     const measuredTerminal: TerminalResult = {
       status: 'completed',
       checks: [
@@ -190,7 +190,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(html).toContain('Unlabelled check');
   });
 
-  it('RV-12d review round 1: event log shows modeled time or step number, element label, kind and outcome — never a raw element id', () => {
+  it('event log shows modeled time or step number, element label, kind and outcome — never a raw element id', () => {
     const measuredTerminal: TerminalResult = {
       status: 'completed',
       checks: [],
@@ -237,7 +237,7 @@ describe('ResultsRegion (Items 3, 4, 5)', () => {
     expect(html).toContain('1 events recorded');
   });
 
-  it('RV-12d review round 1: logical-run events (no atMs) show a step number instead of a fabricated time', () => {
+  it('logical-run events (no atMs) show a step number instead of a fabricated time', () => {
     const measuredTerminal: TerminalResult = {
       status: 'completed',
       checks: [],

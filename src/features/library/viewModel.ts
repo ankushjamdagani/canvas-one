@@ -1,13 +1,6 @@
 /**
- * Library Pure View Models (RV-06b).
- *
- * Implements pure view-model functions for filtering, grouping, keyboard navigation,
- * and detail formatting, with no DOM or React dependency.
- *
- * Specs:
- * - specs/revamp/contracts/catalog.md (§5 Library display mapping)
- * - specs/revamp/design-revalidation.md (§2 Exclusions)
- * - specs/revamp/decisions.md (D30, D35, D42)
+ * Library pure view models: filtering, grouping, keyboard navigation and detail formatting,
+ * with no DOM or React dependency.
  */
 
 import { GROUP_STRIPE_COLORS, type CatalogEntry, type CatalogGroup } from '../catalog/catalog';
@@ -95,7 +88,7 @@ export function groupCatalogEntries(
 }
 
 /**
- * Checks whether an entry is unmodeled (Resolution 7 / Resolution 12).
+ * Checks whether an entry is unmodeled (a diagram label that the simulation ignores).
  */
 export function isUnmodeledEntry(entry: CatalogEntry): boolean {
   return (
@@ -105,9 +98,8 @@ export function isUnmodeledEntry(entry: CatalogEntry): boolean {
 }
 
 /**
- * Structured detail row data for Screen 12C.
- * Adheres strictly to design-revalidation.md §2:
- * OUT: Owner, Used in, Platform team, Failures go to, Open docs.
+ * Structured detail row data for the entry detail popover.
+ * It never includes Owner, Used in, Platform team, Failures go to or Open docs.
  */
 export interface FormattedEntryDetail {
   readonly group: CatalogGroup;

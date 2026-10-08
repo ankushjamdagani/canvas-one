@@ -1,9 +1,8 @@
 /**
- * Dexie database definition for System Studio (RV-16a).
+ * Dexie database definition for System Studio.
  *
- * Implements specs/revamp/contracts/storage.md §1 & §2:
  * - Database namespace: `system-studio-local-v1`, version 1.
- * - Tables, composite keys, and indexes matching storage.md §2 exactly:
+ * - Tables, composite keys, and indexes:
  *   - projects: primary key `id`, indexes `updatedAt`
  *   - branches: primary key `[projectId+id]`, indexes `projectId`
  *   - snapshots: primary key `[projectId+id]`, indexes `projectId`

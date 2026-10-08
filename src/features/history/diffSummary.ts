@@ -1,11 +1,6 @@
 /**
- * Pure diff summary and formatting helpers for System Studio History (RV-11a).
- *
- * Implements specifications from:
- * - specs/revamp/screens/scenario_commit_gate.png (CHANGES list)
- * - specs/revamp/screens/22A_history_ladder.png (commits, branch header)
- * - specs/revamp/contracts/storage.md §2–§5
- * - specs/revamp/contracts/commands.md §3
+ * Pure diff summary and formatting helpers for System Studio History: the CHANGES list,
+ * per-commit change counts, "ahead of" and evidence summary lines.
  */
 
 import type { Document, Element, Id } from '../../domain/studio/model';
@@ -39,7 +34,7 @@ function findRecordLabel(doc: Document | null, recordKind: string, id: Id): stri
       return doc.scenarios.find((s) => s.id === id)?.label ?? null;
     case 'view':
       return doc.views.find((v) => v.id === id)?.label ?? null;
-    // Fixtures and refinements (model.ts §2/§6) have no label field of their own;
+    // Fixtures and refinements have no label field of their own;
     // they are described from linked context by describeFixtureLabel /
     // describeRefinementLabel below rather than via this label lookup.
     case 'fixture':
@@ -51,7 +46,7 @@ function findRecordLabel(doc: Document | null, recordKind: string, id: Id): stri
 }
 
 /**
- * Fixture (model.ts §2: {id, schemaId, value}) has no label. Describe it by its
+ * Fixture ({id, schemaId, value}) has no label. Describe it by its
  * payload schema's label when the schema is still resolvable, or by kind alone —
  * never by its raw id.
  */
@@ -64,7 +59,7 @@ function describeFixtureLabel(doc: Document | null, id: Id): string | null {
 }
 
 /**
- * Refinement (model.ts §6: {id, ownerElementId, memberElementIds, portMappings})
+ * Refinement ({id, ownerElementId, memberElementIds, portMappings})
  * has no label. Describe it by its owning element's label when resolvable, or by
  * kind alone — never by its raw id.
  */
@@ -122,7 +117,7 @@ function describeElementChange(
     return 'removed component';
   }
   if (baseEl && workingEl) {
-    // Check for resource config changes (contract §4 ResourceConfig: flat
+    // Check for resource config changes (ResourceConfig: flat
     // capacity/concurrency/queueLimit numeric fields, never a nested "capacity" object).
     if (baseEl.behavior.kind === 'resource' && workingEl.behavior.kind === 'resource') {
       const baseCfg = baseEl.behavior.config;
@@ -156,7 +151,7 @@ function describeChange(
   workingDoc: Document,
   diff: RecordDiff,
 ): { label: string; detail: string } {
-  // Fixtures and refinements carry no label of their own (model.ts §2/§6); describe
+  // Fixtures and refinements carry no label of their own; describe
   // them from linked context (schema label / owning element label) instead, never
   // by raw id, and never via the generic label lookup below.
   if (diff.recordKind === 'fixture') {
@@ -178,10 +173,10 @@ function describeChange(
   }
 
   // Every other record kind (document/element/connection/relation/schema/scenario/
-  // view) has a required `label` (or `title`) field per model.ts. Try the working
+  // view) has a required `label` (or `title`) field. Try the working
   // document first, then the base document (covers a removed record, which only
   // exists in the base). If the record is found in neither document, that is a
-  // model contract violation — never paper over it with an invented placeholder.
+  // model invariant violation — never paper over it with an invented placeholder.
   const workingLabel = findRecordLabel(workingDoc, diff.recordKind, diff.id);
   const baseLabel = findRecordLabel(baseDoc, diff.recordKind, diff.id);
   const label = workingLabel ?? baseLabel;

@@ -1,8 +1,7 @@
 /**
- * Browser download sink for transfer UI actions (RV-10b).
+ * Browser download sink for transfer UI actions.
  *
- * Implements specs/revamp/contracts/parts-and-export.md ("JSON, images and files"):
- * "Revoke object URLs." The Blob -> object URL -> anchor click -> revoke sequence is the
+ * The Blob -> object URL -> anchor click -> revoke sequence is the
  * only DOM/global side effect anywhere in the transfer UI module; it is injected into
  * `useTransferActions` so every action's own logic stays a pure, synchronously testable
  * function that never touches `document`/`URL` itself.

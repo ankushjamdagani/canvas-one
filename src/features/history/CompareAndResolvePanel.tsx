@@ -1,25 +1,16 @@
 /**
- * CompareAndResolvePanel (22F compare and resolve) — RV-11b review round.
+ * CompareAndResolvePanel: a full-panel merge view. A left list groups records as
+ * UNRESOLVED / AUTO-MERGED / UNCHANGED; the main pane shows the selected record's fields
+ * (conflicting fields show ours vs theirs with use-ours / use-theirs / edit; resolved
+ * fields show "resolved · field · side" with reopen; auto-merged fields are tagged
+ * "auto · side"); a footer progress bar offers Next conflict / Apply and run.
  *
- * specs/revamp/screens/22F_compare_and_resolve.png: a full-panel merge view —
- * left list (UNRESOLVED / AUTO-MERGED / UNCHANGED), a main pane of the selected
- * record's fields (conflicting fields showing ours vs theirs with use-ours /
- * use-theirs / edit; resolved fields showing "resolved · field · side" +
- * reopen; auto-merged fields tagged "auto · side"), and a footer progress bar
- * with Next conflict / Apply and run.
+ * No bare-letter global shortcuts are wired (only Mod+Z, Mod+Shift+Z, Delete/Backspace
+ * and F2 exist app-wide); every action is a visible, labelled control.
  *
- * design-revalidation.md §2 overrides the mockup's single-letter shortcuts
- * ("n next · o ours · t theirs · e edit") — commands.md §1 allows only Mod+Z,
- * Mod+Shift+Z, Delete/Backspace and F2, no bare-letter global shortcuts — so
- * none are wired here; every action is a visible, labelled control.
- *
- * Domain note: persistence/studio/candidates.ts fixes "ours" = main's content
- * and "theirs" = the source branch's head content (its own comment: "Load
- * base/ours(=main head)/theirs(=source head) snapshots"). The 22F mockup's
- * illustrative labels read the opposite way round for its specific example, so
- * the ours/theirs values also show their real branch names, to stay correct
- * (D15: mockup wording is illustrative; getting this backwards would resolve
- * conflicts to the wrong side).
+ * "ours" is main's content and "theirs" is the source branch's head content
+ * (persistence/studio/candidates.ts). The ours/theirs values also show their real branch
+ * names so a conflict is never resolved to the wrong side.
  */
 
 import * as React from 'react';
@@ -344,7 +335,7 @@ export function CompareAndResolvePanel({
   onClose,
   className,
 }: CompareAndResolvePanelProps): React.JSX.Element {
-  // Domain "ours" = main, "theirs" = source branch (see header comment). Labels
+  // "ours" = main, "theirs" = source branch (see header comment). Labels
   // shown beside each side identify its real branch.
   if (mainBranchLabel === null || sourceBranchLabel === null) throw new Error('Merge review requires branch labels');
   const oursBranchLabel = mainBranchLabel;

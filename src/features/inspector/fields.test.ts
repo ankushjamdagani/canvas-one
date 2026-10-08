@@ -98,7 +98,7 @@ describe('fieldsForElement: resource variants', () => {
     expect(capacity.parse('not-a-number').ok).toBe(false);
   });
 
-  it('concurrency must be a safe integer in [1,1024] (D49)', () => {
+  it('concurrency must be a safe integer in [1,1024]', () => {
     const el = processorElement();
     const concurrency = fieldsForElement(el).find((f) => f.id === 'config.concurrency')!;
     expect(concurrency.parse('1.5').ok).toBe(false);
@@ -106,7 +106,7 @@ describe('fieldsForElement: resource variants', () => {
     expect(concurrency.parse('1024').ok).toBe(true);
   });
 
-  it('service time: choosing lognormal sets a variability of 2 and shows its field; leaving it drops it (D50)', () => {
+  it('service time: choosing lognormal sets a variability of 2 and shows its field; leaving it drops it', () => {
     const el = processorElement();
     const field = fieldsForElement(el).find((f) => f.id === 'config.serviceTime')!;
     const heavy = field.apply(el, 'lognormal');
@@ -119,7 +119,7 @@ describe('fieldsForElement: resource variants', () => {
     expect(fieldsForElement(back).some((f) => f.id === 'config.serviceTimeCv')).toBe(false);
   });
 
-  it('service time: absent reads as fixed; choosing exponential writes it (D49)', () => {
+  it('service time: absent reads as fixed; choosing exponential writes it', () => {
     const el = processorElement();
     const field = fieldsForElement(el).find((f) => f.id === 'config.serviceTime')!;
     expect(field.toRaw(el)).toBe('fixed');
@@ -353,7 +353,7 @@ describe('fieldsForConnection', () => {
     expect(fieldsForConnection(conn)).toEqual([]);
   });
 
-  it('summarizes both ends and flags where the caller and the callee disagree (D53)', () => {
+  it('summarizes both ends and flags where the caller and the callee disagree', () => {
     const port = (id: string, direction: 'in' | 'out', settings?: Record<string, unknown>) =>
       ({ id, label: id, direction, channel: 'call', protocol: 'http', schemaId: 's', responseSchemaId: 'r', ...(settings ? { settings } : {}) }) as Element['ports'][number];
     const caller = processorElement({ id: 'a', label: 'Caller', ports: [port('p-out', 'out', { retry: { maxAttempts: 3, backoffMs: 1, backoffMultiplier: 1, maxBackoffMs: 1, jitter: false, attemptTimeoutMs: 40 } })] });
@@ -370,7 +370,7 @@ describe('fieldsForConnection', () => {
   });
 });
 
-describe('fieldsForElement: port settings (D53)', () => {
+describe('fieldsForElement: port settings', () => {
   const outPort = { id: 'po', label: 'out', direction: 'out', channel: 'call', protocol: 'http', schemaId: 's', responseSchemaId: 'r' } as Element['ports'][number];
   const inPort = { id: 'pi', label: 'in', direction: 'in', channel: 'call', protocol: 'grpc', path: '/orders', schemaId: 's', responseSchemaId: 'r' } as Element['ports'][number];
 
@@ -409,7 +409,7 @@ describe('fieldsForElement: port settings (D53)', () => {
     expect(fieldsForElement(unmodeled).some((f) => f.id === 'port.pi.expectedP95Ms')).toBe(true);
   });
 
-  it('a caller can open a circuit breaker, cap in-flight calls and hedge, and each is removed by blanking it (D54)', () => {
+  it('a caller can open a circuit breaker, cap in-flight calls and hedge, and each is removed by blanking it', () => {
     const el = processorElement({ ports: [outPort] });
     const fields = fieldsForElement(el);
     const threshold = fields.find((f) => f.id === 'port.po.circuitBreaker.failureThreshold')!;
@@ -428,7 +428,7 @@ describe('fieldsForElement: port settings (D53)', () => {
     expect(bytes.ports[0].settings).toEqual({ requestBytes: 2048 });
   });
 
-  it('a publisher chooses fire-and-forget and batching; a callee caps concurrency and sizes its reply (D54)', () => {
+  it('a publisher chooses fire-and-forget and batching; a callee caps concurrency and sizes its reply', () => {
     const msgOut = { id: 'pm', label: 'out', direction: 'out', channel: 'message', protocol: 'amqp', schemaId: 's', responseSchemaId: null } as Element['ports'][number];
     const el = processorElement({ ports: [msgOut] });
     const fields = fieldsForElement(el);
@@ -450,7 +450,7 @@ describe('fieldsForElement: port settings (D53)', () => {
     expect(sized.ports[0].settings).toEqual({ responseBytes: 1000 });
   });
 
-  it('a link takes jitter, loss and a bandwidth that blank clears (D54)', () => {
+  it('a link takes jitter, loss and a bandwidth that blank clears', () => {
     const conn = callConnection();
     const fields = fieldsForConnection(conn);
     const bandwidth = fields.find((f) => f.id === 'config.bandwidthKbps')!;
@@ -462,7 +462,7 @@ describe('fieldsForElement: port settings (D53)', () => {
     expect(fields.find((f) => f.id === 'config.jitterMs')!.parse('-1').ok).toBe(false);
   });
 
-  it('an unsimulated caller is read-only: it has no caller settings to edit, only a note (D54)', () => {
+  it('an unsimulated caller is read-only: it has no caller settings to edit, only a note', () => {
     const client = processorElement({ ports: [outPort], behavior: { kind: 'unmodeled', version: 1, reason: 'x' } });
     const fields = fieldsForElement(client).filter((f) => f.group);
     expect(fields.map((f) => f.id)).toEqual(['port.po.unsimulated']);
@@ -480,7 +480,7 @@ describe('kindTagForConnection', () => {
   });
 });
 
-describe('linked-project elements (D52)', () => {
+describe('linked-project elements', () => {
   const linked = processorElement({ visualKind: 'linked-project', label: 'Orders system', linkedProjectId: '00000000-0000-4000-8000-0000000000aa' });
 
   it('shows only read-only fields, so nothing can be edited or applied', () => {

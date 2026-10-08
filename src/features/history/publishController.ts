@@ -1,18 +1,6 @@
 /**
  * PublishController: publish review, draft-behind-main and conflict resolution
- * for System Studio (RV-11b).
- *
- * Implements specifications from:
- * - specs/revamp/design.md screen family: 22C publish review, 22D published,
- *   22E draft behind main, 22F compare and resolve (image assets not present in
- *   this checkout; behavior is taken from the contracts and decisions below).
- * - specs/revamp/contracts/commands.md (history.prepare-publish, history.resolve-conflict, history.publish)
- * - specs/revamp/contracts/transactions.md §4 & §5 (Prepare publish, merge, publish, no undo)
- * - specs/revamp/contracts/storage.md §3 (PublicationMetadata, version suggestions)
- * - specs/revamp/contracts/run-identity.md §5 (Eligibility)
- * - specs/revamp/decisions.md D25 (sequence conflicts: ours/theirs/edit, no guessed
- *   interleaving), D26 (no publish undo — irreversible, confirm required), D29
- *   (source branch closes by default after publish).
+ * for System Studio.
  *
  * Candidates are controller-owned and ephemeral (CandidateController never writes
  * to the DB). This controller only orchestrates the existing CandidateController +
@@ -20,12 +8,9 @@
  * merge, eligibility or scenario execution itself.
  *
  * Scenario execution ("run the candidate's scenarios") is provided by the caller
- * as an injected `runScenario` function rather than built here, per the task's
- * explicit "do NOT build a new runner." In production this is wired to the
- * existing candidate runner, `CandidateController.startCandidateRun` (which
- * itself is the officially specified, already-tested mechanism for executing a
- * scenario against an isolated candidate — see persistence/studio/candidates.ts
- * and publish.test.ts), never a bespoke runner built for this feature.
+ * as an injected `runScenario` function. In production this is wired to
+ * `CandidateController.startCandidateRun` (see persistence/studio/candidates.ts),
+ * which executes a scenario against an isolated candidate.
  */
 
 import type { Document, Id } from '../../domain/studio/model';
@@ -118,41 +103,41 @@ export type PublishStatus =
 export type PublishControllerState = {
   readonly status: PublishStatus;
   readonly candidateId: Id | null;
-  /** Real merge conflicts on the current candidate (22F compare and resolve). */
+  /** Real merge conflicts on the current candidate. */
   readonly conflicts: readonly Readonly<MergeConflict>[];
   /** Per-scenario status computed on the candidate's merged document. */
   readonly scenarios: readonly ScenarioWithStatus[];
   /** The candidate's merged document and the three real inputs the merge was
-   * computed from (22F compare and resolve needs both — labels and auto-merged
+   * computed from (compare and resolve needs both — labels and auto-merged
    * detection read the inputs; the field list reads the merged document). */
   readonly mergedDocument: Document | null;
   readonly mergeInputs: { readonly base: Document; readonly ours: Document; readonly theirs: Document } | null;
   /** Authoritative eligibility from CandidateController.evaluate. */
   readonly eligible: boolean;
   readonly versionSuggestions: VersionSuggestions | null;
-  /** The latest published version's key, or null before any publication (22C "current X · nothing chosen yet"). */
+  /** The latest published version's key, or null before any publication ("current X · nothing chosen yet"). */
   readonly currentVersionKey: string | null;
-  /** Real branch labels (22C "async-fulfilment · 6 commits → main"), never a raw ID. */
+  /** Real branch labels ("async-fulfilment · 6 commits → main"), never a raw ID. */
   readonly sourceBranchLabel: string | null;
   readonly mainBranchLabel: string | null;
-  /** Commits on the source branch since the merge base, newest first (22C "What goes onto main"). */
+  /** Commits on the source branch since the merge base, newest first ("What goes onto main"). */
   readonly commitsSinceFork: readonly Readonly<CommitRecord>[];
-  /** Distinct elements changed between the merge base and the source head (22C "M components touched"). */
+  /** Distinct elements changed between the merge base and the source head ("M components touched"). */
   readonly componentsTouchedCount: number;
   /** How many publications landed on main since this branch's fork point, and the
    * fork point's own version (null when the branch forked before any publication
-   * existed) — 22E "2 versions published since you forked at 2.2.1". */
+   * existed), e.g. "2 versions published since you forked at 2.2.1". */
   readonly versionsPublishedSinceFork: number;
   readonly forkVersionKey: string | null;
-  /** Fields resolved so far on this candidate lineage (22F "resolved · field ·
+  /** Fields resolved so far on this candidate lineage ("resolved · field ·
    * side"). Accumulated across resolveConflict calls within one prepare(); reset
    * on the next prepare() since a fresh merge has no resolution history yet. */
   readonly resolvedFields: readonly Readonly<ResolvedFieldRecord>[];
-  /** Set when prepare-publish returns stale (22E draft behind main). */
+  /** Set when prepare-publish returns stale (draft behind main). */
   readonly staleInfo: PublishStaleInfo | null;
   /** First real issue message when prepare/resolve is blocked outright (missing/invalid/failed). */
   readonly blockedMessage: string | null;
-  /** Set once history.publish applies (22D published). */
+  /** Set once history.publish applies (published). */
   readonly publication: Readonly<PublicationRecord> | null;
   readonly publishedSourceClosed: boolean | null;
   readonly lastError: unknown | null;
@@ -400,7 +385,7 @@ export class PublishController {
 
   /**
    * Walks the source branch's real commit ancestry from its head back to (but
-   * excluding) the merge base, newest first — "What goes onto main" (22C).
+   * excluding) the merge base, newest first — "What goes onto main".
    * Never invents a commit list: an unreachable/missing link throws rather than
    * silently truncating the walk.
    */
@@ -420,7 +405,7 @@ export class PublishController {
         throw new Error(`Commit '${cursor}' referenced by branch ancestry was not found`);
       }
       commits.push(commit);
-      // History transitions are linear per commit (transactions.md §4: parent =
+      // History transitions are linear per commit (parent =
       // branch head); a merge commit's ancestry is walked via its first parent,
       // which is always the branch that carried it forward.
       cursor = commit.parentIds[0] ?? null;
@@ -555,7 +540,7 @@ export class PublishController {
   }
 
   /**
-   * Bulk "ours everywhere" / "theirs everywhere" (22F): resolves every currently
+   * Bulk "ours everywhere" / "theirs everywhere": resolves every currently
    * open conflict with the same side, one at a time — each resolution supersedes
    * the candidate and yields a new one, exactly as a single resolveConflict call
    * does, so this is a loop over the real one-at-a-time contract, never a new
@@ -597,7 +582,7 @@ export class PublishController {
   }
 
   // ==========================================================================
-  // Version suggestions (storage.md §3)
+  // Version suggestions
   // ==========================================================================
 
   private async loadVersionSuggestions(projectId: Id): Promise<void> {
@@ -622,7 +607,7 @@ export class PublishController {
   /**
    * Publishes the current eligible candidate. Callers are responsible for their
    * own explicit confirmation step before calling this — publication is
-   * irreversible (D26): there is no undo command, compensating record or main
+   * irreversible: there is no undo command, compensating record or main
    * rewind.
    */
   async publish(
@@ -644,7 +629,7 @@ export class PublishController {
     try {
       // Build evidence from the latest qualifying saved run per scenario for the
       // candidate's current fingerprint, exactly as HistoryController.commit does
-      // for a branch commit (run-identity.md §5) — never invented, never reused
+      // for a branch commit — never invented, never reused
       // across a different fingerprint.
       const evidence: EvidenceRef[] = [];
       for (const scenarioWithStatus of this.state.scenarios) {

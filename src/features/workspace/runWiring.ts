@@ -1,12 +1,11 @@
 /**
- * Pure helpers wiring the run lane into the workspace shell (RV-12d).
+ * Pure helpers wiring the run feature into the workspace shell.
  *
- * Implements specs/revamp/contracts/commands.md "Scenarios (D41)":
- * - scenario.select: "per-browser preference keyed by project + branch. Missing or
- *   deleted selection falls back to the first scenario in document order; none → no
- *   selection."
- * - Run is disabled while the session is saving/loading/needsReload (D25 covers the
- *   configuration-draft case inside RunController itself; this covers the session's
+ * - scenario.select: a per-browser preference keyed by project + branch. A missing or
+ *   deleted selection falls back to the first scenario in document order; with no
+ *   scenarios there is no selection.
+ * - Run is disabled while the session is saving/loading/needsReload (the
+ *   configuration-draft case is handled inside RunController itself; this covers the session's
  *   own busy/needs-reload states, which RunController does not know about).
  *
  * localStorage access is isolated in read/writeScenarioSelection so Workspace never
@@ -17,7 +16,7 @@
 import type { Id } from '../../domain/studio/model';
 
 /**
- * D41: per-browser preference keyed by project + branch.
+ * Per-browser preference keyed by project + branch.
  */
 export function scenarioSelectionStorageKey(projectId: Id, branchId: Id): string {
   return `system-studio.scenario-selection.${projectId}.${branchId}`;
@@ -72,7 +71,7 @@ export function writeScenarioSelection(projectId: Id, branchId: Id, scenarioId: 
 
 /**
  * Reasons Run is disabled that come from the session layer, not from RunController
- * (which only knows about run/compile state, per D25 commentary in RunController.ts).
+ * (which only knows about run/compile state).
  * Returns null when the session isn't blocking Run.
  */
 export function computeSessionRunDisabledReason(

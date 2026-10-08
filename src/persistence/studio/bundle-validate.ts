@@ -1,18 +1,15 @@
 /**
- * Portable bundle validation for CanvasOne transfer (RV-16b).
- *
- * Implements specs/revamp/contracts/storage.md §1 (versions), §4 (Portable bundle),
- * §6 (limits, including the Transfer row) and run-identity.md §5 (evidence inventory).
+ * Portable bundle validation for CanvasOne transfer.
  *
  * Pure and outside any transaction: no Dexie access, no mutation, never repairs. Given the
  * raw file bytes, returns either the validated `ProjectBundle` or a list of typed `Issue`s
- * with paths. Steps run in the exact order the task prescribes:
+ * with paths. Steps run in this order:
  *
  *   1. Byte cap (64 MiB) BEFORE decoding or parsing.
  *   2. An ITERATIVE scan of the raw JSON text for container count (<=100,000) and raw
  *      depth (<=40, root = 1), done before JSON.parse. Never recursive over untrusted input.
  *   3. Parse, then check the envelope (format/version; 7, 8 and unknown -> unsupported).
- *   4. Bundle shape: closed keys per storage.md §4 and its table rows.
+ *   4. Bundle shape: closed keys for the bundle and each table row.
  *   5. Every snapshot: validateDocument, plus its ID must equal the recomputed content hash.
  *   6. Every reference (via computePinClosure, plus snapshot-table existence this repo's
  *      verifyReferenceIntegrity also checks -- pin-closure.ts's own CONTRACT GAP comment
@@ -21,10 +18,10 @@
  *   8. mainBranchId and initialSnapshotId exist.
  *   9. Publications: contiguous ordinals, strictly increasing versions, versionKey/metadata.
  *  10. Evidence inventory: each commit evidence ref's run exists with that fingerprint.
- *  11. Limits (§6, Local project row) on the bundle's own record counts.
+ *  11. Limits (local project row) on the bundle's own record counts.
  *
- * Evidence inventory is strict (run-identity.md §5 "each commit evidence ref's run exists
- * with that scenario and fingerprint"): the referenced run must exist, its `fingerprint`
+ * Evidence inventory is strict (each commit evidence ref's run must exist
+ * with that scenario and fingerprint): the referenced run must exist, its `fingerprint`
  * must equal the evidence ref's fingerprint, and its `manifest.scenario.id` must be a
  * string equal to the ref's `scenarioId` -- a missing or non-string `scenario.id` is
  * itself a reported issue, never silently skipped.
@@ -68,8 +65,8 @@ export type BundleValidationFailure = { readonly ok: false; readonly issues: rea
 export type BundleValidationResult = BundleValidationOk | BundleValidationFailure;
 
 /**
- * Distinguishes an unsupported-version rejection (storage.md §1: "Versions 7, 8 and
- * unknown ones are rejected with a clear message") from every other validation failure,
+ * Distinguishes an unsupported-version rejection (versions 7, 8 and unknown ones are
+ * rejected with a clear message) from every other validation failure,
  * so the caller can surface `failed/unsupported-version` instead of a generic `invalid`.
  */
 export type BundleValidationOutcome =
@@ -417,7 +414,7 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     return { ok: false, kind: 'invalid', issues };
   }
 
-  // §6 Local project count limits, checked on the bundle's own record counts.
+  // Local project count limits, checked on the bundle's own record counts.
   if (rawBranches.length > STORAGE_LIMITS.maxBranchesPerProject) {
     issues.push(createIssue('too-many', 'branches exceed the 100-branch project limit', ['project', 'branches']));
   }
@@ -894,8 +891,8 @@ export async function validatePortableBundle(bytes: Uint8Array): Promise<BundleV
     }
   });
 
-  // Step 10: evidence inventory -- run-identity.md §5: "each commit evidence ref's run
-  // exists with that scenario and fingerprint." Strict: a cited run's manifest must carry
+  // Step 10: evidence inventory -- each commit evidence ref's run must
+  // exist with that scenario and fingerprint. Strict: a cited run's manifest must carry
   // a string `scenario.id` and it must equal the evidence ref's scenarioId; a missing or
   // non-string manifest scenario id is itself an issue, not silently skipped.
   const runById = new Map(runs.map((r) => [r.id, r]));

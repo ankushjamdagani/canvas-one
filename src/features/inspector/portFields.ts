@@ -1,5 +1,5 @@
 /**
- * Port settings as inspector fields (D53). Each connectable port of the selected node gets its own
+ * Port settings as inspector fields. Each connectable port of the selected node gets its own
  * group: what the caller sends and how it retries on an out-port, what the callee promises or
  * enforces on an in-port. Rows are editable on the node, because the port belongs to the node;
  * the connection inspector only summarizes them.
@@ -210,7 +210,7 @@ function retryFields(element: Element, port: Port): FieldSpec<Element>[] {
   return fields;
 }
 
-/** An unsimulated node has no caller behavior to edit: what it sends is fixed (D54). */
+/** An unsimulated node has no caller behavior to edit: what it sends is fixed. */
 function unsimulatedCallerFields(port: Port): FieldSpec<Element>[] {
   return [
     readonlyField<Element>(

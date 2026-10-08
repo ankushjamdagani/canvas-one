@@ -1,7 +1,6 @@
 /**
- * Pure functions for computing inverse changes from a pre-apply Document (RV-12c1).
+ * Pure functions for computing inverse changes from a pre-apply Document.
  *
- * Implements RV-12c1 requirement:
  * Inverse changes are computed from the pre-apply Document:
  * - insert → remove
  * - replace → replace with the prior record

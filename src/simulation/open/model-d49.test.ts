@@ -12,7 +12,7 @@ import { compileExecution } from '../../domain/execution';
 import { OpenSimulation, type SimLifecycleFact } from './kernel';
 
 /**
- * D49 model changes (realism audit H1, H11, H13): exponential service time, routers that
+ * Model changes: exponential service time, routers that
  * don't hold a slot while waiting, and caller retries with backoff, jitter and attempt
  * timeouts. Statistical checks use six seeds and a 99% batch-means interval (t(5,.995) =
  * 4.032), as in oracles.test.ts.
@@ -45,7 +45,7 @@ const retry = (o: Partial<CallRetryPolicy> = {}): CallRetryPolicy => ({
   maxAttempts: 3, backoffMs: 0, backoffMultiplier: 2, maxBackoffMs: 10_000, jitter: false, attemptTimeoutMs: null, ...o,
 });
 
-describe('D49 exponential service time (H1)', () => {
+describe('exponential service time', () => {
   it('matches the M/M/1 mean queue wait rho*S/(1-rho) at rho=0.8 (twice the M/D/1 wait)', () => {
     const capacity = 20;
     const S = 1 / capacity;
@@ -75,11 +75,11 @@ describe('D49 exponential service time (H1)', () => {
   });
 });
 
-describe('D49 routers do not hold a slot while waiting (H11)', () => {
+describe('routers do not hold a slot while waiting', () => {
   it('a one-slot gateway passes load far above 1/round-trip', () => {
     const backends = [1, 2, 3, 4].map((i) => node(`b${i}`, 'service', processor({ capacity: 50, concurrency: 1 })));
     const edges = backends.map((b) => edge(`g-${b.id}`, 'gw', b.id, { latencyMs: 5, returnLatencyMs: 5 }));
-    // The old slot hold capped this at 1 / (0.5 + 5 + 20 + 5 ms) ~ 33/s.
+    // Holding a slot while waiting would cap this at 1 / (0.5 + 5 + 20 + 5 ms) ~ 33/s.
     const m = new OpenSimulation(graph([node('gw', 'gateway', router({ capacity: 2000, concurrency: 1 })), ...backends], edges, workload('gw', 150), 3, 60)).advance(60);
     expect(m.roots.rejected).toBe(0);
     expect(m.roots.throughput).toBeGreaterThan(140);
@@ -87,7 +87,7 @@ describe('D49 routers do not hold a slot while waiting (H11)', () => {
   });
 });
 
-describe('D49 caller retries (H13)', () => {
+describe('caller retries', () => {
   it('matches geometric amplification: attempts = 1 + p + p^2 and final failures = p^3', () => {
     const p = 0.3;
     const ratios: number[] = [];
@@ -206,7 +206,7 @@ describe('D49 caller retries (H13)', () => {
   });
 });
 
-describe('D49 validation', () => {
+describe('retry and service-time option validation', () => {
   const g = (b: Partial<typeof base>, e: Partial<ExecutionEdge> = {}) =>
     graph([node('a', 'service', processor(b)), node('b', 'service', processor())], [edge('a-b', 'a', 'b', e)], workload('a', 1), 1, 10);
   const codes = (x: ExecutionGraph) => compileExecution(x, true).issues.filter((i) => i.severity === 'error').map((i) => i.code);

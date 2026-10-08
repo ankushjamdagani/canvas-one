@@ -12,7 +12,7 @@ import { mintRunStartToken } from './token';
 import { computeSnapshotId } from './primitives';
 import type { Actor, ProjectCreateCommand, RunRecord } from './types';
 
-const FIXTURES_DIR = join(process.cwd(), 'specs/revamp/fixtures');
+const FIXTURES_DIR = join(process.cwd(), 'src/features/entry/examples');
 const s01Doc = JSON.parse(readFileSync(join(FIXTURES_DIR, 's01.json'), 'utf8')) as Document;
 
 const testActor: Actor = {
@@ -26,7 +26,7 @@ const VERSIONS = {
   runnerVersions: [{ runnerId: 'studio-runner', version: 'studio-runner/1' }],
 };
 
-describe('RV-08a End-to-end: S01 prepare, run, save, load, and candidate eligibility', () => {
+describe('End-to-end: S01 prepare, run, save, load, and candidate eligibility', () => {
   it('runs all three S01 scenarios, saves with tokens, loads them, and achieves eligibility only when all three are saved', async () => {
     const db = createStudioDatabase(`test-e2e-${crypto.randomUUID()}`);
     const repo = new LocalRepository(db);
