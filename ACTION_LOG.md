@@ -3389,3 +3389,11 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Platform: Codex; no subagents.
 - Verification: staged scope and diff checks reviewed; the preceding build/unit/browser results apply. Commit and remote push results reported in the task response.
 - Limitations: the broader browser-suite intermittency documented above remains.
+
+### Migration code cleanup (Codex)
+- Outcome: extracted standalone metadata synchronization, removed unreachable public-page branches from the private shell and narrowed its page type; consolidated duplicated CSS selector transforms; corrected entry-point formatting and stale ID-factory commentary. Motion, routing, storage and PWA behavior preserved.
+- Files: App, new lib/usePageMetadata, standalone/embedded entry points, Next page/layout files, CSS build wrappers and new scoped-selector helper; HANDOFF/ACTION_LOG. Platform: Codex with graphify navigation; no subagents. Preserved a concurrent unrelated ACTION_LOG entry.
+- Verification: final standalone/package/real Next host builds, Storybook build, 1,965 unit tests (12 skipped), 39 pre/post selector comparisons and embedded browser test pass. Broad production suite: 246 passed / 1 failed / 4 skipped; final focused suite: 38 passed / same history failure. History case passes unchanged alone. Diff check passes.
+- Limitations: existing landing geometry check excluded; browser Forward workspace visibility remains intermittent, with no source fix claimed. Diagnostic unused-symbol sweep still reports older warnings outside this migration cleanup.
+- Lesson: sharing a CommonJS plugin directly with Vite broke its config loader; sharing the dependency-free selector transform while retaining bundler-specific wrappers restores compatibility. Existing real-host verification rule applies.
+- Commit: user authorized committing the cleanup; staged only its code and documentation, preserving concurrent planning notes. Verification results above apply; commit result reported in the task response.

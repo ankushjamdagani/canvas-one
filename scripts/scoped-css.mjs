@@ -1,15 +1,7 @@
 import prefixSelector from 'postcss-prefix-selector';
+import transform from './scoped-selector.cjs';
 
-/** Scope utilities, resets and vendor rules; leave keyframes and font faces intact. */
+/** Vite loads ESM plugins; Next loads the CommonJS PostCSS wrapper. */
 export function scopedCss() {
-  return prefixSelector({
-    prefix: '.canvas-one-root',
-    transform(prefix, selector, prefixed, _file, rule) {
-      if (rule.parent?.type === 'atrule' && /keyframes$/.test(rule.parent.name)) return selector;
-      if (selector.startsWith('.canvas-one-root')) return selector;
-      return /^(?::root|:host|html|body)(?=\b|\s|$|:|\[)/.test(selector)
-        ? selector.replace(/^(?::root|:host|html|body)/, prefix)
-        : prefixed;
-    },
-  });
+  return prefixSelector({ prefix: '.canvas-one-root', transform });
 }

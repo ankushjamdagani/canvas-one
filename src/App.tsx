@@ -1,9 +1,5 @@
 import * as React from 'react';
-import {
-  openStudioRepository,
-  SessionController,
-  formatStudioError,
-} from './features/session';
+import { openStudioRepository, SessionController, formatStudioError } from './features/session';
 import type { Actor, StudioRepository } from './persistence/studio';
 import { EntryScreen } from './features/entry';
 import { LandingPage } from './features/entry/LandingPage';
@@ -13,10 +9,14 @@ import { navigate, useRoute } from '@/lib/router';
 import { RouteShell } from './features/shell';
 import type { PageKind } from '@/lib/motion/direction';
 import { ShellReady } from '@/lib/motion/shell-context';
+import { Button } from '@/components/ui/button';
+import { usePageMetadata } from '@/lib/usePageMetadata';
 
 // The workspace (canvas, panels, history, runs) is its own chunk: the entry screen renders
 // without it, and it is prefetched once the browser is idle so opening a project stays fast.
-const Workspace = lazyComponent<React.ComponentProps<typeof import('./features/workspace/Workspace').Workspace>>(
+const Workspace = lazyComponent<
+  React.ComponentProps<typeof import('./features/workspace/Workspace').Workspace>
+>(
   () => import('./features/workspace/Workspace').then((module) => module.Workspace),
   <div
     data-testid="workspace-loading-screen"
@@ -25,15 +25,14 @@ const Workspace = lazyComponent<React.ComponentProps<typeof import('./features/w
     Opening project…
   </div>,
 );
-import { Button } from '@/components/ui/button';
-
-// Exported so the workspace can mint the same kind of id for its RunController
-// (the app's mintId) instead of defining its own.
+// Shared with the workspace's RunController through its mintId prop.
 const MINT_ID = () => crypto.randomUUID();
 
 function getOrCreateActorId(storageNamespace?: string): string {
   try {
-    const key = storageNamespace ? `${storageNamespace}:system-studio.actor-id` : 'system-studio.actor-id';
+    const key = storageNamespace
+      ? `${storageNamespace}:system-studio.actor-id`
+      : 'system-studio.actor-id';
     const stored = localStorage.getItem(key);
     if (stored) return stored;
     const fresh = crypto.randomUUID();
@@ -58,33 +57,28 @@ type BootState =
       actor: Actor;
     };
 
-export interface AppProps { storageNamespace?: string; basePath?: string; manageMetadata?: boolean; siteOrigin?: string }
+export interface AppProps {
+  storageNamespace?: string;
+  basePath?: string;
+  manageMetadata?: boolean;
+  siteOrigin?: string;
+}
 
-export default function App({ storageNamespace, basePath, manageMetadata = false, siteOrigin }: AppProps = {}) {
+export default function App({
+  storageNamespace,
+  basePath,
+  manageMetadata = false,
+  siteOrigin,
+}: AppProps = {}) {
   const { route } = useRoute();
-  React.useEffect(() => {
-    if (!manageMetadata) return;
-    const publicPage = route.kind === 'home' || route.kind === 'brand';
-    document.title = route.kind === 'home' ? 'Canvas One — The shared canvas for engineers and AI' : `${route.kind === 'brand' ? 'Brand' : route.kind === 'projects' ? 'Projects' : 'Workspace'} | Canvas One`;
-    for (const [name, content] of [
-      ['robots', publicPage ? 'index, follow' : 'noindex, nofollow'],
-      ['description', route.kind === 'brand' ? 'Canvas One brand guidelines, visual language and interface foundations.' : 'Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.'],
-    ]) {
-      let element = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
-      if (!element) { element = document.createElement('meta'); element.name = name; document.head.append(element); }
-      element.content = content;
-    }
-    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (siteOrigin && publicPage) {
-      if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.append(canonical); }
-      canonical.href = `${new URL(siteOrigin).origin}${basePath ?? ''}${route.kind === 'brand' ? '/brand' : '/'}`;
-    } else canonical?.remove();
-    for (const property of ['og:title', 'og:description']) {
-      const element = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
-      if (element) element.content = property === 'og:title' ? document.title : document.querySelector<HTMLMetaElement>('meta[name="description"]')!.content;
-    }
-  }, [route.kind, manageMetadata, siteOrigin, basePath]);
-  const [bootState, setBootState] = React.useState<BootState>({ status: 'booting' });
+  usePageMetadata(route.kind, {
+    enabled: manageMetadata,
+    siteOrigin,
+    basePath,
+  });
+  const [bootState, setBootState] = React.useState<BootState>({
+    status: 'booting',
+  });
 
   const runBoot = React.useCallback(async () => {
     setBootState({ status: 'booting' });
@@ -136,64 +130,57 @@ export default function App({ storageNamespace, basePath, manageMetadata = false
   }, [storageNamespace]);
 
   React.useEffect(() => {
-    if (route.kind !== 'home' && route.kind !== 'brand' && bootState.status === 'booting') void runBoot();
+    if (route.kind !== 'home' && route.kind !== 'brand' && bootState.status === 'booting')
+      void runBoot();
   }, [runBoot, route.kind]);
 
   const renderPage = (kind: PageKind): React.ReactNode => {
     if (kind === 'home') return <LandingPage basePath={basePath} />;
     if (kind === 'brand') return <BrandPage basePath={basePath} />;
 
-  // Full-page error state naming unavailable/quota with a Retry button
-  if (bootState.status === 'failed') {
-    return (
-      <div
-        data-testid="boot-error-screen"
-        className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-shell text-ink"
-      >
-        <div className="max-w-md w-full p-6 rounded-card border border-risk-edge bg-risk-tint text-center shadow-raised">
-          <h1
-            data-testid="boot-error-title"
-            className="text-lg font-bold text-destructive"
-          >
-            Storage {bootState.code === 'quota' ? 'quota exceeded' : 'unavailable'}
-          </h1>
-          <p className="text-xs text-secondary-text mt-2">
-            {bootState.message} ({bootState.code})
-          </p>
-          <div className="mt-5">
-            <Button
-              data-testid="boot-retry-btn"
-              onClick={runBoot}
-              variant="default"
-              size="sm"
-            >
-              Retry
-            </Button>
+    // Full-page error state naming unavailable/quota with a Retry button
+    if (bootState.status === 'failed') {
+      return (
+        <div
+          data-testid="boot-error-screen"
+          className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-shell text-ink"
+        >
+          <div className="max-w-md w-full p-6 rounded-card border border-risk-edge bg-risk-tint text-center shadow-raised">
+            <h1 data-testid="boot-error-title" className="text-lg font-bold text-destructive">
+              Storage {bootState.code === 'quota' ? 'quota exceeded' : 'unavailable'}
+            </h1>
+            <p className="text-xs text-secondary-text mt-2">
+              {bootState.message} ({bootState.code})
+            </p>
+            <div className="mt-5">
+              <Button data-testid="boot-retry-btn" onClick={runBoot} variant="default" size="sm">
+                Retry
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (bootState.status === 'booting') {
+    if (bootState.status === 'booting') {
+      return (
+        <div
+          data-testid="boot-loading-screen"
+          className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
+        >
+          Loading Canvas One…
+        </div>
+      );
+    }
+
     return (
-      <div
-        data-testid="boot-loading-screen"
-        className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
-      >
-        Loading Canvas One…
-      </div>
+      <StudioShell
+        repository={bootState.repository}
+        session={bootState.session}
+        actor={bootState.actor}
+        pageKind={kind}
+      />
     );
-  }
-
-  return (
-    <StudioShell
-      repository={bootState.repository}
-      session={bootState.session}
-      actor={bootState.actor}
-      pageKind={kind}
-    />
-  );
   };
   return <RouteShell renderPage={renderPage} />;
 }
@@ -207,14 +194,14 @@ function StudioShell({
   repository: StudioRepository;
   session: SessionController;
   actor: Actor;
-  pageKind: PageKind;
+  pageKind: Exclude<PageKind, 'home' | 'brand'>;
 }) {
-  const sessionState = React.useSyncExternalStore(
-    session.subscribe,
-    session.getState,
-  );
+  const sessionState = React.useSyncExternalStore(session.subscribe, session.getState);
   const { route, known } = useRoute();
-  const [openError, setOpenError] = React.useState<{ projectId: string; message: string } | null>(null);
+  const [openError, setOpenError] = React.useState<{
+    projectId: string;
+    message: string;
+  } | null>(null);
 
   React.useEffect(() => whenIdle(() => void Workspace.preload()), []);
 
@@ -238,11 +225,18 @@ function StudioShell({
       .openProject(routeProjectId, targetBranchId)
       .then((result) => {
         if (cancelled || result.status === 'ready') return;
-        setOpenError({ projectId: routeProjectId, message: formatStudioError(result, 'Failed to open project') });
+        setOpenError({
+          projectId: routeProjectId,
+          message: formatStudioError(result, 'Failed to open project'),
+        });
       })
       .catch((err) => {
         console.error('Unexpected error opening project:', err);
-        if (!cancelled) setOpenError({ projectId: routeProjectId, message: 'An unexpected error occurred while opening the project' });
+        if (!cancelled)
+          setOpenError({
+            projectId: routeProjectId,
+            message: 'An unexpected error occurred while opening the project',
+          });
       });
     return () => {
       cancelled = true;
@@ -255,9 +249,18 @@ function StudioShell({
   React.useEffect(() => {
     const previous = previousAddress.current;
     previousAddress.current = { projectId, branchId, mainBranchId };
-    if (previous.projectId === projectId && previous.branchId === branchId && previous.mainBranchId === mainBranchId) return;
+    if (
+      previous.projectId === projectId &&
+      previous.branchId === branchId &&
+      previous.mainBranchId === mainBranchId
+    )
+      return;
     if (!projectId || !branchId) return;
-    navigate({ kind: 'project', projectId, branchId: branchId === mainBranchId ? null : branchId });
+    navigate({
+      kind: 'project',
+      projectId,
+      branchId: branchId === mainBranchId ? null : branchId,
+    });
   }, [projectId, branchId, mainBranchId]);
 
   const goToProject = React.useCallback(() => {
@@ -274,12 +277,16 @@ function StudioShell({
   const lastProjectRoute = React.useRef<Extract<typeof route, { kind: 'project' }> | null>(null);
   if (route.kind === 'project') lastProjectRoute.current = route;
 
-  const renderPage = (kind: PageKind): React.ReactNode => {
-    if (kind === 'home') return <LandingPage />;
-    if (kind === 'brand') return <BrandPage />;
+  const renderPage = (kind: typeof pageKind): React.ReactNode => {
     if (kind === 'projects') {
       return (
-        <EntryScreen session={session} repository={repository} mintId={MINT_ID} actor={actor} onOpenSuccess={goToProject} />
+        <EntryScreen
+          session={session}
+          repository={repository}
+          mintId={MINT_ID}
+          actor={actor}
+          onOpenSuccess={goToProject}
+        />
       );
     }
     const projectRoute = route.kind === 'project' ? route : lastProjectRoute.current;

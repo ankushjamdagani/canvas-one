@@ -7,13 +7,32 @@ import { PortalRootProvider } from '../components/ui/portal-root';
 import { acquireRouter, RouterSnapshotProvider } from '../lib/router';
 
 /** SSR public pages and browser projects share the original persistent route shell. */
-export function StandaloneApp({ initialPath, basePath = '', siteOrigin }: { initialPath: string; basePath?: string; siteOrigin?: string }) {
+export function StandaloneApp({
+  initialPath,
+  basePath = '',
+  siteOrigin,
+}: {
+  initialPath: string;
+  basePath?: string;
+  siteOrigin?: string;
+}) {
   const root = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => acquireRouter(basePath), [basePath]);
-  const snapshot = React.useMemo(() => ({ pathname: `${basePath}${initialPath}`, basePath }), [basePath, initialPath]);
-  return <div className="canvas-one-root" ref={root}>
-    <RouterSnapshotProvider value={snapshot}><PortalRootProvider root={root}>
-      <ThemeProvider target={root}><MotionProvider><App basePath={basePath} manageMetadata siteOrigin={siteOrigin} /></MotionProvider></ThemeProvider>
-    </PortalRootProvider></RouterSnapshotProvider>
-  </div>;
+  const snapshot = React.useMemo(
+    () => ({ pathname: `${basePath}${initialPath}`, basePath }),
+    [basePath, initialPath],
+  );
+  return (
+    <div className="canvas-one-root" ref={root}>
+      <RouterSnapshotProvider value={snapshot}>
+        <PortalRootProvider root={root}>
+          <ThemeProvider target={root}>
+            <MotionProvider>
+              <App basePath={basePath} manageMetadata siteOrigin={siteOrigin} />
+            </MotionProvider>
+          </ThemeProvider>
+        </PortalRootProvider>
+      </RouterSnapshotProvider>
+    </div>
+  );
 }

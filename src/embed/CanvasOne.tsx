@@ -18,13 +18,21 @@ export interface CanvasOneProps {
 }
 
 /** Browser-only workspace. The host owns routing to this mount and PWA registration. */
-export function CanvasOne({ basePath = '', storageNamespace, publicNavigation = 'client', entryRoute = 'projects' }: CanvasOneProps) {
+export function CanvasOne({
+  basePath = '',
+  storageNamespace,
+  publicNavigation = 'client',
+  entryRoute = 'projects',
+}: CanvasOneProps) {
   const normalizedPath = normalizeBasePath(basePath);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [mountedPath, setMountedPath] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const release = acquireRouter(normalizedPath, { publicNavigation, entryRoute });
+    const release = acquireRouter(normalizedPath, {
+      publicNavigation,
+      entryRoute,
+    });
     setMountedPath(normalizedPath);
     return release;
   }, [normalizedPath, publicNavigation, entryRoute]);
@@ -36,7 +44,11 @@ export function CanvasOne({ basePath = '', storageNamespace, publicNavigation = 
           <ThemeProvider target={rootRef} storageNamespace={storageNamespace}>
             <MotionProvider>
               <React.Suspense fallback={<div role="status">Loading Canvas One…</div>}>
-              <App key={`${normalizedPath}:${storageNamespace ?? ''}`} storageNamespace={storageNamespace} basePath={normalizedPath} />
+                <App
+                  key={`${normalizedPath}:${storageNamespace ?? ''}`}
+                  storageNamespace={storageNamespace}
+                  basePath={normalizedPath}
+                />
               </React.Suspense>
             </MotionProvider>
           </ThemeProvider>
