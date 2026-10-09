@@ -6,6 +6,10 @@ The version lives in `package.json` only. The app header reads it from there (`s
 
 ## [Unreleased]
 
+### Added
+- README rewrite, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue and pull request templates.
+- MIT `LICENSE`.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

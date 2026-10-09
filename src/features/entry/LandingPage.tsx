@@ -666,11 +666,11 @@ export function LandingPage() {
               </Button>
             </div>
             <footer className="lp-local">
-              100% in-browser Web Worker
+              100% in-browser
               <br />
-              Simulates queues, not code
+              Worker simulations
               <br />
-              Zero cloud egress
+              Zero cloud cost
             </footer>
           </Reveal>
           <Reveal
