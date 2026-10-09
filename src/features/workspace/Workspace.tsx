@@ -3221,7 +3221,7 @@ export function Workspace({
       data-testid="workspace-root"
       data-panel-preference-state={panelPreferenceState}
       data-dock-preference-state={dockPreferenceState}
-      className="relative flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none min-[1000px]:p-[23px] min-[1000px]:[--topbar-inset:53px]"
+      className="relative flex flex-col w-full max-w-full h-screen overflow-hidden bg-shell select-none min-[1000px]:p-[23px] min-[1000px]:[--topbar-inset:67px]"
     >
       {/* Project Canvas design: the sheet's double drafting frame. Wide
           viewports only, so narrow layouts keep their full width. */}

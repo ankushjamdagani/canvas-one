@@ -1,9 +1,7 @@
 .drafting-board {
   isolation: isolate;
-  position: relative;
   width: 100%;
   min-height: 100svh;
-  overflow: hidden;
   background: var(--shell);
   color: var(--foreground);
   font-family: var(--font-sans);
@@ -69,9 +67,6 @@
   transform-origin: center;
 }
 @media (max-width: 999px) {
-  .drafting-board {
-    padding: 32px;
-  }
   .drafting-stage {
     position: relative;
     left: auto;

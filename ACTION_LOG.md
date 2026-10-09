@@ -3342,3 +3342,13 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Platform: agy (lead).
 - Verification: `npx tsc -b` passed; `npm test` passed (1,942 tests passed, 12 skipped); `npx playwright test tests/studio-landing.spec.ts` passed (10 passed); `npm run build` passed cleanly with all chunks within size limits.
 - Limitations: None.
+
+## 2026-10-09
+
+### Consistent page headers and frame boundaries (Codex)
+- Outcome: shared the Brand page's clipped internal scrolling and sticky blurred/bordered header across landing and projects; workspace header shares the surface and frame alignment with updated panel clearance. Desktop authored landing coordinates preserved; mobile navigation wraps inside the frame.
+- Files: shared drafting board/sheet components and styles, `src/styles.css`, entry brand/landing CSS, workspace TopBar/Workspace, `tests/page-boundaries.spec.ts`, `HANDOFF.md`, `LESSONS.md`, `ACTION_LOG.md`.
+- Platform: Codex; no subagents. Graphify used for navigation.
+- Verification: production and Storybook builds pass; 1,942 unit tests pass / 12 skipped; 29 public/transition browser checks pass, plus six final boundary/workspace checks. Desktop/320px screenshots inspected; diff check passes.
+- Limitations: pre-existing landing geometry assertion expects 800×176, but HEAD initializes 722×136 after the preceding copy update; excluded from the passing public run. Preview http://127.0.0.1:5191/.
+- Lesson: padded scroll containers affect sticky positioning; measured bounds caught a doubled frame inset. Boundary tests must also allow a fitted desktop page with no vertical overflow.

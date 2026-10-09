@@ -10,7 +10,36 @@
 
 .brand-wordmark { font-family: "IBM Plex Sans", sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: 0; }
 .public-header-action { height: 32px; padding: 0 12px; font-size: var(--text-ui); border-color: var(--hairline); border-radius: 7px; background: var(--background); }
-.public-header { position: relative; z-index: 40; display: flex; min-height: 40px; flex-wrap: wrap; align-items: center; gap: 12px; }
+.public-page-scroll {
+  position: fixed;
+  inset: 0;
+  height: 100svh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  clip-path: inset(23px);
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+}
+.public-sheet { --page-gutter: 32px; padding-top: 23px; padding-inline: var(--page-gutter); }
+@media (min-width: 1000px) { .public-sheet { --page-gutter: 56px; } }
+.public-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  min-height: 67px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-inline: calc(23px - var(--page-gutter, 32px));
+  padding: 13px calc(var(--page-gutter, 32px) - 23px);
+}
+.public-header, .page-header-surface {
+  background: color-mix(in srgb, var(--shell) 80%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid var(--hairline);
+}
 .public-brand { display: flex; flex-shrink: 0; align-items: center; gap: 8px; color: inherit; text-decoration: none; white-space: nowrap; }
 .public-version { font: 10px var(--font-mono); color: var(--text-placeholder); }
 .public-header nav { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }

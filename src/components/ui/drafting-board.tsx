@@ -40,14 +40,14 @@ export function DraftingBoard({
   const scale = Math.min(1, size.w / 1440, size.h / 900);
   return (
     <div
-      className={cn("drafting-board", shell && "drafting-board--in-shell")}
+      className={cn("drafting-board public-page-scroll public-sheet", shell && "drafting-board--in-shell")}
       style={{ "--board-scale": scale } as React.CSSProperties}
     >
       {!shell && (
-        <>
+        <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
           <DraftingGround paused={paused} />
           <DraftingFrame />
-        </>
+        </div>
       )}
       {children}
     </div>

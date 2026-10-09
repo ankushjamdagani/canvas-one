@@ -22,10 +22,7 @@ export function DraftingSheet({
     <div
       data-page={page}
       className={cn(
-        "relative isolate flex min-h-svh flex-col pb-11 font-sans text-ink min-[481px]:pb-[76px]",
-        page === "brand"
-          ? "px-8 pt-8 min-[1000px]:px-14 min-[1000px]:pt-9"
-          : "px-6 pt-6 min-[481px]:px-10 min-[481px]:pt-9 min-[1101px]:px-14",
+        "public-page-scroll public-sheet isolate flex min-h-svh flex-col pb-11 font-sans text-ink min-[481px]:pb-[76px]",
         shell ? "bg-transparent" : "bg-shell",
       )}
     >

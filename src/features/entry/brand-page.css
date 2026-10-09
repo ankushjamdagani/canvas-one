@@ -11,21 +11,6 @@
   --face-ai: var(--branch-solid);
   --face-risk: var(--risk-text);
 }
-[data-page="brand"] { padding-top: 23px; }
-[data-page="brand"] > .public-header {
-  position: sticky;
-  top: 0;
-  min-height: 67px;
-  flex-shrink: 0;
-  margin: 0 -9px;
-  padding: 13px 9px;
-  background: color-mix(in srgb, var(--shell) 80%, transparent);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border-bottom: 1px solid var(--hairline);
-}
-@media (min-width: 1000px) {
-  [data-page="brand"] > .public-header { margin-inline: -33px; padding-inline: 33px; }
-}
 .brand-section:not([data-in-view="true"]) .canvas-one-face *,
 .brand-hero:not([data-in-view="true"]) .canvas-one-face * {
   animation: none !important;
@@ -685,8 +670,7 @@
     font-size: 34px;
   }
 }
-.drafting-brand-scroller,
-[data-page="brand"] {
+.drafting-brand-scroller {
   position: fixed;
   inset: 0;
   height: 100svh;

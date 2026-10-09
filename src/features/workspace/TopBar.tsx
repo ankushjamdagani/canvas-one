@@ -212,11 +212,9 @@ export function TopBar({
       data-testid="workspace-topbar"
       className={cn(
         "relative shrink-0 flex items-center justify-between px-2 min-[400px]:px-3 sm:px-4 h-12 min-h-12",
-        "border-b border-border bg-background select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2",
-        // Framed sheet (1000px+): transparent bar floating over the canvas dots (the canvas
-        // extends beneath it; --topbar-inset offsets docked panels). Logo lines up with the
-        // Projects page header (x 40 / 56, y 36, 40px tall) inside the 23px frame inset.
-        "min-[1000px]:pointer-events-none min-[1000px]:absolute! min-[1000px]:inset-x-[23px]! min-[1000px]:top-[36px]! min-[1000px]:w-auto! min-[1000px]:h-10 min-[1000px]:min-h-10 min-[1000px]:border-b-0 min-[1000px]:bg-transparent min-[1000px]:px-[17px]! min-[1101px]:px-[33px]!",
+        "page-header-surface select-none z-chrome w-full max-w-full overflow-hidden gap-1.5 sm:gap-2",
+        // Match the public-page header inside the frame; reserve its height for docked panels.
+        "min-[1000px]:absolute! min-[1000px]:inset-x-[23px]! min-[1000px]:top-[23px]! min-[1000px]:w-auto! min-[1000px]:h-[67px] min-[1000px]:min-h-[67px] min-[1000px]:px-[33px]!",
       )}
       role="banner"
     >
