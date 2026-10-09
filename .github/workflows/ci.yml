@@ -32,6 +32,12 @@ jobs:
       - name: Build production app
         run: npm run build
 
+      - name: Build reusable React package
+        run: npm run build:react
+
+      - name: Verify Next.js host consumer
+        run: npm ci --prefix examples/next-host && npm run build --prefix examples/next-host
+
       - name: Build Storybook
         run: npm run build-storybook
 
@@ -60,3 +66,9 @@ jobs:
 
       - name: Run E2E tests
         run: TEST_PRODUCTION=1 npx playwright test --retries=2
+
+      - name: Build embedded consumer
+        run: npm run build:react && npm ci --prefix examples/next-host && npm run build --prefix examples/next-host
+
+      - name: Verify embedded workspace
+        run: npx playwright test --config playwright.embedding.config.ts

@@ -8,33 +8,49 @@ export interface ThemeApi extends ThemeState {
 }
 const ThemeContext = React.createContext<ThemeApi | null>(null);
 const DEFAULT: ThemeState = { paletteId: DEFAULT_PALETTE_ID, mode: DEFAULT_MODE };
+let activeThemeRoot: HTMLElement | null = null;
 
-export function readStoredTheme(): ThemeState {
+/** Imperative canvas effects share the mounted workspace's token root. */
+export function getThemeRoot(): HTMLElement {
+  return activeThemeRoot ?? document.querySelector<HTMLElement>('.canvas-one-root') ?? document.documentElement;
+}
+
+export function themeStorageKey(storageNamespace?: string): string {
+  return storageNamespace ? `${storageNamespace}:${STORAGE_KEY}` : STORAGE_KEY;
+}
+
+export function readStoredTheme(storageNamespace?: string): ThemeState {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(themeStorageKey(storageNamespace));
     if (stored) return parseTheme(stored) ?? DEFAULT;
   } catch { /* A theme remains usable when browser storage is unavailable. */ }
   return DEFAULT;
 }
-export function applyTheme(state: ThemeState): void {
+export function applyTheme(state: ThemeState, target: HTMLElement = getThemeRoot()): void {
   const palette = getPalette(state.paletteId);
   if (!palette) return;
-  applyTokens(palette[state.mode]);
-  document.documentElement.dataset.theme = state.paletteId;
-  document.documentElement.dataset.themeMode = state.mode;
+  applyTokens(palette[state.mode], target);
+  target.dataset.theme = state.paletteId;
+  target.dataset.themeMode = state.mode;
 }
 export function initializeTheme(): void { applyTheme(readStoredTheme()); }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = React.useState<ThemeState>(readStoredTheme);
+export function ThemeProvider({ children, target, storageNamespace }: {
+  children: React.ReactNode;
+  target?: React.RefObject<HTMLElement | null>;
+  storageNamespace?: string;
+}) {
+  // Both server render and first client render use the same markup.
+  const [state, setState] = React.useState<ThemeState>(DEFAULT);
   const current = React.useRef(state);
+  const storageKey = themeStorageKey(storageNamespace);
   const select = React.useCallback((next: ThemeState) => {
     current.current = next;
-    applyTheme(next);
-    try { localStorage.setItem(STORAGE_KEY, serializeTheme(next.paletteId, next.mode)); }
+    applyTheme(next, target?.current ?? document.documentElement);
+    try { localStorage.setItem(storageKey, serializeTheme(next.paletteId, next.mode)); }
     catch { /* Selection still works without storage. */ }
     setState(next);
-  }, []);
+  }, [storageKey, target]);
   const setPaletteId = React.useCallback((id: string) => {
     if (getPalette(id)) select({ ...current.current, paletteId: id });
   }, [select]);
@@ -42,18 +58,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (mode === 'light' || mode === 'dark') select({ ...current.current, mode });
   }, [select]);
   React.useEffect(() => {
-    applyTheme(current.current);
+    const root = target?.current ?? document.documentElement;
+    activeThemeRoot = root;
+    const initial = readStoredTheme(storageNamespace);
+    current.current = initial;
+    applyTheme(initial, root);
+    setState(initial);
     const handler = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY && event.key !== null) return;
+      if (event.key !== storageKey && event.key !== null) return;
       const next = event.newValue === null ? DEFAULT : parseTheme(event.newValue);
       if (!next) return;
       current.current = next;
-      applyTheme(next);
+      applyTheme(next, root);
       setState(next);
     };
     window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
-  }, []);
+    return () => {
+      window.removeEventListener('storage', handler);
+      if (activeThemeRoot === root) activeThemeRoot = null;
+    };
+  }, [storageKey, storageNamespace, target]);
   const api = React.useMemo(() => ({ ...state, setPaletteId, setMode }), [state, setPaletteId, setMode]);
   return <ThemeContext.Provider value={api}>{children}</ThemeContext.Provider>;
 }

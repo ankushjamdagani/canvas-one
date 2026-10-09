@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "outDir": "dist-react/types",
+    "rootDir": "src",
+    "jsx": "react-jsx",
+    "plugins": []
+  },
+  "include": ["src/embed/library.ts"],
+  "exclude": ["node_modules", "src/**/*.test.ts", "src/stories"]
+}

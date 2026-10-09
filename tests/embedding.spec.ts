@@ -1,0 +1,45 @@
+import { test, expect } from './fixtures';
+import { runAll, savedRunCount } from './simulation-support';
+
+test('Next host owns its styles, navigation and PWA while the mounted canvas owns its routes', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/canvas');
+  await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(255, 0, 255)');
+  expect(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--primary').trim())).toBe('red');
+  await page.getByTestId('theme-trigger').click();
+  await page.getByTestId('theme-swatch-nocturne').click();
+  await page.getByRole('button', { name: 'Dark', exact: true }).click();
+  await expect(page.locator('.canvas-one-root')).toHaveAttribute('data-theme', 'nocturne');
+  await expect(page.locator('.canvas-one-root [data-slot="popover-content"]')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
+  expect(await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--primary').trim())).toBe('red');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('theme-trigger')).toBeFocused();
+  await page.getByTestId('create-example-s01').click();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await expect(page).toHaveURL(/\/canvas\/project\//);
+  await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+  await page.reload();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await runAll(page);
+  await expect.poll(() => savedRunCount(page, 'next-host-example:system-studio-local-v1'), { timeout: 30000 }).toBeGreaterThan(0);
+  expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
+  await expect(page.getByTestId('workspace-topbar')).toBeVisible();
+  await expect(page.getByTestId('canvas-floating-dock')).toBeVisible();
+  await expect(page.getByTestId('workspace-root')).not.toHaveAttribute('data-canvas-entering', '');
+  await expect(page.getByTestId('route-card-overlay')).toHaveCount(0);
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await expect.poll(() => page.getByTestId('workspace-topbar').evaluate(element => {
+    const style = getComputedStyle(element);
+    return { opacity: style.opacity, filter: style.filter };
+  })).toEqual({ opacity: '1', filter: 'none' });
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: info.outputPath('embedded-workspace.png') });
+  await page.getByTestId('host-home-link').click();
+  await expect(page).toHaveURL('http://127.0.0.1:5198/');
+  await page.goBack();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  expect(errors).toEqual([]);
+});

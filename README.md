@@ -42,25 +42,36 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:5173>. Pick **Try Beta** to reach your projects, then create a blank project or open one of the bundled examples.
+Open <http://localhost:3000>. Pick **Try Beta** to reach your projects, then create a blank project or open one of the bundled examples.
 
 ## Scripts
 
 | Command                              | What it does                                                    |
 | ------------------------------------ | --------------------------------------------------------------- |
-| `npm run dev`                        | Start the Vite dev server                                       |
-| `npm run build`                      | Type-check and build to `dist/`                                 |
+| `npm run dev`                        | Start the Next.js dev server                                    |
+| `npm run build`                      | Build the standalone Next.js app and offline worker             |
+| `npm run start`                      | Serve the production standalone build                          |
+| `npm run build:react`                | Build the reusable `@canvas-one/react` package to `dist-react/`  |
 | `npm test`                           | Run the unit tests (Vitest)                                     |
 | `npm run test:e2e`                   | Run the browser tests (Playwright) against the dev server       |
-| `TEST_PRODUCTION=1 npm run test:e2e` | Run the browser tests against `vite preview` of a built `dist/` |
+| `TEST_PRODUCTION=1 npm run test:e2e` | Run the browser tests against the built Next.js server         |
 | `npm run storybook`                  | Browse the design system in Storybook on port 6006              |
 | `npm run build-storybook`            | Build a static Storybook                                        |
 
-Install the browser once with `npx playwright install chromium`. To test a production build, run `npm run build` first and start the preview server on port 5174 (`npx vite preview --port 5174`).
+Install the browser once with `npx playwright install chromium`. Run `npm run build` before production browser checks; Playwright starts an isolated server on port 5174. `dev:vite` and `build:vite` remain available for development tooling.
+
+## Standalone, PWA and embedding
+
+`npm run build` prepares `.next/standalone`, including public assets and the offline worker. Deploy that directory and run `node server.js`, or use `npm run start` in this checkout. HTTPS is required for installation outside localhost. Set `CANVAS_SITE_URL` to your public origin at build time to generate the sitemap. Set `NEXT_PUBLIC_CANVAS_BASE_PATH` at build time for a standalone deployment behind a subroute.
+
+Public landing and Brand pages are prerendered without opening IndexedDB. Local projects retain the existing database and export formats. The standalone app owns its PWA; a host application mounting the reusable module owns its own offline setup.
+
+See [embedding instructions](docs/embedding.md), the [Next.js host example](examples/next-host/README.md), and [offline behavior](docs/pwa.md). The React package can be built and packed locally; it has not been published to npm.
 
 ## Project layout
 
 ```
+app/             Next.js routes, metadata and standalone PWA manifest
 src/
   domain/        Pure model, readiness checks, versioning, scenario runner
   simulation/    Discrete-event kernel and Web Worker protocol
@@ -68,14 +79,17 @@ src/
   features/      Screens and workflows: workspace, runs, history, library, transfer…
   components/    Shared UI primitives, design tokens, canvas traffic visuals
   stories/       Storybook stories for the design system
+  embed/         Reusable CanvasOne component and package entry
+  standalone/    Next.js shell and offline registration
 tests/           Playwright browser tests
+examples/next-host/ Built-package consumer mounted under /canvas
 ```
 
 `DESIGN.md` describes the architecture and design system in depth, and `PRODUCT.md` records the product intent.
 
 ## Built with
 
-React 19, TypeScript, Vite, [React Flow](https://reactflow.dev/), Dexie, Radix UI, Tailwind CSS, Motion, Vitest, Playwright and Storybook.
+Next.js, React 19, TypeScript, [React Flow](https://reactflow.dev/), Dexie, Radix UI, Tailwind CSS, Motion, Vitest, Playwright and Storybook. Vite builds the reusable module and supports Storybook/unit-test tooling.
 
 ## Contributing
 

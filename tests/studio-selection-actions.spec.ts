@@ -4,6 +4,14 @@ async function waitForIdle(page: Page) {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
 }
 
+async function clickClearPane(page: Page) {
+  const pane = page.locator('.react-flow__pane');
+  const paneBox = (await pane.boundingBox())!;
+  const headerBox = (await page.getByTestId('workspace-topbar').boundingBox())!;
+  // The canvas extends behind desktop chrome; target its exposed surface.
+  await pane.click({ position: { x: 50, y: Math.max(50, headerBox.y + headerBox.height - paneBox.y + 24) } });
+}
+
 // Notes rest as comment bubbles; a click keeps one open.
 async function openNotes(page: Page) {
   const bubbles = page.locator('[data-open="false"]');
@@ -172,7 +180,7 @@ test.describe('Studio selection actions and note dock', () => {
     await page.getByTestId('dock-more-btn').click();
     await expect(page.getByTestId('dock-more-popover')).toBeVisible();
     // Click on canvas pane to dismiss
-    await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+    await clickClearPane(page);
     await expect(page.getByTestId('dock-more-popover')).toBeHidden();
 
     // 4. Delete note
@@ -183,7 +191,7 @@ test.describe('Studio selection actions and note dock', () => {
     await expect(noteToDelete).toHaveCount(0);
 
     // 5. Area / marquee box selection across nodes
-    await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+    await clickClearPane(page);
     await expect(page.getByTestId('selection-count')).toHaveCount(0);
 
     const firstNode = page.locator('.component-node').nth(0);
@@ -340,7 +348,7 @@ test.describe('Studio selection actions and note dock', () => {
     await expect(boundary).toBeVisible();
 
     // Clear selection by clicking empty canvas
-    await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+    await clickClearPane(page);
     await waitForIdle(page);
     await expect(page.getByTestId('selection-count')).toHaveCount(0);
 
@@ -415,7 +423,7 @@ test.describe('Studio selection actions and note dock', () => {
     await expect(boundary).toBeVisible();
 
     // Clear selection then click group container header: selects group elements + attached notes
-    await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
+    await clickClearPane(page);
     await waitForIdle(page);
     await boundary.locator('span', { hasText: 'Mixed Note Group' }).click();
     await waitForIdle(page);

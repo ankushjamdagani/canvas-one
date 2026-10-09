@@ -6,7 +6,7 @@ Thanks for helping out. This project is a pre-1.0 preview, so please open an iss
 
 ```sh
 npm ci
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:3000
 ```
 
 Node.js 22.12 or newer is required.
@@ -18,7 +18,8 @@ Run the checks that match your change:
 ```sh
 npx tsc -b         # type-check (never pass --noEmit false; it writes .js files next to sources)
 npm test           # unit tests
-npm run build      # production build; keep every chunk under Vite's 500 kB warning
+npm run build      # standalone Next.js production build and offline worker
+npm run build:react # reusable module; keep every chunk under Vite's 500 kB warning
 npx playwright install chromium
 npm run build && TEST_PRODUCTION=1 npm run test:e2e   # browser tests against the built app
 npm run build-storybook                               # if you touched src/components/ui or tokens

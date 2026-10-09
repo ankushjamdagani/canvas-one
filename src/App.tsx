@@ -31,9 +31,9 @@ import { Button } from '@/components/ui/button';
 // (the app's mintId) instead of defining its own.
 const MINT_ID = () => crypto.randomUUID();
 
-function getOrCreateActorId(): string {
+function getOrCreateActorId(storageNamespace?: string): string {
   try {
-    const key = 'system-studio.actor-id';
+    const key = storageNamespace ? `${storageNamespace}:system-studio.actor-id` : 'system-studio.actor-id';
     const stored = localStorage.getItem(key);
     if (stored) return stored;
     const fresh = crypto.randomUUID();
@@ -58,7 +58,32 @@ type BootState =
       actor: Actor;
     };
 
-export default function App() {
+export interface AppProps { storageNamespace?: string; basePath?: string; manageMetadata?: boolean; siteOrigin?: string }
+
+export default function App({ storageNamespace, basePath, manageMetadata = false, siteOrigin }: AppProps = {}) {
+  const { route } = useRoute();
+  React.useEffect(() => {
+    if (!manageMetadata) return;
+    const publicPage = route.kind === 'home' || route.kind === 'brand';
+    document.title = route.kind === 'home' ? 'Canvas One — The shared canvas for engineers and AI' : `${route.kind === 'brand' ? 'Brand' : route.kind === 'projects' ? 'Projects' : 'Workspace'} | Canvas One`;
+    for (const [name, content] of [
+      ['robots', publicPage ? 'index, follow' : 'noindex, nofollow'],
+      ['description', route.kind === 'brand' ? 'Canvas One brand guidelines, visual language and interface foundations.' : 'Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.'],
+    ]) {
+      let element = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+      if (!element) { element = document.createElement('meta'); element.name = name; document.head.append(element); }
+      element.content = content;
+    }
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (siteOrigin && publicPage) {
+      if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.append(canonical); }
+      canonical.href = `${new URL(siteOrigin).origin}${basePath ?? ''}${route.kind === 'brand' ? '/brand' : '/'}`;
+    } else canonical?.remove();
+    for (const property of ['og:title', 'og:description']) {
+      const element = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+      if (element) element.content = property === 'og:title' ? document.title : document.querySelector<HTMLMetaElement>('meta[name="description"]')!.content;
+    }
+  }, [route.kind, manageMetadata, siteOrigin, basePath]);
   const [bootState, setBootState] = React.useState<BootState>({ status: 'booting' });
 
   const runBoot = React.useCallback(async () => {
@@ -67,6 +92,7 @@ export default function App() {
     try {
       const bootRes = await openStudioRepository({
         mintId: MINT_ID,
+        dbName: storageNamespace ? `${storageNamespace}:system-studio-local-v1` : undefined,
       });
 
       if (!bootRes.ok) {
@@ -82,7 +108,7 @@ export default function App() {
       }
 
       const actor: Actor = {
-        actorId: getOrCreateActorId(),
+        actorId: getOrCreateActorId(storageNamespace),
         kind: 'local-human',
         displayName: 'You',
       };
@@ -107,11 +133,15 @@ export default function App() {
         message: 'Database unavailable. Storage could not be initialized.',
       });
     }
-  }, []);
+  }, [storageNamespace]);
 
   React.useEffect(() => {
-    void runBoot();
-  }, [runBoot]);
+    if (route.kind !== 'home' && route.kind !== 'brand' && bootState.status === 'booting') void runBoot();
+  }, [runBoot, route.kind]);
+
+  const renderPage = (kind: PageKind): React.ReactNode => {
+    if (kind === 'home') return <LandingPage basePath={basePath} />;
+    if (kind === 'brand') return <BrandPage basePath={basePath} />;
 
   // Full-page error state naming unavailable/quota with a Retry button
   if (bootState.status === 'failed') {
@@ -161,18 +191,23 @@ export default function App() {
       repository={bootState.repository}
       session={bootState.session}
       actor={bootState.actor}
+      pageKind={kind}
     />
   );
+  };
+  return <RouteShell renderPage={renderPage} />;
 }
 
 function StudioShell({
   repository,
   session,
   actor,
+  pageKind,
 }: {
   repository: StudioRepository;
   session: SessionController;
   actor: Actor;
+  pageKind: PageKind;
 }) {
   const sessionState = React.useSyncExternalStore(
     session.subscribe,
@@ -216,7 +251,11 @@ function StudioShell({
 
   // Session -> URL: opening, creating or switching a project or branch moves the address bar.
   const { projectId, branchId, mainBranchId } = sessionState;
+  const previousAddress = React.useRef({ projectId, branchId, mainBranchId });
   React.useEffect(() => {
+    const previous = previousAddress.current;
+    previousAddress.current = { projectId, branchId, mainBranchId };
+    if (previous.projectId === projectId && previous.branchId === branchId && previous.mainBranchId === mainBranchId) return;
     if (!projectId || !branchId) return;
     navigate({ kind: 'project', projectId, branchId: branchId === mainBranchId ? null : branchId });
   }, [projectId, branchId, mainBranchId]);
@@ -281,5 +320,5 @@ function StudioShell({
     );
   };
 
-  return <RouteShell renderPage={renderPage} />;
+  return renderPage(pageKind);
 }

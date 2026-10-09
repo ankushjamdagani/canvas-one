@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { m } from 'motion/react';
+import { m, useAnimationControls } from 'motion/react';
 import { useMotionEnv } from '@/lib/motion/env';
 import {
   EASE,
@@ -9,22 +9,27 @@ import {
   type RevealSpec,
 } from '@/lib/motion/tokens';
 
-const ScopeContext = React.createContext<RevealScopeValue>({ contentCount: 0, baseDelay: 0 });
+type Scope = RevealScopeValue & { phase?: 'enter' | 'exit'; onEntered?: (element: HTMLElement) => void };
+const ScopeContext = React.createContext<Scope>({ contentCount: 0, baseDelay: 0 });
 
 /** Page-level context for stagger counts and the page's start delay. Omitted fields inherit. */
 export function RevealScope({
   contentCount,
   baseDelay,
+  phase,
+  onEntered,
   children,
 }: {
   contentCount?: number;
   baseDelay?: number;
+  phase?: 'enter' | 'exit';
+  onEntered?: (element: HTMLElement) => void;
   children?: React.ReactNode;
 }) {
   const parent = React.useContext(ScopeContext);
   const value = React.useMemo(
-    () => ({ contentCount: contentCount ?? parent.contentCount, baseDelay: baseDelay ?? parent.baseDelay }),
-    [contentCount, baseDelay, parent.contentCount, parent.baseDelay],
+    () => ({ contentCount: contentCount ?? parent.contentCount, baseDelay: baseDelay ?? parent.baseDelay, phase: phase ?? parent.phase, onEntered: onEntered ?? parent.onEntered }),
+    [contentCount, baseDelay, phase, onEntered, parent.contentCount, parent.baseDelay, parent.phase, parent.onEntered],
   );
   return <ScopeContext.Provider value={value}>{children}</ScopeContext.Provider>;
 }
@@ -90,6 +95,20 @@ export type RevealProps = HtmlProps & {
 export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...rest }: RevealProps) {
   const scope = React.useContext(ScopeContext);
   const env = useMotionEnv();
+  const controls = useAnimationControls();
+  const element = React.useRef<HTMLElement>(null);
+  const started = React.useRef(false);
+  // Public server HTML stays visible. Apply the initial pose only after hydration,
+  // before paint; late-mounted workspace content gets the same entry sequence.
+  React.useLayoutEffect(() => {
+    if (!scope.phase) return;
+    if (!started.current) {
+      controls.set('hidden');
+      started.current = true;
+    }
+    void controls.start(scope.phase);
+    return () => controls.stop();
+  }, [controls, scope.phase, env.reduced, env.off, env.coarse]);
   const custom = React.useMemo<Custom>(
     () => ({
       enter: revealSpec(kind, 'enter', index, scope, env),
@@ -101,8 +120,15 @@ export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...r
   return (
     <Tag
       {...rest}
+      ref={element}
       variants={revealVariants}
       custom={custom}
+      initial={false}
+      animate={scope.phase ? controls : undefined}
+      exit="exit"
+      onAnimationComplete={(definition: unknown) => {
+        if (definition === 'enter' && element.current) scope.onEntered?.(element.current);
+      }}
       data-reveal-kind={kind}
       data-reveal-index={index}
     >

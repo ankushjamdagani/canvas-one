@@ -12,10 +12,10 @@ test.describe('Project Canvas design (2026-10-07)', () => {
     await expect(page.getByTestId('topbar-back')).toBeVisible();
     await expect(page.getByTestId('topbar-collaborators')).toBeVisible();
     await expect(page.getByTestId('topbar-share-btn')).toBeDisabled();
-    // The canvas (and its dots) run beneath the floating top bar.
+    // Canvas and header begin at the shared frame interior; the canvas continues beneath it.
     const bar = await page.getByTestId('workspace-topbar').boundingBox();
     const canvasBox = await page.getByTestId('canvas-container').boundingBox();
-    expect(canvasBox!.y).toBeLessThan(bar!.y);
+    expect(canvasBox!.y).toBeLessThanOrEqual(bar!.y);
 
     const crosshair = page.locator('canvas[data-decoration=canvas-crosshair]');
     const blank = await crosshair.evaluate((el: HTMLCanvasElement) => el.toDataURL());

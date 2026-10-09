@@ -7,15 +7,55 @@ export type Route =
   | { readonly kind: 'projects' }
   | { readonly kind: 'project'; readonly projectId: string; readonly branchId: string | null };
 
-export function parseRoute(pathname: string): Route | null {
-  const parts = pathname.split('/').filter(Boolean).map((part) => {
+let activeBasePath = '';
+const RouterSnapshotContext = React.createContext<{ pathname: string; basePath: string } | null>(null);
+export const RouterSnapshotProvider = RouterSnapshotContext.Provider;
+let routerOwner: symbol | null = null;
+export interface RouterOptions {
+  publicNavigation?: 'document' | 'client';
+  entryRoute?: 'home' | 'projects';
+}
+let activeOptions: RouterOptions = {};
+
+/** A URL path prefix, never an origin, query string, or encoded path. */
+export function normalizeBasePath(basePath = ''): string {
+  if (basePath === '' || basePath === '/') return '';
+  if (!/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\/?$/.test(basePath)) {
+    throw new TypeError('Canvas One basePath must contain only URL path segments (for example /tools/canvas).');
+  }
+  return basePath.replace(/\/$/, '');
+}
+
+/** Controllers share one address bar, so only one routed workspace may own it. */
+export function acquireRouter(basePath = '', options: RouterOptions = {}): () => void {
+  const normalized = normalizeBasePath(basePath);
+  if (routerOwner) throw new Error('Only one Canvas One router can be mounted per page.');
+  const owner = Symbol('Canvas One router');
+  routerOwner = owner;
+  activeBasePath = normalized;
+  activeOptions = options;
+  notify();
+  return () => {
+    if (routerOwner !== owner) return;
+    routerOwner = null;
+    activeBasePath = '';
+    activeOptions = {};
+    notify();
+  };
+}
+
+export function parseRoute(pathname: string, basePath = activeBasePath): Route | null {
+  const prefix = normalizeBasePath(basePath);
+  if (prefix && pathname !== prefix && !pathname.startsWith(`${prefix}/`)) return null;
+  const localPath = prefix ? pathname.slice(prefix.length) : pathname;
+  const parts = localPath.split('/').filter(Boolean).map((part) => {
     try {
       return decodeURIComponent(part);
     } catch {
       return part;
     }
   });
-  if (parts.length === 0) return { kind: 'home' };
+  if (parts.length === 0) return { kind: basePath === activeBasePath ? activeOptions.entryRoute ?? 'home' : 'home' };
   if (parts.length === 1 && parts[0] === 'brand') return { kind: 'brand' };
   if (parts.length === 1 && parts[0] === 'projects') return { kind: 'projects' };
   if (parts[0] !== 'project' || !parts[1]) return null;
@@ -26,11 +66,12 @@ export function parseRoute(pathname: string): Route | null {
   return null;
 }
 
-export function formatRoute(route: Route): string {
-  if (route.kind === 'home') return '/';
-  if (route.kind === 'brand') return '/brand';
-  if (route.kind === 'projects') return '/projects';
-  const project = `/project/${encodeURIComponent(route.projectId)}`;
+export function formatRoute(route: Route, basePath = activeBasePath): string {
+  const prefix = normalizeBasePath(basePath);
+  if (route.kind === 'home') return `${prefix}/`;
+  if (route.kind === 'brand') return `${prefix}/brand`;
+  if (route.kind === 'projects') return `${prefix}/projects`;
+  const project = `${prefix}/project/${encodeURIComponent(route.projectId)}`;
   return route.branchId ? `${project}/branch/${encodeURIComponent(route.branchId)}` : project;
 }
 
@@ -55,18 +96,29 @@ const getPathname = () => window.location.pathname;
 export function navigate(route: Route, options: { replace?: boolean } = {}) {
   const path = formatRoute(route);
   if (path === window.location.pathname) return;
-  if (options.replace) window.history.replaceState(null, '', path);
-  else window.history.pushState(null, '', path);
+  if (activeOptions.publicNavigation === 'document' && (route.kind === 'home' || route.kind === 'brand')) {
+    if (options.replace) window.location.replace(path);
+    else window.location.assign(path);
+    return;
+  }
+  const state = { ...window.history.state };
+  // Next's native History API adapter copies its bookkeeping itself. Passing its
+  // internal marker back bypasses that adapter and leaves its canonical URL stale.
+  delete state.__NA;
+  delete state._N;
+  if (options.replace) window.history.replaceState(state, '', path);
+  else window.history.pushState(state, '', path);
   notify();
 }
 
 /** Current route; unknown paths read as home (the app rewrites the URL to `/`). */
 export function useRoute(): { route: Route; known: boolean } {
-  const pathname = React.useSyncExternalStore(subscribe, getPathname);
+  const snapshot = React.useContext(RouterSnapshotContext);
+  const pathname = React.useSyncExternalStore(subscribe, getPathname, () => snapshot?.pathname ?? '/');
   return React.useMemo(() => {
-    const parsed = parseRoute(pathname);
+    const parsed = parseRoute(pathname, snapshot?.basePath ?? activeBasePath);
     return { route: parsed ?? { kind: 'home' }, known: parsed !== null };
-  }, [pathname]);
+  }, [pathname, snapshot?.basePath]);
 }
 
 /**
@@ -80,11 +132,13 @@ export function useInternalLinks() {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
       if (!anchor || (anchor.target && anchor.target !== '_self') || anchor.hasAttribute('download')) return;
+      if (routerOwner && !anchor.closest('.canvas-one-root')) return;
       const url = new URL(anchor.href, window.location.href);
       if (url.origin !== window.location.origin) return;
-      if (url.hash) return;
+      if (url.hash || url.search) return;
       const next = parseRoute(url.pathname);
       if (!next) return;
+      if (activeOptions.publicNavigation === 'document' && (next.kind === 'home' || next.kind === 'brand')) return;
       event.preventDefault();
       navigate(next);
     };

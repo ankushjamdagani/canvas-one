@@ -1,10 +1,14 @@
 import * as React from "react";
+import { usePortalRoot } from "./portal-root";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
-const DialogPortal = DialogPrimitive.Portal;
+function DialogPortal({ container, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Portal>) {
+  const root = usePortalRoot();
+  return <DialogPrimitive.Portal container={container ?? root} {...props} />;
+}
 
 const DialogTrigger = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Trigger>,

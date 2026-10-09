@@ -11,6 +11,7 @@
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
+import { usePortalRoot } from '@/components/ui/portal-root';
 import {
   X,
   Search,
@@ -43,6 +44,7 @@ export function LibraryPanel({
   renderLinkedProjects,
   captureRequested,
 }: LibraryPanelProps) {
+  const portalRoot = usePortalRoot();
   const [searchQuery, setSearchQuery] = React.useState(initialSearchQuery);
   const [tab, setTab] = React.useState<LibraryTab>('standard');
   const [oursCount, setOursCount] = React.useState(0);
@@ -321,7 +323,7 @@ export function LibraryPanel({
           >
             <EntryDetailCard entry={activeDetailEntry} />
           </div>,
-          document.body,
+          portalRoot ?? document.body,
         )}
 
       {/* 5. Sticky Footer Bar */}

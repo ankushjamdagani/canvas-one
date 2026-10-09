@@ -8,6 +8,7 @@ import { DraftingSheet } from "@/components/ui/drafting-sheet";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
 import { EASE } from "@/lib/motion/tokens";
 import "./brand-page.css";
+import { getThemeRoot } from '@/lib/theme';
 
 const expressions = [
   ["base", "Ready", "Idle · AI available"],
@@ -184,7 +185,7 @@ function AppLaunch({ motion, playing }: { motion: boolean; playing: boolean }) {
     <progress aria-label="Example app launch progress" value={splash.progress} max={100} />
   </div>;
 }
-export function BrandPage({ animate = true }: { animate?: boolean }) {
+export function BrandPage({ animate = true, basePath }: { animate?: boolean; basePath?: string }) {
   const [demosVisible, setDemosVisible] = useState(false);
   useEffect(() => {
     const visible = new Set<Element>();
@@ -199,11 +200,7 @@ export function BrandPage({ animate = true }: { animate?: boolean }) {
     document.querySelectorAll('.brand-section, .brand-hero').forEach((section) => observer.observe(section));
     return () => observer.disconnect();
   }, []);
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof matchMedia !== "undefined" &&
-      matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
+  const [reduced, setReduced] = useState(false);
   const [playing, setPlaying] = useState(animate && !reduced);
   const [flowIndex, setFlowIndex] = useState(0);
   const [pick, setPick] = useState<Expression>("base");
@@ -230,6 +227,7 @@ export function BrandPage({ animate = true }: { animate?: boolean }) {
       setReduced(media.matches);
       if (media.matches) setPlaying(false);
     };
+    change();
     media.addEventListener("change", change);
     return () => media.removeEventListener("change", change);
   }, []);
@@ -243,7 +241,7 @@ export function BrandPage({ animate = true }: { animate?: boolean }) {
   }, [playing, motion, flowIndex, demosVisible]);
   useEffect(() => {
     const sync = () => {
-      const css = getComputedStyle(document.documentElement);
+      const css = getComputedStyle(getThemeRoot());
       setHex(
         Object.fromEntries(
           ["ink", "primary", "branch", "risk", "shell", "desk"].map((t) => [
@@ -255,7 +253,7 @@ export function BrandPage({ animate = true }: { animate?: boolean }) {
     };
     sync();
     const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-mode', 'data-palette'] });
+    observer.observe(getThemeRoot(), { attributes: true, attributeFilter: ['style', 'class', 'data-theme', 'data-mode', 'data-palette'] });
     return () => observer.disconnect();
   }, []);
   const current = playing
@@ -271,6 +269,7 @@ export function BrandPage({ animate = true }: { animate?: boolean }) {
     <RevealScope contentCount={3}>
     <DraftingSheet
       page="brand"
+      basePath={basePath}
     >
       <main className="brand-page">
         <section className="brand-hero">

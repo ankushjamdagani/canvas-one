@@ -66,7 +66,7 @@ export function InspectorPanel({
 
   const containerClass =
     variant === 'dock'
-      ? 'flex flex-col h-full w-[320px] shrink-0 border-l border-control-border bg-panel'
+      ? 'flex flex-col h-full w-[320px] shrink-0 border-l border-control-border bg-panel min-[1000px]:pt-[var(--topbar-inset)]'
       : variant === 'hosted'
         ? 'flex flex-col w-full h-full min-h-0 bg-panel'
         : 'flex flex-col w-full h-full bg-panel';

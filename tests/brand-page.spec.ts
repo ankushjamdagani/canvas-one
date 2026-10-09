@@ -22,9 +22,10 @@ test('public chrome and theme controls stay consistent across landing and brand'
   expect(await page.getByRole('dialog').evaluate(el=>getComputedStyle(el).fontFamily)).toBe(themeFont);
   await page.getByRole('button',{name:'Dark',exact:true}).click();
   await page.keyboard.press('Escape');
-  const mode = await page.evaluate(()=>document.documentElement.className);
+  const mode = await page.evaluate(()=>document.querySelector<HTMLElement>('.canvas-one-root')!.dataset.themeMode);
+  expect(mode).toBe('dark');
   await page.getByRole('link',{name:'Canvas One',exact:true}).click();
-  expect(await page.evaluate(()=>document.documentElement.className)).toBe(mode);
+  expect(await page.evaluate(()=>document.querySelector<HTMLElement>('.canvas-one-root')!.dataset.themeMode)).toBe(mode);
 });
 
 test('brand background stays viewport sized and offscreen faces are idle', async ({page}) => {
@@ -125,6 +126,32 @@ test('manual state changes blink and terminal expressions settle without losing 
       await expect(page.locator('.brand-player-display .brand-status')).toHaveText(name);
     }
   }
+});
+
+test('rapid expression requests complete the blink and hold the latest displayed face', async ({page}) => {
+  await page.clock.install({time:new Date('2026-01-01T00:00:00Z')});
+  await page.goto('/brand');
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
+  await page.locator('#transitions').scrollIntoViewIfNeeded();
+  await page.clock.runFor(1000);
+  const face = page.locator('.brand-player-display > .canvas-one-face');
+  await page.getByRole('button',{name:'Thinking',exact:true}).click();
+  await page.clock.runFor(20);
+  await expect(face).toHaveAttribute('data-closing','true');
+  await page.getByRole('button',{name:'Reading the board',exact:true}).click();
+  await page.clock.runFor(20);
+  await expect(face).toHaveAttribute('data-closing','true');
+  await expect(face).toHaveAttribute('data-expression','base');
+  await page.clock.runFor(160);
+  await expect(face).toHaveAttribute('data-expression','look');
+  await expect(face).toHaveAttribute('data-closing','false');
+  await page.getByRole('button',{name:'Working',exact:true}).click();
+  await page.clock.runFor(400);
+  await expect(face).toHaveAttribute('data-expression','look');
+  await expect(face).toHaveAttribute('data-closing','false');
+  await page.clock.runFor(650);
+  await expect(face).toHaveAttribute('data-expression','squint');
+  await expect(face).toHaveAttribute('data-closing','false');
 });
 
 test('working progress is enclosed and the app prompt belongs to chat', async ({page}) => {

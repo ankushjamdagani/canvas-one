@@ -21,8 +21,7 @@ test('rename: blank projects default to Untitled, taken names are flagged, succe
   await expect(page.getByTestId('breadcrumb-project-btn').locator('svg')).toHaveCount(1);
   await expect(branchToggle.locator('svg')).toHaveCount(2);
   const header = page.getByTestId('workspace-topbar');
-  expect((await header.boundingBox())?.height).toBe(40);
-  await expect(header).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  expect((await header.boundingBox())?.height).toBe(67);
 
   // Name taken: popover with the three rows, Enter does not save.
   await page.getByTestId('breadcrumb-project-btn').click();

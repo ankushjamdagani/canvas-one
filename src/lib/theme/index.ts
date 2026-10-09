@@ -1,4 +1,4 @@
-export { ThemeProvider, useTheme, PALETTES, initializeTheme } from './ThemeContext';
+export { ThemeProvider, useTheme, PALETTES, initializeTheme, getThemeRoot, themeStorageKey } from './ThemeContext';
 export { ThemePopover, ThemeButton } from './ThemePopover';
 export type { ThemeState, ThemeApi } from './ThemeContext';
 export type { ThemePalette, ThemeTokens, ThemeMode } from './palettes';

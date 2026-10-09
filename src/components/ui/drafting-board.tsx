@@ -31,9 +31,10 @@ export function DraftingBoard({
     setGroundPaused(paused);
     return () => setGroundPaused(false);
   }, [paused, setGroundPaused]);
-  const [size, setSize] = React.useState({ w: innerWidth, h: innerHeight });
+  const [size, setSize] = React.useState({ w: 1440, h: 900 });
   React.useEffect(() => {
     const resize = () => setSize({ w: innerWidth, h: innerHeight });
+    resize();
     addEventListener("resize", resize);
     return () => removeEventListener("resize", resize);
   }, []);

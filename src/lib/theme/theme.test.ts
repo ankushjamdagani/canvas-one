@@ -12,10 +12,21 @@ import {
   type ThemeTokens,
 } from './palettes';
 import { applyTokens, serializeTheme, parseTheme } from './apply';
-import { readStoredTheme } from './ThemeContext';
+import { readStoredTheme, themeStorageKey } from './ThemeContext';
 import { contrastRatio } from '@/components/studio/tokens';
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('embedded theme storage', () => {
+  it('preserves the default key and isolates configured namespaces', () => {
+    expect(themeStorageKey()).toBe('studio:theme');
+    const getItem = vi.fn((key: string) => key === 'host:studio:theme' ? 'slate:dark' : 'evergreen:light');
+    vi.stubGlobal('localStorage', { getItem });
+    expect(readStoredTheme('host')).toEqual({ paletteId: 'slate', mode: 'dark' });
+    expect(readStoredTheme()).toEqual({ paletteId: 'evergreen', mode: 'light' });
+    expect(getItem).toHaveBeenCalledWith('host:studio:theme');
+  });
+});
 
 const REQUIRED_TOKEN_KEYS: (keyof ThemeTokens)[] = [
   'desk', 'shell', 'canvas', 'panel', 'sunken', 'raised',

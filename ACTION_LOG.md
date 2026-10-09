@@ -3352,3 +3352,40 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Verification: production and Storybook builds pass; 1,942 unit tests pass / 12 skipped; 29 public/transition browser checks pass, plus six final boundary/workspace checks. Desktop/320px screenshots inspected; diff check passes.
 - Limitations: pre-existing landing geometry assertion expects 800×176, but HEAD initializes 722×136 after the preceding copy update; excluded from the passing public run. Preview http://127.0.0.1:5191/.
 - Lesson: padded scroll containers affect sticky positioning; measured bounds caught a doubled frame inset. Boundary tests must also allow a fitted desktop page with no vertical overflow.
+
+### SEO, Next.js and PWA architecture assessment (Codex)
+- Outcome: inspected the current React/Vite stack, custom routing, browser storage and HTML entry; recommended Next.js public rendering with a client workspace and explicit offline caching, preserving the domain and persistence layers. Compared retaining Vite with a separate public site.
+- Files: `ACTION_LOG.md` only; no application changes.
+- Platform: Codex; graphify navigation; no subagents.
+- Verification: source/configuration inspection and official Next.js/Google documentation; tests/builds not run for this advisory task.
+- Limitations: deployed indexing/performance not audited; future collaboration/backend requirements remain unspecified.
+
+### Next.js standalone, offline PWA and host embedding (Codex)
+- Outcome: migrated default scripts to Next.js with visible prerendered landing/Brand content, metadata and private-route noindex; retained local storage formats and simulation. Added a versioned offline workspace worker with non-disruptive updates, prepared standalone deployment output, and built `@canvas-one/react` with prefix routing, namespaced storage and scoped styles/themes/portals. A real Next.js consumer mounts it at `/canvas`; host owns embedded PWA policy.
+- Files: `app/`, standalone/embed modules, router/theme/motion and foundation portals/styles, build/package/PWA scripts, host example, package/config/CI files, migration/browser tests, README/CONTRIBUTING/deployment docs, `.env.example`, HANDOFF/LESSONS/ACTION_LOG. Regression exposed inspector docks missing existing header clearance; corrected both dock paths and stale header/canvas test coordinates.
+- Platform: Codex lead; native embedding, PWA and critic subagents; graphify navigation and delegate workflow.
+- Verification: standalone, React package, real host and Storybook builds pass; 1,960 unit tests pass / 12 skipped. Production no-JS HTML, offline deep-link reopening plus simulation, metadata and embedded host storage/worker isolation checks pass; host screenshot inspected. Final full production run: 241 passed, 3 connection-gesture cases failed, 4 skipped; known pre-existing landing geometry mismatch excluded. Full selection suite passes all 8 tests after header-aware pointer coordinates. Diff check passes. Preview http://127.0.0.1:5205/.
+- Limitations: full browser suite is not clean. Repeated connection/undo probes passed 9/9 serially but concurrent probes failed 5/9, including restored-edge visibility; no application fix established. Removed unproven timing change and diagnostic code. Storybook retains existing addon size warnings. No npm publication or external deployment performed; configure origin/prefix for deployment.
+- Lesson: a real host build/browser caught dropped library exports, misplaced client directives, bundled CJS React imports and file-URL workers. SSR preference initialization and history timing affected regressions; scoped portal/theme ownership and real pointer geometry are required. One passing rerun does not establish a flaky canvas issue is fixed.
+
+### Migration animation and brand-reference repair (Codex)
+- Outcome: restored public entry/exit reveals after hydration while preserving visible no-JavaScript HTML; client motion preferences update active controls and heading focus waits for its own reveal. Shared faces now match the supplied reference's exact conditional geometry, pupil sizes and idle owners. Rapid expression requests finish the active 120ms close/180ms reopen, display the latest request behind closed eyes and hold it for 600ms. The supplied HTML remains unchanged.
+- Files: `src/components/ui/canvas-one-face.tsx`, new face geometry tests, Reveal and its tests, RouteShell, brand/route browser tests, HANDOFF/LESSONS/ACTION_LOG.
+- Platform: Codex lead, native face executor and independent motion reviewer; delegate CLI diagnostics from Gemini 3.1 Pro and Claude Haiku 4.5. Initial Gemini headless tools were denied, Sonnet attempts timed out and a Gemini reference retry hit a network timeout; short supplied-source diagnostics succeeded. Unsupported Gemini claims were discarded after inspecting browser geometry.
+- Verification: final standalone, React package, real Next host and Storybook builds pass; 1,965 units pass / 12 skipped. Final production brand/motion/migration checks: 26 passed, including intermediate opacity, heading focus, rapid blink requests, no-JS content, offline simulation and 320px reflow; embedded host: 1 passed. Native rendered comparison matched all 30 reference SVG specimens; screenshot inspected. Broader frozen-build run: 243 passed / 3 failed / 4 skipped; all three failures passed independently on the final build. Diff check passes. Preview http://127.0.0.1:5205/brand.
+- Limitations: broader suite is not clean: authoring connection/undo gestures and a mobile scenario-sheet race failed under the full run. Their passing isolated reruns do not establish a source fix. Existing landing geometry mismatch excluded; existing Storybook addon warnings remain.
+- Lesson: visible settled pages do not prove entry animation or smooth interrupted transitions; test intermediate poses and compare animation owners with the reference. Concurrent heavy verification caused runner timeouts; the final unit suite passed separately. Pause a browser clock at an explicit future instant before testing sub-120ms requests.
+
+### GitHub navigation hover consistency (Codex)
+- Outcome: GitHub shares Brand's accent-text underline hover, 5px underline offset and transparent background through one foundation CSS rule.
+- Files: `src/styles.css`, HANDOFF/ACTION_LOG.
+- Platform: Codex; no subagents.
+- Verification: production and Storybook builds pass; shared selector and diff inspected; diff check passes. No new tests for this small reversible style change.
+- Limitations: existing Storybook addon warnings remain. Local preview refreshed at http://127.0.0.1:5205/brand.
+
+### Commit and push the migration and follow-up repairs (Codex)
+- Outcome: collected the Next.js/PWA/embedding migration, reference-based motion repairs and GitHub hover change into one commit on `master` for `origin/master`.
+- Files: all current implementation, configuration, documentation and test changes from these tasks; generated builds and local diagnostic artifacts remain ignored.
+- Platform: Codex; no subagents.
+- Verification: staged scope and diff checks reviewed; the preceding build/unit/browser results apply. Commit and remote push results reported in the task response.
+- Limitations: the broader browser-suite intermittency documented above remains.

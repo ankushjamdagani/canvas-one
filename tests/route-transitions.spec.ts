@@ -11,6 +11,51 @@ const trackOverlay = (page: Page) =>
   });
 const overlaySeen = (page: Page) => page.evaluate(() => !!(window as unknown as { __overlaySeen?: boolean }).__overlaySeen);
 
+test('public content animates through intermediate entry and exit poses after hydration', async ({ page }) => {
+  await page.addInitScript(() => {
+    const samples: Record<string, number[]> = {};
+    (window as unknown as { revealSamples: typeof samples }).revealSamples = samples;
+    const sample = () => {
+      document.querySelectorAll('[data-page-kind]').forEach(frame => {
+        const reveal = frame.querySelector('[data-reveal-kind="content"]');
+        if (!reveal) return;
+        const key = frame.getAttribute('data-page-kind')!;
+        const values = samples[key] ??= [];
+        if (values.length < 1500) values.push(Number(getComputedStyle(reveal).opacity));
+      });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.goto('/');
+  const opacitySamples = (kind: string) => page.evaluate(kind =>
+    (window as unknown as { revealSamples: Record<string, number[]> }).revealSamples[kind] ?? [], kind);
+  await expect.poll(async () => (await opacitySamples('home')).some(v => v > 0.05 && v < 0.95)).toBe(true);
+  await expect.poll(async () => (await opacitySamples('home')).at(-1)).toBe(1);
+  await page.getByRole('link', { name: 'Brand', exact: true }).click();
+  await expect(page.locator('[data-page-kind="home"]')).toHaveCount(0);
+  const home = await opacitySamples('home');
+  expect(home.slice(home.indexOf(1) + 1).some(v => v > 0.05 && v < 0.95)).toBe(true);
+  await expect.poll(async () => (await opacitySamples('brand')).some(v => v > 0.05 && v < 0.95)).toBe(true);
+  await expect.poll(async () => (await opacitySamples('brand')).at(-1)).toBe(1);
+});
+
+test('route headings receive keyboard focus only after their reveal finishes', async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('focusin', event => {
+      const heading = event.target;
+      if (!(heading instanceof HTMLElement) || heading.tagName !== 'H1') return;
+      const reveal = heading.closest('[data-reveal-kind]');
+      if (reveal) (window as unknown as { headingFocusOpacity: number }).headingFocusOpacity = Number(getComputedStyle(reveal).opacity);
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Brand', exact: true }).click();
+  const heading = page.locator('[data-page-kind="brand"] h1');
+  await expect(heading).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { headingFocusOpacity: number }).headingFocusOpacity)).toBe(1);
+});
+
 test('landing and brand fade content, preserve the board and reset deep scroll', async ({page}) => {
   await page.goto('/');
   await page.getByTestId('route-board').evaluate(el=>el.setAttribute('data-preserved','yes'));
@@ -51,7 +96,9 @@ test('rapid forward/back navigation settles on the last route', async ({ page })
   await expect(page.getByTestId('landing-page')).toBeVisible();
   await page.getByRole('link', { name: 'Try Beta' }).last().click();
   await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
   await page.goForward();
+  await expect(page).toHaveURL(/\/projects$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByTestId('landing-page')).toBeVisible();

@@ -3502,7 +3502,7 @@ export function Workspace({
         {scenarioDraft && document && !isMobileInspector && !inspectorHosted ? (
           <aside
             data-testid="scenario-inspector-dock"
-            className="w-[320px] min-w-[320px] h-full overflow-hidden border-l border-border bg-panel"
+            className="w-[320px] min-w-[320px] h-full overflow-hidden border-l border-border bg-panel min-[1000px]:pt-[var(--topbar-inset)]"
             aria-label="Scenario inspector"
           >
             <ScenarioEditor

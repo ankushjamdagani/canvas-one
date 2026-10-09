@@ -196,8 +196,8 @@ test.describe('routes', () => {
 
     await page.goto('/project/does-not-exist');
     await expect(page.getByTestId('project-route-error')).toBeVisible();
-    await page.goto('/not-a-route');
-    await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId('landing-page')).toBeVisible();
+    const missing = await page.goto('/not-a-route');
+    expect(missing?.status()).toBe(404);
+    await expect(page.getByRole('heading', { name: '404', exact: true })).toBeVisible();
   });
 });

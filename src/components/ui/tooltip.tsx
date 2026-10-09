@@ -1,6 +1,12 @@
 import * as React from "react";
+import { usePortalRoot } from "./portal-root";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
+
+function TooltipPortal({ container, ...props }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Portal>) {
+  const root = usePortalRoot();
+  return <TooltipPrimitive.Portal container={container ?? root} {...props} />;
+}
 
 const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;
@@ -17,7 +23,7 @@ const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
-  <TooltipPrimitive.Portal>
+  <TooltipPortal>
     <TooltipPrimitive.Content
       ref={ref}
       data-slot="tooltip-content"
@@ -28,7 +34,7 @@ const TooltipContent = React.forwardRef<
       )}
       {...props}
     />
-  </TooltipPrimitive.Portal>
+  </TooltipPortal>
 ));
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 

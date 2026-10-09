@@ -46,7 +46,7 @@ for (const palette of PALETTES) for (const mode of ['light', 'dark'] as const) {
       const focus = await button.evaluate(el => {
         const s = getComputedStyle(el);
         const values = s.outlineColor.match(/[\d.]+/g)!.slice(0, 3).map(Number);
-        return { colour: '#' + values.map(v => v.toString(16).padStart(2, '0')).join(''), background: getComputedStyle(document.documentElement).getPropertyValue('--background').trim() };
+        return { colour: '#' + values.map(v => v.toString(16).padStart(2, '0')).join(''), background: getComputedStyle(document.querySelector('.canvas-one-root')!).getPropertyValue('--background').trim() };
       });
       expect(contrastRatio(focus.colour, focus.background)).toBeGreaterThanOrEqual(3);
       await scan('proposal:focus');

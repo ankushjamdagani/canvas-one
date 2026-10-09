@@ -1,4 +1,5 @@
 import * as React from "react";
+import { usePortalRoot } from "./portal-root";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -19,7 +20,10 @@ const DropdownTrigger = React.forwardRef<
 DropdownTrigger.displayName = DropdownMenuPrimitive.Trigger.displayName;
 
 const DropdownGroup = DropdownMenuPrimitive.Group;
-const DropdownPortal = DropdownMenuPrimitive.Portal;
+function DropdownPortal({ container, ...props }: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Portal>) {
+  const root = usePortalRoot();
+  return <DropdownMenuPrimitive.Portal container={container ?? root} {...props} />;
+}
 const DropdownSub = DropdownMenuPrimitive.Sub;
 const DropdownRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
@@ -94,7 +98,7 @@ const DropdownContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
 >(({ className, sideOffset = 6, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
+  <DropdownPortal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       data-slot="dropdown-content"
@@ -105,7 +109,7 @@ const DropdownContent = React.forwardRef<
       )}
       {...props}
     />
-  </DropdownMenuPrimitive.Portal>
+  </DropdownPortal>
 ));
 DropdownContent.displayName = DropdownMenuPrimitive.Content.displayName;
 

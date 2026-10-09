@@ -133,6 +133,12 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
     if (page.shift) setShift(page.shift);
   }, [page.kind, page.shift]);
 
+  const revealedPage = React.useCallback((element: HTMLElement) => {
+    const frame = element.closest<HTMLElement>('[data-page-kind]');
+    if (!swapped.current || frame?.dataset.pageKind !== page.kind || frame.inert || document.activeElement !== document.body) return;
+    element.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true });
+  }, [page.kind]);
+
   // The overlay never outlives a stuck workspace.
   React.useEffect(() => {
     if (overlay?.stage !== 'hold') return;
@@ -155,16 +161,12 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
             data-page-kind={page.kind}
             className="relative z-10"
             variants={PAGE_VARIANTS}
-            initial="hidden"
+            initial={false}
             animate={phase}
             exit="exit"
-            onAnimationComplete={(def) => {
-              if (def !== 'enter' || !swapped.current || document.activeElement !== document.body) return;
-              document.querySelector<HTMLElement>(`[data-page-kind="${page.kind}"] h1`)?.focus({ preventScroll: true });
-            }}
           >
             <PageA11y exiting={phase === 'exit'} onMount={mountedPage} />
-            <RevealScope baseDelay={page.baseDelay}>{renderPage(page.kind)}</RevealScope>
+            <RevealScope baseDelay={page.baseDelay} phase={phase} onEntered={revealedPage}>{renderPage(page.kind)}</RevealScope>
           </m.div>
         </AnimatePresence>
         {overlay && <CardOverlay state={overlay} onGrown={onOverlayGrown} onDone={onOverlayDone} />}

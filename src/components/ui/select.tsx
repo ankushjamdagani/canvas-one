@@ -1,7 +1,13 @@
 import * as React from "react";
+import { usePortalRoot } from "./portal-root";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function SelectPortal({ container, ...props }: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Portal>) {
+  const root = usePortalRoot();
+  return <SelectPrimitive.Portal container={container ?? root} {...props} />;
+}
 
 const Select = SelectPrimitive.Root;
 
@@ -86,7 +92,7 @@ const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
+  <SelectPortal>
     <SelectPrimitive.Content
       ref={ref}
       data-slot="select-content"
@@ -112,7 +118,7 @@ const SelectContent = React.forwardRef<
       </SelectPrimitive.Viewport>
       <SelectScrollDownButton />
     </SelectPrimitive.Content>
-  </SelectPrimitive.Portal>
+  </SelectPortal>
 ));
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 

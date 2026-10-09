@@ -1,7 +1,12 @@
 node_modules/
 dist/
+.next/
+next-env.d.ts
+public/sw.js
+dist-react/
 playwright-report/
 test-results/
+test-results-embedding/
 *.local
 .env*
 !.env.example

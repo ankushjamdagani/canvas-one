@@ -20,6 +20,7 @@ import {
 import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
 import "./landing-page.css";
+import { formatRoute } from '@/lib/router';
 
 type Point = { x: number; y: number };
 const initialNodes: Record<string, Point> = {
@@ -33,7 +34,7 @@ const request =
 const curve = (a: Point, height: number, b: Point) =>
   `M ${a.x + 100} ${a.y + height} C ${a.x + 100} ${(a.y + height + b.y) / 2} ${b.x + 100} ${(a.y + height + b.y) / 2} ${b.x + 100} ${b.y}`;
 
-export function LandingPage() {
+export function LandingPage({ basePath }: { basePath?: string } = {}) {
   const [paused, setPaused] = React.useState(false),
     [time, setTime] = React.useState(0);
   const [override, setOverride] = React.useState<
@@ -50,9 +51,14 @@ export function LandingPage() {
     height: number;
     scale: number;
   } | null>(null);
-  const reduced = React.useRef(
-    matchMedia("(prefers-reduced-motion: reduce)").matches,
-  ).current;
+  const [reduced, setReduced] = React.useState(false);
+  React.useEffect(() => {
+    const media = matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   React.useEffect(() => {
     if (paused || reduced) return;
     const timer = setInterval(() => setTime((value) => value + 100), 100);
@@ -232,6 +238,7 @@ export function LandingPage() {
     <RevealScope contentCount={4}>
       <DraftingBoard paused={paused}>
         <PublicHeader
+          basePath={basePath}
           page="landing"
           className="lp-header"
           collaborators={
@@ -357,7 +364,7 @@ export function LandingPage() {
               style={{ left: hero.x + 18, top: hero.y + hero.h + 166 }}
             >
               <Button asChild className="lp-beta">
-                <a href="/projects">
+                <a href={formatRoute({ kind: 'projects' }, basePath)}>
                   Try Beta <ArrowRight />
                 </a>
               </Button>

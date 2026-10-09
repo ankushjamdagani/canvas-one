@@ -124,9 +124,9 @@ export async function noOverflow(page: Page) {
     .toBe(true);
 }
 
-export async function savedRunCount(page: Page) {
-  return page.evaluate(() => new Promise<number>((resolve, reject) => {
-    const request = indexedDB.open('system-studio-local-v1');
+export async function savedRunCount(page: Page, dbName = 'system-studio-local-v1') {
+  return page.evaluate((name) => new Promise<number>((resolve, reject) => {
+    const request = indexedDB.open(name);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const db = request.result;
@@ -134,7 +134,7 @@ export async function savedRunCount(page: Page) {
       count.onerror = () => { db.close(); reject(count.error); };
       count.onsuccess = () => { db.close(); resolve(count.result); };
     };
-  }));
+  }), dbName);
 }
 
 export async function runAll(page: Page) {

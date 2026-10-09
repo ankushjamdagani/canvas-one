@@ -11,11 +11,13 @@ export function DraftingSheet({
   page,
   navigation,
   sectionNavigation,
+  basePath,
 }: {
   children: ReactNode;
   page: string;
   navigation?: ReactNode;
   sectionNavigation?: ReactNode;
+  basePath?: string;
 }) {
   const shell = useRouteShell();
   return (
@@ -32,7 +34,7 @@ export function DraftingSheet({
           <DraftingFrame />
         </div>
       )}
-      <PublicHeader page={page === 'brand' ? 'brand' : 'projects'} owner={navigation} />
+      <PublicHeader page={page === 'brand' ? 'brand' : 'projects'} owner={navigation} basePath={basePath} />
       {sectionNavigation && (
         <Reveal kind="chrome" index={3} className="mt-5 w-full min-w-0">{sectionNavigation}</Reveal>
       )}

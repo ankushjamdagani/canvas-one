@@ -66,7 +66,7 @@ test('source switch save failure leaves scenario and recording intact until retr
   });
   await requestSwitch(page);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('could not be saved', { timeout: 20000 });
+  await expect(page.locator('.canvas-one-root').getByRole('alert')).toContainText('could not be saved', { timeout: 20000 });
   await expect(page.getByRole('button', { name: 'Select scenario', exact: true })).toContainText('Steady traffic');
   expect(await savedRuns(page)).toBe(0);
   await page.evaluate(() => (window as unknown as { restoreSimulationRunSave: () => void }).restoreSimulationRunSave());
