@@ -3397,3 +3397,12 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 - Limitations: existing landing geometry check excluded; browser Forward workspace visibility remains intermittent, with no source fix claimed. Diagnostic unused-symbol sweep still reports older warnings outside this migration cleanup.
 - Lesson: sharing a CommonJS plugin directly with Vite broke its config loader; sharing the dependency-free selector transform while retaining bundler-specific wrappers restores compatibility. Existing real-host verification rule applies.
 - Commit: user authorized committing the cleanup; staged only its code and documentation, preserving concurrent planning notes. Verification results above apply; commit result reported in the task response.
+
+## 2026-10-11
+
+### Undo rejected refactor and plan composable architecture (Codex)
+- Outcome: restored app/source/configuration to pre-refactor commit `8f41338`, removed refactor-only source/build outputs and workspace symlinks; saved recoverable patch/source backup at `/tmp/canvas-one-refactor-backup-20261011-120714`. No database deletion or implementation of the new plan.
+- Files: only new architecture plan and HANDOFF/LESSONS/ACTION_LOG changes remain relative to baseline. Platform: Codex, graphify navigation and delegate CLI reviews by Claude Sonnet 4.6 and Gemini 3.1 Pro high.
+- Plan: package-owned contracts; headless behavior and optional presentation; command discovery versus palette; one document authority, atomic history/storage coordination, staged full-app parity and AI proposals. Both initial reviewers requested revisions; findings incorporated by lead, without a second independent approval pass.
+- Verification: 1,965 unit tests passed / 12 skipped, production build passed, 28 isolated production authoring/history/run/Quick options tests passed; diff check passed. Full browser, embedding and Storybook suites not rerun for rollback. Review state: `.delegate/runs/20261011-121033/state.json`.
+- Lesson: package extraction must retain the full current product rather than create reduced/advanced app surfaces. Rollback must also clear generated Next types referencing removed paths before validating the restored build.
