@@ -85,6 +85,6 @@ export async function buildServiceWorker(root = process.cwd(), basePath = proces
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const result = await buildServiceWorker();
+  const result = await buildServiceWorker(path.resolve(process.argv[2] || 'apps/web'));
   console.log(`Canvas One offline worker generated: ${result.assetCount} assets (${result.version})`);
 }

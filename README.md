@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/favicon.svg" alt="Canvas One logo" width="96" height="96" />
+  <img src="apps/web/public/favicon.svg" alt="Canvas One logo" width="96" height="96" />
 </p>
 
 <h1 align="center">Canvas One</h1>
@@ -62,7 +62,9 @@ Install the browser once with `npx playwright install chromium`. Run `npm run bu
 
 ## Standalone, PWA and embedding
 
-`npm run build` prepares `.next/standalone`, including public assets and the offline worker. Deploy that directory and run `node server.js`, or use `npm run start` in this checkout. HTTPS is required for installation outside localhost. Set `CANVAS_SITE_URL` to your public origin at build time to generate the sitemap. Set `NEXT_PUBLIC_CANVAS_BASE_PATH` at build time for a standalone deployment behind a subroute.
+`npm run build` prepares `apps/web/.next/standalone`, including public assets and the offline worker. Deploy that directory and run `node apps/web/server.js` from its root, or use `npm run start` in this checkout. HTTPS is required for installation outside localhost. Set `CANVAS_SITE_URL` to your public origin at build time to generate the sitemap. Set `NEXT_PUBLIC_CANVAS_BASE_PATH` at build time for a standalone deployment behind a subroute.
+
+The Next.js composition entry lives in `apps/web`. Independent functionality is being extracted incrementally into `packages/*`, each owning its public contracts. The full existing workspace remains the app throughout extraction; see [the architecture plan](docs/composable-architecture-plan.md) and [parity ledger](docs/architecture/parity-ledger.md) for implementation gates and remaining work.
 
 Public landing and Brand pages are prerendered without opening IndexedDB. Local projects retain the existing database and export formats. The standalone app owns its PWA; a host application mounting the reusable module owns its own offline setup.
 

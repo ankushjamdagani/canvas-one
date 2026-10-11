@@ -8,13 +8,14 @@
  */
 
 import type { Cycle, CycleOutcome, ElementMetric, FlowRecord, ResultDelta, RunCheckpoint } from '../../domain/studio/runner/types';
+import { advanceTime, normalizeRange, seekTime, type TimeRange } from '@canvas-one/playback';
 import { CycleIndex } from './playback-history';
 import { FlashIndex, type FlashAt } from './playback-flashes';
 import { TrafficIndex } from './playback-traffic';
 import { CycleOverlapIndex, cycleFlowEvents, cycleIntervalStatistics } from './cycle-inspection-query';
 import type { CycleActivePeriod, CycleActivityEvent, CycleIntervalStatistics } from './cycle-inspection-query';
 export type { FlashAt } from './playback-flashes';
-export type PlaybackRange = { readonly startMs: number; readonly endMs: number };
+export type PlaybackRange = TimeRange;
 
 /** How much history behind the playhead a stream keeps, in simulated ms. */
 export const HISTORY_MS = 120_000;
@@ -112,11 +113,8 @@ export class PlaybackStore {
 
   setSelection(range: PlaybackRange | null): void {
     if (range === null) { this.range = null; return; }
-    if (!Number.isFinite(range.startMs) || !Number.isFinite(range.endMs)) return;
-    const limit = Math.min(this.computed, this.endAt ?? Infinity);
-    const startMs = Math.max(this.windowStart, Math.min(range.startMs, limit));
-    const endMs = Math.max(this.windowStart, Math.min(range.endMs, limit));
-    this.range = endMs - startMs >= 1 ? { startMs, endMs } : null;
+    const normalized = normalizeRange(range, { startMs: this.windowStart, availableMs: this.computed, endMs: this.endAt });
+    if (normalized !== undefined) this.range = normalized;
   }
 
   atSelectionEnd(): boolean { return this.range !== null && this.playhead >= this.range.endMs; }
@@ -378,17 +376,16 @@ export class PlaybackStore {
   /** Moves the playhead by `realDtMs` of real time at `speed`, never past what is computed or the end of the run. */
   advance(realDtMs: number): void {
     if (!this.playing || (!this.ended && !this.following)) return;
-    const limit = Math.min(this.computed, this.endAt ?? Infinity, !this.ended && this.following ? Infinity : this.range?.endMs ?? Infinity);
-    const target = this.playhead + realDtMs * this.speed;
-    this.playhead = Math.max(this.playhead, Math.min(target, limit));
+    this.playhead = advanceTime(this.playhead, realDtMs, this.speed,
+      { startMs: this.windowStart, availableMs: this.computed, endMs: this.endAt },
+      !this.ended && this.following ? null : this.range?.endMs ?? null);
     this.evict();
   }
 
   /** Jumps the playhead within the retained window and what is computed. */
   seek(ms: number): void {
-    if (Number.isNaN(ms)) return;
-    const limit = Math.min(this.computed, this.endAt ?? Infinity);
-    this.playhead = Math.max(this.windowStart, Math.min(ms, limit));
+    this.playhead = seekTime(this.playhead, ms,
+      { startMs: this.windowStart, availableMs: this.computed, endMs: this.endAt });
   }
 
   /** The playhead has caught up with the worker and is waiting for more. */

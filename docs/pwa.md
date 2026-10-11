@@ -2,7 +2,7 @@
 
 The standalone Next.js shell registers `src/standalone/PwaRegistration.tsx` in production. The reusable CanvasOne component does not register a worker. An embedding host owns its manifest, service worker and offline policy.
 
-Run `npm run build`; it builds Next.js, generates `public/sw.js`, and copies public and static assets into `.next/standalone`. Run `npm start` to serve that deployment. Deploy the matching `.next/standalone` directory as a unit. HTTPS is required outside localhost.
+Run `npm run build`; it builds Next.js, generates `apps/web/public/sw.js`, and copies public and static assets into `apps/web/.next/standalone/apps/web`. Run `npm start` to serve that deployment. Deploy the matching `apps/web/.next/standalone` directory as a unit and run `node apps/web/server.js` from its root. HTTPS is required outside localhost.
 
 Set `NEXT_PUBLIC_CANVAS_BASE_PATH=/canvas` consistently at build time when deploying the standalone app under `/canvas`. The Next base path, manifest URLs, worker scope and generated asset URLs must agree. Serving `sw.js` with `Cache-Control: no-cache` allows update checks to see new releases.
 

@@ -8,6 +8,6 @@ for (let index = 0; index < args.length; index += 2) {
   env[['--port', '-p'].includes(flag) ? 'PORT' : 'HOSTNAME'] = value;
 }
 env.HOSTNAME ||= '0.0.0.0';
-const child = spawn(process.execPath, ['.next/standalone/server.js'], { stdio: 'inherit', env });
+const child = spawn(process.execPath, ['apps/web/.next/standalone/apps/web/server.js'], { stdio: 'inherit', env });
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
 child.on('exit', code => process.exit(code ?? 1));

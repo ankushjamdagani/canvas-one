@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  publicDir: 'apps/web/public',
   plugins: [tailwindcss(), react()],
   css: { postcss: { plugins: [] } },
   resolve: {
