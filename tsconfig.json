@@ -1,4 +1,5 @@
 {
+  "references": [{ "path": "./packages/ui" }, { "path": "./packages/playback" }, { "path": "./packages/commands" }],
   "compilerOptions": {
     "target": "ES2022",
     "lib": [
@@ -36,13 +37,14 @@
   },
   "include": [
     "src",
-    "app",
+    "apps/web/app",
     "tests",
     "next-env.d.ts",
-    ".next/types/**/*.ts",
+    "apps/web/next-env.d.ts",
+    "apps/web/.next/types/**/*.ts",
     "vite.config.ts",
     "playwright.config.ts",
-    ".next/dev/types/**/*.ts"
+    "apps/web/.next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

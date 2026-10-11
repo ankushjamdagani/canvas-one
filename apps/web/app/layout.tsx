@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import '@fontsource-variable/inter';
 import '@xyflow/react/dist/style.css';
-import '../src/styles.css';
-import { PwaRegistration } from '../src/standalone/PwaRegistration';
+import '../../../src/styles.css';
+import { PwaRegistration } from '../../../src/standalone/PwaRegistration';
 
 const basePath = process.env.NEXT_PUBLIC_CANVAS_BASE_PATH || '';
 const description =

@@ -1,5 +1,5 @@
-import { StandaloneApp } from '../src/standalone/StandaloneApp';
-import { publicMetadata } from '../src/standalone/siteMetadata';
+import { StandaloneApp } from '../../../src/standalone/StandaloneApp';
+import { publicMetadata } from '../../../src/standalone/siteMetadata';
 export const metadata = publicMetadata('/');
 export default function Page() {
   return (

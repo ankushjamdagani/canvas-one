@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { StandaloneApp } from '../../src/standalone/StandaloneApp';
+import { StandaloneApp } from '../../../../src/standalone/StandaloneApp';
 export const metadata: Metadata = {
   title: 'Projects',
   robots: { index: false, follow: false },

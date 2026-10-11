@@ -1,0 +1,49 @@
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "./utils.js";
+
+const badgeVariants = cva(
+  "inline-flex items-center gap-1 rounded-tag border px-2 py-0.5 font-mono text-xs tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        // Board tag tones
+        neutral: "border-border bg-sunken text-body",
+        success: "border-selected-edge bg-accent text-accent-foreground",
+        accent: "border-selected-edge bg-accent text-accent-foreground",
+        branch: "border-branch-edge bg-branch-tint text-branch",
+        risk: "border-risk-edge bg-risk-tint text-risk-text",
+        warning: "border-warning-edge bg-warning-tint text-warning-text",
+        solid: "border-transparent bg-foreground text-shell",
+        count:
+          "rounded-full border-transparent bg-primary px-2 py-0.5 font-sans text-xs font-semibold normal-case tracking-normal text-primary-foreground",
+
+        // Legacy aliases retained so existing app usages keep compiling.
+        default: "border-selected-edge bg-accent text-accent-foreground",
+        secondary: "border-border bg-sunken text-body",
+        destructive: "border-risk-edge bg-risk-tint text-risk-text",
+        outline: "border-border bg-transparent text-foreground",
+        amber: "border-warning-edge bg-warning-tint text-warning-text",
+      },
+    },
+    defaultVariants: {
+      variant: "neutral",
+    },
+  }
+);
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return (
+    <div
+      data-slot="badge"
+      className={cn(badgeVariants({ variant }), className)}
+      {...props}
+    />
+  );
+}
+
+export { Badge, badgeVariants };

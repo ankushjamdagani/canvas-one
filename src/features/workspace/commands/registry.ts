@@ -46,6 +46,7 @@
  * single-letter shortcuts, Duplicate project and Project settings.
  */
 
+import { executeAvailable } from '@canvas-one/commands';
 import type { Id } from '../../../domain/studio/model';
 import type { PanelId, Placement } from '../panels';
 import type { ConflictResolution } from '../../../domain/versioning/resolve';
@@ -1313,13 +1314,11 @@ export async function executeCommand<K extends CommandId>(
   ctx: CommandContext,
   handlers: CommandHandlers,
 ): Promise<ExecuteResult> {
-  const availability = getAvailability(id, ctx, payload);
-  if (!availability.enabled) {
-    return { status: 'disabled', reason: availability.reason, code: availability.code };
-  }
   const handler = handlers[id] as (payload: CommandPayloads[K]) => unknown | Promise<unknown>;
-  const value = await handler(payload);
-  return { status: 'done', value };
+  return executeAvailable(
+    () => getAvailability(id, ctx, payload),
+    () => handler(payload),
+  );
 }
 
 // ============================================================================

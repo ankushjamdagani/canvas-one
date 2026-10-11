@@ -7,6 +7,7 @@ import { esmExternalRequirePlugin } from 'rolldown/plugins';
 import { scopedCss } from './scripts/scoped-css.mjs';
 
 export default defineConfig({
+  publicDir: 'apps/web/public',
   base: './',
   plugins: [esmExternalRequirePlugin({ external: ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client'] }), tailwind(), react()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },

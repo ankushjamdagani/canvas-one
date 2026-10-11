@@ -47,6 +47,8 @@ Do not invent milestones beyond the requested task.
 
 ## 5. Editing and verification
 
+- Make every change in a dedicated worktree and `codex/` feature branch. Never commit or push directly to `main` or `master`. Open a PR for the user to review and merge; agents do not merge it.
+
 - Check `git status` before editing; preserve unrelated changes
 - Make only scoped changes; on Codex use `apply_patch`
 - Inspect diff before handing back — every changed file must belong to the task

@@ -1,8 +1,11 @@
 node_modules/
+node_modules
 dist/
+packages/*/dist/
 .next/
 next-env.d.ts
 public/sw.js
+apps/web/public/sw.js
 dist-react/
 playwright-report/
 test-results/

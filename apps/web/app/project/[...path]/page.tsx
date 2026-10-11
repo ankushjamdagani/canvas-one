@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { StandaloneApp } from '../../../src/standalone/StandaloneApp';
+import { StandaloneApp } from '../../../../../src/standalone/StandaloneApp';
 export const metadata: Metadata = {
   title: 'Workspace',
   robots: { index: false, follow: false },

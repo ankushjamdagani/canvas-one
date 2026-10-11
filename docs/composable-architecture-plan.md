@@ -1,6 +1,6 @@
 # Canvas One composable architecture plan
 
-Status: proposal for implementation; no implementation authorized by this document.
+Status: implementation authorized by the user, proceeding through the gated phases below. The first tranche establishes ownership ADRs, moves the existing Next entry to `apps/web`, and extracts UI leaves, playback timeframe primitives and command execution. The remaining packages and AI integration are not yet delivered.
 Baseline: restored commit `8f41338`. Updated 2026-10-11.
 
 ## Product requirements
