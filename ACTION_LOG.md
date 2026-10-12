@@ -3490,3 +3490,11 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: InitialLoad, pure boot/dismiss helper, CSS and loader browser coverage; HANDOFF/LESSONS updated. Codex; no subagents.
 - Verification: production and Storybook builds passed; 18 focused production browsers passed, including intermediate face opacity and mid-fallback hydration; paused real CSS keyframes inspected on desktop/mobile. Final isolated full units: 2,130 passed / 12 skipped. Initial concurrent unit run had one session-history stress timeout; no session change, isolated rerun passed. Full browser suite not run.
 - Lesson: honour the existing CPU-isolation rule for browser animation runs too; independent exit animation names prevent elapsed waiting time from shortening a ready fade or restarting a fallback already in progress.
+
+### 2026-10-12 — Local canvas-one route
+
+- Outcome: confirmed this checkout matches the requested Canvas One repository at `56de3c2`; mounted its complete standalone app at `/canvas-one` with prefixed Brand/projects/project/branch routes, SSR metadata and invalid-path 404s. Existing routes, styling and browser-local projects are shared without source duplication.
+- Files: `apps/web/app/canvas-one/[[...path]]/page.tsx`, `tests/canvas-one-route.spec.ts`, README, ACTION_LOG and LESSONS. Codex; no subagents. Dedicated branch `codex/canvas-one-route`.
+- Verification: clean production build, package boundaries and TypeScript passed; 10 focused units and seven focused production browsers passed. Desktop/mobile screenshots inspected. Full serial production suite: 260 passed, four skipped, five failed; all five failures reproduced with the same assertions on clean original commit `56de3c2` (three header-backdrop checks, project-card title click, landing demo drag). No fix of those existing failures claimed.
+- Limitations: original PWA manifest/offline cache routes retained; the additional mount is not separately precached. An initial four-worker full browser run was stopped after resource timeouts; the complete serial run above is the final result.
+- Lesson: use complete worktree-local dependencies for Next standalone tracing/React identity, and run repeated local Axe scans serially. Both rules are captured in LESSONS.
