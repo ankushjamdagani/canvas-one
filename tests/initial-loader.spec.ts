@@ -98,6 +98,30 @@ test('CSS releases the overlay if the bootstrap and application scripts are bloc
   await expect(page.locator('[data-reveal-kind="content"]').first()).toHaveCSS('opacity', '1');
 });
 
+for (const delayedHydration of [false, true]) {
+  test(`missing loader animation dismisses the logo with ${delayedHydration ? 'timeout' : 'hydration'}`, async ({ page }) => {
+    await page.route('**/*', async route => {
+      if (route.request().resourceType() === 'document') {
+        const response = await route.fetch();
+        const html = (await response.text()).replace('</head>', '<style>.canvas-one-root [data-initial-loader] { animation: none !important; position: static !important; }</style></head>');
+        await route.fulfill({ response, body: html });
+      } else if (delayedHydration && route.request().resourceType() === 'script') {
+        await route.abort();
+      } else await route.continue();
+    });
+    await page.goto('/');
+    await expect(page.locator('[data-initial-loader]')).toHaveJSProperty('hidden', true, { timeout: 4500 });
+    await expect(page.locator('[data-initial-loader]')).toBeHidden();
+    await expect(page.getByTestId('landing-page')).toBeVisible();
+    if (!delayedHydration) {
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('[data-reveal-kind="content"]').first()).toHaveCSS('opacity', '1', { timeout: 10000 });
+      await expect(page.locator('.public-brand')).toHaveCSS('opacity', '1', { timeout: 10000 });
+      await page.screenshot({ path: test.info().outputPath('loader-dismissed.png') });
+    }
+  });
+}
+
 test('hydration during the fallback fade does not restart the visible cover', async ({ page }) => {
   await page.addInitScript(() => {
     const samples: number[] = [];
