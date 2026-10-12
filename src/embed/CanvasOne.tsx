@@ -6,6 +6,7 @@ import { ThemeProvider } from '../lib/theme';
 import { MotionProvider } from '../lib/motion/MotionProvider';
 import { PortalRootProvider } from '../components/ui/portal-root';
 import type { StudioComposition } from '../../apps/web/src/composition';
+import { LoadingFace } from '../components/ui/loading-face';
 
 const App = React.lazy(() => import('../App'));
 
@@ -47,7 +48,7 @@ export function CanvasOne({
         <PortalRootProvider root={rootRef}>
           <ThemeProvider target={rootRef} storageNamespace={storageNamespace}>
             <MotionProvider>
-              <React.Suspense fallback={<div role="status">Loading Canvas One…</div>}>
+              <React.Suspense fallback={<LoadingFace className="min-h-screen w-full bg-shell text-ink" />}>
                 <App
                   key={`${normalizedPath}:${storageNamespace ?? ''}`}
                   storageNamespace={storageNamespace}

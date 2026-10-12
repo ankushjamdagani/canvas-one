@@ -4,7 +4,7 @@ import { RevealScope } from '@/components/ui/reveal';
 import { useInternalLinks, useRoute } from '@/lib/router';
 import { pageDirection, type PageKind } from '@/lib/motion/direction';
 import { useMotionEnv } from '@/lib/motion/env';
-import { RouteShellContext, type RouteShellApi } from '@/lib/motion/shell-context';
+import { BoardFrameReadyContext, RouteShellContext, type RouteShellApi } from '@/lib/motion/shell-context';
 import { BOARD, CARD } from '@/lib/motion/tokens';
 import { BoardLayer, type BoardShift } from './BoardLayer';
 import { CardOverlay, type OverlayState } from './CardOverlay';
@@ -47,6 +47,10 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
   const [shift, setShift] = React.useState<BoardShift>({ dir: 0, n: 0 });
   const [boardVisible, setBoardVisible] = React.useState(target !== 'project');
   const [groundPaused, setGroundPaused] = React.useState(false);
+  const [frameReady, setFrameReady] = React.useState(true);
+  const activeFrames = React.useRef(0);
+  const frameStarted = React.useCallback(() => { activeFrames.current++; setFrameReady(false); }, []);
+  const frameFinished = React.useCallback(() => { activeFrames.current = Math.max(0, activeFrames.current - 1); setFrameReady(activeFrames.current === 0); }, []);
   const [phase, setPhase] = React.useState<'enter' | 'exit'>('enter');
   const [overlay, setOverlay] = React.useState<OverlayState | null>(null);
   const overlayRef = React.useRef<OverlayState | null>(null);
@@ -153,8 +157,9 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
 
   return (
     <RouteShellContext.Provider value={api}>
+      <BoardFrameReadyContext.Provider value={frameReady}>
       <div className="relative isolate min-h-svh bg-shell">
-        <BoardLayer visible={boardVisible} intro={intro} shift={shift} paused={groundPaused} />
+        <BoardLayer visible={boardVisible} intro={intro} shift={shift} paused={groundPaused} onFrameStart={frameStarted} onFrameComplete={frameFinished} />
         <AnimatePresence mode="wait">
           <m.div
             key={page.kind}
@@ -171,6 +176,7 @@ export function RouteShell({ renderPage }: { renderPage: (kind: PageKind) => Rea
         </AnimatePresence>
         {overlay && <CardOverlay state={overlay} onGrown={onOverlayGrown} onDone={onOverlayDone} />}
       </div>
+      </BoardFrameReadyContext.Provider>
     </RouteShellContext.Provider>
   );
 }

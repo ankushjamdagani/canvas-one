@@ -1,5 +1,9 @@
 import * as React from 'react';
 
+// Visible by default for server HTML and foundation specimens outside the shell.
+export const BoardFrameReadyContext = React.createContext(true);
+export const useBoardFrameReady = () => React.useContext(BoardFrameReadyContext);
+
 export interface RouteShellApi {
   beginOpen(el: HTMLElement): void;
   cancelOpen(): void;

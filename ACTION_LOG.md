@@ -3449,3 +3449,44 @@ Configured repository-scoped Model Context Protocol (MCP) server `canvas-one` ac
 Configured stdio command `node` with portable repository-relative arguments `./packages/cli/dist/main.js mcp` and environment variables `CANVAS_ONE_BRIDGE_URL=http://127.0.0.1:47831` and `CANVAS_ONE_AGENT_TOKEN=<agentToken printed by bridge>`.
 Platform: agy.
 Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp get canvas-one` (status: enabled); verified Claude Code MCP discovery with `claude mcp list` (detected `canvas-one` stdio server, pending approval); verified Antigravity `.agents/mcp_config.json` schema matches `~/.gemini/config/mcp_config.json` and builtin agy-customizations specification; ran full unit test suite (2,130 passed, 12 skipped).
+
+### 2026-10-12 — Initial-load flash
+
+- Outcome: finite CSS entrances establish reveal/frame/dot poses before first paint and continue across delayed hydration; Motion retains exit and route-shift orchestration. Reduced-motion CSS applies before hydration, and no-JavaScript content becomes fully visible.
+- Files: shared reveal, BoardLayer, foundation CSS, reveal unit and production browser regressions; HANDOFF and LESSONS updated. Platform: Codex; no subagents.
+- Verification: production build and Storybook build passed; 2,130 units passed / 12 skipped; ten focused production browser checks passed (first-frame monotonic opacity, delayed hydration, no-JavaScript visibility, reduced motion, exits, heading focus, card overlay, rapid navigation and cancelled exit). Full browser suite not run. Existing Storybook chunk warnings remain.
+- Lesson: hiding visible server HTML in a layout effect still flashes before hydration. Separately, stopping exit controls on presence changes strands route completion; keep presence-driven CSS cleanup separate from Motion ownership.
+
+### 2026-10-12 — Logo-face first-load cover (replaces CSS entrance strategy)
+
+- Outcome: user-approved opaque Thinking-face overlay covers initial HTML; hydration prepares and runs the original Motion entrance, then removes the cover without a minimum wait. Three-second bootstrap/CSS fallbacks reveal content; expired initial hydration skips hiding it again. No-JavaScript bypasses the cover, and reduced-motion keeps the face static and preserves heading focus.
+- Files: InitialLoad foundation component and boot helper, standalone/layout integration, reveal/board guards, loader CSS and browser regressions; reverted prior CSS entrance/test changes. Codex; no subagents.
+- Verification: production and Storybook builds passed; full units 2,130 passed / 12 skipped, final focused motion/reveal checks 22 passed; 13 final production browser checks passed, including blocked scripts, timeout/late hydration in normal and reduced-motion modes, original entrances/exits, focus and interrupted navigation. First-paint loader screenshot inspected. Full browser suite not run.
+- Lesson: discuss changes to the animation strategy before replacing approved choreography. Skipped entrances must still signal completion for route heading focus.
+
+### 2026-10-12 — Worktree cleanup
+
+- Removed the three auxiliary checkouts (initial-load, canvas-one-mcp, local-ai-setup), retaining the primary checkout, local feature branches and existing PRs. All three had clean tracked/untracked status; ignored files were generated dependencies/build artifacts.
+- Preservation: all Git refs saved in `/private/tmp/system-studio-worktrees-20261012.bundle`. Codex; no subagents. Verification: worktree inventory checked before/after removal. No application changes or tests required.
+
+### 2026-10-12 — Larger loading face and header sequencing
+
+- Outcome: doubled the loader face to 128px through one shared loading component; replaced visible boot/opening/embedded loading text with the face. Public header background and bottom border now fade after actual frame completion, including overlapping/cancelled intros and route shifts.
+- Files: loading/header foundation components, initial cover, App/embed fallbacks, BoardLayer/RouteShell readiness, CSS, Storybook and browser coverage; HANDOFF/LESSONS updated. Codex; no subagents.
+- Verification: production and Storybook builds passed; final units 2,130 passed / 12 skipped; all 16 focused production browser checks passed, plus a desktop/mobile visual confirmation of the header and larger face. Full browser suite not run. Existing Storybook chunk warnings remain.
+- Lesson: header material sits outside child content reveals and needs its own completion gate; count overlapping frame animations rather than relying on a fixed delay or a single ready boolean.
+
+### 2026-10-12 — All-page visual verification
+
+- Inspected 68 captures of landing, Brand, projects and workspace on desktop/mobile: staged startup, light/dark settled layouts, reduced motion, populated projects and opening/return. Loader size, text-free loading and border-before-header sequence verified; no page errors or horizontal overflow in startup captures.
+- Found/fixed an interrupted-intro regression: opening early and returning could leave the header hidden; stopping the intro could also retain partial native border geometry. Explicitly settle/cancel superseded intros and release readiness exactly once. Files: BoardLayer, header regression test and HANDOFF/LESSONS. Codex; no subagents.
+- Verification: final production build and 2,130 units passed / 12 skipped; 17 focused production browser checks passed, then all four header checks and desktop/mobile open-return captures passed after the final native-fill correction. Full browser suite not run.
+- Remaining findings recorded without design changes: mobile Brand's Logo section enters ahead of its hero; dark-theme white cards/node titles have low contrast. Audit artifacts retained in `/private/tmp/system-studio-page-visuals`.
+- Lesson: superseded native animation promises may not resolve, and stop can preserve partial fill states. Verify delayed return after early opening, including final border transforms and header visibility.
+
+### 2026-10-12 — Animate the initial loader out
+
+- Outcome: face and cover fade over 280ms; face shifts up 8px and shrinks to 0.92. Hydration and timeout both animate instead of immediately hiding. Ready exits use fresh animation names; hydration during a fallback fade cannot restart the cover. Reduced-motion/no-JavaScript paths retain immediate dismissal.
+- Files: InitialLoad, pure boot/dismiss helper, CSS and loader browser coverage; HANDOFF/LESSONS updated. Codex; no subagents.
+- Verification: production and Storybook builds passed; 18 focused production browsers passed, including intermediate face opacity and mid-fallback hydration; paused real CSS keyframes inspected on desktop/mobile. Final isolated full units: 2,130 passed / 12 skipped. Initial concurrent unit run had one session-history stress timeout; no session change, isolated rerun passed. Full browser suite not run.
+- Lesson: honour the existing CPU-isolation rule for browser animation runs too; independent exit animation names prevent elapsed waiting time from shortening a ready fade or restarting a fallback already in progress.

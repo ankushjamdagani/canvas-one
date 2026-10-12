@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { m, useAnimationControls } from 'motion/react';
-import { useMotionEnv } from '@/lib/motion/env';
+import { motionOff, useMotionEnv } from '@/lib/motion/env';
+import { useSkipInitialEntrance } from './initial-load';
 import {
   EASE,
   revealSpec,
@@ -98,17 +99,23 @@ export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...r
   const controls = useAnimationControls();
   const element = React.useRef<HTMLElement>(null);
   const started = React.useRef(false);
-  // Public server HTML stays visible. Apply the initial pose only after hydration,
-  // before paint; late-mounted workspace content gets the same entry sequence.
+  const skipInitialEntrance = useSkipInitialEntrance();
+  // Prepare the pose under the first-load cover. If the cover already timed out,
+  // retain the visible server content; later mounts still use the normal entrance.
   React.useLayoutEffect(() => {
     if (!scope.phase) return;
     if (!started.current) {
-      controls.set('hidden');
       started.current = true;
+      if (scope.phase === 'enter' && (skipInitialEntrance() || window.matchMedia('(prefers-reduced-motion: reduce)').matches || motionOff())) {
+        controls.set({ opacity: 1, y: 0, filter: 'none' });
+        if (element.current) scope.onEntered?.(element.current);
+        return;
+      }
+      controls.set('hidden');
     }
     void controls.start(scope.phase);
     return () => controls.stop();
-  }, [controls, scope.phase, env.reduced, env.off, env.coarse]);
+  }, [controls, scope.phase, env.reduced, env.off, env.coarse, skipInitialEntrance]);
   const custom = React.useMemo<Custom>(
     () => ({
       enter: revealSpec(kind, 'enter', index, scope, env),
