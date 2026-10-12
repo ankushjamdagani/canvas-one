@@ -1,6 +1,6 @@
 {
   "name": "@canvas-one/cli", "version": "0.1.0", "private": true, "type": "module", "files": ["dist", "README.md"],
   "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
-  "bin": {"canvas-one-agent": "./dist/main.js"}, "scripts": {"build": "tsc -b && node scripts/prepare-bin.mjs"},
+  "bin": {"canvas-one-agent": "./dist/main.js"}, "scripts": {"build": "tsc -b --force && node scripts/prepare-bin.mjs"},
   "dependencies": {"@canvas-one/agent-bridge": "0.1.0"}, "devDependencies": {"typescript": "7.0.2", "@types/node": "26.4.1"}
 }

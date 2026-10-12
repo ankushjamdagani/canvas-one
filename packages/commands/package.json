@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -b --force"
   },
   "devDependencies": {
     "typescript": "7.0.2"

@@ -171,7 +171,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b --force"
   },
   "dependencies": {
     "@canvas-one/storage": "0.1.0",

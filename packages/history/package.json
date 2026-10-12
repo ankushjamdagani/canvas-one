@@ -5,7 +5,7 @@
   "type": "module",
   "files": ["dist", "README.md"],
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "scripts": { "build": "tsc -p tsconfig.json" },
+  "scripts": { "build": "tsc -b --force" },
   "dependencies": { "@canvas-one/whiteboard": "0.1.0" },
   "devDependencies": { "typescript": "7.0.2" }
 }
