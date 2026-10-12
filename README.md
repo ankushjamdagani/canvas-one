@@ -46,20 +46,6 @@ npm run dev
 
 Open <http://localhost:3000>. Pick **Try Beta** to reach your projects, then create a blank project or open one of the bundled examples.
 
-### Local Canvas One route
-
-Open `http://localhost:3000/canvas-one` after starting the development server.
-This checkout is the Canvas One application itself; the route reuses its complete
-standalone shell, local storage, styling and workspace rather than linking to GitHub.
-Brand, projects and project/branch deep links stay under `/canvas-one`; the original
-`/`, `/brand`, `/projects` and `/project/...` routes remain available. Both mounts
-share existing browser-local projects. With `NEXT_PUBLIC_CANVAS_BASE_PATH` set,
-include that deployment prefix before `/canvas-one`.
-The existing PWA manifest and offline cache continue to use the original routes.
-
-Verify the integration with `TEST_PRODUCTION=1 pnpm exec playwright test tests/canvas-one-route.spec.ts --workers=1`
-after `pnpm run build`.
-
 ### Local AI collaboration
 
 Keep `npm run dev` running. In a second terminal, start the local bridge:
