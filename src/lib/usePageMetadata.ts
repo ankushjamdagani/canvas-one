@@ -12,10 +12,10 @@ export function usePageMetadata(
     const description =
       kind === 'brand'
         ? 'Canvas One brand guidelines, visual language and interface foundations.'
-        : 'Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.';
+        : 'Stop prompting in a box: The open canvas to collaborate visually with AI.';
     document.title =
       kind === 'home'
-        ? 'Canvas One — The shared canvas for engineers and AI'
+        ? 'Canvas One — Collaborate visually with AI'
         : `${kind === 'brand' ? 'Brand' : kind === 'projects' ? 'Projects' : 'Workspace'} | Canvas One`;
     for (const [name, content] of [
       ['robots', publicPage ? 'index, follow' : 'noindex, nofollow'],

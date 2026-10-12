@@ -7,10 +7,10 @@ import { INITIAL_LOAD_BOOTSTRAP } from '../../../src/lib/motion/initial-load';
 
 const basePath = process.env.NEXT_PUBLIC_CANVAS_BASE_PATH || '';
 const description =
-  'Beyond chat: The shared canvas for engineers and AI to think, architect, and review systems together.';
+  'Stop prompting in a box: The open canvas to collaborate visually with AI.';
 export const metadata: Metadata = {
   title: {
-    default: 'Canvas One — The shared canvas for engineers and AI',
+    default: 'Canvas One — Collaborate visually with AI',
     template: '%s | Canvas One',
   },
   description,
