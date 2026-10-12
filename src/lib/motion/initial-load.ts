@@ -24,7 +24,8 @@ export const INITIAL_LOAD_BOOTSTRAP = `(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) loader.hidden = true;
     else {
       const style = getComputedStyle(loader);
-      if (style.visibility !== 'hidden' && Number(style.opacity) === 1) loader.dataset.loaderExit = 'true';
+      if (style.animationName === 'none') loader.hidden = true;
+      else if (style.visibility !== 'hidden' && Number(style.opacity) === 1) loader.dataset.loaderExit = 'true';
     }
   }, ${INITIAL_LOAD_TIMEOUT_MS});
 })();`;
@@ -36,6 +37,11 @@ export function dismissInitialLoader(loader: HTMLElement): void {
     return;
   }
   const style = getComputedStyle(loader);
+  // Missing/disabled loader CSS cannot fire animationend; never leave its face visible.
+  if (style.animationName === 'none') {
+    loader.hidden = true;
+    return;
+  }
   // A fallback already fading out must not restart at full opacity on hydration.
   if (style.visibility === 'hidden' || Number(style.opacity) < 1 || loader.dataset.loaderExit) return;
   loader.dataset.loaderExit = 'true';

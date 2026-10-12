@@ -3498,3 +3498,10 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: clean production build, package boundaries and TypeScript passed; 10 focused units and seven focused production browsers passed. Desktop/mobile screenshots inspected. Full serial production suite: 260 passed, four skipped, five failed; all five failures reproduced with the same assertions on clean original commit `56de3c2` (three header-backdrop checks, project-card title click, landing demo drag). No fix of those existing failures claimed.
 - Limitations: original PWA manifest/offline cache routes retained; the additional mount is not separately precached. An initial four-worker full browser run was stopped after resource timeouts; the complete serial run above is the final result.
 - Lesson: use complete worktree-local dependencies for Next standalone tracing/React identity, and run repeated local Axe scans serially. Both rules are captured in LESSONS.
+
+### 2026-10-12 — Dismiss a loader whose animation is unavailable
+
+- Outcome: reproduced the screenshot on the live Vercel landing page: hidden=false, position=static, animationName=none, and no loader rules in any linked stylesheet. Hydration and the independent bootstrap timeout now hide the loader directly when it cannot animate, preserving normal fades when CSS is present.
+- Files: initial-load motion helper, production loader regressions, HANDOFF, ACTION_LOG and LESSONS. Codex; no subagents.
+- Verification: clean production build/TypeScript/package boundaries passed and emitted loader CSS; all 12 focused production loader/header checks passed. Missing-animation hydration and blocked-script timeout paths dismiss the logo. Full browser/Storybook suites not rerun for this scoped fallback fix.
+- Lesson: never make critical overlay dismissal depend solely on animationend; handle missing or disabled animation styles explicitly. Clean build output and live stylesheet contents must both be checked for deployment-only styling reports.
