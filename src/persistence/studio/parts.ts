@@ -11,7 +11,8 @@ import {
 import { canonicalJson, sha256Hex } from "../../domain/studio/canonical";
 import type { Id } from "../../domain/studio/model";
 import type { StudioDatabase } from "./db";
-import { createIssue, mapErrorToFailedResult } from "./errors";
+import { createIssue } from "../../domain/studio/issue";
+import { mapErrorToFailedResult } from "./errors";
 import { sha256HexOfBytes, type FileTokenRegistry } from "./file-tokens";
 import { calculateRecordBytes, enforceProjectLimits } from "./limits";
 import {

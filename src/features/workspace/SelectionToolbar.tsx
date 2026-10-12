@@ -1,7 +1,7 @@
 /** Selection-scoped actions, routed through the command registry. */
 
 import * as React from 'react';
-import { useStore } from '@xyflow/react';
+import { useStore } from '@canvas-one/editor-reactflow/react';
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,

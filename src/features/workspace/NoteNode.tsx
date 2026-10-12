@@ -1,5 +1,5 @@
 import * as React from 'react';
-import type { NodeProps } from '@xyflow/react';
+import type { NodeProps } from '@canvas-one/editor-reactflow/react';
 import {
   Trash2, Pin, PinOff, Pencil, MessageSquare, Minimize2, Palette, Check,
   Bold, Italic, Strikethrough, Code, Link as LinkIcon, List,

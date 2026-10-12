@@ -15,11 +15,11 @@ export const SVG_EXPORT_LIMITATIONS =
 export const PNG_EXPORT_LIMITATIONS =
   'Raster image of the active view, bounded to at most 8,192 px per side and 16 million total pixels. Excludes execution traces, scenarios, and unpublished branch history.';
 
-export const MERMAID_EXPORT_LIMITATIONS =
-  'Lossy diagram export: labels, directed relations, and view groups only. Excludes notes, coordinates, styles, ports, payload schemas, behavior, resources, scenarios, history, and metrics. No import or round-trip promise.';
+export { MERMAID_EXPORT_LIMITATIONS } from '@canvas-one/system-design/export/mermaid-limitations';
+import { MERMAID_EXPORT_LIMITATIONS } from '@canvas-one/system-design/export/mermaid-limitations';
 
-export const CSV_EXPORT_LIMITATIONS =
-  'Whole-run summary metrics only (not raw trace or time-series events). Spreadsheet-safe text encoding with formula-injection defense; use JSON export for exact text.';
+export { CSV_EXPORT_LIMITATIONS } from '@canvas-one/simulation-system-design/export/csv-limitations';
+import { CSV_EXPORT_LIMITATIONS } from '@canvas-one/simulation-system-design/export/csv-limitations';
 
 export function getExportLimitations(format: ExportFormat): string {
   switch (format) {

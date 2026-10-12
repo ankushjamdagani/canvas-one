@@ -1,4 +1,4 @@
-import { useStore } from '@xyflow/react';
+import { useStore } from '@canvas-one/editor-reactflow/react';
 
 export interface SelectionBoxProps {
   readonly selectedIds: readonly string[];

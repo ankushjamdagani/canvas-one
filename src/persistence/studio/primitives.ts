@@ -1,3 +1,5 @@
+import { validateActor } from '@canvas-one/system-design/session/validate-actor';
+export { validateActor };
 /**
  * Persistence primitives for System Studio repository.
  *
@@ -8,26 +10,21 @@
  */
 
 import type { Table } from 'dexie';
+import { insertImmutable as insertStorageImmutable, checkReceipt } from '@canvas-one/storage';
 import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
 import type { Document, Id } from '../../domain/studio/model';
 import type { Issue } from '../../domain/studio/validate';
 import type { StudioDatabase } from './db';
-import { createIssue, RepositoryError } from './errors';
+import { createIssue } from '../../domain/studio/issue';
+import { RepositoryError } from './errors';
 import type { Actor, AuthoredResult, FailedResult, InvalidResult } from './types';
 
 /**
  * Canonical lowercase UUID format: 8-4-4-4-12 lowercase hex with version 1-5 and variant [89ab].
  * Matches the UUID check in validate.ts.
  */
-export const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-
-/**
- * Checks if a value conforms to canonical lowercase UUID format.
- */
-export function isValidUuid(val: unknown): val is Id {
-  return typeof val === 'string' && UUID_REGEX.test(val);
-}
+export { UUID_REGEX, isValidUuid } from '../../domain/studio/ids';
+import { UUID_REGEX, isValidUuid } from '../../domain/studio/ids';
 
 /**
  * Validates a required UUID field, returning a structured Issue if missing or invalid.
@@ -76,37 +73,6 @@ export function validateRevision(
  * Validates an Actor envelope.
  * Only kind: 'local-human' is accepted; unknown kinds are rejected.
  */
-export function validateActor(actor: unknown): Issue[] | null {
-  if (!actor || typeof actor !== 'object') {
-    return [createIssue('wrong-type', 'Actor must be an object', ['actor'])];
-  }
-  const a = actor as Partial<Actor>;
-  const issues: Issue[] = [];
-
-  if (typeof a.actorId !== 'string' || a.actorId.trim().length === 0) {
-    issues.push(
-      createIssue('invalid-id', 'actor.actorId must be a non-empty string', ['actor', 'actorId']),
-    );
-  }
-
-  if (a.kind !== 'local-human') {
-    issues.push(
-      createIssue(
-        'invalid-literal',
-        `Unknown actor kind: ${String(a.kind)}; expected 'local-human'`,
-        ['actor', 'kind'],
-      ),
-    );
-  }
-
-  if (typeof a.displayName !== 'string') {
-    issues.push(
-      createIssue('wrong-type', 'actor.displayName must be a string', ['actor', 'displayName']),
-    );
-  }
-
-  return issues.length > 0 ? issues : null;
-}
 
 /**
  * Validates the envelope shared by every branch-scoped authored command: actor, operation,
@@ -214,50 +180,15 @@ export async function insertImmutable<T>(
   row: T,
   key: any,
 ): Promise<void> {
-  const existing = await table.get(key);
-
-  if (existing !== undefined) {
-    const canonExisting = canonicalJson(existing);
-    const canonNew = canonicalJson(row);
-
-    if (canonExisting.ok && canonNew.ok && canonExisting.text === canonNew.text) {
-      // Equal collision: exact idempotent no-op
-      return;
-    }
-
-    // Conflicting content on immutable row
-    throw new RepositoryError({
-      code: 'invalid',
-      message: 'Immutable record collision with conflicting content; row will not be overwritten',
-      issues: [
-        createIssue('structural-rule', 'Conflicting immutable row collision', []),
-      ],
-    });
-  }
-
-  try {
-    await table.add(row);
-  } catch (err: unknown) {
-    // If a concurrent write inserted the same row
-    if (err && typeof err === 'object' && (err as { name?: string }).name === 'ConstraintError') {
-      const concurrent = await table.get(key);
-      if (concurrent !== undefined) {
-        const canonExisting = canonicalJson(concurrent);
-        const canonNew = canonicalJson(row);
-        if (canonExisting.ok && canonNew.ok && canonExisting.text === canonNew.text) {
-          return;
-        }
-      }
-      throw new RepositoryError({
-        code: 'invalid',
-        message: 'Immutable record collision with conflicting content; row will not be overwritten',
-        issues: [
-          createIssue('structural-rule', 'Conflicting immutable row collision', []),
-        ],
-      });
-    }
-    throw err;
-  }
+  await insertStorageImmutable(table, row, key, (existing, incoming) => {
+    const left = canonicalJson(existing);
+    const right = canonicalJson(incoming);
+    return left.ok && right.ok && left.text === right.text;
+  }, () => new RepositoryError({
+    code: 'invalid',
+    message: 'Immutable record collision with conflicting content; row will not be overwritten',
+    issues: [createIssue('structural-rule', 'Conflicting immutable row collision', [])],
+  }));
 }
 
 export type ReceiptCheckResult =
@@ -277,16 +208,17 @@ export async function checkOperationReceipt(
   operationId: string,
   requestHash: string,
 ): Promise<ReceiptCheckResult> {
-  const existing = await db.operations.get([projectId, operationId]);
-
-  if (!existing) {
+  const replay = await checkReceipt(
+    { get: key => db.operations.get([key[0], key[1]]) }, projectId, operationId, requestHash,
+  );
+  if (replay.kind === 'new') {
     return { isRetry: false };
   }
 
-  if (existing.requestHash === requestHash) {
+  if (replay.kind === 'replay') {
     return {
       isRetry: true,
-      result: existing.result as AuthoredResult,
+      result: replay.result as AuthoredResult,
     };
   }
 

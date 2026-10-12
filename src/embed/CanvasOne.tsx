@@ -5,6 +5,7 @@ import { acquireRouter, normalizeBasePath } from '../lib/router';
 import { ThemeProvider } from '../lib/theme';
 import { MotionProvider } from '../lib/motion/MotionProvider';
 import { PortalRootProvider } from '../components/ui/portal-root';
+import type { StudioComposition } from '../../apps/web/src/composition';
 
 const App = React.lazy(() => import('../App'));
 
@@ -15,6 +16,8 @@ export interface CanvasOneProps {
   storageNamespace?: string;
   publicNavigation?: 'document' | 'client';
   entryRoute?: 'home' | 'projects';
+  /** Host-selected storage, execution and model adapters; keep this object stable. */
+  composition?: StudioComposition;
 }
 
 /** Browser-only workspace. The host owns routing to this mount and PWA registration. */
@@ -23,6 +26,7 @@ export function CanvasOne({
   storageNamespace,
   publicNavigation = 'client',
   entryRoute = 'projects',
+  composition,
 }: CanvasOneProps) {
   const normalizedPath = normalizeBasePath(basePath);
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -48,6 +52,7 @@ export function CanvasOne({
                   key={`${normalizedPath}:${storageNamespace ?? ''}`}
                   storageNamespace={storageNamespace}
                   basePath={normalizedPath}
+                  composition={composition}
                 />
               </React.Suspense>
             </MotionProvider>

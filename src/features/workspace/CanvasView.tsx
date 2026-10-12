@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createReactFlowAdapter } from '@canvas-one/editor-reactflow';
 import { Input } from '@/components/ui/input';
 import {
   ReactFlow,
@@ -12,6 +13,8 @@ import {
   useViewport,
   useNodesInitialized,
   ViewportPortal,
+  withoutSelectionChanges,
+  createReactFlowGeometryBridge,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -19,8 +22,8 @@ import {
   type OnNodeDrag,
   type NodeChange,
   type EdgeChange,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from '@canvas-one/editor-reactflow/react';
+import '@canvas-one/editor-reactflow/style.css';
 import type { Document, Id, NoteTone } from '../../domain/studio/model';
 import type { RecordChange } from '../../persistence/studio/types';
 import { NodeCard } from './NodeCard';
@@ -239,6 +242,39 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
+  const editor = React.useMemo(() => createReactFlowAdapter({
+    ...createReactFlowGeometryBridge(reactFlow),
+    getSelection: () => [...reactFlow.getNodes().filter(node => node.selected), ...reactFlow.getEdges().filter(edge => edge.selected)].map(item => item.id),
+    setSelection: ids => {
+      if (!onRequestSelection || !onRequestClearSelection) return { supported: false, reason: 'Host has no guarded selection handler' };
+      if (ids.length === 0) { onRequestClearSelection(); return { supported: true, value: undefined }; }
+      const selectedNodes = ids.map(id => reactFlow.getNode(id)).filter((node): node is Node<ProjectedNodeData> => !!node);
+      const selectedEdges = ids.map(id => reactFlow.getEdge(id)).filter((edge): edge is Edge => !!edge);
+      if (selectedNodes.length + selectedEdges.length !== ids.length) return { supported: false, reason: 'Selection contains missing objects' };
+      if (selectedNodes.length && selectedEdges.length) return { supported: false, reason: 'Current host cannot select nodes and connectors together' };
+      if (selectedEdges.length) {
+        if (selectedEdges.some(edge => (edge.data as { rerouted?: boolean } | undefined)?.rerouted)) return { supported: false, reason: 'Rerouted connectors are visual stand-ins' };
+        onRequestSelection({ kind: 'connection', ids: selectedEdges.map(edge => (edge.data as { connection?: { id: string } } | undefined)?.connection?.id ?? edge.id) });
+      } else {
+        const elementIds: string[] = []; const noteIds: string[] = [];
+        for (const node of selectedNodes) {
+          if (node.data.kind === 'element' || node.data.kind === 'boundary') elementIds.push(node.data.element.id);
+          else if (node.data.kind === 'note') noteIds.push(node.data.note.id);
+          else if (node.data.kind === 'group') elementIds.push(...node.data.group.elementIds);
+        }
+        onRequestSelection({ kind: 'mixed', elementIds: [...new Set(elementIds)], noteIds: [...new Set(noteIds)] });
+      }
+      return { supported: true, value: undefined };
+    },
+  }), [reactFlow, onRequestSelection, onRequestClearSelection]);
+  React.useEffect(() => {
+    editor.mount(null, { onIntent: () => undefined });
+    return () => editor.dispose();
+  }, [editor]);
+  const screenToBoard = React.useCallback((point: { x: number; y: number }) => {
+    const converted = editor.screenToBoard(point);
+    return converted.supported ? converted.value : reactFlow.screenToFlowPosition(point);
+  }, [editor, reactFlow]);
   const { zoom } = useViewport();
   const gridGap = gridGapFor(zoom);
   const playbackTraffic = usePlaybackTraffic(playbackSource);
@@ -292,13 +328,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           }
         }
       }
-      onNodesChangeRaw(changes.filter((c) => c.type !== 'select'));
+      onNodesChangeRaw(withoutSelectionChanges(changes));
     },
     [onNodesChangeRaw],
   );
   const onEdgesChange = React.useCallback(
     (changes: EdgeChange[]) => {
-      onEdgesChangeRaw(changes.filter((c) => c.type !== 'select'));
+      onEdgesChangeRaw(withoutSelectionChanges(changes));
     },
     [onEdgesChangeRaw],
   );
@@ -880,8 +916,8 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     const centreScreen = rect
       ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
       : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    return reactFlow.screenToFlowPosition(centreScreen);
-  }, [reactFlow]);
+    return screenToBoard(centreScreen);
+  }, [screenToBoard]);
 
   // The docked Library panel places at the viewport centre via this handle.
   // Dragging a picker card or a note onto the canvas places it at the drop point.
@@ -901,7 +937,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         if (!entryId || !getEntry(entryId)) return;
         e.preventDefault();
         rememberPart(entryId);
-        const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const flowPoint = screenToBoard({ x: e.clientX, y: e.clientY });
         await applyPlacement(entryId, flowPoint);
         return;
       }
@@ -918,7 +954,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           link = null;
         }
         if (!link) return;
-        const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const flowPoint = screenToBoard({ x: e.clientX, y: e.clientY });
         await applyPlacement('linked-project', flowPoint, link);
         return;
       }
@@ -926,7 +962,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       if (types.includes(NOTE_MIME_TYPE)) {
         e.preventDefault();
         if (!document || !projection.activeView || isSaving) return;
-        const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const flowPoint = screenToBoard({ x: e.clientX, y: e.clientY });
 
         // Auto-attach as sticky note if dropped onto/near an existing component placement
         let attachedElementIds: readonly Id[] = [];
@@ -957,7 +993,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         }
       }
     },
-    [reactFlow, applyPlacement, document, projection.activeView, isSaving, measuredHeights, mintId, onApplyChanges],
+    [screenToBoard, applyPlacement, document, projection.activeView, isSaving, measuredHeights, mintId, onApplyChanges],
   );
 
   // ==========================================================================

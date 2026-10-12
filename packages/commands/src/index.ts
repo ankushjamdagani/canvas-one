@@ -52,6 +52,11 @@ export interface CommandDefinition<Context, Payload, Value> {
   readonly execute: (payload: Payload, context: Context, execution: ExecutionContext) => Value | Promise<Value>;
 }
 export interface CommandRegistration { dispose(): void }
+/** Hosts bind JSON payloads for palette execution; absence advertises a required custom form. */
+export type PaletteCommandContribution<Context> = {
+  readonly definition: CommandDefinition<Context, unknown, unknown>;
+  readonly palette?: { readonly input: JsonValue };
+};
 interface Registered<Context> {
   readonly metadata: CommandMetadata;
   readonly run: (input: unknown, context: Context, execution: ExecutionContext) => Promise<ExecutionResult<unknown>>;

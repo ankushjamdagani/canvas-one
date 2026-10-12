@@ -1,5 +1,10 @@
 # Standalone and embedded Canvas One
 
+See [composables.md](composables.md) for independent boards, custom components,
+command contributions, canvas replacement and AI collaboration. The example host
+keeps all complete-app workflows on its existing `/canvas` mount. Its `/independent`
+page is a consumer fixture; it adds no route to the standalone product.
+
 The standalone Next.js shell owns public HTML, metadata and its PWA. The reusable
 `CanvasOne` component owns the browser workspace. Mount one workspace per browser
 page: existing controllers share its address bar and router.

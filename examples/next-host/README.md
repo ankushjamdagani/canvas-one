@@ -18,3 +18,10 @@ npm run start --prefix examples/next-host
 Open http://localhost:5198/canvas. This host does not register a service worker;
 the host must implement its own PWA setup if installation or offline loading is
 needed. `storageNamespace="next-host-example"` isolates fixture projects.
+
+The existing `/canvas` app also demonstrates trusted host composition through
+`ComposedCanvas.tsx`. Open a project, search Cmd+K for **Add host review card**, and
+run the contributed command. It uses the system-design planner and the normal
+session transaction to create a host-rendered component with persistence and
+undo/redo. Its schema registration and custom UI are supplied separately; the
+host can change presentation without replacing history or storage behavior.

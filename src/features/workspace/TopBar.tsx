@@ -6,6 +6,7 @@ import {
   Command as CommandIcon,
   GitBranch,
   History as HistoryIcon,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,8 @@ export interface TopBarProps {
   /** Key hint from the registry (commands.open), e.g. "F2". */
   quickOptionsShortcut?: string;
   quickOptionsActive?: boolean;
+  onOpenAgents?: () => void;
+  agentsActive?: boolean;
   transferActions: TransferActions;
 }
 
@@ -116,6 +119,8 @@ export function TopBar({
   onOpenQuickOptions,
   quickOptionsShortcut,
   quickOptionsActive,
+  onOpenAgents,
+  agentsActive,
   transferActions,
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
@@ -500,6 +505,13 @@ export function TopBar({
           <span aria-hidden="true">↗</span>
           Share
         </Button>
+        {onOpenAgents && (
+          <Button type="button" data-testid="topbar-agents-btn" variant={agentsActive ? "tint" : "outline"}
+            size="sm" className="hidden sm:inline-flex h-7 px-2.5 shrink-0 pointer-coarse:min-w-11" aria-label="AI collaboration" onClick={onOpenAgents}>
+            <Bot className="size-3.5 sm:mr-1" aria-hidden="true" />
+            <span className="hidden sm:inline">AI</span>
+          </Button>
+        )}
         {onOpenQuickOptions && (
           <Button
             type="button"

@@ -18,11 +18,11 @@ export default defineConfig({
     cssCodeSplit: false,
     modulePreload: false,
     rolldownOptions: {
-      input: 'src/embed/library.ts',
+      input: {index: 'src/embed/library.ts', board: 'packages/react/src/index.tsx', reactflow: 'packages/react/src/reactflow.tsx'},
       preserveEntrySignatures: 'strict',
       output: {
         banner: '"use client";',
-        entryFileNames: 'index.js',
+        entryFileNames: '[name].js',
         chunkFileNames: '[name]-[hash].js',
         assetFileNames: asset => asset.names?.some(name => name.endsWith('.css')) ? 'styles.css' : 'assets/[name]-[hash][extname]',
         codeSplitting: { groups: [

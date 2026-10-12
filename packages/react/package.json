@@ -1,0 +1,45 @@
+{
+  "name": "@canvas-one/react",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "style.css",
+    "reactflow.css"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./board": {"types": "./dist/index.d.ts", "import": "./dist/index.js"},
+    "./style.css": "./style.css",
+    "./styles.css": "./style.css",
+    "./reactflow.css": "./reactflow.css",
+    "./reactflow": {
+      "types": "./dist/reactflow.d.ts",
+      "import": "./dist/reactflow.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@canvas-one/whiteboard": "0.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@canvas-one/editor-reactflow": "0.1.0"
+  },
+  "peerDependenciesMeta": {"@canvas-one/editor-reactflow": {"optional": true}},
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "@types/react": "19.2.18"
+  }
+}

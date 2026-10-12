@@ -1,0 +1,185 @@
+{
+  "name": "@canvas-one/simulation-system-design",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "./repository-evidence": { "types": "./dist/repository-evidence.d.ts", "import": "./dist/repository-evidence.js" },
+    "./run-persistence": { "types": "./dist/run-persistence.d.ts", "import": "./dist/run-persistence.js" },
+    "./archive": { "types": "./dist/archive/index.d.ts", "import": "./dist/archive/index.js" },
+    "./archive/contracts": { "types": "./dist/archive/contracts.d.ts", "import": "./dist/archive/contracts.js" },
+    "./archive/validation": { "types": "./dist/archive/validation.d.ts", "import": "./dist/archive/validation.js" },
+    "./history": { "types": "./dist/history/index.d.ts", "import": "./dist/history/index.js" },
+    "./history/controller": { "types": "./dist/history/controller.d.ts", "import": "./dist/history/controller.js" },
+    "./history/publish-controller": { "types": "./dist/history/publish-controller.d.ts", "import": "./dist/history/publish-controller.js" },
+    "./history/types": { "types": "./dist/history/types.d.ts", "import": "./dist/history/types.js" },
+    "./history/contracts": { "types": "./dist/history/contracts.d.ts", "import": "./dist/history/contracts.js" },
+    "./history/scenario-status": { "types": "./dist/history/scenario-status.d.ts", "import": "./dist/history/scenario-status.js" },
+    "./candidate-execution": { "types": "./dist/candidate-execution.d.ts", "import": "./dist/candidate-execution.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runner/expr": {
+      "types": "./dist/runner/expr.d.ts",
+      "import": "./dist/runner/expr.js"
+    },
+    "./runner/schema-value": {
+      "types": "./dist/runner/schema-value.d.ts",
+      "import": "./dist/runner/schema-value.js"
+    },
+    "./runner/evidence": {
+      "types": "./dist/runner/evidence.d.ts",
+      "import": "./dist/runner/evidence.js"
+    },
+    "./runner/resource-adapter": {
+      "types": "./dist/runner/resource-adapter.d.ts",
+      "import": "./dist/runner/resource-adapter.js"
+    },
+    "./runner/pipeline": {
+      "types": "./dist/runner/pipeline.d.ts",
+      "import": "./dist/runner/pipeline.js"
+    },
+    "./runner/compile": {
+      "types": "./dist/runner/compile.d.ts",
+      "import": "./dist/runner/compile.js"
+    },
+    "./runner/machine": {
+      "types": "./dist/runner/machine.d.ts",
+      "import": "./dist/runner/machine.js"
+    },
+    "./runner/cycles": {
+      "types": "./dist/runner/cycles.d.ts",
+      "import": "./dist/runner/cycles.js"
+    },
+    "./runner/types": {
+      "types": "./dist/runner/types.d.ts",
+      "import": "./dist/runner/types.js"
+    },
+    "./runner/assertions": {
+      "types": "./dist/runner/assertions.d.ts",
+      "import": "./dist/runner/assertions.js"
+    },
+    "./runner/decision": {
+      "types": "./dist/runner/decision.d.ts",
+      "import": "./dist/runner/decision.js"
+    },
+    "./runner/expr-api": {
+      "types": "./dist/runner/expr-api.d.ts",
+      "import": "./dist/runner/expr-api.js"
+    },
+    "./runner/scenario-runner": {
+      "types": "./dist/runner/scenario-runner.d.ts",
+      "import": "./dist/runner/scenario-runner.js"
+    },
+    "./runner/trace": {
+      "types": "./dist/runner/trace.d.ts",
+      "import": "./dist/runner/trace.js"
+    },
+    "./engine/primitives": {
+      "types": "./dist/engine/primitives.d.ts",
+      "import": "./dist/engine/primitives.js"
+    },
+    "./engine/open/behaviors": {
+      "types": "./dist/engine/open/behaviors.d.ts",
+      "import": "./dist/engine/open/behaviors.js"
+    },
+    "./engine/open/kernel": {
+      "types": "./dist/engine/open/kernel.d.ts",
+      "import": "./dist/engine/open/kernel.js"
+    },
+    "./execution": {
+      "types": "./dist/execution.d.ts",
+      "import": "./dist/execution.js"
+    },
+    "./worker/protocol": {
+      "types": "./dist/worker/protocol.d.ts",
+      "import": "./dist/worker/protocol.js"
+    },
+    "./worker/summary": {
+      "types": "./dist/worker/summary.d.ts",
+      "import": "./dist/worker/summary.js"
+    },
+    "./worker/inProcessTransport": {
+      "types": "./dist/worker/inProcessTransport.d.ts",
+      "import": "./dist/worker/inProcessTransport.js"
+    },
+    "./worker/transport": {
+      "types": "./dist/worker/transport.d.ts",
+      "import": "./dist/worker/transport.js"
+    },
+    "./playback": {
+      "types": "./dist/playback/index.d.ts",
+      "import": "./dist/playback/index.js"
+    },
+    "./playback/playback": {
+      "types": "./dist/playback/playback.d.ts",
+      "import": "./dist/playback/playback.js"
+    },
+    "./playback/playback-history": {
+      "types": "./dist/playback/playback-history.d.ts",
+      "import": "./dist/playback/playback-history.js"
+    },
+    "./playback/playback-flashes": {
+      "types": "./dist/playback/playback-flashes.d.ts",
+      "import": "./dist/playback/playback-flashes.js"
+    },
+    "./playback/playback-traffic": {
+      "types": "./dist/playback/playback-traffic.d.ts",
+      "import": "./dist/playback/playback-traffic.js"
+    },
+    "./playback/cycle-inspection-query": {
+      "types": "./dist/playback/cycle-inspection-query.d.ts",
+      "import": "./dist/playback/cycle-inspection-query.js"
+    },
+    "./playback/timeline-layout": {
+      "types": "./dist/playback/timeline-layout.d.ts",
+      "import": "./dist/playback/timeline-layout.js"
+    },
+    "./controller": {
+      "types": "./dist/controller.d.ts",
+      "import": "./dist/controller.js"
+    },
+    "./token": {
+      "types": "./dist/token.d.ts",
+      "import": "./dist/token.js"
+    },
+    "./artifacts": {
+      "types": "./dist/artifacts.d.ts",
+      "import": "./dist/artifacts.js"
+    },
+    "./export/csv": {
+      "types": "./dist/export/csv.d.ts",
+      "import": "./dist/export/csv.js"
+    },
+    "./export/csv-types": {
+      "types": "./dist/export/csv-types.d.ts",
+      "import": "./dist/export/csv-types.js"
+    },
+    "./export/csv-filename": {
+      "types": "./dist/export/csv-filename.d.ts",
+      "import": "./dist/export/csv-filename.js"
+    },
+    "./export/csv-limitations": {
+      "types": "./dist/export/csv-limitations.d.ts",
+      "import": "./dist/export/csv-limitations.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@canvas-one/storage": "0.1.0",
+    "@canvas-one/history": "0.1.0",
+    "@canvas-one/system-design": "0.1.0",
+    "@canvas-one/playback": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

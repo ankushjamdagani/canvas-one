@@ -1,5 +1,7 @@
 import * as React from 'react';
-import { openStudioRepository, SessionController, formatStudioError } from './features/session';
+import { type SessionController, formatStudioError } from './features/session';
+import { defaultStudioComposition, type StudioComposition } from '../apps/web/src/composition';
+import { createCompositionLifetime } from '../apps/web/src/composition-lifetime';
 import type { Actor, StudioRepository } from './persistence/studio';
 import { EntryScreen } from './features/entry';
 import { LandingPage } from './features/entry/LandingPage';
@@ -62,6 +64,7 @@ export interface AppProps {
   basePath?: string;
   manageMetadata?: boolean;
   siteOrigin?: string;
+  composition?: StudioComposition;
 }
 
 export default function App({
@@ -69,6 +72,7 @@ export default function App({
   basePath,
   manageMetadata = false,
   siteOrigin,
+  composition = defaultStudioComposition,
 }: AppProps = {}) {
   const { route } = useRoute();
   usePageMetadata(route.kind, {
@@ -80,15 +84,31 @@ export default function App({
     status: 'booting',
   });
 
+  const bootLifetime = React.useRef(createCompositionLifetime());
+  React.useEffect(() => {
+    const lifetime = bootLifetime.current;
+    lifetime.activate();
+    setBootState({status: 'booting'});
+    return () => lifetime.dispose();
+  }, [composition, storageNamespace]);
+
   const runBoot = React.useCallback(async () => {
+    const lifetime = bootLifetime.current;
+    const generation = lifetime.begin();
+    if (!lifetime.current(generation)) return;
+    let releaseRepository: (() => void) | undefined;
     setBootState({ status: 'booting' });
 
     try {
-      const bootRes = await openStudioRepository({
+      const bootRes = await composition.openRepository({
         mintId: MINT_ID,
         dbName: storageNamespace ? `${storageNamespace}:system-studio-local-v1` : undefined,
       });
 
+      if (!lifetime.current(generation)) {
+        if (bootRes.ok) bootRes.dispose?.();
+        return;
+      }
       if (!bootRes.ok) {
         setBootState({
           status: 'failed',
@@ -101,18 +121,20 @@ export default function App({
         return;
       }
 
+      releaseRepository = bootRes.dispose;
       const actor: Actor = {
         actorId: getOrCreateActorId(storageNamespace),
         kind: 'local-human',
         displayName: 'You',
       };
 
-      const session = new SessionController({
+      const session = composition.createSession({
         repository: bootRes.repository,
         mintId: MINT_ID,
         actor,
       });
 
+      if (!lifetime.adopt(generation, () => {session.dispose(); releaseRepository?.();})) return;
       setBootState({
         status: 'ready',
         repository: bootRes.repository,
@@ -120,6 +142,8 @@ export default function App({
         actor,
       });
     } catch (err) {
+      releaseRepository?.();
+      if (!lifetime.current(generation)) return;
       console.error('Boot error:', err);
       setBootState({
         status: 'failed',
@@ -127,12 +151,12 @@ export default function App({
         message: 'Database unavailable. Storage could not be initialized.',
       });
     }
-  }, [storageNamespace]);
+  }, [storageNamespace, composition]);
 
   React.useEffect(() => {
     if (route.kind !== 'home' && route.kind !== 'brand' && bootState.status === 'booting')
       void runBoot();
-  }, [runBoot, route.kind]);
+  }, [runBoot, route.kind, bootState.status]);
 
   const renderPage = (kind: PageKind): React.ReactNode => {
     if (kind === 'home') return <LandingPage basePath={basePath} />;
@@ -179,6 +203,7 @@ export default function App({
         session={bootState.session}
         actor={bootState.actor}
         pageKind={kind}
+        composition={composition}
       />
     );
   };
@@ -190,11 +215,13 @@ function StudioShell({
   session,
   actor,
   pageKind,
+  composition,
 }: {
   repository: StudioRepository;
   session: SessionController;
   actor: Actor;
   pageKind: Exclude<PageKind, 'home' | 'brand'>;
+  composition: StudioComposition;
 }) {
   const sessionState = React.useSyncExternalStore(session.subscribe, session.getState);
   const { route, known } = useRoute();
@@ -299,6 +326,7 @@ function StudioShell({
           onBackToProjects={() => navigate({ kind: 'projects' })}
           mintId={MINT_ID}
           actor={actor}
+          composition={composition}
         />
       );
     }

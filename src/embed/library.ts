@@ -1,6 +1,12 @@
 'use client';
 import '@fontsource-variable/inter';
-import '@xyflow/react/dist/style.css';
+import '@canvas-one/editor-reactflow/style.css';
 import '../styles.css';
 export { CanvasOne } from './CanvasOne';
 export type { CanvasOneProps } from './CanvasOne';
+export { createStudioComposition } from '../../apps/web/src/composition';
+export type { StudioComposition, StudioCanvasHost } from '../../apps/web/src/composition';
+export type {CanvasViewProps as StudioCanvasHostProps, CanvasViewHandle as StudioCanvasHostHandle} from '../features/workspace/CanvasView';
+export { Board, projectBoardPage, useBoardRuntime, useBoardSnapshot, useBoardActor, useBoardPortalTarget } from '@canvas-one/react';
+export { ReactFlowBoard, ReactFlowEditorHost } from '@canvas-one/react/reactflow';
+export type { BoardProps, BoardEditorHostProps, BoardHostBridge, BoardComponentProps, BoardRenderers } from '@canvas-one/react';

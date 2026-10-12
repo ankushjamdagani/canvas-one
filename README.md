@@ -29,9 +29,11 @@
 
 The simulator models performance behaviour. It does not execute your application code or reproduce a specific cloud provider, so treat results as a learning aid rather than a capacity plan.
 
-> The landing page shows an illustrative collaboration with an AI assistant. The app does not call any AI service today.
+The landing page shows an illustrative collaboration. The workspace supports local CLI/MCP agents through explicit browser pairing and reviewable proposals; hosts can inject a model provider. Credentials remain outside project documents. See [composable packages and AI setup](docs/composables.md).
 
 ## Quick start
+
+For hosted deployment, follow the [Vercel setup guide](docs/deployment-vercel.md).
 
 Requires Node.js 22.12 or newer (developed on Node 24).
 

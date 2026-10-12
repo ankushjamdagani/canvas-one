@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@canvas-one/editor-reactflow/react';
 import { ChevronDown, ChevronRight, Ungroup } from 'lucide-react';
 import type { ProjectedNodeData } from './projection';
 

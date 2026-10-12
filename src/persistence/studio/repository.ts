@@ -1,3 +1,4 @@
+import { exportProjectArchive } from '@canvas-one/simulation-system-design/archive';
 /**
  * Local Repository implementation for System Studio.
  *
@@ -7,13 +8,19 @@
  */
 
 import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
+import { AtomicDocumentCoordinator, AtomicOperationCoordinator, type OperationWrite, ImmutableArtifactCoordinator, ArtifactPruningCoordinator, insertImmutableRecords, deleteIndexMatches, type ImmutableRecordPolicy, type ImmutableRecord, PreferenceService, ProjectCatalogReader, ProjectLifecycleCoordinator } from '@canvas-one/storage';
+import { HistoryTransitionPlanner } from '@canvas-one/history';
+import { RunPersistenceService } from '@canvas-one/simulation-system-design/run-persistence';
+import { RepositoryEvidencePolicy } from '@canvas-one/simulation-system-design/repository-evidence';
+import { IndexedDbBackend } from '@canvas-one/storage-indexeddb';
 import { validateDocument, type Issue } from '../../domain/studio/validate';
 import type { Document, Id, Scenario } from '../../domain/studio/model';
 import { isExposureList } from '../../domain/studio/exposure';
 import { TERMINAL_STATUSES, type TraceEvent } from '../../domain/studio/runner/types';
 import { codePointLength } from '../../domain/studio/text';
 import { createStudioDatabase, StudioDatabase } from './db';
-import { createIssue, mapErrorToFailedResult, RepositoryError } from './errors';
+import { createIssue } from '../../domain/studio/issue';
+import { mapErrorToFailedResult, RepositoryError } from './errors';
 import {
   calculateRecordBytes,
   enforceProjectLimits,
@@ -22,9 +29,7 @@ import {
 import {
   computeRequestHash,
   computeSnapshotId,
-  insertImmutable,
   isValidUuid,
-  recordOperationReceipt,
   replayedResult,
   validateActor,
   validateCommandEnvelope,
@@ -149,6 +154,25 @@ function getProjectTables(db: StudioDatabase) {
   ];
 }
 
+export type ProjectStorageRows = {
+  projects: ProjectRecord; branches: BranchRecord; snapshots: SnapshotRecord;
+  operations: import('./types').OperationRecord; commits: CommitRecord;
+  publications: PublicationRecord; checkpoints: CheckpointRecord; runs: RunRecord;
+  parts: PartRecord; traceChunks: TraceChunkRecord;
+};
+function immutablePolicy<Rows>(): ImmutableRecordPolicy<Rows> {
+  return {
+    equal: (_store, left, right) => {
+      const a = canonicalJson(left); const b = canonicalJson(right);
+      return a.ok && b.ok && a.text === b.text;
+    },
+    collision: () => new RepositoryError({
+      code: 'invalid', message: 'Immutable record collision with conflicting content; row will not be overwritten',
+      issues: [createIssue('structural-rule', 'Conflicting immutable row collision', [])],
+    }),
+  };
+}
+
 export type LocalRepositoryOptions = {
   readonly buildVersions?: BuildManifestVersions;
   /** Injected ID minting for transfer (download IDs). */
@@ -159,6 +183,8 @@ export type LocalRepositoryOptions = {
 
 export class LocalRepository implements StudioRepository {
   private readonly db: StudioDatabase;
+  private readonly catalog: ProjectCatalogReader<ProjectRecord>;
+  private readonly preferences: PreferenceService<typeof PREFERENCES_SCHEMA, unknown, FailedResult>;
   private readonly buildVersions: BuildManifestVersions;
   /**
    * Injected downloadId minting. There is no fallback generator of any kind (not even a
@@ -175,6 +201,8 @@ export class LocalRepository implements StudioRepository {
     options?: LocalRepositoryOptions | BuildManifestVersions,
   ) {
     this.db = db ?? createStudioDatabase();
+    this.catalog = new ProjectCatalogReader(new IndexedDbBackend<{ projects: ProjectRecord }>(this.db, ['projects']));
+    this.preferences = new PreferenceService({ backend: new IndexedDbBackend<{ preferences: PreferenceRecord }>(this.db, ['preferences']), schema: PREFERENCES_SCHEMA, failed: mapErrorToFailedResult });
     if (options && 'compilerVersion' in options) {
       this.buildVersions = options;
       this.mintId = undefined;
@@ -201,9 +229,7 @@ export class LocalRepository implements StudioRepository {
    */
   async loadProject(projectId: Id): Promise<Readonly<ProjectRecord> | null> {
     try {
-      const record = await this.db.projects.get(projectId);
-      if (!record) return null;
-      return Object.freeze(structuredClone(record));
+      return await this.catalog.load(projectId);
     } catch (err) {
       if (err instanceof RepositoryError) throw err;
       throw new RepositoryError({
@@ -219,15 +245,7 @@ export class LocalRepository implements StudioRepository {
    */
   async listProjects(): Promise<readonly ProjectRecord[]> {
     try {
-      const records = await this.db.projects.toArray();
-      records.sort((a, b) => {
-        if (a.title < b.title) return -1;
-        if (a.title > b.title) return 1;
-        if (a.id < b.id) return -1;
-        if (a.id > b.id) return 1;
-        return 0;
-      });
-      return Object.freeze(records.map((r) => Object.freeze(structuredClone(r))));
+      return await this.catalog.list();
     } catch (err) {
       if (err instanceof RepositoryError) throw err;
       throw new RepositoryError({
@@ -298,8 +316,7 @@ export class LocalRepository implements StudioRepository {
    */
   async loadPreferences(): Promise<Readonly<PreferenceRecord> | null> {
     try {
-      const record = await this.db.preferences.get('user');
-      return record ? Object.freeze(structuredClone(record)) : null;
+      return await this.preferences.load();
     } catch (err) {
       if (err instanceof RepositoryError) throw err;
       throw new RepositoryError({
@@ -319,114 +336,64 @@ export class LocalRepository implements StudioRepository {
     value: unknown,
     key = 'user',
   ): Promise<SavePreferencesResult> {
-    try {
-      return await this.db.transaction('rw', this.db.preferences, async () => {
-        const existing = await this.db.preferences.get(key);
-
-        if (existing) {
-          if (existing.revision !== expectedRevision) {
-            return {
-              status: 'stale',
-              scope: 'preferences',
-              expected: expectedRevision,
-              actual: existing.revision,
-            };
-          }
-          const nextRevision = existing.revision + 1;
-          const updated: PreferenceRecord = {
-            key,
-            schema: PREFERENCES_SCHEMA,
-            revision: nextRevision,
-            value: structuredClone(value),
-          };
-          await this.db.preferences.put(updated);
-          return {
-            status: 'applied',
-            revision: nextRevision,
-            value: Object.freeze(structuredClone(value)),
-          };
-        } else {
-          if (expectedRevision !== 0) {
-            return {
-              status: 'stale',
-              scope: 'preferences',
-              expected: expectedRevision,
-              actual: 0,
-            };
-          }
-          const nextRevision = 1;
-          const record: PreferenceRecord = {
-            key,
-            schema: PREFERENCES_SCHEMA,
-            revision: nextRevision,
-            value: structuredClone(value),
-          };
-          await this.db.preferences.put(record);
-          return {
-            status: 'applied',
-            revision: nextRevision,
-            value: Object.freeze(structuredClone(value)),
-          };
-        }
-      });
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    return this.preferences.save(expectedRevision, value, key);
   }
 
-  /**
-   * Deletes a project atomically using CAS on the main branch's head commit.
-   * Returns missing/already-absent on retry.
-   */
+  private historyOperation(): AtomicOperationCoordinator<ProjectStorageRows, AuthoredResult> {
+    return new AtomicOperationCoordinator({
+      backend: new IndexedDbBackend<ProjectStorageRows>(this.db, getProjectTables(this.db).map(table => table.name as keyof ProjectStorageRows)),
+      policy: immutablePolicy<ProjectStorageRows>(),
+      decodeReceipt: value => value as AuthoredResult,
+      reused: operationId => ({ status: 'failed', code: 'operation-id-reused', issues: [createIssue('duplicate-id', `Operation ID ${operationId} has already been used with a different request payload`, ['operationId'], operationId)] }),
+      failed: mapErrorToFailedResult,
+    });
+  }
+
+  private projectLifecycle<Result>(): ProjectLifecycleCoordinator<ProjectStorageRows, Result> {
+    type Rows = ProjectStorageRows;
+    return new ProjectLifecycleCoordinator<Rows, Result>({
+      // Domain policies and portable related-row writes share this complete transaction.
+backend: new IndexedDbBackend<Rows>(this.db, getProjectTables(this.db).map(table => table.name as keyof Rows), {
+        branches: [{ name: 'project', keyPath: 'projectId' }], snapshots: [{ name: 'project', keyPath: 'projectId' }],
+        commits: [{ name: 'project', keyPath: 'projectId' }], publications: [{ name: 'project', keyPath: 'projectId' }],
+        checkpoints: [{ name: 'project', keyPath: 'projectId' }], runs: [{ name: 'project', keyPath: 'projectId' }],
+        parts: [{ name: 'project', keyPath: 'projectId' }], operations: [{ name: 'project', keyPath: 'projectId' }],
+        traceChunks: [{ name: 'run', keyPath: ['projectId', 'runId'] }],
+      }),
+      missing: id => ({ status: 'missing', ids: [id] }) as Result,
+      stale: (expected, actual) => ({ status: 'stale', scope: 'project', expected, actual }) as Result,
+      reused: operationId => ({ status: 'failed', code: 'operation-id-reused', issues: [createIssue('duplicate-id', `Operation ID ${operationId} has already been used with a different request payload`, ['operationId'], operationId)] }) as Result,
+      decodeReceipt: value => value as Result,
+      failed: error => mapErrorToFailedResult(error) as Result,
+    });
+  }
+
+  /** Deletes atomically after main-head protection; retries report missing. */
   async deleteProject(
     projectId: Id,
     expectedMainHead: ExpectedHead,
   ): Promise<DeleteProjectResult> {
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const project = await this.db.projects.get(projectId);
-          if (!project) {
-            return { status: 'missing', ids: [projectId] };
-          }
-
-          const mainBranch = await this.db.branches.get([projectId, project.mainBranchId]);
-          if (!mainBranch) {
-            return { status: 'missing', ids: [projectId] };
-          }
-
-          if (mainBranch.headCommitId !== expectedMainHead) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: expectedMainHead,
-              actual: mainBranch.headCommitId,
-            };
-          }
-
-          // Delete all records belonging to this projectId across all project-scoped tables
-          await this.db.projects.delete(projectId);
-          await this.db.branches.where('projectId').equals(projectId).delete();
-          await this.db.snapshots.where('projectId').equals(projectId).delete();
-          await this.db.commits.where('projectId').equals(projectId).delete();
-          await this.db.publications.where('projectId').equals(projectId).delete();
-          await this.db.checkpoints.where('projectId').equals(projectId).delete();
-          await this.db.runs.where('projectId').equals(projectId).delete();
-          await this.db.parts.where('projectId').equals(projectId).delete();
-          await this.db.operations.where('projectId').equals(projectId).delete();
-          await this.db.traceChunks
-            .where('[projectId+runId]')
-            .between([projectId, ''], [projectId, '\uffff'], true, true)
-            .delete();
-
-          return { status: 'applied', projectId };
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    return this.projectLifecycle<DeleteProjectResult>().delete(projectId, {
+      protect: async (stores, project) => {
+        const mainBranch = await stores.branches.get([projectId, project.mainBranchId]);
+        if (!mainBranch) return { status: 'missing', ids: [projectId] };
+        if (mainBranch.headCommitId !== expectedMainHead) return {
+          status: 'stale', scope: 'branch', expected: expectedMainHead, actual: mainBranch.headCommitId,
+        };
+        return null;
+      },
+      cleanup: async stores => {
+        for (const name of ['branches', 'snapshots', 'commits', 'publications', 'checkpoints', 'runs', 'parts', 'operations'] as const) {
+          await deleteIndexMatches(stores[name], 'project', projectId);
+        }
+        for (;;) {
+          const page = await stores.traceChunks.queryRange('run', [projectId, ''], [projectId, '\uffff'], 1000);
+          for (const entry of page.entries) await stores.traceChunks.delete(entry.key);
+          if (!page.truncated) break;
+        }
+      },
+      applied: () => ({ status: 'applied', projectId }),
+    });
   }
 
   /**
@@ -495,8 +462,8 @@ export class LocalRepository implements StudioRepository {
     readonly projectId: Id;
     readonly branchId: Id;
     readonly expectedWorkingRevision: number;
-  }): Promise<BranchRecord | MissingResult | StaleResult> {
-    const branch = await this.db.branches.get([command.projectId, command.branchId]);
+  }, branchStore: { get(key: [string, string]): Promise<BranchRecord | undefined> } = this.db.branches): Promise<BranchRecord | MissingResult | StaleResult> {
+    const branch = await branchStore.get([command.projectId, command.branchId]);
     if (!branch) {
       return { status: 'missing', ids: [command.branchId] };
     }
@@ -682,63 +649,21 @@ export class LocalRepository implements StudioRepository {
       calculateRecordBytes(draftBranchRow) +
       calculateRecordBytes(snapshotRow);
 
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          // Check receipt FIRST before any other checks
-          const replay = await replayedResult(this.db, projectId, command.operationId, requestHash);
-          if (replay) return replay;
-
-          // Check if project already exists
-          const existingProject = await this.db.projects.get(projectId);
-          if (existingProject) {
-            return {
-              status: 'failed',
-              code: 'conflict',
-              issues: [
-                createIssue(
-                  'duplicate-id',
-                  `Project ${projectId} already exists`,
-                  ['payload', 'newProjectId'],
-                  projectId,
-                ),
-              ],
-            };
-          }
-
-          // Check limits
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId,
-            additionalBranches: 2,
-            additionalReceipts: 1,
-            additionalLocalBytes: localBytes,
-            additionalExportBytes: exportBytes,
-          });
-          if (limitError) return limitError;
-
-          // Insert rows
-          await insertImmutable(this.db.snapshots, snapshotRow, [projectId, snapshotId]);
-          await this.db.branches.add(mainBranchRow);
-          await this.db.branches.add(draftBranchRow);
-          await this.db.projects.add(projectRow);
-
-          // Store receipt
-          await recordOperationReceipt(
-            this.db,
-            projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
-
-          return appliedResult;
+    return this.projectLifecycle<AuthoredResult>().create(
+      { projectId, operationId: command.operationId, requestHash }, projectRow, {
+        exists: () => ({ status: 'failed', code: 'conflict', issues: [createIssue('duplicate-id', `Project ${projectId} already exists`, ['payload', 'newProjectId'], projectId)] }),
+        check: stores => enforceProjectLimits(this.db, {
+          projectId, additionalBranches: 2, additionalReceipts: 1,
+          additionalLocalBytes: localBytes, additionalExportBytes: exportBytes,
+        }, stores),
+        initialize: async stores => {
+          await insertImmutableRecords(stores, [{ store: 'snapshots', key: [projectId, snapshotId], row: snapshotRow }], immutablePolicy<ProjectStorageRows>());
+          await stores.branches.add([projectId, mainBranchId], mainBranchRow);
+          await stores.branches.add([projectId, draftBranchId], draftBranchRow);
         },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        result: appliedResult,
+      },
+    );
   }
 
   /**
@@ -746,7 +671,7 @@ export class LocalRepository implements StudioRepository {
    * Updates project title and the active Document.title together via a new snapshot;
    * other branches untouched.
    */
-  private async handleProjectRename(
+private async handleProjectRename(
     command: ProjectRenameCommand,
   ): Promise<AuthoredResult> {
     const envelopeInvalid = validateCommandEnvelope(command);
@@ -842,88 +767,36 @@ export class LocalRepository implements StudioRepository {
       document: updatedDocument,
     };
 
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
-
-          // Compare-and-set check on project revision
-          const currentProject = await this.db.projects.get(command.projectId);
-          if (!currentProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
-
-          if (currentProject.revision !== command.expectedProjectRevision) {
-            return {
-              status: 'stale',
-              scope: 'project',
-              expected: command.expectedProjectRevision,
-              actual: currentProject.revision,
-            };
-          }
-
-          // Compare-and-set check on active branch workingRevision
-          const currentBranch = await this.loadBranchAtRevision(command);
-          if ('status' in currentBranch) return currentBranch;
-
-          // Check limits before mutation
-          const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalReceipts: 1,
-            additionalLocalBytes: addedLocalBytes,
-            additionalExportBytes: addedLocalBytes,
-          });
-          if (limitError) return limitError;
-
-          // Apply mutations
-          await insertImmutable(this.db.snapshots, newSnapshotRow, [
-            command.projectId,
-            newSnapshotId,
-          ]);
-
-          const now = Date.now();
-          const nextProjectRev = currentProject.revision + 1;
-          const nextBranchRev = currentBranch.workingRevision + 1;
-
-          await this.db.branches.update([command.projectId, command.branchId], {
-            workingSnapshotId: newSnapshotId,
-            workingRevision: nextBranchRev,
-          });
-
-          await this.db.projects.update(command.projectId, {
-            title: newTitle,
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: nextBranchRev,
-            changedIds: [command.projectId, command.branchId],
-            undo: null,
-            value: { kind: 'none' },
-          };
-
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
-
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    return this.projectLifecycle<AuthoredResult>().update(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      command.expectedProjectRevision,
+      async (stores, currentProject, nextProjectRev, now) => {
+        const currentBranch = await this.loadBranchAtRevision(command, stores.branches);
+        if ('status' in currentBranch) return { rejected: currentBranch };
+        const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
+        const limit = await enforceProjectLimits(this.db, {
+          projectId: command.projectId, additionalReceipts: 1,
+          additionalLocalBytes: addedLocalBytes, additionalExportBytes: addedLocalBytes,
+        }, stores);
+        if (limit) return { rejected: limit };
+        const nextBranchRev = currentBranch.workingRevision + 1;
+        const result: AppliedResult = {
+          status: 'applied', operationId: command.operationId,
+          projectRevision: nextProjectRev, branchRevision: nextBranchRev,
+          changedIds: [command.projectId, command.branchId], undo: null, value: { kind: 'none' },
+        };
+        return {
+          project: { ...currentProject, title: newTitle, revision: nextProjectRev, updatedAt: now },
+          result,
+          apply: async () => {
+            await insertImmutableRecords(stores, [{ store: 'snapshots', key: [command.projectId, newSnapshotId], row: newSnapshotRow }], immutablePolicy<ProjectStorageRows>());
+            await stores.branches.update([command.projectId, command.branchId], {
+              workingSnapshotId: newSnapshotId, workingRevision: nextBranchRev,
+            });
+          },
+        };
+      },
+    );
   }
 
   /**
@@ -969,50 +842,25 @@ export class LocalRepository implements StudioRepository {
       return mapErrorToFailedResult(err);
     }
 
-    try {
-      return await this.db.transaction('rw', getProjectTables(this.db), async () => {
-        const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-        if (replay) return replay;
-
-        const project = await this.db.projects.get(command.projectId);
-        if (!project) return { status: 'missing', ids: [command.projectId] };
-        if (project.revision !== command.expectedProjectRevision) {
-          return {
-            status: 'stale',
-            scope: 'project',
-            expected: command.expectedProjectRevision,
-            actual: project.revision,
-          };
-        }
-
-        const now = Date.now();
-        const nextProjectRev = project.revision + 1;
+    return this.projectLifecycle<AuthoredResult>().update(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      command.expectedProjectRevision,
+      async (stores, project, nextProjectRev, now) => {
         const updated: ProjectRecord = { ...project, description, team, ...(exposures ? { exposures } : {}), revision: nextProjectRev, updatedAt: now };
         const limit = await enforceProjectLimits(this.db, {
-          projectId: command.projectId,
-          additionalReceipts: 1,
+          projectId: command.projectId, additionalReceipts: 1,
           additionalLocalBytes: calculateRecordBytes(updated) - calculateRecordBytes(project),
           additionalExportBytes: 0,
-        });
-        if (limit) return limit;
-
-        await this.db.projects.update(command.projectId, { description, team, ...(exposures ? { exposures } : {}), revision: nextProjectRev, updatedAt: now });
-
-        const appliedResult: AppliedResult = {
-          status: 'applied',
-          operationId: command.operationId,
-          projectRevision: nextProjectRev,
-          branchRevision: null,
-          changedIds: [command.projectId],
-          undo: null,
-          value: { kind: 'none' },
+        }, stores);
+        if (limit) return { rejected: limit };
+        const result: AppliedResult = {
+          status: 'applied', operationId: command.operationId,
+          projectRevision: nextProjectRev, branchRevision: null,
+          changedIds: [command.projectId], undo: null, value: { kind: 'none' },
         };
-        await recordOperationReceipt(this.db, command.projectId, command.operationId, requestHash, appliedResult);
-        return appliedResult;
-      });
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        return { project: updated, result };
+      },
+    );
   }
 
   /**
@@ -1073,156 +921,130 @@ export class LocalRepository implements StudioRepository {
       return mapErrorToFailedResult(err);
     }
 
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
+    return this.historyOperation().execute(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      async stores => {
+        // Load project and source branch
+        const project = await stores.projects.get(command.projectId);
+        if (!project) {
+          return { status: 'missing', ids: [command.projectId] };
+        }
 
-          // Load project and source branch
-          const project = await this.db.projects.get(command.projectId);
-          if (!project) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
+        const sourceBranch = await stores.branches.get([
+          command.projectId,
+          command.branchId,
+        ]);
+        if (!sourceBranch) {
+          return { status: 'missing', ids: [command.branchId] };
+        }
 
-          const sourceBranch = await this.db.branches.get([
-            command.projectId,
-            command.branchId,
-          ]);
-          if (!sourceBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
+        // Check HEAD mismatch -> failed/conflict HEAD_MOVED
+        if (sourceBranch.headCommitId !== command.payload.expectedHeadId) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'HEAD_MOVED: Source branch head commit does not match expectedHeadId',
+                ['payload', 'expectedHeadId'],
+                command.payload.expectedHeadId,
+              ),
+            ],
+          };
+        }
 
-          // Check HEAD mismatch -> failed/conflict HEAD_MOVED
-          if (sourceBranch.headCommitId !== command.payload.expectedHeadId) {
-            return {
-              status: 'failed',
-              code: 'conflict',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'HEAD_MOVED: Source branch head commit does not match expectedHeadId',
-                  ['payload', 'expectedHeadId'],
-                  command.payload.expectedHeadId,
-                ),
-              ],
-            };
-          }
+        // Check working revision mismatch -> stale
+        if (sourceBranch.workingRevision !== command.expectedWorkingRevision) {
+          return {
+            status: 'stale',
+            scope: 'branch',
+            expected: command.expectedWorkingRevision,
+            actual: sourceBranch.workingRevision,
+          };
+        }
 
-          // Check working revision mismatch -> stale
-          if (sourceBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: sourceBranch.workingRevision,
-            };
-          }
+        // Check if branch ID already exists
+        const existingBranch = await stores.branches.get([
+          command.projectId,
+          newBranchId,
+        ]);
+        if (existingBranch) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'duplicate-id',
+                `Branch ${newBranchId} already exists in project`,
+                ['payload', 'newBranchId'],
+                newBranchId,
+              ),
+            ],
+          };
+        }
 
-          // Check if branch ID already exists
-          const existingBranch = await this.db.branches.get([
-            command.projectId,
-            newBranchId,
-          ]);
-          if (existingBranch) {
-            return {
-              status: 'failed',
-              code: 'conflict',
-              issues: [
-                createIssue(
-                  'duplicate-id',
-                  `Branch ${newBranchId} already exists in project`,
-                  ['payload', 'newBranchId'],
-                  newBranchId,
-                ),
-              ],
-            };
-          }
+        // Determine new branch snapshot and head
+        let workingSnapshotId: string;
+        let headCommitId: ExpectedHead;
 
-          // Determine new branch snapshot and head
-          let workingSnapshotId: string;
-          let headCommitId: ExpectedHead;
-
-          if (command.payload.source === 'working') {
-            workingSnapshotId = sourceBranch.workingSnapshotId;
+        if (command.payload.source === 'working') {
+          workingSnapshotId = sourceBranch.workingSnapshotId;
+          headCommitId = sourceBranch.headCommitId;
+        } else {
+          // source === 'head'
+          if (sourceBranch.headCommitId !== null) {
+            const headCommit = await stores.commits.get([
+              command.projectId,
+              sourceBranch.headCommitId,
+            ]);
+            if (!headCommit) {
+              return { status: 'missing', ids: [sourceBranch.headCommitId] };
+            }
+            workingSnapshotId = headCommit.snapshotId;
             headCommitId = sourceBranch.headCommitId;
           } else {
-            // source === 'head'
-            if (sourceBranch.headCommitId !== null) {
-              const headCommit = await this.db.commits.get([
-                command.projectId,
-                sourceBranch.headCommitId,
-              ]);
-              if (!headCommit) {
-                return { status: 'missing', ids: [sourceBranch.headCommitId] };
-              }
-              workingSnapshotId = headCommit.snapshotId;
-              headCommitId = sourceBranch.headCommitId;
-            } else {
-              // Unborn branch: head is null, snapshot is the project's creation snapshot
-              workingSnapshotId = project.initialSnapshotId;
-              headCommitId = null;
-            }
+            // Unborn branch: head is null, snapshot is the project's creation snapshot
+            workingSnapshotId = project.initialSnapshotId;
+            headCommitId = null;
           }
+        }
 
-          const now = Date.now();
-          const newBranchRow: BranchRecord = {
-            projectId: command.projectId,
-            id: newBranchId,
-            label,
-            state: 'open',
-            headCommitId,
-            workingSnapshotId,
-            workingRevision: 0,
-            createdAt: now,
-          };
+        const now = Date.now();
+        const planner = new HistoryTransitionPlanner();
+        const newBranchRow = planner.fork(sourceBranch, { id: newBranchId, label, snapshotId: workingSnapshotId, headCommitId, now });
 
-          // Check limits before mutation
-          const branchBytes = calculateRecordBytes(newBranchRow);
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalBranches: 1,
-            additionalReceipts: 1,
-            additionalLocalBytes: branchBytes,
-            additionalExportBytes: branchBytes,
-          });
-          if (limitError) return limitError;
+        // Check limits before mutation
+        const branchBytes = calculateRecordBytes(newBranchRow);
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalBranches: 1,
+          additionalReceipts: 1,
+          additionalLocalBytes: branchBytes,
+          additionalExportBytes: branchBytes,
+        }, stores);
+        if (limitError) return limitError;
 
-          // Add branch and bump project revision (source is not altered)
-          await this.db.branches.add(newBranchRow);
+        const updatedProject = planner.project(project, now);
+        const nextProjectRev = updatedProject.revision;
+        const writes: OperationWrite<ProjectStorageRows>[] = [
+          { kind: 'add', store: 'branches', key: [command.projectId, newBranchId], row: newBranchRow },
+          { kind: 'update', store: 'projects', key: command.projectId, row: updatedProject },
+        ];
 
-          const nextProjectRev = project.revision + 1;
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: 0,
+          changedIds: [newBranchId],
+          undo: null,
+          value: { kind: 'branch', branchId: newBranchId },
+        };
 
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: 0,
-            changedIds: [newBranchId],
-            undo: null,
-            value: { kind: 'branch', branchId: newBranchId },
-          };
-
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
-
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        return { writes, result: appliedResult };
+      },
+    );
   }
 
   /**
@@ -1245,6 +1067,16 @@ export class LocalRepository implements StudioRepository {
     }
 
     const changes = command.payload.changes;
+    const proposal = command.payload.proposal;
+    if (proposal !== undefined && (
+      !proposal || typeof proposal !== 'object' ||
+      typeof proposal.operationId !== 'string' || proposal.operationId.length < 1 || proposal.operationId.length > 200 ||
+      !proposal.actor || typeof proposal.actor !== 'object' || proposal.actor.kind !== 'agent' ||
+      typeof proposal.actor.actorId !== 'string' || proposal.actor.actorId.length < 1 || proposal.actor.actorId.length > 200 ||
+      typeof proposal.actor.displayName !== 'string' || proposal.actor.displayName.length < 1 || proposal.actor.displayName.length > 200 ||
+      Object.keys(proposal).some(key => !['operationId', 'actor'].includes(key)) ||
+      Object.keys(proposal.actor).some(key => !['actorId', 'displayName', 'kind'].includes(key))
+    )) return {status: 'invalid', issues: [createIssue('wrong-type', 'Proposal attribution must identify the paired agent and proposal operation', ['payload', 'proposal'])]};
     if (!Array.isArray(changes)) {
       return {
         status: 'invalid',
@@ -1264,6 +1096,15 @@ export class LocalRepository implements StudioRepository {
         ],
       };
     }
+
+    // An immutable receipt must replay before domain application: an accepted
+    // insertion is no longer valid against the subsequently updated document.
+    let requestHash: string;
+    try {
+      requestHash = await computeRequestHash(command);
+      const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
+      if (replay) return replay;
+    } catch (err) { return mapErrorToFailedResult(err); }
 
     // 4. Pre-read current branch & snapshot to compute updated document BEFORE transaction
     const project = await this.db.projects.get(command.projectId);
@@ -1300,91 +1141,40 @@ export class LocalRepository implements StudioRepository {
       return mapErrorToFailedResult(err);
     }
 
-    let requestHash: string;
-    try {
-      requestHash = await computeRequestHash(command);
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
-
     const newSnapshotRow: SnapshotRecord = {
       projectId: command.projectId,
       id: newSnapshotId,
       document: updatedDocument,
     };
 
-    // 6. Execute atomic transaction
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
-
-          // Compare-and-set check on branch workingRevision
-          const curBranch = await this.loadBranchAtRevision(command);
-          if ('status' in curBranch) return curBranch;
-
-          const curProject = await this.db.projects.get(command.projectId);
-          if (!curProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
-
-          // Enforce limits before mutation
-          const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalReceipts: 1,
-            additionalLocalBytes: addedLocalBytes,
-            additionalExportBytes: addedLocalBytes,
-          });
-          if (limitError) return limitError;
-
-          // Write snapshot (insert-if-absent)
-          await insertImmutable(this.db.snapshots, newSnapshotRow, [
-            command.projectId,
-            newSnapshotId,
-          ]);
-
-          const now = Date.now();
-          const nextBranchRev = curBranch.workingRevision + 1;
-          const nextProjectRev = curProject.revision + 1;
-
-          await this.db.branches.update([command.projectId, command.branchId], {
-            workingSnapshotId: newSnapshotId,
-            workingRevision: nextBranchRev,
-          });
-
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: nextBranchRev,
-            changedIds: applied.changedIds,
-            undo: null,
-            value: { kind: 'none' },
-          };
-
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
-
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    // 6. Storage owns receipt replay, CAS and the authored atomic write. Domain
+    // application, hashing and limits retain their existing policies.
+    type WriteRows = {
+      projects: ProjectRecord; branches: BranchRecord; snapshots: SnapshotRecord;
+      operations: import('./types').OperationRecord; commits: CommitRecord;
+      publications: PublicationRecord; checkpoints: CheckpointRecord; runs: RunRecord;
+      parts: PartRecord; traceChunks: TraceChunkRecord;
+    };
+    const coordinator = new AtomicDocumentCoordinator<WriteRows, AuthoredResult>({
+      backend: new IndexedDbBackend<WriteRows>(this.db, getProjectTables(this.db).map(table => table.name as keyof WriteRows)),
+      decodeReceipt: result => result as AuthoredResult,
+      missing: id => ({ status: 'missing', ids: [id] }),
+      stale: (expected, actual) => ({ status: 'stale', scope: 'branch', expected, actual }),
+      reused: operationId => ({ status: 'failed', code: 'operation-id-reused', issues: [createIssue('duplicate-id', `Operation ID ${operationId} has already been used with a different request payload`, ['operationId'], operationId)] }),
+      failed: mapErrorToFailedResult,
+      equalSnapshot: (left, right) => {
+        const a = canonicalJson(left); const b = canonicalJson(right);
+        return a.ok && b.ok && a.text === b.text;
+      },
+      snapshotCollision: () => new RepositoryError({ code: 'invalid', message: 'Immutable record collision with conflicting content; row will not be overwritten', issues: [createIssue('structural-rule', 'Conflicting immutable row collision', [])] }),
+      check: async stores => {
+        const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
+        return enforceProjectLimits(this.db, { projectId: command.projectId, additionalReceipts: 1, additionalLocalBytes: addedLocalBytes, additionalExportBytes: addedLocalBytes }, stores);
+      },
+      applied: revisions => ({ status: 'applied', ...revisions, changedIds: applied.changedIds, undo: null, value: { kind: 'none' }, ...(proposal ? { proposal: structuredClone(proposal) } : {}) }),
+    });
+    return coordinator.commit({ operationId: command.operationId, projectId: command.projectId, branchId: command.branchId,
+      expectedRevision: command.expectedWorkingRevision, requestHash, snapshot: newSnapshotRow });
   }
 
   /**
@@ -1461,75 +1251,53 @@ export class LocalRepository implements StudioRepository {
     const checkpointBytes = calculateRecordBytes(checkpointRow);
 
     // 6. Execute atomic transaction
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
+    return this.historyOperation().execute(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      async stores => {
+        // Compare-and-set check on branch workingRevision
+        const curBranch = await this.loadBranchAtRevision(command, stores.branches);
+        if ('status' in curBranch) return curBranch;
 
-          // Compare-and-set check on branch workingRevision
-          const curBranch = await this.loadBranchAtRevision(command);
-          if ('status' in curBranch) return curBranch;
+        const curProject = await stores.projects.get(command.projectId);
+        if (!curProject) {
+          return { status: 'missing', ids: [command.projectId] };
+        }
 
-          const curProject = await this.db.projects.get(command.projectId);
-          if (!curProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
+        // Enforce 100-per-project checkpoint limit and limits
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalCheckpoints: 1,
+          additionalReceipts: 1,
+          additionalLocalBytes: checkpointBytes,
+          additionalExportBytes: checkpointBytes,
+        }, stores);
+        if (limitError) return limitError;
 
-          // Enforce 100-per-project checkpoint limit and limits
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalCheckpoints: 1,
-            additionalReceipts: 1,
-            additionalLocalBytes: checkpointBytes,
-            additionalExportBytes: checkpointBytes,
-          });
-          if (limitError) return limitError;
+        const updatedProject = new HistoryTransitionPlanner().project(curProject, now);
+        const nextProjectRev = updatedProject.revision;
+        const writes: OperationWrite<ProjectStorageRows>[] = [
+          { kind: 'immutable', store: 'checkpoints', key: [command.projectId, command.payload.checkpointId], row: checkpointRow },
+          { kind: 'update', store: 'projects', key: command.projectId, row: updatedProject },
+        ];
 
-          // Insert immutable checkpoint
-          await insertImmutable(this.db.checkpoints, checkpointRow, [
-            command.projectId,
-            command.payload.checkpointId,
-          ]);
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: curBranch.workingRevision,
+          changedIds: [command.payload.checkpointId],
+          undo: null,
+          value: {
+            kind: 'artifact',
+            artifactType: 'checkpoint',
+            id: command.payload.checkpointId,
+            revision: null,
+          },
+        };
 
-          // Working copy intact; project revision++
-          const nextProjectRev = curProject.revision + 1;
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: curBranch.workingRevision,
-            changedIds: [command.payload.checkpointId],
-            undo: null,
-            value: {
-              kind: 'artifact',
-              artifactType: 'checkpoint',
-              id: command.payload.checkpointId,
-              revision: null,
-            },
-          };
-
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
-
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        return { writes, result: appliedResult };
+      },
+    );
   }
 
   /**
@@ -1643,102 +1411,77 @@ export class LocalRepository implements StudioRepository {
     const checkpointBytes = calculateRecordBytes(checkpointRow);
 
     // 7. Execute atomic transaction: checkpoint first, then replace working content
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
-
-          // Verify project and non-main
-          const curProject = await this.db.projects.get(command.projectId);
-          if (!curProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
-          if (command.branchId === curProject.mainBranchId) {
-            return {
-              status: 'invalid',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'Direct restore on main branch is rejected; main is changed only by publication',
-                  ['branchId'],
-                  command.branchId,
-                ),
-              ],
-            };
-          }
-
-          // Compare-and-set check on branch workingRevision
-          const curBranch = await this.loadBranchAtRevision(command);
-          if ('status' in curBranch) return curBranch;
-
-          // Re-verify target snapshot in transaction
-          const curTarget = await this.db.snapshots.get([command.projectId, snapshotId]);
-          if (!curTarget) {
-            return { status: 'missing', ids: [snapshotId] };
-          }
-
-          // Enforce checkpoint count limit (100) and storage limits
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalCheckpoints: 1,
-            additionalReceipts: 1,
-            additionalLocalBytes: checkpointBytes,
-            additionalExportBytes: checkpointBytes,
-          });
-          if (limitError) return limitError;
-
-          // 1. Checkpoint current working state
-          await insertImmutable(this.db.checkpoints, checkpointRow, [
-            command.projectId,
-            command.payload.checkpointId,
-          ]);
-
-          // 2. Replace working content with target snapshot (workingRevision++)
-          const nextBranchRev = curBranch.workingRevision + 1;
-          await this.db.branches.update([command.projectId, command.branchId], {
-            workingSnapshotId: snapshotId,
-            workingRevision: nextBranchRev,
-          });
-
-          // 3. Project revision++
-          const nextProjectRev = curProject.revision + 1;
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: nextBranchRev,
-            changedIds: [command.branchId, command.payload.checkpointId],
-            undo: null,
-            value: {
-              kind: 'artifact',
-              artifactType: 'checkpoint',
-              id: command.payload.checkpointId,
-              revision: null,
-            },
+    return this.historyOperation().execute(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      async stores => {
+        // Verify project and non-main
+        const curProject = await stores.projects.get(command.projectId);
+        if (!curProject) {
+          return { status: 'missing', ids: [command.projectId] };
+        }
+        if (command.branchId === curProject.mainBranchId) {
+          return {
+            status: 'invalid',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'Direct restore on main branch is rejected; main is changed only by publication',
+                ['branchId'],
+                command.branchId,
+              ),
+            ],
           };
+        }
 
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
+        // Compare-and-set check on branch workingRevision
+        const curBranch = await this.loadBranchAtRevision(command, stores.branches);
+        if ('status' in curBranch) return curBranch;
 
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        // Re-verify target snapshot in transaction
+        const curTarget = await stores.snapshots.get([command.projectId, snapshotId]);
+        if (!curTarget) {
+          return { status: 'missing', ids: [snapshotId] };
+        }
+
+        // Enforce checkpoint count limit (100) and storage limits
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalCheckpoints: 1,
+          additionalReceipts: 1,
+          additionalLocalBytes: checkpointBytes,
+          additionalExportBytes: checkpointBytes,
+        }, stores);
+        if (limitError) return limitError;
+
+        const planner = new HistoryTransitionPlanner();
+        const updatedBranch = planner.restore(curBranch, snapshotId);
+        const updatedProject = planner.project(curProject, now);
+        const nextBranchRev = updatedBranch.workingRevision;
+        const nextProjectRev = updatedProject.revision;
+        const writes: OperationWrite<ProjectStorageRows>[] = [
+          { kind: 'immutable', store: 'checkpoints', key: [command.projectId, command.payload.checkpointId], row: checkpointRow },
+          { kind: 'update', store: 'branches', key: [command.projectId, command.branchId], row: updatedBranch },
+          { kind: 'update', store: 'projects', key: command.projectId, row: updatedProject },
+        ];
+
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: nextBranchRev,
+          changedIds: [command.branchId, command.payload.checkpointId],
+          undo: null,
+          value: {
+            kind: 'artifact',
+            artifactType: 'checkpoint',
+            id: command.payload.checkpointId,
+            revision: null,
+          },
+        };
+
+        return { writes, result: appliedResult };
+      },
+    );
   }
 
   /**
@@ -1795,119 +1538,99 @@ export class LocalRepository implements StudioRepository {
     }
 
     // 5. Execute atomic transaction
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
+    return this.historyOperation().execute(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      async stores => {
+        const curProject = await stores.projects.get(command.projectId);
+        if (!curProject) {
+          return { status: 'missing', ids: [command.projectId] };
+        }
 
-          const curProject = await this.db.projects.get(command.projectId);
-          if (!curProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
-
-          if (command.branchId === curProject.mainBranchId) {
-            return {
-              status: 'invalid',
-              issues: [
-                createIssue('structural-rule', 'Cannot reopen main branch', ['branchId'], command.branchId),
-              ],
-            };
-          }
-
-          const curBranch = await this.db.branches.get([command.projectId, command.branchId]);
-          if (!curBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
-
-          if (curBranch.state !== 'closed') {
-            return {
-              status: 'invalid',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'Branch is already open; only closed branches can be reopened',
-                  ['branchId'],
-                  command.branchId,
-                ),
-              ],
-            };
-          }
-
-          // Check head mismatch
-          if (curBranch.headCommitId !== command.payload.expectedHeadId) {
-            return {
-              status: 'failed',
-              code: 'conflict',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'HEAD_MOVED: Branch head commit does not match expectedHeadId',
-                  ['payload', 'expectedHeadId'],
-                  command.payload.expectedHeadId,
-                ),
-              ],
-            };
-          }
-
-          // Compare-and-set check on branch workingRevision
-          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: curBranch.workingRevision,
-            };
-          }
-
-          // Enforce limits
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalReceipts: 1,
-          });
-          if (limitError) return limitError;
-
-          // Set open via revision check; branch revision++; history and main unchanged
-          const now = Date.now();
-          const nextBranchRev = curBranch.workingRevision + 1;
-          const nextProjectRev = curProject.revision + 1;
-
-          await this.db.branches.update([command.projectId, command.branchId], {
-            state: 'open',
-            workingRevision: nextBranchRev,
-          });
-
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: nextBranchRev,
-            changedIds: [command.branchId],
-            undo: null,
-            value: { kind: 'branch', branchId: command.branchId },
+        if (command.branchId === curProject.mainBranchId) {
+          return {
+            status: 'invalid',
+            issues: [
+              createIssue('structural-rule', 'Cannot reopen main branch', ['branchId'], command.branchId),
+            ],
           };
+        }
 
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
+        const curBranch = await stores.branches.get([command.projectId, command.branchId]);
+        if (!curBranch) {
+          return { status: 'missing', ids: [command.branchId] };
+        }
 
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        if (curBranch.state !== 'closed') {
+          return {
+            status: 'invalid',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'Branch is already open; only closed branches can be reopened',
+                ['branchId'],
+                command.branchId,
+              ),
+            ],
+          };
+        }
+
+        // Check head mismatch
+        if (curBranch.headCommitId !== command.payload.expectedHeadId) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'HEAD_MOVED: Branch head commit does not match expectedHeadId',
+                ['payload', 'expectedHeadId'],
+                command.payload.expectedHeadId,
+              ),
+            ],
+          };
+        }
+
+        // Compare-and-set check on branch workingRevision
+        if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+          return {
+            status: 'stale',
+            scope: 'branch',
+            expected: command.expectedWorkingRevision,
+            actual: curBranch.workingRevision,
+          };
+        }
+
+        // Enforce limits
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalReceipts: 1,
+        }, stores);
+        if (limitError) return limitError;
+
+        const now = Date.now();
+        const planner = new HistoryTransitionPlanner();
+        const updatedBranch = planner.reopen(curBranch);
+        const updatedProject = planner.project(curProject, now);
+        const nextBranchRev = updatedBranch.workingRevision;
+        const nextProjectRev = updatedProject.revision;
+        const writes: OperationWrite<ProjectStorageRows>[] = [
+          { kind: 'update', store: 'branches', key: [command.projectId, command.branchId], row: updatedBranch },
+          { kind: 'update', store: 'projects', key: command.projectId, row: updatedProject },
+        ];
+
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: nextBranchRev,
+          changedIds: [command.branchId],
+          undo: null,
+          value: { kind: 'branch', branchId: command.branchId },
+        };
+
+        return { writes, result: appliedResult };
+      },
+    );
   }
 
   /**
@@ -1915,39 +1638,14 @@ export class LocalRepository implements StudioRepository {
    * fingerprint, status, provenance or checks differ from the copy evaluated beforehand.
    */
   private async findChangedCitedRun(
-    projectId: Id,
-    evidence: readonly EvidenceRef[],
-    citedRuns: readonly RunRecord[],
+    projectId: Id, evidence: readonly EvidenceRef[], citedRuns: readonly RunRecord[],
+    runs: import('@canvas-one/storage').TransactionStore<RunRecord>,
   ): Promise<FailedResult | null> {
-    const ineligible = (ref: EvidenceRef, message: string): FailedResult => ({
-      status: 'failed',
-      code: 'ineligible',
-      issues: [createIssue('structural-rule', message, ['evidence', ref.scenarioId], ref.runId)],
-    });
-
-    for (const ref of evidence) {
-      const cachedRun = citedRuns.find((r) => r.id === ref.runId);
-      const curRun = await this.db.runs.get([projectId, ref.runId]);
-      if (!curRun || !cachedRun) {
-        return ineligible(ref, `Cited evidence run '${ref.runId}' missing from database`);
-      }
-
-      const curChecks = canonicalJson(curRun.checks);
-      const cachedChecks = canonicalJson(cachedRun.checks);
-      if (
-        curRun.fingerprint !== cachedRun.fingerprint ||
-        curRun.status !== cachedRun.status ||
-        curRun.provenance !== cachedRun.provenance ||
-        !curChecks.ok ||
-        !cachedChecks.ok ||
-        curChecks.text !== cachedChecks.text
-      ) {
-        return ineligible(ref, `Cited evidence run '${ref.runId}' changed between evaluation and transaction`);
-      }
-    }
-    return null;
+    return new RepositoryEvidencePolicy({
+      buildVersions: this.buildVersions,
+      loadRun: (scope, id) => runs.get([scope, id]),
+    }).recheck(projectId, evidence, citedRuns);
   }
-
   /**
    * Validates cited evidence against `doc` outside any transaction (shared by commit and
    * publish): refs are well formed per scenario, every scenario has one, each cited run
@@ -1955,198 +1653,17 @@ export class LocalRepository implements StudioRepository {
    * current build versions (never taken from the evidence).
    */
   private async checkEvidence(
-    projectId: Id,
-    doc: Document,
-    evidence: readonly EvidenceRef[],
+    projectId: Id, doc: Document, evidence: readonly EvidenceRef[],
     labels: { readonly document: 'working' | 'candidate'; readonly zeroScenarios: string },
   ): Promise<
     | { readonly status: 'ok'; readonly evidenceManifest: EvidenceManifest; readonly citedRuns: RunRecord[] }
-    | InvalidResult
-    | FailedResult
+    | InvalidResult | FailedResult
   > {
-    if (!doc.scenarios || doc.scenarios.length === 0) {
-      return {
-        status: 'failed',
-        code: 'ineligible',
-        issues: [
-          createIssue(
-            'structural-rule',
-            labels.zeroScenarios,
-            ['scenarios'],
-          ),
-        ],
-      };
-    }
-
-    // Evidence ref validation against working document:
-    // at most one ref per scenarioId; a ref for a scenario that isn't in the working document -> invalid
-    const seenScenarioIds = new Set<Id>();
-    const docScenarioMap = new Map<Id, Scenario>(doc.scenarios.map((s) => [s.id, s]));
-    const refValidationIssues: Issue[] = [];
-
-    for (let i = 0; i < evidence.length; i++) {
-      const ref = evidence[i];
-      if (seenScenarioIds.has(ref.scenarioId)) {
-        refValidationIssues.push(
-          createIssue(
-            'duplicate-id',
-            `Duplicate evidence ref for scenario '${ref.scenarioId}'`,
-            ['payload', 'evidence', i],
-            ref.scenarioId,
-          ),
-        );
-      } else {
-        seenScenarioIds.add(ref.scenarioId);
-      }
-
-      if (!docScenarioMap.has(ref.scenarioId)) {
-        refValidationIssues.push(
-          createIssue(
-            'dangling-reference',
-            `Evidence ref cites scenario '${ref.scenarioId}' which does not exist in ${labels.document} document`,
-            ['payload', 'evidence', i],
-            ref.scenarioId,
-          ),
-        );
-      }
-    }
-
-    if (refValidationIssues.length > 0) {
-      return { status: 'invalid', issues: refValidationIssues };
-    }
-
-    // Every scenario in the document must have a ref
-    const refByScenarioId = new Map<Id, EvidenceRef>();
-    for (const ref of evidence) {
-      refByScenarioId.set(ref.scenarioId, ref);
-    }
-
-    for (const scenario of doc.scenarios) {
-      if (!refByScenarioId.has(scenario.id)) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Scenario '${scenario.id}' has no qualifying evidence run`,
-              ['evidence', scenario.id],
-              scenario.id,
-            ),
-          ],
-        };
-      }
-    }
-
-    // A ref whose run is missing -> failed/ineligible naming the run;
-    // run.scenarioId !== ref.scenarioId or run.fingerprint !== ref.fingerprint -> failed/ineligible
-    for (const ref of evidence) {
-      const runRec = await this.db.runs.get([projectId, ref.runId]);
-      if (!runRec) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' missing from database`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-
-      // The run's scenario comes from its stored manifest; a run without one can't back a ref.
-      const runScenarioId: unknown = (runRec.manifest as { scenario?: { id?: unknown } } | null)?.scenario?.id;
-      if (typeof runScenarioId !== 'string' || runScenarioId !== ref.scenarioId) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' scenarioId '${runScenarioId}' does not match ref scenarioId '${ref.scenarioId}'`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-
-      if (runRec.fingerprint !== ref.fingerprint) {
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              `Cited evidence run '${ref.runId}' fingerprint '${runRec.fingerprint}' does not match ref fingerprint '${ref.fingerprint}'`,
-              ['evidence', ref.scenarioId],
-              ref.runId,
-            ),
-          ],
-        };
-      }
-    }
-
-    // 5. Eligibility computed OUTSIDE the transaction from the working snapshot:
-    // Build manifest and fingerprint for each scenario using the repository's current build versions (never from evidence)
-    // and verify that THAT ref's run qualifies (no other cited run stands in).
-    const candidateScenarios: CandidateScenario[] = [];
-    const citedRuns: RunRecord[] = [];
-
-    for (const scenario of doc.scenarios) {
-      const manifestRes = await buildManifest(doc, scenario.id, this.buildVersions);
-      if (manifestRes.status !== 'ok') {
-        const issues = manifestFailureIssues(scenario.id, manifestRes);
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues,
-        };
-      }
-
-      const ref = refByScenarioId.get(scenario.id)!;
-      const runRec = (await this.db.runs.get([projectId, ref.runId]))!;
-
-      const qualResult = runQualifies(runRec, {
-        scenarioId: scenario.id,
-        fingerprint: manifestRes.fingerprint,
-        compiledScopeElementIds: manifestRes.manifest.scope.includedElementIds,
-      });
-
-      if (!qualResult.qualifies) {
-        const message =
-          runRec.status === 'incomplete'
-            ? `Scenario '${scenario.id}' evidence run is incomplete`
-            : `Scenario '${scenario.id}' evidence run is not qualifying: ${qualResult.reasons.join(', ')}`;
-        return {
-          status: 'failed',
-          code: 'ineligible',
-          issues: [
-            createIssue(
-              'structural-rule',
-              message,
-              ['evidence', scenario.id],
-              scenario.id,
-            ),
-          ],
-        };
-      }
-
-      candidateScenarios.push({
-        scenarioId: scenario.id,
-        fingerprint: manifestRes.fingerprint,
-        scope: manifestRes.manifest.scope,
-      });
-      citedRuns.push(runRec);
-    }
-
-
-    return { status: 'ok', evidenceManifest: buildEvidenceManifest(candidateScenarios, citedRuns), citedRuns };
+    return new RepositoryEvidencePolicy({
+      buildVersions: this.buildVersions,
+      loadRun: (scope, id) => this.db.runs.get([scope, id]),
+    }).check(projectId, doc, evidence, labels);
   }
-
   /**
    * history.commit:
    * Non-main branch; passing evidence for every scenario.
@@ -2317,130 +1834,105 @@ export class LocalRepository implements StudioRepository {
     const commitBytes = calculateRecordBytes(commitRow);
 
     // 7. Atomic transaction
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
+    return this.historyOperation().execute(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      async stores => {
+        // Recheck branch
+        const curBranch = await stores.branches.get([
+          command.projectId,
+          command.branchId,
+        ]);
+        if (!curBranch) {
+          return { status: 'missing', ids: [command.branchId] };
+        }
 
-          // Recheck branch
-          const curBranch = await this.db.branches.get([
-            command.projectId,
-            command.branchId,
-          ]);
-          if (!curBranch) {
-            return { status: 'missing', ids: [command.branchId] };
-          }
-
-          if (curBranch.state === 'closed') {
-            return {
-              status: 'invalid',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'Cannot commit to a closed branch',
-                  ['branchId'],
-                  command.branchId,
-                ),
-              ],
-            };
-          }
-
-          if (curBranch.workingRevision !== command.expectedWorkingRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: command.expectedWorkingRevision,
-              actual: curBranch.workingRevision,
-            };
-          }
-
-          if (curBranch.headCommitId !== command.payload.expectedHeadId) {
-            return {
-              status: 'failed',
-              code: 'conflict',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'HEAD_MOVED: Branch head commit does not match expectedHeadId',
-                  ['payload', 'expectedHeadId'],
-                  command.payload.expectedHeadId,
-                ),
-              ],
-            };
-          }
-
-          // Recheck project
-          const curProject = await this.db.projects.get(command.projectId);
-          if (!curProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
-
-          // Inside the transaction, recheck that each cited run is unchanged since evaluation
-          const changedRun = await this.findChangedCitedRun(command.projectId, command.payload.evidence, citedRuns);
-          if (changedRun) return changedRun;
-
-          // Enforce 1,000-commit limit and storage limits
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalCommits: 1,
-            additionalReceipts: 1,
-            additionalLocalBytes: commitBytes,
-            additionalExportBytes: commitBytes,
-          });
-          if (limitError) return limitError;
-
-          // Insert immutable commit
-          await insertImmutable(this.db.commits, commitRow, [
-            command.projectId,
-            command.payload.commitId,
-          ]);
-
-          // Advance branch head and increment workingRevision
-          const nextBranchRev = curBranch.workingRevision + 1;
-          await this.db.branches.update([command.projectId, command.branchId], {
-            headCommitId: command.payload.commitId,
-            workingRevision: nextBranchRev,
-          });
-
-          // Advance project revision
-          const nextProjectRev = curProject.revision + 1;
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: nextBranchRev,
-            changedIds: [command.payload.commitId],
-            undo: null,
-            value: {
-              kind: 'artifact',
-              artifactType: 'commit',
-              id: command.payload.commitId,
-              revision: null,
-            },
+        if (curBranch.state === 'closed') {
+          return {
+            status: 'invalid',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'Cannot commit to a closed branch',
+                ['branchId'],
+                command.branchId,
+              ),
+            ],
           };
+        }
 
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
+        if (curBranch.workingRevision !== command.expectedWorkingRevision) {
+          return {
+            status: 'stale',
+            scope: 'branch',
+            expected: command.expectedWorkingRevision,
+            actual: curBranch.workingRevision,
+          };
+        }
 
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        if (curBranch.headCommitId !== command.payload.expectedHeadId) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'HEAD_MOVED: Branch head commit does not match expectedHeadId',
+                ['payload', 'expectedHeadId'],
+                command.payload.expectedHeadId,
+              ),
+            ],
+          };
+        }
+
+        // Recheck project
+        const curProject = await stores.projects.get(command.projectId);
+        if (!curProject) {
+          return { status: 'missing', ids: [command.projectId] };
+        }
+
+        // Inside the transaction, recheck that each cited run is unchanged since evaluation
+        const changedRun = await this.findChangedCitedRun(command.projectId, command.payload.evidence, citedRuns, stores.runs);
+        if (changedRun) return changedRun;
+
+        // Enforce 1,000-commit limit and storage limits
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalCommits: 1,
+          additionalReceipts: 1,
+          additionalLocalBytes: commitBytes,
+          additionalExportBytes: commitBytes,
+        }, stores);
+        if (limitError) return limitError;
+
+        const planner = new HistoryTransitionPlanner();
+        const updatedBranch = planner.commit(curBranch, command.payload.commitId);
+        const updatedProject = planner.project(curProject, now);
+        const nextBranchRev = updatedBranch.workingRevision;
+        const nextProjectRev = updatedProject.revision;
+        const writes: OperationWrite<ProjectStorageRows>[] = [
+          { kind: 'immutable', store: 'commits', key: [command.projectId, command.payload.commitId], row: commitRow },
+          { kind: 'update', store: 'branches', key: [command.projectId, command.branchId], row: updatedBranch },
+          { kind: 'update', store: 'projects', key: command.projectId, row: updatedProject },
+        ];
+
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: nextBranchRev,
+          changedIds: [command.payload.commitId],
+          undo: null,
+          value: {
+            kind: 'artifact',
+            artifactType: 'commit',
+            id: command.payload.commitId,
+            revision: null,
+          },
+        };
+
+        return { writes, result: appliedResult };
+      },
+    );
   }
 
   /**
@@ -2631,161 +2123,177 @@ export class LocalRepository implements StudioRepository {
     if (replay) return replay;
 
     // 11. Atomic transaction
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
-          if (replay) return replay;
+    return this.historyOperation().execute(
+      { projectId: command.projectId, operationId: command.operationId, requestHash },
+      async stores => {
+        // Project check
+        const curProject = await stores.projects.get(command.projectId);
+        if (!curProject) {
+          return { status: 'missing', ids: [command.projectId] };
+        }
 
-          // Project check
-          const curProject = await this.db.projects.get(command.projectId);
-          if (!curProject) {
-            return { status: 'missing', ids: [command.projectId] };
-          }
+        if (curProject.revision !== command.payload.expectedProjectRevision) {
+          return {
+            status: 'stale',
+            scope: 'project',
+            expected: command.payload.expectedProjectRevision,
+            actual: curProject.revision,
+          };
+        }
 
-          if (curProject.revision !== command.payload.expectedProjectRevision) {
-            return {
-              status: 'stale',
-              scope: 'project',
-              expected: command.payload.expectedProjectRevision,
-              actual: curProject.revision,
-            };
-          }
+        // Source branch check
+        const curSource = await stores.branches.get([
+          command.projectId,
+          ticketBinding.sourceBranchId,
+        ]);
+        if (!curSource) {
+          return { status: 'missing', ids: [ticketBinding.sourceBranchId] };
+        }
 
-          // Source branch check
-          const curSource = await this.db.branches.get([
-            command.projectId,
-            ticketBinding.sourceBranchId,
-          ]);
-          if (!curSource) {
-            return { status: 'missing', ids: [ticketBinding.sourceBranchId] };
-          }
+        if (curSource.state === 'closed') {
+          return {
+            status: 'invalid',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'Source branch is closed; cannot publish from a closed branch',
+                ['branchId'],
+                ticketBinding.sourceBranchId,
+              ),
+            ],
+          };
+        }
 
-          if (curSource.state === 'closed') {
+        if (curSource.workingRevision !== ticketBinding.expectedSourceRevision) {
+          return {
+            status: 'stale',
+            scope: 'branch',
+            expected: ticketBinding.expectedSourceRevision,
+            actual: curSource.workingRevision,
+          };
+        }
+
+        if (curSource.headCommitId !== ticketBinding.expectedSourceHeadId) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'HEAD_MOVED: Source branch head commit changed since candidate was prepared',
+                ['payload', 'candidateId'],
+                ticketBinding.expectedSourceHeadId,
+              ),
+            ],
+          };
+        }
+
+        // Main branch check
+        const curMain = await stores.branches.get([
+          command.projectId,
+          ticketBinding.mainBranchId,
+        ]);
+        if (!curMain) {
+          return { status: 'missing', ids: [ticketBinding.mainBranchId] };
+        }
+
+        if (curMain.workingRevision !== ticketBinding.expectedMainRevision) {
+          return {
+            status: 'stale',
+            scope: 'branch',
+            expected: ticketBinding.expectedMainRevision,
+            actual: curMain.workingRevision,
+          };
+        }
+
+        if (curMain.headCommitId !== ticketBinding.expectedMainHeadId) {
+          return {
+            status: 'failed',
+            code: 'conflict',
+            issues: [
+              createIssue(
+                'structural-rule',
+                'HEAD_MOVED: Main branch head commit changed since candidate was prepared',
+                ['payload', 'candidateId'],
+                ticketBinding.expectedMainHeadId,
+              ),
+            ],
+          };
+        }
+
+        // Main working snapshot == main head snapshot (or creation snapshot while unborn)
+        if (curMain.headCommitId === null) {
+          if (curMain.workingSnapshotId !== curProject.initialSnapshotId) {
             return {
               status: 'invalid',
               issues: [
                 createIssue(
                   'structural-rule',
-                  'Source branch is closed; cannot publish from a closed branch',
-                  ['branchId'],
-                  ticketBinding.sourceBranchId,
+                  'Main branch has uncommitted working changes (working snapshot differs from creation snapshot while unborn)',
+                  ['mainBranchId'],
+                  curMain.id,
                 ),
               ],
             };
           }
-
-          if (curSource.workingRevision !== ticketBinding.expectedSourceRevision) {
-            return {
-              status: 'stale',
-              scope: 'branch',
-              expected: ticketBinding.expectedSourceRevision,
-              actual: curSource.workingRevision,
-            };
-          }
-
-          if (curSource.headCommitId !== ticketBinding.expectedSourceHeadId) {
-            return {
-              status: 'failed',
-              code: 'conflict',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  'HEAD_MOVED: Source branch head commit changed since candidate was prepared',
-                  ['payload', 'candidateId'],
-                  ticketBinding.expectedSourceHeadId,
-                ),
-              ],
-            };
-          }
-
-          // Main branch check
-          const curMain = await this.db.branches.get([
+        } else {
+          const mainHeadCommit = await stores.commits.get([
             command.projectId,
-            ticketBinding.mainBranchId,
+            curMain.headCommitId,
           ]);
-          if (!curMain) {
-            return { status: 'missing', ids: [ticketBinding.mainBranchId] };
+          if (!mainHeadCommit) {
+            return { status: 'missing', ids: [curMain.headCommitId] };
           }
-
-          if (curMain.workingRevision !== ticketBinding.expectedMainRevision) {
+          if (curMain.workingSnapshotId !== mainHeadCommit.snapshotId) {
             return {
-              status: 'stale',
-              scope: 'branch',
-              expected: ticketBinding.expectedMainRevision,
-              actual: curMain.workingRevision,
-            };
-          }
-
-          if (curMain.headCommitId !== ticketBinding.expectedMainHeadId) {
-            return {
-              status: 'failed',
-              code: 'conflict',
+              status: 'invalid',
               issues: [
                 createIssue(
                   'structural-rule',
-                  'HEAD_MOVED: Main branch head commit changed since candidate was prepared',
-                  ['payload', 'candidateId'],
-                  ticketBinding.expectedMainHeadId,
+                  'Main branch has uncommitted working changes (working snapshot differs from head commit snapshot)',
+                  ['mainBranchId'],
+                  curMain.id,
                 ),
               ],
             };
           }
+        }
 
-          // Main working snapshot == main head snapshot (or creation snapshot while unborn)
-          if (curMain.headCommitId === null) {
-            if (curMain.workingSnapshotId !== curProject.initialSnapshotId) {
-              return {
-                status: 'invalid',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    'Main branch has uncommitted working changes (working snapshot differs from creation snapshot while unborn)',
-                    ['mainBranchId'],
-                    curMain.id,
-                  ),
-                ],
-              };
-            }
-          } else {
-            const mainHeadCommit = await this.db.commits.get([
-              command.projectId,
-              curMain.headCommitId,
-            ]);
-            if (!mainHeadCommit) {
-              return { status: 'missing', ids: [curMain.headCommitId] };
-            }
-            if (curMain.workingSnapshotId !== mainHeadCommit.snapshotId) {
-              return {
-                status: 'invalid',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    'Main branch has uncommitted working changes (working snapshot differs from head commit snapshot)',
-                    ['mainBranchId'],
-                    curMain.id,
-                  ),
-                ],
-              };
-            }
-          }
+        // Inside the transaction, recheck that each cited run is unchanged since evaluation
+        const changedRun = await this.findChangedCitedRun(command.projectId, command.payload.evidence, citedRuns, stores.runs);
+        if (changedRun) return changedRun;
 
-          // Inside the transaction, recheck that each cited run is unchanged since evaluation
-          const changedRun = await this.findChangedCitedRun(command.projectId, command.payload.evidence, citedRuns);
-          if (changedRun) return changedRun;
+        // Check existing publications and version ordering
+        const existingPublications = await this.db.publications
+          .where('projectId')
+          .equals(command.projectId)
+          .toArray();
 
-          // Check existing publications and version ordering
-          const existingPublications = await this.db.publications
-            .where('projectId')
-            .equals(command.projectId)
-            .toArray();
+        const duplicateKeyPub = existingPublications.find(
+          (p) => p.versionKey === versionKey,
+        );
+        if (duplicateKeyPub) {
+          return {
+            status: 'failed',
+            code: 'duplicate-version',
+            issues: [
+              createIssue(
+                'structural-rule',
+                `Publication version '${versionKey}' already exists in project`,
+                ['metadata', 'version'],
+              ),
+            ],
+          };
+        }
 
-          const duplicateKeyPub = existingPublications.find(
-            (p) => p.versionKey === versionKey,
+        if (existingPublications.length > 0) {
+          existingPublications.sort((a, b) => a.ordinal - b.ordinal);
+          const latestPub = existingPublications[existingPublications.length - 1];
+          const cmp = compareSemanticVersions(
+            command.payload.metadata.version,
+            latestPub.metadata.version,
           );
-          if (duplicateKeyPub) {
+          if (cmp === 0) {
             return {
               status: 'failed',
               code: 'duplicate-version',
@@ -2798,178 +2306,116 @@ export class LocalRepository implements StudioRepository {
               ],
             };
           }
-
-          if (existingPublications.length > 0) {
-            existingPublications.sort((a, b) => a.ordinal - b.ordinal);
-            const latestPub = existingPublications[existingPublications.length - 1];
-            const cmp = compareSemanticVersions(
-              command.payload.metadata.version,
-              latestPub.metadata.version,
-            );
-            if (cmp === 0) {
-              return {
-                status: 'failed',
-                code: 'duplicate-version',
-                issues: [
-                  createIssue(
-                    'structural-rule',
-                    `Publication version '${versionKey}' already exists in project`,
-                    ['metadata', 'version'],
-                  ),
-                ],
-              };
-            }
-            if (cmp < 0) {
-              return {
-                status: 'invalid',
-                issues: [
-                  createIssue(
-                    'out-of-range',
-                    `Publication version '${versionKey}' must be strictly greater than latest publication version '${latestPub.versionKey}'`,
-                    ['metadata', 'version'],
-                  ),
-                ],
-              };
-            }
+          if (cmp < 0) {
+            return {
+              status: 'invalid',
+              issues: [
+                createIssue(
+                  'out-of-range',
+                  `Publication version '${versionKey}' must be strictly greater than latest publication version '${latestPub.versionKey}'`,
+                  ['metadata', 'version'],
+                ),
+              ],
+            };
           }
+        }
 
-          const previousMaxOrdinal = existingPublications.reduce(
-            (max, p) => Math.max(max, p.ordinal),
-            0,
-          );
-          const ordinal = previousMaxOrdinal + 1;
+        const previousMaxOrdinal = existingPublications.reduce(
+          (max, p) => Math.max(max, p.ordinal),
+          0,
+        );
+        const ordinal = previousMaxOrdinal + 1;
 
-          // Merge commit parent IDs: [main head, source head] deduplicated (just [source head] when main is unborn)
-          const parentIds: readonly Id[] =
-            curMain.headCommitId === null
-              ? [curSource.headCommitId!]
-              : curMain.headCommitId === curSource.headCommitId
-                ? [curMain.headCommitId]
-                : [curMain.headCommitId, curSource.headCommitId!];
+        // Merge commit parent IDs: [main head, source head] deduplicated (just [source head] when main is unborn)
+        const planner = new HistoryTransitionPlanner();
+        const parentIds = planner.publicationParents(curMain, curSource);
 
-          const now = Date.now();
-          const commitRow: CommitRecord = {
-            projectId: command.projectId,
-            id: command.payload.mergeCommitId,
-            snapshotId: ticketBinding.snapshotId,
-            parentIds,
-            evidence: command.payload.evidence,
-            evidenceManifest,
-            actor: command.actor,
-            createdAt: now,
-            message: command.payload.metadata.title,
-          };
+        const now = Date.now();
+        const commitRow: CommitRecord = {
+          projectId: command.projectId,
+          id: command.payload.mergeCommitId,
+          snapshotId: ticketBinding.snapshotId,
+          parentIds,
+          evidence: command.payload.evidence,
+          evidenceManifest,
+          actor: command.actor,
+          createdAt: now,
+          message: command.payload.metadata.title,
+        };
 
-          const publicationRow: PublicationRecord = {
-            projectId: command.projectId,
+        const publicationRow: PublicationRecord = {
+          projectId: command.projectId,
+          id: command.payload.publicationId,
+          commitId: command.payload.mergeCommitId,
+          sourceBranchId: ticketBinding.sourceBranchId,
+          previousMainHeadId: curMain.headCommitId,
+          ordinal,
+          actor: command.actor,
+          createdAt: now,
+          metadata: command.payload.metadata,
+          versionKey,
+        };
+
+        const snapshotRow: SnapshotRecord = {
+          projectId: command.projectId,
+          id: ticketBinding.snapshotId,
+          document: ticketBinding.document,
+        };
+
+        // Project limits check
+        const existingSnapshot = await stores.snapshots.get([
+          command.projectId,
+          ticketBinding.snapshotId,
+        ]);
+        let additionalBytes =
+          calculateRecordBytes(commitRow) + calculateRecordBytes(publicationRow);
+        if (!existingSnapshot) {
+          additionalBytes += calculateRecordBytes(snapshotRow);
+        }
+
+        const limitError = await enforceProjectLimits(this.db, {
+          projectId: command.projectId,
+          additionalCommits: 1,
+          additionalReceipts: 1,
+          additionalLocalBytes: additionalBytes,
+          additionalExportBytes: additionalBytes,
+        }, stores);
+        if (limitError) return limitError;
+
+        const transitions = planner.publish(curMain, curSource, {
+          commitId: command.payload.mergeCommitId, snapshotId: ticketBinding.snapshotId, keepSourceOpen,
+        });
+        const updatedProject = planner.project(curProject, now);
+        const nextSourceRev = transitions.source.workingRevision;
+        const nextProjectRev = updatedProject.revision;
+        const writes: OperationWrite<ProjectStorageRows>[] = [];
+        if (!existingSnapshot) writes.push({ kind: 'immutable', store: 'snapshots', key: [command.projectId, ticketBinding.snapshotId], row: snapshotRow });
+        writes.push(
+          { kind: 'immutable', store: 'commits', key: [command.projectId, command.payload.mergeCommitId], row: commitRow },
+          { kind: 'immutable', store: 'publications', key: [command.projectId, command.payload.publicationId], row: publicationRow },
+          { kind: 'update', store: 'branches', key: [command.projectId, curMain.id], row: transitions.main },
+          { kind: 'update', store: 'branches', key: [command.projectId, curSource.id], row: transitions.source },
+          { kind: 'update', store: 'projects', key: command.projectId, row: updatedProject },
+        );
+
+        const appliedResult: AppliedResult = {
+          status: 'applied',
+          operationId: command.operationId,
+          projectRevision: nextProjectRev,
+          branchRevision: nextSourceRev,
+          changedIds: [command.payload.publicationId, command.payload.mergeCommitId],
+          undo: null,
+          value: {
+            kind: 'artifact',
+            artifactType: 'publication',
             id: command.payload.publicationId,
-            commitId: command.payload.mergeCommitId,
-            sourceBranchId: ticketBinding.sourceBranchId,
-            previousMainHeadId: curMain.headCommitId,
-            ordinal,
-            actor: command.actor,
-            createdAt: now,
-            metadata: command.payload.metadata,
-            versionKey,
-          };
+            revision: null,
+          },
+        };
 
-          const snapshotRow: SnapshotRecord = {
-            projectId: command.projectId,
-            id: ticketBinding.snapshotId,
-            document: ticketBinding.document,
-          };
-
-          // Project limits check
-          const existingSnapshot = await this.db.snapshots.get([
-            command.projectId,
-            ticketBinding.snapshotId,
-          ]);
-          let additionalBytes =
-            calculateRecordBytes(commitRow) + calculateRecordBytes(publicationRow);
-          if (!existingSnapshot) {
-            additionalBytes += calculateRecordBytes(snapshotRow);
-          }
-
-          const limitError = await enforceProjectLimits(this.db, {
-            projectId: command.projectId,
-            additionalCommits: 1,
-            additionalReceipts: 1,
-            additionalLocalBytes: additionalBytes,
-            additionalExportBytes: additionalBytes,
-          });
-          if (limitError) return limitError;
-
-          // Write snapshot (insert-if-absent)
-          if (!existingSnapshot) {
-            await insertImmutable(this.db.snapshots, snapshotRow, [
-              command.projectId,
-              ticketBinding.snapshotId,
-            ]);
-          }
-
-          // Write merge commit
-          await insertImmutable(this.db.commits, commitRow, [
-            command.projectId,
-            command.payload.mergeCommitId,
-          ]);
-
-          // Write publication
-          await insertImmutable(this.db.publications, publicationRow, [
-            command.projectId,
-            command.payload.publicationId,
-          ]);
-
-          // Advance main head AND working snapshot to the merge commit/snapshot together
-          const nextMainRev = curMain.workingRevision + 1;
-          await this.db.branches.update([command.projectId, curMain.id], {
-            headCommitId: command.payload.mergeCommitId,
-            workingSnapshotId: ticketBinding.snapshotId,
-            workingRevision: nextMainRev,
-          });
-
-          // Source branch: keeps its head and snapshot and is closed unless keepSourceOpen
-          const nextSourceRev = curSource.workingRevision + 1;
-          await this.db.branches.update([command.projectId, curSource.id], {
-            state: keepSourceOpen ? 'open' : 'closed',
-            workingRevision: nextSourceRev,
-          });
-
-          // Advance project revision
-          const nextProjectRev = curProject.revision + 1;
-          await this.db.projects.update(command.projectId, {
-            revision: nextProjectRev,
-            updatedAt: now,
-          });
-
-          const appliedResult: AppliedResult = {
-            status: 'applied',
-            operationId: command.operationId,
-            projectRevision: nextProjectRev,
-            branchRevision: nextSourceRev,
-            changedIds: [command.payload.publicationId, command.payload.mergeCommitId],
-            undo: null,
-            value: {
-              kind: 'artifact',
-              artifactType: 'publication',
-              id: command.payload.publicationId,
-              revision: null,
-            },
-          };
-
-          await recordOperationReceipt(
-            this.db,
-            command.projectId,
-            command.operationId,
-            requestHash,
-            appliedResult,
-          );
-
-          return appliedResult;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        return { writes, result: appliedResult };
+      },
+    );
   }
 
   /**
@@ -3018,358 +2464,36 @@ export class LocalRepository implements StudioRepository {
   // ==========================================================================
 
   async saveRun(
-    startToken: unknown,
-    terminalResult: unknown,
-    chunks?: unknown,
+    startToken: unknown, terminalResult: unknown, chunks?: unknown,
     options?: { projectId?: Id; document?: Document } | Id,
   ): Promise<SaveRunResult> {
-    // 1. Verify start token against unforgeable registry
-    const tokenBinding = validateRunStartToken(startToken);
-    if (!tokenBinding) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            'Start token is invalid, forged, or not registered in the runner registry',
-            ['startToken'],
-          ),
-        ],
-      };
-    }
-
-    // 2. Validate token object against registry binding
-    if (
-      typeof startToken === 'object' &&
-      startToken !== null &&
-      ((startToken as any).runId !== tokenBinding.runId ||
-        (startToken as any).snapshotId !== tokenBinding.snapshotId ||
-        (startToken as any).fingerprint !== tokenBinding.fingerprint ||
-        (startToken as any).projectId !== tokenBinding.projectId)
-    ) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            'Start token object properties do not match registered binding',
-            ['startToken'],
-          ),
-        ],
-      };
-    }
-
-    // 3. Resolve project ID ONLY from the start token registry binding
-    const projectId: Id = tokenBinding.projectId;
-    if (!projectId || !isValidUuid(projectId)) {
-      return {
-        status: 'invalid',
-        issues: [createIssue('invalid-id', 'Valid projectId is required in start token binding', ['projectId'])],
-      };
-    }
-
-    // If caller-supplied projectId (options or terminalResult) disagrees with the binding -> invalid
-    const callerProjectId = typeof options === 'string' ? options : options?.projectId;
-    if (callerProjectId !== undefined && callerProjectId !== projectId) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            `Caller-supplied projectId (${callerProjectId}) does not match start token binding (${projectId})`,
-            ['projectId'],
-          ),
-        ],
-      };
-    }
-
-    const termProjectId = (terminalResult as any)?.projectId;
-    if (termProjectId !== undefined && termProjectId !== projectId) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            `Terminal result projectId (${termProjectId}) does not match start token binding (${projectId})`,
-            ['projectId'],
-          ),
-        ],
-      };
-    }
-
-    // 4. Verify terminal result
-    if (!terminalResult || typeof terminalResult !== 'object') {
-      return {
-        status: 'invalid',
-        issues: [createIssue('wrong-type', 'Terminal result must be an object', ['terminalResult'])],
-      };
-    }
-    const term = terminalResult as any;
-
-    // Requirement 3: terminalResult.runId must equal the binding's runId
-    if (term.runId !== tokenBinding.runId) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            `Run ID in terminal result (${String(term.runId)}) does not match start token binding (${tokenBinding.runId})`,
-            ['runId'],
-          ),
-        ],
-      };
-    }
-
-    // Requirement 3: terminal manifest fingerprint must equal the binding's fingerprint
-    let termFingerprint =
-      term.fingerprint ?? term.manifestFingerprint ?? (term.manifest as any)?.fingerprint;
-    if (termFingerprint === undefined && term.manifest && typeof term.manifest === 'object') {
-      try {
-        const canon = canonicalJson(term.manifest);
-        if (canon.ok) {
-          termFingerprint = `ss-run-v1:${await sha256Hex(canon.text)}`;
-        }
-      } catch {
-        // ignore error and let check fail below
-      }
-    }
-
-    if (termFingerprint !== tokenBinding.fingerprint) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            `Manifest fingerprint in terminal result (${String(termFingerprint)}) does not match start token binding (${tokenBinding.fingerprint})`,
-            ['fingerprint'],
-          ),
-        ],
-      };
-    }
-
-    // Verify snapshotId match (if present on terminal result)
-    if (term.snapshotId !== undefined && term.snapshotId !== tokenBinding.snapshotId) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'structural-rule',
-            `Snapshot ID in terminal result (${term.snapshotId}) does not match start token binding (${tokenBinding.snapshotId})`,
-            ['snapshotId'],
-          ),
-        ],
-      };
-    }
-
-    // Verify terminal status: only terminal statuses persist
-    const status = term.status;
-    if (!TERMINAL_STATUSES.includes(status)) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'invalid-literal',
-            `Only terminal statuses persist; received non-terminal or unknown status '${String(status)}'`,
-            ['status'],
-          ),
-        ],
-      };
-    }
-
-    // Verify summary
-    const summary = term.summary;
-    if (!summary || typeof summary !== 'object') {
-      return {
-        status: 'invalid',
-        issues: [createIssue('missing-property', 'Run summary is required to save run', ['summary'])],
-      };
-    }
-    const checks = Array.isArray(term.checks) ? term.checks : [];
-
-    // 5. Verify snapshot row exists or insert-if-absent from supplied document
-    const snapshotKey: [string, string] = [projectId, tokenBinding.snapshotId];
-    const existingSnapshot = await this.db.snapshots.get(snapshotKey);
-    const documentToInsert: Document | undefined =
-      typeof options === 'object' && options?.document
-        ? options.document
-        : tokenBinding.document ?? term.document;
-
-    if (!existingSnapshot) {
-      if (documentToInsert) {
-        try {
-          const computedSnapId = await computeSnapshotId(documentToInsert);
-          if (computedSnapId !== tokenBinding.snapshotId) {
-            return {
-              status: 'invalid',
-              issues: [
-                createIssue(
-                  'structural-rule',
-                  `Provided document snapshot ID (${computedSnapId}) does not match token snapshot ID (${tokenBinding.snapshotId})`,
-                  ['snapshotId'],
-                ),
-              ],
+    const service = new RunPersistenceService<FailedResult['code']>({
+      validateToken: validateRunStartToken,
+      loadSnapshot: (projectId, snapshotId) => this.db.snapshots.get([projectId, snapshotId]),
+      loadRun: (projectId, runId) => this.db.runs.get([projectId, runId]),
+      computeSnapshotId, calculateRecordBytes,
+      checkRetention: (projectId, runId) => enforceRunRetentionLimits(this.db, projectId, runId),
+      checkLimits: additions => enforceProjectLimits(this.db, additions),
+      commit: artifacts => {
+        type Rows = { runs: RunRecord; traceChunks: TraceChunkRecord; snapshots: SnapshotRecord };
+        const records: ImmutableRecord<Rows>[] = [];
+        if (artifacts.snapshot) records.push({ store: 'snapshots', key: [artifacts.snapshot.projectId, artifacts.snapshot.id], row: artifacts.snapshot });
+        records.push({ store: 'runs', key: [artifacts.run.projectId, artifacts.run.id], row: artifacts.run });
+        for (const row of artifacts.chunks) records.push({ store: 'traceChunks', key: [row.projectId, row.runId, row.index], row });
+        return new ImmutableArtifactCoordinator<Rows, SaveRunResult>({
+          backend: new IndexedDbBackend<Rows>(this.db, ['runs', 'traceChunks', 'snapshots']),
+          policy: immutablePolicy<Rows>(),
+          failed: error => {
+            if (error instanceof RepositoryError && error.code === 'invalid') return {
+              status: 'invalid', issues: error.issues ?? [createIssue('structural-rule', error.message)],
             };
-          }
-        } catch (err) {
-          if (err instanceof RepositoryError && err.code === 'invalid') {
-            return {
-              status: 'invalid',
-              issues: err.issues ?? [createIssue('structural-rule', err.message, ['document'])],
-            };
-          }
-          throw err;
-        }
-      } else {
-        return {
-          status: 'invalid',
-          issues: [
-            createIssue(
-              'dangling-reference',
-              `Snapshot '${tokenBinding.snapshotId}' does not exist for project '${projectId}' and no document was supplied`,
-              ['snapshotId'],
-            ),
-          ],
-        };
-      }
-    }
-
-    // 5. Check retention & limits before mutation
-    const retentionLimitResult = await enforceRunRetentionLimits(this.db, projectId, tokenBinding.runId);
-    if (retentionLimitResult) {
-      return retentionLimitResult;
-    }
-
-    // Normalize chunks
-    const chunkRecords: TraceChunkRecord[] = [];
-    let chunksAreSaved = false;
-
-    if (chunks !== null && chunks !== undefined) {
-      chunksAreSaved = true;
-      if (Array.isArray(chunks)) {
-        if (chunks.length > 0) {
-          if ('events' in chunks[0] && Array.isArray((chunks[0] as any).events)) {
-            for (let i = 0; i < chunks.length; i++) {
-              const c = chunks[i] as any;
-              const events = c.events;
-              const firstSeq = c.firstSequence ?? (events.length > 0 ? events[0].sequence : 0);
-              const payloads = c.payloads ?? null;
-              const bLength = c.byteLength ?? calculateRecordBytes(events);
-              chunkRecords.push({
-                projectId,
-                runId: tokenBinding.runId,
-                index: c.index ?? i,
-                firstSequence: firstSeq,
-                events,
-                payloads,
-                byteLength: bLength,
-              });
-            }
-          } else if ('kind' in chunks[0] && 'sequence' in chunks[0]) {
-            const events = chunks as readonly TraceEvent[];
-            chunkRecords.push({
-              projectId,
-              runId: tokenBinding.runId,
-              index: 0,
-              firstSequence: events[0].sequence,
-              events,
-              payloads: null,
-              byteLength: calculateRecordBytes(events),
-            });
-          }
-        }
-      }
-    }
-
-    const now = Date.now();
-    const runRecord: RunRecord = {
-      projectId,
-      id: tokenBinding.runId,
-      snapshotId: tokenBinding.snapshotId,
-      manifest: tokenBinding.manifest,
-      fingerprint: tokenBinding.fingerprint,
-      status,
-      provenance: 'local', // set ONLY by the repository!
-      checks,
-      summary,
-      traceState: chunksAreSaved ? 'complete' : 'not-saved',
-      createdAt: tokenBinding.createdAt ?? now,
-      completedAt: term.completedAt ?? now,
-    };
-
-    // Calculate added bytes for project limits
-    let addLocalBytes = calculateRecordBytes(runRecord);
-    let addExportBytes = calculateRecordBytes({ ...runRecord, traceState: 'not-saved' });
-    for (const chunk of chunkRecords) {
-      addLocalBytes += calculateRecordBytes(chunk);
-    }
-    if (!existingSnapshot && documentToInsert) {
-      const snapRecord = { projectId, id: tokenBinding.snapshotId, document: documentToInsert };
-      const snapBytes = calculateRecordBytes(snapRecord);
-      addLocalBytes += snapBytes;
-      addExportBytes += snapBytes;
-    }
-
-    const byteLimitResult = await enforceProjectLimits(this.db, {
-      projectId,
-      additionalLocalBytes: addLocalBytes,
-      additionalExportBytes: addExportBytes,
-      additionalRuns: (await this.db.runs.get([projectId, tokenBinding.runId])) ? 0 : 1,
+            return mapErrorToFailedResult(error);
+          },
+        }).save(records, () => ({ status: 'applied', runId: artifacts.run.id, run: Object.freeze(structuredClone(artifacts.run)) }));
+      },
     });
-    if (byteLimitResult) {
-      return byteLimitResult;
-    }
-
-    // 6. Commit atomically in one transaction
-    try {
-      return await this.db.transaction(
-        'rw',
-        [this.db.runs, this.db.traceChunks, this.db.snapshots],
-        async () => {
-          if (!existingSnapshot && documentToInsert) {
-            await insertImmutable(
-              this.db.snapshots,
-              {
-                projectId,
-                id: tokenBinding.snapshotId,
-                document: documentToInsert,
-              },
-              [projectId, tokenBinding.snapshotId],
-            );
-          }
-
-          // insertImmutable guarantees immutability (insert-if-absent, conflicting content fails with invalid)
-          await insertImmutable(
-            this.db.runs,
-            runRecord,
-            [projectId, tokenBinding.runId],
-          );
-
-          for (const chunk of chunkRecords) {
-            await insertImmutable(
-              this.db.traceChunks,
-              chunk,
-              [projectId, tokenBinding.runId, chunk.index],
-            );
-          }
-
-          return {
-            status: 'applied',
-            runId: tokenBinding.runId,
-            run: Object.freeze(structuredClone(runRecord)),
-          };
-        },
-      );
-    } catch (err: unknown) {
-      if (err instanceof RepositoryError && err.code === 'invalid') {
-        return {
-          status: 'invalid',
-          issues: err.issues ?? [createIssue('structural-rule', err.message)],
-        };
-      }
-      return mapErrorToFailedResult(err);
-    }
+    return service.save(startToken, terminalResult, chunks, options);
   }
-
   async loadRun(projectId: Id, runId: Id): Promise<Readonly<RunRecord> | null> {
     try {
       const record = await this.db.runs.get([projectId, runId]);
@@ -3667,36 +2791,12 @@ export class LocalRepository implements StudioRepository {
    * unchanged.
    */
   async exportProject(params: ExportProjectParams): Promise<ExportProjectResult> {
-    const { projectId, expectedProjectRevision } = params;
-
-    // No `mintId` was injected at construction -- fail fast, before doing any work, rather
-    // than inventing a downloadId.
-    if (!this.mintId) {
-      return {
-        status: 'invalid',
-        issues: [
-          createIssue(
-            'missing-property',
-            'exportProject requires a LocalRepository constructed with an injected mintId; none was provided',
-            ['mintId'],
-          ),
-        ],
-      };
-    }
-    const mintId = this.mintId;
-
-    let read: {
-      project: ProjectRecord;
-      branches: BranchRecord[];
-      snapshots: SnapshotRecord[];
-      commits: CommitRecord[];
-      publications: PublicationRecord[];
-      checkpoints: CheckpointRecord[];
-      runs: RunRecord[];
-      parts: PartRecord[];
-    };
-    try {
-      const outcome = await this.db.transaction(
+    return exportProjectArchive(params, {
+      missingMintIdMessage: 'exportProject requires a LocalRepository constructed with an injected mintId; none was provided',
+      mintId: this.mintId ?? undefined,
+      limits: STORAGE_LIMITS,
+      mapError: mapErrorToFailedResult,
+      reader: { read: async ({ projectId, expectedProjectRevision }) => this.db.transaction(
         'r',
         [
           this.db.projects,
@@ -3736,85 +2836,8 @@ export class LocalRepository implements StudioRepository {
             data: { project, branches, snapshots, commits, publications, checkpoints, runs, parts },
           };
         },
-      );
-      if (outcome.status === 'missing' || outcome.status === 'stale') {
-        return outcome;
-      }
-      read = outcome.data;
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
-
-    const stripProjectId = <T extends { projectId: Id }>(row: T): Omit<T, 'projectId'> => {
-      const { projectId: _drop, ...rest } = row;
-      return rest;
-    };
-
-    const bundle: ProjectBundle = {
-      id: read.project.id,
-      title: read.project.title,
-      createdAt: read.project.createdAt,
-      updatedAt: read.project.updatedAt,
-      mainBranchId: read.project.mainBranchId,
-      initialSnapshotId: read.project.initialSnapshotId,
-      branches: read.branches.map(stripProjectId).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-      snapshots: read.snapshots
-        .map(stripProjectId)
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-      commits: read.commits.map(stripProjectId).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-      publications: read.publications
-        .map(stripProjectId)
-        .sort((a, b) => a.ordinal - b.ordinal),
-      checkpoints: read.checkpoints
-        .map(stripProjectId)
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-      runs: read.runs
-        .map((r) => ({ ...stripProjectId(r), traceState: 'not-saved' as const }))
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
-      parts: read.parts
-        .map(stripProjectId)
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : a.revision - b.revision)),
-    };
-
-    const envelope = { format: PORTABLE_FORMAT, version: PORTABLE_VERSION, project: bundle };
-    const canon = canonicalJson(envelope);
-    if (!canon.ok) {
-      return {
-        status: 'failed',
-        code: 'limit',
-        issues: canon.issues,
-      };
-    }
-    if (canon.bytes > STORAGE_LIMITS.maxExportEnvelopeBytes) {
-      return {
-        status: 'failed',
-        code: 'limit',
-        issues: [
-          createIssue(
-            'too-large',
-            `Export envelope is ${canon.bytes} bytes, exceeding the ${STORAGE_LIMITS.maxExportEnvelopeBytes}-byte (64 MiB) cap; nothing was written`,
-            [],
-            projectId,
-          ),
-        ],
-      };
-    }
-
-    let sha256: string;
-    try {
-      sha256 = await sha256Hex(canon.text);
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
-    const bytes = new TextEncoder().encode(canon.text);
-    const downloadId = mintId();
-
-    return {
-      status: 'done',
-      value: { kind: 'download', downloadId },
-      bytes,
-      sha256,
-    };
+      ) },
+    });
   }
 
   /**
@@ -3954,67 +2977,32 @@ export class LocalRepository implements StudioRepository {
       sumBytes(runRows) +
       sumBytes(partRows);
 
-    try {
-      return await this.db.transaction('rw', getProjectTables(this.db), async () => {
-        const replay = await replayedResult(this.db, newProjectId, command.operationId, requestHash);
-        if (replay) return replay;
-
-        // 2. newProjectId already used by a different import -> rejected.
-        const existingProject = await this.db.projects.get(newProjectId);
-        if (existingProject) {
-          return {
-            status: 'failed',
-            code: 'conflict',
-            issues: [
-              createIssue(
-                'duplicate-id',
-                `Project ${newProjectId} already exists`,
-                ['payload', 'newProjectId'],
-                newProjectId,
-              ),
-            ],
-          } as const;
-        }
-
-        // 3. Project limits on the new namespace (before writing anything): counts
-        // AND accounted bytes (128 MiB local / 64 MiB export), exactly as every other
-        // authored write enforces them.
-        const limitError = await enforceProjectLimits(this.db, {
-          projectId: newProjectId,
-          additionalBranches: branchRows.length,
-          additionalCommits: commitRows.length,
-          additionalCheckpoints: checkpointRows.length,
-          additionalRuns: runRows.length,
-          additionalParts: partRows.length,
-          additionalReceipts: 1,
-          additionalLocalBytes: localBytes,
-          additionalExportBytes: exportBytes,
-        });
-        if (limitError) return limitError;
-
-        // 4. Write everything. Nothing becomes visible unless this whole transaction commits.
-        await this.db.projects.add(projectRow);
-        for (const row of branchRows) await this.db.branches.add(row);
-        for (const row of snapshotRows) await insertImmutable(this.db.snapshots, row, [row.projectId, row.id]);
-        for (const row of commitRows) await insertImmutable(this.db.commits, row, [row.projectId, row.id]);
-        for (const row of publicationRows) {
-          await insertImmutable(this.db.publications, row, [row.projectId, row.id]);
-        }
-        for (const row of checkpointRows) {
-          await insertImmutable(this.db.checkpoints, row, [row.projectId, row.id]);
-        }
-        for (const row of runRows) await insertImmutable(this.db.runs, row, [row.projectId, row.id]);
-        for (const row of partRows) {
-          await insertImmutable(this.db.parts, row, [row.projectId, row.id, row.revision]);
-        }
-
-        await recordOperationReceipt(this.db, newProjectId, command.operationId, requestHash, appliedResult);
-
-        return appliedResult;
-      });
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+    const records: ImmutableRecord<ProjectStorageRows>[] = [
+      ...snapshotRows.map(row => ({ store: 'snapshots' as const, key: [row.projectId, row.id], row })),
+      ...commitRows.map(row => ({ store: 'commits' as const, key: [row.projectId, row.id], row })),
+      ...publicationRows.map(row => ({ store: 'publications' as const, key: [row.projectId, row.id], row })),
+      ...checkpointRows.map(row => ({ store: 'checkpoints' as const, key: [row.projectId, row.id], row })),
+      ...runRows.map(row => ({ store: 'runs' as const, key: [row.projectId, row.id], row })),
+      ...partRows.map(row => ({ store: 'parts' as const, key: [row.projectId, row.id, row.revision], row })),
+    ];
+    return this.projectLifecycle<AuthoredResult>().create(
+      { projectId: newProjectId, operationId: command.operationId, requestHash }, projectRow, {
+        exists: () => ({ status: 'failed', code: 'conflict', issues: [
+          createIssue('duplicate-id', `Project ${newProjectId} already exists`, ['payload', 'newProjectId'], newProjectId),
+        ] }),
+        check: stores => enforceProjectLimits(this.db, {
+          projectId: newProjectId, additionalBranches: branchRows.length,
+          additionalCommits: commitRows.length, additionalCheckpoints: checkpointRows.length,
+          additionalRuns: runRows.length, additionalParts: partRows.length, additionalReceipts: 1,
+          additionalLocalBytes: localBytes, additionalExportBytes: exportBytes,
+        }, stores),
+        initialize: async stores => {
+          for (const row of branchRows) await stores.branches.add([row.projectId, row.id], row);
+          await insertImmutableRecords(stores, records, immutablePolicy<ProjectStorageRows>());
+        },
+        result: appliedResult,
+      },
+    );
   }
 
   /**
@@ -4028,148 +3016,75 @@ export class LocalRepository implements StudioRepository {
    * an error.
    */
   async pruneUnreferenced(params: PruneUnreferencedParams): Promise<PruneUnreferencedResult> {
-    const { projectId, expectedProjectRevision, selection } = params;
-    try {
-      return await this.db.transaction(
-        'rw',
-        getProjectTables(this.db),
-        async () => {
-          const project = await this.db.projects.get(projectId);
-          if (!project) {
-            return { status: 'missing', ids: [projectId] } as const;
+    const coordinator = new ArtifactPruningCoordinator<ProjectStorageRows, PruneUnreferencedResult>({
+      backend: new IndexedDbBackend<ProjectStorageRows>(this.db, getProjectTables(this.db).map(table => table.name as keyof ProjectStorageRows), {
+        traceChunks: [{ name: 'run', keyPath: ['projectId', 'runId'] }],
+      }),
+      traceIndex: 'run',
+      missing: id => ({ status: 'missing', ids: [id] }),
+      stale: (expected, actual) => ({ status: 'stale', scope: 'project', expected, actual }),
+      failed: mapErrorToFailedResult,
+      applied: changes => ({ status: 'applied', ...changes }),
+      protect: async (_stores, project, { projectId, selection }) => {
+        const [branches, commits, publications, checkpoints, runs] = await Promise.all([
+          this.db.branches.where('projectId').equals(projectId).toArray(),
+          this.db.commits.where('projectId').equals(projectId).toArray(),
+          this.db.publications.where('projectId').equals(projectId).toArray(),
+          this.db.checkpoints.where('projectId').equals(projectId).toArray(),
+          this.db.runs.where('projectId').equals(projectId).toArray(),
+        ]);
+
+        const closure = computePinClosure(
+          toPinClosureState({ project, branches, commits, publications, checkpoints, runs }),
+        );
+        const pinnedRunIds = new Set(closure.pinnedRunIds);
+
+        // Pin closure treats every stored run as pinning its own snapshot "pinned or
+        // not" (pin-closure.ts: "every stored run is retained until an explicit prune
+        // removes it"). For deciding whether a SELECTED snapshot may be released by
+        // THIS prune call, "any retained run" therefore means any run
+        // that will still exist after this call -- so the gate and the later deletion
+        // both use a closure computed with `selection.runIds` (full deletions, not
+        // trace-only prunes) already removed, never the raw pre-mutation closure. This
+        // is why selecting a run together with the snapshot it alone referenced can
+        // succeed in one call ("a snapshot referenced only by a pruned run gets
+        // released"), while a snapshot still reachable via a branch, commit, checkpoint,
+        // or a run NOT in `selection.runIds` stays pinned and rejected.
+        const runsExcludingDeletions = runs.filter((r) => !selection.runIds.includes(r.id));
+        const closureExcludingDeletions = computePinClosure(
+          toPinClosureState({ project, branches, commits, publications, checkpoints, runs: runsExcludingDeletions }),
+        );
+        const releasableSnapshotPins = new Set(closureExcludingDeletions.pinnedSnapshotIds);
+
+        // Any selected pinned run (full row deletion) or pinned snapshot -> referenced-
+        // artifact; nothing deleted. A pinned run in `traceRunIds` is NOT rejected here
+        // : pruning trace chunks changes only traceState,
+        // never checks or status, and pinning protects the evidence
+        // run ROW (its fingerprint, checks, status, summary), not its trace bytes.
+        // Trace-only pruning never removes the row a commit's evidence points at, so it
+        // cannot break `referenced-artifact` integrity even when the run is pinned.
+        const referencedIssues: Issue[] = [];
+        for (const runId of selection.runIds) {
+          if (pinnedRunIds.has(runId)) {
+            referencedIssues.push(
+              createIssue('structural-rule', `run '${runId}' is pinned (referenced as commit evidence)`, ['selection', 'runIds'], runId),
+            );
           }
-          if (project.revision !== expectedProjectRevision) {
-            return {
-              status: 'stale',
-              scope: 'project',
-              expected: expectedProjectRevision,
-              actual: project.revision,
-            } as const;
+        }
+        for (const snapshotId of selection.snapshotIds) {
+          if (releasableSnapshotPins.has(snapshotId)) {
+            referencedIssues.push(
+              createIssue('structural-rule', `snapshot '${snapshotId}' is pinned`, ['selection', 'snapshotIds'], snapshotId),
+            );
           }
+        }
+        if (referencedIssues.length > 0) {
+          return { status: 'failed', code: 'referenced-artifact', issues: referencedIssues } as const;
+        }
 
-          const [branches, commits, publications, checkpoints, runs] = await Promise.all([
-            this.db.branches.where('projectId').equals(projectId).toArray(),
-            this.db.commits.where('projectId').equals(projectId).toArray(),
-            this.db.publications.where('projectId').equals(projectId).toArray(),
-            this.db.checkpoints.where('projectId').equals(projectId).toArray(),
-            this.db.runs.where('projectId').equals(projectId).toArray(),
-          ]);
-
-          const closure = computePinClosure(
-            toPinClosureState({ project, branches, commits, publications, checkpoints, runs }),
-          );
-          const pinnedRunIds = new Set(closure.pinnedRunIds);
-          const runById = new Map(runs.map((r) => [r.id, r]));
-
-          // Pin closure treats every stored run as pinning its own snapshot "pinned or
-          // not" (pin-closure.ts: "every stored run is retained until an explicit prune
-          // removes it"). For deciding whether a SELECTED snapshot may be released by
-          // THIS prune call, "any retained run" therefore means any run
-          // that will still exist after this call -- so the gate and the later deletion
-          // both use a closure computed with `selection.runIds` (full deletions, not
-          // trace-only prunes) already removed, never the raw pre-mutation closure. This
-          // is why selecting a run together with the snapshot it alone referenced can
-          // succeed in one call ("a snapshot referenced only by a pruned run gets
-          // released"), while a snapshot still reachable via a branch, commit, checkpoint,
-          // or a run NOT in `selection.runIds` stays pinned and rejected.
-          const runsExcludingDeletions = runs.filter((r) => !selection.runIds.includes(r.id));
-          const closureExcludingDeletions = computePinClosure(
-            toPinClosureState({ project, branches, commits, publications, checkpoints, runs: runsExcludingDeletions }),
-          );
-          const releasableSnapshotPins = new Set(closureExcludingDeletions.pinnedSnapshotIds);
-
-          // Any selected pinned run (full row deletion) or pinned snapshot -> referenced-
-          // artifact; nothing deleted. A pinned run in `traceRunIds` is NOT rejected here
-          // : pruning trace chunks changes only traceState,
-          // never checks or status, and pinning protects the evidence
-          // run ROW (its fingerprint, checks, status, summary), not its trace bytes.
-          // Trace-only pruning never removes the row a commit's evidence points at, so it
-          // cannot break `referenced-artifact` integrity even when the run is pinned.
-          const referencedIssues: Issue[] = [];
-          for (const runId of selection.runIds) {
-            if (pinnedRunIds.has(runId)) {
-              referencedIssues.push(
-                createIssue('structural-rule', `run '${runId}' is pinned (referenced as commit evidence)`, ['selection', 'runIds'], runId),
-              );
-            }
-          }
-          for (const snapshotId of selection.snapshotIds) {
-            if (releasableSnapshotPins.has(snapshotId)) {
-              referencedIssues.push(
-                createIssue('structural-rule', `snapshot '${snapshotId}' is pinned`, ['selection', 'snapshotIds'], snapshotId),
-              );
-            }
-          }
-          if (referencedIssues.length > 0) {
-            return { status: 'failed', code: 'referenced-artifact', issues: referencedIssues } as const;
-          }
-
-          const alreadyAbsentIds: Id[] = [];
-          const deletedRunIds: Id[] = [];
-          const tracePrunedRunIds: Id[] = [];
-
-          // traceRunIds: delete trace chunks and set traceState 'pruned' only.
-          for (const runId of selection.traceRunIds) {
-            const run = runById.get(runId);
-            if (!run) {
-              alreadyAbsentIds.push(runId);
-              continue;
-            }
-            await this.db.traceChunks
-              .where('[projectId+runId]')
-              .equals([projectId, runId])
-              .delete();
-            if (run.traceState !== 'pruned') {
-              await this.db.runs.put({ ...run, traceState: 'pruned' });
-            }
-            tracePrunedRunIds.push(runId);
-          }
-
-          // Selected unpinned runs: delete the run row and its chunks entirely.
-          for (const runId of selection.runIds) {
-            const run = runById.get(runId);
-            if (!run) {
-              alreadyAbsentIds.push(runId);
-              continue;
-            }
-            await this.db.traceChunks
-              .where('[projectId+runId]')
-              .equals([projectId, runId])
-              .delete();
-            await this.db.runs.delete([projectId, runId]);
-            deletedRunIds.push(runId);
-          }
-
-          // A snapshot is deleted only if unpinned in `closureExcludingDeletions`, computed
-          // above BEFORE any mutation (the same closure already used for the
-          // referenced-artifact gate, so every requested snapshotId here is guaranteed
-          // either absent or already known-unpinned).
-          const deletedSnapshotIds: Id[] = [];
-          for (const snapshotId of selection.snapshotIds) {
-            const existing = await this.db.snapshots.get([projectId, snapshotId]);
-            if (!existing) {
-              alreadyAbsentIds.push(snapshotId);
-              continue;
-            }
-            await this.db.snapshots.delete([projectId, snapshotId]);
-            deletedSnapshotIds.push(snapshotId);
-          }
-
-          const nextRevision = project.revision + 1;
-          await this.db.projects.put({ ...project, revision: nextRevision, updatedAt: Date.now() });
-
-          return {
-            status: 'applied',
-            projectRevision: nextRevision,
-            deletedRunIds,
-            tracePrunedRunIds,
-            deletedSnapshotIds,
-            alreadyAbsentIds,
-          } as const;
-        },
-      );
-    } catch (err) {
-      return mapErrorToFailedResult(err);
-    }
+        return null;
+      },
+    });
+    return coordinator.prune(params);
   }
 }

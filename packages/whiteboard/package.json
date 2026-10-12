@@ -1,0 +1,54 @@
+{
+  "name": "@canvas-one/whiteboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "examples",
+    "schema"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./document": {
+      "types": "./dist/document.d.ts",
+      "import": "./dist/document.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./extensions": {
+      "types": "./dist/extensions.d.ts",
+      "import": "./dist/extensions.js"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "import": "./dist/editor.js"
+    },
+    "./planners": {
+      "types": "./dist/planners.d.ts",
+      "import": "./dist/planners.js"
+    },
+    "./schema/board-v1.json": "./schema/board-v1.json",
+    "./export/raster": {
+      "types": "./dist/export/raster.d.ts",
+      "import": "./dist/export/raster.js"
+    },
+    "./browser/raster": {
+      "types": "./dist/browser/raster.d.ts",
+      "import": "./dist/browser/raster.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

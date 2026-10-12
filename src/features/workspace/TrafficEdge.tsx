@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useStore, useViewport, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useStore, useViewport, type EdgeProps } from '@canvas-one/editor-reactflow/react';
 import { CellsAndLanesConnection, CellsAndLanesConnectionInspection } from '@/components/traffic/cells-and-lanes';
 import { PlaybackTrafficContext } from './usePlaybackTraffic';
 import { SimulationHighlightContext } from './SimulationHighlight';

@@ -1,7 +1,7 @@
 # Canvas One composable architecture plan
 
-Status: implementation authorized by the user, proceeding through the gated phases below. The first tranche establishes ownership ADRs, moves the existing Next entry to `apps/web`, and extracts UI leaves, playback timeframe primitives and command execution. The remaining packages and AI integration are not yet delivered.
-Baseline: restored commit `8f41338`. Updated 2026-10-11.
+Status: integrated implementation on `codex/authoring-contracts`, based on merged PR #1; implementation and final verification are complete, pending user review/merge. All sixteen package workspaces contain extracted behavior. The existing complete Next.js workspace supports reviewable AI collaboration and host-contributed components/actions. See [composables](composables.md) for the actual public APIs and HANDOFF.md for checks. No alternate old/new product route was introduced.
+Baseline: restored commit `8f41338`. Updated 2026-10-12.
 
 ## Product requirements
 

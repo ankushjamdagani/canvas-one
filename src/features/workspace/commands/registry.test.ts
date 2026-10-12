@@ -21,11 +21,48 @@ import {
   type ShortcutEvent,
 } from './registry';
 import { DEFAULT_DOCK_CONFIG } from '../dockConfig';
+import { CommandRegistry, type PaletteCommandContribution } from '@canvas-one/commands';
+import { buildContributedQuickOptions } from './registry';
 
 const MAIN = 'b0000000-0000-4000-8000-000000000001';
 const DRAFT = 'b0000000-0000-4000-8000-000000000002';
 const OTHER = 'b0000000-0000-4000-8000-000000000003';
 const SCENARIO = 'c0000000-0000-4000-8000-000000000001';
+
+describe('host command palette contributions', () => {
+  it('discovers validated host rows, rechecks availability at execution and disposes per instance', async () => {
+    const registry = new CommandRegistry<CommandContext>();
+    const other = new CommandRegistry<CommandContext>();
+    const execute = vi.fn();
+    const contribution: PaletteCommandContribution<CommandContext> = {
+      definition: { metadata: {id: 'host/explain', label: 'Explain selection', keywords: ['architecture'], effect: 'query'},
+        validate: input => input === 'selection' ? {valid: true, value: input} : {valid: false, reason: 'Choose selection'},
+        availability: ctx => ctx.storageState === 'ready' ? {enabled: true} : {enabled: false, code: 'storage', reason: 'Storage unavailable'},
+        execute }, palette: {input: 'selection'},
+    };
+    const registration = registry.register(contribution.definition);
+    const group = buildContributedQuickOptions(registry, [contribution], makeContext())!;
+    expect(group.options[0].keywords).toContain('architecture');
+    expect(group.options[0].availability.enabled).toBe(true);
+    await registry.execute('host/explain', 'selection', makeContext({storageState: 'failed'}));
+    expect(execute).not.toHaveBeenCalled();
+    await registry.execute('host/explain', 'selection', makeContext());
+    expect(execute).toHaveBeenCalledOnce();
+    expect(buildContributedQuickOptions(other, [contribution], makeContext())).toBeNull();
+    registration.dispose();
+    expect(buildContributedQuickOptions(registry, [contribution], makeContext())).toBeNull();
+  });
+  it('advertises unsupported custom forms explicitly rather than manufacturing inputs', () => {
+    const registry = new CommandRegistry<CommandContext>();
+    const contribution: PaletteCommandContribution<CommandContext> = {
+      definition: {metadata: {id: 'host/configure', label: 'Configure host', effect: 'ui'},
+        validate: () => ({valid: true, value: {}}), availability: () => ({enabled: true}), execute: vi.fn()},
+    };
+    registry.register(contribution.definition);
+    const option = buildContributedQuickOptions(registry, [contribution], makeContext())!.options[0];
+    expect(option.availability).toMatchObject({enabled: false, code: 'unsupported-palette-input'});
+  });
+});
 
 function makeContext(overrides: Partial<CommandContext> = {}): CommandContext {
   return {
@@ -401,7 +438,7 @@ describe('panel, results and inspector availability', () => {
 
   it('lists close rows in Quick options only while their surface is open', () => {
     const idle = buildQuickOptions(makeContext()).find((g) => g.group === 'review')!;
-    const base = ['history.open', 'history.commit', 'history.prepare-publish', 'library.open', 'results.open'];
+    const base = ['agents.open', 'history.open', 'history.commit', 'history.prepare-publish', 'library.open', 'results.open'];
     expect(idle.options.map((o) => o.id)).toEqual(base);
     const open = buildQuickOptions(makeContext({ panels: OPEN_PANELS, resultsVisible: true })).find((g) => g.group === 'review')!;
     expect(open.options.map((o) => o.id)).toEqual([...base, 'history.close', 'library.close', 'results.close']);
@@ -573,8 +610,12 @@ describe('matchGlobalShortcut', () => {
     expect(matchGlobalShortcut(keyEvent({ key: 'F2', inDialog: true }), true)).toBeNull();
   });
 
-  it('has no ⌘K / ⌘R / ⌘H / ⌘B / ⌘L bindings', () => {
-    for (const key of ['k', 'r', 'h', 'b', 'l']) {
+  it('opens the command center with Mod+K while preserving unrelated native shortcuts', () => {
+    expect(matchGlobalShortcut(keyEvent({ key: 'k', metaKey: true }), true)).toBe('commands.open');
+    expect(matchGlobalShortcut(keyEvent({ key: 'k', ctrlKey: true }), false)).toBe('commands.open');
+    expect(matchGlobalShortcut(keyEvent({ key: 'k', metaKey: true, inEditableField: true }), true)).toBeNull();
+    expect(matchGlobalShortcut(keyEvent({ key: 'k', metaKey: true, inDialog: true }), true)).toBeNull();
+    for (const key of ['r', 'h', 'b', 'l']) {
       expect(matchGlobalShortcut(keyEvent({ key, metaKey: true }), true)).toBeNull();
     }
   });

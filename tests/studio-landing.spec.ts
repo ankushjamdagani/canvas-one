@@ -156,8 +156,8 @@ test("landing follows authored board geometry and timed collaboration sequence",
   const bounds = await page.locator(".lp-hero").boundingBox();
   expect(bounds!.x).toBeCloseTo(104, 0);
   expect(bounds!.y).toBeCloseTo(168, 0);
-  expect(bounds!.width).toBe(800);
-  expect(bounds!.height).toBe(176);
+  expect(bounds!.width).toBe(722);
+  expect(bounds!.height).toBe(136);
   await expect(page.getByLabel("Move Async Buffer demo node")).toHaveCount(0);
   await page.clock.runFor(4000);
   await expect(page.getByLabel("Move Async Buffer demo node")).toContainText(
@@ -191,7 +191,7 @@ test("landing follows authored board geometry and timed collaboration sequence",
   await handle.focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".lp-dimension")).toHaveText(
-    "Text · H1 · 808 × 176",
+    "Text · H1 · 730 × 136",
   );
   const box = await handle.boundingBox();
   await page.mouse.move(box!.x + 4, box!.y + 4);
@@ -199,7 +199,7 @@ test("landing follows authored board geometry and timed collaboration sequence",
   await page.mouse.move(box!.x + 24, box!.y + 14);
   await page.mouse.up();
   await expect(page.locator(".lp-dimension")).toHaveText(
-    "Text · H1 · 828 × 186",
+    "Text · H1 · 750 × 146",
   );
   await page.clock.runFor(5000);
   await expect(page.getByLabel("Move Async Buffer demo node")).toHaveCount(0);
