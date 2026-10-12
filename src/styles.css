@@ -41,7 +41,9 @@
   margin-inline: calc(23px - var(--page-gutter, 32px));
   padding: 13px calc(var(--page-gutter, 32px) - 23px);
 }
-.public-header, .page-header-surface {
+.public-header { isolation: isolate; border-bottom: 1px solid transparent; }
+.public-header-surface { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.public-header-surface, .page-header-surface {
   background: color-mix(in srgb, var(--shell) 80%, transparent);
   backdrop-filter: blur(16px) saturate(1.4);
   border-bottom: 1px solid var(--hairline);
@@ -756,6 +758,7 @@ body {
   animation: initial-loader-timeout 0s 3s forwards;
 }
 .initial-load-overlay[hidden] { display: none; }
+.loading-face { display: grid; place-items: center; }
 @media (prefers-reduced-motion: reduce) {
-  .initial-load-overlay .canvas-one-face * { animation: none !important; transition: none !important; }
+  .loading-face .canvas-one-face * { animation: none !important; transition: none !important; }
 }

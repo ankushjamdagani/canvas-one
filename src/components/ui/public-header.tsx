@@ -7,6 +7,7 @@ import { Button } from './button';
 import { Reveal } from './reveal';
 import { cn } from '@/lib/utils';
 import { formatRoute } from '@/lib/router';
+import { HeaderSurface } from './header-surface';
 
 /** Shared chrome for public pages; projects replace the beta action with their owner. */
 export function PublicHeader({ page, collaborators, owner, className, basePath }: {
@@ -17,6 +18,7 @@ export function PublicHeader({ page, collaborators, owner, className, basePath }
   basePath?: string;
 }) {
   return <header className={cn('public-header', className)}>
+    <HeaderSurface />
     <Reveal as="a" kind="chrome" index={0} href={formatRoute({ kind: 'home' }, basePath)} className="public-brand">
       <BrandMark /><span className="brand-wordmark">Canvas One</span>
     </Reveal>

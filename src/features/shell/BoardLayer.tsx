@@ -20,12 +20,16 @@ export function BoardLayer({
   intro,
   shift,
   paused,
+  onFrameStart,
+  onFrameComplete,
 }: {
   visible: boolean;
   /** Decided once at first mount: play the load intro. */
   intro: boolean;
   shift: BoardShift;
   paused: boolean;
+  onFrameStart?: () => void;
+  onFrameComplete?: () => void;
 }) {
   const env = useMotionEnv();
   const skipInitialEntrance = useSkipInitialEntrance();
@@ -44,10 +48,14 @@ export function BoardLayer({
   const frame = React.useRef<HTMLDivElement>(null);
 
   React.useLayoutEffect(() => {
-    if (!playIntro || skipInitialEntrance() || window.matchMedia('(prefers-reduced-motion: reduce)').matches || motionOff()) return;
+    if (!playIntro || skipInitialEntrance() || window.matchMedia('(prefers-reduced-motion: reduce)').matches || motionOff()) {
+      return;
+    }
     const d = dots.current;
     const f = frame.current;
     if (!d || !f) return;
+    onFrameStart?.();
+    let active = true;
     const controls = [
       animate(d, { opacity: [0, 1], scale: [BOARD.dotsScale, 1] }, { duration: BOARD.dotsIntro, ease: EASE.enter }),
       ...Array.from(f.querySelectorAll<HTMLElement>('.drafting-frame-side')).map((side) =>
@@ -56,7 +64,9 @@ export function BoardLayer({
       animate(f.querySelector<HTMLElement>('.drafting-frame-ring')!, { opacity: [0, 1], scale: [0.995, 1] },
         { duration: BOARD.ringDuration, delay: BOARD.ringDelay, ease: EASE.enter }),
     ];
+    void controls.at(-1)!.then(() => { if (active) { active = false; onFrameComplete?.(); } });
     return () => {
+      if (active) { active = false; onFrameComplete?.(); }
       controls.forEach((c) => c.stop());
       d.style.opacity = '1';
       d.style.transform = '';
@@ -65,7 +75,7 @@ export function BoardLayer({
         el.style.opacity = '1';
       });
     };
-  }, [playIntro, skipInitialEntrance]);
+  }, [playIntro, skipInitialEntrance, onFrameStart, onFrameComplete]);
 
   React.useEffect(() => {
     if (!shift.n || env.reduced) return;
@@ -88,18 +98,22 @@ export function BoardLayer({
   }, [shift.n, shift.dir, env.reduced, mounted]);
 
   // Frame choreography continues even after the hidden dot canvas is released.
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!shift.n || env.reduced) return;
     const ring = frame.current?.querySelector<HTMLElement>('.drafting-frame-ring');
     if (!ring) return;
+    onFrameStart?.();
+    let active = true;
     const control = animate(ring, { opacity: [1, 0.25, 1] }, {
       duration: BOARD.shiftDuration, ease: EASE.inOut, times: [0, 0.45, 1],
     });
+    void control.then(() => { if (active) { active = false; onFrameComplete?.(); } });
     return () => {
+      if (active) { active = false; onFrameComplete?.(); }
       control.stop();
       ring.style.opacity = '1';
     };
-  }, [shift.n, env.reduced]);
+  }, [shift.n, env.reduced, onFrameStart, onFrameComplete]);
 
   return (
     <div

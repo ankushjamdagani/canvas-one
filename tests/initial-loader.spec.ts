@@ -16,6 +16,7 @@ test(`${reducedMotion}: logo cover appears before hydration, times out, and late
     const loader = page.locator('[data-initial-loader]');
     await expect(loader).toBeVisible();
     await expect(loader.locator('svg')).toHaveAttribute('data-expression', 'wink');
+    await expect(loader.locator('svg')).toHaveAttribute('width', '128');
     if (reducedMotion === 'reduce') await expect(loader.locator('svg circle').first()).toHaveCSS('animation-name', 'none');
     else await page.screenshot({ path: '/private/tmp/loader-first-paint.png' });
     expect(await loader.evaluate(el => {
@@ -38,6 +39,7 @@ test(`${reducedMotion}: logo cover appears before hydration, times out, and late
     await page.waitForLoadState('networkidle');
     expect(await page.evaluate(() => (window as unknown as { initialOpacity: number[] }).initialOpacity.every(v => v === 1))).toBe(true);
     await expect(loader).toBeHidden();
+    await expect(page.locator('[data-header-surface]')).toHaveCSS('opacity', '1');
     expect(errors).toEqual([]);
     await page.getByRole('link', { name: 'Brand', exact: true }).click();
     await expect(page.locator('[data-page-kind="brand"] h1')).toBeFocused();

@@ -13,6 +13,7 @@ import type { PageKind } from '@/lib/motion/direction';
 import { ShellReady } from '@/lib/motion/shell-context';
 import { Button } from '@/components/ui/button';
 import { usePageMetadata } from '@/lib/usePageMetadata';
+import { LoadingFace } from '@/components/ui/loading-face';
 
 // The workspace (canvas, panels, history, runs) is its own chunk: the entry screen renders
 // without it, and it is prefetched once the browser is idle so opening a project stays fast.
@@ -20,12 +21,11 @@ const Workspace = lazyComponent<
   React.ComponentProps<typeof import('./features/workspace/Workspace').Workspace>
 >(
   () => import('./features/workspace/Workspace').then((module) => module.Workspace),
-  <div
+  <LoadingFace
     data-testid="workspace-loading-screen"
-    className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
-  >
-    Opening project…
-  </div>,
+    className="min-h-screen w-full bg-shell text-ink"
+    label="Opening project"
+  />,
 );
 // Shared with the workspace's RunController through its mintId prop.
 const MINT_ID = () => crypto.randomUUID();
@@ -188,12 +188,10 @@ export default function App({
 
     if (bootState.status === 'booting') {
       return (
-        <div
+        <LoadingFace
           data-testid="boot-loading-screen"
-          className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
-        >
-          Loading Canvas One…
-        </div>
+          className="min-h-screen w-full bg-shell text-ink"
+        />
       );
     }
 
@@ -346,12 +344,11 @@ function StudioShell({
       );
     }
     return (
-      <div
+      <LoadingFace
         data-testid="workspace-loading-screen"
-        className="min-h-screen w-full flex items-center justify-center bg-shell text-xs text-secondary-text"
-      >
-        Opening project…
-      </div>
+        className="min-h-screen w-full bg-shell text-ink"
+        label="Opening project"
+      />
     );
   };
 

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CanvasOneFace } from './canvas-one-face';
+import { LoadingFace } from './loading-face';
 import { initialLoadExpired } from '@/lib/motion/initial-load';
 
 const InitialLoadContext = React.createContext<() => boolean>(() => false);
@@ -17,8 +17,8 @@ export function InitialLoad({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <InitialLoadContext.Provider value={skip}>
-      <div ref={loader} data-initial-loader className="initial-load-overlay" role="status" aria-label="Loading Canvas One" suppressHydrationWarning>
-        <CanvasOneFace size={64} expression="wink" transition={false} />
+      <div ref={loader} data-initial-loader className="initial-load-overlay" suppressHydrationWarning>
+        <LoadingFace />
       </div>
       {children}
     </InitialLoadContext.Provider>

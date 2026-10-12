@@ -3468,3 +3468,10 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 
 - Removed the three auxiliary checkouts (initial-load, canvas-one-mcp, local-ai-setup), retaining the primary checkout, local feature branches and existing PRs. All three had clean tracked/untracked status; ignored files were generated dependencies/build artifacts.
 - Preservation: all Git refs saved in `/private/tmp/system-studio-worktrees-20261012.bundle`. Codex; no subagents. Verification: worktree inventory checked before/after removal. No application changes or tests required.
+
+### 2026-10-12 — Larger loading face and header sequencing
+
+- Outcome: doubled the loader face to 128px through one shared loading component; replaced visible boot/opening/embedded loading text with the face. Public header background and bottom border now fade after actual frame completion, including overlapping/cancelled intros and route shifts.
+- Files: loading/header foundation components, initial cover, App/embed fallbacks, BoardLayer/RouteShell readiness, CSS, Storybook and browser coverage; HANDOFF/LESSONS updated. Codex; no subagents.
+- Verification: production and Storybook builds passed; final units 2,130 passed / 12 skipped; all 16 focused production browser checks passed, plus a desktop/mobile visual confirmation of the header and larger face. Full browser suite not run. Existing Storybook chunk warnings remain.
+- Lesson: header material sits outside child content reveals and needs its own completion gate; count overlapping frame animations rather than relying on a fixed delay or a single ready boolean.
