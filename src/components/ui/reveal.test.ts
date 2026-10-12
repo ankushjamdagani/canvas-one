@@ -25,11 +25,14 @@ describe('Reveal', () => {
     expect(html).toContain('a');
   });
 
-  it('keeps routed public content visible in server HTML', () => {
+  it('ships a finite CSS entrance with server HTML instead of hiding it during hydration', () => {
     const html = renderToStaticMarkup(React.createElement(RevealScope, { phase: 'enter', baseDelay: 1.4 },
       React.createElement(Reveal, {}, 'Searchable public content')));
     expect(html).toContain('Searchable public content');
     expect(html).not.toMatch(/opacity:0|visibility:hidden|blur\(/);
+    expect(html).toContain('data-reveal-phase="enter"');
+    expect(html).toContain('--reveal-delay:1.4s');
+    expect(html).toContain('--reveal-duration:0.9s');
   });
 
   it('hidden/enter/exit variants resolve the spec', () => {

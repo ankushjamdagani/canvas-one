@@ -41,29 +41,8 @@ export function BoardLayer({
   const dots = React.useRef<HTMLDivElement>(null);
   const frame = React.useRef<HTMLDivElement>(null);
 
-  React.useLayoutEffect(() => {
-    if (!playIntro) return;
-    const d = dots.current;
-    const f = frame.current;
-    if (!d || !f) return;
-    const controls = [
-      animate(d, { opacity: [0, 1], scale: [BOARD.dotsScale, 1] }, { duration: BOARD.dotsIntro, ease: EASE.enter }),
-      ...Array.from(f.querySelectorAll<HTMLElement>('.drafting-frame-side')).map((side) =>
-        animate(side, { [side.classList.contains('drafting-frame-top') || side.classList.contains('drafting-frame-bottom') ? 'scaleX' : 'scaleY']: [0, 1] },
-          { duration: BOARD.frameIntro, delay: BOARD.frameDelay, ease: EASE.inOut })),
-      animate(f.querySelector<HTMLElement>('.drafting-frame-ring')!, { opacity: [0, 1], scale: [0.995, 1] },
-        { duration: BOARD.ringDuration, delay: BOARD.ringDelay, ease: EASE.enter }),
-    ];
-    return () => {
-      controls.forEach((c) => c.stop());
-      d.style.opacity = '1';
-      d.style.transform = '';
-      f.querySelectorAll<HTMLElement>('.drafting-frame-side, .drafting-frame-ring').forEach((el) => {
-        el.style.transform = '';
-        el.style.opacity = '1';
-      });
-    };
-  }, [playIntro]);
+  // Intro is declarative CSS so server paint and hydration share one timeline.
+  // Imperative animation below is reserved for later route shifts.
 
   React.useEffect(() => {
     if (!shift.n || env.reduced) return;
@@ -103,11 +82,19 @@ export function BoardLayer({
     <div
       data-testid="route-board"
       data-intro={String(playIntro)}
+      style={{
+        '--board-dots-duration': `${BOARD.dotsIntro}s`,
+        '--board-dots-scale': BOARD.dotsScale,
+        '--board-frame-duration': `${BOARD.frameIntro}s`,
+        '--board-frame-delay': `${BOARD.frameDelay}s`,
+        '--board-ring-duration': `${BOARD.ringDuration}s`,
+        '--board-ring-delay': `${BOARD.ringDelay}s`,
+      } as React.CSSProperties}
       aria-hidden="true"
       className="pointer-events-none absolute inset-0"
     >
       <div className="fixed inset-0 z-0 transition-opacity" style={{ opacity: visible ? 1 : 0, transitionDuration: `${fadeSeconds}s` }}>
-        {mounted && <div ref={dots} className="absolute inset-0" style={{ opacity: playIntro && !shift.n ? 0 : 1 }}>
+        {mounted && <div ref={dots} data-board-dots className="absolute inset-0" style={{ opacity: 1 }}>
           <DraftingGround paused={paused || !visible} pointerSource="document" />
         </div>}
       </div>

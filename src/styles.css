@@ -743,3 +743,51 @@ body {
     animation: none !important;
   }
 }
+/* Entry begins with the stylesheet, before hydration. Finite CSS animation also
+   leaves public content visible when JavaScript is unavailable. No fill-forwards:
+   a completed reveal must not retain a transform/filter stacking context. */
+@keyframes studio-reveal-enter {
+  from { opacity: 0; transform: translateY(var(--reveal-y)); filter: blur(var(--reveal-blur)); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes studio-board-dots {
+  from { opacity: 0; transform: scale(var(--board-dots-scale)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes studio-board-horizontal { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes studio-board-vertical { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes studio-board-ring {
+  from { opacity: 0; transform: scale(0.995); }
+  to { opacity: 1; transform: none; }
+}
+[data-intro="true"] [data-board-dots] {
+  animation: studio-board-dots var(--board-dots-duration) cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+[data-intro="true"] .drafting-frame-top,
+[data-intro="true"] .drafting-frame-bottom {
+  animation: studio-board-horizontal var(--board-frame-duration) cubic-bezier(0.65, 0, 0.35, 1) var(--board-frame-delay) backwards;
+}
+[data-intro="true"] .drafting-frame-left,
+[data-intro="true"] .drafting-frame-right {
+  animation: studio-board-vertical var(--board-frame-duration) cubic-bezier(0.65, 0, 0.35, 1) var(--board-frame-delay) backwards;
+}
+[data-intro="true"] .drafting-frame-ring {
+  animation: studio-board-ring var(--board-ring-duration) cubic-bezier(0.22, 1, 0.36, 1) var(--board-ring-delay) backwards;
+}
+[data-reveal-phase="enter"] {
+  animation: studio-reveal-enter var(--reveal-duration) cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-intro="true"] [data-board-dots],
+  [data-intro="true"] .drafting-frame-side,
+  [data-intro="true"] .drafting-frame-ring { animation: none; }
+  [data-reveal-phase="enter"] {
+    --reveal-y: 0px !important;
+    --reveal-blur: 0px !important;
+    --reveal-duration: 0.001s !important;
+    --reveal-delay: 0s !important;
+  }
+}
+@media (pointer: coarse) {
+  [data-reveal-phase="enter"] { --reveal-blur: 0px !important; }
+}

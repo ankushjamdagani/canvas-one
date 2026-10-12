@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { m, useAnimationControls } from 'motion/react';
+import { m, useAnimationControls, useIsPresent } from 'motion/react';
 import { useMotionEnv } from '@/lib/motion/env';
 import {
   EASE,
@@ -95,18 +95,27 @@ export type RevealProps = HtmlProps & {
 export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...rest }: RevealProps) {
   const scope = React.useContext(ScopeContext);
   const env = useMotionEnv();
+  const isPresent = useIsPresent();
+  const phase = isPresent ? scope.phase : 'exit';
   const controls = useAnimationControls();
   const element = React.useRef<HTMLElement>(null);
-  const started = React.useRef(false);
-  // Public server HTML stays visible. Apply the initial pose only after hydration,
-  // before paint; late-mounted workspace content gets the same entry sequence.
+  const previousPhase = React.useRef(scope.phase);
+  // CSS owns entry from first paint, including server HTML before hydration.
+  // Motion owns exit only; hydration must never rewind an already-painted entry.
   React.useLayoutEffect(() => {
+    const previous = previousPhase.current;
+    previousPhase.current = scope.phase;
     if (!scope.phase) return;
-    if (!started.current) {
-      controls.set('hidden');
-      started.current = true;
+    if (scope.phase !== 'exit') {
+      controls.stop();
+      if (previous === 'exit' && element.current) {
+        element.current.style.opacity = rest.style?.opacity?.toString() ?? '';
+        element.current.style.transform = rest.style?.transform ?? '';
+        element.current.style.filter = rest.style?.filter ?? '';
+      }
+      return;
     }
-    void controls.start(scope.phase);
+    void controls.start('exit');
     return () => controls.stop();
   }, [controls, scope.phase, env.reduced, env.off, env.coarse]);
   const custom = React.useMemo<Custom>(
@@ -120,14 +129,25 @@ export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...r
   return (
     <Tag
       {...rest}
+      style={scope.phase ? {
+        ...rest.style,
+        '--reveal-y': `${custom.enter.y}px`,
+        '--reveal-blur': `${custom.enter.blur}px`,
+        '--reveal-duration': `${custom.enter.duration}s`,
+        '--reveal-delay': `${custom.enter.delay}s`,
+      } as React.CSSProperties : rest.style}
       ref={element}
       variants={revealVariants}
       custom={custom}
       initial={false}
       animate={scope.phase ? controls : undefined}
       exit="exit"
-      onAnimationComplete={(definition: unknown) => {
-        if (definition === 'enter' && element.current) scope.onEntered?.(element.current);
+      data-reveal-phase={phase}
+      onAnimationEnd={(event: React.AnimationEvent<HTMLElement>) => {
+        rest.onAnimationEnd?.(event);
+        if (event.target === event.currentTarget && event.animationName.endsWith('studio-reveal-enter')) {
+          scope.onEntered?.(event.currentTarget);
+        }
       }}
       data-reveal-kind={kind}
       data-reveal-index={index}

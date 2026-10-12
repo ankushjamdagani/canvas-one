@@ -3449,3 +3449,10 @@ Configured repository-scoped Model Context Protocol (MCP) server `canvas-one` ac
 Configured stdio command `node` with portable repository-relative arguments `./packages/cli/dist/main.js mcp` and environment variables `CANVAS_ONE_BRIDGE_URL=http://127.0.0.1:47831` and `CANVAS_ONE_AGENT_TOKEN=<agentToken printed by bridge>`.
 Platform: agy.
 Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp get canvas-one` (status: enabled); verified Claude Code MCP discovery with `claude mcp list` (detected `canvas-one` stdio server, pending approval); verified Antigravity `.agents/mcp_config.json` schema matches `~/.gemini/config/mcp_config.json` and builtin agy-customizations specification; ran full unit test suite (2,130 passed, 12 skipped).
+
+### 2026-10-12 — Initial-load flash
+
+- Outcome: finite CSS entrances establish reveal/frame/dot poses before first paint and continue across delayed hydration; Motion retains exit and route-shift orchestration. Reduced-motion CSS applies before hydration, and no-JavaScript content becomes fully visible.
+- Files: shared reveal, BoardLayer, foundation CSS, reveal unit and production browser regressions; HANDOFF and LESSONS updated. Platform: Codex; no subagents.
+- Verification: production build and Storybook build passed; 2,130 units passed / 12 skipped; ten focused production browser checks passed (first-frame monotonic opacity, delayed hydration, no-JavaScript visibility, reduced motion, exits, heading focus, card overlay, rapid navigation and cancelled exit). Full browser suite not run. Existing Storybook chunk warnings remain.
+- Lesson: hiding visible server HTML in a layout effect still flashes before hydration. Separately, stopping exit controls on presence changes strands route completion; keep presence-driven CSS cleanup separate from Motion ownership.
