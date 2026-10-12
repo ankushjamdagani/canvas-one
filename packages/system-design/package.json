@@ -304,7 +304,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.react.json"
+    "build": "tsc -b --force tsconfig.json tsconfig.react.json"
   },
   "dependencies": {
     "@canvas-one/whiteboard": "0.1.0",

@@ -61,6 +61,8 @@ node packages/cli/dist/main.js bridge --origin http://localhost:3000 --origin ht
 
 Prompting happens in the external agent; the default app has no built-in model chat. Browser projects are origin-local: export/import a hosted project to use it locally. App edits reload automatically; rerun `npm run build:packages` after package edits and restart the bridge after CLI/bridge edits. Local development uses webpack to avoid the current Turbopack scoped-PostCSS resolution issue.
 
+If an older checkout reports missing workspace declarations after removing generated files, run `npx tsc -b --force` from the repository root, then restart `npm run dev`. Package build scripts now force output generation so stale incremental metadata cannot suppress missing declarations.
+
 ## Scripts
 
 | Command                              | What it does                                                    |

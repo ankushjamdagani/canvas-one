@@ -46,7 +46,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.browser.json"
+    "build": "tsc -b --force tsconfig.json tsconfig.browser.json"
   },
   "devDependencies": {
     "typescript": "7.0.2"

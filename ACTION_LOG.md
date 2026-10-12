@@ -3435,3 +3435,7 @@ This file is the cumulative, append-only, concise record of completed tasks in t
 ## 2026-10-12 — Fresh local setup and cleanup
 
 Fetched and fast-forwarded clean master to merged PR #2; archived the dirty setup worktree; preserved clean merged branches in /tmp/canvas-one-merged-branches-20261012.bundle, removed their worktrees and deleted merged local/remote branches; created codex/local-ai-setup. README now documents local AI bridge, pairing, external MCP and proposal review. Selected webpack for reliable local dev. Platform: Codex, no subagents. Verification: npm ci, all sixteen package builds, boundaries/headless imports and default npm run dev succeeded; /projects returned HTTP 200. Diff whitespace check passed. Full unit/production suites not rerun for docs/dev-command changes. Lesson: test a real page after Next readiness; Turbopack scoped PostCSS fails in this workspace.
+
+## 2026-10-12 — Missing workspace declarations
+
+Reproduced the exact agent-bridge errors with agents dist removed and incremental metadata retained. Changed all sixteen package build scripts to forced project build mode; preserved optional browser/React entries and CLI executable preparation. Updated README/HANDOFF/LESSONS. Verification: all package builds, boundaries/headless imports, root typecheck and missing agents+bridge output recovery pass; CLI help works. Codex only. Full runtime suites not rerun for build-script-only fix. Lesson: incremental metadata must not suppress missing generated declarations.

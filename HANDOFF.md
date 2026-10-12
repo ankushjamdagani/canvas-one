@@ -1,5 +1,7 @@
 # Development handoff
 
+Package output recovery (2026-10-12): reproduced missing @canvas-one/agents declarations by removing its dist while retaining tsbuildinfo. Every package build now uses forced TypeScript build mode, including optional browser/React entries. All sixteen builds, boundaries/headless imports and root typecheck pass; removing both agents/bridge output and building bridge alone recreates both. Fix included on codex/local-ai-setup / PR #3.
+
 Local setup (2026-10-12): PR #2 is merged at `cab9fd0`; primary master fast-forwarded to origin/master. Previous task worktrees cleaned up recoverably (dirty setup archived, clean merged branches bundled in /tmp/canvas-one-merged-branches-20261012.bundle); fresh local setup lives in managed worktree `local-ai-setup/system-design-planner`, branch `codex/local-ai-setup`. README includes local bridge/MCP/proposal instructions. Development now selects webpack, matching production's existing compiler, to avoid the observed Turbopack/PostCSS error. Prior pending-merge notes below are historical; CI completed successfully before merge.
 
 ## Active composable implementation — 2026-10-12

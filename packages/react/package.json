@@ -27,7 +27,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -b --force"
   },
   "dependencies": {
     "@canvas-one/whiteboard": "0.1.0"
