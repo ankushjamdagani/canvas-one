@@ -1,5 +1,7 @@
 # Lessons
 
+- Verify a real HTTP page after Next dev reports ready. This workspace's scoped PostCSS plugin currently requires webpack for local development; readiness alone masked a Turbopack HTTP 500. Why: 2026-10-12 local AI setup.
+
 Rules learned from past failures, corrections and wasted effort. Loaded every session on every platform. Follow them; cite the rule when it changes your approach.
 
 - For architectural extraction, preserve the complete existing product in its current routes; move behavior behind package-owned contracts and keep product UI in the app. Establish field ownership, a single document authority and atomic history/storage cutover before restructuring; verify real application consumers, not merely package creation. Use explicit scoped stores for atomic accounting/evidence reads; preserve bound Dexie table/update middleware when adapting existing storage. Verify resource cleanup across authority replacements and final teardown. Wrap platform functions such as structuredClone when storing them on a class, since browser receiver checks differ from Node. Never replace the app with a reduced generic board plus a separate advanced app unless the user explicitly requests that split. Why: 2026-10-11 rollback; 2026-10-12 extraction review, quota hooks, extension lifecycle and browser-only illegal invocation.

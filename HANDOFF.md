@@ -1,5 +1,7 @@
 # Development handoff
 
+Local setup (2026-10-12): PR #2 is merged at `cab9fd0`; primary master fast-forwarded to origin/master. Previous task worktrees cleaned up recoverably (dirty setup archived, clean merged branches bundled in /tmp/canvas-one-merged-branches-20261012.bundle); fresh local setup lives in managed worktree `local-ai-setup/system-design-planner`, branch `codex/local-ai-setup`. README includes local bridge/MCP/proposal instructions. Development now selects webpack, matching production's existing compiler, to avoid the observed Turbopack/PostCSS error. Prior pending-merge notes below are historical; CI completed successfully before merge.
+
 ## Active composable implementation — 2026-10-12
 
 CI follow-up: clean-checkout typechecking now includes whiteboard browser and system-design React entries, with explicit React-project dependencies; CI builds all workspace exports before checking types/boundaries. A completely clean `npx tsc -b`, production build, 2,130 units / 12 skipped and all 10 landing browser tests pass locally. The stale landing geometry test now asserts the authored 722×136 dimensions and corresponding resize results; application geometry was not changed. GitHub rerun is pending push. Vercel setup is documented in `docs/deployment-vercel.md`; no hosted deployment has been created.

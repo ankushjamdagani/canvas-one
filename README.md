@@ -46,6 +46,21 @@ npm run dev
 
 Open <http://localhost:3000>. Pick **Try Beta** to reach your projects, then create a blank project or open one of the bundled examples.
 
+### Local AI collaboration
+
+Keep `npm run dev` running. In a second terminal, start the local bridge:
+
+```sh
+node packages/cli/dist/main.js bridge --origin http://localhost:3000 --origin http://127.0.0.1:3000
+```
+
+1. Open a project, then **Cmd+K → AI collaboration**. Enter the printed bridge URL and pairing code. Codes expire after two minutes; restart the bridge for fresh credentials.
+2. Configure your external agent's **stdio MCP server** with command `node` and arguments `<absolute-repo-path>/packages/cli/dist/main.js`, `mcp`. Set `CANVAS_ONE_BRIDGE_URL` to the printed URL and `CANVAS_ONE_AGENT_TOKEN` to the printed agent token. Keep credentials outside Git.
+3. Prompt the connected agent: “Inspect my board and component schemas. Propose a client → API → database diagram with short annotations. Submit it for review using the current scope and revision.”
+4. Preview and accept/reject the proposal in the app. Keep the board and bridge open while the agent works.
+
+Prompting happens in the external agent; the default app has no built-in model chat. Browser projects are origin-local: export/import a hosted project to use it locally. App edits reload automatically; rerun `npm run build:packages` after package edits and restart the bridge after CLI/bridge edits. Local development uses webpack to avoid the current Turbopack scoped-PostCSS resolution issue.
+
 ## Scripts
 
 | Command                              | What it does                                                    |
