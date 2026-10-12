@@ -8,10 +8,10 @@ test("landing preserves supplied copy and opens projects with working history", 
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Beyond chat.",
+    "Stop prompting in a box!",
   );
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Where engineers and AI architect systems together.",
+    "Collaborate visually with AI.",
   );
   await expect(page.getByText("You & Claude", { exact: true })).toBeVisible();
   await expect(page.getByText("npx canvas-one@preview")).toBeVisible();

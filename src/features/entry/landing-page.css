@@ -130,6 +130,13 @@
   border: 1px solid var(--selected-edge);
   border-radius: 4px;
   padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+}
+.lp-dimension-hint {
+  opacity: 0.7;
 }
 .lp-buffer,
 .lp-note {
@@ -173,10 +180,11 @@
 }
 .lp-copy {
   position: absolute;
-  width: 440px;
-  font-family: var(--font-display);
-  font-size: 17px;
+  width: 480px;
+  font-family: var(--font-sans);
+  font-size: 15px;
   line-height: 1.6;
+  letter-spacing: 0;
   text-wrap: pretty;
   color: var(--body);
   margin: 0;
@@ -512,14 +520,18 @@
 .lp-local {
   position: absolute;
   left: 700px;
-  top: 372px;
+  top: 512px;
   margin: 0;
-  font: 500 21px/1.15 var(--font-handwritten);
+  font: 500 24px/1.15 var(--font-handwritten);
   color: var(--secondary-text);
   text-align: right;
-  transform: rotate(-3deg);
+  transform: rotate(-10deg);
   transform-origin: right top;
   pointer-events: none;
+  opacity: 0.8;
+}
+.lp-local div {
+  margin-bottom: 12px;
 }
 .lp-cursor {
   position: absolute;

@@ -20,7 +20,7 @@ import {
 import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
 import "./landing-page.css";
-import { formatRoute } from '@/lib/router';
+import { formatRoute } from "@/lib/router";
 
 type Point = { x: number; y: number };
 const initialNodes: Record<string, Point> = {
@@ -41,7 +41,7 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
     "accepted" | "dismissed" | null
   >(null);
   const [nodes, setNodes] = React.useState(initialNodes),
-    [hero, setHero] = React.useState({ x: 104, y: 168, w: 722, h: 136 });
+    [hero, setHero] = React.useState({ x: 104, y: 248, w: 760, h: 146 });
   const drag = React.useRef<{
     start: Point;
     point: Point;
@@ -56,8 +56,8 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
     const media = matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduced(media.matches);
     update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
   React.useEffect(() => {
     if (paused || reduced) return;
@@ -131,7 +131,7 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
     setTime(0);
     setOverride(null);
     setNodes(initialNodes);
-    setHero({ x: 104, y: 168, w: 800, h: 176 });
+    setHero({ x: 104, y: 248, w: 760, h: 146 });
   };
   const startDrag = (
     event: React.PointerEvent,
@@ -287,10 +287,11 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
             >
               <span className="lp-dimension" aria-hidden="true">
                 Text · H1 · {Math.round(hero.w)} × {Math.round(hero.h)}
+                <span className="lp-dimension-hint"> · Drag to move</span>
               </span>
               <h1 tabIndex={-1} className="outline-none">
-                Beyond chat.
-                <em>Where engineers and AI architect systems together.</em>
+                Stop prompting in a box!
+                <em>Collaborate visually with AI.</em>
               </h1>
               {["TL", "TR", "BL", "BR"].map((corner) => (
                 <button
@@ -352,19 +353,19 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
               kind="content"
               index={1}
               className="lp-copy"
-              style={{ left: hero.x + 19, top: hero.y + hero.h + 46 }}
+              style={{ left: hero.x + 19, top: hero.y + hero.h + 36 }}
             >
-              The collaborative whiteboard canvas for engineers and AI to design
-              architectures, trace execution flows, and review systems together.
+              An open spatial workspace to map thoughts, connect concepts, and
+              build ideas together—beyond text limits.
             </Reveal>
             <Reveal
               kind="content"
               index={2}
               className="lp-actions"
-              style={{ left: hero.x + 18, top: hero.y + hero.h + 166 }}
+              style={{ left: hero.x + 18, top: hero.y + hero.h + 140 }}
             >
               <Button asChild className="lp-beta">
-                <a href={formatRoute({ kind: 'projects' }, basePath)}>
+                <a href={formatRoute({ kind: "projects" }, basePath)}>
                   Try Beta <ArrowRight />
                 </a>
               </Button>
@@ -673,11 +674,9 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
               </Button>
             </div>
             <footer className="lp-local">
-              100% in-browser
-              <br />
-              Worker simulations
-              <br />
-              Zero cloud cost
+              <div>Infinite workspace</div>
+              <div>Real-time AI partner</div>
+              <div>100% browser-local</div>
             </footer>
           </Reveal>
           <Reveal
