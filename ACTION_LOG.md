@@ -3463,3 +3463,8 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: InitialLoad foundation component and boot helper, standalone/layout integration, reveal/board guards, loader CSS and browser regressions; reverted prior CSS entrance/test changes. Codex; no subagents.
 - Verification: production and Storybook builds passed; full units 2,130 passed / 12 skipped, final focused motion/reveal checks 22 passed; 13 final production browser checks passed, including blocked scripts, timeout/late hydration in normal and reduced-motion modes, original entrances/exits, focus and interrupted navigation. First-paint loader screenshot inspected. Full browser suite not run.
 - Lesson: discuss changes to the animation strategy before replacing approved choreography. Skipped entrances must still signal completion for route heading focus.
+
+### 2026-10-12 — Worktree cleanup
+
+- Removed the three auxiliary checkouts (initial-load, canvas-one-mcp, local-ai-setup), retaining the primary checkout, local feature branches and existing PRs. All three had clean tracked/untracked status; ignored files were generated dependencies/build artifacts.
+- Preservation: all Git refs saved in `/private/tmp/system-studio-worktrees-20261012.bundle`. Codex; no subagents. Verification: worktree inventory checked before/after removal. No application changes or tests required.
