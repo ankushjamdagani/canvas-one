@@ -3509,3 +3509,11 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: the five files from PR #6. Codex; no subagents. Branch `codex/revert-canvas-one-route`.
 - Verification: all application, test and documentation files outside ACTION_LOG exactly match pre-PR commit `56de3c2`; no new runtime behavior to test. The original app build was verified at that commit during the previous task's baseline comparison.
 - Lesson: distinguish a route inside a standalone product from mounting that product in a separate host repository; confirm the intended host before changing routing.
+
+### 2026-10-13 — Pre-hydration loader full-screen coverage
+
+- Outcome: reproduced the pre-hydration flash failure in e2e tests where missing external stylesheet rules caused `[data-initial-loader]` to render as an unstyled 128px static element at (0, 0) exposing the landing page underneath before hydration dismisses it. Inlined critical `INITIAL_LOAD_STYLE` in the layout `<head>`, added inline fixed full-screen dimensions/shell background on the loader element, and ensured `display: none` is set alongside `hidden`.
+- Files: `src/lib/motion/initial-load.ts`, `apps/web/app/layout.tsx`, `src/components/ui/initial-load.tsx`, `src/styles.css`, `tests/initial-loader.spec.ts`, `HANDOFF.md`, `LESSONS.md`, `ACTION_LOG.md`. Antigravity (agy); no subagents. Branch `codex/fix-prehydration-loader`.
+- Verification: added regression test in `tests/initial-loader.spec.ts` asserting loader covers viewport before hydration even when external stylesheets lack loader rules (failed as static in top-left before fix, passed as fixed full-screen after fix). All 9 initial loader e2e tests and 4 header e2e tests passed. All 2,130 unit tests passed (12 skipped). Next.js standalone build passed cleanly.
+- Lesson: critical first-paint covering overlays must inline their fixed positioning, full-bleed dimensions, and surface background in `<head>` or on the element itself, never relying exclusively on external stylesheets which can be delayed, missing, or cached out-of-sync.
+

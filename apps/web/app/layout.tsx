@@ -3,7 +3,7 @@ import '@fontsource-variable/inter';
 import '@canvas-one/editor-reactflow/style.css';
 import '../../../src/styles.css';
 import { PwaRegistration } from '../../../src/standalone/PwaRegistration';
-import { INITIAL_LOAD_BOOTSTRAP } from '../../../src/lib/motion/initial-load';
+import { INITIAL_LOAD_BOOTSTRAP, INITIAL_LOAD_STYLE } from '../../../src/lib/motion/initial-load';
 
 const basePath = process.env.NEXT_PUBLIC_CANVAS_BASE_PATH || '';
 const description =
@@ -31,8 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <style dangerouslySetInnerHTML={{ __html: INITIAL_LOAD_STYLE }} />
         <script dangerouslySetInnerHTML={{ __html: INITIAL_LOAD_BOOTSTRAP }} />
-        <noscript><style>{'.canvas-one-root [data-initial-loader] { display: none !important; }'}</style></noscript>
+        <noscript><style>{'.canvas-one-root [data-initial-loader], [data-initial-loader] { display: none !important; }'}</style></noscript>
       </head>
       <body style={{ margin: 0 }}>
         {children}
