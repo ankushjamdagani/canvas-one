@@ -1,0 +1,10 @@
+[mcp_servers.canvas-one]
+command = "node"
+args = [
+  "/Users/ankushjamdagani/personal/system-design-planner/packages/cli/dist/main.js",
+  "mcp"
+]
+
+[mcp_servers.canvas-one.env]
+CANVAS_ONE_BRIDGE_URL = "http://127.0.0.1:47831"
+CANVAS_ONE_AGENT_TOKEN = "<agentToken printed by bridge>"
