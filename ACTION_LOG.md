@@ -3491,7 +3491,7 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: production and Storybook builds passed; 18 focused production browsers passed, including intermediate face opacity and mid-fallback hydration; paused real CSS keyframes inspected on desktop/mobile. Final isolated full units: 2,130 passed / 12 skipped. Initial concurrent unit run had one session-history stress timeout; no session change, isolated rerun passed. Full browser suite not run.
 - Lesson: honour the existing CPU-isolation rule for browser animation runs too; independent exit animation names prevent elapsed waiting time from shortening a ready fade or restarting a fallback already in progress.
 
-### 2026-10-12 — Local canvas-one route
+### 2026-10-12 — Revert the additional canvas-one mount
 
 - Outcome: confirmed this checkout matches the requested Canvas One repository at `56de3c2`; mounted its complete standalone app at `/canvas-one` with prefixed Brand/projects/project/branch routes, SSR metadata and invalid-path 404s. Existing routes, styling and browser-local projects are shared without source duplication.
 - Files: `apps/web/app/canvas-one/[[...path]]/page.tsx`, `tests/canvas-one-route.spec.ts`, README, ACTION_LOG and LESSONS. Codex; no subagents. Dedicated branch `codex/canvas-one-route`.
@@ -3505,3 +3505,7 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: initial-load motion helper, production loader regressions, HANDOFF, ACTION_LOG and LESSONS. Codex; no subagents.
 - Verification: clean production build/TypeScript/package boundaries passed and emitted loader CSS; all 12 focused production loader/header checks passed. Missing-animation hydration and blocked-script timeout paths dismiss the logo. Full browser/Storybook suites not rerun for this scoped fallback fix.
 - Lesson: never make critical overlay dismissal depend solely on animationend; handle missing or disabled animation styles explicitly. Clean build output and live stylesheet contents must both be checked for deployment-only styling reports.
+- Outcome: reverted all changes from PR #6 at the user's request. Removed the additional standalone route and its browser tests; restored README and LESSONS to the pre-PR versions. Canvas One remains the independently deployed app linked from unwitty.dev.
+- Files: the five files from PR #6. Codex; no subagents. Branch `codex/revert-canvas-one-route`.
+- Verification: all application, test and documentation files outside ACTION_LOG exactly match pre-PR commit `56de3c2`; no new runtime behavior to test. The original app build was verified at that commit during the previous task's baseline comparison.
+- Lesson: distinguish a route inside a standalone product from mounting that product in a separate host repository; confirm the intended host before changing routing.
