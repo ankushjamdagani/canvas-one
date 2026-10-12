@@ -3,7 +3,7 @@
     "canvas-one": {
       "command": "node",
       "args": [
-        "/Users/ankushjamdagani/personal/system-design-planner/packages/cli/dist/main.js",
+        "./packages/cli/dist/main.js",
         "mcp"
       ],
       "env": {

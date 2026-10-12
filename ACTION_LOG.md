@@ -3446,6 +3446,6 @@ Configured repository-scoped Model Context Protocol (MCP) server `canvas-one` ac
 - Added `.mcp.json` for Claude Code.
 - Added `.agents/mcp_config.json` for Gemini / Antigravity workspace customization.
 - Added `.codex/config.toml` for Codex CLI project configuration.
-Configured stdio command `node` with arguments `/Users/ankushjamdagani/personal/system-design-planner/packages/cli/dist/main.js mcp` and environment variables `CANVAS_ONE_BRIDGE_URL=http://127.0.0.1:47831` and `CANVAS_ONE_AGENT_TOKEN=<agentToken printed by bridge>`.
+Configured stdio command `node` with portable repository-relative arguments `./packages/cli/dist/main.js mcp` and environment variables `CANVAS_ONE_BRIDGE_URL=http://127.0.0.1:47831` and `CANVAS_ONE_AGENT_TOKEN=<agentToken printed by bridge>`.
 Platform: agy.
 Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp get canvas-one` (status: enabled); verified Claude Code MCP discovery with `claude mcp list` (detected `canvas-one` stdio server, pending approval); verified Antigravity `.agents/mcp_config.json` schema matches `~/.gemini/config/mcp_config.json` and builtin agy-customizations specification; ran full unit test suite (2,130 passed, 12 skipped).
