@@ -13,7 +13,13 @@
       "path": "./packages/whiteboard"
     },
     {
+      "path": "./packages/whiteboard/tsconfig.browser.json"
+    },
+    {
       "path": "./packages/system-design"
+    },
+    {
+      "path": "./packages/system-design/tsconfig.react.json"
     },
     {
       "path": "./packages/history"

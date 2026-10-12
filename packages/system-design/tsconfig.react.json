@@ -15,5 +15,11 @@
     "src/**/*.ts",
     "src/react/**/*.tsx"
   ],
-  "exclude": []
+  "exclude": [],
+  "references": [
+    {"path": "../agents"},
+    {"path": "../history"},
+    {"path": "../ui"},
+    {"path": "../whiteboard"}
+  ]
 }

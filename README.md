@@ -33,6 +33,8 @@ The landing page shows an illustrative collaboration. The workspace supports loc
 
 ## Quick start
 
+For hosted deployment, follow the [Vercel setup guide](docs/deployment-vercel.md).
+
 Requires Node.js 22.12 or newer (developed on Node 24).
 
 ```sh
