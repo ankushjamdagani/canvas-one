@@ -1,3 +1,5 @@
+import { toPinClosureState } from '@canvas-one/history';
+export { toPinClosureState };
 /**
  * Bridges Dexie rows to the pure `computePinClosure` input.
  *
@@ -12,53 +14,13 @@
  */
 
 import type { StudioDatabase } from './db';
-import type {
-  BranchRecord,
-  CheckpointRecord,
-  CommitRecord,
-  ProjectRecord,
-  PublicationRecord,
-  RunRecord,
-} from './types';
+import {collectProjectRows, type TransactionStores} from '@canvas-one/storage';
+import type {ProjectStorageRows} from './repository';
 import {
   computePinClosure,
   type PinClosureResult,
   type PinClosureState,
 } from '../../domain/versioning/pin-closure';
-
-type PinClosureRows = {
-  readonly project: Pick<ProjectRecord, 'initialSnapshotId' | 'mainBranchId'>;
-  readonly branches: readonly Pick<BranchRecord, 'id' | 'state' | 'headCommitId' | 'workingSnapshotId'>[];
-  readonly commits: readonly Pick<CommitRecord, 'id' | 'snapshotId' | 'parentIds' | 'evidence'>[];
-  readonly publications: readonly Pick<PublicationRecord, 'id' | 'commitId'>[];
-  readonly checkpoints: readonly Pick<CheckpointRecord, 'id' | 'snapshotId'>[];
-  readonly runs: readonly Pick<RunRecord, 'id' | 'snapshotId'>[];
-};
-
-/** Projects stored rows onto the plain shape `computePinClosure` reads. */
-export function toPinClosureState(rows: PinClosureRows): PinClosureState {
-  return {
-    project: {
-      initialSnapshotId: rows.project.initialSnapshotId,
-      mainBranchId: rows.project.mainBranchId,
-    },
-    branches: rows.branches.map((b) => ({
-      id: b.id,
-      state: b.state,
-      headCommitId: b.headCommitId,
-      workingSnapshotId: b.workingSnapshotId,
-    })),
-    commits: rows.commits.map((c) => ({
-      id: c.id,
-      snapshotId: c.snapshotId,
-      parentIds: c.parentIds,
-      evidence: c.evidence,
-    })),
-    publications: rows.publications.map((p) => ({ id: p.id, commitId: p.commitId })),
-    checkpoints: rows.checkpoints.map((cp) => ({ id: cp.id, snapshotId: cp.snapshotId })),
-    runs: rows.runs.map((r) => ({ id: r.id, snapshotId: r.snapshotId })),
-  };
-}
 
 /**
  * Loads the plain project state computePinClosure needs, or null if the project itself
@@ -93,4 +55,15 @@ export async function computeProjectPinClosure(
   const state = await loadPinClosureState(db, projectId);
   if (!state) return null;
   return computePinClosure(state);
+}
+
+export async function computeProjectPinClosureFromStores(stores: TransactionStores<ProjectStorageRows>, projectId: string): Promise<PinClosureResult | null> {
+  const project = await stores.projects.get(projectId);
+  if (!project) return null;
+  const [branches, commits, publications, checkpoints, runs] = await Promise.all([
+    collectProjectRows(stores.branches, projectId), collectProjectRows(stores.commits, projectId),
+    collectProjectRows(stores.publications, projectId), collectProjectRows(stores.checkpoints, projectId),
+    collectProjectRows(stores.runs, projectId),
+  ]);
+  return computePinClosure(toPinClosureState({project, branches, commits, publications, checkpoints, runs}));
 }

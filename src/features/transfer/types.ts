@@ -9,7 +9,6 @@ import type { LocalRepository } from '../../persistence/studio/repository';
 import type {
   Actor,
   AppliedResult,
-  RunRecord,
   StudioRepository,
 } from '../../persistence/studio/types';
 
@@ -100,61 +99,23 @@ export type ImportProjectJsonResult = ImportProjectJsonSuccess | ImportProjectJs
 
 export type DiagramExportFormat = 'svg' | 'png';
 
-export type PngDimensions = {
-  readonly width: number;
-  readonly height: number;
-  readonly scale: number;
-};
+export type { PngDimensions } from '@canvas-one/whiteboard/export/raster';
 
-export type CanvasContext2DLike = {
-  fillStyle: string;
-  fillRect(x: number, y: number, w: number, h: number): void;
-  drawImage(image: unknown, dx: number, dy: number, dw: number, dh: number): void;
-};
-
-export type CanvasLike = {
-  width: number;
-  height: number;
-  getContext(type: '2d'): CanvasContext2DLike | null;
-  toBlob(callback: (blob: Blob | null) => void, type?: string): void;
-  convertToBlob?(options?: { type?: string }): Promise<Blob>;
-};
-
-export type CanvasFactory = (width: number, height: number) => CanvasLike;
-
-export type ImageLoader = (url: string) => Promise<unknown>;
-
-export type RenderPngOptions = {
-  readonly canvasFactory?: CanvasFactory;
-  readonly imageLoader?: ImageLoader;
-};
+export type { CanvasContext2DLike, CanvasLike, CanvasFactory, ImageLoader, RenderPngOptions, RasterizationProvider } from '@canvas-one/whiteboard/browser/raster';
 
 // ============================================================================
 // Mermaid Export Types
 // ============================================================================
 
-export type MermaidExportResult = {
-  readonly text: string;
-  readonly fileName: string;
-  readonly limitations: string;
-};
+export type { MermaidExportResult } from '@canvas-one/system-design/export/mermaid-types';
 
 // ============================================================================
 // CSV Export Types
 // ============================================================================
 
-export type CsvExportOptions = {
-  readonly run: RunRecord;
-  readonly snapshotDocument?: Document | null;
-};
+export type { CsvExportOptions } from '@canvas-one/simulation-system-design/export/csv-types';
 
-export type CsvExportResult = {
-  readonly csv: string;
-  readonly fileName: string;
-  readonly rowCount: number;
-  readonly byteLength: number;
-  readonly limitations: string;
-};
+export type { CsvExportResult } from '@canvas-one/simulation-system-design/export/csv-types';
 
 // ============================================================================
 // Limitations

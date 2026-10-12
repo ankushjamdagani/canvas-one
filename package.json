@@ -12,12 +12,16 @@
   "bugs": "https://github.com/ankushjamdagani/canvas-one/issues",
   "version": "0.1.0",
   "type": "module",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "npm run build:packages && npm run dev --workspace @canvas-one/web --",
     "build": "npm run build:packages && npm run check:packages && tsc -b && npm run build --workspace @canvas-one/web && node scripts/build-service-worker.mjs apps/web && node scripts/prepare-standalone.mjs apps/web",
     "check:packages": "node scripts/check-package-boundaries.mjs",
-    "build:packages": "npm run build --workspace @canvas-one/ui && npm run build --workspace @canvas-one/playback && npm run build --workspace @canvas-one/commands",
+    "check:headless-consumer": "node scripts/check-headless-consumer.mjs",
+    "build:packages": "node scripts/build-packages.mjs",
     "start": "node scripts/start-standalone.mjs",
     "dev:vite": "npm run build:packages && vite --host 0.0.0.0",
     "build:vite": "npm run build:packages && tsc -b && vite build",
@@ -28,6 +32,7 @@
     "build-storybook": "npm run build:packages && storybook build"
   },
   "dependencies": {
+    "@canvas-one/whiteboard": "0.1.0",
     "@canvas-one/ui": "0.1.0",
     "@canvas-one/playback": "0.1.0",
     "@canvas-one/commands": "0.1.0",
@@ -68,7 +73,19 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-resizable-panels": "4.13.2",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "@canvas-one/system-design": "0.1.0",
+    "@canvas-one/history": "0.1.0",
+    "@canvas-one/simulation-system-design": "0.1.0",
+    "@canvas-one/storage": "0.1.0",
+    "@canvas-one/storage-indexeddb": "0.1.0",
+    "@canvas-one/agents": "0.1.0",
+    "@canvas-one/collaboration": "0.1.0",
+    "@canvas-one/agent-bridge": "0.1.0",
+    "@canvas-one/editor-reactflow": "0.1.0",
+    "@canvas-one/cli": "0.1.0",
+    "@canvas-one/react": "0.1.0",
+    "@canvas-one/components-basic": "0.1.0"
   },
   "devDependencies": {
     "rolldown": "1.2.7",

@@ -1,6 +1,6 @@
 import { readActionRgb } from '@/lib/theme/color';
 import * as React from "react";
-import { useStore } from "@xyflow/react";
+import { useStore } from "@canvas-one/editor-reactflow/react";
 
 /**
  * Snapped crosshair that follows a mouse over the canvas, from the Project

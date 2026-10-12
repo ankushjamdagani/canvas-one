@@ -1,19 +1,9 @@
+import type { TrafficOutcomeKind, TrafficOutcome, TrafficNodeActivity, TrafficConnectionActivity } from '@canvas-one/playback/traffic';
+export type { TrafficOutcomeKind, TrafficOutcome, TrafficNodeActivity, TrafficConnectionActivity } from '@canvas-one/playback/traffic';
 import { useId, useState, useRef, useLayoutEffect, type CSSProperties, type ReactNode } from 'react';
 import { Server, Cpu, ListOrdered, Hourglass, TimerReset, PauseCircle, Check, TriangleAlert, Ban, Timer, TimerOff, CircleX, RotateCcw, MailX, Unlink, Clock, Pin } from 'lucide-react';
-
-export type TrafficOutcomeKind = 'success' | 'error' | 'rejected' | 'timeout' | 'expired' | 'cancelled' | 'retryExhausted' | 'redeliveryExhausted' | 'lost' | 'late';
-/** Supply rates over the trailing ten simulation seconds, independent of zoom. */
-export interface TrafficOutcome { kind: TrafficOutcomeKind; rate: number; detail?: string }
-export interface TrafficNodeActivity {
-  queued: number; processing: number; capacity: number; awaiting: number; retry: number;
-  retryIn?: string; services?: { name: string; pending: number }[];
-  noProgress?: { count: number; service: string; age: string }; outcomes?: TrafficOutcome[];
-}
 export interface CellsAndLanesNodeProps { label: string; metadata?: string; activity: TrafficNodeActivity; style?: CSSProperties; className?: string; /** Attach cells below an existing host card without replacing its controls. */ activityOnly?: boolean }
-export interface TrafficConnectionActivity {
-  forward: number; returning: number; asynchronous?: boolean; blocked?: number; errors?: number; late?: number;
-  loss?: boolean; exhausted?: boolean; outcomes?: TrafficOutcome[];
-}
+
 export interface CellsAndLanesConnectionProps { activity: TrafficConnectionActivity; width?: number; progress?: number; reducedMotion?: boolean; label?: string; /** SVG host path, with the same bounded lane vocabulary as the guide. */ path?: string }
 const ink = 'var(--foreground)', body = 'var(--body)', muted = 'var(--secondary-text)', off = 'var(--secondary-text)', green = 'var(--action-text)', purple = 'var(--branch-text)', clay = 'var(--risk-text)';
 const mono: CSSProperties = { fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' };

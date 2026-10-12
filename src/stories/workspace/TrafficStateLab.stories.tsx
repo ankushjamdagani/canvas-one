@@ -1,7 +1,7 @@
 import { nodeTypes, edgeTypes, FitIdleCanvas, idleNodes, idleEdges, dependencyNodes, dependencyEdges, fanoutNodes, fanoutEdges, ExampleContext, exampleNodeTypes, exampleEdgeTypes, PendingContext, PendingEdge, pendingNodeTypes, pendingEdgeTypes, TrafficVisualStyles, type ExamplePhase, type TravelDirection, type LabFrame } from '../shared/traffic-visuals';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { ReactFlow, type EdgeProps } from '@xyflow/react';
+import { ReactFlow, type EdgeProps } from '@canvas-one/editor-reactflow/react';
 import { Pause, Play } from 'lucide-react';
 import { PlaybackTrafficContext } from '@/features/workspace/usePlaybackTraffic';
 import { Button } from '@/components/ui/button';

@@ -4,19 +4,14 @@
  */
 
 import type {
-  Connection,
   Document,
-  Element,
-  Fixture,
   Id,
-  PayloadSchema,
-  Refinement,
-  Relation,
-  Scenario,
-  View,
 } from '../../domain/studio/model';
+import type { RecordChange } from '../../domain/studio/records';
+export { RECORD_KINDS } from '../../domain/studio/records';
+export type { EditableRecord, RecordChange, RecordKind } from '../../domain/studio/records';
 import type { ProjectExposure } from '../../domain/studio/exposure';
-import type { CheckResult, RunSummary, TerminalStatus, TraceEvent } from '../../domain/studio/runner/types';
+import type { CheckResult, RunSummary, TerminalStatus } from '../../domain/studio/runner/types';
 import type { EvidenceRef, EvidenceManifest } from '../../domain/studio/runner/evidence';
 import type { Issue } from '../../domain/studio/validate';
 import type { BuildManifestVersions } from '../../domain/studio/manifest';
@@ -29,10 +24,7 @@ export const DB_NAME = 'system-studio-local-v1';
 export const DB_VERSION = 1;
 export const PREFERENCES_SCHEMA = 'studio-preferences/1';
 
-export const DEFAULT_BUILD_VERSIONS: BuildManifestVersions = Object.freeze({
-  compilerVersion: 'studio-compiler/1',
-  runnerVersions: Object.freeze([{ runnerId: 'studio-runner', version: 'studio-runner/5' }]),
-});
+export { DEFAULT_BUILD_VERSIONS } from '@canvas-one/simulation-system-design/artifacts';
 
 // ============================================================================
 // Ceilings and Limits
@@ -66,28 +58,15 @@ export const STORAGE_LIMITS = {
  * { actorId, kind: 'local-human', displayName }
  * Unknown kinds are rejected.
  */
-export type Actor = {
-  readonly actorId: string;
-  readonly kind: 'local-human';
-  readonly displayName: string;
-};
+export type Actor = import('@canvas-one/whiteboard').Actor<'local-human'>;
 
 // ============================================================================
 // Publication Metadata
 // ============================================================================
 
-export type SemanticVersion = {
-  readonly major: number;
-  readonly minor: number;
-  readonly patch: number;
-};
+export type SemanticVersion = import('@canvas-one/history').SemanticVersion;
 
-export type PublicationMetadata = {
-  readonly version: SemanticVersion;
-  readonly title: string;
-  readonly rationale: string;
-  readonly ticketUrl: string | null;
-};
+export type PublicationMetadata = import('@canvas-one/history').PublicationMetadata;
 
 // ============================================================================
 // Table Record Types
@@ -98,10 +77,7 @@ export type PublicationMetadata = {
  * Fields: id, title, revision, mainBranchId, initialSnapshotId, importSourceId: Id | null, createdAt, updatedAt
  * Indexes: updatedAt
  */
-export type ProjectRecord = {
-  readonly id: Id;
-  readonly title: string;
-  readonly revision: number;
+export type ProjectRecord = import('@canvas-one/storage').ProjectRecord<{
   readonly mainBranchId: Id;
   readonly initialSnapshotId: string; // Hash
   readonly importSourceId: Id | null;
@@ -110,9 +86,7 @@ export type ProjectRecord = {
   readonly team?: string;
   /** connection types other projects can connect to when they link here. Absent means none. */
   readonly exposures?: readonly ProjectExposure[];
-  readonly createdAt: number;
-  readonly updatedAt: number;
-};
+}>;
 
 export const PROJECT_DESCRIPTION_MAX_LENGTH = 500;
 export const PROJECT_TEAM_MAX_LENGTH = 60;
@@ -135,152 +109,70 @@ export function projectExposures(project: Pick<ProjectRecord, 'exposures'>): rea
  * Fields: projectId, id, label, state: 'open' | 'closed', headCommitId: Id | null, workingSnapshotId, workingRevision, createdAt
  * Indexes: projectId
  */
-export type BranchRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly label: string;
-  readonly state: 'open' | 'closed';
-  readonly headCommitId: Id | null;
-  readonly workingSnapshotId: string; // Hash
-  readonly workingRevision: number;
-  readonly createdAt: number;
-};
+export type BranchRecord = import('@canvas-one/history').BranchRecord;
 
 /**
  * snapshots table: primary key [projectId+id] (id = content hash)
  * Fields: projectId, id, document
  * Indexes: projectId
  */
-export type SnapshotRecord = {
-  readonly projectId: Id;
-  readonly id: string; // lowercase SHA-256 hex
-  readonly document: Document;
-};
+export type SnapshotRecord = import('@canvas-one/storage').SnapshotRecord<Document>;
 
 /**
  * commits table: primary key [projectId+id]
  * Fields: projectId, id, snapshotId, parentIds, evidence: EvidenceRef[], actor, createdAt, message
  * Indexes: projectId
  */
-export type CommitRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly snapshotId: string; // Hash
-  readonly parentIds: readonly Id[];
-  readonly evidence: readonly EvidenceRef[];
-  readonly evidenceManifest?: EvidenceManifest;
-  readonly actor: Actor;
-  readonly createdAt: number;
-  readonly message: string;
-};
+export type CommitRecord = import('@canvas-one/history').CommitRecord<Actor, EvidenceRef, EvidenceManifest>;
 
 /**
  * publications table: primary key [projectId+id]
  * Fields: projectId, id, commitId, sourceBranchId, previousMainHeadId: Id | null, ordinal, actor, createdAt, metadata, versionKey
  * Indexes: projectId; unique [projectId+ordinal]; unique [projectId+versionKey]
  */
-export type PublicationRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly commitId: Id;
-  readonly sourceBranchId: Id;
-  readonly previousMainHeadId: Id | null;
-  readonly ordinal: number;
-  readonly actor: Actor;
-  readonly createdAt: number;
-  readonly metadata: PublicationMetadata;
-  readonly versionKey: string; // 'M.m.p' with no leading zeros
-};
+export type PublicationRecord = import('@canvas-one/history').PublicationRecord<Actor>;
 
 /**
  * checkpoints table: primary key [projectId+id]
  * Fields: projectId, id, snapshotId, sourceBranchId, label, actor, createdAt
  * Indexes: projectId
  */
-export type CheckpointRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly snapshotId: string; // Hash
-  readonly sourceBranchId: Id;
-  readonly label: string;
-  readonly actor: Actor;
-  readonly createdAt: number;
-};
+export type CheckpointRecord = import('@canvas-one/history').CheckpointRecord<Actor>;
 
 /**
  * runs table: primary key [projectId+id]
  * Fields: projectId, id, snapshotId, manifest, fingerprint, status, provenance, checks, summary, traceState, createdAt, completedAt
  * Indexes: projectId; [projectId+fingerprint]
  */
-export type RunRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly snapshotId: string; // Hash
-  readonly manifest: unknown;
-  readonly fingerprint: string;
-  readonly status: TerminalStatus;
-  readonly provenance: 'local' | 'imported-unverified';
-  readonly checks: readonly CheckResult[];
-  readonly summary: RunSummary;
-  readonly traceState: 'complete' | 'pruned' | 'not-saved';
-  readonly createdAt: number;
-  readonly completedAt: number;
-};
+export type RunRecord = import('@canvas-one/simulation-system-design/artifacts').RunRecord;
 
 /**
  * traceChunks table: primary key [projectId+runId+index]
  * Fields: projectId, runId, index, firstSequence, events, payloads, byteLength
  * Indexes: [projectId+runId]
  */
-export type TraceChunkRecord = {
-  readonly projectId: Id;
-  readonly runId: Id;
-  readonly index: number;
-  readonly firstSequence: number;
-  readonly events: readonly TraceEvent[];
-  readonly payloads: unknown;
-  readonly byteLength: number;
-};
+export type TraceChunkRecord = import('@canvas-one/simulation-system-design/artifacts').TraceChunkRecord;
 
 /**
  * operations table: primary key [projectId+id]
  * Fields: projectId, id (operationId), requestHash, result, createdAt
  * Indexes: projectId
  */
-export type OperationRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly requestHash: string; // lowercase SHA-256 hex
-  readonly result: unknown;
-  readonly createdAt: number;
-};
+export type OperationRecord = import('@canvas-one/storage').OperationReceipt<unknown>;
 
 /**
  * parts table: primary key [projectId+id+revision]
  * Fields: projectId, id, revision, label, description, content, createdAt
  * Indexes: projectId; [projectId+id]
  */
-export type PartRecord = {
-  readonly projectId: Id;
-  readonly id: Id;
-  readonly revision: number;
-  readonly label: string;
-  readonly description: string;
-  readonly content: unknown;
-  readonly createdAt: number;
-};
+export type PartRecord = import('@canvas-one/simulation-system-design/archive/contracts').PartRecord;
 
 /**
  * preferences table: primary key key
  * Fields: key, schema: 'studio-preferences/1', revision, value
  * Indexes: none
  */
-export type PreferenceRecord = {
-  readonly key: string;
-  readonly schema: typeof PREFERENCES_SCHEMA;
-  readonly revision: number;
-  readonly value: unknown;
-};
+export type PreferenceRecord = import('@canvas-one/storage').PreferenceRecord<typeof PREFERENCES_SCHEMA, unknown>;
 
 // ============================================================================
 // Error Model
@@ -291,19 +183,7 @@ export type PreferenceRecord = {
  * "not-found | invalid | stale | referenced-artifact | quota | unavailable |
  *  unsupported-version | operation-id-reused | limit", with structured issue paths and IDs.
  */
-const STORAGE_ERROR_CODES = [
-  'not-found',
-  'invalid',
-  'stale',
-  'referenced-artifact',
-  'quota',
-  'unavailable',
-  'unsupported-version',
-  'operation-id-reused',
-  'limit',
-] as const;
-
-export type StorageErrorCode = (typeof STORAGE_ERROR_CODES)[number];
+export type StorageErrorCode = import('@canvas-one/storage').StorageErrorCode;
 
 // ============================================================================
 // Command Values and Results
@@ -331,6 +211,7 @@ export type CommandValue =
   | { readonly kind: 'draft'; readonly draftId: Id }
   | { readonly kind: 'download'; readonly downloadId: Id };
 
+export type ProposalAttribution = import('@canvas-one/agents').ProposalAttribution;
 export type AppliedResult = {
   readonly status: 'applied';
   readonly operationId: Id;
@@ -339,6 +220,7 @@ export type AppliedResult = {
   readonly changedIds: readonly Id[];
   readonly undo: { readonly entryId: Id; readonly label: string } | null;
   readonly value: CommandValue;
+  readonly proposal?: ProposalAttribution;
 };
 
 export type InvalidResult = {
@@ -358,22 +240,12 @@ export type MissingResult = {
   readonly ids: readonly Id[];
 };
 
-export type FailedCode =
-  | 'quota'
-  | 'unavailable'
-  | 'referenced-artifact'
-  | 'operation-id-reused'
-  | 'limit'
+export type FailedCode = import('@canvas-one/storage').StorageFailedCode
   | 'ineligible'
   | 'conflict'
-  | 'unsupported-version'
   | 'duplicate-version';
 
-export type FailedResult = {
-  readonly status: 'failed';
-  readonly code: FailedCode;
-  readonly issues: readonly Issue[];
-};
+export type FailedResult = import('@canvas-one/storage').StorageFailure<Issue, FailedCode>;
 
 export type UnsupportedResult = {
   readonly status: 'unsupported';
@@ -398,10 +270,7 @@ export type DeleteProjectResult =
   | StaleResult
   | FailedResult;
 
-export type SaveRunResult =
-  | { readonly status: 'applied'; readonly runId: Id; readonly run: RunRecord }
-  | InvalidResult
-  | FailedResult;
+export type SaveRunResult = import('@canvas-one/simulation-system-design/artifacts').SaveRunResult<FailedCode>;
 
 // ============================================================================
 // History reads and reference integrity
@@ -522,34 +391,6 @@ export type BranchCreateCommand = {
   };
 };
 
-export const RECORD_KINDS = [
-  'element',
-  'connection',
-  'relation',
-  'schema',
-  'fixture',
-  'refinement',
-  'scenario',
-  'view',
-] as const;
-
-export type RecordKind = (typeof RECORD_KINDS)[number];
-
-export type EditableRecord =
-  | { readonly recordKind: 'element'; readonly record: Element }
-  | { readonly recordKind: 'connection'; readonly record: Connection }
-  | { readonly recordKind: 'relation'; readonly record: Relation }
-  | { readonly recordKind: 'schema'; readonly record: PayloadSchema }
-  | { readonly recordKind: 'fixture'; readonly record: Fixture }
-  | { readonly recordKind: 'refinement'; readonly record: Refinement }
-  | { readonly recordKind: 'scenario'; readonly record: Scenario }
-  | { readonly recordKind: 'view'; readonly record: View };
-
-export type RecordChange =
-  | { readonly kind: 'insert'; readonly value: EditableRecord }
-  | { readonly kind: 'replace'; readonly value: EditableRecord }
-  | { readonly kind: 'remove'; readonly recordKind: RecordKind; readonly id: Id };
-
 export type ModelApplyRecordsCommand = {
   readonly commandId: 'model.apply-records';
   readonly operationId: Id;
@@ -559,35 +400,13 @@ export type ModelApplyRecordsCommand = {
   readonly actor: Actor;
   readonly payload: {
     readonly changes: readonly RecordChange[];
+    readonly proposal?: ProposalAttribution;
   };
 };
 
-export type HistoryCheckpointCommand = {
-  readonly commandId: 'history.checkpoint';
-  readonly operationId: Id;
-  readonly projectId: Id;
-  readonly branchId: Id;
-  readonly expectedWorkingRevision: number;
-  readonly actor: Actor;
-  readonly payload: {
-    readonly checkpointId: Id;
-    readonly label: string;
-  };
-};
+export type HistoryCheckpointCommand = import('@canvas-one/history').HistoryCheckpointCommand<Actor>;
 
-export type HistoryRestoreCommand = {
-  readonly commandId: 'history.restore';
-  readonly operationId: Id;
-  readonly projectId: Id;
-  readonly branchId: Id;
-  readonly expectedWorkingRevision: number;
-  readonly actor: Actor;
-  readonly payload: {
-    readonly snapshotId: string;
-    readonly checkpointId: Id;
-    readonly label: string;
-  };
-};
+export type HistoryRestoreCommand = import('@canvas-one/history').HistoryRestoreCommand<Actor>;
 
 export type BranchReopenCommand = {
   readonly commandId: 'branch.reopen';
@@ -601,40 +420,11 @@ export type BranchReopenCommand = {
   };
 };
 
-export type HistoryCommitCommand = {
-  readonly commandId: 'history.commit';
-  readonly operationId: Id;
-  readonly projectId: Id;
-  readonly branchId: Id;
-  readonly expectedWorkingRevision: number;
-  readonly actor: Actor;
-  readonly payload: {
-    readonly commitId: Id;
-    readonly expectedHeadId: ExpectedHead;
-    readonly message: string;
-    readonly evidence: readonly EvidenceRef[];
-  };
-};
+export type HistoryCommitCommand = import('@canvas-one/history').HistoryCommitCommand<Actor, EvidenceRef>;
 
-export type HistoryPublishPayload = {
-  readonly candidateId: Id;
-  readonly publicationId: Id;
-  readonly mergeCommitId: Id;
-  readonly metadata: PublicationMetadata;
-  readonly evidence: readonly EvidenceRef[];
-  readonly keepSourceOpen?: boolean;
-  readonly expectedProjectRevision: number;
-};
+export type HistoryPublishPayload = import('@canvas-one/history').HistoryPublishPayload<EvidenceRef>;
 
-export type HistoryPublishCommand = {
-  readonly commandId: 'history.publish';
-  readonly operationId: Id;
-  readonly projectId: Id;
-  readonly branchId: Id;
-  readonly expectedWorkingRevision: number;
-  readonly actor: Actor;
-  readonly payload: HistoryPublishPayload;
-};
+export type HistoryPublishCommand = import('@canvas-one/history').HistoryPublishCommand<Actor, EvidenceRef>;
 
 export type GenericCommand = {
   readonly commandId: string;
@@ -704,21 +494,11 @@ export type SwitchBranchOptions = {
 // Save Failure & Recovery
 // ============================================================================
 
-export type SaveFailureRecoveryAction = 'retry' | 'reload' | 'export';
+export type SaveFailureRecoveryAction = import('@canvas-one/storage').SaveFailureRecoveryAction;
 
-export type SaveFailureRecoveryOption = {
-  readonly action: SaveFailureRecoveryAction;
-  readonly label: string;
-  readonly description: string;
-  readonly recommended?: boolean;
-};
+export type SaveFailureRecoveryOption = import('@canvas-one/storage').SaveFailureRecoveryOption;
 
-export type SaveFailureRecoveryInfo = {
-  readonly reason: 'stale' | 'quota' | 'limit' | 'unavailable' | 'other';
-  readonly message: string;
-  readonly keepInMemoryCopy: true;
-  readonly options: readonly SaveFailureRecoveryOption[];
-};
+export type SaveFailureRecoveryInfo = import('@canvas-one/storage').SaveFailureRecoveryInfo;
 
 // ============================================================================
 // Repository API
@@ -842,47 +622,16 @@ export type { FileToken, FileTokenBinding } from './file-tokens';
 // ============================================================================
 
 /** The portable file's fixed format discriminator and version. */
-export const PORTABLE_FORMAT = 'system-studio' as const;
-export const PORTABLE_VERSION = 9 as const;
-
-/** Bundle rows are the table rows with `projectId` omitted. */
-export type BundleBranchRecord = Omit<BranchRecord, 'projectId'>;
-export type BundleSnapshotRecord = Omit<SnapshotRecord, 'projectId'>;
-export type BundleCommitRecord = Omit<CommitRecord, 'projectId'>;
-export type BundlePublicationRecord = Omit<PublicationRecord, 'projectId'>;
-export type BundleCheckpointRecord = Omit<CheckpointRecord, 'projectId'>;
-export type BundleRunRecord = Omit<RunRecord, 'projectId'>;
-export type BundlePartRecord = Omit<PartRecord, 'projectId'>;
-
-/**
- * Portable bundle fields exactly:
- * `ProjectBundle={id,title,createdAt,updatedAt,mainBranchId,initialSnapshotId,branches,
- * snapshots,commits,publications,checkpoints,runs,parts}`. Arrays omit `projectId`.
- * Excludes operation receipts, preferences, trace chunks, device-local actors/credentials,
- * project revision and `importSourceId`.
- */
-export type ProjectBundle = {
-  readonly id: Id;
-  readonly title: string;
-  readonly createdAt: number;
-  readonly updatedAt: number;
-  readonly mainBranchId: Id;
-  readonly initialSnapshotId: string;
-  readonly branches: readonly BundleBranchRecord[];
-  readonly snapshots: readonly BundleSnapshotRecord[];
-  readonly commits: readonly BundleCommitRecord[];
-  readonly publications: readonly BundlePublicationRecord[];
-  readonly checkpoints: readonly BundleCheckpointRecord[];
-  readonly runs: readonly BundleRunRecord[];
-  readonly parts: readonly BundlePartRecord[];
-};
-
-/** `{format:'system-studio',version:9,project:ProjectBundle}`. */
-export type PortableFile = {
-  readonly format: typeof PORTABLE_FORMAT;
-  readonly version: typeof PORTABLE_VERSION;
-  readonly project: ProjectBundle;
-};
+export { PORTABLE_FORMAT, PORTABLE_VERSION } from '@canvas-one/simulation-system-design/archive/contracts';
+export type BundleBranchRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundleBranchRecord;
+export type BundleSnapshotRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundleSnapshotRecord;
+export type BundleCommitRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundleCommitRecord;
+export type BundlePublicationRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundlePublicationRecord;
+export type BundleCheckpointRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundleCheckpointRecord;
+export type BundleRunRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundleRunRecord;
+export type BundlePartRecord = import('@canvas-one/simulation-system-design/archive/contracts').BundlePartRecord;
+export type ProjectBundle = import('@canvas-one/simulation-system-design/archive/contracts').ProjectBundle;
+export type PortableFile = import('@canvas-one/simulation-system-design/archive/contracts').PortableFile;
 
 // ============================================================================
 // Transfer, import, export, prune
@@ -900,22 +649,8 @@ export type ProjectImportCommand = {
 };
 
 /** Controller command `project.export-json {projectId, expectedProjectRevision}`. */
-export type ExportProjectParams = {
-  readonly projectId: Id;
-  readonly expectedProjectRevision: number;
-};
-
-export type ExportProjectResult =
-  | {
-      readonly status: 'done';
-      readonly value: { readonly kind: 'download'; readonly downloadId: Id };
-      readonly bytes: Uint8Array;
-      readonly sha256: string;
-    }
-  | InvalidResult
-  | StaleResult
-  | MissingResult
-  | FailedResult;
+export type ExportProjectParams = import('@canvas-one/simulation-system-design/archive/contracts').ExportProjectParams;
+export type ExportProjectResult = import('@canvas-one/simulation-system-design/archive/contracts').ExportProjectResult;
 
 /**
  * `pruneUnreferenced({projectId, expectedProjectRevision, selection})`. Explicit only

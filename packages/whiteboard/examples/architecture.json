@@ -1,0 +1,14 @@
+{
+  "format": "canvas-one/board", "version": 1, "id": "architecture", "title": "Example architecture",
+  "pages": [{ "id": "overview", "name": "Overview", "extensions": {} }],
+  "entities": [
+    { "id": "api", "type": "example/service", "data": { "name": "API" }, "extensions": {} },
+    { "id": "database", "type": "example/database", "data": { "name": "Database" }, "extensions": {} }
+  ],
+  "placements": [
+    { "id": "api-overview", "pageId": "overview", "entityId": "api", "bounds": { "x": 40, "y": 80, "width": 160, "height": 80 }, "extensions": {} },
+    { "id": "database-overview", "pageId": "overview", "entityId": "database", "bounds": { "x": 340, "y": 80, "width": 160, "height": 80 }, "extensions": {} }
+  ],
+  "connectors": [{ "id": "api-database", "pageId": "overview", "source": { "placementId": "api-overview" }, "target": { "placementId": "database-overview" }, "extensions": {} }],
+  "assets": [], "extensions": { "example/provenance": { "version": "1.0.0", "data": { "source": "authored example" } } }
+}

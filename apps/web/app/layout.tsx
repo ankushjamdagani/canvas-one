@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import '@fontsource-variable/inter';
-import '@xyflow/react/dist/style.css';
+import '@canvas-one/editor-reactflow/style.css';
 import '../../../src/styles.css';
 import { PwaRegistration } from '../../../src/standalone/PwaRegistration';
 

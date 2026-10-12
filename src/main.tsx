@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@fontsource-variable/inter';
-import '@xyflow/react/dist/style.css';
+import '@canvas-one/editor-reactflow/style.css';
 import './styles.css';
 import App from './App';
 import { MotionProvider } from './lib/motion/MotionProvider';

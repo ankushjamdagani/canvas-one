@@ -1,6 +1,10 @@
 # ADR: extract one document authority and preserve atomic editing
 
-Status: selected implementation direction, not completed cutover. Scope: phases 1–6 of `../composable-architecture-plan.md`. Baseline: `0c4a439`. Future changes occur only in worktrees/feature branches with user-merged PRs.
+Status: implemented on `codex/authoring-contracts`, pending user merge. Scope: phases 1–6 of `../composable-architecture-plan.md`. Baseline: `0c4a439`; workspace scaffold merged in PR #1. Changes occur only in worktrees/feature branches with user-merged PRs.
+
+The actual package APIs and composition are documented in [composables](../composables.md). SessionController now lives in system-design and delegates authored state to one whiteboard runtime. Local history, version/candidate mechanics, simulation workflows, storage coordinators and optional editor/presentation are extracted. Root forwarding and policy bindings retain the complete existing product. The system document remains the writable format; BoardDocument projection is read-only. No destructive database or archive conversion was needed. The decision text below records the design constraints, rather than claiming every proposed API name was retained verbatim.
+
+Final verification is recorded in HANDOFF.md and the PR. Units (2,130 passed, 12 skipped), all sixteen package builds, packed headless imports, package boundaries, app, React artifact, real Next host and Storybook builds passed. Final frozen production browsers: 250 passed, 4 skipped, one inherited landing geometry mismatch; fresh embedding: 3 passed. Scoped Claude storage review found transaction reads relying on implicit Dexie scope; accounting and cited-run rechecks now use explicit scoped stores, proved with memory/IndexedDB conformance. Generic packages remain portable; the full app's repository and part repository still bind database/domain policy.
 
 ## Current evidence
 

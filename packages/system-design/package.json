@@ -1,0 +1,334 @@
+{
+  "name": "@canvas-one/system-design",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "./session/validate-actor": { "types": "./dist/session/validate-actor.d.ts", "import": "./dist/session/validate-actor.js" },
+    "./versioning/history-summary": {
+      "types": "./dist/versioning/history-summary.d.ts",
+      "import": "./dist/versioning/history-summary.js"
+    },
+    "./versioning/history-filter": {
+      "types": "./dist/versioning/history-filter.d.ts",
+      "import": "./dist/versioning/history-filter.js"
+    },
+    "./versioning/candidate-policy": {
+      "types": "./dist/versioning/candidate-policy.d.ts",
+      "import": "./dist/versioning/candidate-policy.js"
+    },
+    "./studio/manifest-issues": {
+      "types": "./dist/studio/manifest-issues.d.ts",
+      "import": "./dist/studio/manifest-issues.js"
+    },
+    "./authoring/inspector/presentation": {
+      "types": "./dist/authoring/inspector/presentation.d.ts",
+      "import": "./dist/authoring/inspector/presentation.js"
+    },
+    "./authoring/diagram": {
+      "types": "./dist/authoring/diagram.d.ts",
+      "import": "./dist/authoring/diagram.js"
+    },
+    "./projection": {
+      "types": "./dist/projection.d.ts",
+      "import": "./dist/projection.js"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./studio/closure": {
+      "types": "./dist/studio/closure.d.ts",
+      "import": "./dist/studio/closure.js"
+    },
+    "./studio/issue": {
+      "types": "./dist/studio/issue.d.ts",
+      "import": "./dist/studio/issue.js"
+    },
+    "./studio/ids": {
+      "types": "./dist/studio/ids.d.ts",
+      "import": "./dist/studio/ids.js"
+    },
+    "./studio/readiness": {
+      "types": "./dist/studio/readiness.d.ts",
+      "import": "./dist/studio/readiness.js"
+    },
+    "./studio/freeze": {
+      "types": "./dist/studio/freeze.d.ts",
+      "import": "./dist/studio/freeze.js"
+    },
+    "./studio/text": {
+      "types": "./dist/studio/text.d.ts",
+      "import": "./dist/studio/text.js"
+    },
+    "./studio/canonical": {
+      "types": "./dist/studio/canonical.d.ts",
+      "import": "./dist/studio/canonical.js"
+    },
+    "./studio/validate": {
+      "types": "./dist/studio/validate.d.ts",
+      "import": "./dist/studio/validate.js"
+    },
+    "./studio/model": {
+      "types": "./dist/studio/model.d.ts",
+      "import": "./dist/studio/model.js"
+    },
+    "./studio/refinementRouting": {
+      "types": "./dist/studio/refinementRouting.d.ts",
+      "import": "./dist/studio/refinementRouting.js"
+    },
+    "./studio/exposure": {
+      "types": "./dist/studio/exposure.d.ts",
+      "import": "./dist/studio/exposure.js"
+    },
+    "./studio/records": {
+      "types": "./dist/studio/records.d.ts",
+      "import": "./dist/studio/records.js"
+    },
+    "./studio/protocols": {
+      "types": "./dist/studio/protocols.d.ts",
+      "import": "./dist/studio/protocols.js"
+    },
+    "./studio/manifest": {
+      "types": "./dist/studio/manifest.d.ts",
+      "import": "./dist/studio/manifest.js"
+    },
+    "./studio/connection-label": {
+      "types": "./dist/studio/connection-label.d.ts",
+      "import": "./dist/studio/connection-label.js"
+    },
+    "./studio/port-settings": {
+      "types": "./dist/studio/port-settings.d.ts",
+      "import": "./dist/studio/port-settings.js"
+    },
+    "./parts/capture": {
+      "types": "./dist/parts/capture.d.ts",
+      "import": "./dist/parts/capture.js"
+    },
+    "./parts/validate": {
+      "types": "./dist/parts/validate.d.ts",
+      "import": "./dist/parts/validate.js"
+    },
+    "./parts/types": {
+      "types": "./dist/parts/types.d.ts",
+      "import": "./dist/parts/types.js"
+    },
+    "./parts/place": {
+      "types": "./dist/parts/place.d.ts",
+      "import": "./dist/parts/place.js"
+    },
+    "./parts/remap": {
+      "types": "./dist/parts/remap.d.ts",
+      "import": "./dist/parts/remap.js"
+    },
+    "./versioning/diff": {
+      "types": "./dist/versioning/diff.d.ts",
+      "import": "./dist/versioning/diff.js"
+    },
+    "./versioning/merge": {
+      "types": "./dist/versioning/merge.d.ts",
+      "import": "./dist/versioning/merge.js"
+    },
+    "./versioning/resolve": {
+      "types": "./dist/versioning/resolve.d.ts",
+      "import": "./dist/versioning/resolve.js"
+    },
+    "./versioning/merge-descriptor": {
+      "types": "./dist/versioning/merge-descriptor.d.ts",
+      "import": "./dist/versioning/merge-descriptor.js"
+    },
+    "./bulk-arrivals": {
+      "types": "./dist/bulk-arrivals.d.ts",
+      "import": "./dist/bulk-arrivals.js"
+    },
+    "./workload": {
+      "types": "./dist/workload.d.ts",
+      "import": "./dist/workload.js"
+    },
+    "./component-kinds": {
+      "types": "./dist/component-kinds.d.ts",
+      "import": "./dist/component-kinds.js"
+    },
+    "./authoring/apply-records": {
+      "types": "./dist/authoring/apply-records.d.ts",
+      "import": "./dist/authoring/apply-records.js"
+    },
+    "./catalog/catalog": {
+      "types": "./dist/catalog/catalog.d.ts",
+      "import": "./dist/catalog/catalog.js"
+    },
+    "./catalog/place": {
+      "types": "./dist/catalog/place.d.ts",
+      "import": "./dist/catalog/place.js"
+    },
+    "./catalog/connect": {
+      "types": "./dist/catalog/connect.d.ts",
+      "import": "./dist/catalog/connect.js"
+    },
+    "./authoring/deletePlan": {
+      "types": "./dist/authoring/deletePlan.d.ts",
+      "import": "./dist/authoring/deletePlan.js"
+    },
+    "./authoring/replacePlan": {
+      "types": "./dist/authoring/replacePlan.d.ts",
+      "import": "./dist/authoring/replacePlan.js"
+    },
+    "./authoring/wrapPlan": {
+      "types": "./dist/authoring/wrapPlan.d.ts",
+      "import": "./dist/authoring/wrapPlan.js"
+    },
+    "./authoring/selectionPlans": {
+      "types": "./dist/authoring/selectionPlans.d.ts",
+      "import": "./dist/authoring/selectionPlans.js"
+    },
+    "./authoring/expandPlans": {
+      "types": "./dist/authoring/expandPlans.d.ts",
+      "import": "./dist/authoring/expandPlans.js"
+    },
+    "./authoring/geometry": {
+      "types": "./dist/authoring/geometry.d.ts",
+      "import": "./dist/authoring/geometry.js"
+    },
+    "./authoring/inspector/draft": {
+      "types": "./dist/authoring/inspector/draft.d.ts",
+      "import": "./dist/authoring/inspector/draft.js"
+    },
+    "./authoring/inspector/fields": {
+      "types": "./dist/authoring/inspector/fields.d.ts",
+      "import": "./dist/authoring/inspector/fields.js"
+    },
+    "./authoring/inspector/fieldBuilders": {
+      "types": "./dist/authoring/inspector/fieldBuilders.d.ts",
+      "import": "./dist/authoring/inspector/fieldBuilders.js"
+    },
+    "./authoring/inspector/portFields": {
+      "types": "./dist/authoring/inspector/portFields.d.ts",
+      "import": "./dist/authoring/inspector/portFields.js"
+    },
+    "./authoring/inspector/types": {
+      "types": "./dist/authoring/inspector/types.d.ts",
+      "import": "./dist/authoring/inspector/types.js"
+    },
+    "./authoring/inspector/guard": {
+      "types": "./dist/authoring/inspector/guard.d.ts",
+      "import": "./dist/authoring/inspector/guard.js"
+    },
+    "./catalog/resourceConfigCopy": {
+      "types": "./dist/catalog/resourceConfigCopy.d.ts",
+      "import": "./dist/catalog/resourceConfigCopy.js"
+    },
+    "./authoring/scenarios/draft": {
+      "types": "./dist/authoring/scenarios/draft.d.ts",
+      "import": "./dist/authoring/scenarios/draft.js"
+    },
+    "./authoring/scenarios/draftScenario": {
+      "types": "./dist/authoring/scenarios/draftScenario.d.ts",
+      "import": "./dist/authoring/scenarios/draftScenario.js"
+    },
+    "./authoring/scenarios/types": {
+      "types": "./dist/authoring/scenarios/types.d.ts",
+      "import": "./dist/authoring/scenarios/types.js"
+    },
+    "./authoring/scenarios/budgets": {
+      "types": "./dist/authoring/scenarios/budgets.d.ts",
+      "import": "./dist/authoring/scenarios/budgets.js"
+    },
+    "./authoring/scenarios/idRemap": {
+      "types": "./dist/authoring/scenarios/idRemap.d.ts",
+      "import": "./dist/authoring/scenarios/idRemap.js"
+    },
+    "./authoring/scenarios/pickers": {
+      "types": "./dist/authoring/scenarios/pickers.d.ts",
+      "import": "./dist/authoring/scenarios/pickers.js"
+    },
+    "./authoring/scenarios/summaries": {
+      "types": "./dist/authoring/scenarios/summaries.d.ts",
+      "import": "./dist/authoring/scenarios/summaries.js"
+    },
+    "./authoring/addProbePlan": {
+      "types": "./dist/authoring/addProbePlan.d.ts",
+      "import": "./dist/authoring/addProbePlan.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./react/nodeVisuals": {
+      "types": "./dist/react/nodeVisuals.d.ts",
+      "import": "./dist/react/nodeVisuals.js"
+    },
+    "./export/mermaid": {
+      "types": "./dist/export/mermaid.d.ts",
+      "import": "./dist/export/mermaid.js"
+    },
+    "./export/mermaid-types": {
+      "types": "./dist/export/mermaid-types.d.ts",
+      "import": "./dist/export/mermaid-types.js"
+    },
+    "./export/mermaid-filename": {
+      "types": "./dist/export/mermaid-filename.d.ts",
+      "import": "./dist/export/mermaid-filename.js"
+    },
+    "./export/mermaid-limitations": {
+      "types": "./dist/export/mermaid-limitations.d.ts",
+      "import": "./dist/export/mermaid-limitations.js"
+    },
+    "./export/svg": {
+      "types": "./dist/export/svg.d.ts",
+      "import": "./dist/export/svg.js"
+    },
+    "./session/controller": {
+      "types": "./dist/session/controller.d.ts",
+      "import": "./dist/session/controller.js"
+    },
+    "./session/contracts": {
+      "types": "./dist/session/contracts.d.ts",
+      "import": "./dist/session/contracts.js"
+    },
+    "./session/types": {
+      "types": "./dist/session/types.d.ts",
+      "import": "./dist/session/types.js"
+    },
+    "./session/inverse": {
+      "types": "./dist/session/inverse.d.ts",
+      "import": "./dist/session/inverse.js"
+    },
+    "./canvas/projection": {
+      "types": "./dist/canvas/projection.d.ts",
+      "import": "./dist/canvas/projection.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.react.json"
+  },
+  "dependencies": {
+    "@canvas-one/whiteboard": "0.1.0",
+    "@canvas-one/history": "0.1.0",
+    "@canvas-one/agents": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "@types/react": "19.2.18"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "lucide-react": "1.41.0",
+    "@canvas-one/ui": "0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    },
+    "@canvas-one/ui": {
+      "optional": true
+    }
+  }
+}

@@ -99,4 +99,6 @@ Current source: `src/persistence/studio/types.ts`. Target storage owns envelopes
 
 ## Conversion gate
 
+Implemented additions: `Element.component` owns namespaced custom entity type/data/extensions; `Document.extensions` owns authored namespaced records. System-design preserves and validates their neutral envelope; installed extension validators add policy. History treats these as opaque authored merge values with explicit conflict resolution. Simulation excludes them from its execution manifest. Agents discover bounded registered component schemas and create ordinary reviewable operations; proposal previews/status are ephemeral, and model credentials remain host-owned. Fixture projection preserves all existing system fields without rewriting historical payloads.
+
 Before changing in-memory document shape, the implementation must add bidirectional fixture coverage for every table row above, including multiple placements of one entity, groups/notes/attachments, scenarios, refinements and linked IDs. Core references and system endpoint references validate separately. Unknown namespaced JSON preserves its data values; known schema migrations are explicit. Simulation manifest/fingerprint characterization proves visual fields are excluded as before. This ledger is the minimum migration surface, not permission to rewrite persisted immutable snapshots.

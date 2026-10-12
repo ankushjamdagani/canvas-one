@@ -8,11 +8,11 @@
 
 import type { Id } from '../../domain/studio/model';
 import type { BuildManifestVersions } from '../../domain/studio/manifest';
+import { createIssue } from '../../domain/studio/issue';
 import {
   createStudioDatabase,
   DB_NAME,
   LocalRepository,
-  createIssue,
   isQuotaExceededError,
   mapErrorToFailedResult,
 } from '../../persistence/studio';
@@ -51,6 +51,7 @@ export async function openStudioRepository(
       ok: true,
       status: 'ready',
       repository,
+      dispose: () => db.close(),
     };
   } catch (err) {
     if (isQuotaExceededError(err)) {

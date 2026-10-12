@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "react"
+    ],
+    "tsBuildInfoFile": "./tsconfig.react.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/react/**/*.tsx"
+  ],
+  "exclude": []
+}

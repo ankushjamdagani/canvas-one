@@ -8,6 +8,9 @@
 @import "@fontsource-variable/newsreader/opsz.css";
 @import "@fontsource-variable/newsreader/opsz-italic.css";
 
+/* Overlay content stays reachable as forms, previews and validation grow. */
+.studio-dialog-content { width: calc(100vw - 2rem); max-height: calc(100dvh - 2rem); overflow-y: auto; }
+
 /* The reusable module owns a full-screen route, including its floating controls. */
 .canvas-one-root { min-height: 100svh; color: var(--ink); background: var(--shell); font-family: var(--font-sans); isolation: isolate; }
 

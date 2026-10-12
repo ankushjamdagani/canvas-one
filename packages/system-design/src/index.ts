@@ -1,0 +1,10 @@
+export * from './studio/model.js';
+export { validateDocument, ISSUE_CODES, type Issue, type IssueCode } from './studio/validate.js';
+export { buildManifest, type BuildManifestVersions } from './studio/manifest.js';
+export { checkReadiness } from './studio/readiness.js';
+export { canonicalJson, sha256Hex } from './studio/canonical.js';
+export { RECORD_KINDS, type SystemRecordMap, type RecordKind, type RecordChange, type EditableRecord } from './studio/records.js';
+export { projectSystemDesignDocument, readSystemDesignSource, SYSTEM_DESIGN_SOURCE_EXTENSION, type SystemDesignProjectionOptions } from './projection.js';
+export { planSystemDesignDiagram, discoverSystemDesignComponents, diagramRequestSchema, type DiagramRequest, type DiagramPlanResult, type DiagramAnnotation } from './authoring/diagram.js';
+export { applyRecordChanges } from './authoring/apply-records.js';
+export { planCustomComponent } from './authoring/custom-components.js';

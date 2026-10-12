@@ -36,10 +36,6 @@ export function pngFileName(title: string | null | undefined): string {
   return `${sanitizeFilenameStem(title)}.png`;
 }
 
-export function mermaidFileName(title: string | null | undefined): string {
-  return `${sanitizeFilenameStem(title)}.mmd`;
-}
+export { mermaidFileName } from '@canvas-one/system-design/export/mermaid-filename';
 
-export function csvFileName(title: string | null | undefined): string {
-  return `${sanitizeFilenameStem(title)}.csv`;
-}
+export { csvFileName } from '@canvas-one/simulation-system-design/export/csv-filename';

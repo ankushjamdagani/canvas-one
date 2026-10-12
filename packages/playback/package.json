@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "files": ["dist", "README.md"],
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./timeline": { "types": "./dist/timeline.d.ts", "import": "./dist/timeline.js" },
+    "./traffic": { "types": "./dist/traffic.d.ts", "import": "./dist/traffic.js" }
+  },
   "scripts": { "build": "tsc -p tsconfig.json" }
 }

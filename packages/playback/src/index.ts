@@ -1,4 +1,7 @@
 /** Generic timeframe operations. No renderer, recording or simulation dependency. */
+export * from './timeline.js';
+export * from './traffic.js';
+export * from './controller.js';
 export type TimeRange = { readonly startMs: number; readonly endMs: number };
 
 export type TimeBounds = {

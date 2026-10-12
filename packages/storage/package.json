@@ -1,0 +1,1 @@
+{"name":"@canvas-one/storage","version":"0.1.0","private":true,"type":"module","sideEffects":false,"files":["dist","README.md"],"exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"scripts":{"build":"tsc -p tsconfig.json"},"dependencies":{"@canvas-one/whiteboard":"0.1.0"},"devDependencies":{"typescript":"7.0.2"}}

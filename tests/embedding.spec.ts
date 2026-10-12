@@ -1,6 +1,61 @@
 import { test, expect } from './fixtures';
 import { runAll, savedRunCount } from './simulation-support';
 
+test('complete app composes trusted host commands and custom components with persistence and undo', async ({page}) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/canvas');
+  await page.getByTestId('create-example-s01').click();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await page.getByTestId('topbar-quick-options-btn').click();
+  await page.getByTestId('quick-options-input').fill('host review');
+  await page.getByTestId('quick-option-host:example/add-review-card').click();
+  const card = page.getByTestId('host-review-card');
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText('Host-owned UI, shared authoring history');
+  await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(card).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+Shift+z');
+  await expect(card).toHaveCount(1);
+  const elementId = await card.getAttribute('data-element-id');
+  await page.reload();
+  await expect(card).toHaveCount(1);
+  await expect(card).toHaveAttribute('data-element-id', elementId!);
+  await expect(card).toContainText('Host-owned UI, shared authoring history');
+  expect(errors).toEqual([]);
+});
+
+test('independent boards isolate state and selection with custom and missing renderers', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/independent');
+  const first = page.getByTestId('first-board');
+  const second = page.getByTestId('second-board');
+  await expect(first.getByText('Missing renderer: example/custom')).toBeVisible();
+  await expect(second.getByTestId('custom-renderer')).toBeVisible();
+  await expect(page.getByTestId('first-revision')).toHaveText('0');
+  await page.getByTestId('add-first-component').click();
+  await expect(page.getByTestId('first-entity-count')).toHaveText('3');
+  await expect(page.getByTestId('second-entity-count')).toHaveText('2');
+  await expect(page.getByTestId('first-revision')).toHaveText('1');
+  const shape = first.locator('.react-flow__node[data-id="shape-placement"]');
+  await shape.click();
+  await first.locator('.react-flow__node[data-id="custom-placement"]').click({modifiers: ['Shift']});
+  await expect(first.locator('.react-flow__node.selected')).toHaveCount(2);
+  await expect(second.locator('.react-flow__node.selected')).toHaveCount(0);
+  const bounds = await shape.boundingBox();
+  if (!bounds) throw new Error('Shape geometry unavailable');
+  await page.mouse.move(bounds.x + 50, bounds.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 90, bounds.y + 70, {steps: 8});
+  await page.mouse.up();
+  await expect(page.getByTestId('first-revision')).toHaveText('2');
+  await expect(page.getByTestId('second-revision')).toHaveText('0');
+  expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test('Next host owns its styles, navigation and PWA while the mounted canvas owns its routes', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

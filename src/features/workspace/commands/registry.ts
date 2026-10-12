@@ -46,7 +46,7 @@
  * single-letter shortcuts, Duplicate project and Project settings.
  */
 
-import { executeAvailable } from '@canvas-one/commands';
+import { CommandRegistry, type CommandMetadata, type PaletteCommandContribution } from '@canvas-one/commands';
 import type { Id } from '../../../domain/studio/model';
 import type { PanelId, Placement } from '../panels';
 import type { ConflictResolution } from '../../../domain/versioning/resolve';
@@ -65,6 +65,7 @@ import { readDockConfig, type DockConfig } from '../dockConfig';
 
 export const COMMAND_IDS = [
   'commands.open',
+  'agents.open',
   'project.rename',
   'project.switch',
   'branch.switch',
@@ -142,6 +143,7 @@ export interface CanvasExpansionPayload {
 /** Closed payload per command (never JSON patches). */
 export interface CommandPayloads {
   'commands.open': Empty;
+  'agents.open': Empty;
   'project.rename': { readonly title: string };
   /** "All projects": leaves for the entry screen, where the project is chosen. */
   'project.switch': Empty;
@@ -515,6 +517,11 @@ function expansionAvailability(mode: 'expand' | 'collapse') {
 }
 
 export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition<K> } = {
+  'agents.open': {
+    id: 'agents.open', label: 'AI collaboration', keywords: ['AI', 'agent', 'collaboration', 'pair', 'proposals'],
+    group: 'review', iconKey: 'command', shortcut: null,
+    availability: ctx => requireProject(ctx) ?? ENABLED,
+  },
   'commands.open': {
     id: 'commands.open',
     label: 'Quick options',
@@ -1314,11 +1321,33 @@ export async function executeCommand<K extends CommandId>(
   ctx: CommandContext,
   handlers: CommandHandlers,
 ): Promise<ExecuteResult> {
-  const handler = handlers[id] as (payload: CommandPayloads[K]) => unknown | Promise<unknown>;
-  return executeAvailable(
-    () => getAvailability(id, ctx, payload),
-    () => handler(payload),
-  );
+  return workspaceRegistry(handlers).execute(id, payload, ctx) as Promise<ExecuteResult>;
+}
+
+// Each composed handler set owns its registry. The package supplies dispatch;
+// this app supplies its feature actions, availability policies and presentation.
+const workspaceRegistries = new WeakMap<CommandHandlers, CommandRegistry<CommandContext>>();
+export function workspaceRegistry(handlers: CommandHandlers): CommandRegistry<CommandContext> {
+  const existing = workspaceRegistries.get(handlers);
+  if (existing) return existing;
+  const registry = new CommandRegistry<CommandContext>();
+  for (const id of COMMAND_IDS) {
+    const definition = COMMAND_DEFINITIONS[id];
+    const effect: CommandMetadata['effect'] = id.startsWith('run.') ? 'execution'
+      : id.startsWith('export.') || id.includes('export') ? 'export'
+      : id.startsWith('selection.') || id.startsWith('edit.') || id === 'canvas.add-note' ? 'document'
+      : id.startsWith('project.') || id.startsWith('branch.') || id.startsWith('history.') ? 'session' : 'ui';
+    registry.register<CommandPayloads[typeof id], unknown>({
+      metadata: { id, label: definition.label, keywords: definition.keywords, effect },
+      // Payloads here are internal typed feature invocations; external agent
+      // input passes through schema-validated proposal tools before dispatch.
+      validate: input => ({ valid: true, value: input as CommandPayloads[typeof id] }),
+      availability: (context, input) => getAvailability(id, context, input),
+      execute: input => (handlers[id] as (value: CommandPayloads[typeof id]) => unknown)(input),
+    });
+  }
+  workspaceRegistries.set(handlers, registry);
+  return registry;
 }
 
 // ============================================================================
@@ -1366,6 +1395,8 @@ function matchShortcut(scope: Shortcut['scope'], event: ShortcutEvent, isMac: bo
  * native) and inside nested dialogs.
  */
 export function matchGlobalShortcut(event: ShortcutEvent, isMac: boolean): CommandId | null {
+  if (!event.isComposing && !event.inEditableField && !event.inDialog &&
+      matches({ key: 'k', modifiers: ['Mod'], scope: 'global' }, event, isMac)) return 'commands.open';
   return matchShortcut('global', event, isMac);
 }
 
@@ -1437,7 +1468,7 @@ export function formatShortcut(shortcut: Shortcut, isMac: boolean): string {
 // ============================================================================
 
 /** One selectable row: a command with its bound payload. */
-export type QuickOption = {
+export type BuiltinQuickOption = {
   [K in CommandId]: {
     /** Stable, unique row key (also the cmdk value). */
     readonly key: string;
@@ -1453,6 +1484,38 @@ export type QuickOption = {
     readonly availability: Availability;
   };
 }[CommandId];
+export type HostQuickOption = {
+  readonly hostCommand: true;
+  readonly key: string;
+  readonly id: string;
+  readonly payload: unknown;
+  readonly label: string;
+  readonly detail: string | null;
+  readonly keywords: readonly string[];
+  readonly iconKey: CommandIconKey;
+  readonly badge: null;
+  readonly shortcut: null;
+  readonly availability: import('@canvas-one/commands').Availability;
+};
+export type QuickOption = BuiltinQuickOption | HostQuickOption;
+
+/** Discovery comes from the active registry; contributed payloads are validated without execution. */
+export function buildContributedQuickOptions(registry: CommandRegistry<CommandContext>, contributions: readonly PaletteCommandContribution<CommandContext>[], ctx: CommandContext): QuickOptionGroup | null {
+  const definitions = new Map(contributions.map(item => [item.definition.metadata.id, item]));
+  const options: HostQuickOption[] = registry.discover().flatMap(metadata => {
+    const contribution = definitions.get(metadata.id);
+    if (!contribution) return [];
+    const input = contribution.palette?.input;
+    const checked = contribution.palette ? contribution.definition.validate(input) : null;
+    const availability = checked?.valid
+      ? contribution.definition.availability(ctx, checked.value)
+      : { enabled: false as const, code: 'unsupported-palette-input', reason: checked && !checked.valid ? checked.reason : 'This action requires a custom input form supplied by its host' };
+    return [{hostCommand: true as const, key: `host:${metadata.id}`, id: metadata.id, payload: input, label: metadata.label,
+      detail: metadata.description ?? null, keywords: metadata.keywords ?? [], iconKey: 'command' as const, badge: null,
+      shortcut: null, availability}];
+  });
+  return options.length ? {group: 'edit', label: 'Extensions', options} : null;
+}
 
 export interface QuickOptionGroup {
   readonly group: CommandGroup;
@@ -1537,6 +1600,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   // message) or the publish review; restore and conflict resolution need a chosen
   // target, so they stay in the History panel.
   const review: QuickOption[] = [
+    option('agents.open', {}, ctx),
     option('history.open', {}, ctx),
     option('history.commit', { message: '' }, ctx),
     option('history.prepare-publish', {}, ctx),

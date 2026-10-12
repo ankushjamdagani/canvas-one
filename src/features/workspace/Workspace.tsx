@@ -1,3 +1,5 @@
+import { defaultStudioComposition, type StudioComposition } from '../../../apps/web/src/composition';
+import { SystemDesignPresentationProvider } from '@canvas-one/system-design/react';
 import * as React from "react";
 import type { GroupImperativeHandle, PanelImperativeHandle } from "react-resizable-panels";
 import type { FlowRecord } from "../../domain/studio/runner/types";
@@ -27,8 +29,6 @@ import {
   WorkspacePanelPreferenceStore,
 } from "./panelPreferences";
 import { PanelHost, type PanelCommandRoutes } from "../panels";
-import { HistoryController } from "../history/controller";
-import { PublishController } from "../history/publishController";
 import { DraftBehindMainBanner } from "../history/DraftBehindMainBanner";
 import {
   HistoryLadder,
@@ -58,10 +58,9 @@ import type {
   StudioRepository,
 } from "../../persistence/studio/types";
 import {
-  createCandidateController,
-  createIssue,
   type Actor,
 } from "../../persistence/studio";
+import { createIssue } from "../../domain/studio/issue";
 import type { Id, Note } from "../../domain/studio/model";
 import { captureSelection } from "../../domain/parts/capture";
 import { planPlacement } from "../../domain/parts/place";
@@ -71,7 +70,6 @@ import {
   type ScenariosStatusResult,
 } from "../runs/scenarioStatus";
 import type { RunController } from "../runs/RunController";
-import { WorkerTransport } from "../runs/transport";
 import {
   applyScenarioDraft,
   changeScenarioDraft,
@@ -121,6 +119,8 @@ import {
 } from "./integrationState";
 import {
   buildQuickOptions,
+  buildContributedQuickOptions,
+  workspaceRegistry,
   COMMAND_DEFINITIONS,
   executeCommand,
   formatShortcut,
@@ -138,6 +138,7 @@ import {
   type ShortcutEvent,
 } from "./commands/registry";
 import { QuickOptionsDialog, type RenameOutcome } from "./QuickOptions";
+import { AgentCollaboration } from "../agents/AgentCollaboration";
 import type { TextStepKind } from "./QuickOptionsTextStep";
 import {
   routeHistoryController,
@@ -273,6 +274,7 @@ function useViewportWidth(): number {
 }
 
 export interface WorkspaceProps {
+  composition?: StudioComposition;
   session: SessionController;
   repository: StudioRepository;
   onBackToProjects: () => void;
@@ -303,14 +305,23 @@ const SavedParts = lazyComponent(
   null,
 );
 
-export function Workspace({
+export function Workspace(props: WorkspaceProps) {
+  const presentation = React.useMemo(() => props.composition?.createSystemDesignPresentation?.({session: props.session}) ?? props.composition?.systemDesignPresentation ?? {}, [props.composition, props.session]);
+  return <SystemDesignPresentationProvider value={presentation}>
+    <WorkspaceBody {...props} />
+  </SystemDesignPresentationProvider>;
+}
+
+function WorkspaceBody({
   session,
   repository,
   onBackToProjects,
   mintId,
   actor,
   runControl,
+  composition = defaultStudioComposition,
 }: WorkspaceProps) {
+  const CanvasHost = composition.canvasHost ?? CanvasView;
   const workspaceRootRef = React.useRef<HTMLDivElement>(null);
   useCanvasTransition(workspaceRootRef);
   const routeShell = useRouteShell();
@@ -748,31 +759,16 @@ export function Workspace({
   React.useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | undefined;
-    void import("../runs/RunController").then(({ RunController }) => {
-      if (disposed) return;
-      const worker = new Worker(
-        new URL("../runs/runner.worker.ts", import.meta.url),
-        {
-          type: "module",
-        },
-      );
-      const transport = new WorkerTransport(worker);
-      const controller = new RunController({
-        repository,
-        transport,
-        mintId,
-      });
-      setRunController(controller);
-      cleanup = () => {
-        controller.destroy();
-        transport.terminate?.();
-      };
+    void composition.createExecution({repository, mintId}).then(lease => {
+      if (disposed) { lease.dispose(); return; }
+      setRunController(lease.controller);
+      cleanup = () => lease.dispose();
     });
     return () => {
       disposed = true;
       cleanup?.();
     };
-  }, [repository, mintId]);
+  }, [repository, mintId, composition]);
 
   const runControllerState = React.useSyncExternalStore(
     React.useCallback(
@@ -1555,26 +1551,8 @@ export function Workspace({
   // One HistoryController / CandidateController / PublishController per
   // mounted workspace (mirrors the RunController pattern above), created
   // once via a lazy state initializer rather than on every render.
-  const [historyController] = React.useState(
-    () => new HistoryController({ repository, session, mintId, actor }),
-  );
-  const [candidateController] = React.useState(() =>
-    createCandidateController({ mintId }),
-  );
-  const [publishController] = React.useState(
-    () =>
-      new PublishController({
-        repository,
-        session,
-        candidateController,
-        mintId,
-        actor,
-        // Reuses CandidateController's own already-tested runner --
-        // never a bespoke one, matching the exact pattern in
-        // publishController.test.ts.
-        runScenario: (params) =>
-          candidateController.startCandidateRun(repository, params),
-      }),
+  const [{historyController, candidateController, publishController}] = React.useState(
+    () => composition.createVersioning({repository, session, mintId, actor}),
   );
 
   // HistoryController binds getState/subscribe in its own constructor
@@ -2026,6 +2004,7 @@ export function Workspace({
   // ==========================================================================
 
   const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
+  const [agentsOpen, setAgentsOpen] = React.useState(false);
   // Selection overflow state: a Library capture review request, History's part filter, the
   // part being replaced, and the flow-probe check to open expanded.
   const [captureRequested, setCaptureRequested] = React.useState<number>(0);
@@ -2400,6 +2379,7 @@ export function Workspace({
   const commandHandlers: CommandHandlers = React.useMemo(
     () => ({
       "commands.open": () => setQuickOptionsOpen(true),
+      "agents.open": () => { setQuickOptionsOpen(false); setAgentsOpen(true); },
       "project.rename": ({ title }) => handleRenameProject(title),
       "project.switch": () => handleBackToProjects(),
       "branch.switch": ({ branchId }) => handleSwitchBranch(branchId),
@@ -3059,13 +3039,40 @@ export function Workspace({
     [runCommand, draftContext.id],
   );
 
+  const [hostCommands, setHostCommands] = React.useState<{
+    registry: ReturnType<typeof workspaceRegistry>;
+    contributions: readonly import('@canvas-one/commands').PaletteCommandContribution<CommandContext>[];
+  } | null>(null);
+  React.useEffect(() => {
+    const registry = workspaceRegistry(commandHandlers);
+    const contributions = composition.createCommandContributions?.({session}) ?? [];
+    const registrations: import('@canvas-one/commands').CommandRegistration[] = [];
+    try {
+      for (const contribution of contributions) registrations.push(registry.register(contribution.definition));
+    } catch (error) {
+      for (const registration of registrations.reverse()) registration.dispose();
+      throw error;
+    }
+    setHostCommands({registry, contributions});
+    return () => { for (const registration of registrations.reverse()) registration.dispose(); };
+  }, [composition, session, commandHandlers]);
+
   const quickOptionGroups = React.useMemo(
-    () => (quickOptionsOpen ? buildQuickOptions(commandContext) : []),
-    [quickOptionsOpen, commandContext],
+    () => {
+      if (!quickOptionsOpen) return [];
+      const groups = buildQuickOptions(commandContext);
+      const extensionGroup = hostCommands ? buildContributedQuickOptions(hostCommands.registry, hostCommands.contributions, commandContext) : null;
+      return extensionGroup ? [...groups, extensionGroup] : groups;
+    },
+    [quickOptionsOpen, commandContext, hostCommands],
   );
 
   const handleQuickOption = React.useCallback(
     (option: QuickOption) => {
+      if ('hostCommand' in option) {
+        void hostCommands?.registry.execute(option.id, option.payload, commandContext).catch(error => console.error('Host command failed', error));
+        return;
+      }
       void executeCommand(
         option.id,
         option.payload as never,
@@ -3073,7 +3080,7 @@ export function Workspace({
         commandHandlers,
       );
     },
-    [commandContext, commandHandlers],
+    [commandContext, commandHandlers, hostCommands],
   );
 
   const handleQuickRename = React.useCallback(
@@ -3273,6 +3280,8 @@ export function Workspace({
           }
           quickOptionsShortcut={quickOptionsShortcut}
           quickOptionsActive={quickOptionsOpen}
+          onOpenAgents={() => void executeCommand("agents.open", {}, commandContext, commandHandlers)}
+          agentsActive={agentsOpen}
         />
       ) : (
         <header
@@ -3313,7 +3322,7 @@ export function Workspace({
               }}
               canvas={
                 <>
-                  <CanvasView
+                  <CanvasHost
                     ref={canvasViewRef}
                     document={document}
                     activeViewId={activeViewId}
@@ -3648,6 +3657,13 @@ export function Workspace({
         onRun={handleQuickOption}
         onRename={handleQuickRename}
         onTextCommand={handleQuickTextCommand}
+      />
+      <AgentCollaboration
+        session={session}
+        open={agentsOpen}
+        onOpenChange={setAgentsOpen}
+        modelProvider={composition.modelProvider}
+        selection={{ids: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds], viewId: activeViewId ?? undefined}}
       />
 
       <Dialog

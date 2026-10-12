@@ -16,7 +16,7 @@
  *   - preferences: primary key `key`
  */
 
-import Dexie, { type Table } from 'dexie';
+import { IndexedDbDatabase, type BoundTables } from '@canvas-one/storage-indexeddb';
 import { DB_NAME, DB_VERSION } from './types';
 export { DB_NAME, DB_VERSION };
 import type {
@@ -33,23 +33,24 @@ import type {
   TraceChunkRecord,
 } from './types';
 
-export class StudioDatabase extends Dexie {
-  projects!: Table<ProjectRecord, string>;
-  branches!: Table<BranchRecord, [string, string]>;
-  snapshots!: Table<SnapshotRecord, [string, string]>;
-  commits!: Table<CommitRecord, [string, string]>;
-  publications!: Table<PublicationRecord, [string, string]>;
-  checkpoints!: Table<CheckpointRecord, [string, string]>;
-  runs!: Table<RunRecord, [string, string]>;
-  traceChunks!: Table<TraceChunkRecord, [string, string, number]>;
-  operations!: Table<OperationRecord, [string, string]>;
-  parts!: Table<PartRecord, [string, string, number]>;
-  preferences!: Table<PreferenceRecord, string>;
+type StudioRows = {
+  projects: { row: ProjectRecord; key: string };
+  branches: { row: BranchRecord; key: [string, string] };
+  snapshots: { row: SnapshotRecord; key: [string, string] };
+  commits: { row: CommitRecord; key: [string, string] };
+  publications: { row: PublicationRecord; key: [string, string] };
+  checkpoints: { row: CheckpointRecord; key: [string, string] };
+  runs: { row: RunRecord; key: [string, string] };
+  traceChunks: { row: TraceChunkRecord; key: [string, string, number] };
+  operations: { row: OperationRecord; key: [string, string] };
+  parts: { row: PartRecord; key: [string, string, number] };
+  preferences: { row: PreferenceRecord; key: string };
+};
+export interface StudioDatabase extends BoundTables<StudioRows> {}
+export class StudioDatabase extends IndexedDbDatabase<StudioRows> {
 
   constructor(dbName = DB_NAME) {
-    super(dbName);
-
-    this.version(DB_VERSION).stores({
+    super(dbName, DB_VERSION, {
       projects: 'id, updatedAt',
       branches: '[projectId+id], projectId',
       snapshots: '[projectId+id], projectId',

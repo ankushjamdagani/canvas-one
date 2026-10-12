@@ -1,5 +1,54 @@
 {
-  "references": [{ "path": "./packages/ui" }, { "path": "./packages/playback" }, { "path": "./packages/commands" }],
+  "references": [
+    {
+      "path": "./packages/ui"
+    },
+    {
+      "path": "./packages/playback"
+    },
+    {
+      "path": "./packages/commands"
+    },
+    {
+      "path": "./packages/whiteboard"
+    },
+    {
+      "path": "./packages/system-design"
+    },
+    {
+      "path": "./packages/history"
+    },
+    {
+      "path": "./packages/simulation-system-design"
+    },
+    {
+      "path": "./packages/storage"
+    },
+    {
+      "path": "./packages/storage-indexeddb"
+    },
+    {
+      "path": "./packages/agents"
+    },
+    {
+      "path": "./packages/collaboration"
+    },
+    {
+      "path": "./packages/agent-bridge"
+    },
+    {
+      "path": "./packages/editor-reactflow"
+    },
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./packages/react"
+    },
+    {
+      "path": "./packages/components-basic"
+    }
+  ],
   "compilerOptions": {
     "target": "ES2022",
     "lib": [

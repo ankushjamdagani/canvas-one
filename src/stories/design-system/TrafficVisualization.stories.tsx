@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { createContext, useContext, useEffect, useId, useState } from 'react';
-import { ReactFlow, EdgeLabelRenderer, getSmoothStepPath, useReactFlow, type EdgeProps, type NodeProps } from '@xyflow/react';
+import { ReactFlow, EdgeLabelRenderer, getSmoothStepPath, useReactFlow, type EdgeProps, type NodeProps } from '@canvas-one/editor-reactflow/react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';

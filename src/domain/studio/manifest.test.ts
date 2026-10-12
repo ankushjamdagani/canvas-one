@@ -64,6 +64,16 @@ describe('buildManifest reference fixtures', () => {
 });
 
 describe('buildManifest golden vectors: equal fingerprint', () => {
+  it('excludes custom visual content and opaque authored extensions from execution fingerprints', async () => {
+    const doc = loadFixture('s01.json');
+    const before = await buildManifest(doc, doc.scenarios[0].id, VERSIONS);
+    const changed = structuredClone(doc);
+    changed.elements[0].component = {type: 'example/custom', data: {text: 'Visual explanation'}, extensions: {}};
+    changed.extensions = {'unknown/provider': {version: '9.0.0', data: {opaque: true}}};
+    expect(await buildManifest(changed, changed.scenarios[0].id, VERSIONS)).toEqual(before);
+    changed.elements[0].component.data.text = 'Another explanation';
+    expect(await buildManifest(changed, changed.scenarios[0].id, VERSIONS)).toEqual(before);
+  });
   it('is unaffected by reordered object keys throughout the document', async () => {
     const doc = loadFixture('s01.json');
     const scenarioId = doc.scenarios[0].id;

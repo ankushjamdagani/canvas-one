@@ -1,9 +1,9 @@
-import { CanvasOne } from '@canvas-one/react';
+import { ComposedCanvas } from '../ComposedCanvas';
 
 export default function CanvasPage() {
   return (
     <>
-      <CanvasOne basePath="/canvas" storageNamespace="next-host-example" />
+      <ComposedCanvas />
       <a href="/" className="host-link" data-testid="host-home-link">Host home</a>
     </>
   );

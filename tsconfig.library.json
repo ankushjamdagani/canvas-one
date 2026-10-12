@@ -5,7 +5,7 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "outDir": "dist-react/types",
-    "rootDir": "src",
+    "rootDir": ".",
     "jsx": "react-jsx",
     "plugins": []
   },

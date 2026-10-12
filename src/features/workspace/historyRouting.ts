@@ -13,7 +13,7 @@
  * probe, which is not a user command.
  */
 
-import { createIssue } from '../../persistence/studio/errors';
+import { createIssue } from '../../domain/studio/issue';
 import type { InvalidResult } from '../../persistence/studio';
 import type { HistoryController, HistoryControllerLike } from '../history/controller';
 import type { PublishController, PublishControllerLike } from '../history/publishController';

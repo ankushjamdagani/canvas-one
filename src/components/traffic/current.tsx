@@ -1,6 +1,6 @@
 // Reusable current traffic presentation, independent of Storybook.
 import { createContext, useContext, useEffect, useId, useMemo, useState } from 'react';
-import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useReactFlow, type Node, type Edge, type NodeProps, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useReactFlow, type Node, type Edge, type NodeProps, type EdgeProps } from '@canvas-one/editor-reactflow/react';
 import { Clock, ListOrdered, Cpu, TriangleAlert } from 'lucide-react';
 import { NodeCard } from '@/features/workspace/NodeCard';
 import { TrafficEdge } from '@/features/workspace/TrafficEdge';

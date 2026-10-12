@@ -9,6 +9,11 @@
   },
   "dependencies": {
     "@canvas-one/react": "file:../../dist-react",
+    "@canvas-one/whiteboard": "file:../../packages/whiteboard",
+    "@canvas-one/components-basic": "file:../../packages/components-basic",
+    "@canvas-one/system-design": "file:../../packages/system-design",
+    "@canvas-one/history": "file:../../packages/history",
+    "@canvas-one/agents": "file:../../packages/agents",
     "next": "16.4.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"

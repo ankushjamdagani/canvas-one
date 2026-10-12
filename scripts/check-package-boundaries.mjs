@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { isBuiltin } from 'node:module';
 
 const root = path.resolve(import.meta.dirname, '..');
 const failures = [];
@@ -9,7 +10,7 @@ for (const entry of await readdir(path.join(root, 'packages'), { withFileTypes: 
   if (!entry.isDirectory()) continue;
   const directory = path.join(root, 'packages', entry.name);
   const manifest = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
-  packages.set(manifest.name, { directory, manifest, imports: new Set() });
+  packages.set(manifest.name, { directory, manifest, imports: new Set(), headlessImports: new Set() });
 }
 async function files(directory) {
   const result = [];
@@ -20,7 +21,7 @@ async function files(directory) {
   }
   return result;
 }
-const declarations = /(?:\b(?:import|export)\s+(?:type\s+)?[\s\S]*?\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)['"]([^'"\n]+)['"]/g;
+const declarations = /(?:^[\t ]*(?:import|export)\s+(?:type\s+)?[^;'"`]*?\bfrom\s*|\bimport\s*\(\s*|^[\t ]*import\s*)['"]([^'"\n]+)['"]/gm;
 function checkPublicExport(target, consumer) {
   if (!target.startsWith('@canvas-one/')) return;
   const owner = target.split('/').slice(0, 2).join('/');
@@ -44,11 +45,13 @@ for (const [name, pkg] of packages) {
           const resolved = path.resolve(path.dirname(file), target);
           if (!resolved.startsWith(pkg.directory + path.sep)) failures.push(`${name}: import escapes package: ${target}`);
         } else {
+          if (isBuiltin(target)) continue;
           const owner = target.startsWith('@') ? target.split('/').slice(0, 2).join('/') : target.split('/')[0];
           if (!dependencies[owner]) failures.push(`${name}: undeclared dependency ${target}`);
           if (target.startsWith('@canvas-one/') && !packages.has(owner)) failures.push(`${name}: missing workspace ${owner}`);
           checkPublicExport(target, name);
           pkg.imports.add(owner);
+          if (!/[\\/](?:react|browser)(?:[\\/]|\.tsx?$)/.test(path.relative(pkg.directory, file))) pkg.headlessImports.add(owner);
         }
     }
   }
@@ -60,6 +63,7 @@ for (const directory of ['src', 'apps', 'examples', 'tests']) {
     const source = await readFile(file, 'utf8');
     for (const match of source.matchAll(declarations)) {
       const target = match[1];
+      if (target.startsWith('@xyflow/')) failures.push(`${path.relative(root, file)}: engine import must use @canvas-one/editor-reactflow exports: ${target}`);
       if (target.startsWith('.') && path.resolve(path.dirname(file), target).startsWith(path.join(root, 'packages') + path.sep)) {
         failures.push(`${path.relative(root, file)}: relative package import bypasses exports: ${target}`);
       }
@@ -74,19 +78,22 @@ function traverse(name, stack = []) {
 for (const name of packages.keys()) traverse(name);
 
 // These are the currently extracted headless roots. Add future behavior packages here.
-for (const name of ['@canvas-one/playback', '@canvas-one/commands']) {
+for (const name of ['@canvas-one/playback', '@canvas-one/commands', '@canvas-one/whiteboard', '@canvas-one/system-design', '@canvas-one/history', '@canvas-one/simulation-system-design', '@canvas-one/storage', '@canvas-one/agents', '@canvas-one/collaboration', '@canvas-one/agent-bridge', '@canvas-one/components-basic']) {
   if (!packages.has(name)) continue;
   const forbidden = /^(react|react-dom|next|dexie|@xyflow\/react)$/;
   const inspect = (owner, seen = new Set()) => {
     if (seen.has(owner)) return;
     seen.add(owner);
-    for (const dependency of packages.get(owner).imports) {
+    for (const dependency of packages.get(owner).headlessImports) {
       if (forbidden.test(dependency)) failures.push(`${name}: framework dependency ${dependency}`);
       if (packages.has(dependency)) inspect(dependency, seen);
     }
   };
+  // Optional presentation subpaths may depend on React. Verify the actual
+  // headless entry's loaded graph, rather than forbidding that separate API.
   inspect(name);
-  const probe = spawnSync(process.execPath, ['--input-type=module', '-e',
+  const loader = `export async function resolve(specifier,context,next){if(/^(react|react-dom|next|dexie|@xyflow\\/react)(\\/|$)/.test(specifier))throw new Error('Framework loaded by headless entry: '+specifier);return next(specifier,context);}`;
+  const probe = spawnSync(process.execPath, ['--loader', `data:text/javascript,${encodeURIComponent(loader)}`, '--input-type=module', '-e',
     `for (const key of ['window','document','navigator','HTMLElement','indexedDB']) Object.defineProperty(globalThis,key,{get(){throw new Error('DOM access: '+key)},configurable:true}); await import(${JSON.stringify(name)});`],
   { cwd: root, encoding: 'utf8' });
   if (probe.status !== 0) failures.push(`${name}: built headless import failed: ${probe.stderr.trim()}`);

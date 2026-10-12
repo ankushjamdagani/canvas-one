@@ -21,7 +21,7 @@ Baseline source: `0c4a439` (restored application `8f41338`). These are required 
 | Dock/panels/phone bounded layout/resizers, independent preference persistence, themes/typography/accessibility | `tests/studio-dock-customization.spec.ts`, `studio-panels.spec.ts`, `studio-phone.spec.ts`, `studio-shell.spec.ts`, `theme.spec.ts`, `theme-accessibility.spec.ts`, `typography-consistency.spec.ts`, `landing-theme-states.spec.ts`; `src/features/workspace/panels.test.ts`, `panelPreferences.test.ts` | apps/web presentation; ui foundation; storage preferences |
 | Full existing CanvasOne embed, scoped styles/portals/theme, real Next host | `tests/embedding.spec.ts`; `examples/next-host`; `npm run build:react` | existing product embed retained; generic react host added after whiteboard cutover |
 
-All rows are **required / cutover not yet verified**. A package build alone cannot mark a workflow retained. Source moves keep existing test files and characterization inputs; repair path/tooling differences without weakening assertions. Do not replace the full studio with a reduced `/board` route.
+All rows remain required. Integrated source extraction retains the existing test files and characterization inputs, and the full unit suite passes (2,130 passed, 12 skipped). Package boundaries/headless consumers, Next app, React artifact, real embedding host and Storybook builds pass. Final frozen production browsers: 250 passed, 4 skipped, 1 inherited landing geometry mismatch (expected 800, baseline/current 722). Fresh real embedding: 3 passed. Detailed results are recorded in HANDOFF.md and the PR; a package build alone does not establish browser parity. The complete studio remains the product, with no reduced `/board` route.
 
 ## New functionality gates
 

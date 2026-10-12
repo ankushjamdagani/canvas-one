@@ -1093,7 +1093,7 @@ describe('Publish and Publication Lifecycle', () => {
       },
       snapshotId: modifiedSnapshotId,
     });
-    (controller as any).candidates.set(candidateId, modifiedCand);
+    (controller as any).candidates.candidates.set(candidateId, modifiedCand);
 
     // 4. Try to publish using ONLY the source branch's evidence
     // Fingerprint of modifiedDoc scenario differs from source evidence fingerprint!
