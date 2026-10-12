@@ -3439,3 +3439,13 @@ Fetched and fast-forwarded clean master to merged PR #2; archived the dirty setu
 ## 2026-10-12 — Missing workspace declarations
 
 Reproduced the exact agent-bridge errors with agents dist removed and incremental metadata retained. Changed all sixteen package build scripts to forced project build mode; preserved optional browser/React entries and CLI executable preparation. Updated README/HANDOFF/LESSONS. Verification: all package builds, boundaries/headless imports, root typecheck and missing agents+bridge output recovery pass; CLI help works. Codex only. Full runtime suites not rerun for build-script-only fix. Lesson: incremental metadata must not suppress missing generated declarations.
+
+## 2026-10-12 — Repository MCP server configuration for Codex, Gemini, and Claude
+
+Configured repository-scoped Model Context Protocol (MCP) server `canvas-one` across all three supported agent environments:
+- Added `.mcp.json` for Claude Code.
+- Added `.agents/mcp_config.json` for Gemini / Antigravity workspace customization.
+- Added `.codex/config.toml` for Codex CLI project configuration.
+Configured stdio command `node` with portable repository-relative arguments `./packages/cli/dist/main.js mcp` and environment variables `CANVAS_ONE_BRIDGE_URL=http://127.0.0.1:47831` and `CANVAS_ONE_AGENT_TOKEN=<agentToken printed by bridge>`.
+Platform: agy.
+Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp get canvas-one` (status: enabled); verified Claude Code MCP discovery with `claude mcp list` (detected `canvas-one` stdio server, pending approval); verified Antigravity `.agents/mcp_config.json` schema matches `~/.gemini/config/mcp_config.json` and builtin agy-customizations specification; ran full unit test suite (2,130 passed, 12 skipped).
