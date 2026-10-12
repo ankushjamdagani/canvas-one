@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { m, useAnimationControls, useIsPresent } from 'motion/react';
-import { useMotionEnv } from '@/lib/motion/env';
+import { m, useAnimationControls } from 'motion/react';
+import { motionOff, useMotionEnv } from '@/lib/motion/env';
+import { useSkipInitialEntrance } from './initial-load';
 import {
   EASE,
   revealSpec,
@@ -95,29 +96,26 @@ export type RevealProps = HtmlProps & {
 export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...rest }: RevealProps) {
   const scope = React.useContext(ScopeContext);
   const env = useMotionEnv();
-  const isPresent = useIsPresent();
-  const phase = isPresent ? scope.phase : 'exit';
   const controls = useAnimationControls();
   const element = React.useRef<HTMLElement>(null);
-  const previousPhase = React.useRef(scope.phase);
-  // CSS owns entry from first paint, including server HTML before hydration.
-  // Motion owns exit only; hydration must never rewind an already-painted entry.
+  const started = React.useRef(false);
+  const skipInitialEntrance = useSkipInitialEntrance();
+  // Prepare the pose under the first-load cover. If the cover already timed out,
+  // retain the visible server content; later mounts still use the normal entrance.
   React.useLayoutEffect(() => {
-    const previous = previousPhase.current;
-    previousPhase.current = scope.phase;
     if (!scope.phase) return;
-    if (scope.phase !== 'exit') {
-      controls.stop();
-      if (previous === 'exit' && element.current) {
-        element.current.style.opacity = rest.style?.opacity?.toString() ?? '';
-        element.current.style.transform = rest.style?.transform ?? '';
-        element.current.style.filter = rest.style?.filter ?? '';
+    if (!started.current) {
+      started.current = true;
+      if (scope.phase === 'enter' && (skipInitialEntrance() || window.matchMedia('(prefers-reduced-motion: reduce)').matches || motionOff())) {
+        controls.set({ opacity: 1, y: 0, filter: 'none' });
+        if (element.current) scope.onEntered?.(element.current);
+        return;
       }
-      return;
+      controls.set('hidden');
     }
-    void controls.start('exit');
+    void controls.start(scope.phase);
     return () => controls.stop();
-  }, [controls, scope.phase, env.reduced, env.off, env.coarse]);
+  }, [controls, scope.phase, env.reduced, env.off, env.coarse, skipInitialEntrance]);
   const custom = React.useMemo<Custom>(
     () => ({
       enter: revealSpec(kind, 'enter', index, scope, env),
@@ -129,25 +127,14 @@ export function Reveal({ as = 'div', kind = 'content', index = 0, children, ...r
   return (
     <Tag
       {...rest}
-      style={scope.phase ? {
-        ...rest.style,
-        '--reveal-y': `${custom.enter.y}px`,
-        '--reveal-blur': `${custom.enter.blur}px`,
-        '--reveal-duration': `${custom.enter.duration}s`,
-        '--reveal-delay': `${custom.enter.delay}s`,
-      } as React.CSSProperties : rest.style}
       ref={element}
       variants={revealVariants}
       custom={custom}
       initial={false}
       animate={scope.phase ? controls : undefined}
       exit="exit"
-      data-reveal-phase={phase}
-      onAnimationEnd={(event: React.AnimationEvent<HTMLElement>) => {
-        rest.onAnimationEnd?.(event);
-        if (event.target === event.currentTarget && event.animationName.endsWith('studio-reveal-enter')) {
-          scope.onEntered?.(event.currentTarget);
-        }
+      onAnimationComplete={(definition: unknown) => {
+        if (definition === 'enter' && element.current) scope.onEntered?.(element.current);
       }}
       data-reveal-kind={kind}
       data-reveal-index={index}

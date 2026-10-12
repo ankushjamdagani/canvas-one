@@ -9,26 +9,10 @@ test('public pages have visible HTML without JavaScript', async ({ browser, base
   for (const path of ['/', '/brand']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.locator('[data-reveal-kind="content"]').first()).toHaveCSS('opacity', '1');
-    await expect(page.locator('[data-board-dots]')).toHaveCSS('opacity', '1');
     await expect(page.getByRole('link', { name: 'Try Beta' }).first()).toHaveAttribute('href', '/projects');
     await expect(page.getByTestId('boot-loading-screen')).toHaveCount(0);
   }
   await context.close();
-});
-
-test('reduced motion is visible before hydration with JavaScript disabled', async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false, reducedMotion: 'reduce', baseURL });
-  try {
-    const page = await context.newPage();
-    await page.goto('/');
-    await expect(page.locator('[data-reveal-kind="content"]').first()).toHaveCSS('opacity', '1');
-    await expect(page.locator('[data-reveal-kind="content"]').first()).toHaveCSS('transform', 'none');
-    await expect(page.locator('[data-board-dots]')).toHaveCSS('opacity', '1');
-    await expect(page.locator('.drafting-frame-top')).toHaveCSS('transform', 'none');
-  } finally {
-    await context.close();
-  }
 });
 
 test('public content does not open IndexedDB and metadata follows navigation', async ({ page }) => {

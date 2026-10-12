@@ -3456,3 +3456,10 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: shared reveal, BoardLayer, foundation CSS, reveal unit and production browser regressions; HANDOFF and LESSONS updated. Platform: Codex; no subagents.
 - Verification: production build and Storybook build passed; 2,130 units passed / 12 skipped; ten focused production browser checks passed (first-frame monotonic opacity, delayed hydration, no-JavaScript visibility, reduced motion, exits, heading focus, card overlay, rapid navigation and cancelled exit). Full browser suite not run. Existing Storybook chunk warnings remain.
 - Lesson: hiding visible server HTML in a layout effect still flashes before hydration. Separately, stopping exit controls on presence changes strands route completion; keep presence-driven CSS cleanup separate from Motion ownership.
+
+### 2026-10-12 — Logo-face first-load cover (replaces CSS entrance strategy)
+
+- Outcome: user-approved opaque Thinking-face overlay covers initial HTML; hydration prepares and runs the original Motion entrance, then removes the cover without a minimum wait. Three-second bootstrap/CSS fallbacks reveal content; expired initial hydration skips hiding it again. No-JavaScript bypasses the cover, and reduced-motion keeps the face static and preserves heading focus.
+- Files: InitialLoad foundation component and boot helper, standalone/layout integration, reveal/board guards, loader CSS and browser regressions; reverted prior CSS entrance/test changes. Codex; no subagents.
+- Verification: production and Storybook builds passed; full units 2,130 passed / 12 skipped, final focused motion/reveal checks 22 passed; 13 final production browser checks passed, including blocked scripts, timeout/late hydration in normal and reduced-motion modes, original entrances/exits, focus and interrupted navigation. First-paint loader screenshot inspected. Full browser suite not run.
+- Lesson: discuss changes to the animation strategy before replacing approved choreography. Skipped entrances must still signal completion for route heading focus.

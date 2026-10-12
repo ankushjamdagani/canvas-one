@@ -5,6 +5,7 @@ import { ThemeProvider } from '../lib/theme';
 import { MotionProvider } from '../lib/motion/MotionProvider';
 import { PortalRootProvider } from '../components/ui/portal-root';
 import { acquireRouter, RouterSnapshotProvider } from '../lib/router';
+import { InitialLoad } from '../components/ui/initial-load';
 
 /** SSR public pages and browser projects share the original persistent route shell. */
 export function StandaloneApp({
@@ -28,7 +29,9 @@ export function StandaloneApp({
         <PortalRootProvider root={root}>
           <ThemeProvider target={root}>
             <MotionProvider>
-              <App basePath={basePath} manageMetadata siteOrigin={siteOrigin} />
+              <InitialLoad>
+                <App basePath={basePath} manageMetadata siteOrigin={siteOrigin} />
+              </InitialLoad>
             </MotionProvider>
           </ThemeProvider>
         </PortalRootProvider>

@@ -3,37 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 // These tests run at real animation speed: clear the suite-wide motion-off flag.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('delayed hydration never hides content that has already entered', async ({ page }) => {
-  let release!: () => void;
-  const gate = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/*.js*', async route => { await gate; await route.continue(); });
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
-  try {
-    await page.goto('/', { waitUntil: 'commit' });
-    const content = page.locator('[data-reveal-kind="content"]').first();
-    await expect(content).toHaveCSS('opacity', '1');
-    await page.evaluate(() => {
-      const samples: number[] = [];
-      (window as unknown as { hydrationOpacity: number[] }).hydrationOpacity = samples;
-      const sample = () => {
-        const content = document.querySelector('[data-reveal-kind="content"]');
-        if (content && samples.length < 600) samples.push(Number(getComputedStyle(content).opacity));
-        requestAnimationFrame(sample);
-      };
-      requestAnimationFrame(sample);
-    });
-    release();
-    await page.waitForLoadState('networkidle');
-    expect(await page.evaluate(() => (window as unknown as { hydrationOpacity: number[] }).hydrationOpacity.every(v => v === 1))).toBe(true);
-    expect(errors).toEqual([]);
-    await page.getByRole('link', { name: 'Brand', exact: true }).click();
-    await expect(page.locator('[data-page-kind="brand"] h1')).toBeFocused();
-  } finally {
-    release();
-  }
-});
-
 const trackOverlay = (page: Page) =>
   page.addInitScript(() => {
     new MutationObserver(() => {
@@ -63,10 +32,6 @@ test('public content animates through intermediate entry and exit poses after hy
     (window as unknown as { revealSamples: Record<string, number[]> }).revealSamples[kind] ?? [], kind);
   await expect.poll(async () => (await opacitySamples('home')).some(v => v > 0.05 && v < 0.95)).toBe(true);
   await expect.poll(async () => (await opacitySamples('home')).at(-1)).toBe(1);
-  // A complete server page must never paint before being hidden by hydration.
-  const initial = await opacitySamples('home');
-  expect(initial[0]).toBe(0);
-  expect(initial.every((v, i) => i === 0 || v >= initial[i - 1] - 0.01)).toBe(true);
   await page.getByRole('link', { name: 'Brand', exact: true }).click();
   await expect(page.locator('[data-page-kind="home"]')).toHaveCount(0);
   const home = await opacitySamples('home');
