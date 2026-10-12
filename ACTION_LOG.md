@@ -3475,3 +3475,11 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: loading/header foundation components, initial cover, App/embed fallbacks, BoardLayer/RouteShell readiness, CSS, Storybook and browser coverage; HANDOFF/LESSONS updated. Codex; no subagents.
 - Verification: production and Storybook builds passed; final units 2,130 passed / 12 skipped; all 16 focused production browser checks passed, plus a desktop/mobile visual confirmation of the header and larger face. Full browser suite not run. Existing Storybook chunk warnings remain.
 - Lesson: header material sits outside child content reveals and needs its own completion gate; count overlapping frame animations rather than relying on a fixed delay or a single ready boolean.
+
+### 2026-10-12 — All-page visual verification
+
+- Inspected 68 captures of landing, Brand, projects and workspace on desktop/mobile: staged startup, light/dark settled layouts, reduced motion, populated projects and opening/return. Loader size, text-free loading and border-before-header sequence verified; no page errors or horizontal overflow in startup captures.
+- Found/fixed an interrupted-intro regression: opening early and returning could leave the header hidden; stopping the intro could also retain partial native border geometry. Explicitly settle/cancel superseded intros and release readiness exactly once. Files: BoardLayer, header regression test and HANDOFF/LESSONS. Codex; no subagents.
+- Verification: final production build and 2,130 units passed / 12 skipped; 17 focused production browser checks passed, then all four header checks and desktop/mobile open-return captures passed after the final native-fill correction. Full browser suite not run.
+- Remaining findings recorded without design changes: mobile Brand's Logo section enters ahead of its hero; dark-theme white cards/node titles have low contrast. Audit artifacts retained in `/private/tmp/system-studio-page-visuals`.
+- Lesson: superseded native animation promises may not resolve, and stop can preserve partial fill states. Verify delayed return after early opening, including final border transforms and header visibility.

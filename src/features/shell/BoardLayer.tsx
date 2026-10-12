@@ -46,6 +46,7 @@ export function BoardLayer({
   }, [visible, fadeSeconds]);
   const dots = React.useRef<HTMLDivElement>(null);
   const frame = React.useRef<HTMLDivElement>(null);
+  const cancelIntro = React.useRef<(() => void) | undefined>(undefined);
 
   React.useLayoutEffect(() => {
     if (!playIntro || skipInitialEntrance() || window.matchMedia('(prefers-reduced-motion: reduce)').matches || motionOff()) {
@@ -65,15 +66,25 @@ export function BoardLayer({
         { duration: BOARD.ringDuration, delay: BOARD.ringDelay, ease: EASE.enter }),
     ];
     void controls.at(-1)!.then(() => { if (active) { active = false; onFrameComplete?.(); } });
-    return () => {
+    let disposed = false;
+    const cancel = () => {
+      if (disposed) return;
+      disposed = true;
       if (active) { active = false; onFrameComplete?.(); }
-      controls.forEach((c) => c.stop());
+      // Settle native fill states before stopping so cancelled frames cannot
+      // remain half drawn after their inline styles have been cleared.
+      controls.forEach((c) => { c.complete(); c.stop(); });
       d.style.opacity = '1';
       d.style.transform = '';
       f.querySelectorAll<HTMLElement>('.drafting-frame-side, .drafting-frame-ring').forEach((el) => {
         el.style.transform = '';
         el.style.opacity = '1';
       });
+    };
+    cancelIntro.current = cancel;
+    return () => {
+      if (cancelIntro.current === cancel) cancelIntro.current = undefined;
+      cancel();
     };
   }, [playIntro, skipInitialEntrance, onFrameStart, onFrameComplete]);
 
@@ -102,6 +113,10 @@ export function BoardLayer({
     if (!shift.n || env.reduced) return;
     const ring = frame.current?.querySelector<HTMLElement>('.drafting-frame-ring');
     if (!ring) return;
+    // A new ring animation supersedes the intro's native animation. Explicitly
+    // release its readiness token: a superseded animation may never resolve.
+    cancelIntro.current?.();
+    cancelIntro.current = undefined;
     onFrameStart?.();
     let active = true;
     const control = animate(ring, { opacity: [1, 0.25, 1] }, {

@@ -62,3 +62,18 @@ test('reduced motion shows header material immediately', async ({ page }) => {
   await expect(page.locator('[data-header-surface]')).toHaveCSS('opacity', '1');
   await expect(page.getByTestId('route-board')).toHaveAttribute('data-intro', 'false');
 });
+
+test('opening a project during the frame intro does not strand the returning header', async ({ page }) => {
+  await page.goto('/projects');
+  await page.getByTestId('create-example-s04').click();
+  await expect(page.getByTestId('workspace-root')).toBeVisible();
+  await page.waitForTimeout(3200);
+  await page.getByTestId('topbar-back').click();
+  await expect(page.getByTestId('entry-screen-root')).toBeVisible();
+  await expect(page.locator('[data-page-kind="project"]')).toHaveCount(0);
+  await expect(page.locator('[data-header-surface]')).toHaveCSS('opacity', '1');
+  await expect.poll(() => page.locator('.drafting-frame-side').evaluateAll(sides => sides.every(side => {
+    const transform = getComputedStyle(side).transform;
+    return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
+  }))).toBe(true);
+});
