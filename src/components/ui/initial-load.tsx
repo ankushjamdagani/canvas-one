@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { LoadingFace } from './loading-face';
-import { initialLoadExpired } from '@/lib/motion/initial-load';
+import { dismissInitialLoader, initialLoadExpired } from '@/lib/motion/initial-load';
 
 const InitialLoadContext = React.createContext<() => boolean>(() => false);
 export const useSkipInitialEntrance = () => React.useContext(InitialLoadContext);
@@ -13,11 +13,13 @@ export function InitialLoad({ children }: { children: React.ReactNode }) {
   React.useLayoutEffect(() => {
     prepared.current = true;
     if (window.__canvasInitialLoad) window.clearTimeout(window.__canvasInitialLoad.timer);
-    if (loader.current) loader.current.hidden = true;
+    if (loader.current) dismissInitialLoader(loader.current);
   }, []);
   return (
     <InitialLoadContext.Provider value={skip}>
-      <div ref={loader} data-initial-loader className="initial-load-overlay" suppressHydrationWarning>
+      <div ref={loader} data-initial-loader className="initial-load-overlay" suppressHydrationWarning onAnimationEnd={event => {
+        if (event.target === event.currentTarget && (event.animationName === 'initial-loader-exit' || event.animationName === 'initial-loader-timeout')) event.currentTarget.hidden = true;
+      }}>
         <LoadingFace />
       </div>
       {children}

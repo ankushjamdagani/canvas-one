@@ -3483,3 +3483,10 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: final production build and 2,130 units passed / 12 skipped; 17 focused production browser checks passed, then all four header checks and desktop/mobile open-return captures passed after the final native-fill correction. Full browser suite not run.
 - Remaining findings recorded without design changes: mobile Brand's Logo section enters ahead of its hero; dark-theme white cards/node titles have low contrast. Audit artifacts retained in `/private/tmp/system-studio-page-visuals`.
 - Lesson: superseded native animation promises may not resolve, and stop can preserve partial fill states. Verify delayed return after early opening, including final border transforms and header visibility.
+
+### 2026-10-12 — Animate the initial loader out
+
+- Outcome: face and cover fade over 280ms; face shifts up 8px and shrinks to 0.92. Hydration and timeout both animate instead of immediately hiding. Ready exits use fresh animation names; hydration during a fallback fade cannot restart the cover. Reduced-motion/no-JavaScript paths retain immediate dismissal.
+- Files: InitialLoad, pure boot/dismiss helper, CSS and loader browser coverage; HANDOFF/LESSONS updated. Codex; no subagents.
+- Verification: production and Storybook builds passed; 18 focused production browsers passed, including intermediate face opacity and mid-fallback hydration; paused real CSS keyframes inspected on desktop/mobile. Final isolated full units: 2,130 passed / 12 skipped. Initial concurrent unit run had one session-history stress timeout; no session change, isolated rerun passed. Full browser suite not run.
+- Lesson: honour the existing CPU-isolation rule for browser animation runs too; independent exit animation names prevent elapsed waiting time from shortening a ready fade or restarting a fallback already in progress.
