@@ -3522,3 +3522,12 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
 - Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
 
+### 2026-10-13 — Analyze AI collaboration workflow and UX
+
+- Outcome: documented the shipped local CLI/MCP proposal pipeline, optional model hook, future hosted collaboration boundaries, lifecycle issues and prioritized canvas-centered UX/feature roadmap. Product implementation unchanged.
+- Files: `docs/audits/2026-10-13-ai-collaboration.md`, ACTION_LOG and LESSONS. Codex with three native read-only agents for architecture, UX and detector/coverage evidence; dedicated `codex/ai-collaboration-analysis` worktree.
+- Verification: 11 focused agent/controller/bridge tests passed; UI detector returned zero findings. Initial sandbox run blocked three loopback tests with EPERM; authorized rerun passed. Source and diff reviewed. Browser tests, full build, full units and Storybook not rerun for documentation-only work.
+- Limitations: source-based UX assessment; no fresh visual/browser verification or measured UX uplift. Connection renewal, cancellation propagation, queue retention and richer review remain proposed work.
+- Publication status: local report complete; automatic approval review rejected remote push as repository-derived external disclosure without explicit destination/payload authorization. No push or PR created; user approval requested.
+- Lesson: cancellation of an MCP client's wait does not establish cancellation of relay work; verify queued browser delivery separately. Added a corresponding LESSONS rule.
+

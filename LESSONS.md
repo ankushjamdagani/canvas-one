@@ -1,5 +1,7 @@
 # Lessons
 
+- For AI relay cancellation, verify that queued browser work is revoked as well as the caller's wait. Aborting an MCP fetch alone can leave a diagram request deliverable. Why: 2026-10-13 AI collaboration source audit.
+
 - For composite workspace packages, test recovery with dist missing and tsbuildinfo retained. `tsc -p` and unforced incremental builds can report success without restoring declarations; package build scripts use `tsc -b --force`. Why: 2026-10-12 agent-bridge build failure after local setup.
 
 - Verify a real HTTP page after Next dev reports ready. This workspace's scoped PostCSS plugin currently requires webpack for local development; readiness alone masked a Turbopack HTTP 500. Why: 2026-10-12 local AI setup.
