@@ -3522,3 +3522,16 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
 - Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
 
+### 2026-10-13 — Fix CI Playwright failures for header loading, playback status, and notes
+
+- Outcome: resolved all 3 test failures / flakiness reported from the GitHub Actions CI run on `master`:
+  1. `tests/header-loading.spec.ts`: fixed malformed CSS property declaration `animation-loader-face-exit` -> `animation: initial-loader-face-exit` in `INITIAL_LOAD_STYLE`, allowed frame sampling when `dataset.loaderExit === 'true'`, and widened intermediate opacity bounds to `(0.01, 0.99)` so low-FPS CI runners do not skip the window.
+  2. `tests/studio-playback.spec.ts`: added `await expect(page.getByTestId('playback-status')).toHaveText('Live')` before clicking "Stop run" so React commits the transition to live mode and does not drop the click event during DOM reconciliation / layout shifts.
+  3. `tests/studio-notes.spec.ts` & `src/features/workspace/NoteNode.tsx`: added `onPointerDown={(e) => e.stopPropagation()}` and cleared `leaveTimer.current` on note action buttons to prevent canvas / ReactFlow container from capturing pointerdown and swallowing button clicks, and added explicit wait for the color popover to be hidden before collapsing.
+- Files: `src/features/workspace/NoteNode.tsx`, `src/lib/motion/initial-load.ts`, `tests/header-loading.spec.ts`, `tests/studio-notes.spec.ts`, `tests/studio-playback.spec.ts`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-ci-tests`.
+- Verification: clean production build (`npm run build`), all 2,130 unit tests passed (12 skipped via `npm test`), and Playwright test suite for all three test files passed cleanly with 11 passed (20.4s). AST knowledge graph refreshed via `graphify update .`.
+- Lesson:
+  1. Inline CSS string keyframes and properties must be verified for exact syntax (`animation:` property name); missing colons silently drop styles in browsers.
+  2. In browser tests asserting state transitions triggered by toolbar/header actions, ensure the previous state's commit settles before dispatching consecutive clicks to avoid dropped events during DOM reconciliation.
+  3. Interactive control buttons rendered inside canvas / ReactFlow nodes must intercept `onPointerDown` (`e.stopPropagation()`) to prevent the canvas container from capturing the pointerdown gesture and suppressing button clicks.
+

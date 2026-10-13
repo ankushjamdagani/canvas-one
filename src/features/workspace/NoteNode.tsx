@@ -242,6 +242,7 @@ export function NoteNode({ data, selected }: NodeProps) {
               data-testid={`note-edit-btn-${nodeData.note.id}`}
               aria-label="Edit note"
               title="Edit note"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 setPinned(true);
@@ -260,6 +261,7 @@ export function NoteNode({ data, selected }: NodeProps) {
                   data-testid={`note-color-btn-${nodeData.note.id}`}
                   aria-label="Note colour"
                   title="Note colour"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   className="nodrag nopan pointer-events-auto size-5 flex items-center justify-center rounded hover:bg-black/5 text-secondary-text hover:text-foreground cursor-pointer"
                 >
@@ -306,8 +308,10 @@ export function NoteNode({ data, selected }: NodeProps) {
             data-testid={`note-collapse-btn-${nodeData.note.id}`}
             aria-label="Collapse note"
             title="Collapse to comment bubble"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
+              if (leaveTimer.current) clearTimeout(leaveTimer.current);
               setPinned(false);
               setHovered(false);
             }}
@@ -321,6 +325,7 @@ export function NoteNode({ data, selected }: NodeProps) {
               data-testid={`note-delete-btn-${nodeData.note.id}`}
               aria-label="Delete note"
               title="Delete note"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 nodeData.onDelete?.();

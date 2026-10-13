@@ -49,6 +49,7 @@ test('comments rest as bubbles, open on hover, stay open on click, change colour
   await page.getByTestId(/note-color-sky-/).click();
   await waitForIdle(page);
   await expect(page.locator('.note-card').first()).toHaveClass(/bg-note-sky/);
+  await expect(page.locator('[data-testid^="note-color-menu-"]')).toBeHidden();
 
   await page.locator('.note-card').first().getByTestId(/note-collapse-btn-/).click();
   await page.mouse.move(5, 300);

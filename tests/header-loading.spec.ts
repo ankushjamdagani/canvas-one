@@ -11,7 +11,7 @@ test('header material waits for the page frame, then fades in', async ({ page })
       const ring = document.querySelector('.drafting-frame-ring');
       const surface = document.querySelector('[data-header-surface]');
       const loader = document.querySelector<HTMLElement>('[data-initial-loader]');
-      if (ring && surface && (!loader || loader.hidden) && samples.length < 600) {
+      if (ring && surface && (!loader || loader.hidden || loader.style.display === 'none' || loader.dataset.loaderExit === 'true') && samples.length < 600) {
         samples.push({ ring: Number(getComputedStyle(ring).opacity), surface: Number(getComputedStyle(surface).opacity), page: surface.closest('[data-page-kind]')?.getAttribute('data-page-kind') ?? null });
       }
       requestAnimationFrame(sample);
@@ -21,10 +21,10 @@ test('header material waits for the page frame, then fades in', async ({ page })
   await page.goto('/');
   await expect(page.locator('[data-header-surface]')).toHaveCSS('opacity', '1');
   const samples = await page.evaluate(() => (window as unknown as { headerFrames: { ring: number; surface: number; page: string | null }[] }).headerFrames);
-  const drawing = samples.filter(frame => frame.ring > 0.05 && frame.ring < 0.95);
+  const drawing = samples.filter(frame => frame.ring > 0.01 && frame.ring < 0.99);
   expect(drawing.length).toBeGreaterThan(0);
   expect(drawing.every(frame => frame.surface === 0)).toBe(true);
-  const fading = samples.filter(frame => frame.surface > 0.05 && frame.surface < 0.95);
+  const fading = samples.filter(frame => frame.surface > 0.01 && frame.surface < 0.99);
   expect(fading.length).toBeGreaterThan(0);
   expect(fading.every(frame => frame.ring === 1)).toBe(true);
   await page.screenshot({ path: test.info().outputPath('header-polish-desktop.png') });

@@ -131,6 +131,7 @@ test('finite bulk recording advances while reviewing a selected range', async ({
   await expect.poll(async () => Number(await seeker.getAttribute('aria-valuemax'))).toBeGreaterThan(frontier + 200);
   await expect(seeker).toHaveAttribute('aria-valuenow', reviewedAt!);
   await page.getByRole('button', { name: 'Back to live', exact: true }).click();
+  await expect(page.getByTestId('playback-status')).toHaveText('Live');
   await page.getByRole('button', { name: 'Stop run', exact: true }).click();
   await expect(page.getByTestId('playback-status')).toContainText(/stopped/i, { timeout: 20000 });
   const pane = await tab(page, 'Summary');
