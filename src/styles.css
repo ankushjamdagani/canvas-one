@@ -762,7 +762,7 @@ body {
 }
 .initial-load-overlay > .loading-face, [data-initial-loader] > .loading-face { animation: initial-loader-face-timeout 0.28s cubic-bezier(0.4, 0, 0.2, 1) 3s forwards; }
 /* Separate names restart the ready exit at zero, independently of time spent waiting. */
-.initial-load-overlay[data-loader-exit], [data-initial-loader][data-loader-exit] { animation: initial-loader-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.initial-load-overlay[data-loader-exit], [data-initial-loader][data-loader-exit] { animation: initial-loader-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; pointer-events: none; }
 .initial-load-overlay[data-loader-exit] > .loading-face, [data-initial-loader][data-loader-exit] > .loading-face { animation: initial-loader-face-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 .initial-load-overlay[hidden], [data-initial-loader][hidden] { display: none !important; }
 .loading-face { display: grid; place-items: center; }

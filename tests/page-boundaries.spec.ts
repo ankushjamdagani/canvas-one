@@ -15,7 +15,7 @@ for (const width of [1440, 390, 320]) {
       expect(bounds!.x).toBe(23);
       expect(bounds!.y).toBe(23);
       expect(bounds!.width).toBe(width - 46);
-      const styles = await header.evaluate(el => {
+      const styles = await header.locator('[data-header-surface]').evaluate(el => {
         const css = getComputedStyle(el);
         return { blur: css.backdropFilter, border: css.borderBottomWidth };
       });

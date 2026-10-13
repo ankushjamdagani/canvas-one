@@ -29,7 +29,7 @@ test(`${reducedMotion}: logo cover appears before hydration, times out, and late
     await expect(loader.locator('svg')).toHaveAttribute('data-expression', 'wink');
     await expect(loader.locator('svg')).toHaveAttribute('width', '128');
     if (reducedMotion === 'reduce') await expect(loader.locator('svg circle').first()).toHaveCSS('animation-name', 'none');
-    else await page.screenshot({ path: '/private/tmp/loader-first-paint.png' });
+    else await page.screenshot({ path: test.info().outputPath('loader-first-paint.png') });
     expect(await loader.evaluate(el => {
       const rect = el.getBoundingClientRect();
       return el.contains(document.elementFromPoint(rect.width / 2, rect.height / 2));
