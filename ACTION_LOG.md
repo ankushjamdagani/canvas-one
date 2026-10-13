@@ -3548,4 +3548,14 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
   1. State subscription listeners reading external store/controller state in components using force-update/redraw hooks must include all status-affecting flags (such as `stopping` and `terminal`) in their change detection keys.
   2. Collapsing an expanded element into a smaller trigger located along the cursor's exit path requires a momentary cooldown to prevent the cursor departure movement from inadvertently triggering re-expansion.
 
+### 2026-10-14 — Halt landing demo simulation timer and animations under motionOff to prevent contrast test flakiness
+
+- Outcome: eliminated transient accessibility contrast failures on landing page demo nodes (`.lp-buffer > header > span`, `.lp-buffer-actions > button`) during theme accessibility scans in `cyanotype dark` and `achromatic dark`. When running in Playwright (`studio:motion = 'off'`), `LandingPage` now honors `motionOff()` to stop the background `setInterval` simulation timer and avoid mounting elements during audit scans. Added `:root[data-motion="off"]` CSS overrides disabling `lp-appear` animations and transitions on `.lp-buffer` and `.lp-note`. Added explicit poll in `theme-accessibility.spec.ts` ensuring `.lp-buffer, .lp-note` have reached full opacity before Axe scans. Added user's directive on open-source evaluation and tabular comparisons to `LESSONS.md`.
+- Files: `src/features/entry/LandingPage.tsx`, `src/features/entry/landing-page.css`, `src/lib/motion/env.ts`, `tests/theme-accessibility.spec.ts`, `LESSONS.md`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-ci-tests`.
+- Verification: clean production build (`npm run build`), all 2,130 unit tests passed (12 skipped via `npm test`), and Playwright test suite passed for `tests/theme-accessibility.spec.ts -g "cyanotype dark|achromatic dark"` (2 passed in 18.0s) and `tests/studio-playback.spec.ts` (6 passed in 19.9s).
+- Lesson:
+  1. Continuous background simulation timers on showcase pages must check `motionOff()` in addition to media queries so headless test runners with disabled motion settle immediately to steady state without background timer churn.
+  2. Tabular comparisons should be used when presenting design alternatives or new systems, evaluating existing open-source libraries before custom builds.
+
+
 

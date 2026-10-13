@@ -698,6 +698,16 @@
     transition: none;
   }
 }
+:root[data-motion="off"] .lp-buffer,
+:root[data-motion="off"] .lp-note,
+[data-motion="off"] .lp-buffer,
+[data-motion="off"] .lp-note {
+  animation: none !important;
+}
+:root[data-motion="off"] .lp-cursor,
+[data-motion="off"] .lp-cursor {
+  transition: none !important;
+}
 
 @media (max-width: 479px) {
   .lp-hero h1 {
