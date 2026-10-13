@@ -1,5 +1,4 @@
 import { test, expect, type Page } from './fixtures';
-import type { SnapshotRecord } from '../src/persistence/studio/types';
 
 
 /** Waits until no authored command is in flight. Canvas gestures are ignored

@@ -3522,3 +3522,17 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
 - Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
 
+### 2026-10-13 — Codebase analysis and cleanup
+
+- Outcome: analyzed application and all 16 packages; removed compiler-confirmed unused imports/bindings, dead preview seed and snapshot tuple; simplified a port matcher; shared Next/Vite CSS selector transform; removed obsolete missing-React-workspace validation exemption. Preserved public APIs, initialization, persistence, exhaustive checking and deterministic fixture IDs.
+- Files: 21 source/script/test files plus HANDOFF, ACTION_LOG and LESSONS. Codex lead and native cleanup_audit discovery/review subagent; branch `codex/codebase-cleanup`. Independent source review: no actionable findings; 39 selector/context equivalence cases passed.
+- Verification: 2,130 units passed / 12 skipped; app and all package unused-symbol scans passed; production and Storybook builds, package boundaries/headless imports, CSS scoping probe and diff check passed. Production browser coverage across isolated runs: 263 distinct passes / four skipped / one connection-gesture failure reproduced on clean baseline `a812c8a`. A second gesture failure passed isolated on both baseline and cleanup. No clean single full-suite result claimed.
+- Limitations: initial sandbox unit run had three localhost EPERM failures, resolved by elevated full rerun. Test-managed browser servers exited twice; final coverage used a separately managed isolated server. Temporary verification configs excluded from commit.
+- Lesson: ask the user when configured delegation is blocked or authorization is unclear; captured in LESSONS.
+
+### 2026-10-13 — Cleanup review and workflow clarification
+
+- Outcome: removed the session's rejection narrative from cleanup notes and replaced the fallback rule with asking the user when delegation is blocked or unclear. Completed the authorized Gemini 3.8 Flash High diff audit and Claude Sonnet 4.6 review; both passed. Claude's helper/workspace checks closed with tracked-file evidence; public API preserved.
+- Files: ACTION_LOG, HANDOFF and LESSONS; updated PR #12. Codex lead, Gemini audit and Claude review. Verification: full review outputs inspected and documentation diff/whitespace checked; runtime unchanged, existing test/build results retained.
+- Lesson: ask before replacing a configured model workflow; user selected the available Gemini model for this review.
+

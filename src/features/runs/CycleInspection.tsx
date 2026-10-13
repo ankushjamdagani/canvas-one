@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Play, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Segmented } from "../../components/ui/segmented";
 import {
@@ -56,7 +56,6 @@ export function CycleInspection({
   mobile = false,
   inspectorHeight = 440,
   recordingChanged = false,
-  onSeek,
   onPlayFrom,
   onClearRange,
   onClose,
@@ -233,7 +232,7 @@ export function CycleInspection({
   const cycleList = (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {query.rows.map((cycle, index) => {
+        {query.rows.map((cycle) => {
           const latency =
             cycle.completedAtMs === null
               ? null

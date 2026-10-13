@@ -12,12 +12,12 @@ export { validateActor };
 import type { Table } from 'dexie';
 import { insertImmutable as insertStorageImmutable, checkReceipt } from '@canvas-one/storage';
 import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
-import type { Document, Id } from '../../domain/studio/model';
+import type { Document } from '../../domain/studio/model';
 import type { Issue } from '../../domain/studio/validate';
 import type { StudioDatabase } from './db';
 import { createIssue } from '../../domain/studio/issue';
 import { RepositoryError } from './errors';
-import type { Actor, AuthoredResult, FailedResult, InvalidResult } from './types';
+import type { AuthoredResult, FailedResult, InvalidResult } from './types';
 
 /**
  * Canonical lowercase UUID format: 8-4-4-4-12 lowercase hex with version 1-5 and variant [89ab].

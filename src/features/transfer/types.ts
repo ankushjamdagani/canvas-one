@@ -2,7 +2,7 @@
  * Types shared by the project JSON transfer and the SVG, PNG, Mermaid and CSV exporters.
  */
 
-import type { Document, Id } from '../../domain/studio/model';
+import type { Id } from '../../domain/studio/model';
 import type { Issue } from '../../domain/studio/validate';
 import type { FileTokenRegistry } from '../../persistence/studio/file-tokens';
 import type { LocalRepository } from '../../persistence/studio/repository';

@@ -4,7 +4,6 @@
 
 import type { Document, Id } from '../studio/model.js';
 import type { UndoEntry as HistoryUndoEntry } from '@canvas-one/history';
-import type { Issue } from '../studio/validate.js';
 import type { Actor, AuthoredResult, MissingResult, RecordChange, StaleResult, SessionRepository, UnsupportedResult, FailedResult } from './contracts.js';
 
 export type SessionStatus = 'empty' | 'ready' | 'saving' | 'loading';

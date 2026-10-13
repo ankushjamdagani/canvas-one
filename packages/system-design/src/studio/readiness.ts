@@ -765,7 +765,7 @@ export function checkReadiness(doc: Document, scenarioId: Id): ReadinessResult {
       issues.push(issue('workload-emission-range', [...at, 'emission', 'ratePerSecond'], w.id, 'A stream needs a rate above 0 per second'));
     }
   });
-  doc.connections.forEach((conn, ci) => {
+  doc.connections.forEach((conn) => {
     const src = elementsMap.get(conn.source.elementId);
     if (
       conn.kind === 'call' &&

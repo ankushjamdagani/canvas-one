@@ -26,9 +26,6 @@ function checkPublicExport(target, consumer) {
   if (!target.startsWith('@canvas-one/')) return;
   const owner = target.split('/').slice(0, 2).join('/');
   const pkg = packages.get(owner);
-  // Existing build:react emits this compatibility entry into dist-react;
-  // it becomes a workspace during the later host/authority extraction.
-  if (!pkg && owner === '@canvas-one/react' && [owner, `${owner}/styles.css`].includes(target)) return;
   if (!pkg) { failures.push(`${consumer}: missing workspace ${owner}`); return; }
   const key = target === owner ? '.' : '.' + target.slice(owner.length);
   if (!Object.hasOwn(pkg.manifest.exports ?? {}, key)) failures.push(`${consumer}: non-public package import ${target}`);
@@ -77,7 +74,7 @@ function traverse(name, stack = []) {
 }
 for (const name of packages.keys()) traverse(name);
 
-// These are the currently extracted headless roots. Add future behavior packages here.
+// Headless roots must remain importable without a framework or browser globals.
 for (const name of ['@canvas-one/playback', '@canvas-one/commands', '@canvas-one/whiteboard', '@canvas-one/system-design', '@canvas-one/history', '@canvas-one/simulation-system-design', '@canvas-one/storage', '@canvas-one/agents', '@canvas-one/collaboration', '@canvas-one/agent-bridge', '@canvas-one/components-basic']) {
   if (!packages.has(name)) continue;
   const forbidden = /^(react|react-dom|next|dexie|@xyflow\/react)$/;

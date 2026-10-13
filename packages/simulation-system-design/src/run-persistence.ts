@@ -190,7 +190,6 @@ export class RunPersistenceService<Code extends string = string> {
     const checks = Array.isArray(term.checks) ? term.checks : [];
 
     // 5. Verify snapshot row exists or insert-if-absent from supplied document
-    const snapshotKey: [string, string] = [projectId, tokenBinding.snapshotId];
     const existingSnapshot = await this.options.loadSnapshot(projectId, tokenBinding.snapshotId);
     const documentToInsert: Document | undefined =
       typeof options === 'object' && options?.document
