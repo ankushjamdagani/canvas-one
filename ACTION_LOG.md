@@ -3535,3 +3535,17 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
   2. In browser tests asserting state transitions triggered by toolbar/header actions, ensure the previous state's commit settles before dispatching consecutive clicks to avoid dropped events during DOM reconciliation.
   3. Interactive control buttons rendered inside canvas / ReactFlow nodes must intercept `onPointerDown` (`e.stopPropagation()`) to prevent the canvas container from capturing the pointerdown gesture and suppressing button clicks.
 
+### 2026-10-13 — Resolve stopping redraw, frame sampling, note collapse cooldown, and lavender contrast
+
+- Outcome: resolved all 4 CI failures and flakiness from GitHub Actions on PR #11 (`codex/fix-ci-tests`):
+  1. `src/features/runs/PlaybackPanel.tsx`: added `state?.stopping`, `Boolean(state?.current)`, and `Boolean(state?.current?.terminal)` to subscription dependency key string `next`. When Stop run was clicked, `stopping` toggled but `last === next` prevented `redraw()`, freezing the status indicator at "Live".
+  2. `tests/header-loading.spec.ts`: increased WAAPI frame sampling cap from 600 to 2000 and broadened drawing frame filter to `frame.ring < 0.999` to ensure pre-finish frames asserting `frame.surface === 0` are not skipped under CPU starvation on 2-vCPU CI runners.
+  3. `src/features/workspace/NoteNode.tsx`: added `justCollapsed` cooldown ref (400ms) on note collapse so cursor departure traversing the newly-collapsed bubble does not immediately trigger hover expansion.
+  4. `src/lib/theme/palettes.ts`: updated `lavender` light `action`, `ring`, `mark`, and `aText` from `#C2461F` to `#BA3F19`, increasing contrast ratio against foreground `#FCF0EB` / `#FFF8F4` from 4.2:1 to 5.03:1+ to satisfy WCAG AA (>= 4.5:1).
+- Files: `src/features/runs/PlaybackPanel.tsx`, `src/features/workspace/NoteNode.tsx`, `src/lib/theme/palettes.ts`, `tests/header-loading.spec.ts`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-ci-tests`.
+- Verification: clean production build (`npm run build`), Storybook build (`npm run build-storybook`), all 2,130 unit tests passed (12 skipped via `npm test`), and Playwright test suite for all 4 specs passed (`TEST_PRODUCTION=1 npx playwright test` on `tests/studio-playback.spec.ts`, `tests/header-loading.spec.ts`, `tests/studio-notes.spec.ts`, and `tests/theme-accessibility.spec.ts -g "lavender light"`). AST knowledge graph refreshed via `graphify update .`.
+- Lesson:
+  1. State subscription listeners reading external store/controller state in components using force-update/redraw hooks must include all status-affecting flags (such as `stopping` and `terminal`) in their change detection keys.
+  2. Collapsing an expanded element into a smaller trigger located along the cursor's exit path requires a momentary cooldown to prevent the cursor departure movement from inadvertently triggering re-expansion.
+
+

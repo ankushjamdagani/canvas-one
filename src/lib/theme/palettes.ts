@@ -912,13 +912,13 @@ export const PALETTES: ThemePalette[] = [
       "stickyInk": "#3A3424",
       "sh": "31,28,42",
       "shA": 1,
-      "action": "#C2461F",
+      "action": "#BA3F19",
       "onAction": "#FFF8F4",
       "aTint": "#FBEAE3",
       "aEdge": "#EDB9A5",
-      "ring": "rgba(194,70,31,0.16)",
-      "mark": "linear-gradient(140deg,#C2461F,#E07A45)",
-      "aText": "#C2461F",
+      "ring": "rgba(186,63,25,0.16)",
+      "mark": "linear-gradient(140deg,#BA3F19,#E07A45)",
+      "aText": "#BA3F19",
       "isDark": false
     },
     "dark": {

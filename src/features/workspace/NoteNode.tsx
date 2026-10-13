@@ -38,6 +38,8 @@ export function NoteNode({ data, selected }: NodeProps) {
   const [pinned, setPinned] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
   const leaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justCollapsed = React.useRef(false);
+  const collapseCooldownTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
@@ -63,9 +65,11 @@ export function NoteNode({ data, selected }: NodeProps) {
 
   React.useEffect(() => () => {
     if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    if (collapseCooldownTimer.current) clearTimeout(collapseCooldownTimer.current);
   }, []);
 
   const onEnter = React.useCallback(() => {
+    if (justCollapsed.current) return;
     if (leaveTimer.current) clearTimeout(leaveTimer.current);
     setHovered(true);
   }, []);
@@ -312,6 +316,11 @@ export function NoteNode({ data, selected }: NodeProps) {
             onClick={(e) => {
               e.stopPropagation();
               if (leaveTimer.current) clearTimeout(leaveTimer.current);
+              if (collapseCooldownTimer.current) clearTimeout(collapseCooldownTimer.current);
+              justCollapsed.current = true;
+              collapseCooldownTimer.current = setTimeout(() => {
+                justCollapsed.current = false;
+              }, 400);
               setPinned(false);
               setHovered(false);
             }}
