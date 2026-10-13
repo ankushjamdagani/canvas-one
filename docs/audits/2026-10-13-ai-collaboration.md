@@ -6,6 +6,40 @@ Date: 2026-10-13. Scope: Canvas One's local AI collaboration, model-provider hoo
 
 The application has a working, guarded AI proposal pipeline. The interaction still asks users to manage a bridge, an external agent and a review dialog. The biggest opportunity is to make collaboration a continuous canvas workflow: choose context, ask, observe progress, inspect a spatial diff, request changes, accept, and verify the result.
 
+## Planning clarification — 2026-10-14
+
+The current implementation draft is maintained in [AI collaboration plan](../ai-collaboration-plan.md). Its confirmed scope and pending decisions supersede the research roadmap below.
+
+User subsequently authorized replacing/removing the existing AI flow. The current plan is problem-led; historical dialog, pairing and proposal-list behavior below is implementation evidence, not a requirement to preserve. Connection/setup and layout choices require explicit design and capability verification.
+
+User confirmed in-app instructions through one specifically supported external agent, Suggest as the task default, and Stop preserving applied changes with a separate Undo task action. A bidirectional adapter is therefore current scope; a custom Canvas One agent remains future work.
+
+Subsequent clarification expands the required integrations to Claude, Codex and agy, initially one active agent at a time. Explicit live-edit permission covers the whole current board for that task. Overlapping human edits pause the affected action for a decision; independent work continues. These choices supersede the earlier single-integration assumption.
+
+Final flow choices: use local CLIs with existing sign-in and no API credential management; live permission includes deletion; reload/leave stops further board writes, saves progress and requires explicit resume. The plan records these as confirmed product decisions; technical CLI compatibility still needs verification.
+
+The agent conversation/collaboration panel will be built in-house. Current work targets one human and one external agent on the existing canvas. Multiple humans, additional role agents, a custom model-backed agent, new drawing tools and simulation extensions remain future work. Earlier delivery-order suggestions below are research options, not approved implementation scope. Open-source adoption is optional and must simplify the current work.
+
+### Hosting and model cost boundaries
+
+| Scenario | Where costs apply |
+|---|---|
+| Current app, local bridge and an existing external agent | No additional collaboration-service subscription is inherently required. Existing app hosting, if used, and the external agent's subscription/API usage remain separate. |
+| Collaboration server running on an existing computer | No cloud-hosting subscription is required; electricity, hardware and availability remain local responsibilities. |
+| Future internet-accessible multiplayer | Compute for the collaboration server, database, asset storage, bandwidth and backups may incur costs. Existing infrastructure or suitable free tiers may cover early usage; do not assume they remain free at scale. |
+| Future custom agent calling a model API | The selected provider's inference charges apply. An open-source agent SDK does not include free model inference. |
+| Future custom agent using a local model | Hardware capacity, memory, electricity and possibly rented compute apply instead of a model API charge. |
+
+Using open-source synchronization or agent libraries does not itself require purchasing the vendor's hosted service. No paid hosting, provider or pricing plan has been selected. Current work does not introduce a custom model service or hosted multiplayer deployment.
+
+### Task terminology and minimal lifecycle
+
+A task is one bounded piece of work assigned to an agent, such as “organize these selected notes.” It records the request, agent identity, board/context scope, permissions, progress/outcome and related proposals or applied changes. It is not a project-management ticket, a board commit, a chat message or an individual tool call. A task may produce several tool calls and several coherent editing actions; a conversation can contain several tasks.
+
+Proposed minimal lifecycle: requested → working → waiting for input/review when necessary → completed. Stopped and failed are alternative outcomes. Requesting stop first prevents new actions and cancels queued/in-flight work where supported; report stopped only after acknowledgement. Already-applied changes remain until explicitly undone. A suggested task completes after its review outcome is resolved; a rejected proposal can close without board changes or lead to a revised attempt. Connection state is separate from task state; losing contact does not establish success or safe cancellation.
+
+Pause/resume is optional and should only be presented when the connected agent supports it. Reading/thinking/checking are activity labels for the face, not separate durable task states. This lifecycle is proposed work and must not be described as an existing capability of every external agent.
+
 ## Current user journey
 
 1. Start the app and open a project.

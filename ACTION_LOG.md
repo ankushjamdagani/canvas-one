@@ -3531,3 +3531,76 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Publication status: local report complete; automatic approval review rejected remote push as repository-derived external disclosure without explicit destination/payload authorization. No push or PR created; user approval requested.
 - Lesson: cancellation of an MCP client's wait does not establish cancellation of relay work; verify queued browser delivery separately. Added a corresponding LESSONS rule.
 
+### 2026-10-14 — Record collaboration costs and clarify tasks
+
+- Outcome: saved hosting/model cost boundaries, current versus future scope, in-house panel decision and proposed minimal task lifecycle in the collaboration report.
+- Files: `docs/audits/2026-10-13-ai-collaboration.md`, ACTION_LOG. Codex; no subagents. Existing dedicated `codex/ai-collaboration-analysis` worktree.
+- Verification: documentation diff and whitespace checked; no runtime changes or tests required. Costs are categories, not provider quotes. Task lifecycle is proposed, not a shipped external-agent capability. Publication remains local following the earlier push rejection.
+
+### 2026-10-14 — Draft current AI collaboration implementation plan
+
+- Outcome: wrote a scoped plan separating confirmed direction, pending decisions, acceptance gates, optional OSS evaluation, costs and future integration seams. Asked three initial questions about prompting, permission defaults and Stop behavior; answers remain pending.
+- Files: `docs/ai-collaboration-plan.md`, audit cross-reference and ACTION_LOG; retained prior uncommitted cost documentation. Codex with one native read-only independent plan critic. No installed grill-me skill found; used direct structured questions and independent critique.
+- Verification: documentation diff/whitespace and local Markdown targets checked; no runtime changes, dependency installation or tests. No implementation or remote publication authorized by this plan.
+- Limitations: integrated external-agent messaging and other behavioral choices remain open. Local documentation only; earlier remote push rejection remains in effect.
+
+### 2026-10-14 — Lock first collaboration flow decisions
+
+- Outcome: recorded user choices for in-app prompting to one supported external agent, Suggest by default and Stop preserving completed edits. Added supported-agent prompt/reply/feedback adapter to current scope and its acceptance gate. Asked next questions about agent identity, live-edit boundary and overlap handling.
+- Files: collaboration plan, audit and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior documentation changes retained.
+- Verification: documentation whitespace/diff checks; no runtime changes or tests. Agent selection and remaining behavioral decisions are pending; no remote publication attempted.
+
+### 2026-10-14 — Lock agent support and board-wide live editing
+
+- Outcome: updated current scope to Claude/Codex/agy in-app adapters, explicit task-bound board-wide live edits and overlap handling that pauses affected actions for user decisions while independent work continues. Concurrent role agents remain future work; raised authentication, reload and deletion questions.
+- Files: collaboration plan, audit and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior edits retained.
+- Verification: documentation diff/whitespace checked. No CLI capability claims, dependencies or runtime changes; authentication and remaining behaviors pending. No remote publication attempted.
+
+### 2026-10-14 — Complete core collaboration flow decisions
+
+- Outcome: confirmed local CLI/existing sign-in, no API credential management, live-edit deletion authority and reload/leave behavior that saves progress and blocks further writes until explicit resume. Core product choices are recorded; technical adapter feasibility remains a gate.
+- Files: collaboration plan, audit and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior documentation retained.
+- Verification: documentation diff/whitespace and file-link checks; no runtime changes/tests, CLI support claims or remote publication. Implementation has not started.
+
+### 2026-10-14 — Claude product-manager review of plan and future work
+
+- Outcome: Claude Sonnet 4.6 completed plan-only and repository-context PM reviews through the delegate wrapper, exit 0 with completion markers. Saved consolidated review with lead qualifications; linked it from the unchanged-scope plan.
+- Files: `docs/audits/2026-10-14-claude-pm-review.md`, plan cross-reference, ACTION_LOG and LESSONS. Codex lead; external Claude read-only with tools disabled. Existing local worktree; unrelated main-checkout changes preserved.
+- Verification: read full stdout/stderr of both runs; documentation diff/whitespace and local link checks. No runtime, CLI compatibility or usability verification; recommendations are not implementation approval.
+- Limitation: initial broader-context invocation was rejected by automatic approval review; narrowed invocation succeeded, then user explicitly authorized all repository content and context pass succeeded. No remote Git publication attempted.
+- Lesson: supply the requested plan as the initial external-review payload; additional repository context needs matching authorization. Qualify reviewer diagnoses against source before treating them as facts.
+
+### 2026-10-14 — Incorporate Claude product-manager feedback
+
+- Outcome: expanded plan with first-run/live/recovery/mobile journeys, early three-CLI capability gates, explicit panel migration, context/authority disclosure, scoped errors, authenticated renewal, retention, success measures and versioned future boundaries. Moved task persistence ahead of recovery exposure. Preserved all confirmed choices; qualified overstatements and did not adopt scope reductions or extra deletion approvals.
+- Files: `docs/ai-collaboration-plan.md`, ACTION_LOG. Codex; no new subagents. Existing dedicated worktree; prior changes preserved.
+- Verification: documentation diff/whitespace, local links and feedback coverage checked. No code/dependencies or runtime tests; feasibility remains a gate and implementation has not started. Remote publication remains local.
+
+### 2026-10-14 — Claude UX review and two-part design-generation prompt
+
+- Outcome: Claude Sonnet 4.6 reviewed the full plan/future work as UI/UX designer using authorized repository context, read-only/tools disabled. Archived verbatim review with lead qualifications. Wrote a reusable prompt covering 18 desktop, five mobile and eight future state families; includes dock comparison, brand face, permission/history rules and readable per-state output.
+- Files: UX review, design prompt, plan cross-reference and ACTION_LOG. Codex lead; external Claude via delegate wrapper, exit 0/completion marker. Existing dedicated worktree; prior edits preserved.
+- Verification: full stdout/stderr reviewed; Markdown links, state coverage and whitespace checked. No visual/browser validation, image generation, dependencies or runtime changes. Dock/feedback placement remains exploratory; no confirmed behavior reversed and no remote publication attempted.
+
+### 2026-10-14 — Incorporate UX review and replace legacy-flow assumptions
+
+- Outcome: rewrote collaboration plan around confirmed problems/behavior; adopted task anchor, targeted feedback, accessible spatial review, non-blocking overlap, inspector composition and interruption recovery. Removed mandatory dialog migration/pairing-code retention and blanket old-bug prerequisites. Labelled scheduling, bootstrap, dock/composer and capability choices explicitly. Updated design prompt and audit cross-reference.
+- Files: collaboration plan, design prompt, audit, ACTION_LOG and LESSONS. Codex; no new subagents. Existing dedicated worktree; prior edits preserved.
+- Verification: documentation diff/whitespace, links, state coverage and legacy-assumption scan checked. Planning only; no existing feature removed, code changes or runtime tests. Remote publication remains local.
+- Lesson: authorized flow replacement must not carry old interaction choices into the new plan as requirements. Added corresponding LESSONS rule.
+
+### 2026-10-14 — Quick plan review and remove saved design prompt
+
+- Outcome: reviewed the complete plan for scope and behavior consistency; clarified stale acceptance, crash/disconnect write fencing and task history versus intentional commits. Removed the saved design prompt and its link; supplied a shorter functionality-only prompt in conversation.
+- Files: collaboration plan, deleted design prompt and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior edits preserved.
+- Verification: documentation whitespace and prompt-reference checks; no runtime changes or tests. CLI feasibility, scheduling, bootstrap and interaction layout remain explicit evidence gates; no remote publication attempted.
+
+### 2026-10-14 — Update delegation models and probe local AI integrations
+
+- Outcome: reviewer now `claude-opus-5-5`, critic `gemini-3.8-flash-high`; existing executor unchanged. Recorded desktop execution first, mobile designs now and one active editing task per board. Added feasibility evidence, proposed versioned adapter/task contracts, message routing, task transitions and implementation gates while user designs UI.
+- Files: `.agents/delegate.json`, collaboration plan, CLI feasibility report, review archive, ACTION_LOG and LESSONS. Codex lead; Gemini critic failed (denied/timeout, no executor dispatch); Opus source review completed, corrections incorporated and final independent documentation review passed. Existing dedicated worktree; main preserved.
+- Verification: all three CLIs streamed replies and retained synthetic context via explicit-ID continuation; Codex app-server initialized/discovered models; Codex and Opus completed synthetic MCP inspection/proposal loops; Claude acknowledged two NDJSON messages. JSON/diff/link checks; no production/runtime implementation or project dependency changes, so app suites not run.
+- Limitations: agy MCP denied even with a temporary exact-server rule; original settings restored byte-for-byte and fixture removed. Active steering, cancellation, interrupted recovery, write fencing and safe Undo remain unproved. No remote publication attempted.
+- Host change: Claude Code Homebrew cask upgraded 2.1.191 → 2.1.286 after the requested Opus model required ≥2.1.280; sign-in retained. Homebrew automatic cleanup also ran.
+- Lesson: exit zero/provider SUCCESS can hide denied work; parse terminal errors and denied_actions. Disable automatic Homebrew cleanup for scoped upgrades. Staged validation exposed extra EOF blanks in newly tracked review archives; corrected before the final saved result. Added corresponding LESSONS rules, including checking staged validation's own exit status before committing.
+
