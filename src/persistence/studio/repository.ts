@@ -7,16 +7,15 @@ import { exportProjectArchive } from '@canvas-one/simulation-system-design/archi
  * transaction.
  */
 
-import { canonicalJson, sha256Hex } from '../../domain/studio/canonical';
+import { canonicalJson } from '../../domain/studio/canonical';
 import { AtomicDocumentCoordinator, AtomicOperationCoordinator, type OperationWrite, ImmutableArtifactCoordinator, ArtifactPruningCoordinator, insertImmutableRecords, deleteIndexMatches, type ImmutableRecordPolicy, type ImmutableRecord, PreferenceService, ProjectCatalogReader, ProjectLifecycleCoordinator } from '@canvas-one/storage';
 import { HistoryTransitionPlanner } from '@canvas-one/history';
 import { RunPersistenceService } from '@canvas-one/simulation-system-design/run-persistence';
 import { RepositoryEvidencePolicy } from '@canvas-one/simulation-system-design/repository-evidence';
 import { IndexedDbBackend } from '@canvas-one/storage-indexeddb';
 import { validateDocument, type Issue } from '../../domain/studio/validate';
-import type { Document, Id, Scenario } from '../../domain/studio/model';
+import type { Document, Id } from '../../domain/studio/model';
 import { isExposureList } from '../../domain/studio/exposure';
-import { TERMINAL_STATUSES, type TraceEvent } from '../../domain/studio/runner/types';
 import { codePointLength } from '../../domain/studio/text';
 import { createStudioDatabase, StudioDatabase } from './db';
 import { createIssue } from '../../domain/studio/issue';
@@ -29,7 +28,6 @@ import {
 import {
   computeRequestHash,
   computeSnapshotId,
-  isValidUuid,
   replayedResult,
   validateActor,
   validateCommandEnvelope,
@@ -49,12 +47,7 @@ import {
   deriveVersionKey,
   compareSemanticVersions,
 } from '../../domain/versioning/publication';
-import { buildManifest, type BuildManifestVersions } from '../../domain/studio/manifest';
-import {
-  buildEvidenceManifest,
-  runQualifies,
-  type CandidateScenario,
-} from '../../domain/versioning';
+import type { BuildManifestVersions } from '../../domain/studio/manifest';
 import type { EvidenceManifest, EvidenceRef } from '../../domain/studio/runner/evidence';
 import {
   DEFAULT_BUILD_VERSIONS,
@@ -82,7 +75,6 @@ import {
   type ModelApplyRecordsCommand,
   type PartRecord,
   type PreferenceRecord,
-  type ProjectBundle,
   type ProjectCreateCommand,
   type ProjectImportCommand,
   type ProjectRecord,
@@ -103,11 +95,8 @@ import {
   type StudioRepository,
   type TraceChunkRecord,
   type UnsupportedResult,
-  PORTABLE_FORMAT,
-  PORTABLE_VERSION,
   STORAGE_LIMITS,
 } from './types';
-import { manifestFailureIssues } from './manifest-issues';
 import { toPinClosureState } from './pin-state';
 
 /**

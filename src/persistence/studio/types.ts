@@ -11,10 +11,8 @@ import type { RecordChange } from '../../domain/studio/records';
 export { RECORD_KINDS } from '../../domain/studio/records';
 export type { EditableRecord, RecordChange, RecordKind } from '../../domain/studio/records';
 import type { ProjectExposure } from '../../domain/studio/exposure';
-import type { CheckResult, RunSummary, TerminalStatus } from '../../domain/studio/runner/types';
 import type { EvidenceRef, EvidenceManifest } from '../../domain/studio/runner/evidence';
 import type { Issue } from '../../domain/studio/validate';
-import type { BuildManifestVersions } from '../../domain/studio/manifest';
 
 // ============================================================================
 // Versions

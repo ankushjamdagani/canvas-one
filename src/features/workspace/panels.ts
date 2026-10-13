@@ -1100,7 +1100,7 @@ export function panelReducer(
     }
 
     default: {
-      const _exhaustive: never = action;
+      action satisfies never;
       return { state: prevState, effects: [] };
     }
   }

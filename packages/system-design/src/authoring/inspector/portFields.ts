@@ -8,7 +8,7 @@
 import type { CallRetryPolicy, CircuitBreakerPolicy, Element, Port } from '../../studio/model.js';
 import { DELIVERY_GUARANTEES, MESSAGE_ORDERINGS } from '../../studio/model.js';
 import { describeEndpoint } from '../../studio/protocols.js';
-import { numberField, optionalNumberField, optionalSelectField, readonlyField, selectField, textField } from './fieldBuilders.js';
+import { numberField, optionalNumberField, optionalSelectField, readonlyField, selectField } from './fieldBuilders.js';
 import type { FieldSpec } from './types.js';
 
 type Settings = Record<string, unknown>;

@@ -1551,7 +1551,7 @@ function WorkspaceBody({
   // One HistoryController / CandidateController / PublishController per
   // mounted workspace (mirrors the RunController pattern above), created
   // once via a lazy state initializer rather than on every render.
-  const [{historyController, candidateController, publishController}] = React.useState(
+  const [{historyController, publishController}] = React.useState(
     () => composition.createVersioning({repository, session, mintId, actor}),
   );
 

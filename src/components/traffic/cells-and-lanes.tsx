@@ -1,4 +1,4 @@
-import type { TrafficOutcomeKind, TrafficOutcome, TrafficNodeActivity, TrafficConnectionActivity } from '@canvas-one/playback/traffic';
+import type { TrafficOutcome, TrafficNodeActivity, TrafficConnectionActivity } from '@canvas-one/playback/traffic';
 export type { TrafficOutcomeKind, TrafficOutcome, TrafficNodeActivity, TrafficConnectionActivity } from '@canvas-one/playback/traffic';
 import { useId, useState, useRef, useLayoutEffect, type CSSProperties, type ReactNode } from 'react';
 import { Server, Cpu, ListOrdered, Hourglass, TimerReset, PauseCircle, Check, TriangleAlert, Ban, Timer, TimerOff, CircleX, RotateCcw, MailX, Unlink, Clock, Pin } from 'lucide-react';

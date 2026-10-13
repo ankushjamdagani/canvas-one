@@ -3522,3 +3522,11 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
 - Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
 
+### 2026-10-13 — Codebase analysis and cleanup
+
+- Outcome: analyzed application and all 16 packages; removed compiler-confirmed unused imports/bindings, dead preview seed and snapshot tuple; simplified a port matcher; shared Next/Vite CSS selector transform; removed obsolete missing-React-workspace validation exemption. Preserved public APIs, initialization, persistence, exhaustive checking and deterministic fixture IDs.
+- Files: 21 source/script/test files plus HANDOFF, ACTION_LOG and LESSONS. Codex lead and native cleanup_audit discovery/review subagent; branch `codex/codebase-cleanup`. Independent source review: no actionable findings; 39 selector/context equivalence cases passed.
+- Verification: 2,130 units passed / 12 skipped; app and all package unused-symbol scans passed; production and Storybook builds, package boundaries/headless imports, CSS scoping probe and diff check passed. Production browser coverage across isolated runs: 263 distinct passes / four skipped / one connection-gesture failure reproduced on clean baseline `a812c8a`. A second gesture failure passed isolated on both baseline and cleanup. No clean single full-suite result claimed.
+- Limitations: initial sandbox unit run had three localhost EPERM failures, resolved by elevated full rerun. Test-managed browser servers exited twice; final coverage used a separately managed isolated server. Gemini audit and Headroom diff compression were rejected by automatic approval review over source-transfer concerns; completed with native audit/review and local diff reads instead. Temporary verification configs excluded from commit.
+- Lesson: use native agents/local reads when automatic approval rejects source transfer to external audit or compression services; captured in LESSONS.
+

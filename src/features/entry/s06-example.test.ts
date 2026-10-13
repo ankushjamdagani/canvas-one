@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { Assertion, CallRetryPolicy, Connection, Document, Element, Id, Scenario, Workload } from '../../domain/studio/model';
+import type { Assertion, CallRetryPolicy, Document, Element, Id, Scenario, Workload } from '../../domain/studio/model';
 import { applyRecordChanges } from '../../persistence/studio/apply-records';
 import { validateDocument } from '../../domain/studio/validate';
 import { checkReadiness } from '../../domain/studio/readiness';
@@ -49,7 +49,7 @@ function buildS06(): Document {
     if (e.behavior.kind !== 'resource') throw new Error('not a resource');
     apply([{ kind: 'replace', value: { recordKind: 'element', record: { ...e, behavior: { ...e.behavior, config: { ...e.behavior.config, ...patch } } } as Element } } as never]);
   };
-  const orderClass = mint();
+  mint(); // Preserve the fixture's deterministic ID sequence.
   const connect = (from: Id, to: Id, patch: Record<string, unknown> = {}): Id => {
     const out = el(from).ports.find((p) => p.direction === 'out' && p.channel !== 'event')!;
     const r = planConnection({ document: doc, viewId, source: { elementId: from, portId: out.id }, target: { elementId: to }, mintId: mint });

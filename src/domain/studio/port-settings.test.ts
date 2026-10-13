@@ -52,7 +52,7 @@ describe('port settings validation', () => {
   });
 
   it('accepts message ack and TTL on a message in-port and rejects them on a call in-port', () => {
-    const messageIn = (e: Element, p: Port) => p.direction === 'in' && p.channel === 'message';
+    const messageIn = (_e: Element, p: Port) => p.direction === 'in' && p.channel === 'message';
     expect(validateDocument(withPortSettings(S05, messageIn, { ackDelayMs: 5, messageTtlMs: 10000, delivery: 'at-least-once', ordering: 'per-key' })).ok).toBe(true);
     expect(validateDocument(withPortSettings(S05, messageIn, { delivery: 'sometimes' })).ok).toBe(false);
   });
@@ -116,8 +116,8 @@ describe('reading and describing port settings', () => {
 
 describe('caller policies, payload sizes and link impairments', () => {
   const callOut = (e: Element, p: Port) => e.behavior.kind === 'resource' && p.direction === 'out' && p.channel === 'call';
-  const messageOut = (e: Element, p: Port) => p.direction === 'out' && p.channel === 'message';
-  const messageIn = (e: Element, p: Port) => p.direction === 'in' && p.channel === 'message';
+  const messageOut = (_e: Element, p: Port) => p.direction === 'out' && p.channel === 'message';
+  const messageIn = (_e: Element, p: Port) => p.direction === 'in' && p.channel === 'message';
 
   it('accepts the caller policies on a call out-port and confirm/batch on a message out-port', () => {
     const call = withPortSettings(S05, callOut, {

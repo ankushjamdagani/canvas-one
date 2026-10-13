@@ -18,7 +18,6 @@ import type {
   PayloadSchema,
   PortSettings,
   Port,
-  Shape,
   View,
 } from '../studio/model.js';
 import { shapesCompatible } from '../studio/readiness.js';
@@ -27,7 +26,6 @@ import {
   describeEndpoint,
   normalizePath,
   PORT_PATH_MAX_LENGTH,
-  PROTOCOL_LABELS,
   portPath,
   protocolsFor,
   type Protocol,
@@ -410,12 +408,12 @@ export function planConnection(params: PlanConnectionParams): PlanConnectionResu
     }
 
     if (protocol !== null) {
-      const samePort = (el: Element, port: Port) =>
+      const samePort = (port: Port) =>
         port.channel === channel && port.protocol === protocol && portPath(port) === path;
       let sourceOut: Port | undefined =
-        samePort(sourceElement, effectiveSourcePort) ? effectiveSourcePort : sourceElement.ports.find((p) => p.direction === 'out' && samePort(sourceElement, p));
+        samePort(effectiveSourcePort) ? effectiveSourcePort : sourceElement.ports.find((p) => p.direction === 'out' && samePort(p));
       let targetIn: Port | undefined =
-        samePort(targetElement, targetPort) ? targetPort : targetElement.ports.find((p) => p.direction === 'in' && samePort(targetElement, p));
+        samePort(targetPort) ? targetPort : targetElement.ports.find((p) => p.direction === 'in' && samePort(p));
 
       const exposure = exposures.find((x) => x.protocol === protocol && x.path === path);
       if (!targetIn && isLinked && !exposure) {

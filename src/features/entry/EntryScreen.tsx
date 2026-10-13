@@ -92,15 +92,6 @@ export function formatUpdated(updatedAt: number, now: number): string {
   });
 }
 
-/** Stable 0..1 values from a project id, to vary each card's decorative preview. */
-function previewSeed(id: string, index: number): number {
-  let h = 2166136261 ^ index;
-  for (let i = 0; i < id.length; i += 1) {
-    h = Math.imul(h ^ id.charCodeAt(i), 16777619);
-  }
-  return ((h >>> 0) % 1000) / 1000;
-}
-
 const THUMB_ACCENTS = [
   "var(--primary)",
   "var(--purple)",

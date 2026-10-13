@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import * as React from 'react';
 import { ThemeProvider, ThemePopover, PALETTES } from '@/lib/theme';
 import { getTokens } from '@/lib/theme/palettes';
 import { Button } from '@/components/ui/button';

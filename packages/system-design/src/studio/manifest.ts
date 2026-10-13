@@ -30,7 +30,6 @@ import type {
   DataConnectionConfig,
   CallConnectionConfig,
   MessageConnectionConfig,
-  PortSettings,
   Relation,
   Refinement,
   PortMapping,
