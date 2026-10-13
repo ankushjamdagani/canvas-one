@@ -750,7 +750,7 @@ body {
 @keyframes initial-loader-exit { to { opacity: 0; visibility: hidden; pointer-events: none; } }
 @keyframes initial-loader-face-timeout { to { opacity: 0; transform: translateY(-8px) scale(0.92); } }
 @keyframes initial-loader-face-exit { to { opacity: 0; transform: translateY(-8px) scale(0.92); } }
-.initial-load-overlay {
+.initial-load-overlay, [data-initial-loader] {
   position: fixed;
   inset: 0;
   z-index: 2147483647;
@@ -760,14 +760,16 @@ body {
   color: var(--ink);
   animation: initial-loader-timeout 0.28s cubic-bezier(0.4, 0, 0.2, 1) 3s forwards;
 }
-.initial-load-overlay > .loading-face { animation: initial-loader-face-timeout 0.28s cubic-bezier(0.4, 0, 0.2, 1) 3s forwards; }
+.initial-load-overlay > .loading-face, [data-initial-loader] > .loading-face { animation: initial-loader-face-timeout 0.28s cubic-bezier(0.4, 0, 0.2, 1) 3s forwards; }
 /* Separate names restart the ready exit at zero, independently of time spent waiting. */
-.initial-load-overlay[data-loader-exit] { animation: initial-loader-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-.initial-load-overlay[data-loader-exit] > .loading-face { animation: initial-loader-face-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-.initial-load-overlay[hidden] { display: none; }
+.initial-load-overlay[data-loader-exit], [data-initial-loader][data-loader-exit] { animation: initial-loader-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; pointer-events: none; }
+.initial-load-overlay[data-loader-exit] > .loading-face, [data-initial-loader][data-loader-exit] > .loading-face { animation: initial-loader-face-exit 0.28s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.initial-load-overlay[hidden], [data-initial-loader][hidden] { display: none !important; }
 .loading-face { display: grid; place-items: center; }
 @media (prefers-reduced-motion: reduce) {
-  .initial-load-overlay, .initial-load-overlay > .loading-face,
-  .initial-load-overlay[data-loader-exit], .initial-load-overlay[data-loader-exit] > .loading-face { animation-duration: 0s; }
+  .initial-load-overlay, [data-initial-loader],
+  .initial-load-overlay > .loading-face, [data-initial-loader] > .loading-face,
+  .initial-load-overlay[data-loader-exit], [data-initial-loader][data-loader-exit],
+  .initial-load-overlay[data-loader-exit] > .loading-face, [data-initial-loader][data-loader-exit] > .loading-face { animation-duration: 0s; }
   .loading-face .canvas-one-face * { animation: none !important; transition: none !important; }
 }

@@ -29,7 +29,7 @@ test(`${reducedMotion}: logo cover appears before hydration, times out, and late
     await expect(loader.locator('svg')).toHaveAttribute('data-expression', 'wink');
     await expect(loader.locator('svg')).toHaveAttribute('width', '128');
     if (reducedMotion === 'reduce') await expect(loader.locator('svg circle').first()).toHaveCSS('animation-name', 'none');
-    else await page.screenshot({ path: '/private/tmp/loader-first-paint.png' });
+    else await page.screenshot({ path: test.info().outputPath('loader-first-paint.png') });
     expect(await loader.evaluate(el => {
       const rect = el.getBoundingClientRect();
       return el.contains(document.elementFromPoint(rect.width / 2, rect.height / 2));
@@ -121,6 +121,58 @@ for (const delayedHydration of [false, true]) {
     }
   });
 }
+
+test('loader covers viewport before hydration even if external stylesheet lacks loader rules', async ({ page }) => {
+  let releaseScripts!: () => void;
+  const scriptGate = new Promise<void>(resolve => { releaseScripts = resolve; });
+  await page.route('**/*.js*', async route => {
+    await scriptGate;
+    await route.continue();
+  });
+  // Strip initial-load-overlay from external stylesheets to simulate missing/delayed stylesheet rules
+  await page.route('**/*.css*', async route => {
+    const response = await route.fetch();
+    const css = await response.text();
+    const stripped = css.replaceAll('initial-load-overlay', 'initial-load-overlay-disabled');
+    await route.fulfill({ response, body: stripped });
+  });
+
+  try {
+    await page.goto('/', { waitUntil: 'commit' });
+    const loader = page.locator('[data-initial-loader]');
+    await expect(loader).toBeVisible();
+
+    await page.screenshot({ path: test.info().outputPath('prehydration-missing-css.png') });
+
+    const position = await loader.evaluate(el => getComputedStyle(el).position);
+    expect(position).toBe('fixed');
+
+    const box = await loader.boundingBox();
+    const viewport = page.viewportSize()!;
+    expect(box?.x).toBe(0);
+    expect(box?.y).toBe(0);
+    expect(box?.width).toBe(viewport.width);
+    expect(box?.height).toBe(viewport.height);
+
+    // Loader must cover the center of the viewport
+    expect(await loader.evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(rect.width / 2, rect.height / 2));
+    })).toBe(true);
+
+    // Content h1 must be covered and not top element under point
+    const contentVisible = await page.evaluate(() => {
+      const h1 = document.querySelector('h1');
+      if (!h1) return false;
+      const rect = h1.getBoundingClientRect();
+      const topEl = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return h1.contains(topEl);
+    });
+    expect(contentVisible).toBe(false);
+  } finally {
+    releaseScripts();
+  }
+});
 
 test('hydration during the fallback fade does not restart the visible cover', async ({ page }) => {
   await page.addInitScript(() => {

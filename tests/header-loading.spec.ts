@@ -27,14 +27,14 @@ test('header material waits for the page frame, then fades in', async ({ page })
   const fading = samples.filter(frame => frame.surface > 0.05 && frame.surface < 0.95);
   expect(fading.length).toBeGreaterThan(0);
   expect(fading.every(frame => frame.ring === 1)).toBe(true);
-  await page.screenshot({ path: '/private/tmp/header-polish-desktop.png' });
+  await page.screenshot({ path: test.info().outputPath('header-polish-desktop.png') });
   await page.getByRole('link', { name: 'Brand', exact: true }).click();
   await expect(page.locator('[data-page-kind="brand"] [data-header-surface]')).toHaveCSS('opacity', '1');
   const brand = await page.evaluate(() => (window as unknown as { headerFrames: { ring: number; surface: number; page: string | null }[] }).headerFrames.filter(frame => frame.page === 'brand'));
   expect(brand.some(frame => frame.ring < 0.95 && frame.surface === 0)).toBe(true);
   expect(brand.every(frame => frame.ring >= 0.999 || frame.surface === 0)).toBe(true);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: '/private/tmp/header-polish-mobile.png' });
+  await page.screenshot({ path: test.info().outputPath('header-polish-mobile.png') });
 });
 
 test('database boot uses the large face without visible loading text', async ({ page }) => {

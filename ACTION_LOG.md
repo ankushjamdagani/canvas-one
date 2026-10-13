@@ -3509,3 +3509,16 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Files: the five files from PR #6. Codex; no subagents. Branch `codex/revert-canvas-one-route`.
 - Verification: all application, test and documentation files outside ACTION_LOG exactly match pre-PR commit `56de3c2`; no new runtime behavior to test. The original app build was verified at that commit during the previous task's baseline comparison.
 - Lesson: distinguish a route inside a standalone product from mounting that product in a separate host repository; confirm the intended host before changing routing.
+
+### 2026-10-13 — Pre-hydration loader full-screen coverage
+
+- Outcome: reproduced the pre-hydration flash failure in e2e tests where missing external stylesheet rules caused `[data-initial-loader]` to render as an unstyled 128px static element at (0, 0) exposing the landing page underneath before hydration dismisses it. Inlined critical `INITIAL_LOAD_STYLE` in the layout `<head>`, added inline fixed full-screen dimensions/shell background on the loader element, and ensured `display: none` is set alongside `hidden`.
+- Files: `src/lib/motion/initial-load.ts`, `apps/web/app/layout.tsx`, `src/components/ui/initial-load.tsx`, `src/styles.css`, `tests/initial-loader.spec.ts`, `HANDOFF.md`, `LESSONS.md`, `ACTION_LOG.md`. Antigravity (agy); no subagents. Branch `codex/fix-prehydration-loader`.
+- Verification: added regression test in `tests/initial-loader.spec.ts` asserting loader covers viewport before hydration even when external stylesheets lack loader rules (failed as static in top-left before fix, passed as fixed full-screen after fix). All 9 initial loader e2e tests and 4 header e2e tests passed. All 2,130 unit tests passed (12 skipped). Next.js standalone build passed cleanly.
+### 2026-10-13 — Fix CI check failures for PR #10
+
+- Outcome: resolved all failures from GitHub Actions CI run 38304938269. Fixed hardcoded macOS `/private/tmp` screenshot paths in Playwright tests (`initial-loader.spec.ts`, `header-loading.spec.ts`) that errored with ENOENT on Ubuntu Linux. Fixed `.lp-dimension-hint` WCAG color contrast violation across all themes by inheriting full text color rather than reducing opacity. Added `pointer-events: none` on exiting initial loader so interactive gestures are unblocked during the dismissal fade. Updated test assertions for updated landing hero geometry, copy, and document title (`next-migration.spec.ts`, `page-boundaries.spec.ts`, `studio-landing.spec.ts`).
+- Files: `src/features/entry/landing-page.css`, `src/lib/motion/initial-load.ts`, `src/styles.css`, `tests/header-loading.spec.ts`, `tests/initial-loader.spec.ts`, `tests/next-migration.spec.ts`, `tests/page-boundaries.spec.ts`, `tests/studio-landing.spec.ts`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-prehydration-loader`.
+- Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
+- Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
+

@@ -33,7 +33,7 @@ test('public content does not open IndexedDB and metadata follows navigation', a
   await page.getByRole('link', { name: 'Canvas One', exact: true }).click();
   await expect(page.getByTestId('landing-page')).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
-  await expect(page).toHaveTitle('Canvas One — The shared canvas for engineers and AI');
+  await expect(page).toHaveTitle('Canvas One — Collaborate visually with AI');
 });
 
 test('saved projects reopen and simulate offline after a direct URL reload', async ({ page, context }) => {

@@ -17,9 +17,27 @@ export function InitialLoad({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <InitialLoadContext.Provider value={skip}>
-      <div ref={loader} data-initial-loader className="initial-load-overlay" suppressHydrationWarning onAnimationEnd={event => {
-        if (event.target === event.currentTarget && (event.animationName === 'initial-loader-exit' || event.animationName === 'initial-loader-timeout')) event.currentTarget.hidden = true;
-      }}>
+      <div
+        ref={loader}
+        data-initial-loader
+        className="initial-load-overlay"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 2147483647,
+          display: 'grid',
+          placeItems: 'center',
+          background: 'var(--shell, #fbfaf7)',
+          color: 'var(--ink, #16201d)',
+        }}
+        suppressHydrationWarning
+        onAnimationEnd={event => {
+          if (event.target === event.currentTarget && (event.animationName === 'initial-loader-exit' || event.animationName === 'initial-loader-timeout')) {
+            event.currentTarget.hidden = true;
+            event.currentTarget.style.display = 'none';
+          }
+        }}
+      >
         <LoadingFace />
       </div>
       {children}
