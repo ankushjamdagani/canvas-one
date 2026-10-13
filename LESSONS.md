@@ -50,6 +50,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **Keep Storybook/browser test plugins decoupled from core Vite/Vitest configs.** The `@storybook/addon-vitest` or `storybookTest` plugin injects browser/Playwright runners into Vitest; keeping Storybook testing in a dedicated `vitest.storybook.config.ts` prevents standard `npm test` from being intercepted and failing with browser timeouts. Why: 2026-10-01 Storybook setup.
 - Share dependency-free CSS transforms across Next and Vite, retaining their CommonJS/ESM plugin wrappers; verify both builds after consolidating tooling. Why: 2026-10-09 cleanup exposed Vite's bundled-config loader rewriting a shared CommonJS plugin dependency into an invalid file-URL require.
 - **E2E that expects the entry screen must `page.goto('/')`, not `page.reload()`.** With URL routes, reload inside a project keeps the project open. Why: 2026-10-02 URL routes.
+- **Continuous simulation timers and mounting animations on showcase pages must respect `motionOff()` / `prefers-reduced-motion`.** Accessibility scans (`Axe`) sample computed contrast over DOM elements at runtime; asynchronous intervals mounting elements with CSS fade animations (`animation: lp-appear`) cause transient color contrast violations if scanned mid-flight. Why: 2026-10-13 theme accessibility contrast flakiness on landing page demo nodes.
 
 ## Delegation and review
 
@@ -66,6 +67,8 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - **Run each executor lane in its own git worktree and commit partial work.** Quota and rate-limit hits interrupted Gemini, Sonnet and Codex lanes about 10 times; intact worktrees let another executor resume. Why: 2026-09-24 → 2026-09-29.
 
 ## Workflow
+
+- **Prefer well-formatted tabular comparisons and evaluate existing open-source solutions before building custom implementations.** When designing or creating a new system, structure choices into clear comparison tables evaluating open-source options against custom designs before deciding. Why: 2026-10-14 user directive.
 
 - **For existing-app design proposals, copy the current theme tokens and appearance rather than approximating colours or inventing a dark palette.** Vary layouts independently of the theme. Why: 2026-10-04 playback mockup colour correction.
 

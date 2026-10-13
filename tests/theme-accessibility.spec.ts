@@ -10,6 +10,7 @@ for (const palette of PALETTES) for (const mode of ['light', 'dark'] as const) {
     const failures: unknown[] = [];
     async function audit(state: string) {
       await expect.poll(() => page.locator('[data-reveal-kind]').evaluateAll(elements => elements.every(element => getComputedStyle(element).opacity === '1'))).toBe(true);
+      await expect.poll(() => page.locator('.lp-buffer, .lp-note').evaluateAll(elements => elements.every(element => getComputedStyle(element).opacity === '1'))).toBe(true);
       await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime)).map(animation => animation.finished.catch(() => {}))));
       const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
       for (const violation of result.violations) failures.push({ state, id: violation.id, nodes: violation.nodes.map(node => ({ target: node.target, html: node.html, summary: node.failureSummary })) });

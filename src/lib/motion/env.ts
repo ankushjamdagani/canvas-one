@@ -7,7 +7,11 @@ const STORAGE_KEY = 'studio:motion';
 export function motionOff(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === 'off';
+    const isOff = window.localStorage.getItem(STORAGE_KEY) === 'off';
+    if (isOff && typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.dataset.motion = 'off';
+    }
+    return isOff;
   } catch {
     return false;
   }

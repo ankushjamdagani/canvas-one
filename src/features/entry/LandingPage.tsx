@@ -21,6 +21,7 @@ import { DraftingBoard, DraftingStage } from "@/components/ui/drafting-board";
 import { Reveal, RevealScope } from "@/components/ui/reveal";
 import "./landing-page.css";
 import { formatRoute } from "@/lib/router";
+import { motionOff } from "@/lib/motion/env";
 
 type Point = { x: number; y: number };
 const initialNodes: Record<string, Point> = {
@@ -51,10 +52,12 @@ export function LandingPage({ basePath }: { basePath?: string } = {}) {
     height: number;
     scale: number;
   } | null>(null);
-  const [reduced, setReduced] = React.useState(false);
+  const [reduced, setReduced] = React.useState(
+    () => typeof window !== "undefined" && (matchMedia("(prefers-reduced-motion: reduce)").matches || motionOff()),
+  );
   React.useEffect(() => {
     const media = matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(media.matches);
+    const update = () => setReduced(media.matches || motionOff());
     update();
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);

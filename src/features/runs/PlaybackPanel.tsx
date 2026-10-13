@@ -214,7 +214,7 @@ export function PlaybackPanel({
     const read = () => {
       const store = controller?.getPlayback();
       const state = controller?.getState();
-      const next = `${store?.version}/${store?.playheadMs}/${store?.computedMs}/${store?.playing}/${store?.ended}/${store?.following}/${store?.selection?.startMs}/${store?.selection?.endMs}/${state?.phase}/${state?.current?.saveStatus}`;
+      const next = `${store?.version}/${store?.playheadMs}/${store?.computedMs}/${store?.playing}/${store?.ended}/${store?.following}/${store?.selection?.startMs}/${store?.selection?.endMs}/${state?.phase}/${state?.stopping}/${Boolean(state?.current)}/${Boolean(state?.current?.terminal)}/${state?.current?.saveStatus}`;
       if (last !== next) {
         last = next;
         redraw();

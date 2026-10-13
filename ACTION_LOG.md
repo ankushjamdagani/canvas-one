@@ -3522,3 +3522,40 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
 - Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
 
+### 2026-10-13 — Fix CI Playwright failures for header loading, playback status, and notes
+
+- Outcome: resolved all 3 test failures / flakiness reported from the GitHub Actions CI run on `master`:
+  1. `tests/header-loading.spec.ts`: fixed malformed CSS property declaration `animation-loader-face-exit` -> `animation: initial-loader-face-exit` in `INITIAL_LOAD_STYLE`, allowed frame sampling when `dataset.loaderExit === 'true'`, and widened intermediate opacity bounds to `(0.01, 0.99)` so low-FPS CI runners do not skip the window.
+  2. `tests/studio-playback.spec.ts`: added `await expect(page.getByTestId('playback-status')).toHaveText('Live')` before clicking "Stop run" so React commits the transition to live mode and does not drop the click event during DOM reconciliation / layout shifts.
+  3. `tests/studio-notes.spec.ts` & `src/features/workspace/NoteNode.tsx`: added `onPointerDown={(e) => e.stopPropagation()}` and cleared `leaveTimer.current` on note action buttons to prevent canvas / ReactFlow container from capturing pointerdown and swallowing button clicks, and added explicit wait for the color popover to be hidden before collapsing.
+- Files: `src/features/workspace/NoteNode.tsx`, `src/lib/motion/initial-load.ts`, `tests/header-loading.spec.ts`, `tests/studio-notes.spec.ts`, `tests/studio-playback.spec.ts`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-ci-tests`.
+- Verification: clean production build (`npm run build`), all 2,130 unit tests passed (12 skipped via `npm test`), and Playwright test suite for all three test files passed cleanly with 11 passed (20.4s). AST knowledge graph refreshed via `graphify update .`.
+- Lesson:
+  1. Inline CSS string keyframes and properties must be verified for exact syntax (`animation:` property name); missing colons silently drop styles in browsers.
+  2. In browser tests asserting state transitions triggered by toolbar/header actions, ensure the previous state's commit settles before dispatching consecutive clicks to avoid dropped events during DOM reconciliation.
+  3. Interactive control buttons rendered inside canvas / ReactFlow nodes must intercept `onPointerDown` (`e.stopPropagation()`) to prevent the canvas container from capturing the pointerdown gesture and suppressing button clicks.
+
+### 2026-10-13 — Resolve stopping redraw, frame sampling, note collapse cooldown, and lavender contrast
+
+- Outcome: resolved all 4 CI failures and flakiness from GitHub Actions on PR #11 (`codex/fix-ci-tests`):
+  1. `src/features/runs/PlaybackPanel.tsx`: added `state?.stopping`, `Boolean(state?.current)`, and `Boolean(state?.current?.terminal)` to subscription dependency key string `next`. When Stop run was clicked, `stopping` toggled but `last === next` prevented `redraw()`, freezing the status indicator at "Live".
+  2. `tests/header-loading.spec.ts`: increased WAAPI frame sampling cap from 600 to 2000 and broadened drawing frame filter to `frame.ring < 0.999` to ensure pre-finish frames asserting `frame.surface === 0` are not skipped under CPU starvation on 2-vCPU CI runners.
+  3. `src/features/workspace/NoteNode.tsx`: added `justCollapsed` cooldown ref (400ms) on note collapse so cursor departure traversing the newly-collapsed bubble does not immediately trigger hover expansion.
+  4. `src/lib/theme/palettes.ts`: updated `lavender` light `action`, `ring`, `mark`, and `aText` from `#C2461F` to `#BA3F19`, increasing contrast ratio against foreground `#FCF0EB` / `#FFF8F4` from 4.2:1 to 5.03:1+ to satisfy WCAG AA (>= 4.5:1).
+- Files: `src/features/runs/PlaybackPanel.tsx`, `src/features/workspace/NoteNode.tsx`, `src/lib/theme/palettes.ts`, `tests/header-loading.spec.ts`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-ci-tests`.
+- Verification: clean production build (`npm run build`), Storybook build (`npm run build-storybook`), all 2,130 unit tests passed (12 skipped via `npm test`), and Playwright test suite for all 4 specs passed (`TEST_PRODUCTION=1 npx playwright test` on `tests/studio-playback.spec.ts`, `tests/header-loading.spec.ts`, `tests/studio-notes.spec.ts`, and `tests/theme-accessibility.spec.ts -g "lavender light"`). AST knowledge graph refreshed via `graphify update .`.
+- Lesson:
+  1. State subscription listeners reading external store/controller state in components using force-update/redraw hooks must include all status-affecting flags (such as `stopping` and `terminal`) in their change detection keys.
+  2. Collapsing an expanded element into a smaller trigger located along the cursor's exit path requires a momentary cooldown to prevent the cursor departure movement from inadvertently triggering re-expansion.
+
+### 2026-10-14 — Halt landing demo simulation timer and animations under motionOff to prevent contrast test flakiness
+
+- Outcome: eliminated transient accessibility contrast failures on landing page demo nodes (`.lp-buffer > header > span`, `.lp-buffer-actions > button`) during theme accessibility scans in `cyanotype dark` and `achromatic dark`. When running in Playwright (`studio:motion = 'off'`), `LandingPage` now honors `motionOff()` to stop the background `setInterval` simulation timer and avoid mounting elements during audit scans. Added `:root[data-motion="off"]` CSS overrides disabling `lp-appear` animations and transitions on `.lp-buffer` and `.lp-note`. Added explicit poll in `theme-accessibility.spec.ts` ensuring `.lp-buffer, .lp-note` have reached full opacity before Axe scans. Added user's directive on open-source evaluation and tabular comparisons to `LESSONS.md`.
+- Files: `src/features/entry/LandingPage.tsx`, `src/features/entry/landing-page.css`, `src/lib/motion/env.ts`, `tests/theme-accessibility.spec.ts`, `LESSONS.md`, `ACTION_LOG.md`, `HANDOFF.md`. Antigravity (agy); no subagents. Branch `codex/fix-ci-tests`.
+- Verification: clean production build (`npm run build`), all 2,130 unit tests passed (12 skipped via `npm test`), and Playwright test suite passed for `tests/theme-accessibility.spec.ts -g "cyanotype dark|achromatic dark"` (2 passed in 18.0s) and `tests/studio-playback.spec.ts` (6 passed in 19.9s).
+- Lesson:
+  1. Continuous background simulation timers on showcase pages must check `motionOff()` in addition to media queries so headless test runners with disabled motion settle immediately to steady state without background timer churn.
+  2. Tabular comparisons should be used when presenting design alternatives or new systems, evaluating existing open-source libraries before custom builds.
+
+
+

@@ -38,6 +38,8 @@ export function NoteNode({ data, selected }: NodeProps) {
   const [pinned, setPinned] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
   const leaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justCollapsed = React.useRef(false);
+  const collapseCooldownTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   React.useEffect(() => {
@@ -63,9 +65,11 @@ export function NoteNode({ data, selected }: NodeProps) {
 
   React.useEffect(() => () => {
     if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    if (collapseCooldownTimer.current) clearTimeout(collapseCooldownTimer.current);
   }, []);
 
   const onEnter = React.useCallback(() => {
+    if (justCollapsed.current) return;
     if (leaveTimer.current) clearTimeout(leaveTimer.current);
     setHovered(true);
   }, []);
@@ -242,6 +246,7 @@ export function NoteNode({ data, selected }: NodeProps) {
               data-testid={`note-edit-btn-${nodeData.note.id}`}
               aria-label="Edit note"
               title="Edit note"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 setPinned(true);
@@ -260,6 +265,7 @@ export function NoteNode({ data, selected }: NodeProps) {
                   data-testid={`note-color-btn-${nodeData.note.id}`}
                   aria-label="Note colour"
                   title="Note colour"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   className="nodrag nopan pointer-events-auto size-5 flex items-center justify-center rounded hover:bg-black/5 text-secondary-text hover:text-foreground cursor-pointer"
                 >
@@ -306,8 +312,15 @@ export function NoteNode({ data, selected }: NodeProps) {
             data-testid={`note-collapse-btn-${nodeData.note.id}`}
             aria-label="Collapse note"
             title="Collapse to comment bubble"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
+              if (leaveTimer.current) clearTimeout(leaveTimer.current);
+              if (collapseCooldownTimer.current) clearTimeout(collapseCooldownTimer.current);
+              justCollapsed.current = true;
+              collapseCooldownTimer.current = setTimeout(() => {
+                justCollapsed.current = false;
+              }, 400);
               setPinned(false);
               setHovered(false);
             }}
@@ -321,6 +334,7 @@ export function NoteNode({ data, selected }: NodeProps) {
               data-testid={`note-delete-btn-${nodeData.note.id}`}
               aria-label="Delete note"
               title="Delete note"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 nodeData.onDelete?.();
