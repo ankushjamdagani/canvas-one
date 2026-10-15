@@ -61,6 +61,27 @@ async function journal(page: Page): Promise<{ taskId: string; binding: Record<st
   }));
 }
 
+test('malformed invalid and stale proposals remain reviewable without crashing or writing', async ({ page, baseURL }) => {
+  const f = await fixture(new URL(baseURL!).origin);
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  try {
+    await openBoard(page); const { panel, context } = await start(page, f, 'Propose a router change');
+    const board = await f.tool<Inspection>(context, 'board_inspect', {});
+    const changes = [null, {}, { kind: 'replace' }, { kind: 'insert', value: { recordKind: 'unknown', record: { id: ROUTER } } }, { kind: 'remove', recordKind: '__proto__', id: ROUTER }];
+    for (const stale of [false, true]) {
+      const label = stale ? 'Malformed stale proposal' : 'Malformed invalid proposal';
+      expect(await f.tool(context, 'proposal_submit', { operationId: crypto.randomUUID(), scope: board.scope, expectedRevision: board.revision + (stale ? 1 : 0), label, changes })).toMatchObject({ ok: true, proposal: { status: stale ? 'conflict' : 'invalid' } });
+      await expect(panel.getByRole('heading', { name: label, exact: true })).toBeVisible();
+      await expect(panel.getByText('Changed: Invalid proposed change', { exact: true })).toHaveCount(changes.length);
+      await expect(panel.getByRole('button', { name: 'Accept changes', exact: true })).toBeDisabled();
+    }
+    await page.reload(); await expect(page.getByTestId('workspace-root')).toBeVisible(); const recovered = await openAI(page);
+    await expect(recovered.getByRole('heading', { name: /^Malformed (invalid|stale) proposal$/ })).toBeVisible();
+    await expect(recovered.getByText('Changed: Invalid proposed change', { exact: true })).toHaveCount(changes.length);
+    expect(await journal(page)).toHaveLength(0); expect(errors).toEqual([]);
+  } finally { await f.dispose(); }
+});
+
 test('phone requires desktop execution while a narrow desktop can connect', async ({ browser, page, baseURL }, testInfo) => {
   const mobile = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148' });
   try {

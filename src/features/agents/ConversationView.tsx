@@ -9,7 +9,7 @@ import { Label } from '../../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { renderDiagramSvg } from '../transfer/svg-export';
 import { conversationErrorMessage } from './conversation-errors';
-import { mergeProposalHistory } from './proposal-history';
+import { isDisplayableRecordChange, mergeProposalHistory } from './proposal-history';
 import type { RecordKind } from '../../domain/studio/records';
 
 const active = (task: CollaborationTask) => ['requested', 'working', 'waiting'].includes(task.status);
@@ -112,6 +112,7 @@ export function ConversationView({ controller, session, desktopRequired, onStart
     status: proposal.status === 'accepted' || proposal.status === 'rejected' ? proposal.status : stale || proposal.status === 'conflict' ? 'stale' : proposal.status === 'pending' || proposal.status === 'accepting' ? 'ready' : 'invalid',
     busy: busy || proposal.status === 'accepting', issue: proposal.issues.map(issue => issue.message).join('; ') || undefined,
     changes: proposal.changes.map((change, index) => {
+      if (!isDisplayableRecordChange(change)) return { id: `${index}`, kind: 'change', label: 'Invalid proposed change', detail: 'This change has an unsupported or incomplete record format. Review the validation errors and request revised changes.' };
       const record = change.kind === 'remove' ? currentRecord(change.recordKind, change.id) : change.value.record;
       const label = record && 'label' in record && typeof record.label === 'string' ? record.label : record && 'name' in record && typeof record.name === 'string' ? record.name : change.kind === 'remove' ? `${change.recordKind} ${change.id}` : `${change.value.recordKind} ${record?.id}`;
       let detail = change.kind === 'remove' ? 'Removed in the after-state; inspect the before-state below.' : change.kind === 'insert' ? `New ${change.value.recordKind}.` : `Updated ${change.value.recordKind}.`;

@@ -3636,3 +3636,10 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: checked each worktree for changes, repaired three stale Git links from the repository rename, verified the complete backup bundle and confirmed the supplied HTML remains ignored. Codex; no subagents or runtime changes, so tests not rerun. Temporary PR worktree cleanup requested through the app archive tool.
 - Final state: app archival remained queued, so the clean temporary PR checkout was removed with Git after its artifacts and history were preserved. Exactly one worktree remains (primary); only the PR branch and master remain locally. Updated HANDOFF for the new location.
 
+### 2026-10-15 — Prevent malformed proposal review crashes
+
+- Outcome: guarded untrusted record changes before rendering invalid/stale proposals; incomplete values, null entries and unsupported record kinds show a safe validation fallback. Existing authoring validation and disabled acceptance remain intact. Used the primary PR checkout requested by the user.
+- Files: ConversationView, proposal-history helper/unit test, studio-agents production regression source, HANDOFF, LESSONS and ACTION_LOG. Codex; no subagents.
+- Verification: two helper/history units and TypeScript passed. All seven existing collaboration browser journeys passed against the running localhost:3001 dev server; new malformed invalid/stale/reload regression passed separately (6.7 seconds), zero browser errors or journal writes. No production rebuild or full suite rerun, avoiding interference with the user's active dev build. Design HTML remains ignored.
+- Lesson: invalid proposals retain malformed input for review, so validation status cannot substitute for safe rendering. New browser assertions initially assumed separate text nodes, absent disabled controls and stable recovery ordering; corrected to actual UI contracts without weakening safety checks.
+

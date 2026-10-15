@@ -4,6 +4,8 @@
 
 Checkout consolidation: primary `/Users/ankushjamdagani/personal/canvas-one` now runs `codex/ai-collaboration-analysis` for PR #13. All other local worktrees and feature branches were removed after backup; master remains. Earlier managed-checkout references below describe the implementation location before this move. Recovery bundle and design/review copies are ignored under `artifacts/worktree-cleanup-2026-10-15`; the design HTML also remains at `artifacts/designs/Canvas One AI States.html`. Remote branches were not deleted.
 
+Local follow-up: invalid/stale proposals can contain malformed record changes; ConversationView now checks renderable structure and shows a validation fallback rather than dereferencing missing records. Regression covers null/missing/unsupported changes, disabled acceptance and reload recovery. Verification uses the running localhost:3001 dev app with isolated browser storage to avoid replacing its active `.next`; final prior production results below precede this renderer-only fix.
+
 Active checkout: managed worktree `ai-collaboration-analysis/canvas-one`, branch `codex/ai-collaboration-analysis`, planning baseline `b11c09b`. The supplied `artifacts/designs/Canvas One AI States.html` is a local reference and **must never be committed**, including by force-add. Primary checkout is preserved. Claude/Gemini repository review is authorized. Current AGENTS instructions require a review PR; agents never merge it.
 
 Implementation commit `2675a64` is published in draft [PR #13](https://github.com/ankushjamdagani/canvas-one/pull/13). Keep it draft while the documented agy qualification remains blocked. No merge or deployment was performed.
