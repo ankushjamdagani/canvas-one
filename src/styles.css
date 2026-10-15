@@ -106,7 +106,6 @@
 
 @theme inline {
   --font-sans: "IBM Plex Mono", ui-monospace, monospace;
-  --font-tool: "IBM Plex Sans", ui-sans-serif, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, monospace;
   --font-display: "Newsreader Variable", Georgia, serif;
   --font-handwritten: "Caveat", cursive;
@@ -319,8 +318,6 @@
   --text-ui: 13px;
   --text-ui--line-height: 1.55;
   --text-caption: 12px;
-  --text-tool: 13px;
-  --text-tool--line-height: 1.5;
   --text-caption--line-height: 1.5;
   /* Sentence-case mono metadata labels. */
   --text-micro: 10px;

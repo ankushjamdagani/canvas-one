@@ -169,6 +169,13 @@ export const KeyboardComposer: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Allow live edit for this task…' }));
     await expect(canvas.getByText('Preview grant request: T-18 / attempt-18')).toBeVisible();
     const panel = canvas.getByTestId('collaboration-panel');
+    const controls = within(canvas.getByTestId('agent-send-controls'));
+    const selector = controls.getByRole('combobox', { name: /^Agent$/ });
+    const send = controls.getByRole('button', { name: /^Send$/ });
+    await expect(selector.getBoundingClientRect().right).toBeLessThanOrEqual(send.getBoundingClientRect().left);
+    await expect(canvas.queryByText('Connected locally')).toBeNull();
+    await userEvent.click(controls.getByRole('button', { name: /^Disconnect$/ }));
+    await expect(canvas.getByText('Preview action: disconnect')).toBeVisible();
     await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth);
     await expect(input.getBoundingClientRect().bottom).toBeLessThanOrEqual(panel.getBoundingClientRect().bottom);
     if (window.innerWidth < 640) {

@@ -47,7 +47,7 @@ async function connect(page: Page, service: LocalCollaborationServer, expectComp
   await expect(panel.getByLabel('Task instruction')).toHaveCount(0);
   await panel.getByLabel('2. Paste connection details').fill(JSON.stringify({ url: service.url, pairingSecret: service.pairingSecret }));
   await panel.getByRole('button', { name: 'Connect', exact: true }).click();
-  await expect(panel).toContainText('Connected locally');
+  await expect(panel.getByRole('combobox', { name: 'Agent', exact: true })).toBeVisible();
   if (expectComposer) {
     const draft = panel.getByRole('button', { name: 'Create a draft', exact: true });
     if (await draft.isVisible()) { await draft.click(); await expect(draft).not.toBeVisible(); }
@@ -78,8 +78,6 @@ test('connection setup hides the composer through validation, connection and ret
     await expect(panel.getByLabel('Task instruction')).toHaveCount(0);
     await expect(panel.getByRole('button', { name: 'Send', exact: true })).toHaveCount(0);
     await expect(panel.locator('code')).toContainText(new URL(baseURL!).origin);
-    const setupStyle = await panel.getByRole('region', { name: 'Connection setup' }).evaluate(element => ({ family: getComputedStyle(element).fontFamily, size: getComputedStyle(element).fontSize }));
-    expect(setupStyle.family).toContain('IBM Plex Sans'); expect(setupStyle.size).toBe('13px');
     const bounds = (await floating.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.y).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(1512); expect(bounds.y + bounds.height).toBeLessThanOrEqual(982);
@@ -118,7 +116,7 @@ test('connection setup hides the composer through validation, connection and ret
     await panel.getByLabel('Service address', { exact: true }).fill(f.service.url);
     await panel.getByLabel('Pairing secret', { exact: true }).fill(f.service.pairingSecret);
     await panel.getByRole('button', { name: 'Connect', exact: true }).click();
-    await expect(panel).toContainText('Connected locally');
+    await expect(panel.getByRole('combobox', { name: 'Agent', exact: true })).toBeVisible();
     await expect(panel.getByLabel('2. Paste connection details')).toHaveCount(0);
     await expect(page.getByTestId('inspector-panel')).toBeVisible();
     expect(f.contexts.size).toBe(0);
@@ -167,6 +165,8 @@ test('Suggest review applies once through the board mailbox with durable task pr
     await openBoard(page); const { panel, context } = await start(page, f, 'Rename the router'); const board = await f.tool<Inspection>(context, 'board_inspect', {}), original = board.records.find(record => record.id === ROUTER)!.data as Element;
     expect(await f.tool(context, 'proposal_submit', { operationId: crypto.randomUUID(), scope: board.scope, expectedRevision: board.revision, label: 'Reviewed router name', changes: [{ kind: 'replace', value: { recordKind: 'element', record: { ...original, label: 'Reviewed Router' } } }] })).toMatchObject({ ok: true });
     await expect(panel).toContainText('Reviewed router name'); await expect(page.locator(`[data-element-id="${ROUTER}"]`)).not.toContainText('Reviewed Router'); expect((await journal(page)).filter(row => row.taskId === context.identity.taskId)).toHaveLength(0);
+    const sendBounds = (await panel.getByRole('button', { name: 'Send', exact: true }).boundingBox())!, panelBounds = (await panel.boundingBox())!;
+    expect(sendBounds.y + sendBounds.height).toBeLessThanOrEqual(panelBounds.y + panelBounds.height);
     await page.screenshot({ path: testInfo.outputPath('desktop-suggest-review.png'), fullPage: true });
     f.finishes.get(context.identity.attemptId)!(); await panel.getByRole('button', { name: 'Accept changes', exact: true }).click(); await expect(page.locator(`[data-element-id="${ROUTER}"]`)).toContainText('Reviewed Router');
     await expect.poll(async () => (await journal(page)).filter(row => row.taskId === context.identity.taskId).length).toBe(1);

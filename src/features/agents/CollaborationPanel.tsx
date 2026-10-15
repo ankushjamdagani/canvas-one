@@ -1,11 +1,12 @@
 import * as React from 'react';
-import { ArrowUp, Check, Minus, Plus, RefreshCw, Square, Undo2, X } from 'lucide-react';
+import { ArrowUp, Check, Minus, Plus, RefreshCw, Square, Undo2, X, Unplug } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { CanvasOneFace, type FaceExpression } from '../../components/ui/canvas-one-face';
 import { Label } from '../../components/ui/label';
 import { NativeSelect } from '../../components/ui/native-select';
 import { Segmented } from '../../components/ui/segmented';
 import { Textarea } from '../../components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 
 export type CollaborationIntent = 'task' | 'question' | 'feedback';
 export type CollaborationProvider = 'claude' | 'codex' | 'agy';
@@ -104,17 +105,6 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
   const submit = (event: React.FormEvent) => { event.preventDefault(); if (canSend) composer.onSend?.(); };
 
   return <section aria-label="AI collaboration" className={`flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-panel text-foreground max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11 max-sm:[&_select]:min-h-11 max-sm:[&_summary]:min-h-11 ${className}`} data-testid="collaboration-panel">
-    {connected && <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2">
-      <CanvasOneFace expression={expression} size={32} animate={false} transition={false} aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <Label htmlFor={`${id}-provider`} className="sr-only">Agent</Label>
-        <NativeSelect id={`${id}-provider`} value={provider} disabled={!onProviderChange} onChange={event => onProviderChange?.(event.target.value as CollaborationProvider)}>
-          {providers.map(item => <option key={item.id} value={item.id} disabled={Boolean(item.unavailableReason)}>{item.label}{item.unavailableReason ? ` — ${item.unavailableReason}` : ''}</option>)}
-        </NativeSelect>
-      </div>
-      {connected && connection.onDisconnect && <Button type="button" variant="ghost" size="sm" onClick={connection.onDisconnect}>Disconnect</Button>}
-      <span className="text-caption text-secondary-text">Connected locally</span>
-    </header>}
 
     {connected && task && <section aria-label="Current task" data-task-id={task.id} className="shrink-0 space-y-1 border-b border-hairline px-3 py-2">
       <h3 className="line-clamp-2 min-w-0 break-words font-medium" title={task.title}>{task.title}</h3>
@@ -174,7 +164,18 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
       <Textarea id={`${id}-message`} value={composer.text} onChange={event => composer.onTextChange(event.target.value)} disabled={Boolean(disabledReason) || composer.sending} aria-describedby={disabledReason ? `${id}-reason` : undefined} className="min-h-16 max-h-32 resize-none" onKeyDown={event => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && canSend) { event.preventDefault(); composer.onSend?.(); } }} />
       {disabledReason && <p id={`${id}-reason`} className="text-caption text-secondary-text">{disabledReason}</p>}
       {composer.error && <p role="alert" className="text-caption text-destructive">{composer.error}</p>}
-      <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2">{composer.onCreateDraft && <Button type="button" variant="outline" size="sm" onClick={composer.onCreateDraft}>Create a draft</Button>}{composer.onAddSelection && <Button type="button" variant="ghost" size="sm" onClick={composer.onAddSelection}>Add selection</Button>}{composer.intent === 'task' && <span className="self-center text-caption text-secondary-text">New tasks start in Suggest</span>}</div><Button type="submit" size="sm" disabled={!canSend} loading={composer.sending}><ArrowUp aria-hidden="true" />Send</Button></div>
+      {(composer.onCreateDraft || composer.onAddSelection) && <div className="flex flex-wrap items-center gap-2">{composer.onCreateDraft && <Button type="button" variant="outline" size="sm" onClick={composer.onCreateDraft}>Create a draft</Button>}{composer.onAddSelection && <Button type="button" variant="ghost" size="sm" onClick={composer.onAddSelection}>Add selection</Button>}</div>}
+      <TooltipProvider><div className="flex items-center justify-end gap-2 pt-1" data-testid="agent-send-controls">
+        <span role="img" aria-label={`${providerLabel}: ${task?.status ?? 'connected'}`}><CanvasOneFace expression={expression} size={28} animate={false} transition={false} aria-hidden="true" /></span>
+        <div className="flex min-w-0 max-w-48 flex-1 items-center">
+          <Label htmlFor={`${id}-provider`} className="sr-only">Agent</Label>
+          <NativeSelect id={`${id}-provider`} wrapperClassName="min-w-0 flex-1" className={connection.onDisconnect ? 'min-w-0 rounded-r-none' : 'min-w-0'} value={provider} disabled={!onProviderChange} onChange={event => onProviderChange?.(event.target.value as CollaborationProvider)}>
+            {providers.map(item => <option key={item.id} value={item.id} disabled={Boolean(item.unavailableReason)}>{item.label}{item.unavailableReason ? ` — ${item.unavailableReason}` : ''}</option>)}
+          </NativeSelect>
+          {connection.onDisconnect && <Tooltip><TooltipTrigger asChild><Button type="button" variant="destructive" size="icon" className="shrink-0 rounded-l-none" aria-label="Disconnect" onClick={connection.onDisconnect}><Unplug aria-hidden="true" /></Button></TooltipTrigger><TooltipContent>Disconnect local agents</TooltipContent></Tooltip>}
+        </div>
+        <Tooltip><TooltipTrigger asChild><Button type="submit" size="icon" aria-label="Send" disabled={!canSend} loading={composer.sending}><ArrowUp aria-hidden="true" /></Button></TooltipTrigger><TooltipContent>Send message</TooltipContent></Tooltip>
+      </div></TooltipProvider>
     </form>}
   </section>;
 }

@@ -37,8 +37,8 @@ export function ConnectionSetup({ connecting, error, onConnect }: { readonly con
       await navigator.clipboard.writeText(command); setCopied(true);
     } catch { setLocalError('Could not copy. Select and copy the command above.'); }
   };
-  return <section aria-label="Connection setup" className="space-y-5 font-tool text-tool">
-    <div><h3 className="text-sm font-semibold text-foreground">Connect your local agents</h3><p className="mt-1 text-caption text-secondary-text">Use your installed CLIs and existing sign-in.</p></div>
+  return <section aria-label="Connection setup" className="space-y-5 text-caption">
+    <div><h3 className="font-medium text-foreground">Connect your local agents</h3><p className="mt-1 text-secondary-text">Use your installed CLIs and existing sign-in.</p></div>
     <div className="space-y-2"><p className="font-medium">1. Start the local service</p><p className="text-secondary-text">Run this from the Canvas One repository.</p><div className="flex items-start gap-1 border border-hairline rounded-md bg-background p-2"><code className="min-w-0 flex-1 whitespace-pre-wrap break-all text-caption">{command || 'Preparing command…'}</code><Button type="button" variant="ghost" size="sm" disabled={!command} onClick={() => { void copyCommand(); }}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}{copied ? 'Copied' : 'Copy'}</Button></div></div>
     <form onSubmit={event => { void submit(event); }} className="space-y-3">
       <div className="space-y-2"><Label htmlFor={`${id}-details`}>2. Paste connection details</Label><Input id={`${id}-details`} type="password" autoComplete="off" spellCheck={false} maxLength={CONNECTION_DETAILS_LIMIT} value={details} disabled={manual || busy} onChange={event => { setDetails(event.target.value); setLocalError(undefined); }} placeholder="Paste the JSON printed in your terminal" /><p className="text-secondary-text">Includes the service address and one-use pairing secret.</p></div>
