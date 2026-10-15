@@ -3630,3 +3630,8 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Embedding verification: reusable React artifact and real Next consumer builds passed; all three embedding browser tests passed (10.1 seconds). Example dependencies were installed offline without lockfile changes.
 - Delivery: implementation commit `2675a64` pushed on the dedicated feature branch; draft PR #13 opened and attached to this chat. Supplied HTML absent from tracked/staged files. No merge or deployment.
 
+### 2026-10-15 — Consolidate local worktrees onto PR #13
+
+- Outcome: moved the primary checkout to `codex/ai-collaboration-analysis`; removed four clean obsolete worktrees and nine other local feature branches, keeping master. Preserved all branch history in ignored `artifacts/worktree-cleanup-2026-10-15/branches.bundle` and copied local review/design artifacts before cleanup. Remote branches remain unchanged.
+- Verification: checked each worktree for changes, repaired three stale Git links from the repository rename, verified the complete backup bundle and confirmed the supplied HTML remains ignored. Codex; no subagents or runtime changes, so tests not rerun. Temporary PR worktree cleanup requested through the app archive tool.
+
