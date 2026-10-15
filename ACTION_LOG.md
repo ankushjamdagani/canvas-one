@@ -3634,4 +3634,5 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 
 - Outcome: moved the primary checkout to `codex/ai-collaboration-analysis`; removed four clean obsolete worktrees and nine other local feature branches, keeping master. Preserved all branch history in ignored `artifacts/worktree-cleanup-2026-10-15/branches.bundle` and copied local review/design artifacts before cleanup. Remote branches remain unchanged.
 - Verification: checked each worktree for changes, repaired three stale Git links from the repository rename, verified the complete backup bundle and confirmed the supplied HTML remains ignored. Codex; no subagents or runtime changes, so tests not rerun. Temporary PR worktree cleanup requested through the app archive tool.
+- Final state: app archival remained queued, so the clean temporary PR checkout was removed with Git after its artifacts and history were preserved. Exactly one worktree remains (primary); only the PR branch and master remain locally. Updated HANDOFF for the new location.
 
