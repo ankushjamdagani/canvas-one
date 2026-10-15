@@ -29,7 +29,7 @@
 
 The simulator models performance behaviour. It does not execute your application code or reproduce a specific cloud provider, so treat results as a learning aid rather than a capacity plan.
 
-The landing page shows an illustrative collaboration. The workspace supports local CLI/MCP agents through explicit browser pairing and reviewable proposals; hosts can inject a model provider. Credentials remain outside project documents. See [composable packages and AI setup](docs/composables.md).
+The workspace has an in-app agent conversation with reviewed proposals and explicitly enabled task Live edits. A paired desktop service runs locally signed-in Claude or Codex; agy board-tool support is currently blocked. Credentials remain outside project documents. See [composable packages](docs/composables.md).
 
 ## Quick start
 
@@ -48,18 +48,18 @@ Open <http://localhost:3000>. Pick **Try Beta** to reach your projects, then cre
 
 ### Local AI collaboration
 
-Keep `npm run dev` running. In a second terminal, start the local bridge:
+Keep `npm run dev` running. In a second terminal, start the desktop execution service:
 
 ```sh
-node packages/cli/dist/main.js bridge --origin http://localhost:3000 --origin http://127.0.0.1:3000
+node packages/cli/dist/main.js collaborate --origin http://localhost:3000 --origin http://127.0.0.1:3000
 ```
 
-1. Open a project, then **Cmd+K → AI collaboration**. Enter the printed bridge URL and pairing code. Codes expire after two minutes; restart the bridge for fresh credentials.
-2. Configure your external agent's **stdio MCP server** with command `node` and arguments `<absolute-repo-path>/packages/cli/dist/main.js`, `mcp`. Set `CANVAS_ONE_BRIDGE_URL` to the printed URL and `CANVAS_ONE_AGENT_TOKEN` to the printed agent token. Keep credentials outside Git.
-3. Prompt the connected agent: “Inspect my board and component schemas. Propose a client → API → database diagram with short annotations. Submit it for review using the current scope and revision.”
-4. Preview and accept/reject the proposal in the app. Keep the board and bridge open while the agent works.
+1. Open a project, then **Cmd+K → AI collaboration → Connection settings**. Enter the printed service URL and pairing secret. Secrets expire after five minutes; restart the service for a fresh secret.
+2. Select Claude or Codex with its existing local CLI sign-in. Create or switch to a draft before starting an editing task. Questions are read-only and can run separately.
+3. Send instructions inside Canvas One. Tasks start in Suggest: inspect the proposed changes and accept or reject them. Enable Live for a specific task attempt to authorize changes and deletions across its current board.
+4. Stop disables further writes and keeps completed changes. Undo task prepares a reviewed revert that preserves human edits. Leaving or reloading requires explicit Resume; permissions do not move to another board or agent.
 
-Prompting happens in the external agent; the default app has no built-in model chat. Browser projects are origin-local: export/import a hosted project to use it locally. App edits reload automatically; rerun `npm run build:packages` after package edits and restart the bridge after CLI/bridge edits. Local development uses webpack to avoid the current Turbopack scoped-PostCSS resolution issue.
+Agent execution is desktop-first; phones show collaboration states without running a desktop CLI remotely. Browser projects are origin-local: export/import a hosted project to use it locally. Rerun `npm run build:packages` after package edits and restart the service after CLI changes. Local development uses webpack. The lower-level CLI/MCP bridge remains available for custom hosts; see [CLI transport documentation](packages/cli/README.md).
 
 If an older checkout reports missing workspace declarations after removing generated files, run `npx tsc -b --force` from the repository root, then restart `npm run dev`. Package build scripts now force output generation so stale incremental metadata cannot suppress missing declarations.
 

@@ -74,6 +74,40 @@ export class ProposalController<Document, Change> {
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   list(): readonly Proposal<Change>[] { return [...this.proposals.values()].map(({ proposal }) => structuredClone(proposal)); }
   inspect(operationId: string): Proposal<Change> | null { const found = this.proposals.get(operationId); return found ? structuredClone(found.proposal) : null; }
+  /** Host must durably archive terminal results before releasing their in-memory replay identities. */
+  pruneTerminal(retain: number): number {
+    if (!Number.isSafeInteger(retain) || retain < 0) throw new RangeError('Retention must be a nonnegative safe integer');
+    if (this.busy || this.disposed) return 0;
+    const terminal = [...this.proposals].filter(([, entry]) => entry.proposal.status === 'accepted' || entry.proposal.status === 'rejected');
+    const remove = terminal.slice(0, Math.max(0, terminal.length - retain));
+    for (const [id] of remove) { this.proposals.delete(id); this.plans.delete(id); }
+    if (remove.length) this.emit();
+    return remove.length;
+  }
+  /** Trusted durable review recovery. In-flight acceptance is never turned back into an actionable proposal. */
+  restore(saved: readonly Proposal<Change>[]): { readonly ok: true } | { readonly ok: false; readonly issues: readonly AgentIssue[] } {
+    if (this.disposed || this.busy || this.proposals.size || !Array.isArray(saved)) return { ok: false, issues: [issue('invalid', 'Review recovery requires an empty idle controller')] };
+    const candidate = new ProposalController(this.host, this.limits);
+    try {
+      for (const value of saved) {
+        if (!value || !['pending', 'accepting', 'accepted', 'rejected', 'conflict', 'invalid', 'failed'].includes(value.status) || !Array.isArray(value.issues)) throw new Error('Invalid recovered review');
+        if (canonical(value).length > (this.limits.maxRequestCharacters ?? 262144)) throw new Error('Recovered review exceeds limits');
+        const { status, issues: _issues, acceptedBy, receipt, ...request } = value;
+        if (candidate.proposals.has(request.operationId)) throw new Error('Duplicate recovered review');
+        const result = candidate.submit(request);
+        if (!result.ok) return { ok: false, issues: result.issues };
+        const entry = candidate.proposals.get(request.operationId)!;
+        if (status === 'accepted') {
+          if (!acceptedBy || acceptedBy.kind !== 'human' || !acceptedBy.actorId || !acceptedBy.displayName || receipt === undefined) throw new Error('Accepted review requires durable attribution and receipt');
+          entry.proposal = structuredClone({ ...request, status, issues: [], acceptedBy, receipt });
+        } else if (status === 'rejected') entry.proposal = { ...entry.proposal, status: 'rejected', issues: [] };
+        else if (status !== 'pending') entry.proposal = { ...entry.proposal, status: 'failed', issues: [issue('recovery-required', 'Review was interrupted or invalid; inspect the board and regenerate before applying')] };
+        // Pending proposals are revalidated against today's scope, revision and domain rules by submit.
+      }
+      for (const [id, entry] of candidate.proposals) this.proposals.set(id, entry);
+      this.emit(); return { ok: true };
+    } catch { return { ok: false, issues: [issue('invalid', 'Saved review data is invalid; it was preserved without applying changes')] }; }
+  }
   preview(operationId: string): ProposalPreview<Document> {
     const proposal = this.proposals.get(operationId)?.proposal;
     if (this.disposed || !proposal || proposal.status !== 'pending') return {status: 'unavailable', message: 'Preview requires an open pending proposal'};
@@ -228,12 +262,17 @@ export type ModelProvider = {
 };
 
 export const AGENT_TOOLS = [
+  { name: 'clarification_request', description: 'Ask one explicit question needed to continue this task. The host saves the question and pauses this attempt; a human answer starts a new authorized attempt.', inputSchema: { type: 'object', properties: { questionId: { type: 'string', minLength: 1, maxLength: 200 }, question: { type: 'string', minLength: 1, maxLength: 2000 } }, required: ['questionId', 'question'], additionalProperties: false } },
   { name: 'board_inspect', description: 'Inspect bounded authored board context and its current scope/revision.', inputSchema: {type: 'object', properties: {selectionOnly: {type: 'boolean'}}, additionalProperties: false} },
   { name: 'component_schemas', description: 'Discover available component schemas and authored document format.', inputSchema: {type: 'object', properties: {}, additionalProperties: false} },
   { name: 'document_validate', description: 'Validate a complete authored system-design document without editing.', inputSchema: {type: 'object', properties: {document: {type: 'object'}}, required: ['document'], additionalProperties: false} },
   { name: 'proposal_submit', description: 'Submit a diagram or annotation transaction for human review; never edits directly.', inputSchema: {type: 'object', properties: {operationId: {type: 'string'}, scope: {type: 'object', properties: {projectId: {type: 'string'}, branchId: {type: 'string'}}, required: ['projectId', 'branchId'], additionalProperties: false}, expectedRevision: {type: 'integer', minimum: 0}, label: {type: 'string'}, changes: {type: 'array', minItems: 1, maxItems: 1000, items: {type: 'object'}}}, required: ['operationId', 'scope', 'expectedRevision', 'label', 'changes'], additionalProperties: false} },
+  { name: 'action_submit', description: 'Apply one coherent action only when this task has explicit Live permission. Supply a UUID operation identity and the exact before-records read from this board. Human overlap pauses the action. Suggest tasks must use proposal_submit instead.', inputSchema: {type: 'object', properties: {operationId: {type: 'string', format: 'uuid'}, label: {type: 'string', minLength: 1, maxLength: 200}, changes: {type: 'array', minItems: 1, maxItems: 1000, items: {type: 'object'}}, expectedRecords: {type: 'array', minItems: 1, maxItems: 1000, items: {type: 'object', properties: {recordKind: {type: 'string'}, id: {type: 'string'}, before: {type: ['object', 'null']}}, required: ['recordKind', 'id', 'before'], additionalProperties: false}}}, required: ['operationId', 'label', 'changes', 'expectedRecords'], additionalProperties: false} },
   { name: 'proposal_status', description: 'Inspect proposal review status and validation errors.', inputSchema: {type: 'object', properties: {operationId: {type: 'string'}}, required: ['operationId'], additionalProperties: false} },
   { name: 'diagram_create', description: 'Plan readable components and connections as one proposal for human review.', inputSchema: {type: 'object', required: ['operationId', 'scope', 'expectedRevision', 'label', 'diagram'], properties: {operationId: {type: 'string'}, scope: {type: 'object'}, expectedRevision: {type: 'integer', minimum: 0}, label: {type: 'string'}, diagram: {type: 'object', description: 'Use the diagram schema returned by component_schemas'}}, additionalProperties: false} },
 ] as const;
 export type AgentToolDefinition = typeof AGENT_TOOLS[number];
 export type AgentTool = AgentToolDefinition['name'];
+export * from './tasks.js';
+export * from './task-repository.js';
+export * from './leases.js';

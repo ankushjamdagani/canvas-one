@@ -25,6 +25,8 @@ export type AtomicDocumentOptions<Rows extends AtomicDocumentRows, Result> = {
   readonly check?: (stores: TransactionStores<Rows>, prepared: PreparedDocumentWrite<Rows['snapshots']>, branch: Rows['branches'], project: Rows['projects']) => Promise<Result | null>;
   /** Required immutable metadata writes share document/receipt atomicity. Throw to roll everything back. */
   readonly participants?: readonly ((stores: TransactionStores<Rows>, prepared: PreparedDocumentWrite<Rows['snapshots']>) => Promise<void>)[];
+  /** Trusted synchronous final eligibility check after all awaited writes. False/throw aborts the transaction. */
+  readonly finalGuard?: (prepared: PreparedDocumentWrite<Rows['snapshots']>) => boolean;
 };
 declare const structuredClone: <T>(value: T) => T;
 function freeze<T>(value: T): T {
@@ -59,6 +61,7 @@ export class AtomicDocumentCoordinator<Rows extends AtomicDocumentRows, Result> 
         await stores.projects.put(prepared.projectId, { ...project, revision: projectRevision, updatedAt: now });
         const result = this.options.applied({ operationId: prepared.operationId, projectRevision, branchRevision });
         await stores.operations.add([prepared.projectId, prepared.operationId], { projectId: prepared.projectId, id: prepared.operationId, requestHash: prepared.requestHash, result, createdAt: (this.options.now ?? Date.now)() });
+        if (this.options.finalGuard && this.options.finalGuard(prepared) !== true) throw new Error('Authored authority expired or was revoked before transaction completion');
         return result;
       });
     } catch (error) { return this.options.failed(error); }

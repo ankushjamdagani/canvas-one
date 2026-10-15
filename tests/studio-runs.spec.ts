@@ -46,10 +46,10 @@ test('blank project keeps scenario creation available and Run disabled on deskto
   await page.getByRole('button', { name: 'New scenario', exact: true }).click();
   await page.getByLabel('Name').fill('First traffic test');
   await page.getByTestId('new-scenario-create').click();
-  await expect(page.getByTestId('scenario-inspector-sheet-overlay')).toBeVisible();
+  await expect(page.getByTestId('shared-details-sheet')).toBeVisible();
   await expect(page.getByLabel('Scenario name')).toHaveValue('First traffic test');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(page.getByTestId('scenario-inspector-sheet-overlay')).toHaveCount(0);
+  await expect(page.getByTestId('shared-details-sheet')).toHaveCount(0);
   await expect(trigger).toContainText('No scenario');
 });
 

@@ -1,5 +1,6 @@
 import { LocalUndoHistory } from '@canvas-one/history';
 declare const console: { error(...values: unknown[]): void };
+declare const structuredClone: <T>(value: T) => T;
 import type { AgentActor, ProposalRequest } from '@canvas-one/agents';
 /**
  * SessionController implementation for System Studio: the in-memory editing session
@@ -17,6 +18,8 @@ import { applyRecordChanges } from '../authoring/apply-records.js';
 import type { ProjectExposure } from '../studio/exposure.js';
 import { createIssue } from '../studio/issue.js';
 import {
+  liveTaskTargetsMatch,
+  type LiveTaskAction,
   type Actor,
   type AuthoredResult,
   type BranchCreateCommand,
@@ -956,6 +959,37 @@ export class SessionController {
       return { status: 'invalid', issues: [createIssue('structural-rule', 'Only the active local participant can accept an agent proposal', ['actor'])] };
     }
     return this.applyWithProposal(request.changes, request.label, request);
+  }
+
+  /** Task writes use the same authored authority; authority never auto-transfers to a new draft. */
+  async applyLiveTaskAction(input: LiveTaskAction): Promise<SessionApplyResult> {
+    if (this.disposed) return this.closedResult();
+    const open = this.openBranchOrReject('Session requires reload before live editing', 'Cannot live edit: no project is open');
+    if ('status' in open) return open;
+    let request: LiveTaskAction;
+    try { request = structuredClone(input); } catch { return { status: 'invalid', issues: [createIssue('structural-rule', 'Live action must be serializable', [])] }; }
+    const scope = request?.binding?.scope;
+    if (!scope || scope.projectId !== open.projectId || scope.branchId !== open.branchId || scope.boardId !== open.document.id || typeof request.operationId !== 'string' || !request.operationId || typeof request.label !== 'string' || !request.label.trim() || request.label.length > 200) return { status: 'invalid', issues: [createIssue('structural-rule', 'Live action must identify the current board task and operation', ['binding'])] };
+    if (open.branchId === this.state.mainBranchId) return { status: 'failed', code: 'ineligible', issues: [createIssue('structural-rule', 'Open a draft before granting live editing; authority cannot transfer across branches', ['branchId'])] };
+    return this.runSaving(async () => {
+      const command: ModelApplyRecordsCommand = {
+        commandId: 'model.apply-records', operationId: request.operationId,
+        projectId: open.projectId, branchId: open.branchId, expectedWorkingRevision: open.workingRevision,
+        actor: this.actor, payload: { changes: request.changes, taskAuthority: request.binding, expectedRecords: request.expectedRecords },
+      };
+      const replay = await this.repository.replayAgentTaskAction?.(command);
+      if (replay) { this.updateState({ status: 'ready' }); return replay; }
+      if (!liveTaskTargetsMatch(open.document, request.changes, request.expectedRecords)) {
+        this.updateState({ status: 'ready' });
+        return { status: 'failed' as const, code: 'conflict' as const, issues: [createIssue('structural-rule', 'An affected record changed; pause this action for a decision', ['expectedRecords'])] };
+      }
+      const inverse = computeInverseChanges(open.document, request.changes);
+      if (!inverse.ok) { this.updateState({ status: 'ready' }); return { status: 'invalid' as const, issues: inverse.issues }; }
+      return this.executeAndAdopt(command, () => {
+        this.localHistory.recordAccepted({ label: request.label, inverseChanges: inverse.changes, forwardChanges: [...request.changes] });
+        return this.undoRedoAvailability();
+      });
+    });
   }
 
   private async applyWithProposal(changes: readonly RecordChange[], label: string, proposal?: ProposalRequest<RecordChange>): Promise<SessionApplyResult> {

@@ -1,5 +1,6 @@
 import type { Document, Id } from '../studio/model.js';
-import type { RecordChange } from '../studio/records.js';
+import type { RecordChange, EditableRecord, RecordKind } from '../studio/records.js';
+import { canonicalJson } from '../studio/canonical.js';
 import type { Issue } from '../studio/validate.js';
 import type { ProjectExposure } from '../studio/exposure.js';
 import type { CaptureSelection } from '../parts/types.js';
@@ -29,6 +30,36 @@ export type CommandValue =
   | { readonly kind: 'download'; readonly downloadId: Id };
 
 export type ProposalAttribution = import('@canvas-one/agents').ProposalAttribution;
+export type TaskAttribution = import('@canvas-one/agents').AttemptBinding;
+export type LiveTaskTarget = { readonly recordKind: RecordKind; readonly id: string; readonly before: EditableRecord | null };
+export type LiveTaskAction = {
+  readonly operationId: Id; readonly binding: TaskAttribution; readonly changes: readonly RecordChange[];
+  readonly expectedRecords: readonly LiveTaskTarget[]; readonly label: string;
+};
+/** Exact target comparisons permit unrelated edits but never overwrite an edited target. */
+export function liveTaskTargetsMatch(document: Document, changes: readonly RecordChange[], expected: readonly LiveTaskTarget[]): boolean {
+  if (!Array.isArray(changes) || !Array.isArray(expected) || changes.length === 0 || changes.length > 1000 || expected.length !== changes.length) return false;
+  const tables = { element: document.elements, connection: document.connections, relation: document.relations, schema: document.schemas, fixture: document.fixtures, refinement: document.refinements, scenario: document.scenarios, view: document.views };
+  const seen = new Set<string>();
+  for (const change of changes) {
+    if (!change || typeof change !== 'object' || !['insert', 'replace', 'remove'].includes(change.kind)) return false;
+    const kind = change.kind === 'remove' ? change.recordKind : change.value?.recordKind;
+    const id = change.kind === 'remove' ? change.id : change.value?.record?.id;
+    if (!kind || !Object.hasOwn(tables, kind) || typeof id !== 'string') return false;
+    const key = JSON.stringify([kind, id]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    const target = expected.find(value => value && value.recordKind === kind && value.id === id);
+    if (!target || (change.kind === 'insert' ? target.before !== null : !target.before || target.before.recordKind !== kind || target.before.record?.id !== id)) return false;
+    const actual = tables[kind as RecordKind].find((value: { readonly id: string }) => value.id === id);
+    if (target.before === null ? actual !== undefined : !actual) return false;
+    if (target.before !== null) {
+      const left = canonicalJson(actual), right = canonicalJson(target.before.record);
+      if (!left.ok || !right.ok || left.text !== right.text) return false;
+    }
+  }
+  return true;
+}
 export type AppliedResult = {
   readonly status: 'applied';
   readonly operationId: Id;
@@ -38,6 +69,7 @@ export type AppliedResult = {
   readonly undo: { readonly entryId: Id; readonly label: string } | null;
   readonly value: CommandValue;
   readonly proposal?: ProposalAttribution;
+  readonly task?: TaskAttribution;
 };
 
 export type InvalidResult = {
@@ -155,6 +187,8 @@ export type ModelApplyRecordsCommand = {
   readonly payload: {
     readonly changes: readonly RecordChange[];
     readonly proposal?: ProposalAttribution;
+    readonly taskAuthority?: TaskAttribution;
+    readonly expectedRecords?: readonly LiveTaskTarget[];
   };
 };
 
@@ -189,6 +223,7 @@ export type SessionCommand = ProjectCreateCommand | ProjectRenameCommand | Proje
 export type SnapshotRecord = { readonly id: string; readonly document: Document };
 /** Only the reads and authored commands required by this editing session. */
 export interface SessionRepository {
+ replayAgentTaskAction?(command: ModelApplyRecordsCommand): Promise<AuthoredResult | null>;
  execute(command: SessionCommand): Promise<AuthoredResult | UnsupportedResult>;
  loadProject(projectId: Id): Promise<{readonly id: Id; readonly revision: number; readonly mainBranchId: Id} | null>;
  loadBranch(projectId: Id, branchId: Id): Promise<BranchRecord | null>;

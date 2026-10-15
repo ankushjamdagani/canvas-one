@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { AGENT_TOOLS, loopbackBridgeUrl, type AgentTool, type BridgeReply } from '@canvas-one/agent-bridge';
-export type AgentClientOptions = { readonly url: string; readonly token: string };
+export type AgentClientOptions = { readonly url: string; readonly token: string; readonly protocol?: 'bridge' | 'collaboration-v1' };
 export async function callBoardTool(options: AgentClientOptions, tool: AgentTool, input: unknown, requestId: string = randomUUID(), signal?: AbortSignal): Promise<unknown> {
   if (!options.token) throw new TypeError('An agent bridge token is required');
-  const response = await fetch(loopbackBridgeUrl(options.url) + '/agent/request', {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + options.token}, body: JSON.stringify({requestId, tool, input}), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(65000)]) : AbortSignal.timeout(65000)});
+  const endpoint = options.protocol === 'collaboration-v1' ? '/v1/agent/tool' : '/agent/request';
+  const response = await fetch(loopbackBridgeUrl(options.url) + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + options.token}, body: JSON.stringify({requestId, tool, input}), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(65000)]) : AbortSignal.timeout(65000)});
   const reply = await response.json() as BridgeReply & {error?: string};
   if (!response.ok || reply.error) throw new Error(reply.error ?? `Bridge returned ${response.status}`);
   return reply.result;
@@ -36,7 +37,7 @@ export function createMcpSession(call: (tool: AgentTool, input: unknown, signal:
     }
     if (request.method === 'ping') return result({});
     if (!initialized) return error(-32000, 'Complete MCP initialization before using tools');
-    if (request.method === 'tools/list') return result({tools: AGENT_TOOLS.map(tool => ({...tool, annotations: {readOnlyHint: tool.name !== 'proposal_submit', destructiveHint: false, idempotentHint: true, openWorldHint: false}}))});
+    if (request.method === 'tools/list') return result({tools: AGENT_TOOLS.map(tool => ({...tool, annotations: {readOnlyHint: !['proposal_submit', 'diagram_create', 'action_submit'].includes(tool.name), destructiveHint: tool.name === 'action_submit', idempotentHint: true, openWorldHint: false}}))});
     if (request.method === 'tools/call') {
       const params = request.params as {name?: unknown; arguments?: unknown} | undefined;
       if (!AGENT_TOOLS.some(tool => tool.name === params?.name)) return error(-32602, 'Unknown tool');
