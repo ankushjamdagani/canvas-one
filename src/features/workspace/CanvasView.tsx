@@ -36,6 +36,8 @@ import { SimulationHighlightContext, type SimulationHighlight } from './Simulati
 import { FloatingDock } from './FloatingDock';
 import { SelectionBox } from './SelectionBox';
 import { CanvasCrosshair } from './CanvasCrosshair';
+import { AgentCursor, agentPresenceLabel, findAgentCursorPosition, type AgentPresence } from '../agents/AgentCursor';
+import { useCursorPresentation } from '../agents/cursor-presentation';
 import { rememberPart } from '../library/recentParts';
 import {
   projectDocumentToCanvas,
@@ -129,6 +131,8 @@ function gridGapFor(zoom: number): number {
 }
 
 export interface CanvasViewProps {
+  /** Read-only factual presence; optional for independently supplied canvas hosts. */
+  agentPresence?: AgentPresence;
   document: Document | null;
   activeViewId: Id | null;
   onSelectView: (viewId: Id) => void;
@@ -239,6 +243,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   loadLinkedExposures,
   onOpenLinkedProject,
   runWaitsForScenarioDraft,
+  agentPresence,
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
@@ -275,11 +280,25 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     const converted = editor.screenToBoard(point);
     return converted.supported ? converted.value : reactFlow.screenToFlowPosition(point);
   }, [editor, reactFlow]);
-  const { zoom } = useViewport();
+  const viewport = useViewport();
+  const { zoom } = viewport;
   const gridGap = gridGapFor(zoom);
   const playbackTraffic = usePlaybackTraffic(playbackSource);
   const nodesInitialized = useNodesInitialized();
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [cursorBounds, setCursorBounds] = React.useState({ width: 0, height: 0 });
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const measure = () => setCursorBounds(previous => {
+      const width = container.clientWidth, height = container.clientHeight;
+      return previous.width === width && previous.height === height ? previous : { width, height };
+    });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [document?.id, document?.views.length]);
 
   // Measured card heights (placement id -> px) let group frames and align/distribute
   // use real sizes instead of the fixed estimate (e.g. for expanded cards). Held in state
@@ -479,6 +498,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       }),
     [nodes, selectedElementIds, selectedNoteIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds, linkedProjects, onOpenLinkedProject, document, onApplyChanges, onRequestSelection],
   );
+
+  const agentCursorPosition = React.useMemo(() => {
+    if (!agentPresence) return undefined;
+    const targets = displayNodes.filter(node => !node.hidden).map(node => ({ recordIds: node.data.kind === 'element' || node.data.kind === 'boundary' ? [node.data.element.id] : node.data.kind === 'note' ? [node.data.note.id] : [node.data.group.id], x: node.position.x, y: node.position.y }));
+    return findAgentCursorPosition(agentPresence, targets, viewport, cursorBounds);
+  }, [agentPresence, displayNodes, viewport.x, viewport.y, viewport.zoom, cursorBounds]);
+  const displayedAgentPresence = useCursorPresentation(agentCursorPosition ? agentPresence : undefined);
 
   const displayEdges = React.useMemo(
     () =>
@@ -1257,7 +1283,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     return (
       <div
         data-testid="empty-views-state"
-        className="flex-1 h-full w-full flex flex-col items-center justify-center p-8 text-center bg-canvas select-none"
+        className="relative flex-1 h-full w-full flex flex-col items-center justify-center p-8 text-center bg-canvas select-none"
       >
         <div className="max-w-md p-6 rounded-card border border-control-border bg-panel shadow-raised">
           <p className="text-sm font-semibold text-ink">
@@ -1343,6 +1369,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         />
       )}
 
+      <p role="status" aria-atomic="true" className="sr-only">{displayedAgentPresence ? agentPresenceLabel(displayedAgentPresence) : ''}</p>
       {/* Selected node IDs for the unified selection box */}
       {(() => null)()}
 
@@ -1391,6 +1418,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               ...(commandContext.selectedNoteIds ?? []),
             ]}
           />
+          {displayedAgentPresence && agentCursorPosition && <AgentCursor presence={displayedAgentPresence} position={agentCursorPosition} scale={1 / zoom} />}
         </ViewportPortal>
         {/* Background centres its pattern at half the gap and places each dot at its
             radius. Cancel both offsets so visible dots land on snapped flow coordinates. */}

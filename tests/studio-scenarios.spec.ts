@@ -115,7 +115,7 @@ test.describe('Studio scenario authoring', () => {
     // The editor stays open after Apply; the draft is clean again.
     await expect(apply).toBeDisabled();
     await expect(page.getByTestId('save-status')).toContainText('Saved');
-    await page.getByRole('button', { name: 'Close Scenario' }).click();
+    await page.getByRole('button', { name: 'Close Scenario', exact: true }).click();
     await expect(first.editor).toBeHidden();
 
     const second = await openEditor();

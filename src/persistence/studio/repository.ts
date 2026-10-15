@@ -1,4 +1,10 @@
 import { exportProjectArchive } from '@canvas-one/simulation-system-design/archive';
+import { BrowserTaskLeaseRegistry, authorizeTaskWrite, parseTaskLedger, type AttemptBinding, type TaskScope, type TaskLedger } from '@canvas-one/agents';
+import { StudioConversationStorage } from './agent-conversations';
+import { appendAgentTaskAction, prepareAgentTaskAction, type AgentTaskActionRecord } from './agent-action-journal';
+import { TaskOverlapRegistry } from './agent-overlap';
+import { liveTaskTargetsMatch } from '@canvas-one/system-design/session/contracts';
+import { StudioTaskStorage, agentTaskLedgerKey } from './agent-tasks';
 /**
  * Local Repository implementation for System Studio.
  *
@@ -160,6 +166,12 @@ export type ProjectStorageRows = {
   publications: PublicationRecord; checkpoints: CheckpointRecord; runs: RunRecord;
   parts: PartRecord; traceChunks: TraceChunkRecord;
 };
+type ProjectLifecycleRows = ProjectStorageRows & {
+  agentTaskLedgers: import('./types').AgentTaskLedgerRecord;
+  agentConversations: import('./types').AgentConversationRecord;
+  agentConversationArchive: import('./types').AgentConversationArchiveRecord;
+  agentTaskActions: AgentTaskActionRecord;
+};
 function immutablePolicy<Rows>(): ImmutableRecordPolicy<Rows> {
   return {
     equal: (_store, left, right) => {
@@ -174,6 +186,10 @@ function immutablePolicy<Rows>(): ImmutableRecordPolicy<Rows> {
 }
 
 export type LocalRepositoryOptions = {
+  /** Trusted synchronous host lease check, consulted inside the authored transaction. */
+  readonly checkExecutionLease?: (binding: AttemptBinding) => boolean;
+  /** Host-derived overlap independence; never accepted from provider request booleans. */
+  readonly checkTaskActionIndependence?: (binding: AttemptBinding, changes: readonly import('./types').RecordChange[]) => boolean;
   readonly buildVersions?: BuildManifestVersions;
   /** Injected ID minting for transfer (download IDs). */
   readonly mintId?: () => Id;
@@ -181,7 +197,25 @@ export type LocalRepositoryOptions = {
   readonly fileTokens?: FileTokenRegistry;
 };
 
+function validTaskBinding(value: unknown): value is AttemptBinding {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const binding = value as AttemptBinding;
+  const text = (input: unknown) => typeof input === 'string' && input.length > 0 && input.length <= 200;
+  return Object.keys(binding).every(key => ['taskId', 'actorId', 'scope', 'attemptId', 'generation'].includes(key)) &&
+    text(binding.taskId) && text(binding.actorId) && text(binding.attemptId) && Number.isSafeInteger(binding.generation) && binding.generation > 0 &&
+    !!binding.scope && typeof binding.scope === 'object' && !Array.isArray(binding.scope) &&
+    Object.keys(binding.scope).every(key => ['projectId', 'branchId', 'boardId'].includes(key)) &&
+    text(binding.scope.projectId) && text(binding.scope.branchId) && text(binding.scope.boardId);
+}
+
 export class LocalRepository implements StudioRepository {
+  private readonly agentOverlaps = new TaskOverlapRegistry();
+  holdAgentTaskAction(binding: AttemptBinding, document: Document, changes: readonly import('./types').RecordChange[]): void { this.agentOverlaps.hold(binding, document, changes); }
+  clearAgentTaskOverlap(binding: AttemptBinding): void { this.agentOverlaps.clear(binding); }
+  /** Trusted browser host only; provider tools cannot renew execution authority. */
+  readonly agentExecutionLeases = new BrowserTaskLeaseRegistry(() => performance.now(), { maxActiveEntries: 32, maxTombstones: 10000 });
+  private readonly checkExecutionLease: (binding: AttemptBinding) => boolean;
+  private readonly checkTaskActionIndependence: NonNullable<LocalRepositoryOptions['checkTaskActionIndependence']>;
   private readonly db: StudioDatabase;
   private readonly catalog: ProjectCatalogReader<ProjectRecord>;
   private readonly preferences: PreferenceService<typeof PREFERENCES_SCHEMA, unknown, FailedResult>;
@@ -196,11 +230,24 @@ export class LocalRepository implements StudioRepository {
   readonly fileTokens: FileTokenRegistry;
   private readonly partRepository: PartRepository;
 
+  createAgentTaskStorage(scope: TaskScope): StudioTaskStorage { return new StudioTaskStorage(this.db, scope); }
+  createAgentConversationStorage(scope: TaskScope): StudioConversationStorage { return new StudioConversationStorage(this.db, scope); }
+  async listAgentTaskActions(scope: TaskScope, taskId: string): Promise<readonly AgentTaskActionRecord[]> {
+    return this.db.agentTaskActions.where('[projectId+branchId+boardId+taskId]').equals([scope.projectId, scope.branchId, scope.boardId, taskId]).limit(1001).toArray();
+  }
+  async replayAgentTaskAction(command: ModelApplyRecordsCommand): Promise<AuthoredResult | null> {
+    if (!validTaskBinding(command.payload?.taskAuthority)) return null;
+    const requestHash = await computeRequestHash({ ...command, expectedWorkingRevision: 0 });
+    return replayedResult(this.db, command.projectId, command.operationId, requestHash);
+  }
+
   constructor(
     db?: StudioDatabase,
     options?: LocalRepositoryOptions | BuildManifestVersions,
   ) {
     this.db = db ?? createStudioDatabase();
+    this.checkExecutionLease = options && !('compilerVersion' in options) ? options.checkExecutionLease ?? (binding => this.agentExecutionLeases.permits(binding)) : binding => this.agentExecutionLeases.permits(binding);
+    this.checkTaskActionIndependence = options && !('compilerVersion' in options) ? options.checkTaskActionIndependence ?? ((binding, changes) => this.agentOverlaps.independent(binding, changes)) : (binding, changes) => this.agentOverlaps.independent(binding, changes);
     this.catalog = new ProjectCatalogReader(new IndexedDbBackend<{ projects: ProjectRecord }>(this.db, ['projects']));
     this.preferences = new PreferenceService({ backend: new IndexedDbBackend<{ preferences: PreferenceRecord }>(this.db, ['preferences']), schema: PREFERENCES_SCHEMA, failed: mapErrorToFailedResult });
     if (options && 'compilerVersion' in options) {
@@ -349,11 +396,12 @@ export class LocalRepository implements StudioRepository {
     });
   }
 
-  private projectLifecycle<Result>(): ProjectLifecycleCoordinator<ProjectStorageRows, Result> {
-    type Rows = ProjectStorageRows;
+  private projectLifecycle<Result>(): ProjectLifecycleCoordinator<ProjectLifecycleRows, Result> {
+    type Rows = ProjectLifecycleRows;
     return new ProjectLifecycleCoordinator<Rows, Result>({
       // Domain policies and portable related-row writes share this complete transaction.
-backend: new IndexedDbBackend<Rows>(this.db, getProjectTables(this.db).map(table => table.name as keyof Rows), {
+backend: new IndexedDbBackend<Rows>(this.db, [...getProjectTables(this.db), this.db.agentTaskLedgers, this.db.agentConversations, this.db.agentConversationArchive, this.db.agentTaskActions].map(table => table.name as keyof Rows), {
+        agentTaskActions: [{ name: 'project', keyPath: 'projectId' }],
         branches: [{ name: 'project', keyPath: 'projectId' }], snapshots: [{ name: 'project', keyPath: 'projectId' }],
         commits: [{ name: 'project', keyPath: 'projectId' }], publications: [{ name: 'project', keyPath: 'projectId' }],
         checkpoints: [{ name: 'project', keyPath: 'projectId' }], runs: [{ name: 'project', keyPath: 'projectId' }],
@@ -383,6 +431,22 @@ backend: new IndexedDbBackend<Rows>(this.db, getProjectTables(this.db).map(table
         return null;
       },
       cleanup: async stores => {
+        await deleteIndexMatches(stores.agentTaskActions, 'project', projectId);
+        // Earlier task ledgers intentionally have no project index. Their scoped
+        // tuple keys still permit bounded cleanup without decoding user payloads.
+        for (const name of ['agentTaskLedgers', 'agentConversations', 'agentConversationArchive'] as const) {
+          let after: import('@canvas-one/storage').StorageKey | undefined;
+          for (;;) {
+            const page = await stores[name].scan({ limit: 1000, ...(after === undefined ? {} : { after }) });
+            for (const entry of page.entries) {
+              let identity: unknown;
+              try { identity = JSON.parse('scopeKey' in entry.row ? entry.row.scopeKey : entry.row.key); } catch { continue; }
+              if (Array.isArray(identity) && identity[1] === projectId) await stores[name].delete(entry.key);
+            }
+            if (!page.truncated || !page.entries.length) break;
+            after = page.entries.at(-1)!.key;
+          }
+        }
         for (const name of ['branches', 'snapshots', 'commits', 'publications', 'checkpoints', 'runs', 'parts', 'operations'] as const) {
           await deleteIndexMatches(stores[name], 'project', projectId);
         }
@@ -1057,6 +1121,7 @@ private async handleProjectRename(
   ): Promise<AuthoredResult> {
     const envelopeInvalid = validateCommandEnvelope(command);
     if (envelopeInvalid) return envelopeInvalid;
+    command = structuredClone(command);
 
     // 3. Validate payload
     if (!command.payload || typeof command.payload !== 'object') {
@@ -1068,6 +1133,10 @@ private async handleProjectRename(
 
     const changes = command.payload.changes;
     const proposal = command.payload.proposal;
+    const taskAuthority = command.payload.taskAuthority;
+    if (taskAuthority !== undefined && (!validTaskBinding(taskAuthority) || proposal !== undefined || taskAuthority.scope.projectId !== command.projectId || taskAuthority.scope.branchId !== command.branchId || !Array.isArray(command.payload.expectedRecords))) {
+      return { status: 'invalid', issues: [createIssue('structural-rule', 'Live task authority must bind the exact board attempt and expected targets', ['payload', 'taskAuthority'])] };
+    }
     if (proposal !== undefined && (
       !proposal || typeof proposal !== 'object' ||
       typeof proposal.operationId !== 'string' || proposal.operationId.length < 1 || proposal.operationId.length > 200 ||
@@ -1101,7 +1170,7 @@ private async handleProjectRename(
     // insertion is no longer valid against the subsequently updated document.
     let requestHash: string;
     try {
-      requestHash = await computeRequestHash(command);
+      requestHash = await computeRequestHash(taskAuthority ? { ...command, expectedWorkingRevision: 0 } : command);
       const replay = await replayedResult(this.db, command.projectId, command.operationId, requestHash);
       if (replay) return replay;
     } catch (err) { return mapErrorToFailedResult(err); }
@@ -1123,6 +1192,25 @@ private async handleProjectRename(
     ]);
     if (!currentSnapshot) {
       return { status: 'missing', ids: [branch.workingSnapshotId] };
+    }
+    if (taskAuthority && (currentSnapshot.document.id !== taskAuthority.scope.boardId || !liveTaskTargetsMatch(currentSnapshot.document, changes, command.payload.expectedRecords!))) {
+      return { status: 'failed', code: 'conflict', issues: [createIssue('structural-rule', 'Live task targets changed; pause this action for a decision', ['payload', 'expectedRecords'])] };
+    }
+
+    // A human-reviewed proposal uses human write authority, while its task still
+    // receives an atomic journal entry for a later task-specific reversal.
+    let journalBinding: AttemptBinding | undefined = taskAuthority;
+    if (!journalBinding && proposal) {
+      try {
+        const scope = { projectId: command.projectId, branchId: command.branchId, boardId: currentSnapshot.document.id };
+        const raw = await this.createAgentTaskStorage(scope).load();
+        const ledger = raw === null ? null : parseTaskLedger(raw);
+        if (raw !== null && !ledger) throw new Error('Invalid task attribution ledger');
+        const matching = ledger?.tasks.filter(task => task.actorId === proposal.actor.actorId && task.kind !== 'question') ?? [];
+        if (matching.length > 1) throw new Error('Ambiguous task attribution');
+        const task = matching[0], attempt = task?.attempts.at(-1);
+        if (task && attempt) journalBinding = { taskId: task.id, actorId: task.actorId, scope: task.scope, attemptId: attempt.id, generation: attempt.generation };
+      } catch (error) { return mapErrorToFailedResult(error); }
     }
 
     // Apply changes using pure applyRecordChanges domain helper
@@ -1154,9 +1242,11 @@ private async handleProjectRename(
       operations: import('./types').OperationRecord; commits: CommitRecord;
       publications: PublicationRecord; checkpoints: CheckpointRecord; runs: RunRecord;
       parts: PartRecord; traceChunks: TraceChunkRecord;
+      agentTaskLedgers: import('./types').AgentTaskLedgerRecord;
+      agentTaskActions: AgentTaskActionRecord;
     };
     const coordinator = new AtomicDocumentCoordinator<WriteRows, AuthoredResult>({
-      backend: new IndexedDbBackend<WriteRows>(this.db, getProjectTables(this.db).map(table => table.name as keyof WriteRows)),
+      backend: new IndexedDbBackend<WriteRows>(this.db, [...getProjectTables(this.db), this.db.agentTaskLedgers, this.db.agentTaskActions].map(table => table.name as keyof WriteRows)),
       decodeReceipt: result => result as AuthoredResult,
       missing: id => ({ status: 'missing', ids: [id] }),
       stale: (expected, actual) => ({ status: 'stale', scope: 'branch', expected, actual }),
@@ -1167,11 +1257,34 @@ private async handleProjectRename(
         return a.ok && b.ok && a.text === b.text;
       },
       snapshotCollision: () => new RepositoryError({ code: 'invalid', message: 'Immutable record collision with conflicting content; row will not be overwritten', issues: [createIssue('structural-rule', 'Conflicting immutable row collision', [])] }),
-      check: async stores => {
+      check: async (stores, _prepared, actualBranch, actualProject) => {
+        let liveLedger: TaskLedger | null = null;
+        if (taskAuthority) {
+          if (actualBranch.id === actualProject.mainBranchId) return { status: 'failed', code: 'ineligible', issues: [createIssue('structural-rule', 'Live editing requires the current draft; authority cannot transfer to a new branch', ['branchId'])] };
+          const snapshot = await stores.snapshots.get([command.projectId, actualBranch.workingSnapshotId]);
+          if (!snapshot || snapshot.document.id !== taskAuthority.scope.boardId || !liveTaskTargetsMatch(snapshot.document, changes, command.payload.expectedRecords!)) return { status: 'failed', code: 'conflict', issues: [createIssue('structural-rule', 'Live task targets changed; pause this action for a decision', ['payload', 'expectedRecords'])] };
+          const key = agentTaskLedgerKey(taskAuthority.scope);
+          const row = await stores.agentTaskLedgers.get(key);
+          const ledger = row && typeof row.serializedLedger === 'string' ? parseTaskLedger(row.serializedLedger) : null;
+          if (!ledger || row!.key !== key || row!.revision !== ledger.revision || ledger.tasks.some(task => agentTaskLedgerKey(task.scope) !== key)) return { status: 'failed', code: 'ineligible', issues: [createIssue('structural-rule', 'Live task authority is missing or invalid', ['payload', 'taskAuthority'])] };
+          liveLedger = ledger;
+        }
         const addedLocalBytes = calculateRecordBytes(newSnapshotRow);
-        return enforceProjectLimits(this.db, { projectId: command.projectId, additionalReceipts: 1, additionalLocalBytes: addedLocalBytes, additionalExportBytes: addedLocalBytes }, stores);
+        const limits = await enforceProjectLimits(this.db, { projectId: command.projectId, additionalReceipts: 1, additionalLocalBytes: addedLocalBytes, additionalExportBytes: addedLocalBytes }, stores);
+        if (limits) return limits;
+        // No await after the trusted monotonic lease check and before handing back write eligibility.
+        if (taskAuthority && liveLedger) {
+          const task = liveLedger.tasks.find(value => value.id === taskAuthority.taskId);
+          const independentOfOverlap = task?.status === 'waiting' && task.waitReason === 'overlap' ? this.checkTaskActionIndependence(structuredClone(taskAuthority), structuredClone(changes)) === true : false;
+          const authorized = authorizeTaskWrite(liveLedger, taskAuthority, { dependenciesValidated: true, leaseValid: this.checkExecutionLease(structuredClone(taskAuthority)) === true, independentOfOverlap });
+          if (!authorized.ok) return { status: 'failed', code: 'ineligible', issues: [createIssue('structural-rule', `Live task write denied: ${authorized.code}`, ['payload', 'taskAuthority'])] };
+        }
+        return null;
       },
-      applied: revisions => ({ status: 'applied', ...revisions, changedIds: applied.changedIds, undo: null, value: { kind: 'none' }, ...(proposal ? { proposal: structuredClone(proposal) } : {}) }),
+      applied: revisions => ({ status: 'applied', ...revisions, changedIds: applied.changedIds, undo: null, value: { kind: 'none' }, ...(proposal ? { proposal: structuredClone(proposal) } : {}), ...(taskAuthority ? { task: structuredClone(taskAuthority) } : {}) }),
+      participants: journalBinding ? [stores => appendAgentTaskAction(stores, prepareAgentTaskAction({ binding: journalBinding!, operationId: command.operationId,
+        sequence: command.expectedWorkingRevision + 1, before: currentSnapshot.document, after: updatedDocument, changes }))] : [],
+      finalGuard: taskAuthority ? () => this.checkExecutionLease(structuredClone(taskAuthority)) === true : undefined,
     });
     return coordinator.commit({ operationId: command.operationId, projectId: command.projectId, branchId: command.branchId,
       expectedRevision: command.expectedWorkingRevision, requestHash, snapshot: newSnapshotRow });

@@ -21,8 +21,32 @@ import type { BuildManifestVersions } from '../../domain/studio/manifest';
 // ============================================================================
 
 export const DB_NAME = 'system-studio-local-v1';
-export const DB_VERSION = 1;
+export const DB_VERSION = 4;
+
+export type AgentConversationArchiveRecord = {
+  readonly key: string;
+  readonly scopeKey: string;
+  readonly id: string;
+  readonly taskId?: string;
+  readonly kind: 'message' | 'proposal' | 'operation' | 'context' | 'clarification';
+  readonly state: 'open' | 'closed';
+  readonly ordinal: number;
+  readonly artifact: import('./agent-conversations').ConversationArtifact | import('./agent-conversations').ConversationOperation;
+};
+
+export type AgentConversationRecord = {
+  readonly key: string;
+  readonly revision: number;
+  readonly serializedConversation: string;
+};
 export const PREFERENCES_SCHEMA = 'studio-preferences/1';
+
+/** Durable board-scoped AI task metadata, separate from authored document mutations. */
+export type AgentTaskLedgerRecord = {
+  readonly key: string;
+  readonly revision: number;
+  readonly serializedLedger: string;
+};
 
 export { DEFAULT_BUILD_VERSIONS } from '@canvas-one/simulation-system-design/artifacts';
 
@@ -221,6 +245,7 @@ export type AppliedResult = {
   readonly undo: { readonly entryId: Id; readonly label: string } | null;
   readonly value: CommandValue;
   readonly proposal?: ProposalAttribution;
+  readonly task?: import('@canvas-one/agents').AttemptBinding;
 };
 
 export type InvalidResult = {
@@ -401,6 +426,8 @@ export type ModelApplyRecordsCommand = {
   readonly payload: {
     readonly changes: readonly RecordChange[];
     readonly proposal?: ProposalAttribution;
+    readonly taskAuthority?: import('@canvas-one/agents').AttemptBinding;
+    readonly expectedRecords?: readonly import('@canvas-one/system-design/session/contracts').LiveTaskTarget[];
   };
 };
 
@@ -509,6 +536,13 @@ export type SaveFailureRecoveryInfo = import('@canvas-one/storage').SaveFailureR
  * All nine methods of the repository contract.
  */
 export interface StudioRepository {
+  holdAgentTaskAction?(binding: import('@canvas-one/agents').AttemptBinding, document: Document, changes: readonly RecordChange[]): void;
+  clearAgentTaskOverlap?(binding: import('@canvas-one/agents').AttemptBinding): void;
+  listAgentTaskActions?(scope: import('@canvas-one/agents').TaskScope, taskId: string): Promise<readonly import('./agent-action-journal').AgentTaskActionRecord[]>;
+  readonly agentExecutionLeases?: import('@canvas-one/agents').BrowserTaskLeaseRegistry;
+  createAgentConversationStorage?(scope: import('@canvas-one/agents').TaskScope): import('./agent-conversations').AgentConversationStorage;
+  createAgentTaskStorage?(scope: import('@canvas-one/agents').TaskScope): import('@canvas-one/agents').TaskStorage;
+  replayAgentTaskAction?(command: ModelApplyRecordsCommand): Promise<AuthoredResult | null>;
   /** Detached parts belong only to this project's Library. */
   previewPart(source: import('./parts').PartCaptureSource): Promise<import('./parts').PartCapturePreview | AuthoredResult>;
   listParts(projectId: Id): Promise<readonly PartRecord[]>;

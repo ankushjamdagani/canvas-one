@@ -1,6 +1,10 @@
 # Local CLI and MCP
 
-Start `canvas-one-agent bridge --origin http://localhost:3000`, then pair the current app with its short-lived code. Set `CANVAS_ONE_AGENT_TOKEN` to the printed agent token (keep it outside project files). Use `canvas-one-agent call board_inspect`, `component_schemas`, `document_validate`, `proposal_submit` or `proposal_status`; pass JSON via `--file` or `--input`.
+The task execution service starts with `canvas-one-agent collaborate --origin http://localhost:3000` (or `node packages/cli/dist/main.js collaborate` from this checkout). It prints a loopback address and a single-use pairing secret valid for five minutes. Pass the exact app origin; multiple `--origin` arguments are supported. The service launches locally signed-in Claude or Codex only after the browser authorizes a durable task. agy is explicitly unavailable until its scoped board-tool transport is verified. Optional `--claude-model` and `--codex-model` select a model supported by the installed CLI.
+
+Task authority expires after fifteen seconds without an authenticated browser heartbeat. A stopped or expired attempt requires explicit Resume with a new identity. Browser sessions last eight hours; restarting the service produces a new pairing secret. The service keeps bounded event and request buffers, never reads IndexedDB, and keeps private execution capabilities out of its printed output. `mcp-v1` is an internal scoped transport for the service-owned Claude process.
+
+For custom hosts using the retained review-only bridge, start `canvas-one-agent bridge --origin http://localhost:3000` and pair through that host's bridge UI. The Canvas One app uses `collaborate` instead. Set `CANVAS_ONE_AGENT_TOKEN` to the printed agent token (keep it outside project files). Use `canvas-one-agent call board_inspect`, `component_schemas`, `document_validate`, `proposal_submit` or `proposal_status`; pass JSON via `--file` or `--input`.
 
 Use `diagram_create` for readable component aliases, optional automatic positions and connections. Discover the diagram schema with `component_schemas`; supply the project/branch scope and revision returned by `board_inspect`. Repeating the same operation retains the original generated component IDs; changing its payload requires a new operation ID. Review and accept the proposal in the browser.
 

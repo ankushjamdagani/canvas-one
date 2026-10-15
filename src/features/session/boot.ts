@@ -51,7 +51,7 @@ export async function openStudioRepository(
       ok: true,
       status: 'ready',
       repository,
-      dispose: () => db.close(),
+      dispose: () => { repository.agentExecutionLeases.dispose(); db.close(); },
     };
   } catch (err) {
     if (isQuotaExceededError(err)) {
