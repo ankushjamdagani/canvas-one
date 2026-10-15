@@ -143,6 +143,7 @@ import { ConversationView, type ConversationComposerDraft } from "../agents/Conv
 import { FloatingToolPanel } from '../../components/ui/floating-tool-panel';
 import { CanvasOneFace } from '../../components/ui/canvas-one-face';
 import type { AgentPresence } from '../agents/AgentCursor';
+import { activityMatchesTask } from '../agents/cursor-presentation';
 import type { TextStepKind } from "./QuickOptionsTextStep";
 import {
   routeHistoryController,
@@ -350,9 +351,9 @@ function WorkspaceBody({
   const conversationState = React.useSyncExternalStore<ReturnType<AgentConversationController['getState']> | null>(conversation?.subscribe ?? inertConversationSubscribe, conversation?.getState ?? noConversation, noConversation);
   const agentPresence = React.useMemo((): AgentPresence | undefined => {
     const activity = conversationState?.activity;
-    const task = activity && conversationState?.tasks.find(task => task.id === activity.taskId && task.attempts.at(-1)?.id === activity.attemptId && task.scope.projectId === sessionState.projectId && task.scope.branchId === sessionState.branchId && task.scope.boardId === sessionState.document?.id && ['requested', 'working', 'waiting'].includes(task.status));
-    if (!activity || !task) return undefined;
-    return { phase: activity.kind, targetIds: activity.targetIds, providerLabel: task.providerId === 'claude' ? 'Claude' : task.providerId === 'codex' ? 'Codex' : task.providerId === 'agy' ? 'agy' : 'Agent' };
+    const task = activity && conversationState?.tasks.find(task => activityMatchesTask(activity, task) && task.scope.projectId === sessionState.projectId && task.scope.branchId === sessionState.branchId && task.scope.boardId === sessionState.document?.id);
+    if (!activity || !task || conversationState?.connection !== 'connected') return undefined;
+    return { phase: activity.kind, targetIds: activity.targetIds, activity, providerLabel: task.providerId === 'claude' ? 'Claude' : task.providerId === 'codex' ? 'Codex' : task.providerId === 'agy' ? 'agy' : 'Agent' };
   }, [conversationState, sessionState.projectId, sessionState.branchId, sessionState.document?.id]);
   const [desktopAgentRequired] = React.useState(() => typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
   const agentSelectionRef = React.useRef<{ ids: readonly string[]; viewId?: string }>({ ids: [] });

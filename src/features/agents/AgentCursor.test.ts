@@ -7,7 +7,7 @@ describe('factual agent cursor targeting', () => {
     expect(findAgentCursorPosition(presence, [{ recordIds: ['element'], x: 40, y: 80 }], viewport, bounds)).toEqual({ x: 48, y: 88 });
     expect(agentPresenceLabel(presence)).toBe('Claude · Inspecting board');
   });
-  it('uses edge presence for board-wide reads, hidden records and offscreen targets', () => {
+  it('omits board-wide reads, hidden records and offscreen targets', () => {
     const targets = [{ recordIds: ['element'], x: 400, y: 600 }];
     expect(findAgentCursorPosition({ ...presence, targetIds: [] }, targets, viewport, bounds)).toBeUndefined();
     expect(findAgentCursorPosition({ ...presence, targetIds: ['missing'] }, targets, viewport, bounds)).toBeUndefined();

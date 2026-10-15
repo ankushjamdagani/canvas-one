@@ -7,10 +7,11 @@ import { emptyConversationLedger, parseConversationLedger, serializeConversation
 import { SystemAgentSession, type AgentSelection } from './controller';
 import { attemptBinding, readAuthorizedTask } from './task-authority';
 import { planAgentTaskUndo } from '../../persistence/studio/agent-action-journal';
+import type { AgentActivity } from './activity';
 
-export type ConversationMessage = { readonly id: string; readonly taskId?: string; readonly attemptId?: string; readonly clarificationQuestionId?: string; readonly startingContext?: AgentSelection & { readonly omittedCount: number }; readonly role: 'user' | 'agent' | 'system'; readonly text: string; readonly delivery: 'queued' | 'delivered' | 'acknowledged' | 'failed' };
+export type ConversationMessage = { readonly id: string; readonly taskId?: string; readonly attemptId?: string; readonly classification?: 'notice' | 'diagnostic'; readonly clarificationQuestionId?: string; readonly startingContext?: AgentSelection & { readonly omittedCount: number }; readonly role: 'user' | 'agent' | 'system'; readonly text: string; readonly delivery: 'queued' | 'delivered' | 'acknowledged' | 'failed' };
 export type ConversationProposal = { readonly taskId: string; readonly proposal: Proposal<RecordChange> };
-export type ConversationState = { readonly connection: 'disconnected' | 'pairing' | 'connected'; readonly tasks: readonly CollaborationTask[]; readonly messages: readonly ConversationMessage[]; readonly outstandingQuestions?: readonly ConversationMessage[]; readonly proposals: readonly ConversationProposal[]; readonly providers: readonly ProviderAvailability[]; readonly error: string | null; readonly hasEarlierMessages?: boolean; readonly historyWindowGap?: boolean; readonly blockedActions: readonly { readonly taskId: string; readonly operationId: string }[]; readonly activity?: { readonly taskId: string; readonly attemptId: string; readonly kind: 'reading' | 'applying' | 'reviewing'; readonly targetIds: readonly string[] } };
+export type ConversationState = { readonly connection: 'disconnected' | 'pairing' | 'connected'; readonly tasks: readonly CollaborationTask[]; readonly messages: readonly ConversationMessage[]; readonly outstandingQuestions?: readonly ConversationMessage[]; readonly proposals: readonly ConversationProposal[]; readonly providers: readonly ProviderAvailability[]; readonly error: string | null; readonly hasEarlierMessages?: boolean; readonly historyWindowGap?: boolean; readonly blockedActions: readonly { readonly taskId: string; readonly operationId: string }[]; readonly activity?: AgentActivity; readonly activityLog?: readonly AgentActivity[]; readonly undoableTaskIds?: readonly string[]; readonly pendingUndoTaskIds?: readonly string[] };
 export type ConversationControllerOptions = { readonly session: SessionController; readonly repository: StudioRepository; readonly selection?: () => AgentSelection; readonly mintId: () => string; readonly client?: CollaborationBrowserClient; readonly now?: () => number; readonly leaseMs: number; readonly pollMs: number; readonly heartbeatMs: number; readonly ownership?: { load(): readonly string[]; save(ids: readonly string[]): void }; readonly recoverOwnedAfterReload?: boolean };
 const json = (value: unknown): ConversationJson => JSON.parse(JSON.stringify(value)) as ConversationJson;
 const canonical = (value: unknown): string => JSON.stringify((function sort(input: unknown): unknown { if (Array.isArray(input)) return input.map(sort); if (input && typeof input === 'object') return Object.fromEntries(Object.keys(input).sort().map(key => [key, sort((input as Record<string, unknown>)[key])])); return input; })(value));
@@ -59,6 +60,13 @@ export class AgentConversationController {
   private historyWindowGap = false;
   private historyGeneration = 0;
   private readonly restoredQuestions = new Map<string, ConversationMessage>();
+  private undoEligibilityKey = '';
+  private undoEligibilityGeneration = 0;
+  private readonly undoRequests = new Map<string, Promise<string | null>>();
+  private readonly undoOrigins = new Set<string>();
+  private readonly acceptRequests = new Map<string, Promise<void>>();
+  private readonly streamingMessages = new Map<string, ConversationMessage>();
+  private startingEdit = false;
   private earlierMessages: ConversationMessage[] = [];
   async loadEarlierMessages(): Promise<readonly ConversationMessage[]> {
     const storage = this.artifactStorage, generation = this.historyGeneration; if (!storage?.loadMessagesPage || this.historyHasMore === false) return [];
@@ -92,7 +100,7 @@ export class AgentConversationController {
     for (const id of options.ownership?.load() ?? []) this.owned.add(id);
     this.reviewed = new SystemAgentSession(options.session, options.selection);
     this.ready = this.load().catch(error => { this.problem(error); });
-    this.unsubscribe = options.session.subscribe(() => { if (!this.scopeMatches()) { if (this.scope) this.options.repository.agentExecutionLeases?.revokeScope(this.scope); void this.reconcileScope(); } });
+    this.unsubscribe = options.session.subscribe(() => { if (!this.scopeMatches()) { this.update({ activity: undefined, activityLog: [], undoableTaskIds: [], pendingUndoTaskIds: [] }); if (this.scope) this.options.repository.agentExecutionLeases?.revokeScope(this.scope); void this.reconcileScope(); } else this.refreshUndoEligibility(); });
   }
   getState = (): ConversationState => this.state;
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -118,7 +126,8 @@ export class AgentConversationController {
     this.initialized = false;
     this.tasks = null; this.artifacts = null; this.artifactStorage = null; this.artifactRevision = null;
     this.historyGeneration++; this.restoredQuestions.clear(); this.startingContexts.clear(); this.earlierMessages = []; this.historyBefore = undefined; this.historyHasMore = undefined; this.historyOlderWindow = false; this.historyWindowGap = false;
-    this.update({ tasks: [], messages: [], proposals: [], blockedActions: [], outstandingQuestions: [], hasEarlierMessages: false, historyWindowGap: false, activity: undefined });
+    this.undoEligibilityGeneration++; this.undoEligibilityKey = ''; this.undoRequests.clear(); this.undoOrigins.clear(); this.acceptRequests.clear(); this.streamingMessages.clear();
+    this.update({ tasks: [], messages: [], proposals: [], blockedActions: [], outstandingQuestions: [], hasEarlierMessages: false, historyWindowGap: false, activity: undefined, activityLog: [], undoableTaskIds: [], pendingUndoTaskIds: [] });
     const scope = this.currentScope(); this.scope = scope;
     if (!scope) { this.update({ tasks: [], messages: [], proposals: [] }); return; }
     if (!this.options.repository.createAgentTaskStorage || !this.options.repository.createAgentConversationStorage) throw new Error('Durable agent storage is unavailable');
@@ -150,6 +159,12 @@ export class AgentConversationController {
     const terminal = merged.filter(entry => object(entry.payload) && ['accepted', 'rejected'].includes(String(entry.payload.status)));
     const remaining = 200 - unresolved.length;
     const saved = [...unresolved, ...(remaining > 0 ? terminal.slice(-remaining) : [])].map(entry => { if (entry.taskId) this.proposalOwners.set(entry.id, entry.taskId); return entry.payload as unknown as Proposal<RecordChange>; });
+    for (const proposal of saved) {
+      const markerId = `host-execution:undo:${proposal.operationId}`;
+      const marker = await this.artifactStorage.loadOperation?.(markerId) ?? artifacts.operations.find(entry => entry.operationId === markerId);
+      if (generation !== this.loadGeneration || this.disposed) return;
+      if (marker?.taskId === this.proposalOwners.get(proposal.operationId) && object(marker?.payload) && marker.payload.tool === 'host-undo' && marker.payload.proposalId === proposal.operationId) this.undoOrigins.add(proposal.operationId);
+    }
     const restored = this.reviewed.proposals.restore(saved); if (!restored.ok) throw new Error('Stored proposals require recovery');
     if (this.serviceSessionId && artifacts.eventsSessionId !== this.serviceSessionId) await this.persist(ledger => ({ ...ledger, eventsSessionId: this.serviceSessionId!, eventsCursor: 0 }));
     this.initialized = true; this.publish();
@@ -167,7 +182,39 @@ export class AgentConversationController {
     for (const [id, question] of this.restoredQuestions) if (!this.tasks?.getSnapshot().tasks.some(task => task.id === question.taskId && task.status === 'waiting' && task.waitReason === 'clarification' && task.attempts.at(-1)?.id === question.attemptId)) this.restoredQuestions.delete(id);
     this.update({ outstandingQuestions: [...this.restoredQuestions.values()].filter(question => !visibleIds.has(question.id)) });
     this.update({ tasks: this.tasks?.getSnapshot().tasks ?? [], messages: [...this.earlierMessages, ...(this.artifacts?.messages.map(entry => entry.payload) ?? [])] as unknown as ConversationMessage[], proposals: this.reviewed.proposals.list().map(proposal => ({ taskId: this.proposalOwners.get(proposal.operationId) ?? '', proposal })) });
+    const activity = this.state.activity;
+    if (activity && !this.activityCurrent(activity)) this.update({ activity: undefined });
+    this.refreshUndoEligibility();
   }
+  private activityCurrent(activity: AgentActivity): boolean {
+    const task = this.tasks?.getSnapshot().tasks.find(task => task.id === activity.taskId);
+    if (!this.disposed && this.token !== null && this.scopeMatches() && activity.status === 'succeeded' && task?.status === 'completed' && task.generation === activity.generation + 1 && task.attempts.at(-1)?.id === activity.attemptId && task.attempts.at(-1)?.generation === activity.generation && task.attempts.at(-1)?.status === 'finished') return true;
+    return !this.disposed && this.token !== null && this.scopeMatches() && !!task && task.generation === activity.generation && task.attempts.at(-1)?.id === activity.attemptId && task.attempts.at(-1)?.status === 'working' && (task.status === 'working' || task.status === 'waiting' && task.waitReason === 'overlap') && (activity.status === 'succeeded' || !!this.options.repository.agentExecutionLeases?.permits(attemptBinding(execution(task))));
+  }
+  private recordActivity(activity: AgentActivity): void {
+    const log = [...(this.state.activityLog ?? []).filter(entry => entry.id !== activity.id), activity].slice(-100);
+    this.update({ activityLog: log, ...(this.activityCurrent(activity) && (activity.status === 'running' || this.state.activity?.id === activity.id) ? { activity: activity.status === 'failed' ? undefined : activity } : {}) });
+  }
+  private refreshUndoEligibility(): void {
+    const state = this.options.session.getState(), scope = this.scope, tasks = this.state.tasks;
+    const key = JSON.stringify([this.loadGeneration, state.workingRevision, tasks.map(task => [task.id, task.status, task.attempts.at(-1)?.status]), this.state.proposals.map(entry => [entry.proposal.operationId, entry.proposal.status])]);
+    if (key === this.undoEligibilityKey) return;
+    this.undoEligibilityKey = key; const generation = ++this.undoEligibilityGeneration;
+    this.update({ undoableTaskIds: [], pendingUndoTaskIds: [] });
+    if (!scope || !this.initialized || !state.document || state.branchId === state.mainBranchId || !this.options.repository.listAgentTaskActions || tasks.some(task => task.kind !== 'question' && ['requested', 'working', 'waiting'].includes(task.status) && task.attempts.at(-1)?.status !== 'finished')) return;
+    const document = state.document, revision = state.workingRevision;
+    void Promise.all(tasks.filter(task => task.kind !== 'question').map(async task => {
+      const rows = await this.options.repository.listAgentTaskActions!(scope, task.id);
+      if (rows.some(row => row.taskId !== task.id || row.binding.actorId !== task.actorId)) return null;
+      const plan = planAgentTaskUndo(document, rows);
+      return plan.status !== 'empty' && plan.status !== 'invalid-journal' && !!plan.proposal.preview && plan.proposal.changes.length > 0 ? task.id : null;
+    })).then(ids => {
+      if (generation !== this.undoEligibilityGeneration || this.disposed || !this.scopeMatches() || scope !== this.scope || revision !== this.options.session.getState().workingRevision) return;
+      const eligible = ids.filter((id): id is string => id !== null);
+      this.update({ undoableTaskIds: eligible, pendingUndoTaskIds: eligible.filter(id => this.state.proposals.some(entry => entry.taskId === id && entry.proposal.status === 'pending' && entry.proposal.expectedRevision === revision && this.isUndoProposal(entry.proposal))) });
+    }).catch(() => { /* Failure leaves Undo unavailable; explicit review reports diagnostics. */ });
+  }
+  private isUndoProposal(proposal: Proposal<RecordChange>): boolean { return this.undoOrigins.has(proposal.operationId); }
   private async recoverOwned(repository: TaskRepository, scope: TaskScope): Promise<void> {
     for (const taskId of this.owned) {
       const refreshed = await repository.refresh(); if (!refreshed.ok) throw new Error(refreshed.code);
@@ -282,9 +329,16 @@ export class AgentConversationController {
     catch (error) { if (generation === this.loopGeneration) { this.update({ connection: 'disconnected' }); this.problem(error); } throw error; }
   }
   async start(provider: LocalAgentProvider, prompt: string, kind: 'edit' | 'question' = 'edit'): Promise<string> {
+    if (kind === 'edit' && this.startingEdit) throw new Error('An editing task is already starting');
+    if (kind === 'edit') this.startingEdit = true;
+    try { return await this.startUnlocked(provider, prompt, kind); }
+    finally { if (kind === 'edit') this.startingEdit = false; }
+  }
+  private async startUnlocked(provider: LocalAgentProvider, prompt: string, kind: 'edit' | 'question'): Promise<string> {
     if (!prompt.trim() || prompt.length > 64000) throw new Error('Instructions must be nonempty and at most 64000 characters');
     await this.ready; this.connection(); this.assertProviderAvailable(provider); if (!this.scope || !this.initialized || this.changingScope) throw new Error('Open and load a board before assigning work');
     this.assertCurrentBoard();
+    if (kind === 'edit' && this.state.tasks.some(task => task.kind !== 'question' && ['requested', 'working', 'waiting'].includes(task.status) && task.attempts.at(-1)?.status !== 'finished')) throw new Error('Stop the active editing task before starting another');
     if (kind === 'edit' && this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Create or switch to a draft before starting editing work');
     const selection = this.options.selection?.() ?? { ids: [] }; const ids = selection.ids.filter(id => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(0, 200);
     const startingContext = { ids: [...ids], viewId: typeof selection.viewId === 'string' && selection.viewId.length <= 200 ? selection.viewId : null, omittedCount: selection.ids.length - ids.length };
@@ -340,10 +394,12 @@ export class AgentConversationController {
   }
   async grantLive(taskId: string, attemptId: string): Promise<void> { this.assertCurrentBoard(); const task = this.task(taskId); if (task.attempts.at(-1)?.id !== attemptId) throw new Error('This Live grant belongs to an earlier attempt'); if (this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Create or switch to a draft before allowing Live edits'); await this.command({ ...attemptBinding(execution(task)), type: 'grantLive' }); }
   preview(operationId: string) { return this.reviewed.proposals.preview(operationId); }
-  async stop(taskId: string): Promise<void> {
-    const task = this.task(taskId), binding = execution(task); this.options.repository.agentExecutionLeases?.revoke(attemptBinding(binding)); this.started.delete(binding.attemptId);
+  async stop(taskId: string, expectedAttemptId?: string): Promise<void> {
+    const task = this.task(taskId), binding = execution(task);
+    if (expectedAttemptId && binding.attemptId !== expectedAttemptId) throw new Error('This attempt already ended; the task has a newer attempt');
+    this.options.repository.agentExecutionLeases?.revoke(attemptBinding(binding)); this.started.delete(binding.attemptId);
     this.options.repository.clearAgentTaskOverlap?.(attemptBinding(binding));
-    if (this.state.activity?.taskId === taskId) this.update({ activity: undefined });
+    this.update({ ...(this.state.activity?.taskId === taskId ? { activity: undefined } : {}), activityLog: this.state.activityLog?.map(entry => entry.taskId === taskId && entry.status === 'running' ? { ...entry, status: 'failed', label: 'Board action stopped', completedAt: this.now() } : entry) });
     const repository = this.tasks, connection = this.token && this.client ? { client: this.client, token: this.token } : undefined;
     try { const result = repository && await this.executeCurrent(repository, { ...attemptBinding(binding), type: 'stop' }); if (result && !result.ok && !['stale-attempt', 'invalid-transition'].includes(result.code)) throw new Error(result.code); if (repository === this.tasks) this.publish(); }
     finally { if (connection) await this.requestHostStop(binding, connection.client, connection.token, repository); }
@@ -376,22 +432,35 @@ export class AgentConversationController {
     this.connection();
     const taskId = this.proposalOwners.get(operationId); if (!taskId) throw new Error('Proposal task was not found');
     const task = this.task(taskId);
-    if (task.status === 'completed' || task.status === 'stopped') { await this.message({ id: this.options.mintId(), taskId, role: 'system', text: `Refinement requested for task reversal ${operationId}: ${text}. The existing reversal remains available for human review; prepare a new safe reversal after editing the board.`, delivery: 'acknowledged' }); return; }
+    if (['completed', 'stopped', 'failed', 'interrupted'].includes(task.status)) {
+      const proposal = this.state.proposals.find(entry => entry.proposal.operationId === operationId)?.proposal;
+      if (!proposal || !this.isUndoProposal(proposal)) throw new Error('This task has ended; start a new task or resume it to revise this proposal');
+      await this.message({ id: this.options.mintId(), taskId, role: 'system', text: `Refinement requested for task reversal ${operationId}: ${text}. The existing reversal remains available for human review; prepare a new safe reversal after editing the board.`, delivery: 'acknowledged' }); return;
+    }
     if (task.status !== 'waiting' || task.waitReason !== 'review' || task.attempts.at(-1)?.status !== 'finished') throw new Error('Wait for the current proposal review before requesting a revision');
     this.assertProviderAvailable(task.providerId);
     if (task.attempts.at(-1)?.status === 'finished') { await this.message({ id: this.options.mintId(), taskId, role: 'user', text: `Request changes to ${operationId}: ${text}`, delivery: 'queued' }); const revised = await this.command({ type: 'revise', taskId, actorId: task.actorId, scope: task.scope, attemptId: this.options.mintId(), permission: 'suggest', currentBoardValidated: true }); try { this.reviewed.proposals.reject(operationId, this.reviewed.reviewer); await this.saveProposals(); } catch (error) { await this.command({ ...attemptBinding(execution(revised)), type: 'fail', reason: 'Proposal revision could not be saved' }); throw error; } await this.launch(revised, task.attempts.at(-1)?.providerSessionId, `Revise proposal ${operationId}: ${text}`); }
     else await this.send(taskId, text, 'proposal-revision');
   }
   private async saveProposals(): Promise<void> { await this.persist(ledger => ({ ...ledger, proposals: this.reviewed.proposals.list().map(proposal => ({ id: proposal.operationId, ...(this.proposalOwners.get(proposal.operationId) ? { taskId: this.proposalOwners.get(proposal.operationId)! } : {}), payload: json(proposal) })) })); this.reviewed.proposals.pruneTerminal(20); }
-  async accept(operationId: string): Promise<void> {
+  accept(operationId: string): Promise<void> {
+    const pending = this.acceptRequests.get(operationId); if (pending) return pending;
+    const request = this.acceptOnce(operationId).finally(() => { if (this.acceptRequests.get(operationId) === request) this.acceptRequests.delete(operationId); });
+    this.acceptRequests.set(operationId, request); return request;
+  }
+  private async acceptOnce(operationId: string): Promise<void> {
     this.assertCurrentBoard();
     const reviewed = this.reviewed, storage = this.artifactStorage, repository = this.tasks, scope = this.scope, proposalOwners = new Map(this.proposalOwners);
     const taskId = this.proposalOwners.get(operationId);
     const proposal = reviewed.proposals.list().find(value => value.operationId === operationId);
-    if (!proposal || this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Open the proposal draft before accepting');
+    if (!proposal || proposal.status !== 'pending' || this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Open a pending proposal on its draft before accepting');
     if (!storage || !repository || !scope) throw new Error('Proposal storage is unavailable');
     // Persist the in-flight review before the authored apply; crash recovery never re-applies it silently.
-    await this.persist(ledger => ({ ...ledger, proposals: this.reviewed.proposals.list().map(value => ({ id: value.operationId, ...(this.proposalOwners.get(value.operationId) ? { taskId: this.proposalOwners.get(value.operationId)! } : {}), payload: json(value.operationId === operationId ? { ...value, status: 'accepting' } : value) })) }));
+    await this.persist(ledger => {
+      const saved = ledger.proposals.find(entry => entry.id === operationId);
+      if (saved && (!object(saved.payload) || saved.payload.status !== 'pending')) throw new Error('This proposal is no longer pending; reload its review');
+      return { ...ledger, proposals: this.reviewed.proposals.list().map(value => ({ id: value.operationId, ...(this.proposalOwners.get(value.operationId) ? { taskId: this.proposalOwners.get(value.operationId)! } : {}), payload: json(value.operationId === operationId ? { ...value, status: 'accepting' } : value) })) };
+    });
     const result = await reviewed.proposals.accept(operationId, reviewed.reviewer);
     const outcome = result.ok ? result.proposal : reviewed.proposals.list().find(value => value.operationId === operationId) ?? { ...proposal, status: 'failed' as const };
     // The authored apply may finish after navigation. Its receipt belongs to the captured board.
@@ -438,24 +507,39 @@ export class AgentConversationController {
     this.update({ blockedActions: this.state.blockedActions.filter(action => action.taskId !== taskId) });
   }
   async reject(operationId: string): Promise<void> { const result = this.reviewed.proposals.reject(operationId, this.reviewed.reviewer); await this.saveProposals(); if (!result.ok) throw new Error(result.issues.map(issue => issue.message).join('; ')); await this.finishReviewed(this.proposalOwners.get(operationId)); }
-  async undo(taskId: string): Promise<string | null> {
+  undo(taskId: string): Promise<string | null> {
+    const pending = this.undoRequests.get(taskId); if (pending) return pending;
+    const request = this.prepareUndo(taskId).finally(() => { if (this.undoRequests.get(taskId) === request) this.undoRequests.delete(taskId); });
+    this.undoRequests.set(taskId, request); return request;
+  }
+  private async prepareUndo(taskId: string): Promise<string | null> {
     this.assertCurrentBoard();
+    const generation = this.loadGeneration;
     const task = this.task(taskId), scope = this.currentScope(), state = this.options.session.getState();
     const assertNoActiveAuthoring = () => { if (this.state.tasks.some(value => value.kind !== 'question' && ['requested', 'working', 'waiting'].includes(value.status) && value.attempts.at(-1)?.status !== 'finished')) throw new Error('Stop the active authoring attempt before preparing Undo'); };
     assertNoActiveAuthoring();
     if (!scope || !sameScope(scope, task.scope) || !state.document || state.workingRevision === null || state.branchId === state.mainBranchId || !this.options.repository.listAgentTaskActions) throw new Error('Open this task draft before preparing Undo');
     const rows = await this.options.repository.listAgentTaskActions(scope, taskId);
+    this.assertCurrentBoard(); if (generation !== this.loadGeneration) throw new Error('The task board changed; prepare Undo again');
     assertNoActiveAuthoring();
     if (rows.some(row => row.taskId !== taskId || row.binding.actorId !== task.actorId)) throw new Error('Task reversal attribution is invalid');
-    const after = this.options.session.getState(); if (!after.document || !sameScope(scope, this.currentScope()!) || after.workingRevision !== state.workingRevision) throw new Error('The board changed; prepare Undo again');
+    const after = this.options.session.getState(), currentScope = this.currentScope(); if (!after.document || !currentScope || !sameScope(scope, currentScope) || after.workingRevision !== state.workingRevision) throw new Error('The board changed; prepare Undo again');
     const plan = planAgentTaskUndo(after.document, rows);
     if (plan.status === 'empty') { await this.message({ id: this.options.mintId(), taskId, role: 'system', text: 'There are no remaining task changes to undo.', delivery: 'acknowledged' }); return null; }
     if (plan.status === 'invalid-journal') throw new Error(plan.message);
     if (!plan.proposal.preview || !plan.proposal.changes.length) { await this.message({ id: this.options.mintId(), taskId, role: 'system', text: 'Undo needs refinement because later human edits or dependencies prevent a safe reversal.', delivery: 'acknowledged' }); throw new Error('No safe reversal is ready; preserve the human edits and refine the proposal'); }
+    const existing = this.state.proposals.find(entry => entry.taskId === taskId && entry.proposal.status === 'pending' && entry.proposal.expectedRevision === after.workingRevision && this.isUndoProposal(entry.proposal) && canonical(entry.proposal.changes) === canonical(plan.proposal.changes));
+    if (existing) return existing.proposal.operationId;
     const operationId = this.options.mintId();
-    const submitted = this.reviewed.proposals.submit({ operationId, actor: { actorId: task.actorId, displayName: task.providerId ?? 'Agent', kind: 'agent' }, scope: { projectId: scope.projectId, branchId: scope.branchId }, expectedRevision: after.workingRevision!, label: plan.status === 'ready' ? 'Undo task' : 'Review task revert preserving human edits', changes: plan.proposal.changes });
+    const submitted = this.reviewed.proposals.submit({ operationId, actor: { actorId: task.actorId, displayName: task.providerId ?? 'Agent', kind: 'agent' }, scope: { projectId: scope.projectId, branchId: scope.branchId }, expectedRevision: after.workingRevision!, label: 'Review undo', changes: plan.proposal.changes });
     if (!submitted.ok) throw new Error(submitted.issues.map(issue => issue.message).join('; '));
-    this.proposalOwners.set(operationId, taskId); await this.saveProposals();
+    if (submitted.proposal.status !== 'pending') throw new Error('The new undo review is invalid or stale; the previous review remains available');
+    for (const entry of this.state.proposals) if (entry.taskId === taskId && entry.proposal.status === 'pending' && this.isUndoProposal(entry.proposal)) {
+      const rejected = this.reviewed.proposals.reject(entry.proposal.operationId, this.reviewed.reviewer);
+      if (!rejected.ok) throw new Error('The previous undo review could not be superseded');
+    }
+    this.proposalOwners.set(operationId, taskId); this.undoOrigins.add(operationId);
+    await this.persist(ledger => ({ ...ledger, proposals: this.reviewed.proposals.list().map(proposal => ({ id: proposal.operationId, taskId: this.proposalOwners.get(proposal.operationId), payload: json(proposal) })), operations: [...ledger.operations, { taskId, operationId: `host-execution:undo:${operationId}`, payload: json({ tool: 'host-undo', proposalId: operationId, initiatedBy: this.reviewed.reviewer }) }] }));
     if (plan.status === 'review-required') await this.message({ id: this.options.mintId(), taskId, role: 'system', text: 'Review this partial task reversal. Content changed by people remains untouched.', delivery: 'acknowledged' });
     return operationId;
   }
@@ -521,6 +605,16 @@ export class AgentConversationController {
   }
   private async handleRequest(request: BrowserAuthorityRequest): Promise<void> {
     const { client, token } = this.connection();
+    const epoch = this.loadGeneration, service = this.serviceSessionId;
+    let activity: AgentActivity | undefined;
+    let activityFinished = false;
+    const finishActivity = (successful: boolean) => {
+      if (!activity || activityFinished || epoch !== this.loadGeneration || service !== this.serviceSessionId || !this.activityCurrent(activity)) return;
+      activityFinished = true;
+      const target = activity.targetIds.length === 1 ? this.options.session.getState().document?.elements?.find(element => element.id === activity!.targetIds[0])?.label?.slice(0, 80) : undefined;
+      const label = successful ? activity.kind === 'applying' ? target ? `Updated ${target}` : 'Board changes applied' : activity.kind === 'reviewing' ? 'Changes prepared for review' : target ? `Read ${target}` : 'Board inspection complete' : 'Board action failed';
+      this.recordActivity({ ...activity, status: successful ? 'succeeded' : 'failed', completedAt: this.now(), label });
+    };
     try {
       if (!this.scope || !this.options.repository.createAgentTaskStorage) throw new Error('Task authority is unavailable');
       const metadata = request.payload.kind === 'authorize' ? request.payload.data : undefined;
@@ -534,6 +628,7 @@ export class AgentConversationController {
       const toolName: string = tool.tool;
       const input = object(tool.input) ? tool.input : {};
       if (typeof input.operationId === 'string' && input.operationId.startsWith('host-execution:')) throw new Error('Operation identity is reserved for trusted execution metadata');
+      if (['proposal_submit', 'diagram_create'].includes(toolName) && typeof input.label === 'string' && ['review undo', 'undo task', 'review task revert preserving human edits'].includes(input.label.trim().replace(/\s+/g, ' ').toLowerCase())) throw new Error('This review label is reserved for human-requested task undo');
       if (['proposal_submit', 'diagram_create'].includes(toolName) && typeof input.operationId === 'string') {
         const prior = await this.artifactStorage?.loadOperation?.(input.operationId) ?? this.artifacts?.operations.find(entry => entry.operationId === input.operationId);
         if (prior) {
@@ -549,7 +644,14 @@ export class AgentConversationController {
         if (archived) { await client.result(token, request, { result: archived.payload }, this.lifetime.signal); return; }
       }
       const startingContext = await this.startingContext(task.id);
-      this.update({ activity: { taskId: task.id, attemptId: request.identity.attemptId, kind: toolName === 'action_submit' ? 'applying' : ['proposal_submit', 'diagram_create', 'proposal_status'].includes(toolName) ? 'reviewing' : 'reading', targetIds: toolName === 'board_inspect' ? input.selectionOnly === true ? [...startingContext.ids] : [] : targets(input.changes) } });
+      if (epoch !== this.loadGeneration || service !== this.serviceSessionId || !this.activityCurrent({ ...request.identity, id: request.requestId, kind: 'reading', targetIds: [], label: '', status: 'running', startedAt: this.now() })) throw new Error('Board execution is no longer current');
+      if (toolName !== 'clarification_request') {
+        const kind = toolName === 'action_submit' ? 'applying' : ['proposal_submit', 'diagram_create'].includes(toolName) ? 'reviewing' : 'reading';
+        const targetIds = toolName === 'board_inspect' ? input.selectionOnly === true ? [...startingContext.ids] : [] : targets(input.changes);
+        const target = targetIds.length === 1 ? this.options.session.getState().document?.elements?.find(element => element.id === targetIds[0])?.label?.slice(0, 80) : undefined;
+        activity = { id: request.requestId, taskId: task.id, attemptId: request.identity.attemptId, generation: request.identity.generation, kind, targetIds, label: kind === 'applying' ? target ? `Updating ${target}…` : 'Applying board changes…' : kind === 'reviewing' ? 'Preparing changes…' : target ? `Reading ${target}…` : 'Reading board…', status: 'running', startedAt: this.now() };
+        this.recordActivity(activity);
+      }
       if (toolName === 'board_inspect') {
         result = { ...this.reviewed.context(input.selectionOnly === true, startingContext), task: { id: task.id, attemptId: request.identity.attemptId, kind: task.kind ?? 'edit', permission: task.permission } };
       } else if (toolName === 'clarification_request') {
@@ -587,15 +689,15 @@ export class AgentConversationController {
           this.proposalOwners.set(tool.input.operationId, task.id);
         }
         result = await this.reviewed.executeReviewedTool(tool, { actorId: task.actorId, displayName: task.providerId ?? 'Agent', kind: 'agent' });
-        if (toolName === 'diagram_create' && object(result) && object(result.proposal)) this.update({ activity: { taskId: task.id, attemptId: request.identity.attemptId, kind: 'reviewing', targetIds: targets(result.proposal.changes) } });
+        if (activity && toolName === 'diagram_create' && object(result) && object(result.proposal)) activity = { ...activity, targetIds: targets(result.proposal.changes) };
         if (['proposal_submit', 'diagram_create'].includes(tool.tool)) {
           await this.persist(ledger => ({ ...ledger, proposals: this.reviewed.proposals.list().map(proposal => ({ id: proposal.operationId, taskId: this.proposalOwners.get(proposal.operationId) ?? task.id, payload: json(proposal) })), operations: [...ledger.operations.filter(entry => entry.operationId !== input.operationId), { taskId: task.id, operationId: input.operationId as string, payload: json({ tool: toolName, input: tool.input, result }) }] }));
           this.reviewed.proposals.pruneTerminal(20);
         }
       }
+      finishActivity(object(result) && (toolName === 'action_submit' ? result.status === 'applied' : result.ok !== false && (!object(result.proposal) || !['invalid', 'failed', 'stale'].includes(String(result.proposal.status)))));
       await client.result(token, request, { result: result ?? null }, this.lifetime.signal);
-    } catch (error) { this.problem(error); await client.result(token, request, { error: error instanceof Error ? error.message : 'Board tool failed' }, this.lifetime.signal); }
-    finally { if (this.state.activity?.taskId === request.identity.taskId && this.state.activity.attemptId === request.identity.attemptId) this.update({ activity: undefined }); }
+    } catch (error) { finishActivity(false); this.problem(error); await client.result(token, request, { error: error instanceof Error ? error.message : 'Board tool failed' }, this.lifetime.signal); }
   }
   private async event(event: CollaborationEvent): Promise<void> {
     if (event.cursor <= (this.artifacts?.eventsCursor ?? 0)) return;
@@ -607,17 +709,22 @@ export class AgentConversationController {
     const payload = event.payload;
     if (payload.kind === 'session') await this.command({ ...attemptBinding(binding), type: 'recordSession', providerSessionId: payload.sessionId });
     if (payload.kind === 'text') {
-      const prior = this.state.messages.at(-1); const append = payload.format === 'delta' && prior?.role === 'agent' && prior.taskId === task.id && prior.attemptId === binding.attemptId && prior.text.length + payload.text.length <= 64000;
-      if (append || payload.text.length <= 64000) await this.message({ id: append ? prior.id : this.options.mintId(), taskId: task.id, attemptId: binding.attemptId, role: 'agent', text: append ? prior.text + payload.text : payload.text, delivery: 'acknowledged' }, event.cursor);
+      const prior = this.streamingMessages.get(binding.attemptId); const append = payload.format === 'delta' && prior?.taskId === task.id && prior.text.length + payload.text.length <= 64000;
+      if (append || payload.text.length <= 64000) {
+        const message: ConversationMessage = { id: append ? prior.id : this.options.mintId(), taskId: task.id, attemptId: binding.attemptId, role: 'agent', text: append ? prior.text + payload.text : payload.text, delivery: 'acknowledged' };
+        this.streamingMessages.set(binding.attemptId, message); await this.message(message, event.cursor);
+      }
       else {
         const chunks: ConversationMessage[] = [];
         for (let offset = 0; offset < payload.text.length; offset += 64000) chunks.push({ id: this.options.mintId(), taskId: task.id, attemptId: binding.attemptId, role: 'agent', text: payload.text.slice(offset, offset + 64000), delivery: 'acknowledged' });
+        this.streamingMessages.set(binding.attemptId, chunks.at(-1)!);
         await this.persist(ledger => ({ ...ledger, eventsCursor: event.cursor, messages: [...ledger.messages, ...chunks.map(message => ({ id: message.id, taskId: task.id, payload: json(message) }))] }));
       }
     }
-    if (payload.kind === 'diagnostic') await this.message({ id: this.options.mintId(), taskId: task.id, attemptId: binding.attemptId, role: 'system', text: `${payload.code}: ${payload.message.slice(0, 2000)}`, delivery: 'acknowledged' }, event.cursor);
+    if (payload.kind === 'diagnostic') await this.message({ id: this.options.mintId(), taskId: task.id, attemptId: binding.attemptId, classification: 'diagnostic', role: 'system', text: `${payload.code}: ${payload.message.slice(0, 2000)}`, delivery: 'acknowledged' }, event.cursor);
     if (payload.kind === 'provider-result' || payload.kind === 'attempt-ended') {
-      if (this.state.activity?.taskId === task.id) this.update({ activity: undefined });
+      this.streamingMessages.delete(binding.attemptId);
+      if (this.state.activity?.taskId === task.id && (payload.outcome !== 'succeeded' || this.state.activity.status !== 'succeeded' || task.status === 'waiting' || this.unresolved(task.id))) this.update({ activity: undefined });
       if (task.attempts.at(-1)?.status === 'finished') { await this.persist(ledger => ({ ...ledger, eventsCursor: event.cursor })); return; }
       this.options.repository.agentExecutionLeases?.revoke(attemptBinding(binding)); this.started.delete(binding.attemptId);
       // A provider turn result is not process-close acknowledgement. Fence and close it explicitly.
@@ -641,7 +748,7 @@ export class AgentConversationController {
     const bindings = repository?.getSnapshot().tasks.filter(task => this.owned.has(task.id) && ['requested', 'working', 'waiting'].includes(task.status) && task.attempts.at(-1)?.status !== 'finished').map(execution) ?? [];
     this.token = null; this.serviceSessionId = null; this.lifetime.abort(); this.started.clear();
     if (this.scope) this.options.repository.agentExecutionLeases?.revokeScope(this.scope);
-    this.update({ connection: 'disconnected', activity: undefined });
+    this.update({ connection: 'disconnected', activity: undefined, activityLog: [] });
     try { if (repository && scope) await this.recoverOwned(repository, scope); }
     finally { if (client && token) { await Promise.all(bindings.map(binding => this.requestHostStop(binding, client, token, repository))); await client.disconnect(token).catch(() => {}); } }
   }

@@ -4,7 +4,7 @@ import { expect, userEvent, within } from 'storybook/test';
 import { CollaborationPanel, type CollaborationPanelProps, type CollaborationIntent } from './CollaborationPanel';
 import { ConnectionSetup } from './ConnectionSetup';
 
-type State = 'disconnected' | 'review' | 'overlap' | 'interrupted' | 'mobile' | 'composer' | 'historical-conflict' | 'older-window' | 'provider-unavailable';
+type State = 'disconnected' | 'review' | 'overlap' | 'interrupted' | 'mobile' | 'composer' | 'historical-conflict' | 'older-window' | 'provider-unavailable' | 'markdown';
 
 /** Fixtures exercise presentation only; clicking a command records it without running an agent. */
 function Fixture({ state, narrow = false }: { readonly state: State; readonly narrow?: boolean }) {
@@ -65,6 +65,10 @@ function Fixture({ state, narrow = false }: { readonly state: State; readonly na
   if (state === 'composer') {
     props.task = { id: 'T-18', attemptId: 'attempt-18', title: 'Explain the failure path', status: 'Working', permission: 'suggest', context: 'Checkout service', onStop: record('stop'), onRequestLivePermission: (taskId, attemptId) => setAction(`Preview grant request: ${taskId} / ${attemptId}`) };
   }
+  if (state === 'markdown') {
+    props.messages = [{ id: 'markdown', author: 'Claude', kind: 'agent', text: '# Changes\n\n- **Checkout** renamed\n\n| Before | After |\n| --- | --- |\n| Router | Gateway |\n\n```ts\nconst name = "Gateway";\n```\n\n[Documentation](https://example.com)\n\n[Unsafe](javascript:alert(1))\n\n![Remote diagram](https://example.com/track.png)\n\n<script>alert(1)</script>' }, { id: 'routine', author: 'Activity', kind: 'activity', text: 'Technical delivery receipt' }];
+    props.activity = 'Preparing changes…';
+  }
   return <div className="space-y-2" style={{ width: narrow ? 320 : 380, maxWidth: '100%' }}>
     <p className="text-caption text-secondary-text">Presentation fixture · no agent or board writes</p>
     <div className="h-[640px] min-h-0 overflow-hidden border border-hairline"><CollaborationPanel {...props} /></div>
@@ -75,6 +79,23 @@ function Fixture({ state, narrow = false }: { readonly state: State; readonly na
 const meta = { title: 'AI Collaboration/Current states', component: CollaborationPanel, parameters: { layout: 'padded' } } satisfies Meta<typeof CollaborationPanel>;
 export default meta;
 type Story = StoryObj;
+
+export const MarkdownAndDiagnostics: Story = {
+  render: () => <Fixture state="markdown" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('heading', { name: 'Changes' })).toBeVisible();
+    await expect(canvas.getByRole('table')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Copy code' })).toBeVisible();
+    await expect(canvas.getByRole('link', { name: 'Documentation' })).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(canvas.queryByRole('link', { name: 'Unsafe' })).toBeNull();
+    await expect(canvas.queryByRole('img', { name: 'Remote diagram' })).toBeNull();
+    await expect(canvasElement.querySelector('script')).toBeNull();
+    await expect(within(canvas.getByRole('list', { name: 'Messages' })).queryByText('Technical delivery receipt')).toBeNull();
+    await userEvent.click(canvas.getByText('Details', { exact: true }));
+    await expect(canvas.getByText('Technical delivery receipt')).toBeVisible();
+  },
+};
 
 export const Disconnected: Story = {
   render: () => <Fixture state="disconnected" />,
@@ -161,7 +182,9 @@ export const KeyboardComposer: Story = {
   render: () => <Fixture state="composer" narrow />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByRole('textbox', { name: 'Task instruction' });
+    await expect(canvas.getByRole('button', { name: 'Stop editing task' })).toBeEnabled();
+    await userEvent.click(canvas.getByRole('button', { name: /^Question$/ }));
+    const input = canvas.getByRole('textbox', { name: 'Question' });
     await userEvent.click(input);
     await userEvent.type(input, 'Explain the failure path');
     await userEvent.keyboard('{Control>}{Enter}{/Control}');

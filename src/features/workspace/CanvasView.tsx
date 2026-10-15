@@ -37,6 +37,7 @@ import { FloatingDock } from './FloatingDock';
 import { SelectionBox } from './SelectionBox';
 import { CanvasCrosshair } from './CanvasCrosshair';
 import { AgentCursor, agentPresenceLabel, findAgentCursorPosition, type AgentPresence } from '../agents/AgentCursor';
+import { useCursorPresentation } from '../agents/cursor-presentation';
 import { rememberPart } from '../library/recentParts';
 import {
   projectDocumentToCanvas,
@@ -503,6 +504,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     const targets = displayNodes.filter(node => !node.hidden).map(node => ({ recordIds: node.data.kind === 'element' || node.data.kind === 'boundary' ? [node.data.element.id] : node.data.kind === 'note' ? [node.data.note.id] : [node.data.group.id], x: node.position.x, y: node.position.y }));
     return findAgentCursorPosition(agentPresence, targets, viewport, cursorBounds);
   }, [agentPresence, displayNodes, viewport.x, viewport.y, viewport.zoom, cursorBounds]);
+  const displayedAgentPresence = useCursorPresentation(agentCursorPosition ? agentPresence : undefined);
 
   const displayEdges = React.useMemo(
     () =>
@@ -1291,7 +1293,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
             This project has no views configured in its document.
           </p>
         </div>
-        {agentPresence && <><AgentCursor presence={agentPresence} /><p role="status" className="sr-only">{agentPresenceLabel(agentPresence)}</p></>}
       </div>
     );
   }
@@ -1368,7 +1369,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         />
       )}
 
-      <p role="status" aria-atomic="true" className="sr-only">{agentPresence ? agentPresenceLabel(agentPresence) : ''}</p>
+      <p role="status" aria-atomic="true" className="sr-only">{displayedAgentPresence ? agentPresenceLabel(displayedAgentPresence) : ''}</p>
       {/* Selected node IDs for the unified selection box */}
       {(() => null)()}
 
@@ -1417,7 +1418,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
               ...(commandContext.selectedNoteIds ?? []),
             ]}
           />
-          {agentPresence && agentCursorPosition && <AgentCursor presence={agentPresence} position={agentCursorPosition} scale={1 / zoom} />}
+          {displayedAgentPresence && agentCursorPosition && <AgentCursor presence={displayedAgentPresence} position={agentCursorPosition} scale={1 / zoom} />}
         </ViewportPortal>
         {/* Background centres its pattern at half the gap and places each dot at its
             radius. Cancel both offsets so visible dots land on snapped flow coordinates. */}
@@ -1431,7 +1432,6 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         )}
       </ReactFlow>
-      {agentPresence && !agentCursorPosition && <AgentCursor presence={agentPresence} />}
       </SimulationHighlightContext.Provider>
       </PlaybackTrafficContext.Provider>
 

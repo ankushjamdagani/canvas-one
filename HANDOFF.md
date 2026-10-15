@@ -1,5 +1,13 @@
 # Development handoff
 
+## Assistant chat and activity — 2026-10-15
+
+assistant-ui now presents the controller's durable conversation through an external-store adapter, safe Markdown and composer primitives. Canvas One still owns local CLI execution, history, reviewed proposals and all writes. No Assistant Cloud setup or credential API. The connected composer keeps Agent/Disconnect beside Send; Send becomes the represented attempt's face/Stop, with independent question cancellation. Actionable notices stay visible; raw diagnostics and the latest 100 session operations live in Details. App typography and disconnected setup are preserved.
+
+Presence now waits 200ms from presentation observation, requires a visible actual target, coalesces to the latest operation and retains displayed successful receipts for 700ms across normal completion. Stop, failure, required decisions and scope changes clear it immediately. Review undo is eligibility-gated, deduplicated and marked as trusted host preparation; accepted reversals retain human edits. Controller guards cover parallel stream attribution and duplicate start/Accept requests.
+
+The real signed-in Claude path reproduced four invalid guessed change envelopes before a valid fifth proposal. Exposing the exact RecordChange union and complete-record replacement semantics fixed the demonstrated contract gap: the corrected natural rename passed in 24.9s with one valid proposal on its first try, explicit acceptance, one durable journal entry and zero browser errors. The opt-in regression is `tests/studio-agents-real.spec.ts` (`CANVAS_ONE_REAL_PROVIDER=claude`); ordinary CI skips paid inference. Final verification and limitations are recorded in `docs/audits/2026-10-15-ai-chat-ux.md`. Keep supplied design files ignored; agy remains explicitly blocked.
+
 ## AI collaboration implementation — 2026-10-15
 
 Latest composer refinement: removed the AI-specific font/size tokens; typography now inherits app defaults, with app-wide work deferred to the user. Agent selection moved to the composer immediately left of icon-only Send, with attached destructive Unplug/Disconnect control and a factual state face. Removed the redundant connected label and repeated Suggest footer hint. Composer still requires connection. TypeScript, Storybook build/interaction checks and focused local setup/proposal browser checks cover this update; no production/full-suite rerun.

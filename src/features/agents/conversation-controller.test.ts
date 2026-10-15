@@ -7,7 +7,7 @@ import { AgentConversationController } from './conversation-controller';
 import { prepareAgentTaskAction } from '../../persistence/studio/agent-action-journal';
 import type { Document, Element } from '../../domain/studio/model';
 
-const reviewedCalls = vi.hoisted(() => ({ tools: vi.fn(), beforeAccept: undefined as (() => Promise<void>) | undefined }));
+const reviewedCalls = vi.hoisted(() => ({ tools: vi.fn(), failNextSubmit: false, beforeAccept: undefined as (() => Promise<void>) | undefined }));
 vi.mock('./controller', () => ({ SystemAgentSession: class {
   private proposalsMap = new Map<string, any>();
   reviewer = { actorId: 'human', kind: 'human', displayName: 'Human' };
@@ -15,7 +15,7 @@ vi.mock('./controller', () => ({ SystemAgentSession: class {
     list: () => [...this.proposalsMap.values()],
     pruneTerminal: (_retain: number) => 0,
     restore: (saved: any[]) => { for (const proposal of saved) this.proposalsMap.set(proposal.operationId, proposal); return { ok: true }; },
-    submit: (request: any) => { const proposal = { ...request, status: 'pending', issues: [] }; this.proposalsMap.set(proposal.operationId, proposal); return { ok: true, proposal }; },
+    submit: (request: any) => { if (reviewedCalls.failNextSubmit) { reviewedCalls.failNextSubmit = false; return { ok: false, issues: [{ message: 'Review limit reached' }] }; } const proposal = { ...request, status: 'pending', issues: [] }; this.proposalsMap.set(proposal.operationId, proposal); return { ok: true, proposal }; },
     preview: (id: string) => this.proposalsMap.get(id),
     accept: async (id: string) => { await reviewedCalls.beforeAccept?.(); const proposal = { ...this.proposalsMap.get(id), status: 'accepted', acceptedBy: this.reviewer, receipt: { status: 'applied' } }; this.proposalsMap.set(id, proposal); return { ok: true, proposal }; },
     reject: (id: string) => { const proposal = { ...this.proposalsMap.get(id), status: 'rejected' }; this.proposalsMap.set(id, proposal); return { ok: true, proposal }; },
@@ -30,7 +30,7 @@ vi.mock('./controller', () => ({ SystemAgentSession: class {
 } }));
 
 const controllers: AgentConversationController[] = [];
-afterEach(() => { for (const controller of controllers.splice(0)) controller.dispose(); reviewedCalls.tools.mockClear(); reviewedCalls.beforeAccept = undefined; });
+afterEach(() => { for (const controller of controllers.splice(0)) controller.dispose(); reviewedCalls.tools.mockClear(); reviewedCalls.beforeAccept = undefined; reviewedCalls.failNextSubmit = false; });
 function setup(shared?: ReturnType<typeof stores>, options: { main?: boolean; owned?: string[]; recover?: boolean; boardId?: string; selection?: () => { ids: readonly string[]; viewId?: string | null } } = {}) {
   const storage = shared ?? stores(); let now = 0, count = 0;
   const state = { projectId: 'project', branchId: options.main ? 'main' : 'draft', mainBranchId: 'main', workingRevision: 1, needsReload: false, document: { id: options.boardId ?? 'board' } };
@@ -40,7 +40,7 @@ function setup(shared?: ReturnType<typeof stores>, options: { main?: boolean; ow
   const session = { getState: () => state, getActor: () => ({ actorId: 'human', kind: 'local-human', displayName: 'Human' }), subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); }, applyLiveTaskAction: vi.fn(async () => ({ status: 'applied' })) } as unknown as SessionController;
   const leases = new BrowserTaskLeaseRegistry(() => now, { maxActiveEntries: 32, maxTombstones: 1000 });
   const repository = { createAgentTaskStorage: (scope: { branchId: string }) => scopeStore(scope.branchId).task, createAgentConversationStorage: (scope: { branchId: string }) => scopeStore(scope.branchId).conversation, agentExecutionLeases: leases, holdAgentTaskAction: vi.fn(), clearAgentTaskOverlap: vi.fn(), listAgentTaskActions: vi.fn(async () => []) } as unknown as StudioRepository;
-  let queue: BrowserAuthorityRequest[] = [], events: CollaborationEvent[] = [];
+  let queue: BrowserAuthorityRequest[] = [], events: CollaborationEvent[] = []; let requestCount = 0;
   const client = {
     pair: vi.fn(async () => ({ token: 'token', expiresAt: 10000 })), status: vi.fn(async () => ({ sessionId: 'epoch', providers: [{ id: 'claude', available: true, detail: 'Fixture' }, { id: 'codex', available: true, detail: 'Fixture' }], attempts: [] })),
     start: vi.fn(async (_token, input) => ({ lease: { ...input.identity, deadline: now + 15000 }, requestStartedAt: now })),
@@ -52,7 +52,7 @@ function setup(shared?: ReturnType<typeof stores>, options: { main?: boolean; ow
   let owned = options.owned ?? [];
   const controller = new AgentConversationController({ session, repository, selection: options.selection, client: client as unknown as CollaborationBrowserClient, now: () => now, mintId: () => `id-${++count}-${controllers.length}`, leaseMs: 15000, pollMs: 60000, heartbeatMs: 60000, ownership: { load: () => owned, save: ids => { owned = [...ids]; } }, recoverOwnedAfterReload: options.recover }); controllers.push(controller);
   const identity = (): ExecutionIdentity => client.start.mock.calls.at(-1)![1].identity;
-  const enqueue = (payload: BrowserAuthorityRequest['payload'], binding = identity()) => { queue.push({ version: 1, requestId: `request-${queue.length}`, identity: binding, payload }); };
+  const enqueue = (payload: BrowserAuthorityRequest['payload'], binding = identity()) => { queue.push({ version: 1, requestId: `request-${requestCount++}`, identity: binding, payload }); };
   const emit = (payload: CollaborationEvent['payload'], binding = identity()) => { events.push({ version: 1, cursor: events.length + 1, provider: 'claude', identity: binding, payload }); };
   return { controller, client, session, state, leases, repository, storage, scopeStore, identity, enqueue, emit, setTime: (value: number) => { now = value; }, navigate: (branch = 'other') => { state.branchId = branch; for (const listener of listeners) listener(); } };
 }
@@ -71,6 +71,37 @@ describe('workspace-owned agent conversation authority', () => {
     expect(fixture.storage.taskData().tasks[0].providerId).toBe('claude'); expect(fixture.storage.conversationData().messages[0].payload.delivery).toBe('delivered');
     await fixture.controller.start('codex', 'Explain the board', 'question'); expect(fixture.controller.getState().tasks).toHaveLength(2);
     expect(fixture.client.start.mock.calls[1]?.[1].mode).toBe('question');
+  });
+  it('serializes editing starts while allowing an independent question', async () => {
+    const fixture = await connected();
+    const outcomes = await Promise.allSettled([fixture.controller.start('claude', 'First edit'), fixture.controller.start('codex', 'Duplicate edit')]);
+    expect(outcomes.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
+    await expect(fixture.controller.start('claude', 'Another edit')).rejects.toThrow('active editing');
+    await fixture.controller.start('codex', 'Question', 'question'); expect(fixture.controller.getState().tasks).toHaveLength(2);
+  });
+  it('coalesces interleaved text deltas by attempt instead of global message order', async () => {
+    const fixture = await connected(); await fixture.controller.start('claude', 'Edit'); const editing = fixture.identity();
+    await fixture.controller.start('codex', 'Explain', 'question'); const question = fixture.identity();
+    fixture.emit({ kind: 'text', text: 'Hel', format: 'delta' }, editing); fixture.emit({ kind: 'text', text: 'Wor', format: 'delta' }, question);
+    fixture.emit({ kind: 'text', text: 'lo', format: 'delta' }, editing); fixture.emit({ kind: 'text', text: 'ld', format: 'delta' }, question);
+    await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().messages.filter(message => message.role === 'agent').map(message => message.text)).toEqual(['Hello', 'World']);
+  });
+  it('rejects stale explicit Stop without cancelling the newer attempt', async () => {
+    const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Edit'); const old = fixture.identity();
+    vi.mocked(fixture.session.applyLiveTaskAction).mockResolvedValueOnce({ status: 'invalid', issues: [] } as never);
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'reject', tool: 'action_submit', input: { operationId: 'invalid', label: 'Invalid', changes: [], expectedRecords: [] } } }); await fixture.controller.pollOnce();
+    await fixture.controller.resume(taskId); const current = fixture.identity();
+    await expect(fixture.controller.stop(taskId, old.attemptId)).rejects.toThrow('newer attempt');
+    expect(fixture.leases.permits({ taskId, attemptId: current.attemptId, actorId: current.actorId, generation: current.generation, scope: { projectId: current.projectId, branchId: current.branchId, boardId: current.boardId } })).toBe(true);
+  });
+  it('classifies diagnostics and retains successful board feedback across normal task completion', async () => {
+    const fixture = await connected(); await fixture.controller.start('claude', 'Inspect');
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'inspect', tool: 'board_inspect', input: {} } }); await fixture.controller.pollOnce();
+    fixture.emit({ kind: 'diagnostic', code: 'provider-error', message: 'Technical detail' }); await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().messages.at(-1)).toMatchObject({ classification: 'diagnostic', role: 'system' });
+    fixture.emit({ kind: 'provider-result', outcome: 'succeeded', cancellationAcknowledged: false }); await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().tasks[0]?.status).toBe('completed'); expect(fixture.controller.getState().activity?.status).toBe('succeeded');
   });
   it('rejects edits on main without inventing a draft, while questions remain available', async () => {
     const fixture = setup(undefined, { main: true }); await fixture.controller.ready; await fixture.controller.pair('http://127.0.0.1:47831', 'secret');
@@ -183,6 +214,14 @@ describe('workspace-owned agent conversation authority', () => {
     await expect(fixture.controller.undo(taskId)).rejects.toThrow('Stop the active authoring');
     expect(fixture.repository.listAgentTaskActions).not.toHaveBeenCalled(); expect(fixture.controller.getState().proposals).toHaveLength(0);
   });
+  it('rejects an Undo journal read that finishes after leaving its board', async () => {
+    const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Edit'); await fixture.controller.stop(taskId);
+    let finish!: (rows: never[]) => void;
+    vi.mocked(fixture.repository.listAgentTaskActions!).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const pending = fixture.controller.undo(taskId); fixture.navigate(); finish([]);
+    await expect(pending).rejects.toThrow(/board/i);
+    expect(fixture.controller.getState().proposals).toEqual([]);
+  });
   it('prepares a reviewed Undo for completed changes from a failed task without applying it', async () => {
     const fixture = setup(undefined, { boardId: '00000000-0000-4000-8000-000000000001' }); await fixture.controller.ready; await fixture.controller.pair('http://127.0.0.1:47831', 'secret');
     const taskId = await fixture.controller.start('claude', 'Edit'); const identity = fixture.identity();
@@ -193,11 +232,47 @@ describe('workspace-owned agent conversation authority', () => {
     const before: Document = { schema: 'studio-model/1', id: identity.boardId, title: 'Board', elements: [original], connections: [], relations: [], schemas: [], fixtures: [], refinements: [], scenarios: [], views: [] }, after = { ...before, elements: [edited] };
     Object.assign(fixture.state, { document: after });
     const row = prepareAgentTaskAction({ binding: { taskId, attemptId: identity.attemptId, actorId: identity.actorId, generation: identity.generation, scope: { projectId: identity.projectId, branchId: identity.branchId, boardId: identity.boardId } }, operationId: 'completed-change', sequence: 1, before, after, changes: [{ kind: 'replace', value: { recordKind: 'element', record: edited } }] });
-    vi.mocked(fixture.repository.listAgentTaskActions!).mockResolvedValueOnce([row]); fixture.session.applyLiveTaskAction = vi.fn();
-    await fixture.controller.undo(taskId);
+    vi.mocked(fixture.repository.listAgentTaskActions!).mockResolvedValue([row]); fixture.session.applyLiveTaskAction = vi.fn();
+    const [operationId, duplicate] = await Promise.all([fixture.controller.undo(taskId), fixture.controller.undo(taskId)]);
+    expect(operationId).toBe(duplicate); expect(await fixture.controller.undo(taskId)).toBe(operationId);
+    expect(fixture.controller.getState().proposals).toHaveLength(1);
     expect(fixture.controller.getState().tasks[0]?.status).toBe('failed');
-    expect(fixture.controller.getState().proposals[0]?.proposal).toMatchObject({ status: 'pending', label: 'Undo task', changes: [{ kind: 'replace', value: { recordKind: 'element', record: original } }] });
+    expect(fixture.controller.getState().proposals[0]?.proposal).toMatchObject({ operationId, status: 'pending', label: 'Review undo', changes: [{ kind: 'replace', value: { recordKind: 'element', record: original } }] });
     expect(fixture.state.document).toEqual(after); expect(fixture.session.applyLiveTaskAction).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(fixture.controller.getState().undoableTaskIds).toEqual([taskId]));
+    expect(fixture.controller.getState().pendingUndoTaskIds).toEqual([taskId]);
+    expect(fixture.storage.conversationData().operations).toContainEqual(expect.objectContaining({ operationId: `host-execution:undo:${operationId}`, payload: expect.objectContaining({ tool: 'host-undo', initiatedBy: expect.objectContaining({ kind: 'human' }) }) }));
+    fixture.state.workingRevision = 2; reviewedCalls.failNextSubmit = true;
+    await expect(fixture.controller.undo(taskId)).rejects.toThrow('Review limit reached');
+    expect(fixture.controller.getState().proposals.find(entry => entry.proposal.operationId === operationId)?.proposal.status).toBe('pending');
+    expect(fixture.storage.conversationData().proposals.find((entry: any) => entry.id === operationId).payload.status).toBe('pending');
+    const replacement = await fixture.controller.undo(taskId);
+    expect(replacement).not.toBe(operationId); expect(fixture.controller.getState().proposals.find(entry => entry.proposal.operationId === operationId)?.proposal.status).toBe('rejected');
+    reviewedCalls.beforeAccept = async () => { Object.assign(fixture.state, { document: before, workingRevision: 3 }); };
+    await fixture.controller.accept(replacement!);
+    await vi.waitFor(() => expect(fixture.controller.getState().undoableTaskIds).toEqual([]));
+    expect(fixture.controller.getState().pendingUndoTaskIds).toEqual([]);
+  });
+  it('shares concurrent Accept work and rejects subsequent terminal acceptance', async () => {
+    const fixture = await connected(); await fixture.controller.start('claude', 'Propose');
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'tool', tool: 'proposal_submit', input: { operationId: 'proposal', scope: { projectId: 'project', branchId: 'draft' }, expectedRevision: 1, label: 'Proposal', changes: [] } } }); await fixture.controller.pollOnce();
+    let release!: () => void; const apply = vi.fn(() => new Promise<void>(resolve => { release = resolve; })); reviewedCalls.beforeAccept = apply;
+    const first = fixture.controller.accept('proposal'), second = fixture.controller.accept('proposal'); expect(second).toBe(first);
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1)); release(); await Promise.all([first, second]);
+    await expect(fixture.controller.accept('proposal')).rejects.toThrow('pending proposal'); expect(apply).toHaveBeenCalledTimes(1);
+  });
+  it.each(['proposal_submit', 'diagram_create'] as const)('rejects reserved normalized Undo labels from %s', async tool => {
+    const fixture = await connected(); await fixture.controller.start('claude', 'Propose');
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'tool', tool, input: { operationId: 'spoof', scope: { projectId: 'project', branchId: 'draft' }, expectedRevision: 1, label: '  Review   UNDO  ', changes: [] } } }); await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().proposals).toEqual([]); expect(reviewedCalls.tools).not.toHaveBeenCalled();
+    expect(fixture.client.result.mock.calls.at(-1)?.[2]).toMatchObject({ error: expect.stringContaining('reserved') });
+  });
+  it('rejects ended-task refinement of an ordinary agent proposal', async () => {
+    const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Propose');
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'tool', tool: 'proposal_submit', input: { operationId: 'spoof', scope: { projectId: 'project', branchId: 'draft' }, expectedRevision: 1, label: 'Ordinary proposal', changes: [] } } }); await fixture.controller.pollOnce();
+    await fixture.controller.stop(taskId);
+    await expect(fixture.controller.requestChanges('spoof', 'Change it')).rejects.toThrow('task has ended');
+    expect(fixture.controller.getState().pendingUndoTaskIds).toEqual([]);
   });
   it('persists accepting before authored review and preserves its captured board receipt across navigation', async () => {
     const fixture = await connected(); await fixture.controller.start('claude', 'Propose');
@@ -208,12 +283,36 @@ describe('workspace-owned agent conversation authority', () => {
     expect(fixture.storage.conversationData().scope.branchId).toBe('draft'); expect(fixture.storage.conversationData().proposals[0].payload.status).toBe('accepted');
     expect(fixture.storage.taskData().tasks[0].status).toBe('completed');
   });
-  it('publishes activity only during actual authorized tool handling and clears it afterward', async () => {
+  it('publishes identified tool activity and retains truthful completion without inventing targets from text', async () => {
     const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Edit'); const activity: unknown[] = [];
     fixture.controller.subscribe(() => { const current = fixture.controller.getState().activity; if (current) activity.push(current); });
     fixture.enqueue({ kind: 'tool', data: { requestId: 'inspect', tool: 'board_inspect', input: {} } }); await fixture.controller.pollOnce();
-    expect(activity).toContainEqual({ taskId, attemptId: fixture.identity().attemptId, kind: 'reading', targetIds: [] }); expect(fixture.controller.getState().activity).toBeUndefined();
-    fixture.emit({ kind: 'text', text: 'I might edit fictional-node', format: 'delta' }); await fixture.controller.pollOnce(); expect(fixture.controller.getState().activity).toBeUndefined();
+    expect(activity).toContainEqual(expect.objectContaining({ id: 'request-0', taskId, attemptId: fixture.identity().attemptId, generation: 1, kind: 'reading', targetIds: [], status: 'running' }));
+    expect(fixture.controller.getState().activity).toMatchObject({ status: 'succeeded', label: 'Board inspection complete' });
+    expect(fixture.controller.getState().activityLog).toHaveLength(1);
+    fixture.emit({ kind: 'text', text: 'I might edit fictional-node', format: 'delta' }); await fixture.controller.pollOnce(); expect(fixture.controller.getState().activity?.targetIds).toEqual([]);
+    await fixture.controller.stop(taskId); expect(fixture.controller.getState().activity).toBeUndefined();
+  });
+  it('never lets an older completion clear newer activity or revive activity after Stop', async () => {
+    const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Edit'); await fixture.controller.grantLive(taskId, fixture.identity().attemptId);
+    let resolveOld!: (value: never) => void, resolveNew!: (value: never) => void;
+    vi.mocked(fixture.session.applyLiveTaskAction).mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; })).mockImplementationOnce(() => new Promise(resolve => { resolveNew = resolve; }));
+    const handler = fixture.controller as unknown as { handleRequest(request: BrowserAuthorityRequest): Promise<void> };
+    const request = (id: string): BrowserAuthorityRequest => ({ version: 1, requestId: id, identity: fixture.identity(), payload: { kind: 'tool', data: { requestId: id, tool: 'action_submit', input: { operationId: id, label: 'Change', changes: [], expectedRecords: [] } } } });
+    const old = handler.handleRequest(request('old')); await vi.waitFor(() => expect(resolveOld).toBeTypeOf('function'));
+    const next = handler.handleRequest(request('new')); await vi.waitFor(() => expect(resolveNew).toBeTypeOf('function'));
+    resolveOld({ status: 'applied' } as never); await old;
+    expect(fixture.controller.getState().activity).toMatchObject({ id: 'new', status: 'running' });
+    await fixture.controller.stop(taskId); resolveNew({ status: 'applied' } as never); await next;
+    expect(fixture.controller.getState().activity).toBeUndefined();
+    expect(fixture.controller.getState().activityLog?.find(entry => entry.id === 'new')?.status).toBe('failed');
+  });
+  it('bounds current-session activity and clears it on disconnect', async () => {
+    const fixture = await connected(); await fixture.controller.start('claude', 'Inspect');
+    for (let index = 0; index < 105; index++) { fixture.enqueue({ kind: 'tool', data: { requestId: `tool-${index}`, tool: 'board_inspect', input: {} } }); await fixture.controller.pollOnce(); }
+    expect(fixture.controller.getState().activityLog).toHaveLength(100);
+    expect(fixture.controller.getState().activityLog?.[0]?.id).toBe('request-5');
+    await fixture.controller.disconnect(); expect(fixture.controller.getState().activityLog).toEqual([]);
   });
   it('does not let an old failed heartbeat interrupt a resumed attempt', async () => {
     const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Edit');

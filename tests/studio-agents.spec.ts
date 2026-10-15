@@ -2,6 +2,7 @@ import { test, expect, type Page } from './fixtures';
 import { startCollaborationServer, type ExecutionBackend, type LocalCollaborationServer } from '@canvas-one/agent-bridge/collaboration-server';
 import type { AgentTool } from '@canvas-one/agent-bridge';
 import type { Element, View } from '@canvas-one/system-design';
+import type { CollaborationTask } from '@canvas-one/agents';
 
 const ROUTER = '816fe039-76dd-5b7b-a787-4d7666ff8d62';
 test.beforeEach(async ({ page }, testInfo) => {
@@ -57,7 +58,13 @@ async function connect(page: Page, service: LocalCollaborationServer, expectComp
 }
 async function start(page: Page, f: Awaited<ReturnType<typeof fixture>>, instruction: string) {
   const panel = await connect(page, f.service); await panel.getByLabel('Task instruction').fill(instruction); await panel.getByRole('button', { name: 'Send', exact: true }).click();
-  await expect.poll(() => f.contexts.size).toBe(1); await expect(panel).toContainText('Suggest · review before applying'); return { panel, context: [...f.contexts.values()][0]! };
+  await expect.poll(() => f.contexts.size).toBe(1); await expect(panel.locator('summary').filter({ hasText: 'Suggest · Task details' })).toBeVisible(); return { panel, context: [...f.contexts.values()][0]! };
+}
+async function taskState(page: Page, taskId: string): Promise<CollaborationTask | undefined> {
+  return page.evaluate(id => new Promise<CollaborationTask | undefined>((resolve, reject) => {
+    const request = indexedDB.open('system-studio-local-v1'); request.onerror = () => reject(new Error('Database unavailable'));
+    request.onsuccess = () => { const db = request.result, tx = db.transaction('agentTaskLedgers', 'readonly'), rows = tx.objectStore('agentTaskLedgers').getAll(); rows.onsuccess = () => resolve(rows.result.flatMap(row => JSON.parse(row.serializedLedger).tasks).find((task: CollaborationTask) => task.id === id)); rows.onerror = () => reject(new Error('Task ledger unavailable')); tx.oncomplete = () => db.close(); };
+  }), taskId);
 }
 async function journal(page: Page): Promise<{ taskId: string; binding: Record<string, unknown> }[]> {
   return page.evaluate(() => new Promise<{ taskId: string; binding: Record<string, unknown> }[]>((resolve, reject) => {
@@ -165,7 +172,7 @@ test('Suggest review applies once through the board mailbox with durable task pr
     await openBoard(page); const { panel, context } = await start(page, f, 'Rename the router'); const board = await f.tool<Inspection>(context, 'board_inspect', {}), original = board.records.find(record => record.id === ROUTER)!.data as Element;
     expect(await f.tool(context, 'proposal_submit', { operationId: crypto.randomUUID(), scope: board.scope, expectedRevision: board.revision, label: 'Reviewed router name', changes: [{ kind: 'replace', value: { recordKind: 'element', record: { ...original, label: 'Reviewed Router' } } }] })).toMatchObject({ ok: true });
     await expect(panel).toContainText('Reviewed router name'); await expect(page.locator(`[data-element-id="${ROUTER}"]`)).not.toContainText('Reviewed Router'); expect((await journal(page)).filter(row => row.taskId === context.identity.taskId)).toHaveLength(0);
-    const sendBounds = (await panel.getByRole('button', { name: 'Send', exact: true }).boundingBox())!, panelBounds = (await panel.boundingBox())!;
+    const sendBounds = (await panel.getByRole('button', { name: 'Stop editing task', exact: true }).boundingBox())!, panelBounds = (await panel.boundingBox())!;
     expect(sendBounds.y + sendBounds.height).toBeLessThanOrEqual(panelBounds.y + panelBounds.height);
     await page.screenshot({ path: testInfo.outputPath('desktop-suggest-review.png'), fullPage: true });
     f.finishes.get(context.identity.attemptId)!(); await panel.getByRole('button', { name: 'Accept changes', exact: true }).click(); await expect(page.locator(`[data-element-id="${ROUTER}"]`)).toContainText('Reviewed Router');
@@ -187,13 +194,14 @@ test('historical task Undo selects a new actionable review while accepted receip
     await panel.getByRole('button', { name: 'Accept changes', exact: true }).click();
     await expect(router).toContainText('History Reviewed Router');
     await expect.poll(async () => (await journal(page)).filter(row => row.taskId === context.identity.taskId).length).toBe(1);
-    await expect(panel).toContainText('completed');
+    await expect.poll(async () => (await taskState(page, context.identity.taskId))?.status).toBe('completed');
 
     await panel.getByLabel('Task instruction').fill('Wait without changing the board');
     await panel.getByRole('button', { name: 'Send', exact: true }).click();
     await expect.poll(() => f.contexts.size).toBe(2);
-    await panel.getByRole('button', { name: 'Stop', exact: true }).click();
-    await expect(panel).toContainText('Agent cancellation acknowledged');
+    await panel.getByRole('button', { name: 'Stop editing task', exact: true }).click();
+    const second = [...f.contexts.values()][1]!;
+    await expect.poll(async () => (await taskState(page, second.identity.taskId))?.cancellation).toBe('acknowledged');
     await panel.locator('summary').filter({ hasText: /^Earlier tasks/ }).click();
     await panel.getByRole('button', { name: 'Claude · Rename router for history undo', exact: true }).click();
     const history = panel.getByRole('region', { name: 'Task proposal history' });
@@ -201,8 +209,8 @@ test('historical task Undo selects a new actionable review while accepted receip
     await receipt.click();
     await expect(panel.getByRole('button', { name: 'Accept changes', exact: true })).toHaveCount(0);
 
-    await panel.getByRole('button', { name: 'Undo task', exact: true }).click();
-    await expect(panel.getByRole('heading', { name: 'Undo task', exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: 'Review undo', exact: true }).click();
+    await expect(panel.getByRole('heading', { name: 'Review undo', exact: true })).toBeVisible();
     const accept = panel.getByRole('button', { name: 'Accept changes', exact: true });
     await expect(accept).toBeEnabled();
     await expect(router).toContainText('History Reviewed Router');
@@ -220,7 +228,7 @@ test('Live overlap preserves human edits, independent work continues, and Stop o
   const f = await fixture(new URL(baseURL!).origin);
   try {
     await openBoard(page); const { panel, context } = await start(page, f, 'Organize the board'); await panel.getByRole('button', { name: 'Allow live edit for this task…', exact: true }).click();
-    const grant = page.getByRole('dialog', { name: 'Allow live edit for this task?' }); await expect(grant).toContainText('delete content'); await grant.getByRole('button', { name: 'Allow live edit for this task', exact: true }).click(); await expect(panel).toContainText('Live edit · whole board, including deletions');
+    const grant = page.getByRole('dialog', { name: 'Allow live edit for this task?' }); await expect(grant).toContainText('delete content'); await grant.getByRole('button', { name: 'Allow live edit for this task', exact: true }).click(); await panel.locator('summary').filter({ hasText: 'Live edit · Task details' }).click(); await expect(panel).toContainText('Whole board, including deletions');
     await page.screenshot({ path: testInfo.outputPath('desktop-live-task.png'), fullPage: true });
     const board = await f.tool<Inspection>(context, 'board_inspect', {}), original = board.records.find(record => record.id === ROUTER)!.data as Element;
     const view = board.records.find(record => record.type === 'views')!.data as View;
@@ -234,7 +242,7 @@ test('Live overlap preserves human edits, independent work continues, and Stop o
     expect(await f.tool(context, 'action_submit', { operationId: crypto.randomUUID(), label: 'Conflicting router edit', changes: [{ kind: 'replace', value: { recordKind: 'element', record: { ...original, label: 'Must not overwrite human' } } }], expectedRecords: [{ recordKind: 'element', id: original.id, before: { recordKind: 'element', record: original } }] })).toMatchObject({ status: 'failed', code: 'conflict' }); await expect(panel).toContainText('An affected action needs a decision');
     const current = await f.tool<Inspection>(context, 'board_inspect', {}), independent = current.records.find(record => record.type === 'elements' && record.id !== ROUTER)!.data as Element;
     expect(await f.tool(context, 'action_submit', { operationId: crypto.randomUUID(), label: 'Independent label edit', changes: [{ kind: 'replace', value: { recordKind: 'element', record: { ...independent, label: 'Independent Agent Edit' } } }], expectedRecords: [{ recordKind: 'element', id: independent.id, before: { recordKind: 'element', record: independent } }] })).toMatchObject({ status: 'applied' }); await expect(page.locator(`[data-element-id="${independent.id}"]`)).toContainText('Independent Agent Edit');
-    await panel.getByRole('button', { name: 'Stop', exact: true }).click(); await expect(panel).toContainText('Agent cancellation acknowledged'); await panel.getByRole('button', { name: 'Undo task', exact: true }).click(); await expect(page.locator(`[data-element-id="${independent.id}"]`)).toContainText('Independent Agent Edit'); await panel.getByRole('button', { name: 'Accept changes', exact: true }).click(); await expect(page.locator(`[data-element-id="${independent.id}"]`)).toContainText(independent.label);
+    await panel.getByRole('button', { name: 'Stop editing task', exact: true }).click(); await expect.poll(async () => (await taskState(page, context.identity.taskId))?.cancellation).toBe('acknowledged'); await panel.getByRole('button', { name: 'Review undo', exact: true }).click(); await expect(page.locator(`[data-element-id="${independent.id}"]`)).toContainText('Independent Agent Edit'); await panel.getByRole('button', { name: 'Accept changes', exact: true }).click(); await expect(page.locator(`[data-element-id="${independent.id}"]`)).toContainText(independent.label);
     await page.locator(`[data-element-id="${ROUTER}"]`).click(); await expect(page.getByTestId('inspector-field-config.capacity')).toHaveValue('87');
   } finally { await f.dispose(); }
 });
@@ -259,12 +267,12 @@ test('Stop fences writes before cancellation close evidence arrives', async ({ p
   const f = await fixture(new URL(baseURL!).origin, true);
   try {
     await openBoard(page); const { panel, context } = await start(page, f, 'Wait for explicit cancellation');
-    await panel.getByRole('button', { name: 'Stop', exact: true }).click();
-    await expect(panel).toContainText('Further board writes are disabled');
-    await expect(panel).toContainText('Agent cancellation has not been acknowledged');
+    await panel.getByRole('button', { name: 'Stop editing task', exact: true }).click();
+    await expect(panel).toContainText('Board writes stopped. Waiting for agent cancellation.');
+    await expect.poll(async () => (await taskState(page, context.identity.taskId))?.cancellation).toBe('pending');
     await expect(f.tool(context, 'board_inspect', {})).rejects.toThrow('revoked');
     f.finishes.get(context.identity.attemptId)!('cancelled');
-    await expect(panel).toContainText('Agent cancellation acknowledged');
+    await expect.poll(async () => (await taskState(page, context.identity.taskId))?.cancellation).toBe('acknowledged');
   } finally { await f.dispose(); }
 });
 
@@ -277,13 +285,61 @@ test('Disconnect requires explicit Resume with a new attempt and Suggest permiss
     await expect(panel.getByLabel('Task instruction')).toHaveCount(0);
     await first.dispose(); second = await fixture(new URL(baseURL!).origin);
     await connect(page, second.service, false); await expect.poll(() => second!.contexts.size).toBe(0);
-    await expect(panel).toContainText('interrupted');
+    await expect(panel).toContainText('Work paused. Completed changes remain. Resume to continue.');
     await panel.getByRole('button', { name: 'Resume task', exact: true }).click();
     await expect.poll(() => second!.contexts.size).toBe(1);
     const resumed = [...second.contexts.values()][0]!;
     expect(resumed.identity.taskId).toBe(context.identity.taskId); expect(resumed.identity.attemptId).not.toBe(context.identity.attemptId); expect(resumed.identity.generation).toBeGreaterThan(context.identity.generation);
-    await expect(panel).toContainText('Suggest · review before applying');
+    await panel.locator('summary').filter({ hasText: 'Suggest · Task details' }).click(); await expect(panel).toContainText('Review before applying');
     await expect(first.tool(context, 'board_inspect', {})).rejects.toThrow();
-    await panel.getByRole('button', { name: 'Stop', exact: true }).click(); await expect(panel).toContainText('Agent cancellation acknowledged');
+    await panel.getByRole('button', { name: 'Stop editing task', exact: true }).click(); await expect.poll(async () => (await taskState(page, resumed.identity.taskId))?.cancellation).toBe('acknowledged');
   } finally { await first.dispose(); await second?.dispose(); }
+});
+
+test('agent Markdown stays safe and new responses do not pull readers away from older messages', async ({ page, baseURL }) => {
+  const f = await fixture(new URL(baseURL!).origin);
+  const remoteImages: string[] = [];
+  page.on('request', request => { if (request.url().includes('untrusted-image.invalid')) remoteImages.push(request.url()); });
+  try {
+    await openBoard(page); const { panel, context } = await start(page, f, 'Explain the board');
+    context.emit({ kind: 'text', format: 'message', text: '## Board summary\n\n**Router** is the entry point.\n\n| Node | Role |\n| --- | --- |\n| Router | Entry |\n\n```ts\nconst safe = true;\n```\n\n[Documentation](https://example.com/docs)\n\n[Unsafe](javascript:alert(1))\n\n![remote diagram](https://untrusted-image.invalid/diagram.png)\n\n<script>window.markdownExecuted = true</script><iframe src="https://untrusted-image.invalid/frame"></iframe>' });
+    const messages = panel.getByRole('list', { name: 'Messages', exact: true });
+    await expect(messages.getByRole('heading', { name: 'Board summary' })).toBeVisible();
+    await expect(messages.locator('strong')).toHaveText('Router');
+    await expect(messages.getByRole('table')).toContainText('Entry');
+    await expect(messages.locator('pre')).toHaveText('const safe = true;');
+    await expect(messages.getByRole('button', { name: 'Copy code', exact: true })).toBeVisible();
+    await expect(messages.getByRole('link', { name: 'Documentation' })).toHaveAttribute('href', 'https://example.com/docs');
+    await expect(messages.getByRole('link', { name: 'Unsafe' })).toHaveCount(0);
+    await expect(messages.locator('script,iframe,img')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { markdownExecuted?: boolean }).markdownExecuted)).toBeUndefined();
+    expect(remoteImages).toEqual([]);
+
+    for (let i = 0; i < 30; i++) context.emit({ kind: 'text', format: 'message', text: `Earlier explanation ${i}. ${'Board details and rationale. '.repeat(12)}` });
+    await expect(messages.getByText(/^Earlier explanation 29\./)).toBeAttached();
+    const viewport = panel.getByRole('region', { name: 'Conversation and proposed changes' });
+    await viewport.evaluate(element => { element.scrollTop = 80; element.dispatchEvent(new Event('scroll', { bubbles: true })); });
+    const before = await viewport.evaluate(element => element.scrollTop);
+    context.emit({ kind: 'text', format: 'message', text: 'New response arrived while you read older messages.' });
+    await expect(messages.getByText('New response arrived while you read older messages.')).toBeAttached();
+    expect(await viewport.evaluate(element => element.scrollTop)).toBeCloseTo(before, 0);
+  } finally { await f.dispose(); }
+});
+
+test('question cancellation targets its own attempt and keeps background editing active', async ({ page, baseURL }) => {
+  const f = await fixture(new URL(baseURL!).origin);
+  try {
+    await openBoard(page); const { panel, context } = await start(page, f, 'Keep editing in the background');
+    await panel.getByRole('button', { name: 'Question', exact: true }).click();
+    await panel.getByLabel('Question', { exact: true }).fill('Explain the router without changing it');
+    await panel.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => f.contexts.size).toBe(2);
+    const question = [...f.contexts.values()].find(item => item.identity.attemptId !== context.identity.attemptId)!;
+    await panel.getByTestId('agent-send-controls').getByRole('button', { name: 'Stop question', exact: true }).click();
+    await expect.poll(async () => (await taskState(page, question.identity.taskId))?.cancellation).toBe('acknowledged');
+    expect((await taskState(page, context.identity.taskId))?.status).toBe('working');
+    expect((await taskState(page, context.identity.taskId))?.attempts.at(-1)?.id).toBe(context.identity.attemptId);
+    expect(await f.tool<Inspection>(context, 'board_inspect', {})).toMatchObject({ documentId: expect.any(String) });
+    await expect(panel.getByRole('button', { name: 'Stop editing task', exact: true })).toBeVisible();
+  } finally { await f.dispose(); }
 });

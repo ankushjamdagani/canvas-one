@@ -34,6 +34,6 @@ export const WholeBoardRead: Story = {
   render: () => <CursorFixture spatial={false} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId('agent-presence-cursor')).toHaveAttribute('data-spatial', 'board');
+    await expect(canvas.queryByTestId('agent-presence-cursor')).not.toBeInTheDocument();
   },
 };
