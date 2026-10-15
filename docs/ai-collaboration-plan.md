@@ -96,6 +96,8 @@ Connection errors distinguish missing CLI, sign-in problem, unavailable local se
 
 The board stays dominant. Design how conversation, active-task summary, proposal review, library and inspector coexist so inspecting a node does not erase review context. Compare dock compositions with real content; no right-dock/tab-sharing pattern is presumed approved.
 
+2026-10-15 setup review decision: AI and Inspector are independent. AI opens as a movable, minimizable floating panel, with one header. Before connection, show inline setup only: a current-origin service command, pasted terminal JSON and optional manual fields. Hide the composer while disconnected, connecting or after failure. Match the supplied workbench reference's IBM Plex Sans, 13px body/control scale and compact spacing. Later screen reviews own chat Markdown, activity verbosity, rename outcomes and clearer reviewed Undo.
+
 Define open, minimized and closed panel behavior, focus return and resizing. Panel visibility does not determine task execution. Show discoverable pending/activity indicators when minimized. Mobile uses a deliberate sheet or dedicated view, not a scaled desktop panel; grant disclosures and actions remain clear above the keyboard.
 
 Specify observable task states including requested, working, waiting, interrupted, completed, stopped and failed. Keep connection diagnostics, feedback delivery and face activities separate from durable task state. Pause is offered only when supported. State taxonomy is a contract to design and verify, not a claim about existing CLIs.

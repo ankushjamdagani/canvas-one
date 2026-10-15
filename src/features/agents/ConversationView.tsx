@@ -4,8 +4,7 @@ import { CollaborationPanel, type CollaborationIntent, type CollaborationProvide
 import type { AgentConversationController, ConversationMessage, ConversationProposal } from './conversation-controller';
 import type { SessionController } from '../session/controller';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
+import { ConnectionSetup } from './ConnectionSetup';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { renderDiagramSvg } from '../transfer/svg-export';
 import { conversationErrorMessage } from './conversation-errors';
@@ -33,9 +32,6 @@ export function ConversationView({ controller, session, desktopRequired, onStart
   const setText = (value: string) => onComposerDraftChange({ text: value });
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>();
-  const [setupOpen, setSetupOpen] = React.useState(false);
-  const [url, setUrl] = React.useState('http://127.0.0.1:47831');
-  const [secret, setSecret] = React.useState('');
   const [selectedTaskId, setSelectedTaskId] = React.useState<string>();
   const [selectedProposalId, setSelectedProposalId] = React.useState<string>();
   const [replyTargetId, setReplyTargetId] = React.useState<string>();
@@ -44,7 +40,6 @@ export function ConversationView({ controller, session, desktopRequired, onStart
   const [grant, setGrant] = React.useState<{ taskId: string; attemptId: string } | null>(null);
   const shownError = error ?? (state.error ? conversationErrorMessage(state.error) : undefined);
   const composerRef = React.useRef<HTMLDivElement>(null);
-  const id = React.useId();
   const editing = [...state.tasks].reverse().find(task => task.kind !== 'question' && active(task));
   const editTasks = state.tasks.filter(item => item.kind !== 'question');
   const task = editTasks.find(item => item.id === selectedTaskId) ?? editing ?? [...editTasks].reverse().find(item => item.status === 'interrupted' || item.status === 'failed') ?? editTasks.at(-1);
@@ -145,10 +140,9 @@ export function ConversationView({ controller, session, desktopRequired, onStart
     onRequestChanges: !readOnlyHistory && !desktopRequired && ['pending', 'conflict'].includes(proposal.status) ? () => { setIntent('feedback'); setSelectedProposalId(proposal.operationId); requestAnimationFrame(() => composerRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus()); } : undefined,
   };
   const disabledReason = desktopRequired ? 'Start and control agent tasks from your desktop.' : busy ? 'Waiting for this action to finish.' : intent === 'feedback' && readOnlyHistory ? 'Historical proposals are read only. Return to current work to request changes.' : intent === 'task' && isMain && !clarification ? 'Create or switch to a draft before starting editing work. Questions are available here.' : intent === 'task' && editing && !clarification ? 'One editing task is active. Ask a question, provide proposal feedback, or stop it before starting another.' : undefined;
-  const origin = typeof window === 'undefined' ? 'http://localhost:3000' : window.location.origin;
   return <div ref={composerRef} className="h-full min-h-0">
     <CollaborationPanel provider={provider} providers={(['claude', 'codex', 'agy'] as const).map(providerId => { const availability = state.providers.find(item => item.id === providerId); return { id: providerId, label: providerName(providerId), ...(connected && availability && !availability.available ? { unavailableReason: availability.detail } : {}) }; })} onProviderChange={setProvider}
-      connection={{ status: desktopRequired ? 'desktop-required' : state.connection === 'pairing' ? 'connecting' : state.connection, detail: shownError, onSetup: !desktopRequired ? () => setSetupOpen(true) : undefined, onDisconnect: !desktopRequired && connected ? () => { void controller.disconnect().catch(reason => setError(conversationErrorMessage(reason))); } : undefined }}
+      connection={{ status: desktopRequired ? 'desktop-required' : state.connection === 'pairing' ? 'connecting' : state.connection, detail: shownError, setup: !desktopRequired ? <ConnectionSetup connecting={state.connection === 'pairing'} error={shownError} onConnect={async (url, secret) => { setError(undefined); await controller.pair(url, secret); }} /> : undefined, onDisconnect: !desktopRequired && connected ? () => { void controller.disconnect().catch(reason => setError(conversationErrorMessage(reason))); } : undefined }}
       task={task && { id: task.id, attemptId: currentAttempt?.id, title: `${providerName(task.providerId)} · ${task.instruction}`, status: task.status === 'waiting' ? `Waiting · ${task.waitReason}` : task.status, permission: task.permission, context: taskContext, activity: state.blockedActions.some(action => action.taskId === task.id) ? 'An affected action needs a decision. Your edits remain.' : undefined, expression: task.status === 'working' ? 'squint' : task.status === 'completed' ? 'happy' : task.status === 'failed' ? 'error' : task.status === 'waiting' || task.status === 'interrupted' ? 'wait' : 'base', interruptedSummary: task.status === 'interrupted' ? `Previous permission: ${task.interruptedPermission ?? 'suggest'}. Completed changes remain; pending proposals can be inspected. Resume checks the current board before starting another attempt.` : undefined, cancellation: task.cancellation === 'pending' ? 'Further board writes are disabled. Agent cancellation has not been acknowledged.' : task.cancellation === 'acknowledged' ? 'Agent cancellation acknowledged.' : undefined,
         stopLabel: !active(task) ? 'Retry Stop' : undefined,
         onStop: !desktopRequired && connected && (active(task) || task.attempts.some(attempt => attempt.cancellation === 'pending')) ? () => { setError(undefined); void (active(task) ? controller.stop(task.id) : controller.retryStop(task.id)).catch(reason => setError(conversationErrorMessage(reason))); } : undefined,
@@ -167,15 +161,6 @@ export function ConversationView({ controller, session, desktopRequired, onStart
       historyContent={readOnlyHistory && <section className="mb-3 space-y-2 text-caption" aria-label="Task proposal history"><p>All pending reviews and latest 100 saved proposals. Saved outcomes are read only; pending reviews can be dismissed.</p>{archivedProposals && archivedProposals.taskId === task?.id && archivedProposals.proposals.length === 0 && <p>No saved proposals for this task.</p>}<ul>{ownedProposals.map(entry => <li key={entry.proposal.operationId}><Button type="button" variant="link" size="sm" className="max-w-full justify-start text-left" onClick={() => setSelectedProposalId(entry.proposal.operationId)}>{entry.proposal.label} · {entry.proposal.status}</Button></li>)}</ul><Button type="button" variant="outline" size="sm" onClick={() => { setSelectedTaskId(undefined); setSelectedProposalId(undefined); }}>{editing ? 'Return to active task' : 'Return to latest task'}</Button></section>}
       history={editTasks.filter(item => item.id !== task?.id).map(item => ({ id: item.id, title: `${providerName(item.providerId)} · ${item.instruction}`, outcome: `${item.status} · ${item.permission}`, onOpen: () => { setSelectedTaskId(item.id); setSelectedProposalId(undefined); const scopeKey = JSON.stringify([board.projectId, board.branchId, board.document?.id]); run(async () => { const proposals = await controller.openTaskHistory(item.id); const current = session.getState(); if (scopeKey === JSON.stringify([current.projectId, current.branchId, current.document?.id])) setArchivedProposals({ taskId: item.id, proposals }); }); } }))}
     />
-    <Dialog open={setupOpen} onOpenChange={open => { setSetupOpen(open); if (!open) setSecret(''); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Connect local agents</DialogTitle><DialogDescription>Use your installed CLIs and existing sign-in. Start the local service on this desktop.</DialogDescription></DialogHeader>
-      <code className="block overflow-x-auto whitespace-pre-wrap break-all text-caption">canvas-one-agent collaborate --origin {origin}</code>
-      <form className="space-y-3" onSubmit={event => { event.preventDefault(); run(async () => { const pairingSecret = secret; setSecret(''); await controller.pair(url.trim(), pairingSecret.trim()); setSetupOpen(false); }); }}>
-        <Label htmlFor={`${id}-url`}>Service address</Label><Input id={`${id}-url`} value={url} onChange={event => setUrl(event.target.value)} autoComplete="off" />
-        <Label htmlFor={`${id}-secret`}>Pairing secret</Label><Input id={`${id}-secret`} type="password" value={secret} onChange={event => setSecret(event.target.value)} autoComplete="off" />
-        {shownError && <p role="alert" className="text-caption text-destructive">{shownError}</p>}
-        <Button type="submit" disabled={!url.trim() || !secret.trim() || busy} loading={busy}>Connect</Button>
-      </form>
-    </DialogContent></Dialog>
     <Dialog open={Boolean(grant)} onOpenChange={open => { if (!open) setGrant(null); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{isMain ? 'Live editing needs a draft' : 'Allow live edit for this task?'}</DialogTitle><DialogDescription>{isMain ? 'Create or switch to a draft, then start a task there. Task permissions stay on the board where they were granted.' : 'The agent may create, change and delete content across this whole board for this task. Stop keeps completed changes. Future tasks start in Suggest.'}</DialogDescription></DialogHeader>
       <p className="break-words text-caption">{providerName(state.tasks.find(item => item.id === grant?.taskId)?.providerId)} · {state.tasks.find(item => item.id === grant?.taskId)?.instruction ?? 'This task is no longer available.'}</p>
       {isMain ? <Button type="button" onClick={() => { setGrant(null); onStartDraft(); }}>Create a draft</Button> : <Button type="button" disabled={busy} onClick={() => { const binding = grant; if (!binding) return; run(async () => { const current = controller.getState().tasks.find(item => item.id === binding.taskId); if (!current || current.attempts.at(-1)?.id !== binding.attemptId || !active(current)) throw new Error('This execution attempt is no longer active.'); await controller.grantLive(binding.taskId, binding.attemptId); setGrant(null); }); }}>Allow live edit for this task</Button>}

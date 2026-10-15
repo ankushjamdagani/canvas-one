@@ -38,6 +38,7 @@ export interface CollaborationPanelProps {
   readonly connection: {
     readonly status: 'disconnected' | 'connecting' | 'connected' | 'error' | 'desktop-required';
     readonly detail?: string;
+    readonly setup?: React.ReactNode;
     readonly onSetup?: () => void;
     readonly onRetry?: () => void;
     readonly onDisconnect?: () => void;
@@ -103,7 +104,7 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
   const submit = (event: React.FormEvent) => { event.preventDefault(); if (canSend) composer.onSend?.(); };
 
   return <section aria-label="AI collaboration" className={`flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-panel text-foreground max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11 max-sm:[&_select]:min-h-11 max-sm:[&_summary]:min-h-11 ${className}`} data-testid="collaboration-panel">
-    <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2">
+    {connected && <header className="flex shrink-0 items-center gap-2 border-b border-hairline px-3 py-2">
       <CanvasOneFace expression={expression} size={32} animate={false} transition={false} aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <Label htmlFor={`${id}-provider`} className="sr-only">Agent</Label>
@@ -112,9 +113,10 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
         </NativeSelect>
       </div>
       {connected && connection.onDisconnect && <Button type="button" variant="ghost" size="sm" onClick={connection.onDisconnect}>Disconnect</Button>}
-    </header>
+      <span className="text-caption text-secondary-text">Connected locally</span>
+    </header>}
 
-    {task && <section aria-label="Current task" data-task-id={task.id} className="shrink-0 space-y-1 border-b border-hairline px-3 py-2">
+    {connected && task && <section aria-label="Current task" data-task-id={task.id} className="shrink-0 space-y-1 border-b border-hairline px-3 py-2">
       <h3 className="line-clamp-2 min-w-0 break-words font-medium" title={task.title}>{task.title}</h3>
       <p role="status" className="text-caption">{task.status}{task.activity ? ` · ${task.activity}` : ''}</p>
       <p className="text-caption text-secondary-text">Permission: {task.permission === 'live' ? 'Live edit · whole board, including deletions' : 'Suggest · review before applying'}</p>
@@ -132,12 +134,13 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
     </section>}
 
     <div role="region" className="min-h-[120px] flex-1 overflow-y-auto overscroll-contain p-3" tabIndex={0} aria-label="Conversation and proposed changes">
-      {!connected && <section className="space-y-3" aria-label="Connection setup">
+      {!connected && (connection.setup ?? <section className="space-y-3" aria-label="Connection setup">
         <h3 className="font-medium">{connection.status === 'desktop-required' ? 'Continue on desktop' : connection.status === 'connecting' ? 'Connecting' : connection.status === 'error' ? 'Connection unavailable' : 'Connect an agent'}</h3>
         <p className="text-caption text-secondary-text">{connection.detail ?? (connection.status === 'desktop-required' ? 'You can inspect the board here. Start agent tasks on the desktop with your signed-in CLI.' : 'Install and sign in to your CLI, then start the local Canvas One service.')}</p>
         <div className="flex flex-wrap gap-2">{connection.onSetup && <Button type="button" size="sm" onClick={connection.onSetup}>Connection settings</Button>}{connection.onRetry && <Button type="button" variant="outline" size="sm" onClick={connection.onRetry}><RefreshCw aria-hidden="true" />Check again</Button>}</div>
-      </section>}
-      {connected && !messages.length && !task && <p className="text-caption text-secondary-text">Ask {providerLabel} a question or start a task. Suggested changes wait for your review.</p>}
+      </section>)}
+      {connected && <>
+      {!messages.length && !task && <p className="text-caption text-secondary-text">Ask {providerLabel} a question or start a task. Suggested changes wait for your review.</p>}
       {onLoadEarlierMessages && <Button type="button" variant="outline" size="sm" onClick={onLoadEarlierMessages}>Load earlier messages</Button>}
       {historyWindowGap && <section className="my-3 space-y-2 text-caption" aria-label="Earlier history window"><p role="status">Showing an earlier history window; some newer messages are outside this view.</p>{onReturnToRecentMessages && <Button type="button" variant="outline" size="sm" onClick={onReturnToRecentMessages}>Return to recent messages</Button>}</section>}
       {historyContent}
@@ -152,16 +155,17 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
         {review.onFitChanges && <Button type="button" variant="outline" size="sm" onClick={review.onFitChanges}>Fit to changes</Button>}
       </section>}
       {feedbackDelivery && <div role={feedbackDelivery.status === 'failed' ? 'alert' : 'status'} className="mt-3 text-caption"><p>{feedbackDelivery.detail}</p>{feedbackDelivery.onRetry && <Button type="button" variant="outline" size="sm" onClick={feedbackDelivery.onRetry}>Retry feedback</Button>}</div>}
+      </>}
     </div>
 
-    {review && review.status !== 'accepted' && review.status !== 'rejected' && <div className="flex shrink-0 flex-wrap gap-2 border-t border-hairline p-3" aria-label="Proposal actions">
+    {connected && review && review.status !== 'accepted' && review.status !== 'rejected' && <div className="flex shrink-0 flex-wrap gap-2 border-t border-hairline p-3" aria-label="Proposal actions">
       <Button type="button" size="sm" disabled={review.status !== 'ready' || !review.onAccept || review.busy} onClick={review.onAccept}><Check aria-hidden="true" />Accept changes</Button>
       {review.onRequestChanges && <Button type="button" variant="outline" size="sm" disabled={review.busy} onClick={review.onRequestChanges}>Request changes</Button>}
       {review.onRefresh && <Button type="button" variant="outline" size="sm" disabled={review.busy} onClick={review.onRefresh}>Refresh proposal</Button>}
       {review.onReject && <Button type="button" variant="ghost" size="sm" disabled={review.busy} onClick={review.onReject}><X aria-hidden="true" />{review.rejectLabel ?? 'Reject'}</Button>}
     </div>}
 
-    <form onSubmit={submit} className="shrink-0 space-y-1 border-t border-hairline px-3 py-2">
+    {connected && <form onSubmit={submit} className="shrink-0 space-y-1 border-t border-hairline px-3 py-2">
       <Segmented aria-label="Message purpose" value={composer.intent} onChange={value => composer.onIntentChange(value as CollaborationIntent)} options={[{ id: 'task', label: 'Task', className: 'pointer-coarse:min-h-11' }, { id: 'question', label: 'Question', className: 'pointer-coarse:min-h-11' }, { id: 'feedback', label: 'Feedback', disabled: !composer.targetLabel, className: 'pointer-coarse:min-h-11' }]} />
       {composer.targetLabel && <p className="break-words text-caption">Target: {composer.targetLabel}</p>}
       {composer.onReplyClarification && <Button type="button" variant="outline" size="sm" onClick={composer.onReplyClarification}>Answer agent question</Button>}
@@ -171,6 +175,6 @@ export function CollaborationPanel({ provider, providers, onProviderChange, conn
       {disabledReason && <p id={`${id}-reason`} className="text-caption text-secondary-text">{disabledReason}</p>}
       {composer.error && <p role="alert" className="text-caption text-destructive">{composer.error}</p>}
       <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2">{composer.onCreateDraft && <Button type="button" variant="outline" size="sm" onClick={composer.onCreateDraft}>Create a draft</Button>}{composer.onAddSelection && <Button type="button" variant="ghost" size="sm" onClick={composer.onAddSelection}>Add selection</Button>}{composer.intent === 'task' && <span className="self-center text-caption text-secondary-text">New tasks start in Suggest</span>}</div><Button type="submit" size="sm" disabled={!canSend} loading={composer.sending}><ArrowUp aria-hidden="true" />Send</Button></div>
-    </form>
+    </form>}
   </section>;
 }

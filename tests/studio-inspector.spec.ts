@@ -110,7 +110,7 @@ test.describe('Studio Inspector E2E', () => {
 
     const sheet = page.getByTestId('shared-details-sheet');
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByTestId('inspector-panel')).toHaveAttribute('data-variant', 'hosted');
+    await expect(sheet.getByTestId('inspector-panel')).toHaveAttribute('data-variant', 'sheet');
     await expect(sheet).toContainText('Router');
 
     const hasHorizontalScroll = await page.evaluate(
@@ -133,7 +133,7 @@ test.describe('Studio Inspector E2E', () => {
 
     const dock = page.locator('[data-slot="dock-column"][data-side="right"]');
     await expect(dock.getByTestId('inspector-panel')).toBeVisible();
-    await expect(dock.locator('[data-slot="panel-header"]').getByRole('heading', { name: 'Details', exact: true })).toBeVisible();
+    await expect(dock.locator('[data-slot="panel-header"]').getByRole('heading', { name: 'Inspector', exact: true })).toBeVisible();
 
     await dock.locator('[data-slot="panel-menu-trigger"]').click();
     await page.getByRole('menuitem', { name: 'Float' }).click();

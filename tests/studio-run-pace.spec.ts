@@ -297,7 +297,7 @@ test.describe('Cells and Lanes touch inspection', () => {
     await track.click({ position: { x: box.width * 100 / end, y: box.height / 2 } });
     await expect(page.getByTestId(`edge-${edgeId}`).locator('[data-cells-lanes-connection]')).toHaveAttribute('data-forward', '1');
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole('button', { name: 'Close details panel', exact: true }).click();
+    await page.getByRole('button', { name: 'Close inspector', exact: true }).click();
     await page.keyboard.press('F2');
     await page.getByTestId('quick-options-input').fill('Fit view');
     await page.getByTestId('quick-option-canvas.fit').click();

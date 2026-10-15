@@ -2,6 +2,7 @@ import * as React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { CollaborationPanel, type CollaborationPanelProps, type CollaborationIntent } from './CollaborationPanel';
+import { ConnectionSetup } from './ConnectionSetup';
 
 type State = 'disconnected' | 'review' | 'overlap' | 'interrupted' | 'mobile' | 'composer' | 'historical-conflict' | 'older-window' | 'provider-unavailable';
 
@@ -18,7 +19,7 @@ function Fixture({ state, narrow = false }: { readonly state: State; readonly na
     providers: [{ id: 'claude', label: 'Claude' }, { id: 'codex', label: 'Codex' }, { id: 'agy', label: 'agy' }],
     onProviderChange: provider => setAction(`Preview agent selection: ${provider}`),
     connection: state === 'mobile' ? { status: 'desktop-required' }
-      : state === 'disconnected' ? { status: 'disconnected', onSetup: record('connection settings') }
+      : state === 'disconnected' ? { status: 'disconnected', setup: <ConnectionSetup connecting={false} onConnect={async () => { setAction('Preview action: connect'); }} /> }
       : { status: 'connected', onDisconnect: record('disconnect') },
     messages: state === 'review' ? Array.from({ length: 35 }, (_, index) => ({ id: `message-${index}`, kind: 'agent' as const, author: 'Claude', text: `Review observation ${index + 1}: the proposed queue separates checkout from fulfilment. This is fixture content for testing long conversation scrolling.` })) : [],
     composer: {
@@ -75,7 +76,18 @@ const meta = { title: 'AI Collaboration/Current states', component: Collaboratio
 export default meta;
 type Story = StoryObj;
 
-export const Disconnected: Story = { render: () => <Fixture state="disconnected" /> };
+export const Disconnected: Story = {
+  render: () => <Fixture state="disconnected" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole('textbox', { name: 'Task instruction' })).toBeNull();
+    await expect(canvas.queryByRole('combobox', { name: 'Agent' })).toBeNull();
+    await expect(canvas.getByRole('button', { name: /^Connect$/ })).toBeDisabled();
+    await userEvent.type(canvas.getByLabelText('2. Paste connection details'), 'invalid');
+    await userEvent.click(canvas.getByRole('button', { name: /^Connect$/ }));
+    await expect(canvas.getByRole('alert')).toHaveTextContent('Paste the complete JSON');
+  },
+};
 export const SelectedProviderUnavailable: Story = {
   render: () => <Fixture state="provider-unavailable" />,
   play: async ({ canvasElement }) => {
@@ -135,7 +147,8 @@ export const MobileDesktopRequired: Story = {
     const canvas = within(canvasElement);
     const panel = canvas.getByTestId('collaboration-panel');
     await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth);
-    await expect(canvas.getByRole('textbox', { name: 'Task instruction' })).toBeDisabled();
+    await expect(canvas.queryByRole('textbox', { name: 'Task instruction' })).toBeNull();
+    await expect(canvas.queryByRole('combobox', { name: 'Agent' })).toBeNull();
     if (window.innerWidth < 640) {
       for (const control of panel.querySelectorAll('button, select')) {
         await expect(control.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);

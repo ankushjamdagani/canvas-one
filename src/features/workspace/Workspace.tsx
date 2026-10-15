@@ -140,7 +140,8 @@ import {
 import { QuickOptionsDialog, type RenameOutcome } from "./QuickOptions";
 import { AgentConversationController } from "../agents/conversation-controller";
 import { ConversationView, type ConversationComposerDraft } from "../agents/ConversationView";
-import { CollaborationDock, type CollaborationDockView } from "../agents/CollaborationDock";
+import { FloatingToolPanel } from '../../components/ui/floating-tool-panel';
+import { CanvasOneFace } from '../../components/ui/canvas-one-face';
 import type { AgentPresence } from '../agents/AgentCursor';
 import type { TextStepKind } from "./QuickOptionsTextStep";
 import {
@@ -338,7 +339,7 @@ function WorkspaceBody({
     session.getState,
   );
   const [agentsOpen, setAgentsOpen] = React.useState(false);
-  const [detailsView, setDetailsView] = React.useState<CollaborationDockView>('inspector');
+  const [agentsMinimized, setAgentsMinimized] = React.useState(false);
   const [conversation, setConversation] = React.useState<AgentConversationController | null>(null);
   const [composerDrafts, setComposerDrafts] = React.useState<Readonly<Record<string, ConversationComposerDraft>>>({});
   const composerScopeKey = JSON.stringify([actor.actorId, sessionState.projectId, sessionState.branchId, sessionState.document?.id]);
@@ -1853,7 +1854,7 @@ function WorkspaceBody({
   const inspectorHosted = panelState.viewport.width >= BREAKPOINT_DESKTOP;
   const inspectorWanted =
     inspectorHosted &&
-    Boolean(agentsOpen || (draft && !draft.multi) || (scenarioDraft && document));
+    Boolean((draft && !draft.multi) || (scenarioDraft && document));
   React.useEffect(() => {
     panelDispatch({
       type: "SYNC_OPEN",
@@ -2433,7 +2434,7 @@ function WorkspaceBody({
   const commandHandlers: CommandHandlers = React.useMemo(
     () => ({
       "commands.open": () => setQuickOptionsOpen(true),
-      "agents.open": () => { setQuickOptionsOpen(false); setDetailsView('ai'); setAgentsOpen(true); panelDispatch({ type: 'OPEN', panel: 'inspector' }); },
+      "agents.open": () => { setQuickOptionsOpen(false); setAgentsMinimized(false); setAgentsOpen(true); },
       "project.rename": ({ title }) => handleRenameProject(title),
       "project.switch": () => handleBackToProjects(),
       "branch.switch": ({ branchId }) => handleSwitchBranch(branchId),
@@ -2902,7 +2903,6 @@ function WorkspaceBody({
   const closeDetails = React.useCallback(() => {
     runGuarded(() => {
       closeInspector();
-      setAgentsOpen(false);
       panelDispatch({ type: 'CLOSE', panel: 'inspector' });
       requestAnimationFrame(() => {
         const opener = window.document.querySelector<HTMLElement>('[data-testid="topbar-agents-btn"]');
@@ -2912,11 +2912,19 @@ function WorkspaceBody({
     });
   }, [runGuarded, closeInspector, panelDispatch]);
   const renderInspectorContent = React.useCallback((): React.ReactNode => {
-    if (scenarioDraft && document) return <ScenarioEditor hosted document={document} handle={scenarioDraft} onChange={handleChangeScenarioDraft} onApply={inspectorApply} onCancel={inspectorCancel} onClose={inspectorClose} mintId={mintId} lastRunChecks={scenarioEditorChecks} focusName={scenarioEditorFocusName} focusAssertionId={scenarioEditorFocusAssertionId} />;
-    if (draft && !draft.multi) return <InspectorPanel draft={draft} measured={measuredSection} onChangeField={handleChangeField} onApply={inspectorApply} onCancel={inspectorCancel} onClose={inspectorClose} saving={draft.status === 'saving'} focusFieldId={focusFieldId} variant="hosted" />;
+    if (scenarioDraft && document) return <ScenarioEditor hosted={inspectorHosted} document={document} handle={scenarioDraft} onChange={handleChangeScenarioDraft} onApply={inspectorApply} onCancel={inspectorCancel} onClose={inspectorClose} mintId={mintId} lastRunChecks={scenarioEditorChecks} focusName={scenarioEditorFocusName} focusAssertionId={scenarioEditorFocusAssertionId} />;
+    if (draft && !draft.multi) return <InspectorPanel draft={draft} measured={measuredSection} onChangeField={handleChangeField} onApply={inspectorApply} onCancel={inspectorCancel} onClose={inspectorClose} saving={draft.status === 'saving'} focusFieldId={focusFieldId} variant={inspectorHosted ? 'hosted' : isMobileInspector ? 'sheet' : 'dock'} />;
     return <p className="p-3 text-caption text-secondary-text">Select an item to inspect it.</p>;
-  }, [scenarioDraft, document, handleChangeScenarioDraft, inspectorApply, inspectorCancel, inspectorClose, mintId, scenarioEditorChecks, scenarioEditorFocusName, scenarioEditorFocusAssertionId, draft, measuredSection, handleChangeField, focusFieldId]);
-  const renderDetails = React.useCallback(() => <CollaborationDock activeView={detailsView} onViewChange={setDetailsView} inspectorCount={selectedElementIds.size + selectedNoteIds.size + selectedConnectionIds.size} onClose={closeDetails} inspectorContent={renderInspectorContent()} aiContent={conversation ? <ConversationView controller={conversation} session={session} desktopRequired={desktopAgentRequired} composerDraft={composerDraft} onComposerDraftChange={updateComposerDraft} context={agentSelectionRef.current.ids.map(id => ({ id, label: document?.elements.find(element => element.id === id)?.label ?? id }))} onStartDraft={() => void startDraftFromMain('working')} /> : <p role="status" className="p-3 text-caption">Preparing collaboration…</p>} />, [detailsView, selectedElementIds, selectedNoteIds, selectedConnectionIds, closeDetails, renderInspectorContent, conversation, session, desktopAgentRequired, startDraftFromMain, document, composerDraft, updateComposerDraft]);
+  }, [scenarioDraft, document, handleChangeScenarioDraft, inspectorApply, inspectorCancel, inspectorClose, mintId, scenarioEditorChecks, scenarioEditorFocusName, scenarioEditorFocusAssertionId, draft, measuredSection, handleChangeField, focusFieldId, inspectorHosted, isMobileInspector]);
+  const renderDetails = renderInspectorContent;
+  const closeAgents = React.useCallback(() => {
+    setAgentsOpen(false);
+    requestAnimationFrame(() => {
+      const opener = window.document.querySelector<HTMLElement>('[data-testid="topbar-agents-btn"]');
+      const fallback = window.document.querySelector<HTMLElement>('[data-testid="topbar-quick-options-btn"]');
+      (opener?.getClientRects().length ? opener : fallback)?.focus();
+    });
+  }, []);
 
   const renderPanel = React.useCallback(
     (panelId: PanelId): React.ReactNode => {
@@ -3355,7 +3363,7 @@ function WorkspaceBody({
               commands={panelCommandRoutes}
               renderPanel={renderPanel}
               panelTitles={{
-                inspector: "Details",
+                inspector: scenarioDraft ? 'Scenario' : 'Inspector',
               }}
               panelBadges={{
                 history:
@@ -3539,7 +3547,7 @@ function WorkspaceBody({
             bottom sheet below 768px, same content and guard. */}
         {/* A multi-selection keeps its draft (it is the selection) but shows no
             inspector: only the selection toolbar applies. */}
-        {(agentsOpen || (draft && !draft.multi) || (scenarioDraft && document)) && !isMobileInspector && !inspectorHosted ? (
+        {((draft && !draft.multi) || (scenarioDraft && document)) && !isMobileInspector && !inspectorHosted ? (
           <aside
             data-testid="shared-details-dock"
             className="w-[320px] min-w-[320px] h-full overflow-hidden border-l border-border bg-panel min-[1000px]:pt-[var(--topbar-inset)]"
@@ -3550,7 +3558,7 @@ function WorkspaceBody({
         ) : null}
       </div>
 
-      {(agentsOpen || (draft && !draft.multi) || (scenarioDraft && document)) &&
+      {((draft && !draft.multi) || (scenarioDraft && document)) &&
       isMobileInspector &&
       !simulationDetailsOpen &&
       panelState.activeOverlay !== "library" &&
@@ -3568,6 +3576,10 @@ function WorkspaceBody({
           {renderDetails()}
         </div>
       ) : null}
+
+      <FloatingToolPanel title="AI collaboration" rightInset={Object.values(panelState.panels).some(panel => panel.open && panel.placement === 'right' && !panel.collapsed) ? panelState.sideWidths.right : !inspectorHosted && (draft || scenarioDraft) ? 320 : 0} icon={<CanvasOneFace expression={conversationState?.connection === 'connected' ? 'happy' : 'base'} size={28} aria-hidden="true" />} open={agentsOpen} minimized={agentsMinimized} onMinimizedChange={setAgentsMinimized} onClose={closeAgents}>
+        {conversation ? <ConversationView controller={conversation} session={session} desktopRequired={desktopAgentRequired} composerDraft={composerDraft} onComposerDraftChange={updateComposerDraft} context={agentSelectionRef.current.ids.map(id => ({ id, label: document?.elements.find(element => element.id === id)?.label ?? id }))} onStartDraft={() => void startDraftFromMain('working')} /> : <p role="status" className="p-4 text-sm">Preparing collaboration…</p>}
+      </FloatingToolPanel>
 
       <NewScenarioDialog
         open={newScenarioDialogOpen}

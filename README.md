@@ -54,7 +54,7 @@ Keep `npm run dev` running. In a second terminal, start the desktop execution se
 node packages/cli/dist/main.js collaborate --origin http://localhost:3000 --origin http://127.0.0.1:3000
 ```
 
-1. Open a project, then **Cmd+K → AI collaboration → Connection settings**. Enter the printed service URL and pairing secret. Secrets expire after five minutes; restart the service for a fresh secret.
+1. Open a project, then **Cmd+K → AI collaboration**. In the floating panel, paste the complete JSON printed by the service and select **Connect**. Advanced setup also accepts the address and secret separately. Secrets expire after five minutes; restart the service for fresh details. The composer appears after connection succeeds.
 2. Select Claude or Codex with its existing local CLI sign-in. Create or switch to a draft before starting an editing task. Questions are read-only and can run separately.
 3. Send instructions inside Canvas One. Tasks start in Suggest: inspect the proposed changes and accept or reject them. Enable Live for a specific task attempt to authorize changes and deletions across its current board.
 4. Stop disables further writes and keeps completed changes. Undo task prepares a reviewed revert that preserves human edits. Leaving or reloading requires explicit Resume; permissions do not move to another board or agent.
