@@ -46,7 +46,7 @@ export class SystemAgentSession {
           : [{ code: result.status, message: result.status === 'stale' ? 'Board revision changed; regenerate the proposal' : 'Session could not apply this proposal', path: [] }];
         return { status: result.status === 'stale' ? 'stale' : result.status === 'invalid' ? 'invalid' : 'failed', issues };
       },
-    });
+    }, { maxProposals: 200 });
     this.unsubscribe = this.proposals.subscribe(() => this.update({ proposals: this.proposals.list() }));
   }
 
@@ -86,10 +86,14 @@ export class SystemAgentSession {
   }
 
   /** Paired bridge supplies attribution; request input can never choose its actor. */
+  /** Trusted task host supplies attribution after checking durable attempt authority. */
+  executeReviewedTool(request: BridgeRequest, participant: BridgeParticipant): unknown { return this.handleTool(request, participant); }
+
   private handleTool(request: BridgeRequest, participant: BridgeParticipant): unknown {
     const input = request.input && typeof request.input === 'object' && !Array.isArray(request.input)
       ? request.input as Record<string, unknown> : {};
     switch (request.tool) {
+      case 'clarification_request': throw new Error('Task-bound clarification requires the conversation service');
       case 'board_inspect': return this.context(input.selectionOnly === true);
       case 'component_schemas': return { schemas: this.schemas(), format: 'studio-model/1',
         diagramSchema: diagramRequestSchema, operations: ['insert', 'replace', 'remove'], guidance: 'Use diagram_create with readable component aliases and optional positions for automatic layout. Advanced clients can submit record changes. Validate the resulting document before submitting.' };
@@ -106,13 +110,14 @@ export class SystemAgentSession {
       case 'document_validate': return validateDocument(input.document);
       case 'proposal_submit': return this.proposals.submit({ ...input, actor: participant } as ProposalRequest<RecordChange>);
       case 'proposal_status': return typeof input.operationId === 'string' ? this.proposals.inspect(input.operationId) : null;
+      case 'action_submit': throw new Error('Task-bound live actions require the conversation service; this connection supports reviewed proposals only');
     }
   }
 
-  context(selectionOnly = false) {
+  context(selectionOnly = false, startingSelection?: AgentSelection) {
     const state = this.session.getState();
     if (!state.document || !state.projectId || !state.branchId || state.workingRevision === null) throw new Error('Open a project before inspecting its board');
-    const selected = this.selection();
+    const selected = startingSelection ?? this.selection();
     const ids = new Set(selected.ids);
     const document = state.document;
     const collections = ['elements', 'connections', 'relations', 'schemas', 'fixtures', 'refinements', 'scenarios', 'views'] as const;

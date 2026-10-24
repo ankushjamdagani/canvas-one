@@ -43,6 +43,8 @@ Read [`HANDOFF.md`](HANDOFF.md) at the start of each task. It holds current impl
 
 Do not invent milestones beyond the requested task.
 
+For design-canvas work, prefer OpenPencil's local MCP when available. See [the OpenPencil skill](.agents/skills/openpencil/SKILL.md) for connection, editing and verification. Use Figma when the task specifically requires it.
+
 ---
 
 ## 5. Editing and verification

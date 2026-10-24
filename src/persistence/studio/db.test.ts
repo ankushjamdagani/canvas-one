@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createStudioDatabase, DB_NAME, DB_VERSION } from './db';
 
 describe('StudioDatabase schema introspection', () => {
-  it('instantiates system-studio-local-v1 version 1 by default', () => {
+  it('retains system-studio-local-v1 with the current additive schema version', () => {
     const db = createStudioDatabase();
     expect(db.name).toBe(DB_NAME);
     expect(db.verno).toBe(DB_VERSION);
@@ -16,6 +16,10 @@ describe('StudioDatabase schema introspection', () => {
 
     const tableNames = db.tables.map((t) => t.name).sort();
     const expectedTables = [
+      'agentConversations',
+      'agentConversationArchive',
+      'agentTaskActions',
+      'agentTaskLedgers',
       'branches',
       'checkpoints',
       'commits',

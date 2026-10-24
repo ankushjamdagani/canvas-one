@@ -1,7 +1,7 @@
 /**
  * Dexie database definition for System Studio.
  *
- * - Database namespace: `system-studio-local-v1`, version 1.
+ * - Database namespace: `system-studio-local-v1`, version 4 (additive conversation archive).
  * - Tables, composite keys, and indexes:
  *   - projects: primary key `id`, indexes `updatedAt`
  *   - branches: primary key `[projectId+id]`, indexes `projectId`
@@ -14,12 +14,17 @@
  *   - operations: primary key `[projectId+id]`, indexes `projectId`
  *   - parts: primary key `[projectId+id+revision]`, indexes `projectId`, `[projectId+id]`
  *   - preferences: primary key `key`
+ *   - agentTaskLedgers: primary key `key`
  */
 
 import { IndexedDbDatabase, type BoundTables } from '@canvas-one/storage-indexeddb';
 import { DB_NAME, DB_VERSION } from './types';
+import type { AgentTaskActionRecord } from './agent-action-journal';
 export { DB_NAME, DB_VERSION };
 import type {
+  AgentConversationRecord,
+  AgentConversationArchiveRecord,
+  AgentTaskLedgerRecord,
   BranchRecord,
   CheckpointRecord,
   CommitRecord,
@@ -34,6 +39,10 @@ import type {
 } from './types';
 
 type StudioRows = {
+  agentConversationArchive: { row: AgentConversationArchiveRecord; key: string };
+  agentTaskActions: { row: AgentTaskActionRecord; key: string };
+  agentConversations: { row: AgentConversationRecord; key: string };
+  agentTaskLedgers: { row: AgentTaskLedgerRecord; key: string };
   projects: { row: ProjectRecord; key: string };
   branches: { row: BranchRecord; key: [string, string] };
   snapshots: { row: SnapshotRecord; key: [string, string] };
@@ -63,6 +72,10 @@ export class StudioDatabase extends IndexedDbDatabase<StudioRows> {
       operations: '[projectId+id], projectId',
       parts: '[projectId+id+revision], projectId, [projectId+id]',
       preferences: 'key',
+      agentTaskLedgers: 'key',
+      agentConversations: 'key',
+      agentConversationArchive: 'key, scopeKey, [scopeKey+kind+state], [scopeKey+taskId+kind], [scopeKey+kind+ordinal], [scopeKey+taskId+kind+ordinal]',
+      agentTaskActions: 'key, projectId, [projectId+branchId+boardId+taskId], operationId',
     });
   }
 }

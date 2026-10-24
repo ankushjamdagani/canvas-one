@@ -600,8 +600,21 @@ describe('LocalRepository', () => {
       });
 
       // Stale delete attempt (wrong expectedMainHead)
+      const taskKey = JSON.stringify(['canvas-one/tasks/1', projectId, draftBranchId, s01Doc.id]);
+      const foreignKey = JSON.stringify(['canvas-one/tasks/1', 'another-project', draftBranchId, s01Doc.id]);
+      await db.agentTaskLedgers.bulkPut([{ key: taskKey, revision: 1, serializedLedger: JSON.stringify({ schema: 'canvas-one/tasks/1', revision: 1, tasks: [] }) }, { key: foreignKey, revision: 1, serializedLedger: JSON.stringify({ schema: 'canvas-one/tasks/1', revision: 1, tasks: [] }) }]);
+      const conversationKey = JSON.stringify(['canvas-one/conversation/1', projectId, draftBranchId, s01Doc.id]);
+      await db.agentConversations.put({ key: conversationKey, revision: 1, serializedConversation: JSON.stringify({ schema: 'canvas-one/conversation/1', scope: { projectId, branchId: draftBranchId, boardId: s01Doc.id }, revision: 1, messages: [], proposals: [], operations: [], eventsCursor: 0 }) });
+      const archiveKey = 'archived-message', foreignArchiveKey = 'foreign-message';
+      await db.agentConversationArchive.bulkPut([
+        { key: archiveKey, scopeKey: conversationKey, id: 'message', taskId: 'task', kind: 'message', state: 'closed', ordinal: 1, artifact: { id: 'message', taskId: 'task', payload: { text: 'Saved history' } } },
+        { key: foreignArchiveKey, scopeKey: JSON.stringify(['canvas-one/conversation/1', 'another-project', draftBranchId, s01Doc.id]), id: 'message', kind: 'message', state: 'closed', ordinal: 1, artifact: { id: 'message', payload: { text: 'Other board history' } } },
+      ]);
       const staleDelete = await repo.deleteProject(projectId, 'wrong-head');
       expect(staleDelete.status).toBe('stale');
+      expect(await db.agentTaskLedgers.get(taskKey)).toBeDefined();
+      expect(await db.agentConversations.get(conversationKey)).toBeDefined();
+      expect(await db.agentConversationArchive.get(archiveKey)).toBeDefined();
 
       // Valid delete (expectedMainHead: null)
       const validDelete = await repo.deleteProject(projectId, null);
@@ -615,6 +628,11 @@ describe('LocalRepository', () => {
       expect(await db.branches.where('projectId').equals(projectId).count()).toBe(0);
       expect(await db.snapshots.where('projectId').equals(projectId).count()).toBe(0);
       expect(await db.operations.where('projectId').equals(projectId).count()).toBe(0);
+      expect(await db.agentTaskLedgers.get(taskKey)).toBeUndefined();
+      expect(await db.agentConversationArchive.get(archiveKey)).toBeUndefined();
+      expect(await db.agentConversationArchive.get(foreignArchiveKey)).toBeDefined();
+      expect(await db.agentConversations.get(conversationKey)).toBeUndefined();
+      expect(await db.agentTaskLedgers.get(foreignKey)).toBeDefined();
 
       // Retry delete on already absent project -> missing (missing/already-absent on retry)
       const retryDelete = await repo.deleteProject(projectId, null);

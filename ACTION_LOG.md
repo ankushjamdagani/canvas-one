@@ -3522,3 +3522,159 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: all 2,130 unit tests passed; Next.js standalone build passed; focused Playwright suites for page boundaries, next migration, header loading, initial loader, studio landing, and theme accessibility contrast (Axe) passed.
 - Lesson: screenshot outputs in Playwright tests must always use `test.info().outputPath(...)` rather than host-specific filesystem paths like `/private/tmp`, which do not exist on Linux CI runners.
 
+### 2026-10-13 — Analyze AI collaboration workflow and UX
+
+- Outcome: documented the shipped local CLI/MCP proposal pipeline, optional model hook, future hosted collaboration boundaries, lifecycle issues and prioritized canvas-centered UX/feature roadmap. Product implementation unchanged.
+- Files: `docs/audits/2026-10-13-ai-collaboration.md`, ACTION_LOG and LESSONS. Codex with three native read-only agents for architecture, UX and detector/coverage evidence; dedicated `codex/ai-collaboration-analysis` worktree.
+- Verification: 11 focused agent/controller/bridge tests passed; UI detector returned zero findings. Initial sandbox run blocked three loopback tests with EPERM; authorized rerun passed. Source and diff reviewed. Browser tests, full build, full units and Storybook not rerun for documentation-only work.
+- Limitations: source-based UX assessment; no fresh visual/browser verification or measured UX uplift. Connection renewal, cancellation propagation, queue retention and richer review remain proposed work.
+- Publication status: local report complete; automatic approval review rejected remote push as repository-derived external disclosure without explicit destination/payload authorization. No push or PR created; user approval requested.
+- Lesson: cancellation of an MCP client's wait does not establish cancellation of relay work; verify queued browser delivery separately. Added a corresponding LESSONS rule.
+
+### 2026-10-14 — Record collaboration costs and clarify tasks
+
+- Outcome: saved hosting/model cost boundaries, current versus future scope, in-house panel decision and proposed minimal task lifecycle in the collaboration report.
+- Files: `docs/audits/2026-10-13-ai-collaboration.md`, ACTION_LOG. Codex; no subagents. Existing dedicated `codex/ai-collaboration-analysis` worktree.
+- Verification: documentation diff and whitespace checked; no runtime changes or tests required. Costs are categories, not provider quotes. Task lifecycle is proposed, not a shipped external-agent capability. Publication remains local following the earlier push rejection.
+
+### 2026-10-14 — Draft current AI collaboration implementation plan
+
+- Outcome: wrote a scoped plan separating confirmed direction, pending decisions, acceptance gates, optional OSS evaluation, costs and future integration seams. Asked three initial questions about prompting, permission defaults and Stop behavior; answers remain pending.
+- Files: `docs/ai-collaboration-plan.md`, audit cross-reference and ACTION_LOG; retained prior uncommitted cost documentation. Codex with one native read-only independent plan critic. No installed grill-me skill found; used direct structured questions and independent critique.
+- Verification: documentation diff/whitespace and local Markdown targets checked; no runtime changes, dependency installation or tests. No implementation or remote publication authorized by this plan.
+- Limitations: integrated external-agent messaging and other behavioral choices remain open. Local documentation only; earlier remote push rejection remains in effect.
+
+### 2026-10-14 — Lock first collaboration flow decisions
+
+- Outcome: recorded user choices for in-app prompting to one supported external agent, Suggest by default and Stop preserving completed edits. Added supported-agent prompt/reply/feedback adapter to current scope and its acceptance gate. Asked next questions about agent identity, live-edit boundary and overlap handling.
+- Files: collaboration plan, audit and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior documentation changes retained.
+- Verification: documentation whitespace/diff checks; no runtime changes or tests. Agent selection and remaining behavioral decisions are pending; no remote publication attempted.
+
+### 2026-10-14 — Lock agent support and board-wide live editing
+
+- Outcome: updated current scope to Claude/Codex/agy in-app adapters, explicit task-bound board-wide live edits and overlap handling that pauses affected actions for user decisions while independent work continues. Concurrent role agents remain future work; raised authentication, reload and deletion questions.
+- Files: collaboration plan, audit and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior edits retained.
+- Verification: documentation diff/whitespace checked. No CLI capability claims, dependencies or runtime changes; authentication and remaining behaviors pending. No remote publication attempted.
+
+### 2026-10-14 — Complete core collaboration flow decisions
+
+- Outcome: confirmed local CLI/existing sign-in, no API credential management, live-edit deletion authority and reload/leave behavior that saves progress and blocks further writes until explicit resume. Core product choices are recorded; technical adapter feasibility remains a gate.
+- Files: collaboration plan, audit and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior documentation retained.
+- Verification: documentation diff/whitespace and file-link checks; no runtime changes/tests, CLI support claims or remote publication. Implementation has not started.
+
+### 2026-10-14 — Claude product-manager review of plan and future work
+
+- Outcome: Claude Sonnet 4.6 completed plan-only and repository-context PM reviews through the delegate wrapper, exit 0 with completion markers. Saved consolidated review with lead qualifications; linked it from the unchanged-scope plan.
+- Files: `docs/audits/2026-10-14-claude-pm-review.md`, plan cross-reference, ACTION_LOG and LESSONS. Codex lead; external Claude read-only with tools disabled. Existing local worktree; unrelated main-checkout changes preserved.
+- Verification: read full stdout/stderr of both runs; documentation diff/whitespace and local link checks. No runtime, CLI compatibility or usability verification; recommendations are not implementation approval.
+- Limitation: initial broader-context invocation was rejected by automatic approval review; narrowed invocation succeeded, then user explicitly authorized all repository content and context pass succeeded. No remote Git publication attempted.
+- Lesson: supply the requested plan as the initial external-review payload; additional repository context needs matching authorization. Qualify reviewer diagnoses against source before treating them as facts.
+
+### 2026-10-14 — Incorporate Claude product-manager feedback
+
+- Outcome: expanded plan with first-run/live/recovery/mobile journeys, early three-CLI capability gates, explicit panel migration, context/authority disclosure, scoped errors, authenticated renewal, retention, success measures and versioned future boundaries. Moved task persistence ahead of recovery exposure. Preserved all confirmed choices; qualified overstatements and did not adopt scope reductions or extra deletion approvals.
+- Files: `docs/ai-collaboration-plan.md`, ACTION_LOG. Codex; no new subagents. Existing dedicated worktree; prior changes preserved.
+- Verification: documentation diff/whitespace, local links and feedback coverage checked. No code/dependencies or runtime tests; feasibility remains a gate and implementation has not started. Remote publication remains local.
+
+### 2026-10-14 — Claude UX review and two-part design-generation prompt
+
+- Outcome: Claude Sonnet 4.6 reviewed the full plan/future work as UI/UX designer using authorized repository context, read-only/tools disabled. Archived verbatim review with lead qualifications. Wrote a reusable prompt covering 18 desktop, five mobile and eight future state families; includes dock comparison, brand face, permission/history rules and readable per-state output.
+- Files: UX review, design prompt, plan cross-reference and ACTION_LOG. Codex lead; external Claude via delegate wrapper, exit 0/completion marker. Existing dedicated worktree; prior edits preserved.
+- Verification: full stdout/stderr reviewed; Markdown links, state coverage and whitespace checked. No visual/browser validation, image generation, dependencies or runtime changes. Dock/feedback placement remains exploratory; no confirmed behavior reversed and no remote publication attempted.
+
+### 2026-10-14 — Incorporate UX review and replace legacy-flow assumptions
+
+- Outcome: rewrote collaboration plan around confirmed problems/behavior; adopted task anchor, targeted feedback, accessible spatial review, non-blocking overlap, inspector composition and interruption recovery. Removed mandatory dialog migration/pairing-code retention and blanket old-bug prerequisites. Labelled scheduling, bootstrap, dock/composer and capability choices explicitly. Updated design prompt and audit cross-reference.
+- Files: collaboration plan, design prompt, audit, ACTION_LOG and LESSONS. Codex; no new subagents. Existing dedicated worktree; prior edits preserved.
+- Verification: documentation diff/whitespace, links, state coverage and legacy-assumption scan checked. Planning only; no existing feature removed, code changes or runtime tests. Remote publication remains local.
+- Lesson: authorized flow replacement must not carry old interaction choices into the new plan as requirements. Added corresponding LESSONS rule.
+
+### 2026-10-14 — Quick plan review and remove saved design prompt
+
+- Outcome: reviewed the complete plan for scope and behavior consistency; clarified stale acceptance, crash/disconnect write fencing and task history versus intentional commits. Removed the saved design prompt and its link; supplied a shorter functionality-only prompt in conversation.
+- Files: collaboration plan, deleted design prompt and ACTION_LOG. Codex; no subagents. Existing dedicated worktree; prior edits preserved.
+- Verification: documentation whitespace and prompt-reference checks; no runtime changes or tests. CLI feasibility, scheduling, bootstrap and interaction layout remain explicit evidence gates; no remote publication attempted.
+
+### 2026-10-14 — Update delegation models and probe local AI integrations
+
+- Outcome: reviewer now `claude-opus-5-5`, critic `gemini-3.8-flash-high`; existing executor unchanged. Recorded desktop execution first, mobile designs now and one active editing task per board. Added feasibility evidence, proposed versioned adapter/task contracts, message routing, task transitions and implementation gates while user designs UI.
+- Files: `.agents/delegate.json`, collaboration plan, CLI feasibility report, review archive, ACTION_LOG and LESSONS. Codex lead; Gemini critic failed (denied/timeout, no executor dispatch); Opus source review completed, corrections incorporated and final independent documentation review passed. Existing dedicated worktree; main preserved.
+- Verification: all three CLIs streamed replies and retained synthetic context via explicit-ID continuation; Codex app-server initialized/discovered models; Codex and Opus completed synthetic MCP inspection/proposal loops; Claude acknowledged two NDJSON messages. JSON/diff/link checks; no production/runtime implementation or project dependency changes, so app suites not run.
+- Limitations: agy MCP denied even with a temporary exact-server rule; original settings restored byte-for-byte and fixture removed. Active steering, cancellation, interrupted recovery, write fencing and safe Undo remain unproved. No remote publication attempted.
+- Host change: Claude Code Homebrew cask upgraded 2.1.191 → 2.1.286 after the requested Opus model required ≥2.1.280; sign-in retained. Homebrew automatic cleanup also ran.
+- Lesson: exit zero/provider SUCCESS can hide denied work; parse terminal errors and denied_actions. Disable automatic Homebrew cleanup for scoped upgrades. Staged validation exposed extra EOF blanks in newly tracked review archives; corrected before the final saved result. Added corresponding LESSONS rules, including checking staged validation's own exit status before committing.
+
+### 2026-10-14 — AI collaboration foundations and integration in progress
+
+- Outcome: saved the supplied design under ignored artifacts (never commit); implemented durable task/provider identity, conservative leases, scoped CLI execution/service/browser protocol, native conversation panel/shared dock, additive conversation/action stores, atomic Live authority and task journals. Recovered accepted proposals cannot apply again. Undo proposals preserve later/interleaved human edits. Workspace/controller cutover is still being integrated; agy board tools remain explicitly blocked.
+- Files: agents/agent-bridge/CLI/storage/system-design packages, app agents/workspace/session/persistence and focused tests; HANDOFF. Codex lead with native task_foundation/provider_contract/design_analysis lanes, Gemini configured critic and Opus configured foundation reviewer. Main preserved; implementation remains uncommitted in the existing feature worktree.
+- Verification: package compilation and root typecheck passed before ongoing integration; latest recovery/storage/Live run 21 passed, journal/overlap/epoch run 14 passed, Suggest/Live journaling/recovery run 11 passed. Runtime/service/browser/journal/Live run 51 passed, one outdated post-Stop status assertion being corrected. Full production, Storybook, integrated browser and final review are outstanding; no release-complete claim or publication.
+- Limitation: usage limits interrupted delegation and an approval review; resumed by inspecting saved files rather than repeating changes. No action rejected as unsafe was bypassed.
+- Lesson: persist event cursor identity per local service instance; a restarted service legitimately resets its cursor. Recovered review status and exact attempt-bound Live grants must stay distinct from displayed UI state. Read actual tsconfig names before verification; an assumed tsconfig.app.json did not exist and the correct root configuration was run.
+
+### 2026-10-15 — Resume collaboration review repairs (in progress)
+
+- Outcome: queued task decisions use the durable revision at execution time; terminal proposal retention frees memory only after archival. Project deletion now cleans archived conversations while preserving other projects. Bounded transcript/archive and replay integration continue in delegated lanes; production verification is pending.
+- Files: agents core, session review limits, conversation/persistence/workspace integration and focused tests; plan/HANDOFF. Codex lead with task_foundation/design_analysis; configured Opus reviews are retained in ignored delegate artifacts. No commits or publication; supplied HTML remains ignored.
+- Verification: queued decisions/proposal retention 18 passed, project cleanup 15 passed, runtime/protocol/cancellation/Live authority 68 passed. Earlier full suite 2,325 passed / 12 skipped and production build passed before these repairs. Six collaboration browser journeys need a rebuilt app after the fixed TooltipProvider crash.
+- Limitation: usage-limit approval review prevented one test invocation; the same check succeeded after user resume. Final integrated review remains outstanding; agy board-tool transport remains blocked.
+- Lesson: story decorators can hide missing production providers; test the actual integrated dock. Persist a task's ownership after creation before filtering it against current task state, and fail the exact attempt if startup metadata cannot be saved.
+
+### 2026-10-15 — Integrate and verify AI collaboration
+
+- Outcome: integrated in-house conversation/shared inspector dock, factual face presence, local Claude/Codex task execution, exact-attempt Suggest/Live permissions, cancellation/write fencing, durable bounded history/replay, clarification/overlap recovery and reviewed task Undo preserving human edits. Historical Undo selects its new pending reversal; original receipts remain terminal. Current/future scope and costs remain documented; supplied HTML is ignored and never staged.
+- Files: agents/agent-bridge/CLI/storage/system-design packages, app agent/workspace/session/persistence features, focused unit/browser stories and production tests, setup docs, plan, implementation audit, HANDOFF and LESSONS. Codex lead with native implementation/recovery/regression lanes; configured Gemini critic and Claude Opus reviewer. Primary checkout preserved. Mixed delegation, not a wrapper-dispatched execution run.
+- Verification: 2,360 units passed / 12 skipped; final controller recovery/Undo 51 passed; all 16 packages, boundaries/headless imports, production build, packed headless consumer and Storybook build passed. Fifteen Chromium component stories and seven production collaboration journeys passed together on the final build. Desktop/phone captures inspected. Full production run completed with three failures; two obsolete shared-dock selectors corrected, unchanged historical connection gesture passed in the final focused three-test run. Exact original full-run pass/skip counts unavailable; no all-green full-suite claim.
+- Limitations: agy scoped board-tool transport remains a current release blocker without permission bypass. Production journeys use a synthetic provider, not live inference. Opus foundation review passed; latest integration review's three paging findings were corrected and lead-reviewed, without claiming final independent whole-release approval. Browser storage quota is enforced, but authored-project accounting does not include all local AI metadata. No deployment or merge.
+- Lesson: retained final verification logs explicitly after an earlier tool session expired and lost exact full-suite totals. Final isolated-worktree browser rerun required escalation for filesystem/localhost access; the unprivileged EPERM occurred before tests, and the authorized rerun passed.
+- Embedding verification: reusable React artifact and real Next consumer builds passed; all three embedding browser tests passed (10.1 seconds). Example dependencies were installed offline without lockfile changes.
+- Delivery: implementation commit `2675a64` pushed on the dedicated feature branch; draft PR #13 opened and attached to this chat. Supplied HTML absent from tracked/staged files. No merge or deployment.
+
+### 2026-10-15 — Consolidate local worktrees onto PR #13
+
+- Outcome: moved the primary checkout to `codex/ai-collaboration-analysis`; removed four clean obsolete worktrees and nine other local feature branches, keeping master. Preserved all branch history in ignored `artifacts/worktree-cleanup-2026-10-15/branches.bundle` and copied local review/design artifacts before cleanup. Remote branches remain unchanged.
+- Verification: checked each worktree for changes, repaired three stale Git links from the repository rename, verified the complete backup bundle and confirmed the supplied HTML remains ignored. Codex; no subagents or runtime changes, so tests not rerun. Temporary PR worktree cleanup requested through the app archive tool.
+- Final state: app archival remained queued, so the clean temporary PR checkout was removed with Git after its artifacts and history were preserved. Exactly one worktree remains (primary); only the PR branch and master remain locally. Updated HANDOFF for the new location.
+
+### 2026-10-15 — Prevent malformed proposal review crashes
+
+- Outcome: guarded untrusted record changes before rendering invalid/stale proposals; incomplete values, null entries and unsupported record kinds show a safe validation fallback. Existing authoring validation and disabled acceptance remain intact. Used the primary PR checkout requested by the user.
+- Files: ConversationView, proposal-history helper/unit test, studio-agents production regression source, HANDOFF, LESSONS and ACTION_LOG. Codex; no subagents.
+- Verification: two helper/history units and TypeScript passed. All seven existing collaboration browser journeys passed against the running localhost:3001 dev server; new malformed invalid/stale/reload regression passed separately (6.7 seconds), zero browser errors or journal writes. No production rebuild or full suite rerun, avoiding interference with the user's active dev build. Design HTML remains ignored.
+- Lesson: invalid proposals retain malformed input for review, so validation status cannot substitute for safe rendering. New browser assertions initially assumed separate text nodes, absent disabled controls and stable recovery ordering; corrected to actual UI contracts without weakening safety checks.
+
+### 2026-10-15 — Begin screen-by-screen AI UX review
+
+- Outcome: user selected connection/setup first. Compared supplied reference frame 1.3 with the live disconnected panel and setup source. Proposed independent floating AI panel, a single setup flow, pasted service connection details and concise actionable errors; Markdown, task activity and reviewed Undo remain subsequent screens. No production UI changes yet.
+- Evidence: current UI has duplicated Details/AI headers, two close controls and disabled task controls before connection. Reference contains placeholder commands, six-character codes and ten-minute expiry; actual service uses URL plus secret and five-minute pairing expiry. Treat reference as visual evidence, not transport truth. Undo currently prepares a reviewed reversal, explaining the misleading immediate-Undo label.
+- Verification: read-only source/graph/live UI inspection; no tests needed. Browser capture/preview timed out after initial live inspection, so no new screenshots claimed. Original and unpacked reference stay ignored in artifacts. Codex; no subagents.
+
+### 2026-10-15 — Implement connection/setup UX review step
+
+- Outcome: independent floating AI panel with one header, pointer/keyboard movement, minimize/restore and close preserving drafts/execution; Inspector remains independent. Inline current-origin setup command, masked terminal-JSON paste, optional manual fields, actionable errors and clipboard fallback. Composer/provider/task controls appear only after connection. Scoped IBM Plex Sans13px typography and reference spacing; no global font replacement, credential storage or permission changes.
+- Files: foundation floating panel/stories and style tokens; ConnectionSetup/helper/units; ConversationView/CollaborationPanel/stories; Workspace; affected production-browser sources, README, plan, HANDOFF and LESSONS. Codex with native setup_flow/setup_regressions lanes and independent native review; no external whole-release approval claimed. User-requested primary PR checkout retained, original design and screenshots ignored.
+- Verification: 62 focused units and TypeScript pass; 10 Chromium stories and foundation Storybook build pass. Setup browser checks cover malformed details, Connecting/no composer, failed network/no composer, wrong secret/readable error and manual retry. Final collaboration run8pass/1strict dev-reload syntax error; identical focused reload rerun passed. Four affected Inspector/Scenario/touch checks pass. Desktop/phone captures inspected, computed IBM Plex Sans13px and viewport bounds verified. No new production build/full suite while user's dev app runs.
+- Lesson: review found raw pairing errors overriding mapped recovery copy and unavailable clipboard throwing before promise catch; fixed both. Browser selector updates follow the independent-panel contract. One dev reload error was not reproducible on strict isolated rerun; no flake fix or all-green final combined run claim.
+
+### 2026-10-15 — Simplify composer model and connection controls
+
+- Outcome: removed AI-specific typography tokens/classes; setup and floating panel inherit app typography. Moved the existing agent selector beside Send, attached destructive icon-only Disconnect with tooltip, and kept a factual logo face for state. Removed duplicate connected text and repeated Suggest hint. No composer before connection; model runtime capabilities unchanged.
+- Files: CollaborationPanel/stories, ConnectionSetup, floating foundation, style tokens, affected browser assertions and HANDOFF. Codex; no subagents. Existing primary PR branch; ignored design untouched.
+- Verification: TypeScript and Storybook build pass. Ten Chromium component stories pass; focused local setup+Suggest browser checks2pass, final Send-visibility regression1pass; inspected updated capture. No production/full-suite rebuild while dev app runs. Initial story assertion was placed in the disconnected fixture and used Playwright-only exact options; corrected fixture/API and rechecked without weakening assertions.
+
+### 2026-10-15 — Assistant chat, activity and reviewed Undo
+
+- Outcome: assistant-ui external-store conversation/Markdown/composer integration over existing local controller authority; safe links, no HTML/remote images, code copy, concise activity/Details, Send face/exact Stop and independent question cancellation. Visible-target cursor waits200ms and shows completed receipts700ms; decisions/fences clear immediately. Review undo is eligibility-gated, deduplicated and trusted-host marked; duplicate start/Accept and interleaved streams are guarded. Real Claude reproduced four invalid guessed envelopes; exact tool schemas fixed the gap and the natural rename passed first-try review/acceptance with one journal entry and no browser errors.
+- Files: assistant/cursor/controller UI, adapters/units/stories, Workspace/CanvasView, tool schema in agents package, dependencies, synthetic/opt-in real-provider browsers, audit/HANDOFF/LESSONS. Codex lead with native chat_ui/chat_controller/cursor_presence lanes; configured Gemini critic passed, two Opus review rounds repaired and lead-reviewed (no final independent pass claimed). Design/captures remain ignored; agy remains blocked. PR #13 updated; temporary verification checkout removed.
+- Verification: bounded full units2393pass/12skip; final focused77pass; controller62pass; Chromium stories14pass; TypeScript, all16 packages/boundaries, Storybook and isolated production builds pass. Real Claude rename1pass24.9s. Full isolated browser272pass/5skip/1unrelated Lavender-light landing contrast failure; final rebuilt focused12pass33.2s includes all11 collaboration journeys and unchanged contrast recheck. This is not a contrast-flake fix. Desktop/mobile captures inspected. Exact evidence/limits: docs/audits/2026-10-15-ai-chat-ux.md.
+- Lesson: unbounded restricted units initially2359pass/24fail/12skip (socket permission and contention); bounded elevated rerun passed. Accidentally launched Next build in primary after copying snapshot; stopped at startup, verified dev HTTP200, then built/verified in isolation. Added explicit absolute-copy/workdir rule. Review found mixed-clock cursor timing, unsafe backslash links, missing clipboard API, concurrent stream/review edges and Undo provenance/replacement ordering; regression-covered fixes preserve validated authority.
+
+## 2026-10-24
+
+### OpenPencil agent workflow
+
+- Outcome: shared OpenPencil skill documents target discovery, scoped reads, JSX editing, visual verification and authenticated local-transport troubleshooting; AGENTS points to it and preserves explicit Figma requests. Codex/Claude discovery links reuse the shared source.
+- Files: AGENTS.md, .agents/skills/openpencil/SKILL.md, .codex/skills/openpencil, .claude/skills/openpencil, LESSONS.md and ACTION_LOG.md. Codex; no subagents. Dedicated feature worktree; no app code or persistent MCP configuration changes.
+- Verification: skill validation and diff whitespace checks; instructions grounded in the preceding successful MCP document read/render and live-app visual check with version 0.16.0. App tests/build/e2e not run for documentation-only changes.
+- Lesson: default and bundled Python lacked PyYAML for the skill validator; isolated `uv run --with pyyaml` validation passed. Local MCP handshake success alone concealed a sandbox EPERM; the skill and LESSONS distinguish transport access from app state.
+

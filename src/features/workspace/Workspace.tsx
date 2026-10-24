@@ -138,7 +138,12 @@ import {
   type ShortcutEvent,
 } from "./commands/registry";
 import { QuickOptionsDialog, type RenameOutcome } from "./QuickOptions";
-import { AgentCollaboration } from "../agents/AgentCollaboration";
+import { AgentConversationController } from "../agents/conversation-controller";
+import { ConversationView, type ConversationComposerDraft } from "../agents/ConversationView";
+import { FloatingToolPanel } from '../../components/ui/floating-tool-panel';
+import { CanvasOneFace } from '../../components/ui/canvas-one-face';
+import type { AgentPresence } from '../agents/AgentCursor';
+import { activityMatchesTask } from '../agents/cursor-presentation';
 import type { TextStepKind } from "./QuickOptionsTextStep";
 import {
   routeHistoryController,
@@ -290,6 +295,9 @@ export interface WorkspaceProps {
   /** Run-control slot, owned by the run feature; empty until supplied. */
   runControl?: React.ReactNode;
 }
+const noConversation = () => null;
+const inertConversationSubscribe = () => () => {};
+const emptyComposerDraft: ConversationComposerDraft = { provider: 'claude', intent: 'task', text: '' };
 
 // The results region and the Ours tab load on demand, so the workspace chunk stays under the size limit.
 const PlaybackPanel = lazyComponent(
@@ -331,6 +339,55 @@ function WorkspaceBody({
     session.subscribe,
     session.getState,
   );
+  const [agentsOpen, setAgentsOpen] = React.useState(false);
+  const [agentsMinimized, setAgentsMinimized] = React.useState(false);
+  const [conversation, setConversation] = React.useState<AgentConversationController | null>(null);
+  const [composerDrafts, setComposerDrafts] = React.useState<Readonly<Record<string, ConversationComposerDraft>>>({});
+  const composerScopeKey = JSON.stringify([actor.actorId, sessionState.projectId, sessionState.branchId, sessionState.document?.id]);
+  const composerDraft = composerDrafts[composerScopeKey] ?? emptyComposerDraft;
+  const updateComposerDraft = React.useCallback((patch: Partial<ConversationComposerDraft>) => {
+    setComposerDrafts(current => ({ ...current, [composerScopeKey]: { ...(current[composerScopeKey] ?? emptyComposerDraft), ...patch } }));
+  }, [composerScopeKey]);
+  const conversationState = React.useSyncExternalStore<ReturnType<AgentConversationController['getState']> | null>(conversation?.subscribe ?? inertConversationSubscribe, conversation?.getState ?? noConversation, noConversation);
+  const agentPresence = React.useMemo((): AgentPresence | undefined => {
+    const activity = conversationState?.activity;
+    const task = activity && conversationState?.tasks.find(task => activityMatchesTask(activity, task) && task.scope.projectId === sessionState.projectId && task.scope.branchId === sessionState.branchId && task.scope.boardId === sessionState.document?.id);
+    if (!activity || !task || conversationState?.connection !== 'connected') return undefined;
+    return { phase: activity.kind, targetIds: activity.targetIds, activity, providerLabel: task.providerId === 'claude' ? 'Claude' : task.providerId === 'codex' ? 'Codex' : task.providerId === 'agy' ? 'agy' : 'Agent' };
+  }, [conversationState, sessionState.projectId, sessionState.branchId, sessionState.document?.id]);
+  const [desktopAgentRequired] = React.useState(() => typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const agentSelectionRef = React.useRef<{ ids: readonly string[]; viewId?: string }>({ ids: [] });
+  React.useEffect(() => {
+    const ownershipKey = 'canvas-one/agent-owned-task-ids/1';
+    const readOwnership = (): Record<string, readonly string[]> => {
+      const raw = window.sessionStorage.getItem(ownershipKey);
+      if (!raw) return {};
+      const value: unknown = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 2000 || !Object.values(value).every(ids => Array.isArray(ids) && ids.length <= 2000 && ids.every(id => typeof id === 'string' && id.length > 0 && id.length <= 200))) throw new Error('Task ownership metadata is unavailable.');
+      return value as Record<string, readonly string[]>;
+    };
+    const ownership = {
+      load: (): readonly string[] => {
+        try {
+          return [...new Set(Object.values(readOwnership()).flat())];
+        } catch { return []; }
+      },
+      save: (ids: readonly string[]) => {
+        const state = session.getState();
+        if (!state.projectId || !state.branchId || !state.document) throw new Error('No board is open for task ownership.');
+        const key = JSON.stringify([session.getActor().actorId, state.projectId, state.branchId, state.document.id]);
+        const records = readOwnership();
+        const currentTasks = new Set(next.getState().tasks.map(task => task.id));
+        records[key] = ids.filter(id => currentTasks.has(id));
+        window.sessionStorage.setItem(ownershipKey, JSON.stringify(records));
+      },
+    };
+    const next = new AgentConversationController({ session, repository, mintId, selection: () => agentSelectionRef.current, ownership, recoverOwnedAfterReload: true, leaseMs: 15000, pollMs: 500, heartbeatMs: 5000 });
+    setConversation(next);
+    const depart = () => { void next.depart(); };
+    window.addEventListener('pagehide', depart);
+    return () => { window.removeEventListener('pagehide', depart); next.dispose(); setConversation(current => current === next ? null : current); };
+  }, [session, repository, mintId]);
 
   // Project record + branch list for the breadcrumb, project menu and branch
   // popover. Project.title and the branch list are navigation
@@ -2004,7 +2061,6 @@ function WorkspaceBody({
   // ==========================================================================
 
   const [quickOptionsOpen, setQuickOptionsOpen] = React.useState(false);
-  const [agentsOpen, setAgentsOpen] = React.useState(false);
   // Selection overflow state: a Library capture review request, History's part filter, the
   // part being replaced, and the flow-probe check to open expanded.
   const [captureRequested, setCaptureRequested] = React.useState<number>(0);
@@ -2379,7 +2435,7 @@ function WorkspaceBody({
   const commandHandlers: CommandHandlers = React.useMemo(
     () => ({
       "commands.open": () => setQuickOptionsOpen(true),
-      "agents.open": () => { setQuickOptionsOpen(false); setAgentsOpen(true); },
+      "agents.open": () => { setQuickOptionsOpen(false); setAgentsMinimized(false); setAgentsOpen(true); },
       "project.rename": ({ title }) => handleRenameProject(title),
       "project.switch": () => handleBackToProjects(),
       "branch.switch": ({ branchId }) => handleSwitchBranch(branchId),
@@ -2844,42 +2900,37 @@ function WorkspaceBody({
     void runCommand("inspector.close", { draftId: draftContext.id });
   }, [draftContext.id, runCommand]);
 
+  agentSelectionRef.current = { ids: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds], viewId: activeViewId ?? undefined };
+  const closeDetails = React.useCallback(() => {
+    runGuarded(() => {
+      closeInspector();
+      panelDispatch({ type: 'CLOSE', panel: 'inspector' });
+      requestAnimationFrame(() => {
+        const opener = window.document.querySelector<HTMLElement>('[data-testid="topbar-agents-btn"]');
+        const fallback = window.document.querySelector<HTMLElement>('[data-testid="topbar-quick-options-btn"]');
+        (opener?.getClientRects().length ? opener : fallback)?.focus();
+      });
+    });
+  }, [runGuarded, closeInspector, panelDispatch]);
+  const renderInspectorContent = React.useCallback((): React.ReactNode => {
+    if (scenarioDraft && document) return <ScenarioEditor hosted={inspectorHosted} document={document} handle={scenarioDraft} onChange={handleChangeScenarioDraft} onApply={inspectorApply} onCancel={inspectorCancel} onClose={inspectorClose} mintId={mintId} lastRunChecks={scenarioEditorChecks} focusName={scenarioEditorFocusName} focusAssertionId={scenarioEditorFocusAssertionId} />;
+    if (draft && !draft.multi) return <InspectorPanel draft={draft} measured={measuredSection} onChangeField={handleChangeField} onApply={inspectorApply} onCancel={inspectorCancel} onClose={inspectorClose} saving={draft.status === 'saving'} focusFieldId={focusFieldId} variant={inspectorHosted ? 'hosted' : isMobileInspector ? 'sheet' : 'dock'} />;
+    return <p className="p-3 text-caption text-secondary-text">Select an item to inspect it.</p>;
+  }, [scenarioDraft, document, handleChangeScenarioDraft, inspectorApply, inspectorCancel, inspectorClose, mintId, scenarioEditorChecks, scenarioEditorFocusName, scenarioEditorFocusAssertionId, draft, measuredSection, handleChangeField, focusFieldId, inspectorHosted, isMobileInspector]);
+  const renderDetails = renderInspectorContent;
+  const closeAgents = React.useCallback(() => {
+    setAgentsOpen(false);
+    requestAnimationFrame(() => {
+      const opener = window.document.querySelector<HTMLElement>('[data-testid="topbar-agents-btn"]');
+      const fallback = window.document.querySelector<HTMLElement>('[data-testid="topbar-quick-options-btn"]');
+      (opener?.getClientRects().length ? opener : fallback)?.focus();
+    });
+  }, []);
+
   const renderPanel = React.useCallback(
     (panelId: PanelId): React.ReactNode => {
       if (panelId === "inspector") {
-        if (scenarioDraft && document) {
-          return (
-            <ScenarioEditor
-              hosted
-              document={document}
-              handle={scenarioDraft}
-              onChange={handleChangeScenarioDraft}
-              onApply={inspectorApply}
-              onCancel={inspectorCancel}
-              onClose={inspectorClose}
-              mintId={mintId}
-              lastRunChecks={scenarioEditorChecks}
-              focusName={scenarioEditorFocusName}
-              focusAssertionId={scenarioEditorFocusAssertionId}
-            />
-          );
-        }
-        if (draft && !draft.multi) {
-          return (
-            <InspectorPanel
-              draft={draft}
-              measured={measuredSection}
-              onChangeField={handleChangeField}
-              onApply={inspectorApply}
-              onCancel={inspectorCancel}
-              onClose={inspectorClose}
-              saving={draft.status === "saving"}
-              focusFieldId={focusFieldId}
-              variant="hosted"
-            />
-          );
-        }
-        return null;
+        return renderDetails();
       }
       if (panelId === "history") {
         if (historyView === "commit") {
@@ -2971,6 +3022,7 @@ function WorkspaceBody({
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      renderDetails,
       draft,
       scenarioDraft,
       document,
@@ -3028,7 +3080,7 @@ function WorkspaceBody({
         void runCommand("panel.reset-width", { panelId }),
       close: (panelId) => {
         if (panelId === "inspector")
-          void runCommand("inspector.close", { draftId: draftContext.id });
+          closeDetails();
         else
           void runCommand(
             panelId === "history" ? "history.close" : "library.close",
@@ -3036,7 +3088,7 @@ function WorkspaceBody({
           );
       },
     }),
-    [runCommand, draftContext.id],
+    [runCommand, draftContext.id, closeDetails],
   );
 
   const [hostCommands, setHostCommands] = React.useState<{
@@ -3312,7 +3364,7 @@ function WorkspaceBody({
               commands={panelCommandRoutes}
               renderPanel={renderPanel}
               panelTitles={{
-                inspector: scenarioDraft ? "Scenario" : "Configuration",
+                inspector: scenarioDraft ? 'Scenario' : 'Inspector',
               }}
               panelBadges={{
                 history:
@@ -3360,6 +3412,7 @@ function WorkspaceBody({
                     trafficEntryElementIds={trafficEntryElementIds}
                     playbackSource={runController}
                     simulationHighlight={simulationHighlight}
+                    agentPresence={agentPresence}
                     linkedProjects={linkedProjects}
                     loadLinkedExposures={async (projectId) => {
                       const record = await repository.loadProject(projectId);
@@ -3495,49 +3548,24 @@ function WorkspaceBody({
             bottom sheet below 768px, same content and guard. */}
         {/* A multi-selection keeps its draft (it is the selection) but shows no
             inspector: only the selection toolbar applies. */}
-        {draft && !draft.multi && !isMobileInspector && !inspectorHosted ? (
-          <InspectorPanel
-            draft={draft}
-            measured={measuredSection}
-            onChangeField={handleChangeField}
-            onApply={inspectorApply}
-            onCancel={inspectorCancel}
-            onClose={inspectorClose}
-            saving={draft.status === "saving"}
-            focusFieldId={focusFieldId}
-            variant="dock"
-          />
-        ) : null}
-        {scenarioDraft && document && !isMobileInspector && !inspectorHosted ? (
+        {((draft && !draft.multi) || (scenarioDraft && document)) && !isMobileInspector && !inspectorHosted ? (
           <aside
-            data-testid="scenario-inspector-dock"
+            data-testid="shared-details-dock"
             className="w-[320px] min-w-[320px] h-full overflow-hidden border-l border-border bg-panel min-[1000px]:pt-[var(--topbar-inset)]"
-            aria-label="Scenario inspector"
+            aria-label="Workspace details"
           >
-            <ScenarioEditor
-              document={document}
-              handle={scenarioDraft}
-              onChange={handleChangeScenarioDraft}
-              onApply={inspectorApply}
-              onCancel={inspectorCancel}
-              onClose={inspectorClose}
-              mintId={mintId}
-              lastRunChecks={scenarioEditorChecks}
-              focusName={scenarioEditorFocusName}
-              focusAssertionId={scenarioEditorFocusAssertionId}
-            />
+            {renderDetails()}
           </aside>
         ) : null}
       </div>
 
-      {draft &&
-      !draft.multi &&
+      {((draft && !draft.multi) || (scenarioDraft && document)) &&
       isMobileInspector &&
       !simulationDetailsOpen &&
       panelState.activeOverlay !== "library" &&
       panelState.activeOverlay !== "history" ? (
         <div
-          data-testid="inspector-sheet-overlay"
+          data-testid="shared-details-sheet"
           // An explicit h-[70vh] (not just max-h) gives the
           // flex column below a definite height to resolve its own h-full against,
           // and overflow-hidden makes sure the sheet itself never grows past that --
@@ -3546,44 +3574,13 @@ function WorkspaceBody({
           // footer permanently in view outside that scroll area.
           className="fixed inset-x-0 bottom-0 z-modal h-[70vh] max-h-[70vh] overflow-hidden shadow-md rounded-t-lg border-t border-control-border"
         >
-          <InspectorPanel
-            draft={draft}
-            measured={measuredSection}
-            onChangeField={handleChangeField}
-            onApply={inspectorApply}
-            onCancel={inspectorCancel}
-            onClose={inspectorClose}
-            saving={draft.status === "saving"}
-            focusFieldId={focusFieldId}
-            variant="sheet"
-          />
+          {renderDetails()}
         </div>
       ) : null}
 
-      {scenarioDraft &&
-      document &&
-      isMobileInspector &&
-      !simulationDetailsOpen &&
-      panelState.activeOverlay !== "library" &&
-      panelState.activeOverlay !== "history" ? (
-        <div
-          data-testid="scenario-inspector-sheet-overlay"
-          className="fixed inset-x-0 bottom-0 z-modal h-[70vh] max-h-[70vh] overflow-hidden shadow-md rounded-t-lg border-t border-control-border bg-panel"
-        >
-          <ScenarioEditor
-            document={document}
-            handle={scenarioDraft}
-            onChange={handleChangeScenarioDraft}
-            onApply={inspectorApply}
-            onCancel={inspectorCancel}
-            onClose={inspectorClose}
-            mintId={mintId}
-            lastRunChecks={scenarioEditorChecks}
-            focusName={scenarioEditorFocusName}
-            focusAssertionId={scenarioEditorFocusAssertionId}
-          />
-        </div>
-      ) : null}
+      <FloatingToolPanel title="AI collaboration" rightInset={Object.values(panelState.panels).some(panel => panel.open && panel.placement === 'right' && !panel.collapsed) ? panelState.sideWidths.right : !inspectorHosted && (draft || scenarioDraft) ? 320 : 0} icon={<CanvasOneFace expression={conversationState?.connection === 'connected' ? 'happy' : 'base'} size={28} aria-hidden="true" />} open={agentsOpen} minimized={agentsMinimized} onMinimizedChange={setAgentsMinimized} onClose={closeAgents}>
+        {conversation ? <ConversationView controller={conversation} session={session} desktopRequired={desktopAgentRequired} composerDraft={composerDraft} onComposerDraftChange={updateComposerDraft} context={agentSelectionRef.current.ids.map(id => ({ id, label: document?.elements.find(element => element.id === id)?.label ?? id }))} onStartDraft={() => void startDraftFromMain('working')} /> : <p role="status" className="p-4 text-sm">Preparing collaboration…</p>}
+      </FloatingToolPanel>
 
       <NewScenarioDialog
         open={newScenarioDialogOpen}
@@ -3657,13 +3654,6 @@ function WorkspaceBody({
         onRun={handleQuickOption}
         onRename={handleQuickRename}
         onTextCommand={handleQuickTextCommand}
-      />
-      <AgentCollaboration
-        session={session}
-        open={agentsOpen}
-        onOpenChange={setAgentsOpen}
-        modelProvider={composition.modelProvider}
-        selection={{ids: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds], viewId: activeViewId ?? undefined}}
       />
 
       <Dialog
