@@ -3669,3 +3669,12 @@ Verification: verified Codex MCP discovery with `codex mcp list` and `codex mcp 
 - Verification: bounded full units2393pass/12skip; final focused77pass; controller62pass; Chromium stories14pass; TypeScript, all16 packages/boundaries, Storybook and isolated production builds pass. Real Claude rename1pass24.9s. Full isolated browser272pass/5skip/1unrelated Lavender-light landing contrast failure; final rebuilt focused12pass33.2s includes all11 collaboration journeys and unchanged contrast recheck. This is not a contrast-flake fix. Desktop/mobile captures inspected. Exact evidence/limits: docs/audits/2026-10-15-ai-chat-ux.md.
 - Lesson: unbounded restricted units initially2359pass/24fail/12skip (socket permission and contention); bounded elevated rerun passed. Accidentally launched Next build in primary after copying snapshot; stopped at startup, verified dev HTTP200, then built/verified in isolation. Added explicit absolute-copy/workdir rule. Review found mixed-clock cursor timing, unsafe backslash links, missing clipboard API, concurrent stream/review edges and Undo provenance/replacement ordering; regression-covered fixes preserve validated authority.
 
+## 2026-10-24
+
+### OpenPencil agent workflow
+
+- Outcome: shared OpenPencil skill documents target discovery, scoped reads, JSX editing, visual verification and authenticated local-transport troubleshooting; AGENTS points to it and preserves explicit Figma requests. Codex/Claude discovery links reuse the shared source.
+- Files: AGENTS.md, .agents/skills/openpencil/SKILL.md, .codex/skills/openpencil, .claude/skills/openpencil, LESSONS.md and ACTION_LOG.md. Codex; no subagents. Dedicated feature worktree; no app code or persistent MCP configuration changes.
+- Verification: skill validation and diff whitespace checks; instructions grounded in the preceding successful MCP document read/render and live-app visual check with version 0.16.0. App tests/build/e2e not run for documentation-only changes.
+- Lesson: default and bundled Python lacked PyYAML for the skill validator; isolated `uv run --with pyyaml` validation passed. Local MCP handshake success alone concealed a sandbox EPERM; the skill and LESSONS distinguish transport access from app state.
+

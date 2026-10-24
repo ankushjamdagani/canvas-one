@@ -166,3 +166,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - Retain long verification output in a task-specific log with `pipefail` and `tee`; tool session expiry can otherwise lose final counts. Report focused reruns separately from the original full-suite result. Why: 2026-10-15 the completed production suite's three failures were recoverable from artifacts, but exact pass/skip counts were not.
 - Invalid and stale proposals retain untrusted payloads for review. Guard their change structure before rendering; successful proposal storage does not establish valid record shapes. Cover malformed live and recovered reviews in browser tests. Why: 2026-10-15 a correctly rejected missing `value.record` crashed ConversationView.
 - Normalize errors at the component that catches them; a raw local error must not override the parent's actionable message. Clipboard availability and rejection both need a manual-copy fallback. Why: 2026-10-15 setup review caught raw pairing codes and unsupported-context copy failures.
+
+# Local design tooling
+
+- An OpenPencil MCP handshake does not establish app connectivity. Inspect transport errors and verify a scoped document read before diagnosing “app not connected”; sandbox socket access can fail with EPERM even while the app reports Running. Use approved scoped access, preserving authentication. See `.agents/skills/openpencil/SKILL.md`. Why: 2026-10-24 local MCP test succeeded only after the sandbox socket denial was identified.
