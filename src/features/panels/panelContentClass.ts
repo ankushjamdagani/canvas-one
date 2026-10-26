@@ -9,7 +9,7 @@ import type { PanelId } from '@/features/workspace/panels';
 export function panelContentClass(panelId: PanelId, extra?: string): string {
   return cn(
     'flex-1 min-h-0 text-ui bg-panel',
-    panelId === 'history' || panelId === 'library' || panelId === 'inspector' ? 'overflow-hidden p-0' : 'overflow-y-auto p-4',
+    panelId === 'history' || panelId === 'library' || panelId === 'inspector' || panelId === 'comments' ? 'overflow-hidden p-0' : 'overflow-y-auto p-4',
     extra,
   );
 }

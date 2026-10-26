@@ -74,6 +74,7 @@ export interface TopBarProps {
   quickOptionsActive?: boolean;
   onOpenAgents?: () => void;
   agentsActive?: boolean;
+  collaborators?: React.ReactNode;
   transferActions: TransferActions;
 }
 
@@ -121,6 +122,7 @@ export function TopBar({
   quickOptionsActive,
   onOpenAgents,
   agentsActive,
+  collaborators,
   transferActions,
 }: TopBarProps) {
   const [isRenaming, setIsRenaming] = React.useState(false);
@@ -316,7 +318,7 @@ export function TopBar({
                     type="button"
                     data-testid="breadcrumb-project-btn"
                     className={cn(
-                      "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-xs font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[64px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
+                      "group flex cursor-pointer items-center gap-1.5 h-7 px-2.5 rounded-[6px] border text-xs font-medium transition-colors min-w-[6ch] max-w-[120px] max-[400px]:max-w-[48px] max-[359px]:max-w-[48px] sm:max-w-[220px] shrink pointer-coarse:self-stretch pointer-coarse:min-w-11 pointer-coarse:min-h-11",
                       isOpen
                         ? "bg-accent border-selected-edge text-accent-foreground"
                         : "border-transparent text-ink hover:bg-sunken hover:border-hairline",
@@ -377,7 +379,7 @@ export function TopBar({
                   <GitBranch
                     size={12}
                     className={cn(
-                      "shrink-0",
+                      "hidden sm:block shrink-0",
                       isOpen ? "text-[var(--branch-active-text)]" : "text-branch",
                     )}
                   />
@@ -394,13 +396,13 @@ export function TopBar({
                   {isOpen ? (
                     <ChevronUp
                       size={11}
-                      className="text-branch shrink-0"
+                      className="hidden sm:block text-branch shrink-0"
                       aria-hidden="true"
                     />
                   ) : (
                     <ChevronDown
                       size={11}
-                      className="text-secondary-text shrink-0"
+                      className="hidden sm:block text-secondary-text shrink-0"
                       aria-hidden="true"
                     />
                   )}
@@ -466,30 +468,6 @@ export function TopBar({
         data-slot="run-control"
         className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 max-sm:shrink min-[1000px]:pointer-events-auto"
       >
-        {/* Illustrative presence and sharing from the Project Canvas design: no
-            collaboration or sharing backend exists, so these are static. */}
-        <span
-          data-testid="topbar-collaborators"
-          className="hidden xl:flex items-center gap-3 shrink-0"
-          role="img"
-          aria-label="Illustrative collaborators"
-        >
-          <span className="flex" aria-hidden="true">
-            <span className="grid size-8 place-items-center rounded-full border-2 border-white bg-primary text-caption font-semibold text-primary-foreground">
-              DK
-            </span>
-            <span className="-ml-2.5 grid size-8 place-items-center rounded-full border-2 border-white bg-[#7C5FC0] text-caption text-white">
-              ✦
-            </span>
-          </span>
-          <span
-            aria-hidden="true"
-            className="flex items-center gap-1.5 font-mono text-micro tracking-[0.12em] text-primary"
-          >
-            <span className="size-1.5 rounded-full bg-[#2E7D6B] shadow-[0_0_0_3px_rgba(46,125,107,0.18),0_0_8px_rgba(46,125,107,0.6)]" />
-            Live
-          </span>
-        </span>
         <div
           className="hidden xl:block w-px h-5 bg-control-border shrink-0"
           aria-hidden="true"
@@ -505,11 +483,12 @@ export function TopBar({
           <span aria-hidden="true">↗</span>
           Share
         </Button>
+        {collaborators}
         {onOpenAgents && (
           <Button type="button" data-testid="topbar-agents-btn" variant={agentsActive ? "tint" : "outline"}
-            size="sm" className="hidden sm:inline-flex h-7 px-2.5 shrink-0 pointer-coarse:min-w-11" aria-label="AI collaboration" onClick={onOpenAgents}>
+            size="sm" className="hidden sm:inline-flex h-7 px-2.5 shrink-0 pointer-coarse:min-w-11" aria-label="Comments" onClick={onOpenAgents}>
             <Bot className="size-3.5 sm:mr-1" aria-hidden="true" />
-            <span className="hidden sm:inline">AI</span>
+            <span className="hidden sm:inline">Comments</span>
           </Button>
         )}
         {onOpenQuickOptions && (

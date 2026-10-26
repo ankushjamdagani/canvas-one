@@ -85,6 +85,8 @@ export function readWorkspacePanelPreferences(value: unknown): WorkspacePanelPre
   const history = readPanelPreference(value.panels.history);
   // Older stored values predate the inspector panel; it then keeps its default.
   const inspector = readPanelPreference(value.panels.inspector);
+  // Conversation panels were added without changing the shared preference schema.
+  const comments = readPanelPreference(value.panels.comments);
   const { left, right } = value.sideWidths;
   if (
     !library ||
@@ -99,7 +101,7 @@ export function readWorkspacePanelPreferences(value: unknown): WorkspacePanelPre
     return null;
   }
   return {
-    panels: { library, history, inspector: inspector ?? defaultInspectorPreference() },
+    panels: { library, history, inspector: inspector ?? defaultInspectorPreference(), comments: comments ?? createInitialPanelState().panels.comments },
     sideWidths: { left, right },
   };
 }

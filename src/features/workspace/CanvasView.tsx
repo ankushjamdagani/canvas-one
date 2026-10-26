@@ -131,6 +131,8 @@ function gridGapFor(zoom: number): number {
 }
 
 export interface CanvasViewProps {
+  /** Annotation UI is outside authored graph records and simulation inputs. */
+  renderConversations?: (viewport: { x: number; y: number; zoom: number }, targets: readonly { id: string; x: number; y: number }[]) => React.ReactNode;
   /** Read-only factual presence; optional for independently supplied canvas hosts. */
   agentPresence?: AgentPresence;
   document: Document | null;
@@ -201,6 +203,7 @@ export interface CanvasViewHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   fitView: () => void;
+  locateConversation?: (point: { x: number; y: number }) => void;
 }
 
 /** Rebuilds canvas nodes from the projection, keeping each existing node's
@@ -244,6 +247,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   onOpenLinkedProject,
   runWaitsForScenarioDraft,
   agentPresence,
+  renderConversations,
 }: CanvasViewProps, ref) {
   const [dragMode, setDragMode] = React.useState<DragMode>('select');
   const reactFlow = useReactFlow();
@@ -1275,6 +1279,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       zoomIn: handleZoomIn,
       zoomOut: handleZoomOut,
       fitView: handleFitView,
+      locateConversation: point => { void reactFlow.setCenter(point.x, point.y, { zoom: reactFlow.getZoom(), duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180 }); },
     }),
     [getVisibleCentre, applyPlacement, handleZoomIn, handleZoomOut, handleFitView, handleDeleteSelection, measuredHeights],
   );
@@ -1411,6 +1416,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         className="system-canvas bg-canvas"
       >
         <ViewportPortal>
+          {agentPresence?.phase === 'applying' && agentPresence.activity?.status === 'running' && displayNodes.filter(node => !node.hidden && agentPresence.targetIds.includes(node.data.kind === 'element' || node.data.kind === 'boundary' ? node.data.element.id : node.data.kind === 'note' ? node.data.note.id : node.data.group.id)).map(node => <div key={`working-${node.id}`} aria-hidden="true" className="conversation-object-work" style={{ left: node.position.x - 4, top: node.position.y - 4, width: (node.measured?.width ?? node.width ?? 180) + 8, height: (node.measured?.height ?? node.height ?? 80) + 8 }} />)}
           <SelectionBox
             selectedIds={[
               ...(commandContext.selectedPlacementIds ?? []),
@@ -1432,6 +1438,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         )}
       </ReactFlow>
+      {renderConversations?.(viewport, displayNodes.filter(node => !node.hidden).map(node => ({ id: node.data.kind === 'element' || node.data.kind === 'boundary' ? node.data.element.id : node.data.kind === 'note' ? node.data.note.id : node.data.group.id, x: node.position.x, y: node.position.y })))}
       </SimulationHighlightContext.Provider>
       </PlaybackTrafficContext.Provider>
 

@@ -8,11 +8,12 @@ import { SystemAgentSession, type AgentSelection } from './controller';
 import { attemptBinding, readAuthorizedTask } from './task-authority';
 import { planAgentTaskUndo } from '../../persistence/studio/agent-action-journal';
 import type { AgentActivity } from './activity';
+import { assertConversationChanges, conversationWriteScope } from './scoped-changes';
 
-export type ConversationMessage = { readonly id: string; readonly taskId?: string; readonly attemptId?: string; readonly classification?: 'notice' | 'diagnostic'; readonly clarificationQuestionId?: string; readonly startingContext?: AgentSelection & { readonly omittedCount: number }; readonly role: 'user' | 'agent' | 'system'; readonly text: string; readonly delivery: 'queued' | 'delivered' | 'acknowledged' | 'failed' };
+export type ConversationMessage = { readonly id: string; readonly taskId?: string; readonly attemptId?: string; readonly classification?: 'notice' | 'diagnostic'; readonly clarificationQuestionId?: string; readonly startingContext?: AgentSelection & { readonly omittedCount: number; readonly writeScopeIds?: readonly string[] }; readonly role: 'user' | 'agent' | 'system'; readonly text: string; readonly delivery: 'queued' | 'delivered' | 'acknowledged' | 'failed' };
 export type ConversationProposal = { readonly taskId: string; readonly proposal: Proposal<RecordChange> };
 export type ConversationState = { readonly connection: 'disconnected' | 'pairing' | 'connected'; readonly tasks: readonly CollaborationTask[]; readonly messages: readonly ConversationMessage[]; readonly outstandingQuestions?: readonly ConversationMessage[]; readonly proposals: readonly ConversationProposal[]; readonly providers: readonly ProviderAvailability[]; readonly error: string | null; readonly hasEarlierMessages?: boolean; readonly historyWindowGap?: boolean; readonly blockedActions: readonly { readonly taskId: string; readonly operationId: string }[]; readonly activity?: AgentActivity; readonly activityLog?: readonly AgentActivity[]; readonly undoableTaskIds?: readonly string[]; readonly pendingUndoTaskIds?: readonly string[] };
-export type ConversationControllerOptions = { readonly session: SessionController; readonly repository: StudioRepository; readonly selection?: () => AgentSelection; readonly mintId: () => string; readonly client?: CollaborationBrowserClient; readonly now?: () => number; readonly leaseMs: number; readonly pollMs: number; readonly heartbeatMs: number; readonly ownership?: { load(): readonly string[]; save(ids: readonly string[]): void }; readonly recoverOwnedAfterReload?: boolean };
+export type ConversationControllerOptions = { readonly session: SessionController; readonly repository: StudioRepository; readonly selection?: () => AgentSelection; readonly enforceSelectionScope?: boolean; readonly mintId: () => string; readonly client?: CollaborationBrowserClient; readonly now?: () => number; readonly leaseMs: number; readonly pollMs: number; readonly heartbeatMs: number; readonly ownership?: { load(): readonly string[]; save(ids: readonly string[]): void }; readonly recoverOwnedAfterReload?: boolean };
 const json = (value: unknown): ConversationJson => JSON.parse(JSON.stringify(value)) as ConversationJson;
 const canonical = (value: unknown): string => JSON.stringify((function sort(input: unknown): unknown { if (Array.isArray(input)) return input.map(sort); if (input && typeof input === 'object') return Object.fromEntries(Object.keys(input).sort().map(key => [key, sort((input as Record<string, unknown>)[key])])); return input; })(value));
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -67,6 +68,33 @@ export class AgentConversationController {
   private readonly acceptRequests = new Map<string, Promise<void>>();
   private readonly streamingMessages = new Map<string, ConversationMessage>();
   private startingEdit = false;
+  private readonly readRestrictedTasks = new Set<string>();
+  private readonly readRestrictionCleanup = new Map<string, Promise<void>>();
+  /** Downgrading a thread fences its exact attempts before any asynchronous cleanup. */
+  async restrictToRead(taskIds: readonly string[]): Promise<void> {
+    const ids = new Set(taskIds);
+    const tasks = this.state.tasks.filter(task => ids.has(task.id) && task.kind !== 'question' && (['requested', 'working', 'waiting'].includes(task.status) || this.state.proposals.some(entry => entry.taskId === task.id && !['accepted', 'rejected'].includes(entry.proposal.status))));
+    for (const task of tasks) {
+      this.readRestrictedTasks.add(task.id);
+      this.options.repository.agentExecutionLeases?.revoke(attemptBinding(execution(task)));
+      this.started.delete(task.attempts.at(-1)!.id);
+    }
+    this.update({ activity: this.state.activity && ids.has(this.state.activity.taskId) ? undefined : this.state.activity });
+    await Promise.all(tasks.map(task => {
+      let cleanup = this.readRestrictionCleanup.get(task.id);
+      if (!cleanup) {
+        cleanup = (async () => {
+          if (['requested', 'working', 'waiting'].includes(task.status)) await this.stop(task.id, task.attempts.at(-1)!.id);
+          for (const entry of this.state.proposals.filter(entry => entry.taskId === task.id && !['accepted', 'rejected', 'accepting'].includes(entry.proposal.status))) await this.reject(entry.proposal.operationId);
+        })().finally(() => this.readRestrictionCleanup.delete(task.id));
+        this.readRestrictionCleanup.set(task.id, cleanup);
+      }
+      return cleanup;
+    }));
+  }
+  private assertTaskCanWrite(taskId?: string): void {
+    if (taskId && this.readRestrictedTasks.has(taskId)) throw new Error('This request was restricted to Read. Switch to Write and send a new request.');
+  }
   private earlierMessages: ConversationMessage[] = [];
   async loadEarlierMessages(): Promise<readonly ConversationMessage[]> {
     const storage = this.artifactStorage, generation = this.historyGeneration; if (!storage?.loadMessagesPage || this.historyHasMore === false) return [];
@@ -328,20 +356,23 @@ export class AgentConversationController {
     try { const paired = await client.pair(secret, signal); if (generation !== this.loopGeneration || signal.aborted) throw new Error('Pairing was cancelled'); this.token = paired.token; const status = await client.status(this.token, signal); if (!this.loopCurrent(generation, signal)) throw new Error('Pairing was cancelled'); this.serviceSessionId = status.sessionId; this.tokenInstances.set(paired.token, status.sessionId); if (this.artifacts && this.artifacts.eventsSessionId !== status.sessionId) await this.persist(ledger => ({ ...ledger, eventsSessionId: status.sessionId, eventsCursor: 0 })); if (!this.loopCurrent(generation, signal)) throw new Error('Pairing was cancelled'); this.update({ connection: 'connected', providers: status.providers }); await this.restoreStopObligations(); for (const obligation of [...this.pendingStops.values()]) if (obligation.serviceSessionId === status.sessionId) void this.requestHostStop(obligation.binding, client, this.token, obligation.repository); this.schedule(); }
     catch (error) { if (generation === this.loopGeneration) { this.update({ connection: 'disconnected' }); this.problem(error); } throw error; }
   }
-  async start(provider: LocalAgentProvider, prompt: string, kind: 'edit' | 'question' = 'edit'): Promise<string> {
+  async start(provider: LocalAgentProvider, prompt: string, kind: 'edit' | 'question' = 'edit', onCreated?: (id: string) => void | Promise<void>, selection?: AgentSelection): Promise<string> {
+    const inputSelection = selection ?? this.options.selection?.() ?? { ids: [] };
+    const capturedSelection = { ids: [...inputSelection.ids], viewId: inputSelection.viewId };
     if (kind === 'edit' && this.startingEdit) throw new Error('An editing task is already starting');
     if (kind === 'edit') this.startingEdit = true;
-    try { return await this.startUnlocked(provider, prompt, kind); }
+    try { return await this.startUnlocked(provider, prompt, kind, onCreated, capturedSelection); }
     finally { if (kind === 'edit') this.startingEdit = false; }
   }
-  private async startUnlocked(provider: LocalAgentProvider, prompt: string, kind: 'edit' | 'question'): Promise<string> {
+  private async startUnlocked(provider: LocalAgentProvider, prompt: string, kind: 'edit' | 'question', onCreated: ((id: string) => void | Promise<void>) | undefined, selection: AgentSelection): Promise<string> {
     if (!prompt.trim() || prompt.length > 64000) throw new Error('Instructions must be nonempty and at most 64000 characters');
     await this.ready; this.connection(); this.assertProviderAvailable(provider); if (!this.scope || !this.initialized || this.changingScope) throw new Error('Open and load a board before assigning work');
     this.assertCurrentBoard();
     if (kind === 'edit' && this.state.tasks.some(task => task.kind !== 'question' && ['requested', 'working', 'waiting'].includes(task.status) && task.attempts.at(-1)?.status !== 'finished')) throw new Error('Stop the active editing task before starting another');
     if (kind === 'edit' && this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Create or switch to a draft before starting editing work');
-    const selection = this.options.selection?.() ?? { ids: [] }; const ids = selection.ids.filter(id => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(0, 200);
-    const startingContext = { ids: [...ids], viewId: typeof selection.viewId === 'string' && selection.viewId.length <= 200 ? selection.viewId : null, omittedCount: selection.ids.length - ids.length };
+    const ids = selection.ids.filter(id => typeof id === 'string' && id.length > 0 && id.length <= 200).slice(0, 200);
+    if (this.options.enforceSelectionScope && ids.length !== selection.ids.length) throw new Error('Choose at most 200 valid objects for this conversation, or explicitly choose Whole board.');
+    const startingContext = { ids: [...ids], viewId: typeof selection.viewId === 'string' && selection.viewId.length <= 200 ? selection.viewId : null, omittedCount: selection.ids.length - ids.length, ...(this.options.enforceSelectionScope ? { writeScopeIds: conversationWriteScope(this.options.session.getState().document!, ids) } : {}) };
     const scope = this.scope, repository = this.tasks, taskId = this.options.mintId();
     this.owned.add(taskId);
     const task = await this.command({ type: 'create', taskId, attemptId: this.options.mintId(), actorId: this.options.mintId(), providerId: provider, scope, instruction: prompt, kind });
@@ -350,6 +381,8 @@ export class AgentConversationController {
     try {
       this.saveOwnership();
       await this.message({ id: this.options.mintId(), taskId: task.id, role: 'user', text: prompt, delivery: 'queued', startingContext });
+      await onCreated?.(task.id);
+      this.assertTaskCanWrite(kind === 'question' ? undefined : task.id);
       launchAttempted = true; await this.launch(task); return task.id;
     } catch (error) {
       if (repository) { const failed = await this.executeCurrent(repository, { ...attemptBinding(execution(task)), type: 'fail', reason: 'Task setup could not be saved' }); if (!failed.ok && !['stale-attempt', 'invalid-transition'].includes(failed.code)) this.problem(new Error(failed.code)); if (!launchAttempted) await this.recordCancellation(execution(task), 'acknowledged', repository); if (repository === this.tasks) this.publish(); }
@@ -365,7 +398,16 @@ export class AgentConversationController {
     const context = message?.startingContext ?? this.state.messages.find(value => value.taskId === taskId && value.role === 'user' && value.startingContext)?.startingContext;
     if (context) this.startingContexts.set(taskId, context); return context;
   }
-  private async startingContext(taskId: string): Promise<AgentSelection> { return await this.loadStartingContext(taskId) ?? { ids: [] }; }
+  private async startingContext(taskId: string): Promise<NonNullable<ConversationMessage['startingContext']>> { return await this.loadStartingContext(taskId) ?? { ids: [], omittedCount: 0 }; }
+  private async assertScopeChanges(taskId: string, changes: readonly RecordChange[]): Promise<void> {
+    if (!this.options.enforceSelectionScope) return;
+    const context = await this.loadStartingContext(taskId);
+    const document = this.options.session.getState().document;
+    if (!context || !document || context.omittedCount) throw new Error('The exact conversation scope is unavailable. Inspect the board and send a new request.');
+    assertConversationChanges(document, context.ids, context.writeScopeIds ?? context.ids, changes);
+    this.assertTaskCanWrite(taskId);
+    this.assertCurrentBoard();
+  }
   private async launch(requested: CollaborationTask, providerSessionId?: string, prompt?: string): Promise<void> {
     const binding = execution(requested), leases = this.options.repository.agentExecutionLeases, repository = this.tasks, signal = this.lifetime.signal;
     let connection: ReturnType<AgentConversationController['connection']> | undefined;
@@ -384,7 +426,9 @@ export class AgentConversationController {
       await this.persist(ledger => ({ ...ledger, operations: [...ledger.operations.filter(entry => entry.operationId !== operationId), { taskId: binding.taskId, operationId, payload: json({ kind: 'host-execution', identity: binding, serviceSessionId }) }] }));
       this.attemptInstances.set(binding.attemptId, serviceSessionId);
       if (signal.aborted || !leases.permits(attemptBinding(binding))) throw new Error('Execution was stopped before launch');
-      const launchPrompt = (prompt ?? active.instruction) + '\n\nStarting context (reference only; does not grant editing permission): ' + JSON.stringify(await this.startingContext(active.id));
+      const context = await this.startingContext(active.id);
+      const boundary = this.options.enforceSelectionScope && context.ids.length ? '\nEditing is limited to the captured object IDs and dependency footprint. New objects or a wider footprint require the user to expand the conversation scope and send a new request. Use proposal_submit for scoped changes; diagram_create is unavailable for object-scoped requests.' : '';
+      const launchPrompt = (prompt ?? active.instruction) + '\n\nStarting context (does not grant Live permission): ' + JSON.stringify(context) + boundary;
       dispatched = true;
       const ack = await client.start(token, { identity: binding, provider: active.providerId as LocalAgentProvider, mode: active.kind === 'question' ? 'question' : 'task', prompt: launchPrompt, ...(providerSessionId ? { providerSessionId } : {}) }, signal);
       const renewed = leases.renew(attemptBinding(binding), ack.requestStartedAt, this.options.leaseMs); if (!renewed.ok && !(renewed.code === 'stale-binding' && leases.permits(attemptBinding(binding)))) throw new Error(renewed.code);
@@ -392,8 +436,8 @@ export class AgentConversationController {
       const original = this.state.messages.find(message => message.taskId === active.id && message.role === 'user' && message.delivery === 'queued'); if (original) await this.message({ ...original, delivery: 'delivered' });
     } catch (error) { leases?.revoke(attemptBinding(binding)); try { if (repository) { const failed = await this.executeCurrent(repository, { ...attemptBinding(binding), type: 'fail', reason: error instanceof Error ? error.message : 'Agent startup failed' }); if (!failed.ok && !['stale-attempt', 'invalid-transition'].includes(failed.code)) this.problem(new Error(failed.code)); if (!dispatched) await this.recordCancellation(binding, 'acknowledged', repository); if (repository === this.tasks) this.publish(); } } finally { if (dispatched && connection) await this.requestHostStop(binding, connection.client, connection.token, repository); } this.problem(error); throw error; }
   }
-  async grantLive(taskId: string, attemptId: string): Promise<void> { this.assertCurrentBoard(); const task = this.task(taskId); if (task.attempts.at(-1)?.id !== attemptId) throw new Error('This Live grant belongs to an earlier attempt'); if (this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Create or switch to a draft before allowing Live edits'); await this.command({ ...attemptBinding(execution(task)), type: 'grantLive' }); }
-  preview(operationId: string) { return this.reviewed.proposals.preview(operationId); }
+  async grantLive(taskId: string, attemptId: string): Promise<void> { this.assertTaskCanWrite(taskId); this.assertCurrentBoard(); const task = this.task(taskId); if (task.attempts.at(-1)?.id !== attemptId) throw new Error('This Live grant belongs to an earlier attempt'); if (this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Create or switch to a draft before allowing Live edits'); await this.command({ ...attemptBinding(execution(task)), type: 'grantLive' }); }
+  preview(operationId: string) { this.assertTaskCanWrite(this.proposalOwners.get(operationId)); return this.reviewed.proposals.preview(operationId); }
   async stop(taskId: string, expectedAttemptId?: string): Promise<void> {
     const task = this.task(taskId), binding = execution(task);
     if (expectedAttemptId && binding.attemptId !== expectedAttemptId) throw new Error('This attempt already ended; the task has a newer attempt');
@@ -405,6 +449,7 @@ export class AgentConversationController {
     finally { if (connection) await this.requestHostStop(binding, connection.client, connection.token, repository); }
   }
   async resume(taskId: string): Promise<void> {
+    this.assertTaskCanWrite(taskId);
     this.connection();
     if (this.state.blockedActions.some(action => action.taskId === taskId)) throw new Error('Resolve the affected action before resuming');
     const previous = this.task(taskId); this.assertProviderAvailable(previous.providerId); const scope = this.currentScope(); if (!scope || !sameScope(scope, previous.scope) || this.options.session.getState().needsReload) throw new Error('Reload and validate this board before resuming');
@@ -412,6 +457,7 @@ export class AgentConversationController {
     const task = await this.command({ type: 'resume', taskId, actorId: previous.actorId, scope, attemptId: this.options.mintId(), permission: 'suggest', currentBoardValidated: true }); await this.launch(task, oldAttempt?.cancellation === 'acknowledged' ? oldAttempt.providerSessionId : undefined);
   }
   async send(taskId: string, text: string, target: 'task' | 'clarification' | 'proposal-revision' = 'task'): Promise<void> {
+    this.assertTaskCanWrite(taskId);
     this.connection();
     const task = this.task(taskId);
     if (target === 'clarification' && task.status === 'waiting' && task.waitReason === 'clarification' && task.attempts.at(-1)?.status === 'finished') this.assertProviderAvailable(task.providerId);
@@ -428,6 +474,7 @@ export class AgentConversationController {
     catch (error) { await this.message({ ...message, delivery: 'failed' }); this.problem(error); throw error; }
   }
   async requestChanges(operationId: string, text: string): Promise<void> {
+    this.assertTaskCanWrite(this.proposalOwners.get(operationId));
     this.assertCurrentBoard();
     this.connection();
     const taskId = this.proposalOwners.get(operationId); if (!taskId) throw new Error('Proposal task was not found');
@@ -449,11 +496,14 @@ export class AgentConversationController {
     this.acceptRequests.set(operationId, request); return request;
   }
   private async acceptOnce(operationId: string): Promise<void> {
+    this.assertTaskCanWrite(this.proposalOwners.get(operationId));
     this.assertCurrentBoard();
     const reviewed = this.reviewed, storage = this.artifactStorage, repository = this.tasks, scope = this.scope, proposalOwners = new Map(this.proposalOwners);
     const taskId = this.proposalOwners.get(operationId);
     const proposal = reviewed.proposals.list().find(value => value.operationId === operationId);
     if (!proposal || proposal.status !== 'pending' || this.options.session.getState().branchId === this.options.session.getState().mainBranchId) throw new Error('Open a pending proposal on its draft before accepting');
+    if (this.options.enforceSelectionScope && !taskId) throw new Error('The proposal has no captured conversation scope. Send a new request.');
+    if (taskId) await this.assertScopeChanges(taskId, proposal.changes);
     if (!storage || !repository || !scope) throw new Error('Proposal storage is unavailable');
     // Persist the in-flight review before the authored apply; crash recovery never re-applies it silently.
     await this.persist(ledger => {
@@ -461,6 +511,8 @@ export class AgentConversationController {
       if (saved && (!object(saved.payload) || saved.payload.status !== 'pending')) throw new Error('This proposal is no longer pending; reload its review');
       return { ...ledger, proposals: this.reviewed.proposals.list().map(value => ({ id: value.operationId, ...(this.proposalOwners.get(value.operationId) ? { taskId: this.proposalOwners.get(value.operationId)! } : {}), payload: json(value.operationId === operationId ? { ...value, status: 'accepting' } : value) })) };
     });
+    this.assertTaskCanWrite(taskId);
+    if (taskId) await this.assertScopeChanges(taskId, proposal.changes);
     const result = await reviewed.proposals.accept(operationId, reviewed.reviewer);
     const outcome = result.ok ? result.proposal : reviewed.proposals.list().find(value => value.operationId === operationId) ?? { ...proposal, status: 'failed' as const };
     // The authored apply may finish after navigation. Its receipt belongs to the captured board.
@@ -513,6 +565,7 @@ export class AgentConversationController {
     this.undoRequests.set(taskId, request); return request;
   }
   private async prepareUndo(taskId: string): Promise<string | null> {
+    this.assertTaskCanWrite(taskId);
     this.assertCurrentBoard();
     const generation = this.loadGeneration;
     const task = this.task(taskId), scope = this.currentScope(), state = this.options.session.getState();
@@ -528,6 +581,7 @@ export class AgentConversationController {
     if (plan.status === 'empty') { await this.message({ id: this.options.mintId(), taskId, role: 'system', text: 'There are no remaining task changes to undo.', delivery: 'acknowledged' }); return null; }
     if (plan.status === 'invalid-journal') throw new Error(plan.message);
     if (!plan.proposal.preview || !plan.proposal.changes.length) { await this.message({ id: this.options.mintId(), taskId, role: 'system', text: 'Undo needs refinement because later human edits or dependencies prevent a safe reversal.', delivery: 'acknowledged' }); throw new Error('No safe reversal is ready; preserve the human edits and refine the proposal'); }
+    await this.assertScopeChanges(taskId, plan.proposal.changes);
     const existing = this.state.proposals.find(entry => entry.taskId === taskId && entry.proposal.status === 'pending' && entry.proposal.expectedRevision === after.workingRevision && this.isUndoProposal(entry.proposal) && canonical(entry.proposal.changes) === canonical(plan.proposal.changes));
     if (existing) return existing.proposal.operationId;
     const operationId = this.options.mintId();
@@ -620,6 +674,7 @@ export class AgentConversationController {
       const metadata = request.payload.kind === 'authorize' ? request.payload.data : undefined;
       if (request.payload.kind === 'authorize' && (!object(metadata) || typeof metadata.provider !== 'string' || !['claude', 'codex', 'agy'].includes(metadata.provider) || typeof metadata.mode !== 'string' || !['task', 'question'].includes(metadata.mode))) throw new Error('Invalid startup metadata');
       const task = await readAuthorizedTask(this.options.repository.createAgentTaskStorage(this.scope), this.options.session, request.identity, metadata as Parameters<typeof readAuthorizedTask>[3]);
+      this.assertTaskCanWrite(task.kind === 'question' ? undefined : task.id);
       if (!this.options.repository.agentExecutionLeases?.permits(attemptBinding(request.identity))) throw new Error('Execution lease is expired or revoked');
       if (request.payload.kind === 'authorize') { await client.result(token, request, { result: true }, this.lifetime.signal); this.started.set(request.identity.attemptId, request.identity); return; }
       const tool = request.payload.data; if (!isBridgeRequest(tool)) throw new Error('Unknown board tool');
@@ -627,6 +682,12 @@ export class AgentConversationController {
       let result: unknown;
       const toolName: string = tool.tool;
       const input = object(tool.input) ? tool.input : {};
+      if (['proposal_submit', 'action_submit', 'diagram_create'].includes(toolName) && this.options.enforceSelectionScope) {
+        const context = await this.loadStartingContext(task.id);
+        if (toolName === 'diagram_create' && context?.ids.length) throw new Error('Diagram creation exceeds the conversation scope. Expand the conversation scope or choose Whole board, then send a new request.');
+        if (toolName !== 'diagram_create') await this.assertScopeChanges(task.id, input.changes as readonly RecordChange[]);
+        else if (!context) throw new Error('The exact conversation scope is unavailable. Inspect the board and send a new request.');
+      }
       if (typeof input.operationId === 'string' && input.operationId.startsWith('host-execution:')) throw new Error('Operation identity is reserved for trusted execution metadata');
       if (['proposal_submit', 'diagram_create'].includes(toolName) && typeof input.label === 'string' && ['review undo', 'undo task', 'review task revert preserving human edits'].includes(input.label.trim().replace(/\s+/g, ' ').toLowerCase())) throw new Error('This review label is reserved for human-requested task undo');
       if (['proposal_submit', 'diagram_create'].includes(toolName) && typeof input.operationId === 'string') {
@@ -653,7 +714,7 @@ export class AgentConversationController {
         this.recordActivity(activity);
       }
       if (toolName === 'board_inspect') {
-        result = { ...this.reviewed.context(input.selectionOnly === true, startingContext), task: { id: task.id, attemptId: request.identity.attemptId, kind: task.kind ?? 'edit', permission: task.permission } };
+        result = { ...this.reviewed.context(input.selectionOnly === true, startingContext), task: { id: task.id, attemptId: request.identity.attemptId, kind: task.kind ?? 'edit', permission: task.permission, ...(this.options.enforceSelectionScope ? { editingScope: { ids: startingContext.ids, dependencyIds: startingContext.writeScopeIds ?? startingContext.ids, wholeBoard: startingContext.ids.length === 0 } } : {}) } };
       } else if (toolName === 'clarification_request') {
         const input = tool.input;
         if (!object(input) || typeof input.questionId !== 'string' || !input.questionId.trim() || input.questionId.length > 200 || typeof input.question !== 'string' || !input.question.trim() || input.question.length > 2000) throw new Error('Clarification requires a bounded question identity and text');

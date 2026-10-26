@@ -4,12 +4,14 @@ import { expect, userEvent, within } from 'storybook/test';
 import { CollaborationPanel, type CollaborationPanelProps, type CollaborationIntent } from './CollaborationPanel';
 import { ConnectionSetup } from './ConnectionSetup';
 
-type State = 'disconnected' | 'review' | 'overlap' | 'interrupted' | 'mobile' | 'composer' | 'historical-conflict' | 'older-window' | 'provider-unavailable' | 'markdown';
+type State = 'disconnected' | 'disconnected-history' | 'review' | 'overlap' | 'interrupted' | 'mobile' | 'composer' | 'historical-conflict' | 'older-window' | 'provider-unavailable' | 'markdown';
 
 /** Fixtures exercise presentation only; clicking a command records it without running an agent. */
 function Fixture({ state, narrow = false }: { readonly state: State; readonly narrow?: boolean }) {
   const [text, setText] = React.useState('');
   const [intent, setIntent] = React.useState<CollaborationIntent>('task');
+  const [permissionMode, setPermissionMode] = React.useState<'read' | 'write'>('write');
+  const [writeBehavior, setWriteBehavior] = React.useState<'suggest' | 'live'>('suggest');
   const [action, setAction] = React.useState('');
   const [dismissed, setDismissed] = React.useState(false);
   const [earlierWindow, setEarlierWindow] = React.useState(true);
@@ -19,11 +21,11 @@ function Fixture({ state, narrow = false }: { readonly state: State; readonly na
     providers: [{ id: 'claude', label: 'Claude' }, { id: 'codex', label: 'Codex' }, { id: 'agy', label: 'agy' }],
     onProviderChange: provider => setAction(`Preview agent selection: ${provider}`),
     connection: state === 'mobile' ? { status: 'desktop-required' }
-      : state === 'disconnected' ? { status: 'disconnected', setup: <ConnectionSetup connecting={false} onConnect={async () => { setAction('Preview action: connect'); }} /> }
+      : state === 'disconnected' || state === 'disconnected-history' ? { status: 'disconnected', setup: <ConnectionSetup connecting={false} onConnect={async () => { setAction('Preview action: connect'); }} /> }
       : { status: 'connected', onDisconnect: record('disconnect') },
     messages: state === 'review' ? Array.from({ length: 35 }, (_, index) => ({ id: `message-${index}`, kind: 'agent' as const, author: 'Claude', text: `Review observation ${index + 1}: the proposed queue separates checkout from fulfilment. This is fixture content for testing long conversation scrolling.` })) : [],
     composer: {
-      text, intent, onTextChange: setText, onIntentChange: setIntent,
+      text, intent, permissionMode, writeBehavior, onPermissionModeChange: setPermissionMode, onWriteBehaviorChange: setWriteBehavior, onTextChange: setText, onIntentChange: setIntent,
       context: [{ id: 'checkout', label: 'Checkout service' }],
       targetLabel: state === 'review' ? 'Proposal P-14.1' : undefined,
       disabledReason: state === 'interrupted' ? 'Resume or end the interrupted task before assigning new work.' : undefined,
@@ -31,6 +33,7 @@ function Fixture({ state, narrow = false }: { readonly state: State; readonly na
     },
     history: state === 'review' ? Array.from({ length: 10 }, (_, index) => ({ id: `history-${index}`, title: `Earlier task ${index + 1}`, outcome: 'Completed · changes retained', onOpen: record(`inspect earlier task ${index + 1}`) })) : [],
   };
+  if (state === 'disconnected-history') props.messages = [{ id: 'human-comment', kind: 'user', author: 'Human', text: '**Keep this conversation available offline.**' }, { id: 'saved-answer', kind: 'agent', author: 'Claude', text: 'Saved explanation of the selected object.' }];
   if (state === 'review') {
     props.task = { id: 'T-14', title: 'Decouple checkout and fulfilment', status: 'Waiting for review', permission: 'suggest', context: 'Checkout service', expression: 'reply', onStop: record('stop') };
     props.review = {
@@ -101,7 +104,7 @@ export const Disconnected: Story = {
   render: () => <Fixture state="disconnected" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.queryByRole('textbox', { name: 'Task instruction' })).toBeNull();
+    await expect(canvas.queryByRole('textbox', { name: 'Message' })).toBeNull();
     await expect(canvas.queryByRole('combobox', { name: 'Agent' })).toBeNull();
     await expect(canvas.getByRole('button', { name: /^Connect$/ })).toBeDisabled();
     await userEvent.type(canvas.getByLabelText('2. Paste connection details'), 'invalid');
@@ -109,11 +112,21 @@ export const Disconnected: Story = {
     await expect(canvas.getByRole('alert')).toHaveTextContent('Paste the complete JSON');
   },
 };
+export const DisconnectedConversationHistory: Story = {
+  render: () => <Fixture state="disconnected-history" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Keep this conversation available offline.')).toBeVisible();
+    await expect(canvas.getByText('Saved explanation of the selected object.')).toBeVisible();
+    await expect(canvas.queryByRole('textbox', { name: 'Message' })).toBeNull();
+    await expect(canvas.queryByRole('button', { name: 'Send' })).toBeNull();
+  },
+};
 export const SelectedProviderUnavailable: Story = {
   render: () => <Fixture state="provider-unavailable" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('textbox', { name: 'Task instruction' })).toHaveValue('Add a queue');
+    await expect(canvas.getByRole('textbox', { name: 'Message' })).toHaveValue('Add a queue');
     await expect(canvas.getByRole('button', { name: 'Send' })).toBeDisabled();
     await expect(canvas.getByText('Claude CLI is not installed.')).toBeVisible();
   },
@@ -148,7 +161,7 @@ export const SuggestReview: Story = {
     const canvas = within(canvasElement);
     const scroll = canvas.getByRole('region', { name: 'Conversation and proposed changes' });
     const actions = canvas.getByRole('button', { name: 'Accept changes' });
-    const input = canvas.getByRole('textbox', { name: 'Task instruction' });
+    const input = canvas.getByRole('textbox', { name: 'Message' });
     const before = actions.getBoundingClientRect().top;
     scroll.scrollTop = scroll.scrollHeight;
     await expect(actions.getBoundingClientRect().top).toBe(before);
@@ -156,7 +169,8 @@ export const SuggestReview: Story = {
     await expect(scroll.clientHeight).toBeGreaterThanOrEqual(120);
     await expect(input.getBoundingClientRect().bottom).toBeLessThanOrEqual(canvas.getByTestId('collaboration-panel').getBoundingClientRect().bottom);
     await userEvent.click(canvas.getByRole('button', { name: 'Request changes' }));
-    await expect(canvas.getByRole('textbox', { name: 'Feedback' })).toBeEnabled();
+    await expect(canvas.getByRole('textbox', { name: 'Message' })).toBeEnabled();
+    await expect(canvas.queryByRole('button', { name: /^Feedback$/ })).toBeNull();
     await expect(scroll.clientHeight).toBeGreaterThanOrEqual(120);
   },
 };
@@ -168,7 +182,7 @@ export const MobileDesktopRequired: Story = {
     const canvas = within(canvasElement);
     const panel = canvas.getByTestId('collaboration-panel');
     await expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth);
-    await expect(canvas.queryByRole('textbox', { name: 'Task instruction' })).toBeNull();
+    await expect(canvas.queryByRole('textbox', { name: 'Message' })).toBeNull();
     await expect(canvas.queryByRole('combobox', { name: 'Agent' })).toBeNull();
     if (window.innerWidth < 640) {
       for (const control of panel.querySelectorAll('button, select')) {
@@ -182,14 +196,19 @@ export const KeyboardComposer: Story = {
   render: () => <Fixture state="composer" narrow />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('button', { name: 'Stop editing task' })).toBeEnabled();
-    await userEvent.click(canvas.getByRole('button', { name: /^Question$/ }));
-    const input = canvas.getByRole('textbox', { name: 'Question' });
+    await expect(canvas.getByRole('button', { name: 'Stop request' })).toBeEnabled();
+    await userEvent.click(canvas.getByRole('button', { name: /^Read$/ }));
+    await expect(canvas.queryByRole('button', { name: /^Question$/ })).toBeNull();
+    await expect(canvas.queryByRole('button', { name: /Write behavior/ })).toBeNull();
+    const input = canvas.getByRole('textbox', { name: 'Message' });
     await userEvent.click(input);
     await userEvent.type(input, 'Explain the failure path');
     await userEvent.keyboard('{Control>}{Enter}{/Control}');
     await expect(canvas.getByText('Preview action: send')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Allow live edit for this task…' }));
+    await userEvent.click(canvas.getByRole('button', { name: /^Write$/ }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Write behavior: Suggest' }));
+    const menu = within(canvasElement.ownerDocument.body);
+    await userEvent.click(menu.getByRole('menuitem', { name: 'Allow Live for current request…' }));
     await expect(canvas.getByText('Preview grant request: T-18 / attempt-18')).toBeVisible();
     const panel = canvas.getByTestId('collaboration-panel');
     const controls = within(canvas.getByTestId('agent-send-controls'));

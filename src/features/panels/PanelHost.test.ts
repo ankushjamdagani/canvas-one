@@ -13,11 +13,39 @@ import {
   createState23G,
 } from './panelStates.fixtures';
 import type { PanelId } from '@/features/workspace/panels';
+import { createInitialPanelState, panelReducer, effectiveLayout } from '@/features/workspace/panels';
 
 describe('PanelHost and Panels System Components', () => {
   const dummyCanvas = React.createElement('div', { id: 'test-canvas-content' }, 'CANVAS_VIEWPORT_XYFLOW');
   const renderDummyPanel = (id: PanelId) =>
     React.createElement('div', { id: `panel-content-${id}` }, `CONTENT_${id.toUpperCase()}`);
+
+  it('hosts Comments through the same floating, docking, collapse and close routes', () => {
+    let state = createInitialPanelState();
+    state = panelReducer(state, { type: 'OPEN', panel: 'comments' }).state;
+    const html = renderToStaticMarkup(React.createElement(PanelHost, {
+      state, dispatch: vi.fn(), renderPanel: renderDummyPanel, canvas: dummyCanvas,
+    }));
+    expect(html).toContain('data-slot="floating-panel"');
+    expect(html).toContain('data-panel-id="comments"');
+    expect(html).toContain('CONTENT_COMMENTS');
+    state = panelReducer(state, { type: 'PLACE', panel: 'comments', placement: 'right', index: 0 }).state;
+    expect(effectiveLayout(state).panels.comments).toBe('docked-right');
+    state = panelReducer(state, { type: 'COLLAPSE', panel: 'comments' }).state;
+    expect(effectiveLayout(state).panels.comments).toBe('collapsed');
+    state = panelReducer(state, { type: 'CLOSE', panel: 'comments' }).state;
+    expect(effectiveLayout(state).panels.comments).toBe('hidden');
+  });
+
+  it('uses one shared Comments overlay on narrow screens without changing desktop preferences', () => {
+    const initial = createInitialPanelState({ viewport: { width: 390, height: 844 } });
+    const commentsOpen = panelReducer(initial, { type: 'OPEN', panel: 'comments' }).state;
+    expect(effectiveLayout(commentsOpen).panels.comments).toBe('overlay');
+    const historyOpen = panelReducer(commentsOpen, { type: 'OPEN', panel: 'history' }).state;
+    expect(effectiveLayout(historyOpen).panels.comments).toBe('hidden');
+    expect(effectiveLayout(historyOpen).panels.history).toBe('overlay');
+    expect(historyOpen.panels.comments.placement).toBe('floating');
+  });
 
   // ==========================================================================
   // 1. Static markup rendering of panel layout states

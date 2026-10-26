@@ -9,6 +9,7 @@ export interface AgentPresence {
   /** Record IDs from an actual board request, never inferred from model text. */
   readonly targetIds: readonly string[];
   readonly activity?: AgentActivity;
+  readonly showFace?: boolean;
 }
 export interface AgentCursorTarget {
   readonly recordIds: readonly string[];
@@ -37,7 +38,7 @@ export function AgentCursor({ presence, position, scale = 1 }: { readonly presen
   if (!position) return null;
   return <div aria-hidden="true" data-testid="agent-presence-cursor" data-spatial="target" data-outcome={presence.activity?.status ?? 'running'} className="pointer-events-none absolute z-dock flex max-w-64 items-center gap-1.5 text-caption text-foreground" style={{ left: position.x, top: position.y, transform: `scale(${Number.isFinite(scale) && scale > 0 ? scale : 1})`, transformOrigin: 'top left' }}>
     {position && <MousePointer2 className="size-3 shrink-0 text-primary" aria-hidden="true" />}
-    <CanvasOneFace expression={presence.activity?.status === 'succeeded' ? 'happy' : expression[presence.phase]} size={28} aria-hidden="true" />
+    {presence.showFace !== false && <CanvasOneFace expression={presence.activity?.status === 'succeeded' ? 'happy' : expression[presence.phase]} size={28} aria-hidden="true" />}
     <span className="min-w-0 break-words rounded-control border border-hairline bg-panel px-2 py-1">{agentPresenceLabel(presence)}</span>
   </div>;
 }

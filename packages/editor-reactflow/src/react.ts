@@ -3,7 +3,7 @@ import type { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 import type { ReactFlowBridge } from './index.js';
 export {
   ReactFlow, ReactFlowProvider, Background, BackgroundVariant, MiniMap,
-  useNodesState, useEdgesState, useReactFlow, useViewport, useNodesInitialized, ViewportPortal, Handle, Position,
+  useNodesState, useEdgesState, useReactFlow, useViewport, useNodesInitialized, useUpdateNodeInternals, ViewportPortal, Handle, Position,
   BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useStore,
 } from '@xyflow/react';
 export type {

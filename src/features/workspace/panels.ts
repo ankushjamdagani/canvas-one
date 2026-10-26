@@ -8,20 +8,20 @@
 // Types
 // ============================================================================
 
-export type PanelId = 'library' | 'history' | 'inspector';
+export type PanelId = 'library' | 'history' | 'inspector' | 'comments';
 
 /** Every panel the host can place, in a stable order. */
-export const PANEL_IDS: readonly PanelId[] = ['library', 'history', 'inspector'];
+export const PANEL_IDS: readonly PanelId[] = ['library', 'history', 'inspector', 'comments'];
 
 /**
  * The user-opened panels. Below the desktop tier these are single overlays; the
  * inspector is draft-driven (it follows the selection) and keeps its own
  * dock/sheet below 1200 px.
  */
-const AUXILIARY_PANEL_IDS: readonly PanelId[] = ['library', 'history'];
+const AUXILIARY_PANEL_IDS: readonly PanelId[] = ['library', 'history', 'comments'];
 
 function hiddenPanelModes(): Record<PanelId, PanelMode> {
-  return { library: 'hidden', history: 'hidden', inspector: 'hidden' };
+  return { library: 'hidden', history: 'hidden', inspector: 'hidden', comments: 'hidden' };
 }
 
 export type Placement = 'left' | 'right' | 'floating';
@@ -351,6 +351,13 @@ export function createInitialPanelState(
         floatRect: defaultFloatRect(defaultViewport),
         stackOrder: 1,
       },
+      comments: {
+        open: false,
+        placement: 'floating',
+        collapsed: false,
+        floatRect: defaultFloatRect(defaultViewport),
+        stackOrder: 2,
+      },
       // Draft-driven: opened and closed with the selection, docked right by default.
       inspector: {
         open: false,
@@ -369,6 +376,7 @@ export function createInitialPanelState(
       library: 0,
       history: 0,
       inspector: 0,
+      comments: 0,
     },
     activeOverlay: null,
     gesture: null,
@@ -386,6 +394,7 @@ export function createInitialPanelState(
       library: { ...base.panels.library, ...(overrides.panels?.library ?? {}) },
       history: { ...base.panels.history, ...(overrides.panels?.history ?? {}) },
       inspector: { ...base.panels.inspector, ...(overrides.panels?.inspector ?? {}) },
+      comments: { ...base.panels.comments, ...(overrides.panels?.comments ?? {}) },
     },
     sideWidths: {
       ...base.sideWidths,
@@ -423,7 +432,7 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
     const resultPanels = hiddenPanelModes();
 
     let chosenOverlay: PanelId | null = null;
-    if (activeOverlay === 'library' || activeOverlay === 'history') {
+    if (activeOverlay === 'library' || activeOverlay === 'history' || activeOverlay === 'comments') {
       if (panels[activeOverlay].open) {
         chosenOverlay = activeOverlay;
       }
@@ -472,7 +481,7 @@ export function effectiveLayout(state: WorkspacePanelState): EffectiveLayout {
     // Auxiliary panels are single overlays
     const openAuxiliary = AUXILIARY_PANEL_IDS.filter((id) => panels[id].open);
 
-    if (activeOverlay === 'library' || activeOverlay === 'history') {
+    if (activeOverlay === 'library' || activeOverlay === 'history' || activeOverlay === 'comments') {
       if (panels[activeOverlay].open) {
         resultPanels[activeOverlay] = 'overlay';
       }

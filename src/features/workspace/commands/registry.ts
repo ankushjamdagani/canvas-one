@@ -368,7 +368,7 @@ export interface CommandContext {
   /** Library/History preference state. */
   /** The inspector entry is optional: it only exists on desktop, where it is a hosted panel. */
   readonly panels: Readonly<Record<'library' | 'history', CommandPanelState>> &
-    Readonly<Partial<Record<'inspector', CommandPanelState>>>;
+    Readonly<Partial<Record<'inspector' | 'comments', CommandPanelState>>>;
   /** True while the results region is on screen (a scenario is selected or results.open ran). */
   readonly resultsVisible: boolean;
   /** Commits on the current branch (prepare-publish needs a committed head). */
@@ -518,7 +518,7 @@ function expansionAvailability(mode: 'expand' | 'collapse') {
 
 export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition<K> } = {
   'agents.open': {
-    id: 'agents.open', label: 'AI collaboration', keywords: ['AI', 'agent', 'collaboration', 'pair', 'proposals'],
+    id: 'agents.open', label: 'Comments', keywords: ['AI', 'agent', 'collaboration', 'pair', 'proposals', 'conversation', 'comments'],
     group: 'review', iconKey: 'command', shortcut: null,
     availability: ctx => requireProject(ctx) ?? ENABLED,
   },

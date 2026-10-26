@@ -34,8 +34,10 @@ test('real Claude proposes and applies a node rename through local board authori
     await expect(page.getByTestId('workspace-root')).toBeVisible();
     await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
     await page.keyboard.press('ControlOrMeta+k');
-    await page.getByTestId('quick-options-input').fill('AI collaboration');
+    await page.getByTestId('quick-options-input').fill('Comments');
     await page.getByTestId('quick-option-agents.open').click();
+    await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+    await page.getByTestId('canvas-conversation-expanded').getByRole('button', { name: 'Ask AI', exact: true }).click();
     const panel = page.getByTestId('collaboration-panel');
     await panel.getByLabel('2. Paste connection details').fill(JSON.stringify({ url: service.url, pairingSecret: service.pairingSecret }));
     await panel.getByRole('button', { name: 'Connect', exact: true }).click();
@@ -45,7 +47,7 @@ test('real Claude proposes and applies a node rename through local board authori
     const router = page.locator(`[data-element-id="${ROUTER}"]`);
     await expect(router).toBeVisible();
     const original = await router.locator('strong').innerText();
-    await panel.getByLabel('Task instruction').fill(`Rename the existing router node with id ${ROUTER} to "Real Claude Reviewed Router". Keep everything else unchanged and propose the change for my review.`);
+    await panel.getByRole('textbox', { name: 'Message', exact: true }).fill(`Rename the existing router node with id ${ROUTER} to "Real Claude Reviewed Router". Keep everything else unchanged and propose the change for my review.`);
     await panel.getByRole('button', { name: 'Send', exact: true }).click();
     const accept = panel.getByRole('button', { name: 'Accept changes', exact: true });
     await expect(accept).toBeEnabled({ timeout: 120000 });

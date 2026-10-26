@@ -3,6 +3,7 @@ import {
   History as HistoryIcon,
   LayoutGrid,
   SlidersHorizontal,
+  MessageSquare,
   ChevronsRight,
   ChevronsLeft,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ const defaultIcons: Record<PanelId, React.ComponentType<{ className?: string }>>
   history: HistoryIcon,
   library: LayoutGrid,
   inspector: SlidersHorizontal,
+  comments: MessageSquare,
 };
 
 export const PanelRail: React.FC<PanelRailProps> = ({

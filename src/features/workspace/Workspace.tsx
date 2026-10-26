@@ -140,7 +140,20 @@ import {
 import { QuickOptionsDialog, type RenameOutcome } from "./QuickOptions";
 import { AgentConversationController } from "../agents/conversation-controller";
 import { ConversationView, type ConversationComposerDraft } from "../agents/ConversationView";
-import { FloatingToolPanel } from '../../components/ui/floating-tool-panel';
+import {
+  CanvasConversationStore,
+  type CanvasConversationThread,
+} from "../agents/canvas-conversations";
+import {
+  CanvasConversationLayer,
+  CommentsIndex,
+  ConversationPresence,
+  ConversationScope,
+  HumanConversation,
+  conversationStatus,
+  humanConversationMessages,
+} from "../agents/CanvasConversationExperience";
+import { renderDiagramSvg } from "../transfer/svg-export";
 import { CanvasOneFace } from '../../components/ui/canvas-one-face';
 import type { AgentPresence } from '../agents/AgentCursor';
 import { activityMatchesTask } from '../agents/cursor-presentation';
@@ -296,6 +309,12 @@ export interface WorkspaceProps {
   runControl?: React.ReactNode;
 }
 const noConversation = () => null;
+const emptyComments = {
+  threads: [] as readonly CanvasConversationThread[],
+  loaded: false,
+  error: null,
+};
+const noCommentState = () => emptyComments;
 const inertConversationSubscribe = () => () => {};
 const emptyComposerDraft: ConversationComposerDraft = { provider: 'claude', intent: 'task', text: '' };
 
@@ -339,16 +358,67 @@ function WorkspaceBody({
     session.subscribe,
     session.getState,
   );
-  const [agentsOpen, setAgentsOpen] = React.useState(false);
-  const [agentsMinimized, setAgentsMinimized] = React.useState(false);
+  const [activeConversationId, setActiveConversationId] = React.useState<string>();
+  const [commentStore, setCommentStore] = React.useState<CanvasConversationStore | null>(null);
+  const [commentError, setCommentError] = React.useState<string>();
+  const sendingQueued = React.useRef(new Set<string>());
+  const comments = React.useSyncExternalStore(
+    commentStore?.subscribe ?? inertConversationSubscribe,
+    commentStore?.getState ?? noCommentState,
+    noCommentState,
+  );
+  const activeConversation = comments.threads.find(
+    (thread) => thread.id === activeConversationId,
+  );
+  React.useEffect(() => {
+    setActiveConversationId(undefined);
+    setCommentError(undefined);
+    if (!sessionState.projectId || !sessionState.document) {
+      setCommentStore(null);
+      return;
+    }
+    const store = new CanvasConversationStore({
+      projectId: sessionState.projectId,
+      boardId: sessionState.document.id,
+    });
+    setCommentStore(store);
+    return () => store.dispose();
+  }, [sessionState.projectId, sessionState.document?.id]);
   const [conversation, setConversation] = React.useState<AgentConversationController | null>(null);
   const [composerDrafts, setComposerDrafts] = React.useState<Readonly<Record<string, ConversationComposerDraft>>>({});
-  const composerScopeKey = JSON.stringify([actor.actorId, sessionState.projectId, sessionState.branchId, sessionState.document?.id]);
+  const composerScopeKey = JSON.stringify([actor.actorId, sessionState.projectId, sessionState.document?.id,
+    activeConversationId,
+  ]);
   const composerDraft = composerDrafts[composerScopeKey] ?? emptyComposerDraft;
   const updateComposerDraft = React.useCallback((patch: Partial<ConversationComposerDraft>) => {
-    setComposerDrafts(current => ({ ...current, [composerScopeKey]: { ...(current[composerScopeKey] ?? emptyComposerDraft), ...patch } }));
-  }, [composerScopeKey]);
-  const conversationState = React.useSyncExternalStore<ReturnType<AgentConversationController['getState']> | null>(conversation?.subscribe ?? inertConversationSubscribe, conversation?.getState ?? noConversation, noConversation);
+    setComposerDrafts((current) => ({ ...current, [composerScopeKey]: { ...(current[composerScopeKey] ?? emptyComposerDraft), ...patch,
+        },
+      }));
+  }, [composerScopeKey],
+  );
+  const conversationState = React.useSyncExternalStore<ReturnType<AgentConversationController['getState']> | null>(conversation?.subscribe ?? inertConversationSubscribe, conversation?.getState ?? noConversation, noConversation,
+  );
+  const observedThreadStatus = React.useRef(new Map<string, string>());
+  React.useEffect(() => { observedThreadStatus.current.clear(); }, [sessionState.projectId, sessionState.branchId, sessionState.document?.id]);
+  React.useEffect(() => {
+    if (!commentStore || !comments.loaded) return;
+    for (const thread of comments.threads) {
+      if (thread.taskIds.length && !thread.taskIds.some(id => conversationState?.tasks.some(task => task.id === id))) continue;
+      const status = conversationStatus(thread, conversationState?.tasks ?? []);
+      const previous = observedThreadStatus.current.get(thread.id);
+      observedThreadStatus.current.set(thread.id, status.label);
+      if (
+        previous !== undefined &&
+        previous !== status.label &&
+        (status.attention ||
+          status.complete ||
+          status.label.startsWith("Failed")) &&
+        thread.id !== activeConversationId
+      ) {
+        void commentStore.markUnread(thread.id).catch(() => {});
+      }
+    }
+  }, [commentStore, comments, conversationState?.tasks, activeConversationId]);
   const agentPresence = React.useMemo((): AgentPresence | undefined => {
     const activity = conversationState?.activity;
     const task = activity && conversationState?.tasks.find(task => activityMatchesTask(activity, task) && task.scope.projectId === sessionState.projectId && task.scope.branchId === sessionState.branchId && task.scope.boardId === sessionState.document?.id);
@@ -382,7 +452,10 @@ function WorkspaceBody({
         window.sessionStorage.setItem(ownershipKey, JSON.stringify(records));
       },
     };
-    const next = new AgentConversationController({ session, repository, mintId, selection: () => agentSelectionRef.current, ownership, recoverOwnedAfterReload: true, leaseMs: 15000, pollMs: 500, heartbeatMs: 5000 });
+    const next = new AgentConversationController({
+      enforceSelectionScope: true,
+      session, repository, mintId, selection: () => agentSelectionRef.current, ownership, recoverOwnedAfterReload: true, leaseMs: 15000, pollMs: 500, heartbeatMs: 5000,
+    });
     setConversation(next);
     const depart = () => { void next.depart(); };
     window.addEventListener('pagehide', depart);
@@ -1325,8 +1398,13 @@ function WorkspaceBody({
     if (simulationMobileLayout || !simulationDetailsOpen)
       simulationPanelRef.current?.resize(compactSimulationHeight.current);
     else {
-      const reserve = Math.min(120, Math.max(40, simulationViewportHeight * .2));
-      simulationPanelRef.current?.resize(Math.min(552, simulationViewportHeight - reserve));
+      const reserve = Math.min(
+        120,
+        Math.max(40, simulationViewportHeight * 0.2),
+      );
+      simulationPanelRef.current?.resize(
+        Math.min(552, simulationViewportHeight - reserve),
+      );
     }
   }, [simulationDetailsOpen, simulationMobileLayout, hasSimulation, simulationViewportHeight]);
   const handleSimulationDetailsOpenChange = React.useCallback((open: boolean) => {
@@ -1853,6 +1931,19 @@ function WorkspaceBody({
   // From 1200 px the inspector is a hosted panel (dock, float, collapse, stack, resize)
   // opened and closed by the selection; below that it keeps its own dock or sheet.
   const inspectorHosted = panelState.viewport.width >= BREAKPOINT_DESKTOP;
+  React.useEffect(() => {
+    if (
+      panelState.viewport.width < 768 &&
+      activeConversationId &&
+      panelState.panels.comments.open
+    )
+      panelDispatch({ type: "CLOSE", panel: "comments" });
+  }, [
+    panelState.viewport.width,
+    panelState.panels.comments.open,
+    activeConversationId,
+    panelDispatch,
+  ]);
   const inspectorWanted =
     inspectorHosted &&
     Boolean((draft && !draft.multi) || (scenarioDraft && document));
@@ -2435,7 +2526,11 @@ function WorkspaceBody({
   const commandHandlers: CommandHandlers = React.useMemo(
     () => ({
       "commands.open": () => setQuickOptionsOpen(true),
-      "agents.open": () => { setQuickOptionsOpen(false); setAgentsMinimized(false); setAgentsOpen(true); },
+      "agents.open": () => {
+        setQuickOptionsOpen(false);
+        if (panelStateRef.current.viewport.width < 768) setActiveConversationId(undefined);
+        panelDispatch({ type: "OPEN", panel: "comments" });
+      },
       "project.rename": ({ title }) => handleRenameProject(title),
       "project.switch": () => handleBackToProjects(),
       "branch.switch": ({ branchId }) => handleSwitchBranch(branchId),
@@ -2900,7 +2995,9 @@ function WorkspaceBody({
     void runCommand("inspector.close", { draftId: draftContext.id });
   }, [draftContext.id, runCommand]);
 
-  agentSelectionRef.current = { ids: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds], viewId: activeViewId ?? undefined };
+  agentSelectionRef.current = { ids: activeConversation?.targetIds ?? [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds,
+    ], viewId: activeViewId ?? undefined,
+  };
   const closeDetails = React.useCallback(() => {
     runGuarded(() => {
       closeInspector();
@@ -2918,17 +3015,366 @@ function WorkspaceBody({
     return <p className="p-3 text-caption text-secondary-text">Select an item to inspect it.</p>;
   }, [scenarioDraft, document, handleChangeScenarioDraft, inspectorApply, inspectorCancel, inspectorClose, mintId, scenarioEditorChecks, scenarioEditorFocusName, scenarioEditorFocusAssertionId, draft, measuredSection, handleChangeField, focusFieldId, inspectorHosted, isMobileInspector]);
   const renderDetails = renderInspectorContent;
-  const closeAgents = React.useCallback(() => {
-    setAgentsOpen(false);
-    requestAnimationFrame(() => {
-      const opener = window.document.querySelector<HTMLElement>('[data-testid="topbar-agents-btn"]');
-      const fallback = window.document.querySelector<HTMLElement>('[data-testid="topbar-quick-options-btn"]');
-      (opener?.getClientRects().length ? opener : fallback)?.focus();
-    });
+  const commentAction = React.useCallback((action: () => Promise<unknown>) => {
+    setCommentError(undefined);
+    void action().catch((error) =>
+      setCommentError(
+        error instanceof Error
+          ? error.message
+          : "Could not save this conversation.",
+      ),
+    );
   }, []);
+  const targetLabels = (thread: Pick<CanvasConversationThread, 'targetIds' | 'targetNames'>) =>
+    thread.targetIds.map((id) => {
+      const item = document?.elements.find((item) => item.id === id);
+      const connection = document?.connections.find((item) => item.id === id);
+      const note = document?.views
+        .flatMap((view) => view.notes ?? [])
+        .find((item) => item.id === id);
+      const group = document?.views
+        .flatMap((view) => view.groups ?? [])
+        .find((item) => item.id === id);
+      return {
+        id,
+        label:
+          item?.label ??
+          group?.label ??
+          (connection ? "Connection" : note ? "Sticky note" : thread.targetNames?.[id] ?? id),
+        missing: !item && !connection && !note && !group,
+      };
+    });
+  const threadLabel = (thread: CanvasConversationThread) =>
+    thread.targetIds.length
+      ? targetLabels(thread)
+          .map((item) => item.label + (item.missing ? " (deleted)" : ""))
+          .join(", ")
+      : "Whole board";
+  const openConversation = (id: string) => {
+    const thread = comments.threads.find((thread) => thread.id === id);
+    if (!thread) return;
+    setActiveConversationId(id);
+    commentAction(() => commentStore!.markRead(id));
+    const placement = document?.views
+      .find((view) => view.id === activeViewId)
+      ?.placements.find(
+        (placement) => placement.elementId === thread.targetIds[0],
+      );
+    canvasViewRef.current?.locateConversation?.(
+      placement ? { x: placement.x, y: placement.y } : thread.anchor,
+    );
+  };
+  const createConversation = (useSelection: boolean) =>
+    commentAction(async () => {
+      if (!commentStore) throw new Error("Comments are still loading.");
+      const ids = useSelection
+        ? [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds]
+        : [];
+      const thread = await commentStore.create({
+        title: ids.length
+          ? `Discuss ${ids.length === 1 ? (document?.elements.find((item) => item.id === ids[0])?.label ?? "selection") : `${ids.length} objects`}`
+          : "Board conversation",
+        targetIds: ids,
+        targetNames: Object.fromEntries(targetLabels({ targetIds: ids }).map(item => [item.id, item.label])),
+        anchor: canvasViewRef.current?.getVisibleCentre() ?? { x: 100, y: 100 },
+        author: { id: actor.actorId, name: actor.displayName, kind: "human" },
+      });
+      setActiveConversationId(thread.id);
+      if (panelState.viewport.width < 768)
+        panelDispatch({ type: "CLOSE", panel: "comments" });
+    });
+  const importEarlierConversations = () =>
+    commentAction(async () => {
+      if (!commentStore || !conversationState) return;
+      const ids = conversationState.tasks
+        .filter(
+          (task) =>
+            !comments.threads.some((thread) =>
+              thread.taskIds.includes(task.id),
+            ),
+        )
+        .map((task) => task.id);
+      const thread = await commentStore.create({
+        title: "Earlier AI conversations",
+        anchor: canvasViewRef.current?.getVisibleCentre() ?? { x: 100, y: 100 },
+      });
+      for (const id of ids) await commentStore.attachTask(thread.id, id);
+      await commentStore.setAiEngaged(thread.id, true);
+      setActiveConversationId(thread.id);
+    });
+  const renderCanvasThread = (thread: CanvasConversationThread) => {
+    const tasks =
+      conversationState?.tasks.filter((task) =>
+        thread.taskIds.includes(task.id),
+      ) ?? [];
+    const busy =
+      tasks.some((task) =>
+        ["requested", "working", "waiting"].includes(task.status),
+      ) || thread.queuedRequests.length > 0;
+    const writer = conversationState?.tasks.find(
+      (task) =>
+        task.kind !== "question" &&
+        ["requested", "working", "waiting"].includes(task.status),
+    );
+    const blockingThread =
+      writer &&
+      comments.threads.find((item) => item.taskIds.includes(writer.id));
+    return (
+      <>
+        <ConversationScope
+          thread={thread}
+          labels={targetLabels(thread)}
+          busy={busy}
+          selectionAvailable={Boolean(
+            selectedElementIds.size +
+            selectedNoteIds.size +
+            selectedConnectionIds.size,
+          )}
+          onUseSelection={() =>
+            commentAction(() =>
+              commentStore!.setScope(thread.id, [
+                ...selectedElementIds,
+                ...selectedNoteIds,
+                ...selectedConnectionIds,
+              ], Object.fromEntries(targetLabels({ targetIds: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds] }).map(item => [item.id, item.label]))),
+            )
+          }
+          onBoard={() =>
+            commentAction(() => commentStore!.setScope(thread.id, []))
+          }
+          onLocate={() => openConversation(thread.id)}
+          onResolve={() =>
+            commentAction(() =>
+              commentStore!.setResolved(thread.id, !thread.resolved),
+            )
+          }
+          onBack={() => {
+            setActiveConversationId(undefined);
+            panelDispatch({ type: "OPEN", panel: "comments" });
+          }}
+        />
+        {commentError && (
+          <p role="alert" className="px-3 text-caption text-destructive">
+            {commentError}
+          </p>
+        )}
+        {thread.queuedRequests.length > 0 && (
+          <section
+            className="conversation-waiting"
+            aria-label="Waiting requests"
+          >
+            <p className="text-caption">
+              {composerDraft.permissionMode === "read"
+                ? "Waiting edits are paused in Read. Switch to Write to send a new editing request."
+                : writer
+                  ? "Paused until earlier board work and reviews finish."
+                  : "Earlier work has finished. Send when you are ready; Live will need fresh permission."}
+            </p>
+            {blockingThread && blockingThread.id !== thread.id && (
+              <Button
+                size="sm"
+                variant="link"
+                onClick={() => openConversation(blockingThread.id)}
+              >
+                Open {blockingThread.title}
+              </Button>
+            )}
+            {thread.queuedRequests.map((request) => (
+              <div
+                key={request.id}
+                className="space-y-1 border-t border-hairline pt-2"
+              >
+                <p className="text-caption break-words">{request.text}</p>
+                <p className="text-caption text-secondary-text">Original scope: {request.targetIds?.length ? request.targetIds.map(id => document?.elements.find(item => item.id === id)?.label ?? id).join(', ') : 'Whole board'}</p>
+                {request.branchId && request.branchId !== sessionState.branchId && <p className="text-caption">Switch to the original draft to send this waiting request.</p>}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={
+                      Boolean(writer) ||
+                      Boolean(request.branchId && request.branchId !== sessionState.branchId) ||
+                      composerDraft.permissionMode === "read" ||
+                      desktopAgentRequired ||
+                      conversationState?.connection !== "connected"
+                    }
+                    onClick={() =>
+                      commentAction(async () => {
+                        if (
+                          !conversation ||
+                          sendingQueued.current.has(request.id)
+                        )
+                          return;
+                        sendingQueued.current.add(request.id);
+                        try {
+                          if (
+                            request.branchId &&
+                            request.branchId !== session.getState().branchId
+                          )
+                            throw new Error(
+                              "Switch to the original draft before sending this request.",
+                            );
+                          if (
+                            request.providerId !== "claude" &&
+                            request.providerId !== "codex" &&
+                            request.providerId !== "agy"
+                          )
+                            throw new Error(
+                              "Choose a supported agent before sending this waiting request.",
+                            );
+                          await conversation.start(
+                            request.providerId,
+                            request.text,
+                            request.permissionMode === "read"
+                              ? "question"
+                              : "edit",
+                            async (id) => {
+                              await commentStore!.attachQueuedTask(
+                                thread.id,
+                                request.id,
+                                id,
+                              );
+                            },
+                            {
+                              ids: request.targetIds ?? [],
+                              viewId: activeViewId ?? undefined,
+                            },
+                          );
+                        } finally {
+                          sendingQueued.current.delete(request.id);
+                        }
+                      })
+                    }
+                  >
+                    Send waiting request
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      commentAction(() =>
+                        commentStore!.removeQueuedRequest(
+                          thread.id,
+                          request.id,
+                        ),
+                      )
+                    }
+                  >
+                    Cancel waiting request
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+        {thread.aiEngaged ? (
+          conversation ? (
+            <ConversationView
+              key={thread.id}
+              controller={conversation}
+              session={session}
+              desktopRequired={desktopAgentRequired}
+              taskIds={thread.taskIds}
+              externalMessages={humanConversationMessages(thread)}
+              onQueueMessage={async (text) => {
+                await commentStore!.enqueueRequest(thread.id, {
+                  text,
+                  providerId: composerDraft.provider,
+                  permissionMode: composerDraft.permissionMode ?? "write",
+                  writeBehavior: composerDraft.writeBehavior ?? "suggest",
+                  targetIds: thread.targetIds,
+                  branchId: sessionState.branchId ?? undefined,
+                });
+              }}
+              onTaskStarted={async (id) => {
+                await commentStore!.attachTask(thread.id, id);
+              }}
+              composerDraft={composerDraft}
+              onComposerDraftChange={updateComposerDraft}
+              context={targetLabels(thread)}
+              onStartDraft={() => void startDraftFromMain("working")}
+            />
+          ) : (
+            <p role="status" className="p-3 text-caption">
+              Preparing connection…
+            </p>
+          )
+        ) : (
+          <HumanConversation
+            thread={thread}
+            draft={composerDraft.text}
+            onDraftChange={(text) => updateComposerDraft({ text })}
+            onAskAI={() =>
+              commentAction(() => commentStore!.setAiEngaged(thread.id, true))
+            }
+            error={commentError}
+            onSend={async () => {
+              try {
+                await commentStore!.appendMessage(thread.id, {
+                  text: composerDraft.text,
+                  author: {
+                    id: actor.actorId,
+                    name: actor.displayName,
+                    kind: "human",
+                  },
+                });
+                updateComposerDraft({ text: "" });
+                setCommentError(undefined);
+              } catch (error) {
+                setCommentError(
+                  error instanceof Error
+                    ? error.message
+                    : "Could not save your comment.",
+                );
+              }
+            }}
+          />
+        )}
+      </>
+    );
+  };
+  const commentsPanel = (
+    <div className="flex h-full min-h-0 flex-col">
+      <CommentsIndex
+        threads={comments.threads}
+        tasks={conversationState?.tasks ?? []}
+        error={comments.error ?? commentError}
+        onOpen={(id) => {
+          openConversation(id);
+          if (panelState.viewport.width < 768)
+            panelDispatch({ type: "CLOSE", panel: "comments" });
+        }}
+        onCreate={createConversation}
+        targetLabel={threadLabel}
+      />
+      {conversationState?.tasks.some(
+        (task) =>
+          !comments.threads.some((thread) => thread.taskIds.includes(task.id)),
+      ) && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="m-3"
+          onClick={importEarlierConversations}
+        >
+          Open earlier AI work
+        </Button>
+      )}
+    </div>
+  );
+  const activeCanvasPreview = React.useMemo(() => {
+    if (!activeConversation || composerDraft.permissionMode === 'read' || !document) return undefined;
+    const proposal = conversationState && [...conversationState.proposals].reverse().find(entry => activeConversation.taskIds.includes(entry.taskId) && entry.proposal.status === 'pending' && entry.proposal.expectedRevision === sessionState.workingRevision)?.proposal;
+    if (!proposal) return undefined;
+    const preview = session.previewChanges(proposal.changes);
+    if (!preview.ok) return undefined;
+    try {
+      return <figure className="conversation-board-preview" aria-label="Detached canvas proposal"><figcaption className="text-caption"><strong>{proposal.label}</strong><br />Proposed · {proposal.changes.length} changes · approval required</figcaption><img alt="Detached proposed board; no changes have been applied" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(renderDiagramSvg(preview.document, activeViewId ?? undefined))}`} /></figure>;
+    } catch { return undefined; }
+  }, [activeConversation, composerDraft.permissionMode, document, conversationState?.proposals, sessionState.workingRevision, session, activeViewId]);
 
   const renderPanel = React.useCallback(
     (panelId: PanelId): React.ReactNode => {
+      if (panelId === "comments") return commentsPanel;
       if (panelId === "inspector") {
         return renderDetails();
       }
@@ -3023,6 +3469,7 @@ function WorkspaceBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       renderDetails,
+      commentsPanel,
       draft,
       scenarioDraft,
       document,
@@ -3079,6 +3526,10 @@ function WorkspaceBody({
       resetWidth: (panelId) =>
         void runCommand("panel.reset-width", { panelId }),
       close: (panelId) => {
+        if (panelId === "comments") {
+          panelDispatch({ type: "CLOSE", panel: "comments" });
+          return;
+        }
         if (panelId === "inspector")
           closeDetails();
         else
@@ -3088,7 +3539,7 @@ function WorkspaceBody({
           );
       },
     }),
-    [runCommand, draftContext.id, closeDetails],
+    [runCommand, draftContext.id, closeDetails, panelDispatch],
   );
 
   const [hostCommands, setHostCommands] = React.useState<{
@@ -3332,8 +3783,18 @@ function WorkspaceBody({
           }
           quickOptionsShortcut={quickOptionsShortcut}
           quickOptionsActive={quickOptionsOpen}
-          onOpenAgents={() => void executeCommand("agents.open", {}, commandContext, commandHandlers)}
-          agentsActive={agentsOpen}
+          onOpenAgents={() => void executeCommand("agents.open", {}, commandContext, commandHandlers,
+            )}
+          agentsActive={panelState.panels.comments.open}
+          collaborators={
+            <ConversationPresence
+              threads={comments.threads}
+              tasks={conversationState?.tasks ?? []}
+              person={actor.displayName}
+              activeId={activeConversationId}
+              onOpen={openConversation}
+            />
+          }
         />
       ) : (
         <header
@@ -3355,7 +3816,8 @@ function WorkspaceBody({
             groupRef={workspaceResizeRef}
             defaultLayout={isMobileInspector ? { canvas: 62, simulation: 38 } : { canvas: 90, simulation: 10 }}
           >
-          <ResizablePanel id="canvas" minSize={Math.min(120, Math.max(40, simulationViewportHeight * .2))} className="min-h-0 relative">
+          <ResizablePanel id="canvas" minSize={Math.min(120, Math.max(40, simulationViewportHeight * 0.2),
+              )} className="min-h-0 relative">
           <div className="h-full min-h-0 relative">
             <PanelHost
               className="min-[1000px]:pt-[var(--topbar-inset)]"
@@ -3364,7 +3826,7 @@ function WorkspaceBody({
               commands={panelCommandRoutes}
               renderPanel={renderPanel}
               panelTitles={{
-                inspector: scenarioDraft ? 'Scenario' : 'Inspector',
+                inspector: scenarioDraft ? 'Scenario' : "Configuration",
               }}
               panelBadges={{
                 history:
@@ -3375,7 +3837,20 @@ function WorkspaceBody({
               canvas={
                 <>
                   <CanvasHost
-                    ref={canvasViewRef}
+                        renderConversations={(viewport, targets) => (
+                          <CanvasConversationLayer
+                            threads={comments.threads}
+                            tasks={conversationState?.tasks ?? []}
+                            viewport={viewport}
+                            targets={targets}
+                            activeId={activeConversationId}
+                            onOpen={openConversation}
+                            onClose={() => setActiveConversationId(undefined)}
+                            renderThread={renderCanvasThread}
+                            preview={activeCanvasPreview}
+                          />
+                        )}
+                        ref={canvasViewRef}
                     document={document}
                     activeViewId={activeViewId}
                     onSelectView={setActiveViewId}
@@ -3412,7 +3887,13 @@ function WorkspaceBody({
                     trafficEntryElementIds={trafficEntryElementIds}
                     playbackSource={runController}
                     simulationHighlight={simulationHighlight}
-                    agentPresence={agentPresence}
+                    agentPresence={agentPresence
+                            ? {
+                                ...agentPresence,
+                                showFace: false,
+                              }
+                            : undefined
+                        }
                     linkedProjects={linkedProjects}
                     loadLinkedExposures={async (projectId) => {
                       const record = await repository.loadProject(projectId);
@@ -3577,10 +4058,6 @@ function WorkspaceBody({
           {renderDetails()}
         </div>
       ) : null}
-
-      <FloatingToolPanel title="AI collaboration" rightInset={Object.values(panelState.panels).some(panel => panel.open && panel.placement === 'right' && !panel.collapsed) ? panelState.sideWidths.right : !inspectorHosted && (draft || scenarioDraft) ? 320 : 0} icon={<CanvasOneFace expression={conversationState?.connection === 'connected' ? 'happy' : 'base'} size={28} aria-hidden="true" />} open={agentsOpen} minimized={agentsMinimized} onMinimizedChange={setAgentsMinimized} onClose={closeAgents}>
-        {conversation ? <ConversationView controller={conversation} session={session} desktopRequired={desktopAgentRequired} composerDraft={composerDraft} onComposerDraftChange={updateComposerDraft} context={agentSelectionRef.current.ids.map(id => ({ id, label: document?.elements.find(element => element.id === id)?.label ?? id }))} onStartDraft={() => void startDraftFromMain('working')} /> : <p role="status" className="p-4 text-sm">Preparing collaboration…</p>}
-      </FloatingToolPanel>
 
       <NewScenarioDialog
         open={newScenarioDialogOpen}

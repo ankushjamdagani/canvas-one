@@ -1,5 +1,15 @@
 # Development handoff
 
+## Canvas conversations — 2026-10-26
+
+Implementation lives in managed worktree `canvas-conversations-design/canvas-one`, branch `codex/canvas-conversations-design`, draft PR #15 (stacked on `codex/ai-collaboration-analysis` / PR #13). The OpenPencil proposal is implemented as local canvas comment threads and a shared Comments panel. Read/Write replaces visible request categories; Suggest remains default; Live grants still bind exact attempts and now display captured scope/revision. Existing controller, board writes, approvals, journal and undo remain authoritative.
+
+Annotation metadata has its own additive IndexedDB store, outside simulation documents. Thread drafts survive minimize and creating a draft branch; comments are project/board scoped, while AI task authority remains branch scoped. Waiting edits retain original branch/targets and require explicit sending after the existing writer/review releases. Consume a waiting request and attach its durable task before launching the provider. Never auto-launch recovered work.
+
+Workspace enables captured selection scopes. Object requests may update/delete their captured records, group members, placements/notes and existing incident connections; inserts, connection retargeting, membership expansion and scoped `diagram_create` require an explicit wider/whole-board thread plus a new request. Read downgrades fence attempts and reject pending previews. Local People/AI header presence replaces illustrative collaborators. Keep Configuration's Apply/Cancel workflow.
+
+See `docs/designs/canvas-conversations/implementation.md` for source ownership and boundaries. This does not add a multiplayer server, cross-device comments, annotation export, floating AI launcher or walkthrough orchestration. Custom canvas hosts must implement the optional conversation rendering slot. Paid real-provider coverage stays opt-in; agy remains blocked as before. Verification results belong in the latest ACTION_LOG entry, not the historical totals below.
+
 ## Assistant chat and activity — 2026-10-15
 
 assistant-ui now presents the controller's durable conversation through an external-store adapter, safe Markdown and composer primitives. Canvas One still owns local CLI execution, history, reviewed proposals and all writes. No Assistant Cloud setup or credential API. The connected composer keeps Agent/Disconnect beside Send; Send becomes the represented attempt's face/Stop, with independent question cancellation. Actionable notices stay visible; raw diagnostics and the latest 100 session operations live in Details. App typography and disconnected setup are preserved.
