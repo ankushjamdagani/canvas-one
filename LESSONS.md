@@ -171,3 +171,7 @@ Maintenance (see `AGENTS.md` §6 and `/retro`):
 - Consume a durable waiting request and attach its task before provider launch, in one metadata transaction. Removing it only after launch lets a crash leave the same request available for duplicate execution. Why: 2026-10-26 conversation integration review found this recovery gap.
 - Scope checks on view replacements must reject a selected note inserted into another view without its original attachment baseline. Stable IDs alone do not prevent scope expansion through cross-view moves. Why: 2026-10-26 source review reproduced a note relocation that attached an unselected object.
 - Refresh engine handle measurements when node presentation or selection changes can replace handles without changing outer dimensions. A visible DOM handle and a valid drop do not prove the engine registered its target. Why: 2026-10-26 production connection coverage reported a valid gesture with no target node; explicit geometry refresh fixed three unchanged repetitions.
+
+# Local design tooling
+
+- An OpenPencil MCP handshake does not establish app connectivity. Inspect transport errors and verify a scoped document read before diagnosing “app not connected”; sandbox socket access can fail with EPERM even while the app reports Running. Use approved scoped access, preserving authentication. See `.agents/skills/openpencil/SKILL.md`. Why: 2026-10-24 local MCP test succeeded only after the sandbox socket denial was identified.
