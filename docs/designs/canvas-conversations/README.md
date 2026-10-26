@@ -1,6 +1,6 @@
 # Canvas conversations proposal
 
-Design review material, not implemented application behavior.
+The OpenPencil file remains design review material. The local application implementation and its boundaries are described in [implementation notes](implementation.md).
 
 - [Editable OpenPencil document](<Canvas One - Conversations Revamp.fig>): four pages — Canvas conversation, Suggest review, Live and conflicts, Presence and motion.
 - [Experience specification](experience-spec.md): decisions, alternatives, permission boundaries, comment model, concurrency, motion and acceptance scenarios.

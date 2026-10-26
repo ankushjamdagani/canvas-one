@@ -5,7 +5,9 @@ description: Guide AI participation in Canvas One conversations, board inspectio
 
 # Canvas collaboration
 
-Version 0.1: evolving product action contract. The actions below are semantic capabilities, not tool names. Some are planned. Discover the host's supported commands, schemas, session authority and permission state first; never simulate a missing capability or claim it ran. This skill does not authorize messaging people outside the active Canvas One conversation.
+Version 0.2: evolving product action contract. The actions below are semantic capabilities, not tool names. Some are planned. Discover the host's supported commands, schemas, session authority and permission state first; never simulate a missing capability or claim it ran. This skill does not authorize messaging people outside the active Canvas One conversation.
+
+The current local host supports canvas comment threads, Read/Write with Suggest review and request-specific Live permission, explicit captured object scopes, conservative waiting requests and existing board tools. Object-scoped requests cannot create new records, retarget connections, expand group membership or call `diagram_create`: ask the user to widen the thread scope and send a new request. Waiting work never resumes itself after reload. Network multiplayer, a floating launcher and guided walkthrough orchestration remain capabilities to discover rather than assume.
 
 ## Establish the request
 

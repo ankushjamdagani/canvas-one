@@ -31,9 +31,9 @@ vi.mock('./controller', () => ({ SystemAgentSession: class {
 
 const controllers: AgentConversationController[] = [];
 afterEach(() => { for (const controller of controllers.splice(0)) controller.dispose(); reviewedCalls.tools.mockClear(); reviewedCalls.beforeAccept = undefined; reviewedCalls.failNextSubmit = false; });
-function setup(shared?: ReturnType<typeof stores>, options: { main?: boolean; owned?: string[]; recover?: boolean; boardId?: string; selection?: () => { ids: readonly string[]; viewId?: string | null } } = {}) {
+function setup(shared?: ReturnType<typeof stores>, options: { main?: boolean; owned?: string[]; recover?: boolean; boardId?: string; document?: Document; enforce?: boolean; selection?: () => { ids: readonly string[]; viewId?: string | null } } = {}) {
   const storage = shared ?? stores(); let now = 0, count = 0;
-  const state = { projectId: 'project', branchId: options.main ? 'main' : 'draft', mainBranchId: 'main', workingRevision: 1, needsReload: false, document: { id: options.boardId ?? 'board' } };
+  const state = { projectId: 'project', branchId: options.main ? 'main' : 'draft', mainBranchId: 'main', workingRevision: 1, needsReload: false, document: options.document ?? { id: options.boardId ?? 'board' } };
   const listeners = new Set<() => void>();
   const scoped = new Map<string, ReturnType<typeof stores>>([[state.branchId, storage]]);
   const scopeStore = (branch: string) => { let value = scoped.get(branch); if (!value) { value = stores(); scoped.set(branch, value); } return value; };
@@ -50,7 +50,7 @@ function setup(shared?: ReturnType<typeof stores>, options: { main?: boolean; ow
     heartbeat: vi.fn(async (_token, binding) => ({ lease: { ...binding, deadline: now + 15000 }, requestStartedAt: now })), send: vi.fn(async () => ({ delivered: true, acknowledged: false })),
   };
   let owned = options.owned ?? [];
-  const controller = new AgentConversationController({ session, repository, selection: options.selection, client: client as unknown as CollaborationBrowserClient, now: () => now, mintId: () => `id-${++count}-${controllers.length}`, leaseMs: 15000, pollMs: 60000, heartbeatMs: 60000, ownership: { load: () => owned, save: ids => { owned = [...ids]; } }, recoverOwnedAfterReload: options.recover }); controllers.push(controller);
+  const controller = new AgentConversationController({ session, repository, selection: options.selection, enforceSelectionScope: options.enforce, client: client as unknown as CollaborationBrowserClient, now: () => now, mintId: () => `id-${++count}-${controllers.length}`, leaseMs: 15000, pollMs: 60000, heartbeatMs: 60000, ownership: { load: () => owned, save: ids => { owned = [...ids]; } }, recoverOwnedAfterReload: options.recover }); controllers.push(controller);
   const identity = (): ExecutionIdentity => client.start.mock.calls.at(-1)![1].identity;
   const enqueue = (payload: BrowserAuthorityRequest['payload'], binding = identity()) => { queue.push({ version: 1, requestId: `request-${requestCount++}`, identity: binding, payload }); };
   const emit = (payload: CollaborationEvent['payload'], binding = identity()) => { events.push({ version: 1, cursor: events.length + 1, provider: 'claude', identity: binding, payload }); };
@@ -65,6 +65,118 @@ function stores() {
 }
 async function connected() { const fixture = setup(); await fixture.controller.ready; await fixture.controller.pair('http://127.0.0.1:47831', 'secret'); return fixture; }
 describe('workspace-owned agent conversation authority', () => {
+  it('captures an explicit object scope before asynchronous startup and rejects wider proposals and Live actions', async () => {
+    const element = (id: string): Element => ({ id, label: id, description: '', visualKind: 'host', ports: [], behavior: { kind: 'unmodeled', version: 1, reason: 'Diagram' } });
+    const document: Document = { schema: 'studio-model/1', id: 'board', title: 'Board', elements: [element('a'), element('b')], connections: [], relations: [], schemas: [], fixtures: [], refinements: [], scenarios: [], views: [] };
+    const fixture = setup(undefined, { document, enforce: true });
+    await fixture.controller.ready; await fixture.controller.pair('http://127.0.0.1:47831', 'secret');
+    const ids = ['a'];
+    const started = fixture.controller.start('claude', 'Rename this', 'edit', undefined, { ids });
+    ids[0] = 'b';
+    const taskId = await started;
+    expect(await fixture.controller.loadStartingContext(taskId)).toMatchObject({ ids: ['a'], writeScopeIds: ['a'] });
+    const changes = [{ kind: 'replace', value: { recordKind: 'element', record: { ...document.elements[1], label: 'Outside' } } }];
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'outside', tool: 'proposal_submit', input: { operationId: 'outside', scope: { projectId: 'project', branchId: 'draft' }, changes } } });
+    await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().proposals).toHaveLength(0);
+    expect(fixture.client.result.mock.calls.at(-1)?.[2]).toMatchObject({ error: expect.stringContaining('Expand the conversation scope') });
+    await fixture.controller.grantLive(taskId, fixture.identity().attemptId);
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'outside-live', tool: 'action_submit', input: { operationId: 'outside-live', label: 'Outside', changes, expectedRecords: [] } } });
+    await fixture.controller.pollOnce();
+    expect(fixture.session.applyLiveTaskAction).not.toHaveBeenCalled();
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'inside', tool: 'proposal_submit', input: { operationId: 'inside', scope: { projectId: 'project', branchId: 'draft' }, changes: [{ kind: 'replace', value: { recordKind: 'element', record: { ...document.elements[0], label: 'Inside' } } }] } } });
+    await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().proposals[0]?.proposal.operationId).toBe('inside');
+  });
+  it('coalesces repeated Read downgrades while process cancellation is still pending', async () => {
+    const fixture = await connected(), taskId = await fixture.controller.start('claude', 'Edit');
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'coalesce', tool: 'proposal_submit', input: { operationId: 'coalesced-read', scope: { projectId: 'project', branchId: 'draft' }, changes: [] } } });
+    await fixture.controller.pollOnce();
+    let acknowledge!: () => void;
+    fixture.client.stop.mockImplementationOnce(async () => { await new Promise<void>(resolve => { acknowledge = resolve; }); return { fenced: true, cancellation: 'acknowledged' }; });
+    const first = fixture.controller.restrictToRead([taskId]), second = fixture.controller.restrictToRead([taskId]);
+    while (!acknowledge) await Promise.resolve();
+    acknowledge();
+    await Promise.all([first, second]);
+    expect(fixture.controller.getState().proposals[0]?.proposal.status).toBe('rejected');
+    expect(fixture.client.stop).toHaveBeenCalledTimes(1);
+  });
+  it('revalidates recovered proposals against the durable object scope before accepting', async () => {
+    const element = (id: string): Element => ({ id, label: id, description: '', visualKind: 'host', ports: [], behavior: { kind: 'unmodeled', version: 1, reason: 'Diagram' } });
+    const document: Document = { schema: 'studio-model/1', id: 'board', title: 'Board', elements: [element('a'), element('b')], connections: [], relations: [], schemas: [], fixtures: [], refinements: [], scenarios: [], views: [] };
+    // Emulate a pre-boundary stored proposal; recovery must not trust its old admission.
+    const old = setup(undefined, { document, selection: () => ({ ids: ['a'] }) });
+    await old.controller.ready; await old.controller.pair('http://127.0.0.1:47831', 'secret');
+    await old.controller.start('claude', 'Rename a');
+    old.enqueue({ kind: 'tool', data: { requestId: 'old-scope', tool: 'proposal_submit', input: { operationId: 'old-outside-scope', scope: { projectId: 'project', branchId: 'draft' }, changes: [{ kind: 'replace', value: { recordKind: 'element', record: { ...document.elements[1], label: 'Outside' } } }] } } });
+    await old.controller.pollOnce();
+    const recovered = setup(old.storage, { document, enforce: true });
+    await recovered.controller.ready;
+    await expect(recovered.controller.accept('old-outside-scope')).rejects.toThrow('Expand the conversation scope');
+    expect(recovered.controller.getState().proposals[0]?.proposal.status).toBe('pending');
+  });
+  it('attaches a durable request to its thread before provider launch, including failed launches', async () => {
+    const fixture = await connected();
+    const attached: string[] = [];
+    fixture.client.start.mockImplementationOnce(async () => { throw new Error('Provider unavailable'); });
+    await expect(fixture.controller.start('claude', 'Explain this context', 'question', async id => {
+      expect(fixture.client.start).not.toHaveBeenCalled();
+      expect(fixture.storage.conversationData().messages[0].taskId).toBe(id);
+      attached.push(id);
+    })).rejects.toThrow('Provider unavailable');
+    expect(attached).toHaveLength(1);
+    expect(fixture.controller.getState().tasks.find(task => task.id === attached[0])?.status).toBe('failed');
+  });
+  it('does not launch when the thread association cannot be saved', async () => {
+    const fixture = await connected();
+    await expect(fixture.controller.start('claude', 'Update context', 'edit', async () => { throw new Error('Thread storage failed'); })).rejects.toThrow('Thread storage failed');
+    expect(fixture.client.start).not.toHaveBeenCalled();
+    expect(fixture.controller.getState().tasks[0]).toMatchObject({ status: 'failed', cancellation: 'acknowledged' });
+  });
+  it('cannot launch a request downgraded while its thread association is saving', async () => {
+    const fixture = await connected();
+    await expect(fixture.controller.start('claude', 'Update context', 'edit', async id => {
+      await fixture.controller.restrictToRead([id]);
+    })).rejects.toThrow('restricted to Read');
+    expect(fixture.client.start).not.toHaveBeenCalled();
+    expect(fixture.controller.getState().tasks[0]?.status).toBe('stopped');
+  });
+  it('fences a downgraded thread synchronously before waiting for process cancellation', async () => {
+    const fixture = await connected();
+    const taskId = await fixture.controller.start('claude', 'Update this object');
+    const identity = fixture.identity();
+    await fixture.controller.grantLive(taskId, identity.attemptId);
+    let acknowledge!: () => void;
+    fixture.client.stop.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { acknowledge = resolve; });
+      return { fenced: true, cancellation: 'acknowledged' };
+    });
+    const downgrade = fixture.controller.restrictToRead([taskId]);
+    expect(fixture.leases.permits({ taskId, attemptId: identity.attemptId, actorId: identity.actorId, generation: identity.generation, scope: { projectId: identity.projectId, branchId: identity.branchId, boardId: identity.boardId } })).toBe(false);
+    await expect(fixture.controller.grantLive(taskId, identity.attemptId)).rejects.toThrow('restricted to Read');
+    while (!acknowledge) await Promise.resolve();
+    acknowledge();
+    await downgrade;
+    expect(fixture.controller.getState().tasks.find(task => task.id === taskId)).toMatchObject({ status: 'stopped', permission: 'suggest' });
+    await expect(fixture.controller.resume(taskId)).rejects.toThrow('restricted to Read');
+    await fixture.controller.start('claude', 'Explain the board', 'question');
+    expect(fixture.client.start.mock.calls.at(-1)?.[1].mode).toBe('question');
+  });
+  it('invalidates a downgraded thread preview and cannot reuse it after returning to Write', async () => {
+    const fixture = await connected();
+    const taskId = await fixture.controller.start('claude', 'Propose a change');
+    fixture.enqueue({ kind: 'tool', data: { requestId: 'read-boundary', tool: 'proposal_submit', input: { operationId: 'read-preview', scope: { projectId: 'project', branchId: 'draft' }, changes: [] } } });
+    await fixture.controller.pollOnce();
+    expect(fixture.controller.getState().proposals[0]?.proposal.status).toBe('pending');
+    await fixture.controller.restrictToRead([taskId]);
+    expect(fixture.controller.getState().proposals[0]?.proposal.status).toBe('rejected');
+    expect(() => fixture.controller.preview('read-preview')).toThrow('restricted to Read');
+    await expect(fixture.controller.accept('read-preview')).rejects.toThrow('restricted to Read');
+    await expect(fixture.controller.requestChanges('read-preview', 'Try again')).rejects.toThrow('restricted to Read');
+    const next = await fixture.controller.start('claude', 'A new Write request');
+    expect(next).not.toBe(taskId);
+    expect(fixture.controller.getState().tasks.find(task => task.id === next)?.permission).toBe('suggest');
+  });
   it('persists Suggest task/provider/message before execution and preserves independent read-only questions', async () => {
     const fixture = await connected(); const taskId = await fixture.controller.start('claude', 'Draw flow');
     expect(fixture.controller.getState().tasks[0]).toMatchObject({ id: taskId, providerId: 'claude', permission: 'suggest', status: 'working' });

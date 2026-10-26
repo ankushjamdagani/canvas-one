@@ -12,6 +12,7 @@ import {
 
 const savedPanels: WorkspacePanelPreferences = {
   panels: {
+    comments: createInitialPanelState().panels.comments,
     library: {
       open: true,
       placement: 'right',
@@ -106,7 +107,24 @@ describe('workspace panel preferences', () => {
     expect(hydrated.focusedPanel).toBe('history');
     expect(hydrated.activeOverlay).toBe('history');
     expect(hydrated.viewport).toEqual({ width: 390, height: 844 });
-    expect(hydrated.lastFocusedSequence).toEqual({ library: 4, history: 7, inspector: 0 });
+    expect(hydrated.lastFocusedSequence).toEqual({ library: 4, history: 7, inspector: 0, comments: 0 });
+  });
+
+  it('loads pre-comments layouts and retains Comments geometry across hydration', () => {
+    const { comments: _comments, ...legacyPanels } = savedPanels.panels;
+    const legacy = readWorkspacePanelPreferences({ ...savedPanels, panels: legacyPanels });
+    expect(legacy?.panels.comments).toEqual(createInitialPanelState().panels.comments);
+    expect(legacy?.panels.history).toEqual(savedPanels.panels.history);
+    const state = createInitialPanelState({ panels: { comments: {
+      ...createInitialPanelState().panels.comments,
+      open: true,
+      collapsed: true,
+      placement: 'right',
+      floatRect: { x: 72, y: 84, width: 400, height: 520 },
+    } } });
+    const preferences = panelPreferencesFromState(state);
+    expect(readWorkspacePanelPreferences(preferences)).toEqual(preferences);
+    expect(hydratePanelState(createInitialPanelState(), preferences).panels.comments).toEqual(state.panels.comments);
   });
 
   it('rolls back only the latest outstanding request', () => {

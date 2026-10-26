@@ -49,12 +49,14 @@ const OVERLAY_RETURN_FOCUS: Record<PanelId, string> = {
   history: 'topbar-history-btn',
   library: 'dock-component-btn',
   inspector: 'canvas-container',
+  comments: 'topbar-agents-btn',
 };
 
 const DEFAULT_TITLES: Record<PanelId, string> = {
   history: 'History',
   library: 'Library',
   inspector: 'Configuration',
+  comments: 'Comments',
 };
 
 export const PanelHost: React.FC<PanelHostProps> = ({

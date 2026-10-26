@@ -1,16 +1,22 @@
-import { Handle, Position, type NodeProps } from '@canvas-one/editor-reactflow/react';
-import { useContext } from 'react';
+import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@canvas-one/editor-reactflow/react';
+import { useContext, useLayoutEffect } from 'react';
 import { useSystemDesignNodeRenderer } from '@canvas-one/system-design/react';
 import { PlaybackTrafficContext } from './usePlaybackTraffic';
 import { SimulationHighlightContext } from './SimulationHighlight';
 import { CellsAndLanesNode } from '@/components/traffic/cells-and-lanes';
 import type { ProjectedNodeData } from './projection';
 
-export function NodeCard({ data, selected }: NodeProps) {
+export function NodeCard({ id, data, selected }: NodeProps) {
   const Renderer = useSystemDesignNodeRenderer((data as ProjectedNodeData).kind === 'element' ? (data as Extract<ProjectedNodeData, {kind: 'element'}>).element.component?.type : undefined);
   const traffic = useContext(PlaybackTrafficContext);
   const highlight = useContext(SimulationHighlightContext);
   const node = data as ProjectedNodeData;
+  const updateNodeInternals = useUpdateNodeInternals();
+  const ports = node.kind === 'element' ? node.element.ports : undefined;
+  const expanded = node.kind === 'element' ? node.placement.expanded : undefined;
+  // Renderer/selection updates can replace handles without changing card size.
+  // ResizeObserver alone then leaves visible handles out of the engine registry.
+  useLayoutEffect(() => { updateNodeInternals(id); }, [id, Renderer, selected, ports, expanded, updateNodeInternals]);
   if (node.kind !== 'element') return null;
   const { element, connectable } = node;
   const activity = traffic.activities?.nodes.get(element.id);

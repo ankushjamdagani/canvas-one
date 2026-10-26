@@ -133,7 +133,7 @@ test.describe('Studio Inspector E2E', () => {
 
     const dock = page.locator('[data-slot="dock-column"][data-side="right"]');
     await expect(dock.getByTestId('inspector-panel')).toBeVisible();
-    await expect(dock.locator('[data-slot="panel-header"]').getByRole('heading', { name: 'Inspector', exact: true })).toBeVisible();
+    await expect(dock.locator('[data-slot="panel-header"]').getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible();
 
     await dock.locator('[data-slot="panel-menu-trigger"]').click();
     await page.getByRole('menuitem', { name: 'Float' }).click();

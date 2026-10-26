@@ -78,7 +78,7 @@ test('the retired app database stays untouched while the new app creates and sav
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-state', 'idle');
 
   const names = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name).sort());
-  expect(names).toEqual(['system-studio', 'system-studio-local-v1']);
+  expect(names).toEqual(['canvas-one-conversation-annotations-v1', 'system-studio', 'system-studio-local-v1']);
 
   expect(await readLegacyDatabase(page)).toEqual({ version: 10, stores: ['projects'], records: [LEGACY_RECORD] });
 });
