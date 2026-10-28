@@ -29,6 +29,22 @@ const DRAFT = 'b0000000-0000-4000-8000-000000000002';
 const OTHER = 'b0000000-0000-4000-8000-000000000003';
 const SCENARIO = 'c0000000-0000-4000-8000-000000000001';
 
+describe('canvas visual object commands', () => {
+  it('exposes creation and selection actions while refusing partial mixed captures', () => {
+    const context = makeContext({ selectedCanvasElementIds: ['shape'] });
+    expect(getAvailability('canvas.add-element', context, { kind: 'text' }).enabled).toBe(true);
+    expect(getAvailability('canvas.add-element', { ...context, draftState: 'dirty' }, { kind: 'text' }).enabled).toBe(false);
+    expect(getAvailability('selection.delete', context, {}).enabled).toBe(true);
+    expect(getAvailability('selection.duplicate', context, {}).enabled).toBe(true);
+    expect(buildQuickOptions(context).flatMap(group => group.options).some(option => option.id === 'selection.delete')).toBe(true);
+    const mixed = { ...context, selectedElementIds: ['component'] };
+    expect(getAvailability('selection.duplicate', mixed, {}).enabled).toBe(false);
+    expect(getPayloadFreeAvailability('selection.export', mixed).enabled).toBe(false);
+    expect(getPayloadFreeAvailability('part.capture', mixed).enabled).toBe(false);
+    expect(getAvailability('selection.group', mixed, { label: 'Group' }).enabled).toBe(false);
+  });
+});
+
 describe('host command palette contributions', () => {
   it('discovers validated host rows, rechecks availability at execution and disposes per instance', async () => {
     const registry = new CommandRegistry<CommandContext>();

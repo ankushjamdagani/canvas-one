@@ -26,6 +26,7 @@ export type DeleteSelection = {
   readonly elementIds: readonly Id[];
   readonly connectionIds: readonly Id[];
   readonly noteIds?: readonly Id[];
+  readonly canvasElementIds?: readonly Id[];
 };
 
 export type DeletePlan = {
@@ -172,6 +173,7 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
   // Views: every view drops what points at the removed records, and active view removes selected notes.
   const removedPlacementIds: Id[] = [];
   const removedNoteIdSet = new Set(selection.noteIds ?? []);
+  const removedCanvasElementIdSet = new Set(selection.canvasElementIds ?? []);
   const viewReplacements: View[] = [];
   for (const v of document.views) {
     const placements = v.placements.filter((p) => !removedElementIdSet.has(p.elementId));
@@ -188,7 +190,9 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
           ? { ...n, attachedElementIds: n.attachedElementIds.filter((id) => !removedElementIdSet.has(id)) }
           : n,
       );
+    const canvasElements = v.canvasElements?.filter(shape => v.id !== viewId || !removedCanvasElementIdSet.has(shape.id));
     const changed =
+      canvasElements?.length !== v.canvasElements?.length ||
       placements.length !== v.placements.length ||
       connectionIds.length !== v.connectionIds.length ||
       relationIds.length !== v.relationIds.length ||
@@ -196,7 +200,7 @@ export function planDelete(document: Document, viewId: Id, selection: DeleteSele
       groups.some((g, i) => g.elementIds.length !== v.groups[i]?.elementIds.length) ||
       notes.length !== v.notes.length ||
       notes.some((n, i) => n !== v.notes[i]);
-    if (changed) viewReplacements.push({ ...v, placements, connectionIds, relationIds, groups, notes });
+    if (changed) viewReplacements.push({ ...v, placements, connectionIds, relationIds, groups, notes, ...(canvasElements ? { canvasElements } : {}) });
   }
 
   const changes: RecordChange[] = [];

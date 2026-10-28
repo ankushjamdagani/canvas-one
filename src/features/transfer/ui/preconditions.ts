@@ -32,7 +32,7 @@ export function resolveActiveView(document: Document | null, viewId: Id | null):
 export function hasAuthoredView(document: Document | null, viewId: Id | null): boolean {
   const view = resolveActiveView(document, viewId);
   if (!view) return false;
-  return view.placements.length > 0 || view.notes.length > 0;
+  return view.placements.length > 0 || view.notes.length > 0 || (view.canvasElements?.length ?? 0) > 0;
 }
 
 /** Mermaid precondition: the active view has at least one placed element. */

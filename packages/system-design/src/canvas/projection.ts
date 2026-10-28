@@ -4,6 +4,7 @@
  */
 
 import type {
+  CanvasElement,
   Connection,
   Document,
   Element,
@@ -103,6 +104,13 @@ export type LinkedProjectView =
 
 export type ProjectedNodeData =
   | {
+      readonly kind: 'canvas-element';
+      readonly canvasElement: CanvasElement;
+      readonly onUpdate?: (patch: Partial<Omit<CanvasElement, 'id'>>) => Promise<boolean>;
+      readonly onDuplicate?: () => void;
+      readonly onDelete?: () => void;
+    }
+  | {
       readonly kind: 'boundary';
       readonly element: Element;
       readonly placement: Placement;
@@ -169,7 +177,7 @@ export type ProjectedNodeData =
 
 export type ProjectedNode = {
   readonly id: string;
-  readonly type: 'elementNode' | 'boundaryFrameNode' | 'groupNode' | 'noteNode';
+  readonly type: 'elementNode' | 'boundaryFrameNode' | 'groupNode' | 'noteNode' | 'canvasElementNode';
   readonly position: { readonly x: number; readonly y: number };
   readonly data: ProjectedNodeData;
   readonly selectable?: boolean;
@@ -490,6 +498,10 @@ export function projectDocumentToCanvas(
     });
   }
 
+  for (const canvasElement of activeView.canvasElements ?? []) {
+    nodes.push({ id: canvasElement.id, type: 'canvasElementNode', position: { x: canvasElement.x, y: canvasElement.y }, data: { kind: 'canvas-element', canvasElement }, style: { width: canvasElement.width, height: canvasElement.height }, selectable: true, draggable: true, zIndex: 1 });
+  }
+
   // 5. Edges from connections in view.connectionIds whose endpoints are both placed
   const connectionById = new Map<Id, Connection>(
     document.connections.map((c) => [c.id, c]),
@@ -640,12 +652,22 @@ export function buildMoveChange(
     return note;
   });
 
+  const updatedCanvasElements = view.canvasElements?.map(shape => {
+    const moved = movedMap.get(shape.id);
+    if (!moved) return shape;
+    const x = Math.round(moved.x); const y = Math.round(moved.y);
+    if (shape.x === x && shape.y === y) return shape;
+    hasChanges = true;
+    return { ...shape, x, y };
+  });
+
   if (!hasChanges) return null;
 
   const updatedView: View = {
     ...view,
     placements: updatedPlacements,
     notes: updatedNotes,
+    ...(updatedCanvasElements ? { canvasElements: updatedCanvasElements } : {}),
   };
 
   return {

@@ -167,6 +167,7 @@ import { findRunAllDisabledReason } from "../runs/view-models";
 import type { SessionRenameResult } from "../session/types";
 import {
   planAddNote,
+  planAddCanvasElement,
   planAlign,
   planDistribute,
   planGroup,
@@ -531,6 +532,8 @@ function WorkspaceBody({
   const [selectedNoteIds, setSelectedNoteIds] = React.useState<ReadonlySet<Id>>(
     new Set(),
   );
+  const [selectedCanvasElementIds, setSelectedCanvasElementIds] = React.useState<ReadonlySet<Id>>(new Set());
+  React.useEffect(() => { setSelectedCanvasElementIds(new Set()); }, [activeViewId, sessionState.projectId, sessionState.branchId]);
   const [scenarioDraft, setScenarioDraft] =
     React.useState<ScenarioDraftHandle | null>(null);
   const [scenarioEditorFocusName, setScenarioEditorFocusName] =
@@ -640,6 +643,7 @@ function WorkspaceBody({
   );
 
   const closeInspector = React.useCallback(() => {
+    setSelectedCanvasElementIds(new Set());
     setDraft(null);
     setSelectedNoteIds(new Set());
     setScenarioDraft(null);
@@ -648,7 +652,18 @@ function WorkspaceBody({
 
   const handleRequestSelection = React.useCallback(
     (request: CanvasSelectionRequest) => {
+      if (request.kind === 'canvas-element') {
+        const ids = 'ids' in request ? request.ids : [request.id];
+        runGuarded(() => {
+          const next = request.additive ? new Set(selectedCanvasElementIds) : new Set<Id>();
+          for (const id of ids) { if (request.additive && next.has(id)) next.delete(id); else next.add(id); }
+          setSelectedCanvasElementIds(next);
+          if (!request.additive) { setDraft(null); setScenarioDraft(null); setSelectedNoteIds(new Set()); }
+        });
+        return;
+      }
       if (request.kind === "mixed") {
+        const nextCanvasIds = request.additive ? new Set([...selectedCanvasElementIds, ...(request.canvasElementIds ?? [])]) : new Set(request.canvasElementIds ?? []);
         const nextNoteIds = request.additive
           ? new Set([...selectedNoteIds, ...request.noteIds])
           : new Set(request.noteIds);
@@ -661,11 +676,13 @@ function WorkspaceBody({
                   new Set([...draft.target.ids, ...request.elementIds]),
                 )
               : [...request.elementIds];
-          runGuarded(() =>
-            openInspectorFor({ kind: "element", ids: nextElementIds }),
-          );
+          runGuarded(() => {
+            setSelectedCanvasElementIds(nextCanvasIds);
+            openInspectorFor({ kind: "element", ids: nextElementIds });
+          });
         } else {
           runGuarded(() => {
+            setSelectedCanvasElementIds(nextCanvasIds);
             setDraft(null);
             setScenarioDraft(null);
             setFocusFieldId(null);
@@ -675,6 +692,7 @@ function WorkspaceBody({
       }
 
       if (request.kind === "note") {
+        if (!request.additive) setSelectedCanvasElementIds(new Set());
         const requestedIds = "ids" in request ? request.ids : [request.id];
         if (request.additive) {
           const nextNoteIds = new Set(selectedNoteIds);
@@ -695,6 +713,7 @@ function WorkspaceBody({
       }
 
       if (!request.additive) {
+        setSelectedCanvasElementIds(new Set());
         setSelectedNoteIds(new Set());
       }
 
@@ -734,10 +753,11 @@ function WorkspaceBody({
 
       runGuarded(() => openInspectorFor(nextTarget));
     },
-    [draft, runGuarded, openInspectorFor, closeInspector, selectedNoteIds],
+    [draft, runGuarded, openInspectorFor, closeInspector, selectedNoteIds, selectedCanvasElementIds],
   );
 
   const handleRequestClearSelection = React.useCallback(() => {
+    setSelectedCanvasElementIds(new Set());
     setSelectedNoteIds(new Set());
     if (!draft && !scenarioDraft) return;
     runGuarded(closeInspector);
@@ -2273,6 +2293,7 @@ function WorkspaceBody({
       selectedElementIds: Array.from(selectedElementIds),
       selectedConnectionIds: Array.from(selectedConnectionIds),
       selectedNoteIds: Array.from(selectedNoteIds),
+      selectedCanvasElementIds: Array.from(selectedCanvasElementIds),
       selectedGroupIds,
       selectionWhollyUngrouped,
       selectionHasRefinementMember,
@@ -2346,6 +2367,7 @@ function WorkspaceBody({
     selectedConnectionIds,
     selectedElementIds,
     selectedNoteIds,
+    selectedCanvasElementIds,
     selectedGroupIds,
     selectionWhollyUngrouped,
     selectionHasRefinementMember,
@@ -2431,6 +2453,14 @@ function WorkspaceBody({
       }
       const selectedIds = Array.from(selectedElementIds);
       const selectedNoteIdsList = Array.from(selectedNoteIds);
+      if (selectedCanvasElementIds.size > 0) {
+        if (selectedIds.length || selectedNoteIdsList.length) return { ok: false, message: 'Duplicate shapes and text separately from components and notes' };
+        const copies = (activeView.canvasElements ?? []).filter(item => selectedCanvasElementIds.has(item.id)).map(item => ({ ...item, id: mintId(), x: item.x + 24, y: item.y + 24 }));
+        if (!copies.length || (activeView.canvasElements?.length ?? 0) + copies.length > 200) return { ok: false, message: 'A view can contain up to 200 shapes and text objects' };
+        const result = await applySelectionPlan({ ok: true, label: 'Duplicate shapes and text', changes: [{ kind: 'replace', value: { recordKind: 'view', record: { ...activeView, canvasElements: [...(activeView.canvasElements ?? []), ...copies] } } }] });
+        if (result.ok) setSelectedCanvasElementIds(new Set(copies.map(item => item.id)));
+        return result;
+      }
 
       if (selectedIds.length === 0 && selectedNoteIdsList.length > 0) {
         const notesToDup = activeView.notes.filter((n) =>
@@ -2518,6 +2548,7 @@ function WorkspaceBody({
       applySelectionPlan,
       selectedElementIds,
       selectedNoteIds,
+      selectedCanvasElementIds,
       document,
       mintId,
     ]);
@@ -2825,6 +2856,22 @@ function WorkspaceBody({
           ),
         );
       },
+      'canvas.add-element': async ({ kind }) => {
+        const live = session.getState();
+        if (!live.document || !activeViewId) return { ok: false, message: 'No canvas view is open' };
+        const centre = canvasViewRef.current?.getVisibleCentre();
+        if (!centre) return { ok: false, message: 'No canvas view is open' };
+        const id = mintId();
+        const surface = globalThis.document.querySelector('.canvas-one-root');
+        const ink = surface ? getComputedStyle(surface).getPropertyValue('--ink').trim() : '';
+        const transparent = kind === 'text' || kind === 'line' || kind === 'arrow';
+        const result = await applySelectionPlan(planAddCanvasElement(live.document, activeViewId, id, kind, centre, {
+          centered: true,
+          stroke: transparent && /^#[0-9a-fA-F]{6}$/.test(ink) ? ink : undefined,
+        }));
+        if (result.ok) { closeInspector(); setSelectedCanvasElementIds(new Set([id])); }
+        return result;
+      },
       "part.capture": ({ command }) => session.savePart(command),
       "part.place": ({ content, label }) => placeSavedPart(content, label),
       "part.export": (part) =>
@@ -2995,7 +3042,7 @@ function WorkspaceBody({
     void runCommand("inspector.close", { draftId: draftContext.id });
   }, [draftContext.id, runCommand]);
 
-  agentSelectionRef.current = { ids: activeConversation?.targetIds ?? [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds,
+  agentSelectionRef.current = { ids: activeConversation?.targetIds ?? [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds, ...selectedCanvasElementIds,
     ], viewId: activeViewId ?? undefined,
   };
   const closeDetails = React.useCallback(() => {
@@ -3035,13 +3082,15 @@ function WorkspaceBody({
       const group = document?.views
         .flatMap((view) => view.groups ?? [])
         .find((item) => item.id === id);
+      const canvasElement = document?.views.flatMap(view => view.canvasElements ?? []).find(item => item.id === id);
       return {
         id,
         label:
           item?.label ??
           group?.label ??
+          (canvasElement ? (canvasElement.text.trim().slice(0, 80) || canvasElement.kind.replaceAll('-', ' ')) : undefined) ??
           (connection ? "Connection" : note ? "Sticky note" : thread.targetNames?.[id] ?? id),
-        missing: !item && !connection && !note && !group,
+        missing: !item && !connection && !note && !group && !canvasElement,
       };
     });
   const threadLabel = (thread: CanvasConversationThread) =>
@@ -3068,7 +3117,7 @@ function WorkspaceBody({
     commentAction(async () => {
       if (!commentStore) throw new Error("Comments are still loading.");
       const ids = useSelection
-        ? [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds]
+        ? [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds, ...selectedCanvasElementIds]
         : [];
       const thread = await commentStore.create({
         title: ids.length
@@ -3128,7 +3177,7 @@ function WorkspaceBody({
           selectionAvailable={Boolean(
             selectedElementIds.size +
             selectedNoteIds.size +
-            selectedConnectionIds.size,
+            selectedConnectionIds.size + selectedCanvasElementIds.size,
           )}
           onUseSelection={() =>
             commentAction(() =>
@@ -3136,7 +3185,8 @@ function WorkspaceBody({
                 ...selectedElementIds,
                 ...selectedNoteIds,
                 ...selectedConnectionIds,
-              ], Object.fromEntries(targetLabels({ targetIds: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds] }).map(item => [item.id, item.label]))),
+                ...selectedCanvasElementIds,
+              ], Object.fromEntries(targetLabels({ targetIds: [...selectedElementIds, ...selectedNoteIds, ...selectedConnectionIds, ...selectedCanvasElementIds] }).map(item => [item.id, item.label]))),
             )
           }
           onBoard={() =>
@@ -3859,6 +3909,7 @@ function WorkspaceBody({
                     selectedElementIds={selectedElementIds}
                     selectedConnectionIds={selectedConnectionIds}
                     selectedNoteIds={selectedNoteIds}
+                    selectedCanvasElementIds={selectedCanvasElementIds}
                     onRequestSelection={handleRequestSelection}
                     onRequestClearSelection={handleRequestClearSelection}
                     mintId={mintId}

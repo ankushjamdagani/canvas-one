@@ -42,6 +42,10 @@ export function projectSystemDesignDocument(document: Document, options: SystemD
       placements.push({ id: `note-placement/${view.id}/${note.id}`, pageId: view.id, entityId,
         bounds: { x: note.x, y: note.y, width: note.width, height: options.noteHeight?.(note) ?? 80 }, extensions: {} });
     }
+    for (const shape of view.canvasElements ?? []) {
+      entities.push({ id: shape.id, type: `basic/${shape.kind}`, data: { text: shape.text, fill: shape.fill, stroke: shape.stroke, strokeWidth: shape.strokeWidth, fontSize: shape.fontSize }, extensions: {} });
+      placements.push({ id: `canvas-placement/${shape.id}`, pageId: view.id, entityId: shape.id, bounds: { x: shape.x, y: shape.y, width: shape.width, height: shape.height }, extensions: {} });
+    }
     for (const id of view.connectionIds) {
       const connection = connections.get(id)!; const from = byElement.get(connection.source.elementId); const to = byElement.get(connection.target.elementId);
       if (!from || !to) continue; // The full semantic edge and view membership remain in the source extension.

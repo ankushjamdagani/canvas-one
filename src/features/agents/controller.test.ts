@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { BridgeRequest, BridgeParticipant } from '@canvas-one/agent-bridge';
 import type { Document, Element } from '@canvas-one/system-design';
+import { CANVAS_ELEMENT_KINDS, type CanvasElement } from '../../domain/studio/model';
 import { openStudioRepository, SessionController } from '../session';
 import { SystemAgentSession } from './controller';
 import { StudioDatabase } from '../../persistence/studio/db';
@@ -40,6 +41,32 @@ async function setup(extensions?: readonly import('@canvas-one/whiteboard').Exte
 }
 
 describe('system agent app composition', () => {
+  it('discovers visual-only shapes and text, inspects selected objects and applies them only after review', async () => {
+    const h = await setup();
+    const discovered = h.tool('component_schemas', {}) as { canvasElementSchema: { required: string[]; properties: { kind: { enum: readonly string[] } } }; canvasElementLimit: number; guidance: string };
+    expect(discovered.canvasElementSchema.properties.kind.enum).toEqual(CANVAS_ELEMENT_KINDS);
+    expect(discovered.canvasElementSchema.required).toContain('height');
+    expect(discovered.canvasElementLimit).toBe(200);
+    expect(discovered.guidance).toContain('View.canvasElements');
+    const before = h.session.getState().document!;
+    const view = before.views[0];
+    const shape: CanvasElement = { id: mintId(), kind: 'diamond', x: 40, y: 80, width: 160, height: 120, text: 'Decision', fill: '#ffffff', stroke: '#171717', strokeWidth: 2, fontSize: 16 };
+    const text: CanvasElement = { ...shape, id: mintId(), kind: 'text', x: 240, text: 'Architecture', fill: 'transparent', strokeWidth: 0 };
+    const changes = [{ kind: 'replace', value: { recordKind: 'view', record: { ...view, canvasElements: [shape, text] } } }];
+    const document = { ...before, views: [{ ...view, canvasElements: [shape, text] }] };
+    expect(h.tool('document_validate', { document })).toMatchObject({ ok: true });
+    expect(h.tool('proposal_submit', { ...h.request, changes })).toMatchObject({ ok: true, proposal: { status: 'pending' } });
+    expect(h.session.getState().document!.views[0].canvasElements).toBeUndefined();
+    expect(await h.agents.proposals.accept(h.request.operationId, h.agents.reviewer)).toMatchObject({ ok: true, proposal: { status: 'accepted' } });
+    expect(h.session.getState().document!.elements).toHaveLength(0);
+    expect(h.session.getState().document!.views[0].canvasElements).toEqual([shape, text]);
+    // Supplying only the nested object's ID still discovers its complete containing
+    // view so a provider can preserve sibling fields during record replacement.
+    expect(h.agents.context(true, { ids: [shape.id] }).records).toEqual([{ id: view.id, type: 'views', data: { ...view, canvasElements: [shape, text] } }]);
+    expect(h.session.undoStack).toHaveLength(1);
+    expect((await h.session.undo()).status).toBe('applied');
+    expect(h.session.getState().document!.views[0].canvasElements).toBeUndefined();
+  });
   it('discovers registered schemas and proposes custom components using readable aliases', async () => {
     const h = await setup([{manifest: {id: 'example/cards', version: '1.0.0', dependencies: [], capabilities: ['components', 'schemas']}, contributions: [
       {id: 'example/card', kind: 'schema', version: '1.0.0', capabilities: [], value: {type: 'object', required: ['text'], properties: {text: {type: 'string'}}}},

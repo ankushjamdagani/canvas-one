@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Connection, Document, Element, View } from '../../domain/studio/model';
+import type { CanvasElement, Connection, Document, Element, View } from '../../domain/studio/model';
 import type { RecordChange } from '../../domain/studio/records';
 import { assertConversationChanges, conversationWriteScope } from './scoped-changes';
 
@@ -11,6 +11,35 @@ export function scopedFixture(): Document {
 const replaceView = (view: View): RecordChange => ({ kind: 'replace', value: { recordKind: 'view', record: view } });
 
 describe('captured conversation write scopes', () => {
+  it('captures visual objects and permits only their existing same-view edits and deletions', () => {
+    const original = scopedFixture();
+    const shape: CanvasElement = { id: 'shape', kind: 'rectangle', x: 0, y: 0, width: 160, height: 100, text: '', fill: '#ffffff', stroke: '#171717', strokeWidth: 1, fontSize: 16 };
+    const untouched = { ...shape, id: 'untouched', x: 200 };
+    const view: View = { ...original.views[0], canvasElements: [shape, untouched] };
+    const document = { ...original, views: [view] };
+    const captured = conversationWriteScope(document, [shape.id]);
+    expect(captured).toEqual([shape.id]);
+    const check = (after: View) => assertConversationChanges(document, [shape.id], captured, [replaceView(after)]);
+    expect(() => check({ ...view, canvasElements: [{ ...shape, x: 50, text: 'Updated', fill: '#00aa88' }, untouched] })).not.toThrow();
+    expect(() => check({ ...view, canvasElements: [untouched] })).not.toThrow();
+    expect(() => check({ ...view, canvasElements: [shape, { ...untouched, x: 500 }] })).toThrow('conversation scope');
+    expect(() => check({ ...view, canvasElements: [shape] })).toThrow('conversation scope');
+    expect(() => check({ ...view, canvasElements: [shape, untouched, { ...shape, id: 'new-shape' }] })).toThrow('conversation scope');
+    expect(() => check({ ...view, notes: [] })).toThrow('conversation scope');
+    expect(() => assertConversationChanges(document, [], [], [replaceView({ ...view, canvasElements: [...view.canvasElements!, { ...shape, id: 'new-shape' }] })])).not.toThrow();
+  });
+  it('rejects inserting a captured visual identity into another view or modifying a new object after capture', () => {
+    const original = scopedFixture();
+    const shape: CanvasElement = { id: 'shape', kind: 'text', x: 0, y: 0, width: 160, height: 60, text: 'Label', fill: 'transparent', stroke: '#171717', strokeWidth: 0, fontSize: 16 };
+    const view: View = { ...original.views[0], canvasElements: [shape] };
+    const other: View = { ...original.views[0], id: 'other', notes: [], groups: [], placements: [] };
+    const document = { ...original, views: [view, other] };
+    const captured = conversationWriteScope(document, [shape.id]);
+    expect(() => assertConversationChanges(document, [shape.id], captured, [replaceView({ ...view, canvasElements: [] }), replaceView({ ...other, canvasElements: [shape] })])).toThrow('conversation scope');
+    const later = { ...document, views: [{ ...view, canvasElements: [shape, { ...shape, id: 'later' }] }, other] };
+    expect(() => assertConversationChanges(later, [shape.id], captured, [replaceView({ ...later.views[0], canvasElements: [shape] })])).toThrow('conversation scope');
+    expect(() => conversationWriteScope(document, ['missing-shape'])).toThrow('Reattach the conversation');
+  });
   it('captures dependent connections without granting their other endpoint', () => {
     const document = scopedFixture();
     expect(conversationWriteScope(document, ['a'])).toEqual(['a', 'ab']);

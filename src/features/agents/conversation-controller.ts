@@ -9,6 +9,7 @@ import { attemptBinding, readAuthorizedTask } from './task-authority';
 import { planAgentTaskUndo } from '../../persistence/studio/agent-action-journal';
 import type { AgentActivity } from './activity';
 import { assertConversationChanges, conversationWriteScope } from './scoped-changes';
+import { mutationTargetIds } from './mutation-targets';
 
 export type ConversationMessage = { readonly id: string; readonly taskId?: string; readonly attemptId?: string; readonly classification?: 'notice' | 'diagnostic'; readonly clarificationQuestionId?: string; readonly startingContext?: AgentSelection & { readonly omittedCount: number; readonly writeScopeIds?: readonly string[] }; readonly role: 'user' | 'agent' | 'system'; readonly text: string; readonly delivery: 'queued' | 'delivered' | 'acknowledged' | 'failed' };
 export type ConversationProposal = { readonly taskId: string; readonly proposal: Proposal<RecordChange> };
@@ -19,7 +20,6 @@ const canonical = (value: unknown): string => JSON.stringify((function sort(inpu
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const sameScope = (a: TaskScope, b: TaskScope) => a.projectId === b.projectId && a.branchId === b.branchId && a.boardId === b.boardId;
 const execution = (task: CollaborationTask): ExecutionIdentity => { const attempt = task.attempts.at(-1)!; return { taskId: task.id, attemptId: attempt.id, actorId: task.actorId, generation: task.generation, ...task.scope }; };
-const targets = (changes: unknown): readonly string[] => Array.isArray(changes) ? [...new Set(changes.slice(0, 1000).flatMap(change => { if (!object(change)) return []; const id = change.kind === 'remove' ? change.id : object(change.value) && object(change.value.record) ? change.value.record.id : undefined; return typeof id === 'string' && id.length > 0 && id.length <= 200 ? [id] : []; }))] : [];
 
 /** Workspace-owned lifetime. Closing the panel neither stops work nor revokes permission. */
 export class AgentConversationController {
@@ -708,7 +708,7 @@ export class AgentConversationController {
       if (epoch !== this.loadGeneration || service !== this.serviceSessionId || !this.activityCurrent({ ...request.identity, id: request.requestId, kind: 'reading', targetIds: [], label: '', status: 'running', startedAt: this.now() })) throw new Error('Board execution is no longer current');
       if (toolName !== 'clarification_request') {
         const kind = toolName === 'action_submit' ? 'applying' : ['proposal_submit', 'diagram_create'].includes(toolName) ? 'reviewing' : 'reading';
-        const targetIds = toolName === 'board_inspect' ? input.selectionOnly === true ? [...startingContext.ids] : [] : targets(input.changes);
+        const targetIds = toolName === 'board_inspect' ? input.selectionOnly === true ? [...startingContext.ids] : [] : mutationTargetIds(input.changes, this.options.session.getState().document);
         const target = targetIds.length === 1 ? this.options.session.getState().document?.elements?.find(element => element.id === targetIds[0])?.label?.slice(0, 80) : undefined;
         activity = { id: request.requestId, taskId: task.id, attemptId: request.identity.attemptId, generation: request.identity.generation, kind, targetIds, label: kind === 'applying' ? target ? `Updating ${target}…` : 'Applying board changes…' : kind === 'reviewing' ? 'Preparing changes…' : target ? `Reading ${target}…` : 'Reading board…', status: 'running', startedAt: this.now() };
         this.recordActivity(activity);
@@ -750,7 +750,7 @@ export class AgentConversationController {
           this.proposalOwners.set(tool.input.operationId, task.id);
         }
         result = await this.reviewed.executeReviewedTool(tool, { actorId: task.actorId, displayName: task.providerId ?? 'Agent', kind: 'agent' });
-        if (activity && toolName === 'diagram_create' && object(result) && object(result.proposal)) activity = { ...activity, targetIds: targets(result.proposal.changes) };
+        if (activity && toolName === 'diagram_create' && object(result) && object(result.proposal)) activity = { ...activity, targetIds: mutationTargetIds(result.proposal.changes, this.options.session.getState().document) };
         if (['proposal_submit', 'diagram_create'].includes(tool.tool)) {
           await this.persist(ledger => ({ ...ledger, proposals: this.reviewed.proposals.list().map(proposal => ({ id: proposal.operationId, taskId: this.proposalOwners.get(proposal.operationId) ?? task.id, payload: json(proposal) })), operations: [...ledger.operations.filter(entry => entry.operationId !== input.operationId), { taskId: task.id, operationId: input.operationId as string, payload: json({ tool: toolName, input: tool.input, result }) }] }));
           this.reviewed.proposals.pruneTerminal(20);

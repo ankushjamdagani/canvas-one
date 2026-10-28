@@ -512,6 +512,9 @@ function mergeField(
   path: readonly (string | number)[],
   conflicts: RawConflict[],
 ): unknown {
+  // Optional keyed fields absent on every side must remain absent. Materializing
+  // an empty collection changes canonical snapshots of pre-feature documents.
+  if (b === undefined && o === undefined && t === undefined) return undefined;
   switch (desc.type) {
     case 'scalar':
       return mergeThreeWay('value', b, o, t, recordKind, recordId, path, conflicts);

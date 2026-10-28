@@ -38,7 +38,7 @@ export function conversationWriteScope(
       ...document.refinements,
       ...document.scenarios,
       ...document.views,
-      ...document.views.flatMap((view) => [...view.notes, ...view.groups]),
+      ...document.views.flatMap((view) => [...view.notes, ...view.groups, ...(view.canvasElements ?? [])]),
     ].map((record) => record.id),
   );
   if (ids.some((id) => !known.has(id)))
@@ -88,6 +88,7 @@ function assertViewChange(
     groups: _bg,
     connectionIds: _bc,
     relationIds: _br,
+    canvasElements: _be,
     ...beforeFields
   } = before;
   const {
@@ -96,9 +97,17 @@ function assertViewChange(
     groups: _ag,
     connectionIds: _ac,
     relationIds: _ar,
+    canvasElements: _ae,
     ...afterFields
   } = after;
   if (!same(beforeFields, afterFields)) throw scopeError();
+  assertCollection(before.canvasElements ?? [], after.canvasElements ?? [], (element) => allowed.has(element.id));
+  // Captured IDs authorize existing objects in this view, never insertion or a
+  // move into another view under cover of an existing object's identity.
+  for (const element of after.canvasElements ?? []) {
+    if (allowed.has(element.id) && !(before.canvasElements ?? []).some((prior) => prior.id === element.id))
+      throw scopeError();
+  }
   assertCollection(before.placements, after.placements, (placement) =>
     allowed.has(placement.elementId),
   );

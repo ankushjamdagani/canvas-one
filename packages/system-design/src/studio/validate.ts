@@ -39,6 +39,7 @@ import {
   METRIC_SUBJECT_KEYS,
   ASSUMPTION_SOURCES,
   NOTE_TONES,
+  CANVAS_ELEMENT_KINDS,
 } from './model.js';
 import { PROTOTYPE_KEYS, codePointLength, isSurrogateValid } from './text.js';
 import { errorIssue } from './issue.js';
@@ -1559,7 +1560,7 @@ export function validateDocument(
     for (let vIdx = 0; vIdx < views.length; vIdx++) {
       const v = views[vIdx];
       const vPath = ['views', vIdx];
-      if (checkRecord(v, ['id', 'label', 'placements', 'connectionIds', 'relationIds', 'groups', 'notes'], ['id', 'label', 'placements', 'connectionIds', 'relationIds', 'groups', 'notes'], vPath, docId, issues, 'View')) {
+      if (checkRecord(v, ['id', 'label', 'placements', 'connectionIds', 'relationIds', 'groups', 'notes', 'canvasElements'], ['id', 'label', 'placements', 'connectionIds', 'relationIds', 'groups', 'notes'], vPath, docId, issues, 'View')) {
         let vId: Id | null = null;
         if (validateId(v.id, [...vPath, 'id'], null, issues)) {
           vId = v.id;
@@ -1567,6 +1568,27 @@ export function validateDocument(
         }
 
         validateString(v.label, 1, 80, [...vPath, 'label'], vId, issues, 'View label');
+
+        if (v.canvasElements !== undefined && validateArray(v.canvasElements, 200, [...vPath, 'canvasElements'], vId, issues, 'Canvas elements')) {
+          for (let index = 0; index < v.canvasElements.length; index++) {
+            const shape = v.canvasElements[index];
+            const path = [...vPath, 'canvasElements', index];
+            const fields = ['id', 'kind', 'x', 'y', 'width', 'height', 'text', 'fill', 'stroke', 'strokeWidth', 'fontSize'];
+            if (!checkRecord(shape, fields, fields, path, vId, issues, 'Canvas element')) continue;
+            let shapeId: Id | null = null;
+            if (validateId(shape.id, [...path, 'id'], vId, issues)) {
+              shapeId = shape.id;
+              registerId(shape.id, [...path, 'id'], allIds, issues);
+            }
+            if (typeof shape.kind !== 'string' || !CANVAS_ELEMENT_KINDS.includes(shape.kind as (typeof CANVAS_ELEMENT_KINDS)[number])) issues.push(errorIssue('invalid-literal', [...path, 'kind'], shapeId ?? vId, 'Unknown canvas element kind'));
+            for (const key of ['x', 'y'] as const) validateNumber(shape[key], -1e6, 1e6, [...path, key], shapeId ?? vId, issues, `Canvas ${key}`);
+            for (const key of ['width', 'height'] as const) validateNumber(shape[key], key === 'width' ? 32 : 24, 2000, [...path, key], shapeId ?? vId, issues, `Canvas ${key}`);
+            validateNumber(shape.strokeWidth, 0, 12, [...path, 'strokeWidth'], shapeId ?? vId, issues, 'Stroke width');
+            validateNumber(shape.fontSize, 8, 96, [...path, 'fontSize'], shapeId ?? vId, issues, 'Font size');
+            validateString(shape.text, 0, 4000, [...path, 'text'], shapeId ?? vId, issues, 'Canvas text');
+            for (const key of ['fill', 'stroke'] as const) if (typeof shape[key] !== 'string' || !/^(?:transparent|#[0-9a-fA-F]{6})$/.test(shape[key])) issues.push(errorIssue('invalid-literal', [...path, key], shapeId ?? vId, 'Colors require a six-digit hex value or transparent'));
+          }
+        }
 
         // Placements
         const placedSet = new Set<Id>();

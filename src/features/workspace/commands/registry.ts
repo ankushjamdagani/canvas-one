@@ -47,7 +47,7 @@
  */
 
 import { CommandRegistry, type CommandMetadata, type PaletteCommandContribution } from '@canvas-one/commands';
-import type { Id } from '../../../domain/studio/model';
+import type { Id, CanvasElementKind } from '../../../domain/studio/model';
 import type { PanelId, Placement } from '../panels';
 import type { ConflictResolution } from '../../../domain/versioning/resolve';
 import type { PartContent } from '../../../domain/parts/types';
@@ -117,6 +117,7 @@ export const COMMAND_IDS = [
   'selection.align',
   'selection.distribute',
   'canvas.add-note',
+  'canvas.add-element',
   'part.capture',
   'part.place',
   'part.export',
@@ -208,6 +209,7 @@ export interface CommandPayloads {
   };
   'selection.distribute': { readonly axis: 'x' | 'y' };
   'canvas.add-note': { readonly text: string };
+  'canvas.add-element': { readonly kind: CanvasElementKind };
   /** The bound branch envelope keeps the operation id, so a retry stays idempotent. */
   'part.capture': { readonly command: PartCaptureCommand };
   'part.place': { readonly content: PartContent; readonly label: string };
@@ -380,6 +382,7 @@ export interface CommandContext {
   readonly selectedElementIds: readonly Id[];
   readonly selectedConnectionIds: readonly Id[];
   readonly selectedNoteIds?: readonly Id[];
+  readonly selectedCanvasElementIds?: readonly Id[];
   /** Exact presentation groups represented by the current element selection. */
   readonly selectedGroupIds: readonly Id[];
   readonly selectionWhollyUngrouped: boolean;
@@ -982,7 +985,8 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
     availability: (ctx) => {
       const blocked = requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx);
       if (blocked) return blocked;
-      const count = ctx.selectedElementIds.length + (ctx.selectedNoteIds?.length ?? 0);
+      const count = ctx.selectedElementIds.length + (ctx.selectedNoteIds?.length ?? 0) + (ctx.selectedCanvasElementIds?.length ?? 0);
+      if ((ctx.selectedCanvasElementIds?.length ?? 0) > 0 && (ctx.selectedElementIds.length > 0 || (ctx.selectedNoteIds?.length ?? 0) > 0)) return disabled('invalid-selection', 'Duplicate shapes and text separately from components and notes');
       return count > 0
         ? ENABLED
         : disabled('invalid-selection', 'Select at least 1 component to duplicate');
@@ -1002,7 +1006,7 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
       const count =
         ctx.selectedElementIds.length +
         ctx.selectedConnectionIds.length +
-        (ctx.selectedNoteIds?.length ?? 0);
+        (ctx.selectedNoteIds?.length ?? 0) + (ctx.selectedCanvasElementIds?.length ?? 0);
       return count > 0
         ? ENABLED
         : disabled('invalid-selection', 'Select a component or connection to delete');
@@ -1118,6 +1122,10 @@ export const COMMAND_DEFINITIONS: { readonly [K in CommandId]: CommandDefinition
         ? disabled('limit', 'This view already has 50 notes')
         : ENABLED;
     },
+  },
+  'canvas.add-element': {
+    id: 'canvas.add-element', label: 'Add rectangle', keywords: ['shape', 'rectangle'], group: 'edit', iconKey: 'note', shortcut: null,
+    availability: ctx => requireProject(ctx) ?? requireActiveView(ctx) ?? requireIdle(ctx) ?? requireCleanDraft(ctx, 'adding a shape or text') ?? ENABLED,
   },
   'part.capture': {
     id: 'part.capture',
@@ -1289,6 +1297,9 @@ export function getAvailability<K extends CommandId>(
   ctx: CommandContext,
   payload: CommandPayloads[K],
 ): Availability {
+  if ((ctx.selectedCanvasElementIds?.length ?? 0) > 0 && (
+    id === 'part.capture' || (id.startsWith('selection.') && id !== 'selection.delete' && id !== 'selection.duplicate')
+  )) return disabled('invalid-selection', 'Use these commands with components and notes; shapes and text support move, resize, duplicate and delete');
   return COMMAND_DEFINITIONS[id].availability(ctx, payload);
 }
 
@@ -1308,7 +1319,7 @@ export function getPayloadFreeAvailability(
     | 'selection.export',
   ctx: CommandContext,
 ): Availability {
-  return (COMMAND_DEFINITIONS[id].availability as (ctx: CommandContext) => Availability)(ctx);
+  return getAvailability(id, ctx, undefined as never);
 }
 
 /**
@@ -1335,7 +1346,7 @@ export function workspaceRegistry(handlers: CommandHandlers): CommandRegistry<Co
     const definition = COMMAND_DEFINITIONS[id];
     const effect: CommandMetadata['effect'] = id.startsWith('run.') ? 'execution'
       : id.startsWith('export.') || id.includes('export') ? 'export'
-      : id.startsWith('selection.') || id.startsWith('edit.') || id === 'canvas.add-note' ? 'document'
+      : id.startsWith('selection.') || id.startsWith('edit.') || id === 'canvas.add-note' || id === 'canvas.add-element' ? 'document'
       : id.startsWith('project.') || id.startsWith('branch.') || id.startsWith('history.') ? 'session' : 'ui';
     registry.register<CommandPayloads[typeof id], unknown>({
       metadata: { id, label: definition.label, keywords: definition.keywords, effect },
@@ -1620,6 +1631,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
   ];
 
   const hasSelection =
+    (ctx.selectedCanvasElementIds?.length ?? 0) > 0 ||
     ctx.selectedElementIds.length > 0 ||
     ctx.selectedConnectionIds.length > 0 ||
     ctx.selectedGroupIds.length > 0;
@@ -1644,6 +1656,7 @@ export function buildQuickOptions(ctx: CommandContext): readonly QuickOptionGrou
     option('canvas.select-tool', {}, ctx),
     option('canvas.pan-tool', {}, ctx),
     option('canvas.add-note', { text: '' }, ctx),
+    option('canvas.add-element', { kind: 'rectangle' }, ctx),
     option('edit.undo', {}, ctx),
     option('edit.redo', {}, ctx),
     option('canvas.zoom-out', {}, ctx),

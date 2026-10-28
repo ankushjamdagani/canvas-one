@@ -6,6 +6,21 @@ import { validateDocument, type Document, type RecordChange } from '@canvas-one/
 import type { SessionController } from '../session/controller';
 import { CATALOG_ENTRIES } from '../catalog/catalog';
 import { diagramRequestSchema, planSystemDesignDiagram, type DiagramRequest } from '@canvas-one/system-design/authoring/diagram';
+import { CANVAS_ELEMENT_KINDS } from '../../domain/studio/model';
+
+/** Visual objects are nested view records, not executable catalog components. */
+export const canvasElementSchema = {
+  type: 'object', additionalProperties: false,
+  required: ['id', 'kind', 'x', 'y', 'width', 'height', 'text', 'fill', 'stroke', 'strokeWidth', 'fontSize'],
+  properties: {
+    id: { type: 'string', format: 'uuid' }, kind: { type: 'string', enum: CANVAS_ELEMENT_KINDS },
+    x: { type: 'number', minimum: -1000000, maximum: 1000000 }, y: { type: 'number', minimum: -1000000, maximum: 1000000 },
+    width: { type: 'number', minimum: 32, maximum: 2000 }, height: { type: 'number', minimum: 24, maximum: 2000 },
+    text: { type: 'string', maxLength: 4000 },
+    fill: { type: 'string', pattern: '^(#[0-9a-fA-F]{6}|transparent)$' }, stroke: { type: 'string', pattern: '^(#[0-9a-fA-F]{6}|transparent)$' },
+    strokeWidth: { type: 'number', minimum: 0, maximum: 12 }, fontSize: { type: 'number', minimum: 8, maximum: 96 },
+  },
+} as const;
 
 export type AgentSessionState = {
   readonly status: 'disconnected' | 'pairing' | 'connected' | 'reconnecting';
@@ -96,7 +111,8 @@ export class SystemAgentSession {
       case 'clarification_request': throw new Error('Task-bound clarification requires the conversation service');
       case 'board_inspect': return this.context(input.selectionOnly === true);
       case 'component_schemas': return { schemas: this.schemas(), format: 'studio-model/1',
-        diagramSchema: diagramRequestSchema, operations: ['insert', 'replace', 'remove'], guidance: 'Use diagram_create with readable component aliases and optional positions for automatic layout. Advanced clients can submit record changes. Validate the resulting document before submitting.' };
+        diagramSchema: diagramRequestSchema, canvasElementSchema, canvasElementLimit: 200,
+        operations: ['insert', 'replace', 'remove'], guidance: 'Use diagram_create with readable component aliases and optional positions for executable component layout. Visual-only shapes and standalone text live in View.canvasElements (optional array, maximum 200); use canvasElementSchema and replace the COMPLETE containing view through proposal_submit (Suggest) or action_submit (explicit Live grant). Preserve every other view field and visual object. Use UUID ids for new objects. Object-scoped requests may update/delete only captured existing objects in the same view; creation requires Whole board and a new request. Validate the resulting document before submitting.' };
       case 'diagram_create': {
         const state = this.session.getState();
         if (!state.document) throw new Error('Open a project before creating a diagram');
@@ -121,8 +137,10 @@ export class SystemAgentSession {
     const ids = new Set(selected.ids);
     const document = state.document;
     const collections = ['elements', 'connections', 'relations', 'schemas', 'fixtures', 'refinements', 'scenarios', 'views'] as const;
+    const containingViews = new Set(document.views.filter(view => view.id === selected.viewId ||
+      [...view.notes, ...view.groups, ...(view.canvasElements ?? [])].some(record => ids.has(record.id))).map(view => view.id));
     const records = collections.flatMap((type) => document[type].filter((record) => !selectionOnly || ids.has(record.id) ||
-      (type === 'views' && record.id === selected.viewId)).map((record) => ({ id: record.id, type, data: record })));
+      (type === 'views' && containingViews.has(record.id))).map((record) => ({ id: record.id, type, data: record })));
     return { format: document.schema, documentId: document.id, title: document.title,
       selection: selected, ...boundAgentContext({ scope: { projectId: state.projectId, branchId: state.branchId }, revision: state.workingRevision,
         records, assetReferences: [] }) };

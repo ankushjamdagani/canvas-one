@@ -1,5 +1,13 @@
 # Development handoff
 
+## Canvas shapes and text — 2026-10-28
+
+First authoring slice lives in managed worktree `canvas-shapes-text/canvas-one`, branch `codex/canvas-shapes-text`, stacked on PR #15 / `codex/canvas-conversations-design`. Stop after delivering its review PR; do not begin frames/connections until the user continues. See `docs/designs/canvas-elements.md` for supported controls and limits.
+
+Visual objects use optional `View.canvasElements`, the existing view replacement authority and history. Keep legacy absent fields absent during merges. Shapes never become executable components and do not alter scenario manifests/fingerprints. Generic projections, basic renderers, SVG/PNG and portable JSON archives preserve them. Object-scoped AI can edit/delete only existing same-view captured objects; Whole board is required for new objects. Component-only captures/selection operations refuse visual selections instead of exporting a subset. Text save failures retain drafts; resize failures restore authoritative geometry. Lines/arrows are horizontal standalone marks for now; frames, endpoints/routing, media and reusable visual library support remain later slices.
+
+The inherited Next16.4.0 build reported a known security advisory; this slice updates the compatible patch floor to16.4.3. Final verification belongs in the latest ACTION_LOG entry.
+
 ## Canvas conversations — 2026-10-26
 
 Implementation lives in managed worktree `canvas-conversations-design/canvas-one`, branch `codex/canvas-conversations-design`, draft PR #15 (stacked on `codex/ai-collaboration-analysis` / PR #13). The OpenPencil proposal is implemented as local canvas comment threads and a shared Comments panel. Read/Write replaces visible request categories; Suggest remains default; Live grants still bind exact attempts and now display captured scope/revision. Existing controller, board writes, approvals, journal and undo remain authoritative.
