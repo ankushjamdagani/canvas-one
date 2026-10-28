@@ -14,6 +14,8 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { LibraryPicker } from '../library/LibraryPicker';
+import { CanvasElementPicker } from './CanvasElementPicker';
+import type { CanvasElementKind } from '../../domain/studio/model';
 import { COMMAND_DEFINITIONS, formatShortcut, getAvailability, type Availability, type CommandContext } from './commands/registry';
 import { changeDockConfig, DEFAULT_DOCK_CONFIG, DOCK_COMMAND_IDS, insertDockCommand, type DockCommandId, type DockConfig } from './dockConfig';
 
@@ -48,6 +50,7 @@ const TEST_IDS: Partial<Record<DockCommandId, string>> = {
 };
 
 export interface FloatingDockProps {
+  readonly onAddCanvasElement?: (kind: CanvasElementKind) => void;
   readonly dragMode: 'select' | 'pan';
   readonly zoom: number;
   readonly context: CommandContext;
@@ -76,7 +79,7 @@ function availability(id: DockCommandId, context: CommandContext): Availability 
 }
 
 /** The same command view is used in the dock and its narrow-screen overflow. */
-export function FloatingDock({ dragMode, zoom, context, config, preferenceState, onInvoke,
+export function FloatingDock({ dragMode, zoom, context, config, preferenceState, onInvoke, onAddCanvasElement,
   onConfigure, onRestoreDefaults, onAddNote, onGroup, onPlaceEntry,
   snapToGrid, onToggleSnapToGrid, showMinimap, onToggleMinimap, className, style }: FloatingDockProps) {
   const [moreOpen, setMoreOpen] = React.useState(false);
@@ -636,6 +639,7 @@ export function FloatingDock({ dragMode, zoom, context, config, preferenceState,
           <Separator orientation="vertical" className="h-5 bg-hairline shrink-0 mx-0.5" />
 
           {/* Center customizable controls: horizontally scrollable single row */}
+          {onAddCanvasElement && <CanvasElementPicker disabled={!getAvailability('canvas.add-element', context, { kind: 'rectangle' }).enabled} onPlace={onAddCanvasElement} />}
           <div
             data-testid="dock-center-controls"
             className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto scrollbar-none py-0.5"

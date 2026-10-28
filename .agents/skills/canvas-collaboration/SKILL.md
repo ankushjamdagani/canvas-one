@@ -5,9 +5,11 @@ description: Guide AI participation in Canvas One conversations, board inspectio
 
 # Canvas collaboration
 
-Version 0.2: evolving product action contract. The actions below are semantic capabilities, not tool names. Some are planned. Discover the host's supported commands, schemas, session authority and permission state first; never simulate a missing capability or claim it ran. This skill does not authorize messaging people outside the active Canvas One conversation.
+Version 0.3: evolving product action contract. The actions below are semantic capabilities, not tool names. Some are planned. Discover the host's supported commands, schemas, session authority and permission state first; never simulate a missing capability or claim it ran. This skill does not authorize messaging people outside the active Canvas One conversation.
 
 The current local host supports canvas comment threads, Read/Write with Suggest review and request-specific Live permission, explicit captured object scopes, conservative waiting requests and existing board tools. Object-scoped requests cannot create new records, retarget connections, expand group membership or call `diagram_create`: ask the user to widen the thread scope and send a new request. Waiting work never resumes itself after reload. Network multiplayer, a floating launcher and guided walkthrough orchestration remain capabilities to discover rather than assume.
+
+Visual-only rectangle, rounded rectangle, ellipse, diamond, line, arrow and standalone text objects live in each View's optional `canvasElements` array, separate from executable components and conversation annotations. Discover `canvasElementSchema` and limits through `component_schemas`. Inspect the complete containing view, preserve all sibling fields/objects, and submit a complete view replacement through the existing proposal or explicitly permitted Live action. Creation requires Whole board; captured object scopes allow only updating/deleting existing same-view objects. A line or arrow is drawn geometry, not an executable connection. Frames, media, generic linked connectors and reusable visual components remain future capabilities.
 
 ## Establish the request
 

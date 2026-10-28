@@ -21,6 +21,14 @@ import {
 
 const s05 = REFERENCE_EXAMPLES.find((e) => e.id === 's05')!.fixture;
 
+it('allows shape-only image exports while keeping Mermaid tied to executable placements', () => {
+  const document: Document = { ...s05, views: [{ ...s05.views[0], placements: [], notes: [], canvasElements: [{ id: 'shape', kind: 'text', x: 0, y: 0, width: 200, height: 80, text: 'Label', fill: 'transparent', stroke: '#525252', strokeWidth: 0, fontSize: 16 }] }] };
+  const input = { hasProject: true, document, viewId: document.views[0].id, hasSelectedRun: false };
+  expect(getExportDisabledReason('svg', input)).toBeNull();
+  expect(getExportDisabledReason('png', input)).toBeNull();
+  expect(getExportDisabledReason('mermaid', input)).toBe(NO_PLACED_ELEMENT_REASON);
+});
+
 const emptyDocument: Document = {
   schema: 'studio-model/1',
   id: 'doc-empty',

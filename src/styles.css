@@ -54,6 +54,16 @@
 @media (prefers-reduced-motion: reduce) { .conversation-pin, .conversation-object-work { animation: none !important; transition: none !important; } }
 
 /* The reusable module owns a full-screen route, including its floating controls. */
+.canvas-element { position: relative; }
+.canvas-element:has(.react-flow__resize-control) { outline: 1px solid var(--primary); outline-offset: 3px; }
+.canvas-element-tools { position: absolute; right: 0; bottom: calc(100% + 10px); display: flex; padding: 2px; border: 1px solid var(--control-border); border-radius: var(--radius-control, 6px); background: var(--panel); box-shadow: var(--shadow-raised); }
+.canvas-element-settings { width: min(280px, calc(100vw - 24px)); display: grid; gap: 10px; }
+.canvas-element-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.canvas-element-field input[type=number] { width: 100px; height: 32px; }
+.canvas-element-field input[type=color] { width: 32px; height: 32px; padding: 2px; cursor: pointer; border: 1px solid var(--control-border); border-radius: 4px; background: var(--panel); }
+.canvas-element-editor { position: absolute; top: 0; left: 0; width: min(300px, calc(100vw - 40px)); display: grid; gap: 6px; padding: 8px; border: 1px solid var(--control-border); border-radius: var(--radius-control, 6px); background: var(--panel); box-shadow: var(--shadow-raised); }
+.canvas-element-editor textarea { min-height: 96px; resize: vertical; }
+@media (max-width: 767px) { .canvas-element-tools button { width: 44px; height: 44px; } .canvas-element-field input[type=number], .canvas-element-field input[type=color] { min-height: 44px; } }
 .canvas-one-root { min-height: 100svh; color: var(--ink); background: var(--shell); font-family: var(--font-sans); isolation: isolate; }
 
 .brand-wordmark { font-family: "IBM Plex Sans", sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; letter-spacing: 0; }

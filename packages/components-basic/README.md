@@ -1,7 +1,7 @@
 # Basic components
 
 Headless schemas, validation and atomic creation planners for text, rectangle,
-ellipse, frame, asset-referenced image and freehand entities. Register
+rounded rectangle, ellipse, diamond, standalone line/arrow, frame, asset-referenced image and freehand entities. Register
 `basicComponentsExtension` through the whiteboard extension registry.
 The optional `/react` entry supplies overridable renderers; semantic contracts
 do not import React. Image bytes remain host-owned: the default image renderer

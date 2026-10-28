@@ -6,10 +6,11 @@
  * executable model.
  */
 
-import type { Document, Group, Id, Note, Placement, View } from '../studio/model.js';
+import type { CanvasElement, CanvasElementKind, Document, Group, Id, Note, Placement, View } from '../studio/model.js';
 import type { RecordChange } from '../studio/records.js';
 import { placementHeight, type MeasuredHeights } from './geometry.js';
 import { codePointLength } from '../studio/text.js';
+import { validateDocument } from '../studio/validate.js';
 
 export type AlignEdge = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom';
 export type DistributeAxis = 'x' | 'y';
@@ -38,6 +39,38 @@ function replaceView(view: View, label: string): SelectionPlan {
     label,
     changes: [{ kind: 'replace', value: { recordKind: 'view', record: view } }],
   };
+}
+
+function replaceCanvasView(document: Document, view: View, label: string): SelectionPlan {
+  const checked = validateDocument({ ...document, views: document.views.map(item => item.id === view.id ? view : item) });
+  return checked.ok ? replaceView(view, label) : reject(checked.issues.map(issue => issue.message).join('; '));
+}
+
+export function planAddCanvasElement(document: Document, viewId: Id, id: Id, kind: CanvasElementKind, point: { readonly x: number; readonly y: number }, options: { readonly stroke?: string; readonly centered?: boolean } = {}): SelectionPlan {
+  const view = findView(document, viewId);
+  if (!view) return reject('The active view no longer exists');
+  const line = kind === 'line' || kind === 'arrow';
+  const width = kind === 'text' ? 240 : 180;
+  const height = line ? 40 : kind === 'text' ? 80 : 120;
+  const canvasElement: CanvasElement = { id, kind, x: point.x - (options.centered ? width / 2 : 0), y: point.y - (options.centered ? height / 2 : 0), width, height, text: kind === 'text' ? 'Text' : '', fill: kind === 'text' || line ? 'transparent' : '#ffffff', stroke: options.stroke ?? '#525252', strokeWidth: 2, fontSize: 16 };
+  return replaceCanvasView(document, { ...view, canvasElements: [...(view.canvasElements ?? []), canvasElement] }, kind === 'text' ? 'Add text' : 'Add shape');
+}
+
+export function planUpdateCanvasElement(document: Document, viewId: Id, id: Id, patch: Partial<Omit<CanvasElement, 'id'>>): SelectionPlan {
+  const view = findView(document, viewId);
+  if (!view) return reject('The active view no longer exists');
+  if (!view.canvasElements?.some(item => item.id === id)) return reject('The canvas element no longer exists');
+  // Never let a runtime payload replace identity under cover of an update.
+  if (Object.prototype.hasOwnProperty.call(patch, 'id')) return reject('Canvas element identity cannot be changed');
+  return replaceCanvasView(document, { ...view, canvasElements: view.canvasElements.map(item => item.id === id ? { ...item, ...patch } : item) }, 'Edit canvas element');
+}
+
+export function planDeleteCanvasElements(document: Document, viewId: Id, ids: readonly Id[]): SelectionPlan {
+  const view = findView(document, viewId);
+  if (!view) return reject('The active view no longer exists');
+  if (!ids.length || hasDuplicates(ids) || ids.some(id => !view.canvasElements?.some(item => item.id === id))) return reject('Select existing canvas elements');
+  const selected = new Set(ids);
+  return replaceCanvasView(document, { ...view, canvasElements: view.canvasElements?.filter(item => !selected.has(item.id)) }, 'Delete canvas elements');
 }
 
 function hasDuplicates(ids: readonly Id[]): boolean {

@@ -60,8 +60,9 @@ export function renderDiagramSvg(document: Document, viewId: string | null | und
   const placements = [...view.placements].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const notes = [...view.notes].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const groups = [...view.groups].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const canvasElements = [...(view.canvasElements ?? [])].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-  if (placements.length === 0 && notes.length === 0) {
+  if (placements.length === 0 && notes.length === 0 && canvasElements.length === 0) {
     throw new Error('Add an element or note before exporting the diagram.');
   }
 
@@ -94,6 +95,33 @@ export function renderDiagramSvg(document: Document, viewId: string | null | und
     minY = Math.min(minY, y);
     maxX = Math.max(maxX, x + w);
     maxY = Math.max(maxY, y + h);
+  }
+
+  const canvasSvgParts: string[] = [];
+  for (const shape of canvasElements) {
+    const { x, y, width, height } = shape;
+    if (![x, y, width, height, shape.strokeWidth, shape.fontSize].every(Number.isFinite) || Math.abs(x) > 1e6 || Math.abs(y) > 1e6 || width < 32 || width > 2000 || height < 24 || height > 2000 || shape.strokeWidth < 0 || shape.strokeWidth > 12 || shape.fontSize < 8 || shape.fontSize > 96) throw new Error('Canvas element geometry is outside export limits.');
+    expandBounds(x - shape.strokeWidth / 2, y - shape.strokeWidth / 2, width + shape.strokeWidth, height + shape.strokeWidth);
+    // Whitelist style values even when export is called directly with unvalidated data.
+    const color = (value: string) => /^(?:transparent|#[0-9a-fA-F]{6})$/.test(value) ? value : '#525252';
+    const fill = color(shape.fill); const stroke = color(shape.stroke);
+    const style = `fill="${fill}" stroke="${stroke}" stroke-width="${shape.strokeWidth}"`;
+    let geometry = '';
+    if (shape.kind === 'ellipse') geometry = `<ellipse cx="${x + width / 2}" cy="${y + height / 2}" rx="${width / 2}" ry="${height / 2}" ${style}/>`;
+    else if (shape.kind === 'diamond') geometry = `<polygon points="${x + width / 2},${y} ${x + width},${y + height / 2} ${x + width / 2},${y + height} ${x},${y + height / 2}" ${style}/>`;
+    else if (shape.kind === 'line' || shape.kind === 'arrow') {
+      geometry = `<path d="M ${x} ${y + height / 2} H ${x + width}" fill="none" stroke="${stroke}" stroke-width="${shape.strokeWidth}"/>`;
+      if (shape.kind === 'arrow') geometry += `<path d="M ${x + width - 10} ${y + height / 2 - 6} L ${x + width} ${y + height / 2} L ${x + width - 10} ${y + height / 2 + 6}" fill="none" stroke="${stroke}" stroke-width="${shape.strokeWidth}"/>`;
+    } else if (shape.kind !== 'text') geometry = `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${shape.kind === 'rounded-rectangle' ? 8 : 0}" ${style}/>`;
+    else if (fill !== 'transparent') geometry = `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}"/>`;
+    const textX = shape.kind === 'text' ? x + 8 : x + width / 2;
+    const anchor = shape.kind === 'text' ? 'start' : 'middle';
+    const lines = shape.text.split('\n');
+    const maxLines = Math.max(0, Math.floor((height - 16) / (shape.fontSize * 1.3)));
+    const visibleLines = lines.slice(0, maxLines);
+    const textTop = shape.kind === 'text' ? y + 8 + shape.fontSize : y + height / 2 - (visibleLines.length - 1) * shape.fontSize * 1.3 / 2 + shape.fontSize * 0.35;
+    const text = visibleLines.map((line, index) => `<text x="${textX}" y="${textTop + index * shape.fontSize * 1.3}" text-anchor="${anchor}" font-size="${shape.fontSize}" fill="${stroke}" clip-path="url(#canvas-clip-${xmlEscape(shape.id)})">${xmlEscape(line)}</text>`).join('');
+    canvasSvgParts.push(`<g data-canvas-element-id="${xmlEscape(shape.id)}"><title>${xmlEscape(shape.text || shape.kind)}</title><defs><clipPath id="canvas-clip-${xmlEscape(shape.id)}"><rect x="${x}" y="${y}" width="${width}" height="${height}"/></clipPath></defs>${geometry}${text}</g>`);
   }
 
   // 1. Group shapes
@@ -314,6 +342,7 @@ export function renderDiagramSvg(document: Document, viewId: string | null | und
     edgeSvgParts.join('') +
     edgeLabelParts.join('') +
     nodeSvgParts.join('') +
+    canvasSvgParts.join('') +
     noteSvgParts.join('') +
     `</svg>`;
 

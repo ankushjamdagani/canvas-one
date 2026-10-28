@@ -1,15 +1,16 @@
 import { createIssue, type BoardDocument, type BoardRecordMap, type BoardEntity, type Bounds, type ExtensionDefinition, type Json, type Point, type RecordChange, type ValidationIssue } from '@canvas-one/whiteboard';
 
-export const basicComponentTypes = ['basic/text', 'basic/rectangle', 'basic/ellipse', 'basic/frame', 'basic/image', 'basic/freehand'] as const;
+export const basicComponentTypes = ['basic/text', 'basic/rectangle', 'basic/rounded-rectangle', 'basic/ellipse', 'basic/diamond', 'basic/line', 'basic/arrow', 'basic/frame', 'basic/image', 'basic/freehand'] as const;
 export type BasicComponentType = typeof basicComponentTypes[number];
 export type BasicData = {
   readonly text?: string; readonly fill?: string; readonly stroke?: string; readonly strokeWidth?: number;
+  readonly fontSize?: number;
   readonly assetId?: string; readonly points?: readonly Point[];
 };
 export type BasicPlan = { readonly ok: true; readonly changes: readonly RecordChange<BoardRecordMap>[] }
   | { readonly ok: false; readonly issues: readonly ValidationIssue[] };
 export const basicComponentSchemas = Object.fromEntries(basicComponentTypes.map(type => [type, {
-  type: 'object', properties: { text: { type: 'string' }, fill: { type: 'string' }, stroke: { type: 'string' }, strokeWidth: { type: 'number', minimum: 0 }, assetId: { type: 'string' }, points: { type: 'array', items: { type: 'object', required: ['x', 'y'], properties: { x: { type: 'number' }, y: { type: 'number' } }, additionalProperties: false } } }, additionalProperties: true,
+  type: 'object', properties: { text: { type: 'string' }, fill: { type: 'string' }, stroke: { type: 'string' }, strokeWidth: { type: 'number', minimum: 0 }, fontSize: { type: 'number', minimum: 8, maximum: 96 }, assetId: { type: 'string' }, points: { type: 'array', items: { type: 'object', required: ['x', 'y'], properties: { x: { type: 'number' }, y: { type: 'number' } }, additionalProperties: false } } }, additionalProperties: true,
   ...(type === 'basic/image' ? { required: ['assetId'] } : type === 'basic/freehand' ? { required: ['points'] } : {}),
 }])) as Readonly<Record<BasicComponentType, object>>;
 export function validateBasicEntity(entity: BoardEntity): readonly ValidationIssue[] {
@@ -20,6 +21,7 @@ export function validateBasicEntity(entity: BoardEntity): readonly ValidationIss
   const data = entity.data as Readonly<Record<string, Json>>;
   for (const key of ['text', 'fill', 'stroke', 'assetId']) if (data[key] !== undefined && typeof data[key] !== 'string') fail(`${key} must be a string`, key);
   if (data.strokeWidth !== undefined && (typeof data.strokeWidth !== 'number' || !Number.isFinite(data.strokeWidth) || data.strokeWidth < 0)) fail('strokeWidth must be a nonnegative finite number', 'strokeWidth');
+  if (data.fontSize !== undefined && (typeof data.fontSize !== 'number' || !Number.isFinite(data.fontSize) || data.fontSize < 8 || data.fontSize > 96)) fail('fontSize must be between 8 and 96', 'fontSize');
   if (entity.type === 'basic/image' && (typeof data.assetId !== 'string' || !data.assetId)) fail('Image requires an asset reference', 'assetId');
   if (entity.type === 'basic/freehand' && (!Array.isArray(data.points) || data.points.some(point => !point || typeof point !== 'object' || Array.isArray(point) || typeof (point as { x?: unknown }).x !== 'number' || !Number.isFinite((point as { x: number }).x) || typeof (point as { y?: unknown }).y !== 'number' || !Number.isFinite((point as { y: number }).y)))) fail('Freehand requires finite points', 'points');
   return issues;

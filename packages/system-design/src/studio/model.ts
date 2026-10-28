@@ -385,6 +385,23 @@ export type Note = {
   readonly attachedElementIds: readonly Id[];
 };
 
+export const CANVAS_ELEMENT_KINDS = ['rectangle', 'rounded-rectangle', 'ellipse', 'diamond', 'line', 'arrow', 'text'] as const;
+export type CanvasElementKind = (typeof CANVAS_ELEMENT_KINDS)[number];
+/** Visual-only authoring; never participates in executable system semantics. */
+export type CanvasElement = {
+  readonly id: Id;
+  readonly kind: CanvasElementKind;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly text: string;
+  readonly fill: string;
+  readonly stroke: string;
+  readonly strokeWidth: number;
+  readonly fontSize: number;
+};
+
 export type View = {
   readonly id: Id;
   readonly label: string;
@@ -393,6 +410,8 @@ export type View = {
   readonly relationIds: readonly Id[];
   readonly groups: readonly Group[];
   readonly notes: readonly Note[];
+  /** Omitted on older documents to preserve their canonical bytes. */
+  readonly canvasElements?: readonly CanvasElement[];
 };
 
 // ----------------------------------------------------------------------------

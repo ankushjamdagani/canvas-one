@@ -628,6 +628,11 @@ export const NOTE_DESCRIPTOR: ObjectFieldDescriptor = {
   },
 };
 
+export const CANVAS_ELEMENT_DESCRIPTOR: ObjectFieldDescriptor = {
+  type: 'object',
+  fields: Object.fromEntries(['id', 'kind', 'x', 'y', 'width', 'height', 'text', 'fill', 'stroke', 'strokeWidth', 'fontSize'].map(key => [key, { type: 'scalar' as const }])),
+};
+
 export const VIEW_DESCRIPTOR: ObjectFieldDescriptor = {
   type: 'object',
   fields: {
@@ -638,6 +643,7 @@ export const VIEW_DESCRIPTOR: ObjectFieldDescriptor = {
     relationIds: { type: 'set' }, // set
     groups: { type: 'keyed', item: GROUP_DESCRIPTOR },
     notes: { type: 'keyed', item: NOTE_DESCRIPTOR },
+    canvasElements: { type: 'keyed', item: CANVAS_ELEMENT_DESCRIPTOR },
   },
 };
 

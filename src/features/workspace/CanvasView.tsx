@@ -29,6 +29,8 @@ import type { RecordChange } from '../../persistence/studio/types';
 import { NodeCard } from './NodeCard';
 import { GroupNode } from './GroupNode';
 import { NoteNode } from './NoteNode';
+import { CanvasElementNode } from './CanvasElementNode';
+import { canvasRecordId } from './canvas-element-id';
 import { BoundaryFrameNode } from './BoundaryFrameNode';
 import { TrafficEdge } from './TrafficEdge';
 import { PlaybackTrafficContext, usePlaybackTraffic, type PlaybackSource } from './usePlaybackTraffic';
@@ -45,7 +47,7 @@ import {
   type MeasuredHeights,
 } from './projection';
 import { planDelete, type DeletePlan } from './deletePlan';
-import { planAddNote, planUpdateNote, planDeleteNote } from './selectionPlans';
+import { planAddNote, planUpdateNote, planDeleteNote, planUpdateCanvasElement } from './selectionPlans';
 const NOTE_MIME_TYPE = 'application/x-system-studio-note';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Button } from '@/components/ui/button';
@@ -66,16 +68,17 @@ import { placeEntry } from '../catalog/place';
 import { planConnection, completeConnection, type ConnectionDraft } from '../catalog/connect';
 import { SelectionToolbar } from './SelectionToolbar';
 import type { CommandContext, CommandId, CommandPayloads, ExecuteResult, ShortcutEvent } from './commands/registry';
+import { getAvailability } from './commands/registry';
 import type { DockCommandId, DockConfig } from './dockConfig';
 
 export type CanvasSelectionRequest =
   | {
-      readonly kind: InspectorTargetKind | 'note';
+      readonly kind: InspectorTargetKind | 'note' | 'canvas-element';
       readonly id: Id;
       readonly additive: boolean;
     }
   | {
-      readonly kind: InspectorTargetKind | 'note';
+      readonly kind: InspectorTargetKind | 'note' | 'canvas-element';
       readonly ids: readonly Id[];
       readonly additive?: boolean;
     }
@@ -83,6 +86,7 @@ export type CanvasSelectionRequest =
       readonly kind: 'mixed';
       readonly elementIds: readonly Id[];
       readonly noteIds: readonly Id[];
+      readonly canvasElementIds?: readonly Id[];
       readonly additive?: boolean;
     };
 
@@ -91,6 +95,7 @@ const nodeTypes = {
   boundaryFrameNode: BoundaryFrameNode,
   groupNode: GroupNode,
   noteNode: NoteNode,
+  canvasElementNode: CanvasElementNode,
 };
 
 const edgeTypes = {
@@ -161,6 +166,7 @@ export interface CanvasViewProps {
   selectedConnectionIds?: ReadonlySet<Id>;
   /** Currently selected note ids, for visual highlight and operations. */
   selectedNoteIds?: ReadonlySet<Id>;
+  selectedCanvasElementIds?: ReadonlySet<Id>;
   /** A node/edge was clicked -- the caller (Workspace) runs the navigation guard. */
   onRequestSelection?: (request: CanvasSelectionRequest) => void;
   /** Empty canvas was clicked -- clears selection through the guard. */
@@ -228,6 +234,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   selectedElementIds,
   selectedConnectionIds,
   selectedNoteIds,
+  selectedCanvasElementIds,
   onRequestSelection,
   onRequestClearSelection,
   mintId,
@@ -265,13 +272,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         if (selectedEdges.some(edge => (edge.data as { rerouted?: boolean } | undefined)?.rerouted)) return { supported: false, reason: 'Rerouted connectors are visual stand-ins' };
         onRequestSelection({ kind: 'connection', ids: selectedEdges.map(edge => (edge.data as { connection?: { id: string } } | undefined)?.connection?.id ?? edge.id) });
       } else {
-        const elementIds: string[] = []; const noteIds: string[] = [];
+        const elementIds: string[] = []; const noteIds: string[] = []; const canvasElementIds: string[] = [];
         for (const node of selectedNodes) {
           if (node.data.kind === 'element' || node.data.kind === 'boundary') elementIds.push(node.data.element.id);
           else if (node.data.kind === 'note') noteIds.push(node.data.note.id);
+          else if (node.data.kind === 'canvas-element') canvasElementIds.push(node.data.canvasElement.id);
           else if (node.data.kind === 'group') elementIds.push(...node.data.group.elementIds);
         }
-        onRequestSelection({ kind: 'mixed', elementIds: [...new Set(elementIds)], noteIds: [...new Set(noteIds)] });
+        onRequestSelection({ kind: 'mixed', elementIds: [...new Set(elementIds)], noteIds: [...new Set(noteIds)], canvasElementIds: [...new Set(canvasElementIds)] });
       }
       return { supported: true, value: undefined };
     },
@@ -381,6 +389,19 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     () =>
       nodes.map((n) => {
         const data = n.data;
+        if (data.kind === 'canvas-element') {
+          const viewId = projection.activeView?.id;
+          return { ...n, selected: Boolean(selectedCanvasElementIds?.has(data.canvasElement.id)), data: { ...data,
+            onDuplicate: getAvailability('selection.duplicate', commandContext, {}).enabled ? () => void onExecuteCommand('selection.duplicate', {}) : undefined,
+            onDelete: getAvailability('selection.delete', commandContext, {}).enabled ? () => void onExecuteCommand('selection.delete', {}) : undefined,
+            onUpdate: !isSaving && commandContext.draftState === 'clean' && document && viewId ? async (patch: Parameters<typeof planUpdateCanvasElement>[3]) => {
+            const plan = planUpdateCanvasElement(document, viewId, data.canvasElement.id, patch);
+            let applied = false;
+            try { if (plan.ok) applied = await onApplyChanges(plan.changes, plan.label); }
+            finally { if (!applied) setNodes(projection.nodes as unknown as Node<ProjectedNodeData>[]); }
+            return applied;
+          } : undefined } };
+        }
         if (data.kind === 'group') {
           const viewId = projection.activeView?.id;
           if (!viewId) return n;
@@ -500,12 +521,12 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           },
         };
       }),
-    [nodes, selectedElementIds, selectedNoteIds, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds, linkedProjects, onOpenLinkedProject, document, onApplyChanges, onRequestSelection],
+    [nodes, selectedElementIds, selectedNoteIds, selectedCanvasElementIds, commandContext, isSaving, dragMode, projection.activeView, onExecuteCommand, trafficEntryElementIds, linkedProjects, onOpenLinkedProject, document, onApplyChanges, onRequestSelection],
   );
 
   const agentCursorPosition = React.useMemo(() => {
     if (!agentPresence) return undefined;
-    const targets = displayNodes.filter(node => !node.hidden).map(node => ({ recordIds: node.data.kind === 'element' || node.data.kind === 'boundary' ? [node.data.element.id] : node.data.kind === 'note' ? [node.data.note.id] : [node.data.group.id], x: node.position.x, y: node.position.y }));
+    const targets = displayNodes.filter(node => !node.hidden).map(node => ({ recordIds: [canvasRecordId(node.data)], x: node.position.x, y: node.position.y }));
     return findAgentCursorPosition(agentPresence, targets, viewport, cursorBounds);
   }, [agentPresence, displayNodes, viewport.x, viewport.y, viewport.zoom, cursorBounds]);
   const displayedAgentPresence = useCursorPresentation(agentCursorPosition ? agentPresence : undefined);
@@ -524,6 +545,11 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
   const handleNodeClick: NodeMouseHandler<Node<ProjectedNodeData>> = React.useCallback(
     (event, node) => {
       const data = node.data;
+      if (data.kind === 'canvas-element') {
+        if ((event.target as HTMLElement | null)?.closest('button,textarea,input')) return;
+        onRequestSelection?.({ kind: 'canvas-element', id: data.canvasElement.id, additive: event.shiftKey });
+        return;
+      }
       if (data.kind === 'group') {
         const target = event.target as HTMLElement | null;
         if (target?.closest('button')) return;
@@ -580,6 +606,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
     // Map placement IDs to element IDs and note IDs
     const elementIds: Id[] = [];
     const noteIds: Id[] = [];
+    const canvasElementIds: Id[] = [];
     for (const plId of selectedPlacementIds) {
       const node = nodes.find((n) => n.id === plId);
       if (node) {
@@ -587,14 +614,17 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           elementIds.push(node.data.element.id);
         } else if (node.data.kind === 'note') {
           noteIds.push(node.data.note.id);
+        } else if (node.data.kind === 'canvas-element') {
+          canvasElementIds.push(node.data.canvasElement.id);
         }
       }
     }
-    if (elementIds.length > 0 || noteIds.length > 0) {
+    if (elementIds.length > 0 || noteIds.length > 0 || canvasElementIds.length > 0) {
       onRequestSelection?.({
         kind: 'mixed',
         elementIds,
         noteIds,
+        canvasElementIds,
       });
     }
   }, [nodes, onRequestSelection]);
@@ -693,7 +723,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         (n) => n.type === 'elementNode',
       );
       const noteNodes = nodesToProcess.filter(
-        (n) => n.type === 'noteNode',
+        (n) => n.type === 'noteNode' || n.type === 'canvasElementNode',
       );
 
       const movedList: Array<{ id: string; position: { x: number; y: number } }> = [
@@ -1192,13 +1222,14 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
       elementIds: Array.from(selectedElementIds ?? []),
       connectionIds: Array.from(selectedConnectionIds ?? []),
       noteIds: Array.from(selectedNoteIds ?? []),
+      canvasElementIds: Array.from(selectedCanvasElementIds ?? []),
     }),
-    [selectedElementIds, selectedConnectionIds, selectedNoteIds],
+    [selectedElementIds, selectedConnectionIds, selectedNoteIds, selectedCanvasElementIds],
   );
   const hasSelection =
     currentSelection.elementIds.length > 0 ||
     currentSelection.connectionIds.length > 0 ||
-    currentSelection.noteIds.length > 0;
+    currentSelection.noteIds.length > 0 || currentSelection.canvasElementIds.length > 0;
 
   // The parts toolbar is for nodes and notes; a selected connection has no parts to act on.
   const hasPartSelection = currentSelection.elementIds.length > 0 || currentSelection.noteIds.length > 0;
@@ -1416,12 +1447,13 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
         className="system-canvas bg-canvas"
       >
         <ViewportPortal>
-          {agentPresence?.phase === 'applying' && agentPresence.activity?.status === 'running' && displayNodes.filter(node => !node.hidden && agentPresence.targetIds.includes(node.data.kind === 'element' || node.data.kind === 'boundary' ? node.data.element.id : node.data.kind === 'note' ? node.data.note.id : node.data.group.id)).map(node => <div key={`working-${node.id}`} aria-hidden="true" className="conversation-object-work" style={{ left: node.position.x - 4, top: node.position.y - 4, width: (node.measured?.width ?? node.width ?? 180) + 8, height: (node.measured?.height ?? node.height ?? 80) + 8 }} />)}
+          {agentPresence?.phase === 'applying' && agentPresence.activity?.status === 'running' && displayNodes.filter(node => !node.hidden && agentPresence.targetIds.includes(canvasRecordId(node.data))).map(node => <div key={`working-${node.id}`} aria-hidden="true" className="conversation-object-work" style={{ left: node.position.x - 4, top: node.position.y - 4, width: (node.measured?.width ?? node.width ?? 180) + 8, height: (node.measured?.height ?? node.height ?? 80) + 8 }} />)}
           <SelectionBox
             selectedIds={[
               ...(commandContext.selectedPlacementIds ?? []),
               ...commandContext.selectedGroupIds,
               ...(commandContext.selectedNoteIds ?? []),
+              ...(commandContext.selectedCanvasElementIds ?? []),
             ]}
           />
           {displayedAgentPresence && agentCursorPosition && <AgentCursor presence={displayedAgentPresence} position={agentCursorPosition} scale={1 / zoom} />}
@@ -1438,7 +1470,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
           />
         )}
       </ReactFlow>
-      {renderConversations?.(viewport, displayNodes.filter(node => !node.hidden).map(node => ({ id: node.data.kind === 'element' || node.data.kind === 'boundary' ? node.data.element.id : node.data.kind === 'note' ? node.data.note.id : node.data.group.id, x: node.position.x, y: node.position.y })))}
+      {renderConversations?.(viewport, displayNodes.filter(node => !node.hidden).map(node => ({ id: canvasRecordId(node.data), x: node.position.x, y: node.position.y })))}
       </SimulationHighlightContext.Provider>
       </PlaybackTrafficContext.Provider>
 
@@ -1540,6 +1572,7 @@ const CanvasFlowInner = React.forwardRef<CanvasViewHandle, CanvasViewProps>(func
 
       {/* Canvas dock */}
       <FloatingDock
+        onAddCanvasElement={kind => void onExecuteCommand('canvas.add-element', { kind })}
         dragMode={dragMode}
         zoom={zoom}
         context={commandContext}

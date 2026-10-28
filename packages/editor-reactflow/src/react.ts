@@ -4,7 +4,7 @@ import type { ReactFlowBridge } from './index.js';
 export {
   ReactFlow, ReactFlowProvider, Background, BackgroundVariant, MiniMap,
   useNodesState, useEdgesState, useReactFlow, useViewport, useNodesInitialized, useUpdateNodeInternals, ViewportPortal, Handle, Position,
-  BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useStore,
+  BaseEdge, EdgeLabelRenderer, getSmoothStepPath, useStore, NodeResizer,
 } from '@xyflow/react';
 export type {
   Node, Edge, NodeMouseHandler, EdgeMouseHandler, OnNodeDrag, NodeChange, EdgeChange,
